@@ -600,7 +600,9 @@ where
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
+        let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(executor_arguments);
+        drop(init_timer);
         let data_map = UnsyncMap::new();
 
         let mut ret = Vec::with_capacity(num_txns);

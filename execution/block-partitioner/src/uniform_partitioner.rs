@@ -7,6 +7,7 @@ use aptos_types::{
     },
     transaction::analyzed_transaction::AnalyzedTransaction,
 };
+use aptos_types::block_executor::partitioner::PartitionedTransactions;
 
 /// An implementation of partitioner that splits the transactions into equal-sized chunks.
 pub struct UniformPartitioner {}
@@ -16,10 +17,10 @@ impl BlockPartitioner for UniformPartitioner {
         &self,
         transactions: Vec<AnalyzedTransaction>,
         num_shards: usize,
-    ) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
+    ) -> PartitionedTransactions {
         let total_txns = transactions.len();
         if total_txns == 0 {
-            return vec![];
+            return PartitionedTransactions::empty();
         }
         let txns_per_shard = (total_txns as f64 / num_shards as f64).ceil() as usize;
 
@@ -36,6 +37,6 @@ impl BlockPartitioner for UniformPartitioner {
             global_txn_counter += sub_block.num_txns();
             result.push(SubBlocksForShard::new(shard_id, vec![sub_block]));
         }
-        result
+        PartitionedTransactions::new(result, vec![])
     }
 }

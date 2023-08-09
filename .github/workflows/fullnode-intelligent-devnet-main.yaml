@@ -7,7 +7,7 @@ name: "fullnode-intelligent-devnet-main"
 on:
   workflow_dispatch:
   schedule:
-    - cron: "* 4 * * *" # Once a day, at 04:00 (UTC)
+    - cron: "* 4 */3 * *" # Once every three days, at 04:00 (UTC)
 
 permissions:
   contents: read

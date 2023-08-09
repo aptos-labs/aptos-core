@@ -194,6 +194,7 @@ members = [
     "third_party/move/move-prover",
     "third_party/move/move-prover/boogie-backend",
     "third_party/move/move-prover/bytecode",
+    "third_party/move/move-prover/lab",
     "third_party/move/move-prover/move-abigen",
     "third_party/move/move-prover/move-docgen",
     "third_party/move/move-prover/move-errmapgen",
@@ -252,7 +253,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.71"
+rust-version = "1.71.1"
 
 [workspace.dependencies]
 # Internal crate dependencies.

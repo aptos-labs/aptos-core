@@ -1,10 +1,6 @@
 // Copyright © Aptos Foundation
 
-use aptos_block_partitioner::{
-    build_partitioner_from_envvar,
-    test_utils::{create_signed_p2p_transaction, generate_test_account, TestAccount},
-    verify_partitioner_output,
-};
+use aptos_block_partitioner::{test_utils::{create_signed_p2p_transaction, generate_test_account, TestAccount}, BlockPartitionerConfig, verify_partitioner_output, build_partitioner_from_envvar};
 use aptos_logger::info;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use clap::Parser;
@@ -41,8 +37,20 @@ fn main() {
         .into_par_iter()
         .map(|_i| Mutex::new(generate_test_account()))
         .collect();
-    info!("Created {} accounts", num_accounts);
-    info!("Creating {} transactions", args.block_size);
+    println!("Created {} accounts", num_accounts);
+    println!("Creating {} transactions", args.block_size);
+    let transactions: Vec<AnalyzedTransaction> = (0..args.block_size)
+        .map(|_| {
+            // randomly select a sender and receiver from accounts
+            let mut rng = OsRng;
+
+            let indices = rand::seq::index::sample(&mut rng, num_accounts, 2);
+            let receiver = accounts[indices.index(1)].lock().unwrap();
+            let mut sender = accounts[indices.index(0)].lock().unwrap();
+            create_signed_p2p_transaction(&mut sender, vec![&receiver]).remove(0)
+        })
+        .collect();
+
     let partitioner = build_partitioner_from_envvar(Some(args.num_shards));
     for _ in 0..args.num_blocks {
         let transactions: Vec<AnalyzedTransaction> = (0..args.block_size)

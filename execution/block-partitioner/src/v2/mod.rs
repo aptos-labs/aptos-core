@@ -39,6 +39,7 @@ use std::{
         Mutex, RwLock,
     },
 };
+use aptos_types::block_executor::partitioner::{GLOBAL_ROUND_ID, GLOBAL_SHARD_ID, PartitionedTransactions};
 
 /// The position of a txn in the block *before partitioning*.
 type OriginalTxnIdx = usize;
@@ -257,10 +258,11 @@ impl PartitionerV2 {
         rsets: &[RwLock<HashSet<StorageKeyIdx>>],
         wsets: &[RwLock<HashSet<StorageKeyIdx>>],
         txn_id_matrix: &[Vec<Vec<OriginalTxnIdx>>],
+        move_last_sub_block: bool,
         start_index_matrix: &[Vec<OriginalTxnIdx>],
         new_indices: &[RwLock<TxnIndex>],
         trackers: &DashMap<StorageKeyIdx, RwLock<ConflictingTxnTracker>>,
-    ) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
+    ) -> PartitionedTransactions {
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["add_edges__init"])
             .start_timer();
@@ -269,7 +271,19 @@ impl PartitionerV2 {
             .install(|| txns.into_par_iter().map(|t| Mutex::new(Some(t))).collect());
         let num_rounds = txn_id_matrix.len();
         let num_shards = txn_id_matrix.first().unwrap().len();
-        let sub_block_matrix: Vec<Vec<Mutex<Option<SubBlock<AnalyzedTransaction>>>>> =
+        let actual_sub_block_position = |round_id: usize, shard_id: usize| -> (usize, usize) {
+            if move_last_sub_block {
+                if round_id == num_rounds - 1 {
+                    (GLOBAL_ROUND_ID, GLOBAL_SHARD_ID)
+                } else {
+                    (round_id, shard_id)
+                }
+            } else {
+                (round_id, shard_id)
+            }
+        };
+
+        let mut sub_block_matrix: Vec<Vec<Mutex<Option<SubBlock<AnalyzedTransaction>>>>> =
             self.thread_pool.install(|| {
                 (0..num_rounds)
                     .into_par_iter()
@@ -341,12 +355,14 @@ impl PartitionerV2 {
                                     if *follower_txn_idx > end_idx {
                                         break;
                                     }
+
+                                    let (actual_round_id, actual_shard_id) = actual_sub_block_position(follower_txn_idx.round_id, follower_txn_idx.shard_id);
                                     let dst_txn_idx = ShardedTxnIndex {
                                         txn_index: *new_indices[follower_txn_idx.ori_txn_idx]
                                             .read()
                                             .unwrap(),
-                                        shard_id: follower_txn_idx.shard_id,
-                                        round_id: follower_txn_idx.round_id,
+                                        shard_id: actual_shard_id,
+                                        round_id: actual_round_id,
                                     };
                                     deps.add_dependent_edge(dst_txn_idx, vec![tracker
                                         .storage_location
@@ -375,7 +391,15 @@ impl PartitionerV2 {
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["add_edges__return_obj"])
             .start_timer();
-        let ret: Vec<SubBlocksForShard<AnalyzedTransaction>> = (0..num_shards)
+
+        let global_txns: Vec<TransactionWithDependencies<AnalyzedTransaction>> = if move_last_sub_block {
+            sub_block_matrix.pop().unwrap().last().unwrap().lock().unwrap().take().unwrap().into_transactions_with_deps()
+        } else {
+            vec![]
+        };
+
+        let num_rounds = sub_block_matrix.len();
+        let sharded_txns: Vec<SubBlocksForShard<AnalyzedTransaction>> = (0..num_shards)
             .map(|shard_id| {
                 let sub_blocks: Vec<SubBlock<AnalyzedTransaction>> = (0..num_rounds)
                     .map(|round_id| {
@@ -389,6 +413,7 @@ impl PartitionerV2 {
                 SubBlocksForShard::new(shard_id, sub_blocks)
             })
             .collect();
+        let ret = PartitionedTransactions::new(sharded_txns, global_txns);
         let duration = timer.stop_and_record();
         info!("add_edges__return_obj={duration}");
 
@@ -413,6 +438,7 @@ impl PartitionerV2 {
         Vec<Vec<Vec<OriginalTxnIdx>>>,
         Vec<Vec<OriginalTxnIdx>>,
         Vec<RwLock<TxnIndex>>,
+        bool,
     ) {
         let finalized_indexs: Vec<RwLock<TxnIndex>> =
             (0..num_txns).map(|_tid| RwLock::new(0)).collect();
@@ -442,7 +468,9 @@ impl PartitionerV2 {
             }
         }
 
+        let mut last_round_merged = false;
         if num_remaining_txns >= 1 {
+            last_round_merged = true;
             let last_round_id = txn_idx_matrix.len();
             let timer = MISC_TIMERS_SECONDS
                 .with_label_values(&["last_round"])
@@ -508,7 +536,7 @@ impl PartitionerV2 {
         });
         let duration = timer.stop_and_record();
         info!("new_tid_table={duration}");
-        (txn_idx_matrix, start_index_matrix, finalized_indexs)
+        (txn_idx_matrix, start_index_matrix, finalized_indexs, last_round_merged)
     }
 }
 
@@ -517,7 +545,7 @@ impl BlockPartitioner for PartitionerV2 {
         &self,
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
-    ) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
+    ) -> PartitionedTransactions {
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["preprocess"])
             .start_timer();
@@ -604,7 +632,7 @@ impl BlockPartitioner for PartitionerV2 {
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["multi_rounds"])
             .start_timer();
-        let (finalized_txn_matrix, start_index_matrix, new_idxs) = self.multi_rounds(
+        let (finalized_txn_matrix, start_index_matrix, new_idxs, last_round_merged) = self.multi_rounds(
             num_txns,
             num_executor_shards,
             &rsets,
@@ -625,6 +653,7 @@ impl BlockPartitioner for PartitionerV2 {
             &rsets,
             &wsets,
             &finalized_txn_matrix,
+            last_round_merged,
             &start_index_matrix,
             &new_idxs,
             &trackers,

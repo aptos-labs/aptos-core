@@ -4,6 +4,7 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     AptosVM, VMExecutor,
 };
+use aptos_block_partitioner::BlockPartitionerConfig;
 use aptos_block_partitioner::BlockPartitioner;
 use aptos_crypto::hash::CryptoHash;
 use aptos_language_e2e_tests::{
@@ -11,7 +12,7 @@ use aptos_language_e2e_tests::{
     executor::FakeExecutor,
 };
 use aptos_types::{
-    block_executor::partitioner::SubBlocksForShard,
+    block_executor::partitioner::PartitionedTransactions,
     state_store::state_key::StateKeyInner,
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput},
 };
@@ -161,7 +162,7 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
 
     let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
 
-    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone())
+    let execution_ordered_txns = PartitionedTransactions::flatten(partitioned_txns.clone())
         .into_iter()
         .map(|t| t.into_txn())
         .collect();
@@ -212,7 +213,7 @@ pub fn sharded_block_executor_with_random_transfers<E: ExecutorClient<FakeDataSt
 
     let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
 
-    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone())
+    let execution_ordered_txns = PartitionedTransactions::flatten(partitioned_txns.clone())
         .into_iter()
         .map(|t| t.into_txn())
         .collect();

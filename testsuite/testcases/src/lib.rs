@@ -184,14 +184,31 @@ impl NetworkTest for dyn NetworkLoadTest {
 
         let phased = stats_by_phase.len() > 1;
         for (phase, phase_stats) in stats_by_phase.iter().enumerate() {
-            ctx.report.report_txn_stats(
-                if phased {
-                    format!("{}_phase_{}", self.name(), phase)
-                } else {
-                    self.name().to_string()
-                },
-                &phase_stats.emitter_stats,
-            );
+            let test_name = if phased {
+                format!("{}_phase_{}", self.name(), phase)
+            } else {
+                self.name().to_string()
+            };
+            ctx.report
+                .report_txn_stats(test_name, &phase_stats.emitter_stats);
+            ctx.report.report_text(format!(
+                "Latency breakdown for phase {}: {:?}",
+                phase,
+                phase_stats
+                    .latency_breakdown
+                    .keys()
+                    .into_iter()
+                    .map(|slice| {
+                        let slice_samples = phase_stats.latency_breakdown.get_samples(&slice);
+                        format!(
+                            "{:?}: max: {:.3}, avg: {:.3}",
+                            slice,
+                            slice_samples.max_sample(),
+                            slice_samples.avg_sample()
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            ));
         }
 
         let end_timestamp = SystemTime::now()
@@ -339,8 +356,11 @@ impl dyn NetworkLoadTest {
                 phase_timing[i].end_unixtime_s,
             ))?;
             info!(
-                "Latency breakdown: from {} to {}: {:?}",
-                phase_timing[i].start_unixtime_s, phase_timing[i].end_unixtime_s, latency_breakdown
+                "Latency breakdown details for phase {}: from {} to {}: {:?}",
+                i,
+                phase_timing[i].start_unixtime_s,
+                phase_timing[i].end_unixtime_s,
+                latency_breakdown
             );
             stats_by_phase_filtered.push(LoadTestPhaseStats {
                 emitter_stats: cur.clone(),
