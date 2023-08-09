@@ -3,14 +3,13 @@
 
 use crate::{cpu_profiler::CpuProfiler, memory_profiler::MemProfiler};
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 mod cpu_profiler;
 mod memory_profiler;
 mod utils;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ProfilerConfig {
     cpu_profiler_config: Option<CpuProfilerConfig>,
     mem_profiler_config: Option<MemProfilerConfig>,
@@ -25,7 +24,7 @@ impl ProfilerConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 struct CpuProfilerConfig {
     frequency: i32,
     svg_result_path: PathBuf,
@@ -40,7 +39,7 @@ impl CpuProfilerConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 struct MemProfilerConfig {
     txt_result_path: PathBuf,
     svg_result_path: PathBuf,
