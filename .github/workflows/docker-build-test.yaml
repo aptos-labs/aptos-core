@@ -23,7 +23,8 @@ name: "Build+Test Docker Images"
 on: # build on main branch OR when a PR is labeled with `CICD:build-images`
   # Allow us to run this specific workflow without a PR
   workflow_dispatch:
-  pull_request_target:
+  #pull_request_target:
+  pull_request: # TODO: remove this before landing! This is only to test!
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
@@ -108,6 +109,17 @@ jobs:
       gitSha: ${{ env.GIT_SHA }}
       targetCacheId: ${{ env.TARGET_CACHE_ID }}
       targetRegistry: ${{ env.TARGET_REGISTRY }}
+
+  # This job determines which files were changed
+  file_change_determinator:
+    runs-on: ubuntu-latest
+    outputs:
+      only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run the file change determinator
+        id: determine_file_changes
+        uses: ./.github/actions/file-change-determinator
 
   # This is a PR required job.
   rust-images:
@@ -227,6 +239,28 @@ jobs:
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+
+  # Run all rust smoke tests. This is a PR required job.
+  rust-smoke-tests:
+    needs: [permission-check, file_change_determinator]
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run rust smoke tests
+        uses: ./.github/actions/rust-smoke-tests
+        if: |
+          !failure() && !cancelled() && needs.permission-check.result == 'success' &&
+          needs.file_change_determinator.outputs.only_docs_changed != 'true' && (
+            (github.event_name == 'push' && github.ref_name != 'main') ||
+            github.event_name == 'workflow_dispatch' ||
+            contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+            github.event.pull_request.auto_merge != null ||
+            contains(github.event.pull_request.body, '#e2e')
+          )
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - run: echo "Skipping rust smoke tests! Unrelated changes detected."
+        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
   # This is a PR required job.
   forge-e2e-test:
