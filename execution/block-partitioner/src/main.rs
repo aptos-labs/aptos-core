@@ -7,8 +7,10 @@ use clap::Parser;
 use rand::rngs::OsRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{sync::Mutex, time::Instant};
+use rand::thread_rng;
 use aptos_block_partitioner::v2::PartitionerV2;
 use aptos_block_partitioner::BlockPartitioner;
+use aptos_block_partitioner::test_utils::P2PBlockGenerator;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -33,40 +35,11 @@ fn main() {
     aptos_logger::Logger::new().init();
     info!("Starting the block partitioning benchmark");
     let args = Args::parse();
-    let num_accounts = args.num_accounts;
-    info!("Creating {} accounts", num_accounts);
-    let accounts: Vec<Mutex<TestAccount>> = (0..num_accounts)
-        .into_par_iter()
-        .map(|_i| Mutex::new(generate_test_account()))
-        .collect();
-    println!("Created {} accounts", num_accounts);
-    println!("Creating {} transactions", args.block_size);
-    let transactions: Vec<AnalyzedTransaction> = (0..args.block_size)
-        .map(|_| {
-            // randomly select a sender and receiver from accounts
-            let mut rng = OsRng;
-
-            let indices = rand::seq::index::sample(&mut rng, num_accounts, 2);
-            let receiver = accounts[indices.index(1)].lock().unwrap();
-            let mut sender = accounts[indices.index(0)].lock().unwrap();
-            create_signed_p2p_transaction(&mut sender, vec![&receiver]).remove(0)
-        })
-        .collect();
-
+    let block_gen = P2PBlockGenerator::new(args.num_accounts);
     let partitioner = PartitionerV2::new(8, 4, 10, 64, true);
+    let mut rng = thread_rng();
     for _ in 0..args.num_blocks {
-        let transactions: Vec<AnalyzedTransaction> = (0..args.block_size)
-            .map(|_| {
-                // randomly select a sender and receiver from accounts
-                let mut rng = OsRng;
-
-                let indices = rand::seq::index::sample(&mut rng, num_accounts, 2);
-                let receiver = accounts[indices.index(1)].lock().unwrap();
-                let mut sender = accounts[indices.index(0)].lock().unwrap();
-                create_signed_p2p_transaction(&mut sender, vec![&receiver]).remove(0)
-            })
-            .collect();
-
+        let transactions = block_gen.rand_block(&mut rng, args.block_size);
         info!("Starting to partition");
         let now = Instant::now();
         let partitioned = partitioner.partition(transactions.clone(), args.num_shards);
