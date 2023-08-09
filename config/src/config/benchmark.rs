@@ -34,12 +34,12 @@ impl Default for BenchmarkConfig {
             max_network_channel_size: 1000,
             benchmark_service_threads: Some(2),
 
-            enable_direct_send_testing: true,
+            enable_direct_send_testing: false,
             direct_send_data_size: 100_000,
             direct_send_per_second: 1_000,
 
-            enable_rpc_testing: false,
-            rpc_data_size: 100 * 1024,
+            enable_rpc_testing: true,
+            rpc_data_size: 100_000,
             rpc_per_second: 1_000,
             rpc_in_flight: 8,
         }
