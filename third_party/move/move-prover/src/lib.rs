@@ -76,7 +76,6 @@ pub fn create_init_num_operation_state(env: &GlobalEnv) {
             }
         }
     }
-    //global_state.create_initial_exp_oper_state(env);
     env.set_extension(global_state);
 }
 

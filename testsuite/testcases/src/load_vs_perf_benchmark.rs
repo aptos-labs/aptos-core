@@ -218,7 +218,7 @@ fn to_table(results: &[SingleRunStats]) -> Vec<String> {
         "batch->pos",
         "pos->prop",
         "prop->order",
-        "prop->commit",
+        "order->commit",
         "actual dur"
     ));
 

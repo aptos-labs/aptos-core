@@ -32,7 +32,6 @@ This module provides an interface for aggregators (version 2).
 Represents an integer which supports parallel additions and subtractions
 across multiple transactions. See the module description for more details.
 
-
 Currently supported types for Element are u64 and u128.
 
 
@@ -108,6 +107,7 @@ The value of aggregator overflows. Raised by uncoditional add() call
 <a name="0x1_aggregator_v2_EAGGREGATOR_UNDERFLOW"></a>
 
 The value of aggregator underflows (goes below zero). Raised by uncoditional sub() call
+
 
 <pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>: u64 = 2;
 </code></pre>
