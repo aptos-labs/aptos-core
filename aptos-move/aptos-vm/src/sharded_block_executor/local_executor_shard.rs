@@ -40,12 +40,6 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorService<S> {
         cross_shard_client: LocalCrossShardClient,
     ) -> Self {
         let coordinator_client = Arc::new(LocalCoordinatorClient::new(command_rx, result_tx));
-        // The last shard will be the special shard that handles all discarded txns in a large BlockSTM instance.
-        let num_threads = if shard_id == num_shards - 1 {
-            num_threads * num_shards
-        } else {
-            num_threads
-        };
         let executor_service = Arc::new(ShardedExecutorService::new(
             shard_id,
             num_shards,
