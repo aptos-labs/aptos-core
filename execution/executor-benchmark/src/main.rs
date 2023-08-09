@@ -96,6 +96,8 @@ pub struct PipelineOpt {
     num_executor_shards: usize,
     #[clap(long)]
     async_partitioning: bool,
+    #[clap(long)]
+    use_global_executor: bool,
 }
 
 impl PipelineOpt {
@@ -108,6 +110,7 @@ impl PipelineOpt {
             allow_aborts: self.allow_aborts,
             num_executor_shards: self.num_executor_shards,
             async_partitioning: self.async_partitioning,
+            use_global_executor: self.use_global_executor,
         }
     }
 }
@@ -119,6 +122,11 @@ struct Opt {
 
     #[clap(long, default_value_t = 5)]
     transactions_per_sender: usize,
+
+    /// 0 implies random TX generation; if non-zero, then 'transactions_per_sender is ignored
+    /// 'connected_tx_grps' should be less than 'block_size'
+    #[clap(long, default_value_t = 0)]
+    connected_tx_grps: usize,
 
     #[clap(long)]
     concurrency_level: Option<usize>,
@@ -278,6 +286,7 @@ where
                 blocks,
                 transaction_mix,
                 opt.transactions_per_sender,
+                opt.connected_tx_grps,
                 main_signer_accounts,
                 additional_dst_pool_accounts,
                 data_dir,

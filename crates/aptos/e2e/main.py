@@ -44,7 +44,11 @@ from cases.move import (
     test_move_run,
     test_move_view,
 )
-from cases.node import test_node_show_validator_set
+from cases.node import (
+    test_node_show_validator_set,
+    test_node_update_consensus_key,
+    test_node_update_validator_network_address,
+)
 from cases.stake import (
     test_stake_add_stake,
     test_stake_create_staking_contract,
@@ -158,6 +162,8 @@ def run_tests(run_helper):
 
     # Run node subcommand group tests.
     test_node_show_validator_set(run_helper)
+    test_node_update_consensus_key(run_helper)
+    test_node_update_validator_network_address(run_helper)
 
     # WARNING: This has to stay at the end, else key will get rotated
     test_account_rotate_key(run_helper)

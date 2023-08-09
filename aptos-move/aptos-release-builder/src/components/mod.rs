@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use self::framework::FrameworkReleaseConfig;
-use crate::{aptos_framework_path, components::feature_flags::Features, release_builder_path};
-use anyhow::{anyhow, bail, Result};
+use crate::{aptos_core_path, aptos_framework_path, components::feature_flags::Features};
+use anyhow::{anyhow, bail, Context, Result};
 use aptos::governance::GenerateExecutionHash;
 use aptos_rest_client::Client;
 use aptos_temppath::TempPath;
@@ -205,7 +205,7 @@ impl ReleaseEntry {
                 }
             },
             ReleaseEntry::RawScript(script_path) => {
-                let base_path = release_builder_path().join(script_path.as_path());
+                let base_path = aptos_core_path().join(script_path.as_path());
                 let file_name = base_path
                     .file_name()
                     .and_then(|name| name.to_str())
@@ -213,7 +213,8 @@ impl ReleaseEntry {
                         anyhow!("Unable to obtain file name for proposal: {:?}", script_path)
                     })?
                     .to_string();
-                let file_content = std::fs::read_to_string(base_path)?;
+                let file_content = std::fs::read_to_string(base_path)
+                    .with_context(|| format!("Unable to read file: {}", script_path.display()))?;
 
                 if let ExecutionMode::MultiStep = execution_mode {
                     // Render the hash for multi step proposal.
@@ -347,6 +348,19 @@ impl ReleaseConfig {
 
         // Create directories for source and metadata.
         let mut source_dir = base_path.to_path_buf();
+
+        // If source dir doesnt exist create it, if it does exist error
+        if !source_dir.exists() {
+            println!("Creating source directory: {:?}", source_dir);
+            std::fs::create_dir(source_dir.as_path()).map_err(|err| {
+                anyhow!(
+                    "Fail to create folder for source: {} {:?}",
+                    source_dir.display(),
+                    err
+                )
+            })?;
+        }
+
         source_dir.push("sources");
 
         std::fs::create_dir(source_dir.as_path())
