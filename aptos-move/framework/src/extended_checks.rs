@@ -631,7 +631,7 @@ impl<'a> ExtendedChecker<'a> {
 
     fn is_function(&self, id: QualifiedId<FunId>, full_name_str: &str) -> bool {
         let fun = &self.env.get_function(id);
-        fun.get_full_name_str() == full_name_str
+        fun.get_full_name_with_address() == full_name_str
     }
 }
 

@@ -29,6 +29,8 @@ events emitted to a handle and emit events to the event store.
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="guid.md#0x1_guid">0x1::guid</a>;
 </code></pre>
 
@@ -76,12 +78,12 @@ A handle for an event such that:
 ## Constants
 
 
-<a name="0x1_event_ENOT_EVENT_STRUCT"></a>
+<a name="0x1_event_EMODULE_EVENT_NOT_SUPPORTED"></a>
 
-The module event passed into <code>emit</code> function is not a valid #[event]-attributed struct type.
+Module event feature is not supported.
 
 
-<pre><code><b>const</b> <a href="event.md#0x1_event_ENOT_EVENT_STRUCT">ENOT_EVENT_STRUCT</a>: u64 = 1;
+<pre><code><b>const</b> <a href="event.md#0x1_event_EMODULE_EVENT_NOT_SUPPORTED">EMODULE_EVENT_NOT_SUPPORTED</a>: u64 = 1;
 </code></pre>
 
 
@@ -102,7 +104,10 @@ Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s k
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: store + drop&gt;(msg: &T) { <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T&gt;(msg); }
+<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: store + drop&gt;(msg: &T) {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_bulletproofs_enabled">features::bulletproofs_enabled</a>(), std::error::invalid_state(<a href="event.md#0x1_event_EMODULE_EVENT_NOT_SUPPORTED">EMODULE_EVENT_NOT_SUPPORTED</a>));
+    <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T&gt;(msg);
+}
 </code></pre>
 
 
