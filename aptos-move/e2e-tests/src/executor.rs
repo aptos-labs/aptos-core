@@ -695,7 +695,7 @@ impl FakeExecutor {
         let mut i = 0;
         let mut times = Vec::new();
         while i < iterations {
-            let mut session = vm.new_session(&remote_view, SessionId::void());
+            let mut session = vm.new_session(0, &remote_view, SessionId::void());
 
             // load function name into cache to ensure cache is hot
             let _ = session.load_function(module, &Self::name(function_name), &type_params.clone());
