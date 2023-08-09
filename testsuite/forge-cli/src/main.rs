@@ -1894,8 +1894,14 @@ fn pfn_const_tps(
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(50)
+            SuccessCriteria::new(95)
                 .add_no_restarts()
+                .add_max_expired_tps(0)
+                .add_max_failed_submission_tps(0)
+                // Percentile thresholds are set to +1 second of non-PFN tests. Should be revisited.
+                .add_latency_threshold(2.5, LatencyType::P50)
+                .add_latency_threshold(4., LatencyType::P90)
+                .add_latency_threshold(5., LatencyType::P99)
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup and at most 10% of the run
                     (duration.as_secs() / 10).max(60),

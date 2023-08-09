@@ -16,7 +16,7 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::NodeConfig;
 use aptos_consensus_notifications::ConsensusNotificationSender;
-use aptos_event_notifications::ReconfigNotificationListener;
+use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
@@ -35,7 +35,7 @@ pub fn start_consensus(
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     consensus_to_mempool_sender: mpsc::Sender<QuorumStoreRequest>,
     aptos_db: DbReaderWriter,
-    reconfig_events: ReconfigNotificationListener,
+    reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
