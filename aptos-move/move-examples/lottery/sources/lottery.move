@@ -116,15 +116,25 @@ module lottery::lottery {
         vector::push_back(&mut lottery.tickets, signer::address_of(user))
     }
 
-    #[test_only]
-    /// Useful for testing the private entry `decide_winners` function.
-    public(friend) fun decide_winners_for_testing(): address acquires Lottery, Credentials {
-        decide_winners()
+    /// Securely wraps around `decide_winners_internal` so it can only be called
+    /// as a top-level call from a TXN, preventing **test-and-abort** attacks (see
+    /// [AIP-41](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-41.md)).
+    entry fun decide_winners() acquires Lottery, Credentials {
+        decide_winners_internal();
     }
+
+    /// Insecurely wraps around `decide_winners_internal` allowing this function to
+    /// be called from a Move script or another module, leaving it vulnerable to
+    /// **test-and-abort** attacks (see [AIP-41](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-41.md)).
+    ///
+    /// Commented out for security.
+    //public fun decide_winners_insecure() acquires Lottery, Credentials {
+    //    decide_winners_internal();
+    //}
 
     /// Allows anyone to close the lottery (if enough time has elapsed & more than
     /// 1 user bought tickets) and to draw a random winner.
-    entry fun decide_winners(): address acquires Lottery, Credentials {
+    public(friend) fun decide_winners_internal(): address acquires Lottery, Credentials {
         let lottery = borrow_global_mut<Lottery>(@lottery);
 
         // Make sure the lottery is not being closed too early...
