@@ -20,7 +20,7 @@
 //  - crane - https://github.com/google/go-containerregistry/tree/main/cmd/crane#installation
 //  - pnpm - https://pnpm.io/installation
 // 2. docker login - with authorization to push to the `aptoslabs` org
-// 3. gcloud auth configure-docker us-west1-docker.pkg.dev
+// 3. gcloud auth configure-docker us-docker.pkg.dev
 // 4. gcloud auth login --update-adc
 // 5. AWS CLI credentials configured
 //
@@ -90,7 +90,7 @@ chdir(dirname(process.argv[1]) + "/.."); // change workdir to the root of the re
 execSync("pnpm install --frozen-lockfile", { stdio: "inherit" });
 await import("zx/globals");
 
-const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "GCP_DOCKER_ARTIFACT_REPO_US", "AWS_ACCOUNT_ID", "IMAGE_TAG_PREFIX"];
+const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "AWS_ACCOUNT_ID", "IMAGE_TAG_PREFIX"];
 const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS"];
 
 const parsedArgs = {};
@@ -135,7 +135,6 @@ if (process.env.CI === "true") {
 
 const AWS_ECR = `${parsedArgs.AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/aptos`;
 const GCP_ARTIFACT_REPO = parsedArgs.GCP_DOCKER_ARTIFACT_REPO;
-const GCP_ARTIFACT_REPO_US = parsedArgs.GCP_DOCKER_ARTIFACT_REPO_US;
 const DOCKERHUB = "docker.io/aptoslabs";
 
 const INTERNAL_TARGET_REGISTRIES = [

@@ -53,7 +53,7 @@ proposals:
       discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-28.md"
     execution_mode: MultiStep
     update_sequence:
-    - RawScript: /aptos/aptos-move/aptos-release-builder/data/proposals/aip_28_initialization.move
+    - RawScript: aptos-move/aptos-release-builder/data/proposals/aip_28_initialization.move
     - FeatureFlag:
         enabled:
           - partial_governance_voting

@@ -6,7 +6,9 @@ use crate::{
         nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
     },
     utils::{
-        database::{establish_connection_pool, run_migrations, upsert_uris},
+        database::{
+            check_or_update_chain_id, establish_connection_pool, run_migrations, upsert_uris,
+        },
         gcs::{write_image_to_gcs, write_json_to_gcs},
         image_optimizer::ImageOptimizer,
         json_parser::JSONParser,
@@ -40,7 +42,7 @@ use tracing::{error, info};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ParserConfig {
-    pub google_application_credentials: String,
+    pub google_application_credentials: Option<String>,
     pub bucket: String,
     pub subscription_name: String,
     pub database_url: String,
@@ -49,7 +51,7 @@ pub struct ParserConfig {
     pub num_parsers: usize,
     pub max_file_size_bytes: u32,
     pub image_quality: u8, // Quality up to 100
-    pub release: Option<bool>,
+    pub ack_parsed_uris: Option<bool>,
 }
 
 /// Subscribes to PubSub and sends URIs to Channel
@@ -61,22 +63,43 @@ async fn consume_pubsub_entries_to_channel_loop(
     subscription: Subscription,
     pool: Pool<ConnectionManager<PgConnection>>,
 ) -> anyhow::Result<()> {
+    let mut db_chain_id = None;
     let mut stream = subscription.subscribe(None).await?;
     while let Some(msg) = stream.next().await {
         // Parse metadata from Pubsub message and create worker
         let ack = msg.ack_id();
         let entry_string = String::from_utf8(msg.message.clone().data)?;
         let parts: Vec<&str> = entry_string.split(',').collect();
+
+        let mut conn = pool.get()?;
+        let grpc_chain_id = parts[4].parse::<u64>()?;
+
+        if let Some(existing_id) = db_chain_id {
+            if grpc_chain_id != existing_id {
+                error!(
+                    chain_id = grpc_chain_id,
+                    existing_id = existing_id,
+                    "[NFT Metadata Crawler] Stream somehow changed chain id!",
+                );
+                panic!("[NFT Metadata Crawler] Stream somehow changed chain id!");
+            }
+        } else {
+            db_chain_id = Some(
+                check_or_update_chain_id(&mut conn, grpc_chain_id as i64)
+                    .expect("Chain id should match"),
+            );
+        }
+
         let worker = Worker::new(
             parser_config.clone(),
-            pool.get()?,
+            conn,
             parts[0].to_string(),
             parts[1].to_string(),
             parts[2].to_string().parse()?,
             NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S %Z").unwrap_or(
                 NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S%.f %Z")?,
             ),
-            parts[4].parse::<bool>().unwrap_or(false),
+            parts[5].parse::<bool>().unwrap_or(false),
         );
 
         // Send worker to channel
@@ -138,10 +161,12 @@ impl RunnableConfig for ParserConfig {
         run_migrations(&pool);
         info!("[NFT Metadata Crawler] Finished migrations");
 
-        std::env::set_var(
-            "GOOGLE_APPLICATION_CREDENTIALS",
-            self.google_application_credentials.clone(),
-        );
+        if let Some(google_application_credentials) = self.google_application_credentials.clone() {
+            std::env::set_var(
+                "GOOGLE_APPLICATION_CREDENTIALS",
+                google_application_credentials,
+            );
+        }
 
         // Establish gRPC client
         let config = ClientConfig::default().with_auth().await?;
@@ -168,7 +193,7 @@ impl RunnableConfig for ParserConfig {
                 Arc::clone(&semaphore),
                 Arc::clone(&receiver),
                 subscription.clone(),
-                self.release.unwrap_or(false),
+                self.ack_parsed_uris.unwrap_or(false),
             ));
 
             workers.push(worker);

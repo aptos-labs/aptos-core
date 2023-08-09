@@ -4,7 +4,9 @@
 
 use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
-use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
+use aptos_block_partitioner::{
+    sharded_block_partitioner::ShardedBlockPartitioner, BlockPartitionerConfig,
+};
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
     account_universe::{AUTransactionGen, AccountPickStyle, AccountUniverse, AccountUniverseGen},
@@ -256,7 +258,14 @@ where
             let parallel_block_executor = Arc::new(ShardedBlockExecutor::new(client));
             (
                 Some(parallel_block_executor),
-                Some(ShardedBlockPartitioner::new(num_executor_shards)),
+                Some(
+                    BlockPartitionerConfig::default()
+                        .num_shards(num_executor_shards)
+                        .max_partitioning_rounds(4)
+                        .cross_shard_dep_avoid_threshold(0.9)
+                        .partition_last_round(true)
+                        .build(),
+                ),
             )
         };
 
@@ -372,8 +381,6 @@ where
                     .into_iter()
                     .map(|txn| txn.into())
                     .collect::<Vec<AnalyzedTransaction>>(),
-                4,
-                0.9,
             );
             parallel_block_executor
                 .execute_block(
