@@ -45,10 +45,15 @@ pub struct Dag {
     /// Map between peer id to vector index
     author_to_index: HashMap<Author, usize>,
     storage: Arc<dyn DAGStorage>,
+    initial_round: Round,
 }
 
 impl Dag {
-    pub fn new(epoch_state: Arc<EpochState>, storage: Arc<dyn DAGStorage>) -> Self {
+    pub fn new(
+        epoch_state: Arc<EpochState>,
+        storage: Arc<dyn DAGStorage>,
+        initial_round: Round,
+    ) -> Self {
         let epoch = epoch_state.epoch;
         let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
         let num_validators = author_to_index.len();
@@ -77,6 +82,7 @@ impl Dag {
             nodes_by_round,
             author_to_index,
             storage,
+            initial_round,
         }
     }
 
@@ -85,7 +91,7 @@ impl Dag {
             .nodes_by_round
             .first_key_value()
             .map(|(round, _)| round)
-            .unwrap_or(&0)
+            .unwrap_or(&self.initial_round)
     }
 
     pub fn highest_round(&self) -> Round {
@@ -93,7 +99,7 @@ impl Dag {
             .nodes_by_round
             .last_key_value()
             .map(|(round, _)| round)
-            .unwrap_or(&0)
+            .unwrap_or(&self.initial_round)
     }
 
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {

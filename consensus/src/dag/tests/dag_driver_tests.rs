@@ -72,9 +72,11 @@ fn test_certified_node_handler() {
         verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
-    let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage.clone())));
-
-    let zeroth_round_node = new_certified_node(0, signers[0].author(), vec![]);
+    let dag = Arc::new(RwLock::new(Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        1,
+    )));
 
     let network_sender = Arc::new(MockNetworkSender {});
     let rb = Arc::new(ReliableBroadcast::new(
@@ -115,13 +117,14 @@ fn test_certified_node_handler() {
         fetch_requester,
     );
 
+    let first_round_node = new_certified_node(1, signers[0].author(), vec![]);
     // expect an ack for a valid message
-    assert_ok!(driver.process(zeroth_round_node.clone()));
+    assert_ok!(driver.process(first_round_node.clone()));
     // expect an ack if the same message is sent again
-    assert_ok_eq!(driver.process(zeroth_round_node), CertifiedAck::new(1));
+    assert_ok_eq!(driver.process(first_round_node), CertifiedAck::new(1));
 
-    let parent_node = new_certified_node(0, signers[1].author(), vec![]);
-    let invalid_node = new_certified_node(1, signers[0].author(), vec![parent_node.certificate()]);
+    let parent_node = new_certified_node(1, signers[1].author(), vec![]);
+    let invalid_node = new_certified_node(2, signers[0].author(), vec![parent_node.certificate()]);
     assert_eq!(
         driver.process(invalid_node).unwrap_err().to_string(),
         DagDriverError::MissingParents.to_string()

@@ -56,7 +56,11 @@ pub fn bootstrap_dag(
         time_service.clone(),
     ));
 
-    let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage.clone())));
+    let dag = Arc::new(RwLock::new(Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        current_round,
+    )));
 
     let anchor_election = Box::new(RoundRobinAnchorElection::new(validators));
     let order_rule = OrderRule::new(
@@ -86,10 +90,15 @@ pub fn bootstrap_dag(
         time_service,
         storage.clone(),
         order_rule,
+        fetch_requester.clone(),
+    );
+    let rb_handler = NodeBroadcastHandler::new(
+        dag.clone(),
+        signer,
+        epoch_state.clone(),
+        storage.clone(),
         fetch_requester,
     );
-    let rb_handler =
-        NodeBroadcastHandler::new(dag.clone(), signer, epoch_state.clone(), storage.clone());
     let fetch_handler = FetchRequestHandler::new(dag, epoch_state.clone());
 
     let dag_handler = NetworkHandler::new(

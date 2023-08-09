@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::helpers::new_certified_node;
 use crate::{
     dag::{
         anchor_election::RoundRobinAnchorElection,
         dag_store::Dag,
         order_rule::OrderRule,
-        tests::{dag_test::MockStorage, helpers::new_certified_node},
+        tests::dag_test::MockStorage,
         types::{NodeCertificate, NodeMetadata},
         CertifiedNode,
     },
@@ -153,7 +154,7 @@ proptest! {
             epoch: 1,
             verifier: validator_verifier,
         });
-        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()));
+        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 1);
         for round_nodes in &nodes {
             for node in round_nodes.iter().flatten() {
                 dag.add_node(node.clone()).unwrap();
@@ -231,7 +232,7 @@ fn test_order_rule_basic() {
         epoch: 1,
         verifier: validator_verifier,
     });
-    let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()));
+    let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 1);
     for round_nodes in &nodes {
         for node in round_nodes.iter().flatten() {
             dag.add_node(node.clone()).unwrap();
