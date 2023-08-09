@@ -80,6 +80,7 @@ spec aptos_framework::vesting {
         aborts_if active + pending_active > MAX_U64;
         aborts_if total_active_stake < staking_contract.principal;
         aborts_if accumulated_rewards * staking_contract.commission_percentage > MAX_U64;
+        // This two item both contribute to the timeout
         aborts_if (vesting_contract.remaining_grant + commission_amount) > total_active_stake;
         aborts_if total_active_stake < vesting_contract.remaining_grant;
     }
