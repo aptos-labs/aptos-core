@@ -7,7 +7,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
-use aptos_state_view::{StateViewId, TStateView};
+use aptos_state_view::{StateViewId, TStateView, GenID};
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
@@ -231,6 +231,12 @@ impl TStateView for CachedStateView {
     }
 }
 
+impl GenID for CachedStateView {
+    fn generate_id(&self) -> u32 {
+        0
+    }
+}
+
 pub struct CachedDbStateView {
     db_state_view: DbStateView,
     state_cache: RwLock<HashMap<StateKey, Option<StateValue>>>,
@@ -273,5 +279,11 @@ impl TStateView for CachedDbStateView {
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         self.db_state_view.get_usage()
+    }
+}
+
+impl GenID for CachedDbStateView {
+    fn generate_id(&self) -> u32 {
+        self.db_state_view.generate_id()
     }
 }

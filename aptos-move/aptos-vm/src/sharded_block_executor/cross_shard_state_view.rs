@@ -3,14 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 use anyhow::Result;
 use aptos_logger::trace;
-use aptos_state_view::{StateView, TStateView};
+use aptos_state_view::{StateView, TStateView, GenID};
 use aptos_types::{
     block_executor::partitioner::ShardId,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
 };
-use aptos_block_executor::view::GenID;
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Condvar, Mutex},

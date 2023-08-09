@@ -207,7 +207,7 @@ impl ChunkOutput {
     ) -> Result<Vec<TransactionOutput>> {
         Ok(V::execute_block(
             transactions,
-            &state_view,
+            state_view,
             maybe_block_gas_limit,
         )?)
     }

@@ -19,7 +19,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_aggregator::delta_change_set::DeltaChangeSet;
-use aptos_block_executor::{txn_commit_hook::NoOpTransactionCommitHook, view::GenID};
+use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas_algebra::Gas;
@@ -28,7 +28,7 @@ use aptos_gas_schedule::VMGasParameters;
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, GenID};
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,

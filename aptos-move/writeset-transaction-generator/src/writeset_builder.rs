@@ -6,7 +6,7 @@ use anyhow::format_err;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::aggregator_natives::context::TxnIndex;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, GenID};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
@@ -106,7 +106,7 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
     }
 }
 
-pub fn build_changeset<S: StateView, F>(
+pub fn build_changeset<S: StateView + GenID, F>(
     txn_idx: TxnIndex,
     state_view: &S,
     procedure: F,

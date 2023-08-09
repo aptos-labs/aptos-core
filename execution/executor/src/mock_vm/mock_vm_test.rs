@@ -4,7 +4,7 @@
 
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
 use anyhow::Result;
-use aptos_state_view::TStateView;
+use aptos_state_view::{TStateView, GenID};
 use aptos_types::{
     account_address::AccountAddress,
     state_store::{
@@ -34,6 +34,12 @@ impl TStateView for MockStateView {
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         Ok(StateStorageUsage::new_untracked())
+    }
+}
+
+impl GenID for MockStateView {
+    fn generate_id(&self) -> u32 {
+        0
     }
 }
 

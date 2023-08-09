@@ -5,7 +5,7 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use aptos_state_view::TStateView;
+use aptos_state_view::{TStateView, GenID};
 use aptos_types::{
     access_path::AccessPath,
     state_store::{
@@ -52,5 +52,11 @@ impl TStateView for GenesisStateView {
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         Ok(StateStorageUsage::zero())
+    }
+}
+
+impl GenID for GenesisStateView {
+    fn generate_id(&self) -> u32 {
+        0
     }
 }

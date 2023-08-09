@@ -7,7 +7,7 @@ mod storage_interface;
 
 pub use crate::{rest_interface::RestDebuggerInterface, storage_interface::DBDebuggerInterface};
 use anyhow::{anyhow, Result};
-use aptos_state_view::TStateView;
+use aptos_state_view::{TStateView, GenID};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
@@ -117,6 +117,12 @@ pub struct DebuggerStateView {
     query_sender:
         Mutex<UnboundedSender<(StateKey, Version, std::sync::mpsc::Sender<Option<Vec<u8>>>)>>,
     version: Version,
+}
+
+impl GenID for DebuggerStateView {
+    fn generate_id(&self) -> u32 {
+        0
+    }
 }
 
 async fn handler_thread<'a>(

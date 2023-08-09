@@ -124,8 +124,7 @@ mod verifier;
 
 pub use crate::aptos_vm::AptosVM;
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
-use aptos_block_executor::view::GenID;
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, GenID};
 use aptos_types::{
     block_executor::partitioner::SubBlocksForShard,
     transaction::{

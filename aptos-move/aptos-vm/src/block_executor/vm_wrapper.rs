@@ -7,10 +7,10 @@ use crate::{
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
 };
-use aptos_block_executor::{task::{ExecutionStatus, ExecutorTask}, view::GenID};
+use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, GenID};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use move_core_types::{
     ident_str,

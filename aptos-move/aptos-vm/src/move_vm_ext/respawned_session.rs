@@ -7,9 +7,8 @@ use crate::{
     move_vm_ext::{SessionExt, SessionId},
 };
 use anyhow::{bail, Result};
-use aptos_block_executor::view::GenID;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::{StateView, StateViewId, TStateView};
+use aptos_state_view::{StateView, StateViewId, TStateView, GenID};
 use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,

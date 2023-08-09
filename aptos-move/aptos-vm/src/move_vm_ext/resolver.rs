@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::resolver::AggregatorResolver;
-use aptos_block_executor::view::GenID;
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, GenID};
 use aptos_table_natives::TableResolver;
 use aptos_types::on_chain_config::ConfigStorage;
 use aptos_utils::aptos_try;

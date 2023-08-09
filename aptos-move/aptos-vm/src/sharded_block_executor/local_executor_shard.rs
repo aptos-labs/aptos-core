@@ -7,7 +7,7 @@ use crate::sharded_block_executor::{
 };
 use aptos_block_partitioner::sharded_block_partitioner::MAX_ALLOWED_PARTITIONING_ROUNDS;
 use aptos_logger::trace;
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, GenID};
 use aptos_types::{
     block_executor::partitioner::{RoundId, ShardId, SubBlocksForShard},
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
@@ -15,7 +15,6 @@ use aptos_types::{
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
-use aptos_block_executor::view::GenID;
 
 /// Executor service that runs on local machine and waits for commands from the coordinator and executes
 /// them in parallel.

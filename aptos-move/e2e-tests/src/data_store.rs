@@ -6,7 +6,7 @@
 
 use crate::account::AccountData;
 use anyhow::Result;
-use aptos_state_view::{in_memory_state_view::InMemoryStateView, TStateView};
+use aptos_state_view::{in_memory_state_view::InMemoryStateView, TStateView, GenID};
 use aptos_types::{
     access_path::AccessPath,
     account_config::CoinInfoResource,
@@ -134,5 +134,11 @@ impl TStateView for FakeDataStore {
 
     fn as_in_memory_state_view(&self) -> InMemoryStateView {
         InMemoryStateView::new(self.state_data.clone())
+    }
+}
+
+impl GenID for FakeDataStore {
+    fn generate_id(&self) -> u32 {
+        0
     }
 }

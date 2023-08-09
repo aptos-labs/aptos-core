@@ -11,9 +11,8 @@ use crate::{
         ExecutorShardCommand,
     },
 };
-use aptos_block_executor::view::GenID;
 use aptos_logger::{info, trace};
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, GenID};
 use aptos_types::{
     block_executor::partitioner::{ShardId, SubBlock, SubBlocksForShard},
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},

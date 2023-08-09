@@ -15,7 +15,7 @@ use aptos_mvhashmap::{
     unsync_map::UnsyncMap,
     MVHashMap,
 };
-use aptos_state_view::{StateViewId, TStateView};
+use aptos_state_view::{StateViewId, TStateView, GenID};
 use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
@@ -180,10 +180,6 @@ impl<
 enum ViewMapKind<'a, T: Transaction, X: Executable> {
     MultiVersion(&'a MVHashMapView<'a, T::Key, T::Value, X>),
     Unsync(&'a UnsyncMap<T::Key, T::Value, X>),
-}
-
-pub trait GenID {
-    fn generate_id(&self) -> u32;
 }
 
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {

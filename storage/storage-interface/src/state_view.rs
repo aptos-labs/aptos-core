@@ -4,7 +4,7 @@
 
 use crate::DbReader;
 use anyhow::Result;
-use aptos_state_view::TStateView;
+use aptos_state_view::{TStateView, GenID};
 use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -41,6 +41,12 @@ impl TStateView for DbStateView {
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         self.db.get_state_storage_usage(self.version)
+    }
+}
+
+impl GenID for DbStateView {
+    fn generate_id(&self) -> u32 {
+        0   
     }
 }
 

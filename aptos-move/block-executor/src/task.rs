@@ -4,15 +4,13 @@
 
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::TStateView;
+use aptos_state_view::{TStateView, GenID};
 use aptos_types::{
     executable::ModulePath,
     fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
 use std::{fmt::Debug, hash::Hash};
-
-use crate::view::GenID;
 
 /// The execution result of a transaction
 #[derive(Debug)]

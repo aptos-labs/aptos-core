@@ -12,9 +12,8 @@ use anyhow::{bail, Error};
 use aptos_aggregator::{
     aggregator_extension::AggregatorID, delta_change_set::deserialize, resolver::AggregatorResolver,
 };
-use aptos_block_executor::view::GenID;
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, GenID};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,

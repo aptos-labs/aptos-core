@@ -21,10 +21,10 @@ use aptos_block_executor::{
         Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
     },
-    txn_commit_hook::TransactionCommitHook, view::GenID,
+    txn_commit_hook::TransactionCommitHook
 };
 use aptos_infallible::Mutex;
-use aptos_state_view::{StateView, StateViewId};
+use aptos_state_view::{StateView, StateViewId, GenID};
 use aptos_types::{
     executable::ExecutableTestType,
     fee_statement::FeeStatement,

@@ -11,7 +11,6 @@ use crate::{
     transaction_metadata::TransactionMetadata,
     transaction_validation::APTOS_TRANSACTION_VALIDATION,
 };
-use aptos_block_executor::view::GenID;
 use aptos_framework::RuntimeModuleMetadataV1;
 use aptos_gas_algebra::{Gas, GasExpression};
 use aptos_gas_schedule::{
@@ -19,7 +18,7 @@ use aptos_gas_schedule::{
 };
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, GenID};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     chain_id::ChainId,

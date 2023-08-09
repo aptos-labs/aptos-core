@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sharded_block_executor::ExecutorShardCommand;
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, GenID};
 use aptos_types::transaction::TransactionOutput;
 use move_core_types::vm_status::VMStatus;
-use aptos_block_executor::view::GenID;
 
 // Interface to communicate from the executor shards to the block executor coordinator.
 pub trait CoordinatorClient<S: StateView + GenID + Sync + Send + 'static>: Send + Sync {

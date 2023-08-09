@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 #![forbid(unsafe_code)]
-use crate::TStateView;
+use crate::{TStateView, GenID};
 use anyhow::Result;
 use aptos_types::state_store::{
     state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -39,5 +39,11 @@ impl TStateView for InMemoryStateView {
 
     fn as_in_memory_state_view(&self) -> InMemoryStateView {
         self.clone()
+    }
+}
+
+impl GenID for InMemoryStateView {
+    fn generate_id(&self) -> u32 {
+        0
     }
 }

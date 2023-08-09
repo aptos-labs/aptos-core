@@ -115,3 +115,7 @@ impl<T: StateView> AsStateView for T {
         self
     }
 }
+
+pub trait GenID {
+    fn generate_id(&self) -> u32;
+}

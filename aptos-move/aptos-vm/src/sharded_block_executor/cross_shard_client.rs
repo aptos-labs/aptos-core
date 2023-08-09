@@ -7,10 +7,10 @@ use crate::{
         messages::{CrossShardMsg, CrossShardMsg::RemoteTxnWriteMsg, RemoteTxnWrite},
     },
 };
-use aptos_block_executor::{txn_commit_hook::TransactionCommitHook, view::GenID};
+use aptos_block_executor::txn_commit_hook::TransactionCommitHook;
 use aptos_logger::trace;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, GenID};
 use aptos_types::{
     block_executor::partitioner::{RoundId, ShardId, SubBlock},
     state_store::state_key::StateKey,
