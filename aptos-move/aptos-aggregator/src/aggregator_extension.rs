@@ -704,7 +704,6 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), &*TEST_RESOLVER, 600)
             .expect("Get aggregator failed");
-        assert_ok!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
 
         assert_ok!(aggregator.try_add(400));
         assert_eq!(
@@ -715,7 +714,7 @@ mod test {
             aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
             None
         );
-        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
+        assert_ok!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
     }
 
     #[test]
@@ -732,13 +731,17 @@ mod test {
         assert_err!(aggregator.try_sub(1));
         assert_eq!(
             aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
-            400
+            0
+        );
+        assert_eq!(
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
+            300
         );
         assert_eq!(
             aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
-            None
+            Some(1)
         );
-        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
+        assert_ok!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
     }
 
     #[test]
