@@ -53,6 +53,10 @@ impl FeeStatement {
         }
     }
 
+    pub fn clear_refunds(&mut self) {
+        self.storage_fee_refund_octas = 0;
+    }
+
     pub fn gas_used(&self) -> u64 {
         self.total_charge_gas_units
     }

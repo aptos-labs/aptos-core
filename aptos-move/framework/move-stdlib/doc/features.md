@@ -78,6 +78,7 @@ return true.
     -  [Resource `Features`](#@Specification_1_Features)
     -  [Function `periodical_reward_rate_decrease_enabled`](#@Specification_1_periodical_reward_rate_decrease_enabled)
     -  [Function `partial_governance_voting_enabled`](#@Specification_1_partial_governance_voting_enabled)
+    -  [Function `module_event_enabled`](#@Specification_1_module_event_enabled)
     -  [Function `change_feature_flags`](#@Specification_1_change_feature_flags)
     -  [Function `is_enabled`](#@Specification_1_is_enabled)
     -  [Function `set`](#@Specification_1_set)
@@ -1504,6 +1505,24 @@ Helper to check whether a feature flag is enabled.
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_partial_governance_voting_enabled">spec_partial_governance_voting_enabled</a>();
+</code></pre>
+
+
+
+<a name="@Specification_1_module_event_enabled"></a>
+
+### Function `module_event_enabled`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_module_event_enabled">module_event_enabled</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_module_event_enabled">spec_module_event_enabled</a>();
 </code></pre>
 
 

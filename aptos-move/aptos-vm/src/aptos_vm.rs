@@ -287,10 +287,12 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> (VMStatus, VMOutput) {
+        // Clear side effects: create new session and clear refunds from fee statement.
         let mut session = self
             .0
             .new_session(resolver, SessionId::epilogue_meta(txn_data));
-        let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
+        let mut fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
+        fee_statement.clear_refunds();
 
         match TransactionStatus::from_vm_status(
             error_code.clone(),
