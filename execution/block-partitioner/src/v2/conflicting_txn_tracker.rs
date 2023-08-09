@@ -15,12 +15,19 @@ use std::collections::{btree_set::BTreeSet, HashSet};
 /// it caches some metadata about the location and also keeps track of their status (pending or position finalized) throughout the partitioning process.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ConflictingTxnTracker {
+    /// The storage location on which conflicting txns are being tracked by this tracker.
     pub storage_location: StorageLocation,
+    /// A randomly chosen owner shard of the storage location, for conflict resolution purpose.
     pub anchor_shard_id: ShardId,
+    /// Txns that (1) read the current storage location and (2) have not been accepted.
     pending_reads: BTreeSet<OriginalTxnIdx>,
+    /// Txns that (1) write the current storage location and (2) have not been accepted.
     pending_writes: BTreeSet<OriginalTxnIdx>,
+    /// Txns that write the current storage location.
     pub writer_set: HashSet<OriginalTxnIdx>,
+    /// Txns that have been accepted.
     pub finalized_all: BTreeSet<ShardedTxnIndex2>,
+    /// Txns that (1) write the current storage location and (2) have been accepted.
     pub finalized_writes: BTreeSet<ShardedTxnIndex2>,
 }
 
