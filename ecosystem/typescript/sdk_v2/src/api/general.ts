@@ -2,7 +2,7 @@ import { AptosConfig } from "./aptos_config";
 import { Gen } from "../types";
 import { Memoize, parseApiError } from "../utils";
 import { getBlockByHeight, getBlockByVersion, getChainId, getLedgerInfo, view } from "../internal/general";
-import { ABIRoot, ExtractReturnType, ViewFunctionName, ViewRequestPayload } from "../type_utils";
+import { ABIRoot, ExtractReturnType, ViewFunctionName, ViewRequestPayload } from "../transactions/surf";
 
 export class General {
   readonly config: AptosConfig;
