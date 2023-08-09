@@ -212,7 +212,7 @@ pub fn verify_partitioner_output(
                 for loc in locs.iter() {
                     let key = loc.clone().into_state_key();
                     let key_str = CryptoHash::hash(&key).to_hex();
-                    println!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, send key={} to round={}, shard={}, new_tid={}", round_id, shard_id, old_tid, tid, key_str, dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index);
+                    // println!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, send key={} to round={}, shard={}, new_tid={}", round_id, shard_id, old_tid, tid, key_str, dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index);
                     if round_id != num_rounds - 1 {
                         assert_ne!(dst_tid.round_id, round_id);
                     }
@@ -257,12 +257,11 @@ pub fn verify_partitioner_output(
     for_each_sub_block(GLOBAL_ROUND_ID, GLOBAL_SHARD_ID, output.num_sharded_txns(), output.global_txns.as_slice());
 
     assert_eq!(HashSet::from_iter(0..num_txns), old_tids_seen);
-    assert_eq!(edge_set_from_src_view.len(), edge_set_from_dst_view.len());
     assert_eq!(edge_set_from_src_view, edge_set_from_dst_view);
     for (_sender, old_tids) in old_tids_by_sender {
         assert!(is_sorted(&old_tids));
     }
-    info!("MATRIX_REPORT: total_comm_cost={}", total_comm_cost);
+    println!("MATRIX_REPORT: total_comm_cost={}", total_comm_cost);
 }
 
 fn is_sorted(arr: &Vec<usize>) -> bool {

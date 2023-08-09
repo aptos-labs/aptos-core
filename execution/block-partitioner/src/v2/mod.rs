@@ -39,6 +39,7 @@ use std::{
         Mutex, RwLock,
     },
 };
+use aptos_crypto::hash::CryptoHash;
 use aptos_types::block_executor::partitioner::{GLOBAL_ROUND_ID, GLOBAL_SHARD_ID, PartitionedTransactions};
 
 /// The position of a txn in the block *before partitioning*.
@@ -312,6 +313,7 @@ impl PartitionerV2 {
                         Vec::with_capacity(cur_sub_block_size);
                     (0..cur_sub_block_size).for_each(|pos_in_sub_block| {
                         let ori_txn_idx = txn_id_matrix[round_id][shard_id][pos_in_sub_block];
+                        let new_txn_idx = start_index_matrix[round_id][shard_id] + pos_in_sub_block;
                         let txn = txns[ori_txn_idx].lock().unwrap().take().unwrap();
                         let mut deps = CrossShardDependencies::default();
                         for &key_idx in wsets[ori_txn_idx]
@@ -350,11 +352,13 @@ impl PartitionerV2 {
                                 .next()
                                 .is_none();
                             if is_last_writer_in_cur_sub_block {
+                                // println!("r{round_id}s{shard_id}t{new_txn_idx} key {:?} ADD_DEPENDENT_EDGE", tracker.storage_location.state_key().hash());
                                 let mut end_idx = ShardedTxnIndex2::new(num_rounds, num_shards, 0); // Guaranteed to be invalid.
                                 for follower_txn_idx in tracker
                                     .finalized_all
                                     .range(ShardedTxnIndex2::new(round_id, shard_id + 1, 0)..)
                                 {
+                                    // println!("r{round_id}s{shard_id}t{new_txn_idx} gives key {:?} ADD_DEPENDENT_EDGE to r{}s{}t{}", tracker.storage_location.state_key().hash(), follower_txn_idx.round_id, follower_txn_idx.shard_id, *new_indices[follower_txn_idx.ori_txn_idx].read().unwrap());
                                     if *follower_txn_idx > end_idx {
                                         break;
                                     }
@@ -473,13 +477,19 @@ impl PartitionerV2 {
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["handle_discarded"])
             .start_timer();
+
         if self.merge_discarded {
             info!("Merging txns after discarding stopped.");
-            let last_round_id = txn_idx_matrix.len();
             let last_round_txns: Vec<OriginalTxnIdx> =
                 remaining_txns.into_iter().flatten().collect();
-            self.thread_pool.install(|| {
-                last_round_txns.par_iter().for_each(|txn_idx_ref| {
+            remaining_txns = vec![vec![]; num_executor_shards];
+            remaining_txns[num_executor_shards - 1] = last_round_txns;
+        }
+
+        let last_round_id = txn_idx_matrix.len();
+        self.thread_pool.install(|| {
+            (0..num_executor_shards).into_par_iter().for_each(|shard_id|{
+                remaining_txns[shard_id].par_iter().for_each(|txn_idx_ref|{
                     let txn_idx = *txn_idx_ref;
                     for key_idx_ref in rsets[txn_idx]
                         .read()
@@ -492,20 +502,18 @@ impl PartitionerV2 {
                         tracker.write().unwrap().mark_txn_ordered(
                             txn_idx,
                             last_round_id,
-                            num_executor_shards - 1,
+                            shard_id,
                         );
                     }
                 });
             });
+        });
+        txn_idx_matrix.push(remaining_txns);
 
-            remaining_txns = vec![vec![]; num_executor_shards];
-            remaining_txns[num_executor_shards - 1] = last_round_txns;
-            txn_idx_matrix.push(remaining_txns);
-        } else if num_remaining_txns > 0 {
-            txn_idx_matrix.push(remaining_txns);
-        }
         let duration = timer.stop_and_record();
         info!("handle_discarded={duration}");
+
+        println!("txn_idx_matrix={txn_idx_matrix:?}");
 
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["new_tid_table"])
