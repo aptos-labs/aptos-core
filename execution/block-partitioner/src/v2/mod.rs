@@ -9,7 +9,7 @@ use crate::{
     v2::{conflicting_txn_tracker::ConflictingTxnTracker, counters::MISC_TIMERS_SECONDS},
     BlockPartitioner, Sender,
 };
-use aptos_logger::info;
+use aptos_logger::{info, trace};
 use aptos_types::{
     block_executor::partitioner::{
         CrossShardDependencies, RoundId, ShardId, ShardedTxnIndex, SubBlock, SubBlocksForShard,
@@ -139,7 +139,7 @@ impl PartitionerV2 {
         remaining_txns: Vec<Vec<OriginalTxnIdx>>,
     ) -> (Vec<Vec<OriginalTxnIdx>>, Vec<Vec<OriginalTxnIdx>>) {
         let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&[format!("round_{round_id}__init").as_str()])
+            .with_label_values(&[format!("multi_rounds__round_{round_id}__init").as_str()])
             .start_timer();
         let num_shards = remaining_txns.len();
         let mut discarded: Vec<RwLock<Vec<OriginalTxnIdx>>> = Vec::with_capacity(num_shards);
@@ -153,11 +153,10 @@ impl PartitionerV2 {
         }
 
         let min_discarded_by_sender: DashMap<SenderIdx, AtomicUsize> = DashMap::new();
-        let duration = timer.stop_and_record();
-        info!("round_{}__init={}", round_id, duration);
+        let _duration = timer.stop_and_record();
 
         let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&[format!("round_{round_id}__resolve_conflict").as_str()])
+            .with_label_values(&[format!("multi_rounds__round_{round_id}__resolve_conflict").as_str()])
             .start_timer();
         self.thread_pool.install(|| {
             remaining_txns
@@ -197,11 +196,10 @@ impl PartitionerV2 {
                     });
                 });
         });
-        let duration = timer.stop_and_record();
-        info!("round_{}__resolve_conflict={}", round_id, duration);
+        let _duration = timer.stop_and_record();
 
         let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&[format!("round_{round_id}__keep_relative_order").as_str()])
+            .with_label_values(&[format!("multi_rounds__round_{round_id}__keep_relative_order").as_str()])
             .start_timer();
         self.thread_pool.install(|| {
             (0..num_shards).into_par_iter().for_each(|shard_id| {
@@ -239,18 +237,16 @@ impl PartitionerV2 {
                     });
             });
         });
-        let duration = timer.stop_and_record();
-        info!("round_{}__keep_relative_order={}", round_id, duration);
+        let _duration = timer.stop_and_record();
 
         let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&[format!("round_{round_id}__return_obj").as_str()])
+            .with_label_values(&[format!("multi_rounds__round_{round_id}__return_obj").as_str()])
             .start_timer();
         let ret = (
             extract_and_sort(finally_accepted),
             extract_and_sort(discarded),
         );
-        let duration = timer.stop_and_record();
-        info!("round_{}__return_obj={}", round_id, duration);
+        let _duration = timer.stop_and_record();
         self.thread_pool.spawn(move || {
             drop(potentially_accepted);
             drop(min_discarded_by_sender);
@@ -300,8 +296,7 @@ impl PartitionerV2 {
                     })
                     .collect()
             });
-        let duration = timer.stop_and_record();
-        info!("add_edges__init={duration}");
+        let _duration = timer.stop_and_record();
 
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["add_edges__main"])
@@ -393,8 +388,7 @@ impl PartitionerV2 {
                 });
             });
         });
-        let duration = timer.stop_and_record();
-        info!("add_edges__main={duration}");
+        let _duration = timer.stop_and_record();
 
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["add_edges__return_obj"])
@@ -422,8 +416,7 @@ impl PartitionerV2 {
             })
             .collect();
         let ret = PartitionedTransactions::new(sharded_txns, global_txns);
-        let duration = timer.stop_and_record();
-        info!("add_edges__return_obj={duration}");
+        let _duration = timer.stop_and_record();
 
         self.thread_pool.spawn(move || {
             drop(sub_block_matrix);
@@ -453,7 +446,7 @@ impl PartitionerV2 {
         let mut num_remaining_txns = usize::MAX;
         for round_id in 0..(self.num_rounds_limit - 1) {
             let timer = MISC_TIMERS_SECONDS
-                .with_label_values(&[format!("round_{round_id}").as_str()])
+                .with_label_values(&[format!("multi_rounds__round_{round_id}").as_str()])
                 .start_timer();
             let (accepted, discarded) = self.discarding_round(
                 round_id,
@@ -468,7 +461,6 @@ impl PartitionerV2 {
             remaining_txns = discarded;
             num_remaining_txns = remaining_txns.iter().map(|ts| ts.len()).sum();
             let duration = timer.stop_and_record();
-            info!("round_{round_id}={duration}");
 
             if num_remaining_txns < self.avoid_pct as usize * num_txns / 100 {
                 break;
@@ -476,11 +468,11 @@ impl PartitionerV2 {
         }
 
         let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["handle_discarded"])
+            .with_label_values(&["multi_rounds__handle_discarded"])
             .start_timer();
 
         if self.merge_discarded {
-            info!("Merging txns after discarding stopped.");
+            trace!("Merging txns after discarding stopped.");
             let last_round_txns: Vec<OriginalTxnIdx> =
                 remaining_txns.into_iter().flatten().collect();
             remaining_txns = vec![vec![]; num_executor_shards];
@@ -511,13 +503,10 @@ impl PartitionerV2 {
         });
         txn_idx_matrix.push(remaining_txns);
 
-        let duration = timer.stop_and_record();
-        info!("handle_discarded={duration}");
-
-        println!("txn_idx_matrix={txn_idx_matrix:?}");
+        let _duration = timer.stop_and_record();
 
         let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["new_tid_table"])
+            .with_label_values(&["multi_rounds__new_tid_table"])
             .start_timer();
         let num_rounds = txn_idx_matrix.len();
         let mut start_index_matrix: Vec<Vec<TxnIndex>> =
@@ -546,8 +535,7 @@ impl PartitionerV2 {
                     });
             });
         });
-        let duration = timer.stop_and_record();
-        info!("new_tid_table={duration}");
+        let _duration = timer.stop_and_record();
         (txn_idx_matrix, start_index_matrix, finalized_indexs)
     }
 }
@@ -629,10 +617,8 @@ impl BlockPartitioner for PartitionerV2 {
                     }
                 });
         });
-        let duration_1 = timer_1.stop_and_record();
-        info!("preprocess__main={duration_1}");
-        let duration = timer.stop_and_record();
-        info!("preprocess={duration}");
+        let _duration_1 = timer_1.stop_and_record();
+        let _duration = timer.stop_and_record();
 
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["pre_partition_uniform"])
@@ -644,7 +630,6 @@ impl BlockPartitioner for PartitionerV2 {
                 start_txns[shard_id - 1] + remaining_txn_idxs[shard_id - 1].len();
         }
         let duration = timer.stop_and_record();
-        info!("pre_partition_uniform={duration}");
 
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["multi_rounds"])
@@ -659,8 +644,7 @@ impl BlockPartitioner for PartitionerV2 {
             &start_txns,
             remaining_txn_idxs,
         );
-        let duration = timer.stop_and_record();
-        info!("multi_rounds={duration}");
+        let _duration = timer.stop_and_record();
 
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["add_edges"])
@@ -674,8 +658,7 @@ impl BlockPartitioner for PartitionerV2 {
             &new_idxs,
             &trackers,
         );
-        let duration = timer.stop_and_record();
-        info!("add_edges={duration}");
+        let _duration = timer.stop_and_record();
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["drop"])
             .start_timer();
@@ -691,8 +674,7 @@ impl BlockPartitioner for PartitionerV2 {
             drop(start_index_matrix);
             drop(new_idxs);
         });
-        let duration = timer.stop_and_record();
-        info!("drop={duration}");
+        let _duration = timer.stop_and_record();
         ret
     }
 }
