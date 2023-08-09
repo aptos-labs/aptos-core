@@ -3,6 +3,12 @@
 All notable changes to the Aptos Node SDK will be captured in this file. This changelog is written by hand for now. It adheres to the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- Fix default behavior for coin client to transfer and create account by default
+
+## 1.17.0 (2023-08-04)
+
+- Add support for a fee payer transaction
+- Return transaction message error when transaction has failed when `checkSuccess` is set to true
 
 ## 1.16.0 (2023-08-02)
 

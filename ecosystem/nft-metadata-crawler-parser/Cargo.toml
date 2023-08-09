@@ -1,5 +1,5 @@
 [package]
-name = "nft-metadata-crawler-parser"
+name = "aptos-nft-metadata-crawler-parser"
 description = "NFT Metadata Crawler Parser service."
 version = "0.1.0"
 
