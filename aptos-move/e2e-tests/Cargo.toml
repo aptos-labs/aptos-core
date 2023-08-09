@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-abstract-gas-usage = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-block-executor = { workspace = true }
 aptos-cached-packages ={ workspace = true }
@@ -25,6 +26,7 @@ aptos-gas-profiling = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-memory-usage-tracker = { workspace = true }
+aptos-native-interface = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-table-natives = { workspace = true }

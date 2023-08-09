@@ -2,14 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network::ApplicationNetworkInterfaces;
-use aptos_config::config::{NodeConfig, StateSyncConfig, StorageServiceConfig};
+use aptos_config::config::{NodeConfig, StateSyncConfig};
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::client::AptosDataClient;
 use aptos_data_streaming_service::{
     streaming_client::{new_streaming_service_client_listener_pair, StreamingServiceClient},
     streaming_service::DataStreamingService,
 };
-use aptos_event_notifications::{EventSubscriptionService, ReconfigNotificationListener};
+use aptos_event_notifications::{
+    DbBackedOnChainConfig, EventSubscriptionService, ReconfigNotificationListener,
+};
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_infallible::RwLock;
 use aptos_mempool_notifications::MempoolNotificationListener;
@@ -29,7 +31,7 @@ use aptos_storage_service_server::{
 };
 use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
-use aptos_types::{on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint};
+use aptos_types::waypoint::Waypoint;
 use aptos_vm::AptosVM;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -41,14 +43,12 @@ pub fn create_event_subscription_service(
     db_rw: &DbReaderWriter,
 ) -> (
     EventSubscriptionService,
-    ReconfigNotificationListener,
-    Option<ReconfigNotificationListener>,
+    ReconfigNotificationListener<DbBackedOnChainConfig>,
+    Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
 ) {
     // Create the event subscription service
-    let mut event_subscription_service = EventSubscriptionService::new(
-        ON_CHAIN_CONFIG_REGISTRY,
-        Arc::new(RwLock::new(db_rw.clone())),
-    );
+    let mut event_subscription_service =
+        EventSubscriptionService::new(Arc::new(RwLock::new(db_rw.clone())));
 
     // Create a reconfiguration subscription for mempool
     let mempool_reconfig_subscription = event_subscription_service
@@ -117,7 +117,7 @@ pub fn start_state_sync_and_get_notification_handles(
 
     // Start the state sync storage service
     let storage_service_runtime = setup_state_sync_storage_service(
-        node_config.state_sync.storage_service,
+        node_config.state_sync,
         peers_and_metadata,
         network_service_events,
         &db_rw,
@@ -202,7 +202,7 @@ fn setup_aptos_data_client(
 
 /// Sets up the state sync storage service runtime
 fn setup_state_sync_storage_service(
-    config: StorageServiceConfig,
+    config: StateSyncConfig,
     peers_and_metadata: Arc<PeersAndMetadata>,
     network_service_events: NetworkServiceEvents<StorageServiceMessage>,
     db_rw: &DbReaderWriter,
@@ -212,7 +212,7 @@ fn setup_state_sync_storage_service(
     let storage_service_runtime = aptos_runtimes::spawn_named_runtime("stor-server".into(), None);
 
     // Spawn the state sync storage service servers on the runtime
-    let storage_reader = StorageReader::new(config, Arc::clone(&db_rw.reader));
+    let storage_reader = StorageReader::new(config.storage_service, Arc::clone(&db_rw.reader));
     let service = StorageServiceServer::new(
         config,
         storage_service_runtime.handle().clone(),

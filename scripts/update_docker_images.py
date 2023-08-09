@@ -10,7 +10,7 @@ OS = "linux"
 
 IMAGES = {
     "debian": "debian:bullseye",
-    "rust": "rust:1.70.0-bullseye",
+    "rust": "rust:1.71.1-bullseye",
 }
 
 def update() -> int:

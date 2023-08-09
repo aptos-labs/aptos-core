@@ -73,6 +73,7 @@ impl AggregatorID {
 /// This graph shows how delta of aggregator changed during a single transaction
 /// execution:
 ///
+/// ```text
 /// +A ===========================================>
 ///            ||
 ///          ||||                               +X
@@ -83,6 +84,7 @@ impl AggregatorID {
 ///                         ||
 ///                         ||
 /// -B ===========================================>
+/// ```
 ///
 /// Clearly, +X succeeds if +A and -B succeed. Therefore each delta
 /// validation consists of:
