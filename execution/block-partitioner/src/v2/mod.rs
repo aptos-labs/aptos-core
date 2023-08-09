@@ -442,7 +442,7 @@ impl PartitionerV2 {
     ) {
         let finalized_indexs: Vec<RwLock<TxnIndex>> =
             (0..num_txns).map(|_tid| RwLock::new(0)).collect();
-        let mut txn_idx_matrix: Vec<Vec<Vec<OriginalTxnIdx>>> = Vec::new();
+        let mut accepted_txn_matrix: Vec<Vec<Vec<OriginalTxnIdx>>> = Vec::new();
         let mut num_remaining_txns = usize::MAX;
         for round_id in 0..(self.num_rounds_limit - 1) {
             let timer = MISC_TIMERS_SECONDS
@@ -457,7 +457,7 @@ impl PartitionerV2 {
                 start_txns,
                 remaining_txns,
             );
-            txn_idx_matrix.push(accepted);
+            accepted_txn_matrix.push(accepted);
             remaining_txns = discarded;
             num_remaining_txns = remaining_txns.iter().map(|ts| ts.len()).sum();
             let duration = timer.stop_and_record();
@@ -479,7 +479,7 @@ impl PartitionerV2 {
             remaining_txns[num_executor_shards - 1] = last_round_txns;
         }
 
-        let last_round_id = txn_idx_matrix.len();
+        let last_round_id = accepted_txn_matrix.len();
         self.thread_pool.install(|| {
             (0..num_executor_shards).into_par_iter().for_each(|shard_id|{
                 remaining_txns[shard_id].par_iter().for_each(|txn_idx_ref|{
@@ -501,18 +501,18 @@ impl PartitionerV2 {
                 });
             });
         });
-        txn_idx_matrix.push(remaining_txns);
+        accepted_txn_matrix.push(remaining_txns);
 
         let _duration = timer.stop_and_record();
 
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["multi_rounds__new_tid_table"])
             .start_timer();
-        let num_rounds = txn_idx_matrix.len();
+        let num_rounds = accepted_txn_matrix.len();
         let mut start_index_matrix: Vec<Vec<TxnIndex>> =
             vec![vec![0; num_executor_shards]; num_rounds];
         let mut global_counter: TxnIndex = 0;
-        for (round_id, row) in txn_idx_matrix.iter().enumerate() {
+        for (round_id, row) in accepted_txn_matrix.iter().enumerate() {
             for (shard_id, txns) in row.iter().enumerate() {
                 start_index_matrix[round_id][shard_id] = global_counter;
                 global_counter += txns.len();
@@ -524,11 +524,11 @@ impl PartitionerV2 {
                 (0..num_executor_shards)
                     .into_par_iter()
                     .for_each(|shard_id| {
-                        let sub_block_size = txn_idx_matrix[round_id][shard_id].len();
+                        let sub_block_size = accepted_txn_matrix[round_id][shard_id].len();
                         (0..sub_block_size)
                             .into_par_iter()
                             .for_each(|pos_in_sub_block| {
-                                let txn_idx = txn_idx_matrix[round_id][shard_id][pos_in_sub_block];
+                                let txn_idx = accepted_txn_matrix[round_id][shard_id][pos_in_sub_block];
                                 *finalized_indexs[txn_idx].write().unwrap() =
                                     start_index_matrix[round_id][shard_id] + pos_in_sub_block;
                             });
@@ -536,7 +536,7 @@ impl PartitionerV2 {
             });
         });
         let _duration = timer.stop_and_record();
-        (txn_idx_matrix, start_index_matrix, finalized_indexs)
+        (accepted_txn_matrix, start_index_matrix, finalized_indexs)
     }
 }
 
