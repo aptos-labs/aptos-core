@@ -46,6 +46,7 @@ pub enum FeatureFlag {
     AptosUniqueIdentifiers,
     BulletproofsNatives,
     SignerNativeFormatFix,
+    ModuleEvent,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -170,6 +171,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AptosUniqueIdentifiers => AptosFeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
             FeatureFlag::BulletproofsNatives => AptosFeatureFlag::BULLETPROOFS_NATIVES,
             FeatureFlag::SignerNativeFormatFix => AptosFeatureFlag::SIGNER_NATIVE_FORMAT_FIX,
+            FeatureFlag::ModuleEvent => AptosFeatureFlag::MODULE_EVENT,
         }
     }
 }
@@ -217,6 +219,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::APTOS_UNIQUE_IDENTIFIERS => FeatureFlag::AptosUniqueIdentifiers,
             AptosFeatureFlag::BULLETPROOFS_NATIVES => FeatureFlag::BulletproofsNatives,
             AptosFeatureFlag::SIGNER_NATIVE_FORMAT_FIX => FeatureFlag::SignerNativeFormatFix,
+            AptosFeatureFlag::MODULE_EVENT => FeatureFlag::ModuleEvent,
         }
     }
 }
