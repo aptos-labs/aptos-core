@@ -685,23 +685,27 @@ impl BlockPartitioner for PartitionerV2 {
 
 #[test]
 fn test_partitioner_v2_correctness() {
-    let block_generator = P2PBlockGenerator::new(100);
-    let partitioner = PartitionerV2::new(8, 4, 10, 64);
-    let mut rng = thread_rng();
-    for _run_id in 0..100 {
-        let block_size = 10_u64.pow(rng.gen_range(0, 4)) as usize;
-        let num_shards = rng.gen_range(1, 10);
-        let block = block_generator.rand_block(&mut rng, block_size);
-        let block_clone = block.clone();
-        let partitioned = partitioner.partition(block, num_shards);
-        crate::test_utils::verify_partitioner_output(&block_clone, &partitioned);
+    for merge_discarded in [false, true] {
+        let block_generator = P2PBlockGenerator::new(100);
+        let partitioner = PartitionerV2::new(8, 4, 10, 64, merge_discarded);
+        let mut rng = thread_rng();
+        for _run_id in 0..20 {
+            let block_size = 10_u64.pow(rng.gen_range(0, 4)) as usize;
+            let num_shards = rng.gen_range(1, 10);
+            let block = block_generator.rand_block(&mut rng, block_size);
+            let block_clone = block.clone();
+            let partitioned = partitioner.partition(block, num_shards);
+            crate::test_utils::verify_partitioner_output(&block_clone, &partitioned);
+        }
     }
 }
 
 #[test]
 fn test_partitioner_v2_determinism() {
-    let partitioner = Arc::new(PartitionerV2::new(4, 4, 10, 64));
-    assert_deterministic_result(partitioner);
+    for merge_discarded in [false, true] {
+        let partitioner = Arc::new(PartitionerV2::new(4, 4, 10, 64, merge_discarded));
+        assert_deterministic_result(partitioner);
+    }
 }
 
 /// Evenly divide 0..n-1. Example: uniform_partition(11,3) == [[0,1,2,3],[4,5,6,7],[8,9,10]]
