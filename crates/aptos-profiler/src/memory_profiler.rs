@@ -66,7 +66,7 @@ impl Profiler for MemProfiler {
     }
 
     /// Enable memory profiling until it is disabled
-    fn start_profiling(&self) -> Result<()> {
+    fn start_profiling(&mut self) -> Result<()> {
         let mut prof_active: bool = true;
 
         let result = unsafe {
@@ -87,7 +87,7 @@ impl Profiler for MemProfiler {
     }
 
     /// Disable profiling and run jeprof to obtain results
-    fn end_profiling(&self) -> Result<()> {
+    fn end_profiling(&mut self) -> Result<()> {
         let mut prof_active: bool = false;
         let result = unsafe {
             jemalloc_sys::mallctl(

@@ -6,8 +6,8 @@ use crate::{
     CpuProfilerConfig, Profiler,
 };
 use anyhow::Result;
-use std::{path::PathBuf, thread, time};
 use pprof::ProfilerGuard;
+use std::{path::PathBuf, thread, time};
 
 pub struct CpuProfiler<'a> {
     frequency: i32,
@@ -15,7 +15,7 @@ pub struct CpuProfiler<'a> {
     guard: Option<ProfilerGuard<'a>>,
 }
 
-impl CpuProfiler<'_> {
+impl<'a> CpuProfiler<'a> {
     pub(crate) fn new(config: &CpuProfilerConfig) -> Self {
         Self {
             frequency: config.frequency,
@@ -24,12 +24,12 @@ impl CpuProfiler<'_> {
         }
     }
 
-    pub(crate) fn set_guard(&mut self, guard: ProfilerGuard)-> Result<()> {
+    pub(crate) fn set_guard(&mut self, guard: ProfilerGuard<'a>) -> Result<()> {
         self.guard = Some(guard);
         Ok(())
     }
 
-    pub(crate) fn destory_guard(&mut self)-> Result<()> {
+    pub(crate) fn destory_guard(&mut self) -> Result<()> {
         self.guard = None;
         Ok(())
     }
@@ -50,25 +50,24 @@ impl Profiler for CpuProfiler<'_> {
     }
 
     /// Start profiling until it is stopped
-    fn start_profiling(&self) -> Result<()> {
+    fn start_profiling(&mut self) -> Result<()> {
         let guard = pprof::ProfilerGuard::new(self.frequency).unwrap();
-        self.set_guard(guard);
+        self.set_guard(guard)?;
         Ok(())
     }
 
     /// End profiling
-    fn end_profiling(&self) -> Result<()> {
+    fn end_profiling(&mut self) -> Result<()> {
         //TODO: pprof-rs crate may not have a direct way of stopping the profiling from another function.
         //Potential approach: return guard object to original scope and pass it here to stop and report results
-        if let Ok(report) = self.guard.expect("REASON").report().build() {
-            let file = create_file_with_parents(self.svg_result_path.as_path())?;
-            let _result = report.flamegraph(file);
-        };
-        self.destory_guard();
-        if let Ok(report) = self.guard.expect("REASON").report().build() {
-            let file = create_file_with_parents(self.svg_result_path.as_path())?;
-            let _result = report.flamegraph(file);
-        };
+        if let Some(guard) = &self.guard {
+            if let Ok(report) = guard.report().build() {
+                let file = create_file_with_parents(self.svg_result_path.as_path())?;
+                let _result = report.flamegraph(file);
+            };
+            self.destory_guard()?;
+        }
+
         Ok(())
     }
 
