@@ -17,19 +17,35 @@ pub(crate) fn get_aggregator_field(aggregator: &StructRef, index: usize) -> Part
 }
 
 /// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
-pub(crate) fn aggregator_info(aggregator: &StructRef) -> PartialVMResult<(AggregatorID, u128)> {
-    let (value, limit) = get_aggregator_fields(aggregator)?;
+pub(crate) fn aggregator_info_u128(
+    aggregator: &StructRef,
+) -> PartialVMResult<(AggregatorID, u128)> {
+    let (value, limit) = get_aggregator_fields_u128(aggregator)?;
     assert!(
-        value < u64::MAX as u128,
+        value <= u64::MAX as u128,
         "identifier in aggregator exceeds u64::MAX"
     );
     Ok((AggregatorID::ephemeral(value as u64), limit))
 }
 
+/// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
+pub(crate) fn aggregator_info_u64(aggregator: &StructRef) -> PartialVMResult<(AggregatorID, u64)> {
+    let (value, limit) = get_aggregator_fields_u64(aggregator)?;
+    Ok((AggregatorID::ephemeral(value), limit))
+}
+
 /// Given a reference to `Aggregator` Move struct, returns a tuple of its
 /// fields: (`value`, `limit`).
-pub fn get_aggregator_fields(aggregator: &StructRef) -> PartialVMResult<(u128, u128)> {
+pub fn get_aggregator_fields_u128(aggregator: &StructRef) -> PartialVMResult<(u128, u128)> {
     let value = get_aggregator_field(aggregator, VALUE_FIELD_INDEX)?.value_as::<u128>()?;
     let limit = get_aggregator_field(aggregator, LIMIT_FIELD_INDEX)?.value_as::<u128>()?;
+    Ok((value, limit))
+}
+
+/// Given a reference to `Aggregator` Move struct, returns a tuple of its
+/// fields: (`value`, `limit`).
+pub fn get_aggregator_fields_u64(aggregator: &StructRef) -> PartialVMResult<(u64, u64)> {
+    let value = get_aggregator_field(aggregator, VALUE_FIELD_INDEX)?.value_as::<u64>()?;
+    let limit = get_aggregator_field(aggregator, LIMIT_FIELD_INDEX)?.value_as::<u64>()?;
     Ok((value, limit))
 }
