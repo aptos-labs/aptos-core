@@ -42,8 +42,6 @@ pub trait BlockPartitioner: Send {
     ) -> PartitionedTransactions;
 }
 
-pub mod uniform_partitioner;
-
 /// When multiple transactions access the same storage location,
 /// use this function to pick a shard as the anchor/leader and resolve conflicts.
 /// Used by `ShardedBlockPartitioner` and `V2Partitioner`.
