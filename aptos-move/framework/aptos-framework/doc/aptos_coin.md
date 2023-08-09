@@ -588,4 +588,15 @@ Claim the delegated mint capability and destroy the delegated token.
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+
+
+<a name="0x1_aptos_coin_ExistsAptosCoin"></a>
+
+
+<pre><code><b>schema</b> <a href="aptos_coin.md#0x1_aptos_coin_ExistsAptosCoin">ExistsAptosCoin</a> {
+    <b>requires</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">AptosCoin</a>&gt;&gt;(@aptos_framework);
+}
+</code></pre>
+
+
+[move-book]: https://aptos.dev/move/book/SUMMARY

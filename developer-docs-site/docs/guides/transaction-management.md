@@ -4,7 +4,7 @@ This guide explains how to build a transaction management harness that can scale
 
 ## Background
 
-In Aptos, transactions are mapped back to an account both in terms of the entity that signs or authorizes that transaction as well as a providing an account-based sequence number. When Aptos network receives a new transaction several rules are followed with respect to the this:
+In Aptos, transactions are mapped back to an account in terms of the entity that signs or authorizes that transaction and provides an account-based sequence number. When the Aptos network receives a new transaction, several rules are followed with respect to this:
 
 - The transaction sent from an account must be authorized correctly by that account.
 - The current time as defined by the most recent ledger update must be before the expiration timestamp of the transaction.

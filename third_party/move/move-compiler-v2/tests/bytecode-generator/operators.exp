@@ -1,0 +1,160 @@
+// ---- Model Dump
+module 0x42::operators {
+    private fun arithm(x: u64,y: u64) {
+        Add(x, Mod(Mul(Div(y, Sub(x, y)), y), x))
+    }
+    private fun bits(x: u64,y: u8) {
+        BitAnd(Shl(x, y), x)
+    }
+    private fun bools(x: bool,y: bool) {
+        Or(Or(Or(And(x, y), And(x, Not(y))), And(Not(x), y)), And(Not(x), Not(y)))
+    }
+    private fun equality<T>(x: T,y: T) {
+        Eq<T>(x, y)
+    }
+    private fun inequality<T>(x: T,y: T) {
+        Neq<T>(x, y)
+    }
+    private fun order(x: u64,y: u64) {
+        And(And(And(Lt(x, y), Le(x, y)), Not(Gt(x, y))), Not(Ge(x, y)))
+    }
+} // end 0x42::operators
+
+============ initial bytecode ================
+
+[variant baseline]
+fun operators::arithm($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t6 := -($t0, $t1)
+  1: $t5 := /($t1, $t6)
+  2: $t4 := *($t5, $t1)
+  3: $t3 := %($t4, $t0)
+  4: $t2 := +($t0, $t3)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun operators::bits($t0: u64, $t1: u8): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: $t3 := <<($t0, $t1)
+  1: $t2 := &($t3, $t0)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun operators::bools($t0: bool, $t1: bool): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+  0: if ($t0) goto 1 else goto 4
+  1: label L0
+  2: $t5 := move($t1)
+  3: goto 6
+  4: label L1
+  5: $t5 := false
+  6: label L2
+  7: if ($t5) goto 8 else goto 11
+  8: label L3
+  9: $t4 := true
+ 10: goto 19
+ 11: label L4
+ 12: if ($t0) goto 13 else goto 16
+ 13: label L6
+ 14: $t4 := !($t1)
+ 15: goto 18
+ 16: label L7
+ 17: $t4 := false
+ 18: label L8
+ 19: label L5
+ 20: if ($t4) goto 21 else goto 24
+ 21: label L9
+ 22: $t3 := true
+ 23: goto 33
+ 24: label L10
+ 25: $t6 := !($t0)
+ 26: if ($t6) goto 27 else goto 30
+ 27: label L12
+ 28: $t3 := move($t1)
+ 29: goto 32
+ 30: label L13
+ 31: $t3 := false
+ 32: label L14
+ 33: label L11
+ 34: if ($t3) goto 35 else goto 38
+ 35: label L15
+ 36: $t2 := true
+ 37: goto 47
+ 38: label L16
+ 39: $t7 := !($t0)
+ 40: if ($t7) goto 41 else goto 44
+ 41: label L18
+ 42: $t2 := !($t1)
+ 43: goto 46
+ 44: label L19
+ 45: $t2 := false
+ 46: label L20
+ 47: label L17
+ 48: return $t2
+}
+
+
+[variant baseline]
+fun operators::equality<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+  0: $t2 := ==($t0, $t1)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun operators::inequality<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+  0: $t2 := !=($t0, $t1)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun operators::order($t0: u64, $t1: u64): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+  0: $t5 := <($t0, $t1)
+  1: if ($t5) goto 2 else goto 5
+  2: label L0
+  3: $t4 := <=($t0, $t1)
+  4: goto 7
+  5: label L1
+  6: $t4 := false
+  7: label L2
+  8: if ($t4) goto 9 else goto 13
+  9: label L3
+ 10: $t6 := >($t0, $t1)
+ 11: $t3 := !($t6)
+ 12: goto 15
+ 13: label L4
+ 14: $t3 := false
+ 15: label L5
+ 16: if ($t3) goto 17 else goto 21
+ 17: label L6
+ 18: $t7 := >=($t0, $t1)
+ 19: $t2 := !($t7)
+ 20: goto 23
+ 21: label L7
+ 22: $t2 := false
+ 23: label L8
+ 24: return $t2
+}

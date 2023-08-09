@@ -690,6 +690,7 @@ Publishes supply configuration. Initially, upgrading is not allowed.
 ## Function `allow_supply_upgrades`
 
 This should be called by on-chain governance to update the config and allow
+or disallow upgradability of total supply.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_allow_supply_upgrades">allow_supply_upgrades</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allowed: bool)
@@ -2778,4 +2779,4 @@ Account is not frozen and sufficient balance.
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

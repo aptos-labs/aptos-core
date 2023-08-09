@@ -167,7 +167,7 @@ export class TypeTagStruct extends TypeTag {
     if (
       this.value.module_name.value === "string" &&
       this.value.name.value === "String" &&
-      this.value.address.toHexString() === AccountAddress.fromHex("0x1").toHexString()
+      this.value.address.toHexString() === AccountAddress.CORE_CODE_ADDRESS.toHexString()
     ) {
       return true;
     }
@@ -339,6 +339,24 @@ export class TypeTagParser {
     }
   }
 
+  /**
+   * Consumes all of an unused generic field, mostly applicable to object
+   *
+   * Note: This is recursive.  it can be problematic if there's bad input
+   * @private
+   */
+  private consumeWholeGeneric() {
+    this.consume("<");
+    while (this.tokens[0][1] !== ">") {
+      // If it is nested, we have to consume another nested generic
+      if (this.tokens[0][1] === "<") {
+        this.consumeWholeGeneric();
+      }
+      this.tokens.shift();
+    }
+    this.consume(">");
+  }
+
   private parseCommaList(endToken: TokenValue, allowTraillingComma: boolean): TypeTag[] {
     const res: TypeTag[] = [];
     if (this.tokens.length <= 0) {
@@ -403,10 +421,10 @@ export class TypeTagParser {
       return new TypeTagVector(res);
     }
     if (tokenVal === "string") {
-      return new StructTag(AccountAddress.fromHex("0x1"), new Identifier("string"), new Identifier("String"), []);
+      return new TypeTagStruct(stringStructTag);
     }
     if (tokenTy === "IDENT" && (tokenVal.startsWith("0x") || tokenVal.startsWith("0X"))) {
-      const address = tokenVal;
+      const address = AccountAddress.fromHex(tokenVal);
       this.consume("::");
       const [moduleTokenTy, module] = this.tokens.shift()!;
       if (moduleTokenTy !== "IDENT") {
@@ -418,12 +436,15 @@ export class TypeTagParser {
         bail("Invalid type tag.");
       }
 
-      // an Object `0x1::object::Object<T>` doesn't hold a real type, it points to an address
-      // therefore, we parse it as an address and dont need to care/parse the `T` type
-      if (module === "object" && name === "Object") {
-        // to support a nested type tag, i.e 0x1::some_module::SomeResource<0x1::object::Object<T>>, we want
-        // to remove the `<T>` part from the tokens list so we dont parse it and can keep parse the type tag.
-        this.tokens.splice(0, 3);
+      // Objects can contain either concrete types e.g. 0x1::object::ObjectCore or generics e.g. T
+      // Neither matter as we can't do type checks, so just the address applies and we consume the entire generic.
+      // TODO: Support parsing structs that don't come from core code address
+      if (
+        AccountAddress.CORE_CODE_ADDRESS.toHexString() === address.toHexString() &&
+        module === "object" &&
+        name === "Object"
+      ) {
+        this.consumeWholeGeneric();
         return new TypeTagAddress();
       }
 
@@ -435,12 +456,7 @@ export class TypeTagParser {
         this.consume(">");
       }
 
-      const structTag = new StructTag(
-        AccountAddress.fromHex(address),
-        new Identifier(module),
-        new Identifier(name),
-        tyTags,
-      );
+      const structTag = new StructTag(address, new Identifier(module), new Identifier(name), tyTags);
       return new TypeTagStruct(structTag);
     }
     if (tokenTy === "GENERIC") {

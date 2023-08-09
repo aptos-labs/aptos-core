@@ -20,19 +20,24 @@ aptos-block-partitioner = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-framework =  { workspace = true }
-aptos-gas = { workspace = true }
+aptos-gas-algebra = { workspace = true }
+aptos-gas-meter = { workspace = true }
+aptos-gas-schedule = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-memory-usage-tracker = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-mvhashmap = { workspace = true }
+aptos-native-interface = { workspace = true }
 aptos-state-view = { workspace = true }
+aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 aptos-utils = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
+crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
@@ -40,7 +45,6 @@ move-binary-format = { workspace = true }
 move-bytecode-utils = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
-move-table-extension = { workspace = true }
 move-unit-test = { workspace = true, optional = true }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }

@@ -17,7 +17,7 @@ use move_package::{compilation::build_plan::BuildPlan, BuildConfig};
 use move_unit_test::UnitTestingConfig;
 use move_vm_test_utils::gas_schedule::CostTable;
 // if unix
-#[cfg(any(target_family = "unix"))]
+#[cfg(target_family = "unix")]
 use std::os::unix::prelude::ExitStatusExt;
 // if windows
 #[cfg(target_family = "windows")]

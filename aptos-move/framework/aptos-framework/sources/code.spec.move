@@ -23,27 +23,32 @@ spec aptos_framework::code {
     }
 
     spec publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) {
-        // TODO: Can't verify `check_upgradability` in while loop.
-        pragma verify = false;
+        // TODO: Can't verify 'vector::enumerate' loop.
+        pragma aborts_if_is_partial;
+        let addr = signer::address_of(owner);
+        modifies global<PackageRegistry>(addr);
+        aborts_if pack.upgrade_policy.policy <= upgrade_policy_arbitrary().policy;
     }
 
     spec publish_package_txn {
-        // TODO: Calls `publish_package`.`
+        // TODO: Calls `publish_package`.
         pragma verify = false;
     }
 
     spec check_upgradability(old_pack: &PackageMetadata, new_pack: &PackageMetadata, new_modules: &vector<String>) {
-        // TODO: Can't `aborts_if` in a loop.
-        pragma verify = false;
+        // TODO: Can't verify 'vector::enumerate' loop.
+        pragma aborts_if_is_partial;
+        aborts_if old_pack.upgrade_policy.policy >= upgrade_policy_immutable().policy;
+        aborts_if !can_change_upgrade_policy_to(old_pack.upgrade_policy, new_pack.upgrade_policy);
     }
 
     spec check_dependencies(publish_address: address, pack: &PackageMetadata): vector<AllowedDep> {
-        // TODO: loop too deep.
+        // TODO: Can't verify 'vector::enumerate' loop.
         pragma verify = false;
     }
 
     spec check_coexistence(old_pack: &PackageMetadata, new_modules: &vector<String>) {
-        // TODO: loop too deep.
+        // TODO: Can't verify 'vector::enumerate' loop.
         pragma verify = false;
     }
 

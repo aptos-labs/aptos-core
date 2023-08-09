@@ -10,9 +10,9 @@
 # https://gist.github.com/banool/e6a2b85e2fff067d3a215cbfaf808032
 
 # Make sure we're in the root of the repo.
-if [ ! -d ".github" ] 
+if [ ! -d ".github" ]
 then
-    echo "Please run this from the root of aptos-core" 
+    echo "Please run this from the root of aptos-core"
     exit 1
 fi
 
@@ -37,6 +37,7 @@ cargo +nightly fmt $CHECK_ARG
 cargo sort --grouped --workspace $CHECK_ARG
 
 # Ensure that aptos-cached-packages have been built correctly.
+unset SKIP_FRAMEWORK_BUILD
 cargo build -p aptos-cached-packages
 if [ -n "$CHECK_ARG" ]; then
     if [ -n "$(git status --porcelain -uno aptos-move)" ]; then

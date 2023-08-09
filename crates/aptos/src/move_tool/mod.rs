@@ -37,7 +37,7 @@ use aptos_framework::{
     build_model, docgen::DocgenOptions, extended_checks, natives::code::UpgradePolicy,
     prover::ProverOptions, BuildOptions, BuiltPackage,
 };
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_rest_client::aptos_api_types::{
     EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
 };
@@ -490,7 +490,7 @@ impl CliCommand<&'static str> for TestPackage {
             // TODO(Gas): we may want to switch to non-zero costs in the future
             aptos_debug_natives::aptos_debug_natives(
                 NativeGasParameters::zeros(),
-                AbstractValueSizeGasParameters::zeros(),
+                MiscGasParameters::zeros(),
             ),
             None,
             self.compute_coverage,
@@ -1513,10 +1513,51 @@ impl ArgWithType {
         &'a self,
     ) -> CliTypedResult<serde_json::Value> {
         match self._vector_depth {
-            0 => serde_json::to_value(bcs::from_bytes::<T>(&self.arg)?)
-                .map_err(|err| CliError::UnexpectedError(err.to_string())),
-            1 => serde_json::to_value(bcs::from_bytes::<Vec<T>>(&self.arg)?)
-                .map_err(|err| CliError::UnexpectedError(err.to_string())),
+            0 => match self._ty.clone() {
+                FunctionArgType::U64 => {
+                    serde_json::to_value(bcs::from_bytes::<u64>(&self.arg)?.to_string())
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::U128 => {
+                    serde_json::to_value(bcs::from_bytes::<u128>(&self.arg)?.to_string())
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::U256 => {
+                    serde_json::to_value(bcs::from_bytes::<U256>(&self.arg)?.to_string())
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::Raw => serde_json::to_value(&self.arg)
+                    .map_err(|err| CliError::UnexpectedError(err.to_string())),
+                _ => serde_json::to_value(bcs::from_bytes::<T>(&self.arg)?)
+                    .map_err(|err| CliError::UnexpectedError(err.to_string())),
+            },
+            1 => match self._ty.clone() {
+                FunctionArgType::U64 => {
+                    let u64_vector: Vec<u64> = bcs::from_bytes::<Vec<u64>>(&self.arg)?;
+                    let string_vector: Vec<String> =
+                        u64_vector.iter().map(ToString::to_string).collect();
+                    serde_json::to_value(string_vector)
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::U128 => {
+                    let u128_vector: Vec<u128> = bcs::from_bytes::<Vec<u128>>(&self.arg)?;
+                    let string_vector: Vec<String> =
+                        u128_vector.iter().map(ToString::to_string).collect();
+                    serde_json::to_value(string_vector)
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::U256 => {
+                    let u256_vector: Vec<U256> = bcs::from_bytes::<Vec<U256>>(&self.arg)?;
+                    let string_vector: Vec<String> =
+                        u256_vector.iter().map(ToString::to_string).collect();
+                    serde_json::to_value(string_vector)
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::Raw => serde_json::to_value(&self.arg)
+                    .map_err(|err| CliError::UnexpectedError(err.to_string())),
+                _ => serde_json::to_value(bcs::from_bytes::<Vec<T>>(&self.arg)?)
+                    .map_err(|err| CliError::UnexpectedError(err.to_string())),
+            },
 
             2 => serde_json::to_value(bcs::from_bytes::<Vec<Vec<T>>>(&self.arg)?)
                 .map_err(|err| CliError::UnexpectedError(err.to_string())),

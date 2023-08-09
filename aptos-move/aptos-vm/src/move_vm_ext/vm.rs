@@ -3,7 +3,7 @@
 
 use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
-    natives::aptos_natives,
+    natives::aptos_natives_with_builder,
 };
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext,
@@ -12,11 +12,13 @@ use aptos_framework::natives::{
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_gas_algebra::DynamicExpression;
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
+use aptos_native_interface::SafeNativeBuilder;
+use aptos_table_natives::NativeTableContext;
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
-use move_table_extension::NativeTableContext;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
@@ -37,14 +39,18 @@ pub fn get_max_binary_format_version(features: &Features, gas_feature_version: u
 }
 
 impl MoveVmExt {
-    pub fn new(
+    fn new_impl<F>(
         native_gas_params: NativeGasParameters,
-        abs_val_size_gas_params: AbstractValueSizeGasParameters,
+        misc_gas_params: MiscGasParameters,
         gas_feature_version: u64,
         chain_id: u8,
         features: Features,
         timed_features: TimedFeatures,
-    ) -> VMResult<Self> {
+        gas_hook: Option<F>,
+    ) -> VMResult<Self>
+    where
+        F: Fn(DynamicExpression) + Send + Sync + 'static,
+    {
         // Note: binary format v6 adds a few new integer types and their corresponding instructions.
         //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
         //       the gas schedule hasn't been updated yet.
@@ -56,36 +62,92 @@ impl MoveVmExt {
         let type_size_limit = true;
 
         let verifier_config = verifier_config(&features, &timed_features);
-        let features = Arc::new(features);
+
+        let mut type_max_cost = 0;
+        let mut type_base_cost = 0;
+        let mut type_byte_cost = 0;
+        if timed_features.is_enabled(TimedFeatureFlag::LimitTypeTagSize) {
+            // 5000 limits type tag total size < 5000 bytes and < 50 nodes
+            type_max_cost = 5000;
+            type_base_cost = 100;
+            type_byte_cost = 1;
+        }
+
+        let mut builder = SafeNativeBuilder::new(
+            gas_feature_version,
+            native_gas_params.clone(),
+            misc_gas_params.clone(),
+            timed_features.clone(),
+            features.clone(),
+        );
+
+        if let Some(hook) = gas_hook {
+            builder.set_gas_hook(hook);
+        }
 
         Ok(Self {
-            inner: MoveVM::new_with_config(
-                aptos_natives(
-                    native_gas_params,
-                    abs_val_size_gas_params,
-                    gas_feature_version,
-                    timed_features,
-                    features.clone(),
-                ),
-                VMConfig {
-                    verifier: verifier_config,
-                    max_binary_format_version,
-                    paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
-                    enable_invariant_violation_check_in_swap_loc,
-                    type_size_limit,
-                    max_value_nest_depth: Some(128),
-                },
-            )?,
+            inner: MoveVM::new_with_config(aptos_natives_with_builder(&mut builder), VMConfig {
+                verifier: verifier_config,
+                max_binary_format_version,
+                paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
+                enable_invariant_violation_check_in_swap_loc,
+                type_size_limit,
+                max_value_nest_depth: Some(128),
+                type_max_cost,
+                type_base_cost,
+                type_byte_cost,
+            })?,
+            chain_id,
+            features: Arc::new(features),
+        })
+    }
+
+    pub fn new(
+        native_gas_params: NativeGasParameters,
+        misc_gas_params: MiscGasParameters,
+        gas_feature_version: u64,
+        chain_id: u8,
+        features: Features,
+        timed_features: TimedFeatures,
+    ) -> VMResult<Self> {
+        Self::new_impl::<fn(DynamicExpression)>(
+            native_gas_params,
+            misc_gas_params,
+            gas_feature_version,
             chain_id,
             features,
-        })
+            timed_features,
+            None,
+        )
+    }
+
+    pub fn new_with_gas_hook<F>(
+        native_gas_params: NativeGasParameters,
+        misc_gas_params: MiscGasParameters,
+        gas_feature_version: u64,
+        chain_id: u8,
+        features: Features,
+        timed_features: TimedFeatures,
+        gas_hook: Option<F>,
+    ) -> VMResult<Self>
+    where
+        F: Fn(DynamicExpression) + Send + Sync + 'static,
+    {
+        Self::new_impl(
+            native_gas_params,
+            misc_gas_params,
+            gas_feature_version,
+            chain_id,
+            features,
+            timed_features,
+            gas_hook,
+        )
     }
 
     pub fn new_session<'r, S: MoveResolverExt>(
         &self,
         remote: &'r S,
         session_id: SessionId,
-        aggregator_enabled: bool,
     ) -> SessionExt<'r, '_> {
         let mut extensions = NativeContextExtensions::default();
         let txn_hash: [u8; 32] = session_id
@@ -97,11 +159,7 @@ impl MoveVmExt {
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
-        extensions.add(NativeAggregatorContext::new(
-            txn_hash,
-            remote,
-            aggregator_enabled,
-        ));
+        extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 
         let sender_opt = session_id.sender();
         let script_hash = match session_id {

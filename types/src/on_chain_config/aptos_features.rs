@@ -31,6 +31,7 @@ pub enum FeatureFlag {
     DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING = 21,
     GAS_PAYER_ENABLED = 22,
     APTOS_UNIQUE_IDENTIFIERS = 23,
+    BULLETPROOFS_NATIVES = 24,
 }
 
 /// Representation of features on chain as a bitset.

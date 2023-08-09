@@ -1,0 +1,16 @@
+name: File Change Determinator
+description: Runs the file change determinator (to identify which files changed in a pull request)
+outputs:
+  only_docs_changed:
+    description: "Returns true if only docs files were changed in the pull request"
+    value: ${{ steps.doc_change_determinator.outputs.should_skip }}
+
+runs:
+  using: composite
+  steps:
+    # Run the docs only change determinator
+    - id: doc_change_determinator
+      continue-on-error: true # Avoid skipping any checks if this job fails (see: https://github.com/fkirc/skip-duplicate-actions/issues/301)
+      uses: fkirc/skip-duplicate-actions@v5
+      with:
+        paths_ignore: '["**/*.md", "developer-docs-site/**"]'

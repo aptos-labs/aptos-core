@@ -1,6 +1,7 @@
 name: "Gas Calibration"
 on:
   pull_request:
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
       - main
@@ -23,6 +24,7 @@ concurrency:
 
 jobs:
   run-gas-calibration:
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3

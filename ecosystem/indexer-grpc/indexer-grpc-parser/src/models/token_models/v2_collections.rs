@@ -6,7 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
-    collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+    collection_datas::{CollectionData, QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
     token_utils::{CollectionDataIdType, TokenWriteSet},
     tokens::TableHandleToOwner,
     v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenResource},
@@ -202,10 +202,26 @@ impl CollectionV2 {
             let mut creator_address = match maybe_creator_address {
                 Some(ca) => ca,
                 None => {
-                    Self::get_collection_creator_for_v1(conn, &table_handle).context(format!(
+                    match Self::get_collection_creator_for_v1(conn, &table_handle).context(format!(
                         "Failed to get collection creator for table handle {}, txn version {}",
                         table_handle, txn_version
-                    ))?
+                    )) {
+                        Ok(ca) => ca,
+                        Err(_) => {
+                            // Try our best by getting from the older collection data
+                            match CollectionData::get_collection_creator(conn, &table_handle) {
+                                Ok(creator) => creator,
+                                Err(_) => {
+                                    tracing::error!(
+                                        transaction_version = txn_version,
+                                        lookup_key = &table_handle,
+                                        "Failed to get collection v2 creator for table handle. You probably should backfill db."
+                                    );
+                                    return Ok(None);
+                                },
+                            }
+                        },
+                    }
                 },
             };
             creator_address = standardize_address(&creator_address);

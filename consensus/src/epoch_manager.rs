@@ -69,8 +69,8 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     on_chain_config::{
-        ExecutionConfigV1, LeaderReputationType, OnChainConfigPayload, OnChainConsensusConfig,
-        OnChainExecutionConfig, ProposerElectionType, TransactionShufflerType, ValidatorSet,
+        LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+        OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
     validator_verifier::ValidatorVerifier,
 };
@@ -108,7 +108,7 @@ pub enum LivenessStorageData {
 
 // Manager the components that shared across epoch and spawn per-epoch RoundManager with
 // epoch-specific input.
-pub struct EpochManager {
+pub struct EpochManager<P: OnChainConfigProvider> {
     author: Author,
     config: ConsensusConfig,
     time_service: Arc<dyn TimeService>,
@@ -120,7 +120,7 @@ pub struct EpochManager {
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
-    reconfig_events: ReconfigNotificationListener,
+    reconfig_events: ReconfigNotificationListener<P>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
@@ -142,7 +142,7 @@ pub struct EpochManager {
     recovery_mode: bool,
 }
 
-impl EpochManager {
+impl<P: OnChainConfigProvider> EpochManager<P> {
     pub(crate) fn new(
         node_config: &NodeConfig,
         time_service: Arc<dyn TimeService>,
@@ -153,7 +153,7 @@ impl EpochManager {
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
-        reconfig_events: ReconfigNotificationListener,
+        reconfig_events: ReconfigNotificationListener<P>,
         bounded_executor: BoundedExecutor,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
@@ -792,7 +792,7 @@ impl EpochManager {
         self.spawn_block_retrieval_task(epoch, block_store);
     }
 
-    async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
+    async fn start_new_epoch(&mut self, payload: OnChainConfigPayload<P>) {
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
@@ -807,16 +807,17 @@ impl EpochManager {
             error!("Failed to read on-chain consensus config {}", error);
         }
 
+        if let Err(error) = &onchain_execution_config {
+            error!("Failed to read on-chain execution config {}", error);
+        }
+
         self.epoch_state = Some(Arc::new(epoch_state.clone()));
 
         match self.storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
                 let consensus_config = onchain_consensus_config.unwrap_or_default();
-                let execution_config = onchain_execution_config.unwrap_or(
-                    OnChainExecutionConfig::V1(ExecutionConfigV1 {
-                        transaction_shuffler_type: TransactionShufflerType::NoShuffling,
-                    }),
-                );
+                let execution_config = onchain_execution_config
+                    .unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
                 self.quorum_store_enabled = self.enable_quorum_store(&consensus_config);
                 self.recovery_mode = false;
                 self.start_round_manager(
