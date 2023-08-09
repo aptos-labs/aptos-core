@@ -149,8 +149,8 @@ pub fn verify_partitioner_output(
     for sub_block_list in output.sharded_txns().iter().take(num_shards).skip(1) {
         assert_eq!(num_rounds, sub_block_list.sub_blocks.len());
     }
-    let mut old_tids_by_sender: HashMap<Sender, Vec<usize>> = HashMap::new();
-    let mut old_tids_seen: HashSet<usize> = HashSet::new();
+    let mut old_txn_idxs_by_sender: HashMap<Sender, Vec<usize>> = HashMap::new();
+    let mut old_txn_idxs_seen: HashSet<usize> = HashSet::new();
     let mut edge_set_from_src_view: HashSet<(usize, usize, usize, HashValue, usize, usize, usize)> =
         HashSet::new();
     let mut edge_set_from_dst_view: HashSet<(usize, usize, usize, HashValue, usize, usize, usize)> =
@@ -165,50 +165,50 @@ pub fn verify_partitioner_output(
             (RoundId, ShardId, StateKey),
             u64,
         > = HashMap::new();
-        for (local_tid, td) in sub_block_txns.iter().enumerate() {
-            let sender = td.txn.sender();
-            let old_tid = *old_txn_id_by_txn_hash
-                .get(&td.txn().test_only_hash())
+        for (pos_in_sub_block, txn_with_dep) in sub_block_txns.iter().enumerate() {
+            let sender = txn_with_dep.txn.sender();
+            let old_txn_idx = *old_txn_id_by_txn_hash
+                .get(&txn_with_dep.txn().test_only_hash())
                 .unwrap();
-            old_tids_seen.insert(old_tid);
-            old_tids_by_sender
+            old_txn_idxs_seen.insert(old_txn_idx);
+            old_txn_idxs_by_sender
                 .entry(sender)
                 .or_insert_with(Vec::new)
-                .push(old_tid);
-            let tid = start_txn_idx + local_tid;
-            for loc in td.txn.write_hints().iter() {
+                .push(old_txn_idx);
+            let new_txn_idx = start_txn_idx + pos_in_sub_block;
+            for loc in txn_with_dep.txn.write_hints().iter() {
                 let key = loc.clone().into_state_key();
                 let key_str = CryptoHash::hash(&key).to_hex();
                 println!(
                     "MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, write_hint={}",
-                    round_id, shard_id, old_tid, tid, key_str
+                    round_id, shard_id, old_txn_idx, new_txn_idx, key_str
                 );
             }
-            for (src_tid, locs) in td.cross_shard_dependencies.required_edges().iter() {
+            for (src_txn_idx, locs) in txn_with_dep.cross_shard_dependencies.required_edges().iter() {
                 for loc in locs.iter() {
                     let key = loc.clone().into_state_key();
                     let key_str = CryptoHash::hash(&key).to_hex();
-                    println!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, recv key={} from round={}, shard={}, new_tid={}", round_id, shard_id, old_tid, tid, key_str, src_tid.round_id, src_tid.shard_id, src_tid.txn_index);
+                    println!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, recv key={} from round={}, shard={}, new_tid={}", round_id, shard_id, old_txn_idx, new_txn_idx, key_str, src_txn_idx.round_id, src_txn_idx.shard_id, src_txn_idx.txn_index);
                     if round_id != num_rounds - 1 {
-                        assert_ne!(src_tid.round_id, round_id);
+                        assert_ne!(src_txn_idx.round_id, round_id);
                     }
-                    assert!((src_tid.round_id, src_tid.shard_id) < (round_id, shard_id));
+                    assert!((src_txn_idx.round_id, src_txn_idx.shard_id) < (round_id, shard_id));
                     edge_set_from_dst_view.insert((
-                        src_tid.round_id,
-                        src_tid.shard_id,
-                        src_tid.txn_index,
+                        src_txn_idx.round_id,
+                        src_txn_idx.shard_id,
+                        src_txn_idx.txn_index,
                         CryptoHash::hash(&key),
                         round_id,
                         shard_id,
-                        tid,
+                        new_txn_idx,
                     ));
                     let value = cur_sub_block_inbound_costs
-                        .entry((src_tid.round_id, src_tid.shard_id, key))
+                        .entry((src_txn_idx.round_id, src_txn_idx.shard_id, key))
                         .or_insert_with(|| 0);
                     *value += 1;
                 }
             }
-            for (dst_tid, locs) in td.cross_shard_dependencies.dependent_edges().iter() {
+            for (dst_tid, locs) in txn_with_dep.cross_shard_dependencies.dependent_edges().iter() {
                 for loc in locs.iter() {
                     let key = loc.clone().into_state_key();
                     let key_str = CryptoHash::hash(&key).to_hex();
@@ -220,7 +220,7 @@ pub fn verify_partitioner_output(
                     edge_set_from_src_view.insert((
                         round_id,
                         shard_id,
-                        tid,
+                        new_txn_idx,
                         CryptoHash::hash(&key),
                         dst_tid.round_id,
                         dst_tid.shard_id,
@@ -256,9 +256,9 @@ pub fn verify_partitioner_output(
     }
     for_each_sub_block(GLOBAL_ROUND_ID, GLOBAL_SHARD_ID, output.num_sharded_txns(), output.global_txns.as_slice());
 
-    assert_eq!(HashSet::from_iter(0..num_txns), old_tids_seen);
+    assert_eq!(HashSet::from_iter(0..num_txns), old_txn_idxs_seen);
     assert_eq!(edge_set_from_src_view, edge_set_from_dst_view);
-    for (_sender, old_tids) in old_tids_by_sender {
+    for (_sender, old_tids) in old_txn_idxs_by_sender {
         assert!(is_sorted(&old_tids));
     }
     println!("MATRIX_REPORT: total_comm_cost={}", total_comm_cost);
