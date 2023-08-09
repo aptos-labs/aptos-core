@@ -92,33 +92,33 @@ impl ConflictingTxnTracker {
 }
 
 #[test]
-fn test_storage_location_helper() {
-    let mut helper =
+fn test_conflicting_txn_tracker() {
+    let mut tracker =
         ConflictingTxnTracker::new(StorageLocation::Specific(StateKey::raw(vec![])), 0);
-    helper.add_write_candidate(4);
-    helper.add_write_candidate(10);
-    helper.add_write_candidate(7);
-    helper.add_read_candidate(8);
-    helper.add_write_candidate(9);
+    tracker.add_write_candidate(4);
+    tracker.add_write_candidate(10);
+    tracker.add_write_candidate(7);
+    tracker.add_read_candidate(8);
+    tracker.add_write_candidate(9);
     // candidates: T4(W), T7(W), T8(R), T9(W), T10(W)
     // promoted: -
-    assert!(!helper.has_write_in_range(4, 4)); // 0-length interval
-    assert!(helper.has_write_in_range(4, 5)); // 0-length interval
-    assert!(helper.has_write_in_range(5, 10));
-    assert!(!helper.has_write_in_range(8, 9));
-    assert!(helper.has_write_in_range(11, 5)); // wrapped range
-    assert!(!helper.has_write_in_range(11, 4)); // wrapped range
-    helper.mark_txn_ordered(9, 99, 10);
+    assert!(!tracker.has_write_in_range(4, 4)); // 0-length interval
+    assert!(tracker.has_write_in_range(4, 5)); // 0-length interval
+    assert!(tracker.has_write_in_range(5, 10));
+    assert!(!tracker.has_write_in_range(8, 9));
+    assert!(tracker.has_write_in_range(11, 5)); // wrapped range
+    assert!(!tracker.has_write_in_range(11, 4)); // wrapped range
+    tracker.mark_txn_ordered(9, 99, 10);
     // candidates: T4(W), T7(W), T8(R), T10(W)
     // promoted: (99,10)/T9(W)
-    assert!(helper.has_write_in_range(5, 10));
-    helper.mark_txn_ordered(7, 99, 20);
+    assert!(tracker.has_write_in_range(5, 10));
+    tracker.mark_txn_ordered(7, 99, 20);
     // candidates: T4(W), T8(R), T10(W)
     // promoted: (99,10)/T9(W), (99,20)/T7(W)
-    assert!(!helper.has_write_in_range(5, 10));
-    helper.mark_txn_ordered(4, 99, 20);
-    helper.mark_txn_ordered(8, 99, 30);
-    helper.mark_txn_ordered(10, 99, 30);
+    assert!(!tracker.has_write_in_range(5, 10));
+    tracker.mark_txn_ordered(4, 99, 20);
+    tracker.mark_txn_ordered(8, 99, 30);
+    tracker.mark_txn_ordered(10, 99, 30);
     // candidates: -
     // promoted: (99,10)/T9(W), (99,20)/T4(W), (99,20)/T7(W), (99,30)/T8(R), (99,30)/T10(W)
     assert_eq!(
@@ -127,7 +127,7 @@ fn test_storage_location_helper() {
             ShardedTxnIndex2::new(99, 20, 4),
             ShardedTxnIndex2::new(99, 20, 7)
         ],
-        helper
+        tracker
             .finalized_all
             .range(ShardedTxnIndex2::new(98, 0, 0)..ShardedTxnIndex2::new(99, 20, 8))
             .copied()
@@ -139,7 +139,7 @@ fn test_storage_location_helper() {
             ShardedTxnIndex2::new(99, 30, 8),
             ShardedTxnIndex2::new(99, 30, 10)
         ],
-        helper
+        tracker
             .finalized_all
             .range(ShardedTxnIndex2::new(99, 20, 7)..)
             .copied()
@@ -150,7 +150,7 @@ fn test_storage_location_helper() {
             ShardedTxnIndex2::new(99, 20, 7),
             ShardedTxnIndex2::new(99, 30, 10)
         ],
-        helper
+        tracker
             .finalized_writes
             .range(ShardedTxnIndex2::new(99, 20, 7)..ShardedTxnIndex2::new(99, 40, 0))
             .copied()
