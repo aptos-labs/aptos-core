@@ -1324,7 +1324,7 @@ impl AptosVM {
         // dkg todo: verify the validity of the dkg transcript if there is one in block metadata
         // only pass in the first valid dkg transcript to the prologue as args
 
-        let mut args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
+        let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
         if self.0.get_features().is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG) {
             session
                 .execute_function_bypass_visibility(

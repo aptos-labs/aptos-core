@@ -28,8 +28,6 @@ use fail::fail_point;
 use futures::{SinkExt, StreamExt};
 use std::{boxed::Box, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
-use aptos_types::dkg::StartDKGEvent;
-use crate::dkg::dkg_manager::StakeDis;
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
@@ -256,9 +254,7 @@ impl StateComputer for ExecutionProxy {
         let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().as_ref().unwrap().clone();
         // trigger the start of dkg
         if !dkg_events.is_empty() {
-            let maybe_dist: Option<StakeDis> = dkg_events.first().map(|e|StartDKGEvent::try_from(e).unwrap().into());
-            println!("maybe_dist={:?}", maybe_dist);
-            dkg_manager_wrapper.start_dkg(maybe_dist).await;
+            dkg_manager_wrapper.start_dkg(dkg_events).await;
         }
 
         *latest_logical_time = logical_time;
@@ -467,7 +463,7 @@ async fn test_commit_sync_race() {
     executor.new_epoch(
         &EpochState::empty(),
         Arc::new(PayloadManager::DirectMempool),
-        Arc::new(DKGManagerWrapper::NoDKG),
+        Arc::new(DKGManagerWrapper::default()),
         create_transaction_shuffler(TransactionShufflerType::NoShuffling),
         None,
         create_transaction_deduper(TransactionDeduperType::NoDedup),

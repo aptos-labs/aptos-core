@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use crate::network::{IncomingDKGRequest, TConsensusMsg};
 
-use super::{dkg_reliable_broadcast::{DKGNodeHandler, DKGAggNodeHandler}, types::{DKGMessage, TDKGMessage}, dkg_network::DKGRpcHandler, dkg_manager::DKGManager};
+use super::{dkg_reliable_broadcast::{DKGNodeHandler, DKGAggNodeHandler}, types::DKGMessage, dkg_network::DKGRpcHandler, dkg_manager::DKGManager};
 
 pub struct DKGNetworkHandler {
     author: Author,
@@ -43,13 +43,13 @@ impl DKGNetworkHandler {
     }
 
     pub async fn start(mut self) {
-        info!(epoch = self.epoch_state.epoch, "[DKG] DKGHandler started");
+        info!(epoch = self.epoch_state.epoch, author = self.author, "[DKG] DKGHandler started");
         while let Some(msg) = self.dkg_rpc_rx.next().await {
             if let Err(e) = self.process_rpc(msg).await {
                 warn!(error = ?e, "[DKG] error processing rpc");
             }
         }
-        info!(epoch = self.epoch_state.epoch, "[DKG] DKGHandler stopped");
+        info!(epoch = self.epoch_state.epoch, author = self.author, "[DKG] DKGHandler stopped");
     }
 
     async fn process_rpc(&mut self, rpc_request: IncomingDKGRequest) -> anyhow::Result<()> {
@@ -63,14 +63,8 @@ impl DKGNetworkHandler {
         }
 
         let response: anyhow::Result<DKGMessage> = match dkg_message {
-            DKGMessage::DKGNodeMsg(node) => node
-                .verify(&self.epoch_state.verifier)
-                .and_then(|_| self.node_receiver.process(node))
-                .map(|r| r.into()),
-            DKGMessage::DKGAggNodeMsg(agg_node) => agg_node
-                .verify(&self.epoch_state.verifier)
-                .and_then(|_| self.agg_node_receiver.process(agg_node))
-                .map(|r| r.into()),
+            DKGMessage::DKGNodeMsg(node) => self.node_receiver.process(node).map(|r| r.into()),
+            DKGMessage::DKGAggNodeMsg(agg_node) => self.agg_node_receiver.process(agg_node).map(|r| r.into()),
             _ => {
                 error!("[DKG] unknown rpc message {:?}", dkg_message);
                 Err(anyhow::anyhow!("[DKG] unknown rpc message"))

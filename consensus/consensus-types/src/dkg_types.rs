@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_types::dkg::DKGTranscriptWrapper;
 use serde::{Deserialize, Serialize};
-use aptos_dkg::pvss::scrape::Transcript;
 
 use crate::common::Author;
 
@@ -34,20 +34,19 @@ impl DKGAggNodeMetadata {
     }
 }
 
-
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq, Eq)]
 pub struct DKGAggNode {
     pub metadata: DKGAggNodeMetadata,
     // dkg todo: use aggregated transcript here
     // I am assuming aggregated transcript contains the authors of individual transcript
-    pub agg_trx: Transcript,
+    pub agg_trx: DKGTranscriptWrapper,
 }
 
 impl DKGAggNode {
     pub fn new(
         epoch: u64,
         author: Author,
-        agg_trx: Transcript,
+        agg_trx: DKGTranscriptWrapper,
     ) -> Self {
         Self {
             metadata: DKGAggNodeMetadata {
@@ -61,7 +60,7 @@ impl DKGAggNode {
     #[cfg(test)]
     pub fn new_for_test(
         metadata: DKGAggNodeMetadata,
-        agg_trx: Transcript,
+        agg_trx: DKGTranscriptWrapper,
     ) -> Self {
         Self {
             metadata,
@@ -81,7 +80,7 @@ impl DKGAggNode {
         self.metadata.epoch
     }
 
-    pub fn agg_trx(&self) -> &Transcript {
+    pub fn agg_trx(&self) -> &DKGTranscriptWrapper {
         &self.agg_trx
     }
 

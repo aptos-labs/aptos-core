@@ -15,7 +15,7 @@ use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
     randomness::Randomness,
-    transaction::{SignedTransaction, Transaction, TransactionStatus},
+    transaction::{SignedTransaction, Transaction, TransactionStatus}, dkg::DKGTranscriptWrapper,
 };
 use std::fmt::{Debug, Display, Formatter};
 
@@ -120,7 +120,7 @@ impl ExecutedBlock {
         validators: &[AccountAddress],
         txns: Vec<SignedTransaction>,
         block_gas_limit: Option<u64>,
-        dkg_transcripts: Vec<aptos_dkg::pvss::scrape::Transcript>,
+        dkg_transcripts: Vec<DKGTranscriptWrapper>,
         maybe_randomness: Option<Randomness>,
     ) -> Vec<Transaction> {
         // reconfiguration suffix don't execute

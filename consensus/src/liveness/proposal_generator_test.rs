@@ -42,7 +42,7 @@ async fn test_proposal_generation_empty_tree() {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        Arc::new(DKGManagerWrapper::NoDKG),
+        Arc::new(DKGManagerWrapper::default()),
     );
     let mut proposer_election =
         UnequivocalProposerElection::new(Box::new(RotatingProposer::new(vec![signer.author()], 1)));
@@ -83,7 +83,7 @@ async fn test_proposal_generation_parent() {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        Arc::new(DKGManagerWrapper::NoDKG),
+        Arc::new(DKGManagerWrapper::default()),
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
         vec![inserter.signer().author()],
@@ -156,7 +156,7 @@ async fn test_old_proposal_generation() {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        Arc::new(DKGManagerWrapper::NoDKG),
+        Arc::new(DKGManagerWrapper::default()),
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
         vec![inserter.signer().author()],
@@ -194,7 +194,7 @@ async fn test_correct_failed_authors() {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        Arc::new(DKGManagerWrapper::NoDKG),
+        Arc::new(DKGManagerWrapper::default()),
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
         vec![author, peer1, peer2],

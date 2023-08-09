@@ -19,7 +19,7 @@ use aptos_types::{
     randomness::Randomness,
     transaction::{SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
-    validator_verifier::ValidatorVerifier,
+    validator_verifier::ValidatorVerifier, dkg::DKGTranscriptWrapper,
 };
 use mirai_annotations::debug_checked_verify_eq;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -349,7 +349,7 @@ impl Block {
         validators: &[AccountAddress],
         txns: Vec<SignedTransaction>,
         block_gas_limit: Option<u64>,
-        dkg_transcripts: Vec<aptos_dkg::pvss::scrape::Transcript>,
+        dkg_transcripts: Vec<DKGTranscriptWrapper>,
         maybe_randomness: Option<Randomness>,
     ) -> Vec<Transaction> {
         if block_gas_limit.is_some() {
@@ -379,7 +379,7 @@ impl Block {
     fn new_block_metadata(
         &self,
         validators: &[AccountAddress],
-        dkg_transcripts: Vec<aptos_dkg::pvss::scrape::Transcript>,
+        dkg_transcripts: Vec<DKGTranscriptWrapper>,
         maybe_randomness: Option<Randomness>,
     ) -> BlockMetadata {
         BlockMetadata::new(

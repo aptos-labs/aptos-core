@@ -6,26 +6,25 @@ pub use aptos_consensus_types::{common::Author, dkg_types::DKGAggNode};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
-use aptos_types::validator_verifier::ValidatorVerifier;
+use aptos_types::dkg::{DKGTranscriptWrapper, DKGPvssConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use aptos_dkg::pvss::scrape::Transcript;
 
 use crate::{network::TConsensusMsg, network_interface::ConsensusMsg};
 
 pub trait TDKGMessage: Into<DKGMessage> + TryFrom<DKGMessage> {
     // dkg todo: pass in public keys for verification
-    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()>;
+    fn verify(&self, dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()>;
 }
 
 impl TDKGMessage for DKGNodeAck {
-    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    fn verify(&self, _dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
         Ok(())
     }
 }
 
 impl TDKGMessage for DKGAggNodeAck {
-    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    fn verify(&self, _dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
         Ok(())
     }
 }
@@ -61,14 +60,14 @@ impl DKGNodeMetadata {
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
 pub struct DKGNode {
     metadata: DKGNodeMetadata,
-    trx: Transcript,
+    trx: DKGTranscriptWrapper,
 }
 
 impl DKGNode {
     pub fn new(
         epoch: u64,
         author: Author,
-        trx: Transcript,
+        trx: DKGTranscriptWrapper,
     ) -> Self {
         Self {
             metadata: DKGNodeMetadata {
@@ -82,7 +81,7 @@ impl DKGNode {
     #[cfg(test)]
     pub fn new_for_test(
         metadata: DKGNodeMetadata,
-        trx: Transcript,
+        trx: DKGTranscriptWrapper,
     ) -> Self {
         Self {
             metadata,
@@ -102,15 +101,16 @@ impl DKGNode {
         self.metadata.epoch
     }
 
-    pub fn transcript(&self) -> &Transcript {
+    pub fn transcript(&self) -> &DKGTranscriptWrapper {
         &self.trx
     }
 }
 
 impl TDKGMessage for DKGNode {
     // dkg todo: verification requires public keys
-    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    fn verify(&self, dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
         // dkg todo: verify pvss transcript
+        self.trx.verify(dkg_pvss_config)?;
 
         Ok(())
     }
@@ -162,11 +162,9 @@ where
 }
 
 impl TDKGMessage for DKGAggNode {
-    // dkg todo: verification requires public keys
-    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        // TODO: move this check to rpc process logic to delay it as much as possible for performance
-
+    fn verify(&self, dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
         // dkg todo: verify aggregated pvss transcript
+        self.agg_trx.verify(dkg_pvss_config)?;
 
         Ok(())
     }
@@ -308,7 +306,7 @@ pub struct DKGTestMessage(pub Vec<u8>);
 
 #[cfg(test)]
 impl TDKGMessage for DKGTestMessage {
-    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    fn verify(&self, _dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
         todo!()
     }
 }
@@ -319,7 +317,7 @@ pub struct DKGTestAck(pub Vec<u8>);
 
 #[cfg(test)]
 impl TDKGMessage for DKGTestAck {
-    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    fn verify(&self, _dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
         todo!()
     }
 }
