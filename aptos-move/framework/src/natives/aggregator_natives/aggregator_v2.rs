@@ -3,12 +3,14 @@
 
 use crate::natives::aggregator_natives::{helpers_v2::aggregator_info, NativeAggregatorContext};
 use aptos_aggregator::aggregator_extension::AggregatorID;
+use aptos_types::vm_status::StatusCode;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::{
     AGGREGATOR_V2_READ_BASE, AGGREGATOR_V2_TRY_ADD_BASE, AGGREGATOR_V2_TRY_SUB_BASE, *,
 };
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
+use move_binary_format::errors::PartialVMError;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -23,13 +25,22 @@ use std::collections::VecDeque;
 
 fn native_create_aggregator(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 1);
 
     context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
     let limit = safely_pop_arg!(args, u128);
+    match ty_args[0] {
+        Type::U128 => (),
+        Type::U64 => {
+            if limit > u64::max_value() as u128 {
+                return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR).into());
+            }
+        },
+        _ => return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR).into()),
+    }
 
     // Get the current aggregator data.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
