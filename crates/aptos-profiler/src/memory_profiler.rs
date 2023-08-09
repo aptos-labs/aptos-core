@@ -57,8 +57,8 @@ impl Profiler for MemProfiler {
         // TODO: Run jeprof commands from within Rust, current tries give unresolved errors
         Command::new("python3")
             .arg("./crates/aptos-profiler/src/jeprof.py")
-            .arg(&self.txt_result_path.to_string_lossy().as_ref())
-            .arg(&self.svg_result_path.to_string_lossy().as_ref())
+            .arg(self.txt_result_path.to_string_lossy().as_ref())
+            .arg(self.svg_result_path.to_string_lossy().as_ref())
             .output()
             .expect("Failed to execute command");
 
@@ -106,8 +106,8 @@ impl Profiler for MemProfiler {
         // TODO: Run jeprof commands from within Rust, current tries give unresolved errors
         Command::new("python3")
             .arg("./crates/aptos-profiler/src/jeprof.py")
-            .arg(&self.txt_result_path.to_string_lossy().as_ref())
-            .arg(&self.svg_result_path.to_string_lossy().as_ref())
+            .arg(self.txt_result_path.to_string_lossy().as_ref())
+            .arg(self.svg_result_path.to_string_lossy().as_ref())
             .output()
             .expect("Failed to execute command");
         Ok(())
@@ -116,12 +116,12 @@ impl Profiler for MemProfiler {
     /// Expose the results in TXT format
     fn expose_text_results(&self) -> Result<String> {
         let content = convert_svg_to_string(self.txt_result_path.as_path());
-        return content;
+        content;
     }
 
     /// Expose the results in SVG format
     fn expose_svg_results(&self) -> Result<String> {
         let content = convert_svg_to_string(self.svg_result_path.as_path());
-        return content;
+        content;
     }
 }
