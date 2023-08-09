@@ -102,9 +102,11 @@ export const GetAccountCurrentTokens = `
     ${TokenDataFieldsFragmentDoc}
 ${CollectionDataFieldsFragmentDoc}`;
 export const GetAccountTokensCount = `
-    query getAccountTokensCount($owner_address: String) {
-  current_token_ownerships_aggregate(
-    where: {owner_address: {_eq: $owner_address}, amount: {_gt: "0"}}
+    query getAccountTokensCount($where_condition: current_token_ownerships_v2_bool_exp, $offset: Int, $limit: Int) {
+  current_token_ownerships_v2_aggregate(
+    where: $where_condition
+    offset: $offset
+    limit: $limit
   ) {
     aggregate {
       count
@@ -138,8 +140,13 @@ export const GetAccountTransactionsData = `
 }
     `;
 export const GetCollectionData = `
-    query getCollectionData($where_condition: current_collections_v2_bool_exp!, $offset: Int, $limit: Int) {
-  current_collections_v2(where: $where_condition, offset: $offset, limit: $limit) {
+    query getCollectionData($where_condition: current_collections_v2_bool_exp!, $offset: Int, $limit: Int, $order_by: [current_collections_v2_order_by!]) {
+  current_collections_v2(
+    where: $where_condition
+    offset: $offset
+    limit: $limit
+    order_by: $order_by
+  ) {
     collection_id
     token_standard
     collection_name
@@ -151,12 +158,12 @@ export const GetCollectionData = `
 }
     `;
 export const GetCollectionsWithOwnedTokens = `
-    query getCollectionsWithOwnedTokens($where_condition: current_collection_ownership_v2_view_bool_exp!, $offset: Int, $limit: Int) {
+    query getCollectionsWithOwnedTokens($where_condition: current_collection_ownership_v2_view_bool_exp!, $offset: Int, $limit: Int, $order_by: [current_collection_ownership_v2_view_order_by!]) {
   current_collection_ownership_v2_view(
     where: $where_condition
-    order_by: {last_transaction_version: desc}
     offset: $offset
     limit: $limit
+    order_by: $order_by
   ) {
     current_collection {
       creator_address
@@ -206,43 +213,58 @@ export const GetNumberOfDelegators = `
 }
     `;
 export const GetOwnedTokens = `
-    query getOwnedTokens($where_condition: current_token_ownerships_v2_bool_exp!, $offset: Int, $limit: Int) {
+    query getOwnedTokens($where_condition: current_token_ownerships_v2_bool_exp!, $offset: Int, $limit: Int, $order_by: [current_token_ownerships_v2_order_by!]) {
   current_token_ownerships_v2(
     where: $where_condition
     offset: $offset
     limit: $limit
+    order_by: $order_by
+  ) {
+    ...CurrentTokenOwnershipFields
+  }
+}
+    ${CurrentTokenOwnershipFieldsFragmentDoc}`;
+export const GetOwnedTokensByTokenData = `
+    query getOwnedTokensByTokenData($where_condition: current_token_ownerships_v2_bool_exp!, $offset: Int, $limit: Int, $order_by: [current_token_ownerships_v2_order_by!]) {
+  current_token_ownerships_v2(
+    where: $where_condition
+    offset: $offset
+    limit: $limit
+    order_by: $order_by
   ) {
     ...CurrentTokenOwnershipFields
   }
 }
     ${CurrentTokenOwnershipFieldsFragmentDoc}`;
 export const GetTokenActivities = `
-    query getTokenActivities($idHash: String!, $offset: Int, $limit: Int) {
-  token_activities(
-    where: {token_data_id_hash: {_eq: $idHash}}
-    order_by: {transaction_version: desc}
+    query getTokenActivities($where_condition: token_activities_v2_bool_exp!, $offset: Int, $limit: Int, $order_by: [token_activities_v2_order_by!]) {
+  token_activities_v2(
+    where: $where_condition
+    order_by: $order_by
     offset: $offset
     limit: $limit
   ) {
-    creator_address
-    collection_name
-    name
-    token_data_id_hash
-    collection_data_id_hash
+    after_value
+    before_value
+    entry_function_id_str
+    event_account_address
+    event_index
     from_address
+    is_fungible_v2
+    property_version_v1
     to_address
-    transaction_version
-    transaction_timestamp
-    property_version
-    transfer_type
-    event_sequence_number
     token_amount
+    token_data_id
+    token_standard
+    transaction_timestamp
+    transaction_version
+    type
   }
 }
     `;
 export const GetTokenActivitiesCount = `
     query getTokenActivitiesCount($token_id: String) {
-  token_activities_aggregate(where: {token_data_id_hash: {_eq: $token_id}}) {
+  token_activities_v2_aggregate(where: {token_data_id: {_eq: $token_id}}) {
     aggregate {
       count
     }
@@ -250,15 +272,25 @@ export const GetTokenActivitiesCount = `
 }
     `;
 export const GetTokenCurrentOwnerData = `
-    query getTokenCurrentOwnerData($where_condition: current_token_ownerships_v2_bool_exp!) {
-  current_token_ownerships_v2(where: $where_condition) {
+    query getTokenCurrentOwnerData($where_condition: current_token_ownerships_v2_bool_exp!, $offset: Int, $limit: Int, $order_by: [current_token_ownerships_v2_order_by!]) {
+  current_token_ownerships_v2(
+    where: $where_condition
+    offset: $offset
+    limit: $limit
+    order_by: $order_by
+  ) {
     owner_address
   }
 }
     `;
 export const GetTokenData = `
-    query getTokenData($where_condition: current_token_datas_v2_bool_exp) {
-  current_token_datas_v2(where: $where_condition) {
+    query getTokenData($where_condition: current_token_datas_v2_bool_exp, $offset: Int, $limit: Int, $order_by: [current_token_datas_v2_order_by!]) {
+  current_token_datas_v2(
+    where: $where_condition
+    offset: $offset
+    limit: $limit
+    order_by: $order_by
+  ) {
     token_data_id
     token_name
     token_uri
@@ -281,19 +313,25 @@ export const GetTokenData = `
 }
     `;
 export const GetTokenOwnedFromCollection = `
-    query getTokenOwnedFromCollection($where_condition: current_token_ownerships_v2_bool_exp!, $offset: Int, $limit: Int) {
+    query getTokenOwnedFromCollection($where_condition: current_token_ownerships_v2_bool_exp!, $offset: Int, $limit: Int, $order_by: [current_token_ownerships_v2_order_by!]) {
   current_token_ownerships_v2(
     where: $where_condition
     offset: $offset
     limit: $limit
+    order_by: $order_by
   ) {
     ...CurrentTokenOwnershipFields
   }
 }
     ${CurrentTokenOwnershipFieldsFragmentDoc}`;
 export const GetTokenOwnersData = `
-    query getTokenOwnersData($where_condition: current_token_ownerships_v2_bool_exp!) {
-  current_token_ownerships_v2(where: $where_condition) {
+    query getTokenOwnersData($where_condition: current_token_ownerships_v2_bool_exp!, $offset: Int, $limit: Int, $order_by: [current_token_ownerships_v2_order_by!]) {
+  current_token_ownerships_v2(
+    where: $where_condition
+    offset: $offset
+    limit: $limit
+    order_by: $order_by
+  ) {
     owner_address
   }
 }
@@ -357,6 +395,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     },
     getOwnedTokens(variables: Types.GetOwnedTokensQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetOwnedTokensQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetOwnedTokensQuery>(GetOwnedTokens, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getOwnedTokens', 'query');
+    },
+    getOwnedTokensByTokenData(variables: Types.GetOwnedTokensByTokenDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetOwnedTokensByTokenDataQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetOwnedTokensByTokenDataQuery>(GetOwnedTokensByTokenData, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getOwnedTokensByTokenData', 'query');
     },
     getTokenActivities(variables: Types.GetTokenActivitiesQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetTokenActivitiesQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetTokenActivitiesQuery>(GetTokenActivities, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getTokenActivities', 'query');
