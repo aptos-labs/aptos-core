@@ -51,7 +51,7 @@ const TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS: u64 = 1000;
 
 // Up to MAX_RESPONSE_CHANNEL_SIZE response can be buffered in the channel. If the channel is full,
 // the server will not fetch more data from the cache and file store until the channel is not full.
-const MAX_RESPONSE_CHANNEL_SIZE: usize = 80;
+const MAX_RESPONSE_CHANNEL_SIZE: usize = 10;
 
 // The server will retry to send the response to the client and give up after RESPONSE_CHANNEL_SEND_TIMEOUT.
 // This is to prevent the server from being occupied by a slow client.
