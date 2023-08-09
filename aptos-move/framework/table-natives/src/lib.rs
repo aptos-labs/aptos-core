@@ -69,11 +69,19 @@ struct TableData {
     tables: BTreeMap<TableHandle, Table>,
 }
 
+/// A structure containing information about the layout of a value
+/// stored in a table. Needed in order to lift aggregator and snapshot
+/// values from the value and replacing them with identifiers.
+struct LayoutInfo {
+    layout: MoveTypeLayout,
+    has_aggregator_lifting: bool,
+}
+
 /// A structure representing a single table.
 struct Table {
     handle: TableHandle,
     key_layout: MoveTypeLayout,
-    value_layout_info: (MoveTypeLayout, bool),
+    value_layout_info: LayoutInfo,
     content: BTreeMap<Vec<u8>, GlobalValue>,
 }
 
@@ -120,11 +128,11 @@ impl<'a> NativeTableContext<'a> {
                 // if there are lifted values.
                 match op {
                     Op::New(val) => {
-                        let bytes = serialize(&value_layout_info.0, &val)?;
+                        let bytes = serialize(&value_layout_info.layout, &val)?;
                         entries.insert(key, Op::New(bytes));
                     },
                     Op::Modify(val) => {
-                        let bytes = serialize(&value_layout_info.0, &val)?;
+                        let bytes = serialize(&value_layout_info.layout, &val)?;
                         entries.insert(key, Op::Modify(bytes));
                     },
                     Op::Delete => {
@@ -157,8 +165,7 @@ impl TableData {
         Ok(match self.tables.entry(handle) {
             Entry::Vacant(e) => {
                 let key_layout = context.type_to_type_layout(key_ty)?;
-                let value_layout_info =
-                    context.type_to_type_layout_with_aggregator_lifting(value_ty)?;
+                let value_layout_info = LayoutInfo::from_value_ty(context, value_ty)?;
                 let table = Table {
                     handle,
                     key_layout,
@@ -172,6 +179,17 @@ impl TableData {
     }
 }
 
+impl LayoutInfo {
+    fn from_value_ty(context: &SafeNativeContext, value_ty: &Type) -> PartialVMResult<Self> {
+        let (layout, has_aggregator_lifting) =
+            context.type_to_type_layout_with_aggregator_lifting(value_ty)?;
+        Ok(Self {
+            layout,
+            has_aggregator_lifting,
+        })
+    }
+}
+
 impl Table {
     fn get_or_create_global_value(
         &mut self,
@@ -180,18 +198,18 @@ impl Table {
     ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
         Ok(match self.content.entry(key) {
             Entry::Vacant(entry) => {
-                let resolved_data = if self.value_layout_info.1 {
+                let resolved_data = if self.value_layout_info.has_aggregator_lifting {
                     // There is an aggregator lifting: need to pass layout to ensure
                     // it gets recorded.
-                    context.resolver.resolve_table_entry_with_layout(
+                    context.resolver.resolve_table_entry_value(
                         &self.handle,
                         entry.key(),
-                        Some(&self.value_layout_info.0),
+                        &self.value_layout_info.layout,
                     )
                 } else {
                     context
                         .resolver
-                        .resolve_table_entry(&self.handle, entry.key())
+                        .resolve_table_entry_bytes(&self.handle, entry.key())
                 };
                 let data = resolved_data.map_err(|err| {
                     partial_extension_error(format!("remote table resolver failure: {}", err))
@@ -199,7 +217,7 @@ impl Table {
 
                 let (gv, loaded) = match data {
                     Some(val_bytes) => {
-                        let val = deserialize(&self.value_layout_info.0, &val_bytes)?;
+                        let val = deserialize(&self.value_layout_info.layout, &val_bytes)?;
                         (
                             GlobalValue::cached(val)?,
                             Some(NumBytes::new(val_bytes.len() as u64)),

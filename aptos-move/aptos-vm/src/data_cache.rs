@@ -167,14 +167,23 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
-    fn get_resource_with_metadata_and_layout(
+    fn get_resource_value_with_metadata(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-        _layout: Option<&MoveTypeLayout>,
+        _layout: &MoveTypeLayout,
     ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
         // TODO(aggregator): use layout for aggregator liftings.
+        self.get_resource_bytes_with_metadata(address, struct_tag, metadata)
+    }
+
+    fn get_resource_bytes_with_metadata(
+        &self,
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+        metadata: &[Metadata],
+    ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
         Ok(self.get_any_resource(address, struct_tag, metadata)?)
     }
 }
@@ -203,13 +212,21 @@ impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
-    fn resolve_table_entry_with_layout(
+    fn resolve_table_entry_value(
         &self,
         handle: &TableHandle,
         key: &[u8],
-        _layout: Option<&MoveTypeLayout>,
+        _layout: &MoveTypeLayout,
     ) -> Result<Option<Vec<u8>>, Error> {
         // TODO(aggregator): use layout for aggregator liftings.
+        self.resolve_table_entry_bytes(handle, key)
+    }
+
+    fn resolve_table_entry_bytes(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+    ) -> Result<Option<Vec<u8>>, Error> {
         self.get_state_value_bytes(&StateKey::table_item((*handle).into(), key.to_vec()))
     }
 }

@@ -18,8 +18,6 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{Features, TimedFeatures},
 };
-#[cfg(feature = "testing")]
-use move_core_types::value::MoveTypeLayout;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]
 use {
@@ -46,11 +44,10 @@ impl AggregatorResolver for AptosBlankStorage {
 
 #[cfg(feature = "testing")]
 impl TableResolver for AptosBlankStorage {
-    fn resolve_table_entry_with_layout(
+    fn resolve_table_entry_bytes(
         &self,
         _handle: &TableHandle,
         _key: &[u8],
-        _layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Vec<u8>>, Error> {
         Ok(None)
     }

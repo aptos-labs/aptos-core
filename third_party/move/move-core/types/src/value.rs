@@ -90,7 +90,7 @@ pub enum MoveStructLayout {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
 pub enum LayoutTag {
-    /// The current type is corresponds to an aggregator or a snapshot values
+    /// The current type corresponds to an aggregator or a snapshot values
     /// and requires special handling in serialization and deserialization.
     AggregatorLifting,
 }

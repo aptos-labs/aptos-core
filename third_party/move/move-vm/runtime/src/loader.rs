@@ -2892,32 +2892,23 @@ impl Loader {
         let contains_lifting =
             self.is_aggregator_struct(gidx) || self.is_aggregator_snapshot_struct(gidx);
         *has_aggregator_lifting |= contains_lifting;
-        const LIFTED_IDENTIFIER_INDEX: usize = 0;
 
         let field_tys = struct_type
             .fields
             .iter()
             .map(|ty| self.subst(ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
-        let field_layouts = field_tys
+        let mut field_layouts = field_tys
             .iter()
-            .enumerate()
-            .map(|(idx, ty)| {
-                if contains_lifting && idx == LIFTED_IDENTIFIER_INDEX {
-                    Ok(MoveTypeLayout::Tagged(
-                        LayoutTag::AggregatorLifting,
-                        Box::new(self.type_to_type_layout_impl(
-                            ty,
-                            count,
-                            has_aggregator_lifting,
-                            depth + 1,
-                        )?),
-                    ))
-                } else {
-                    self.type_to_type_layout_impl(ty, count, has_aggregator_lifting, depth + 1)
-                }
-            })
+            .map(|ty| self.type_to_type_layout_impl(ty, count, has_aggregator_lifting, depth + 1))
             .collect::<PartialVMResult<Vec<_>>>()?;
+
+        // For aggregators / snapshots, the first field should be lifted.
+        if contains_lifting {
+            if let Some(l) = field_layouts.first_mut() {
+                *l = MoveTypeLayout::Tagged(LayoutTag::AggregatorLifting, Box::new(l.clone()));
+            }
+        }
 
         let field_node_count = *count - count_before;
         let struct_layout = MoveStructLayout::new(field_layouts);
@@ -2941,7 +2932,7 @@ impl Loader {
     // types.
     // Let's think how we can do this nicer.
 
-    /// Returns true f a given struct is an Aggregator.
+    /// Returns true if a given struct is an Aggregator.
     fn is_aggregator_struct(&self, gidx: CachedStructIndex) -> bool {
         let struct_type = self.module_cache.read().struct_at(gidx);
         struct_type.module.address().eq(&AccountAddress::ONE)
@@ -2949,7 +2940,7 @@ impl Loader {
             && struct_type.name.as_ident_str().eq(ident_str!("Aggregator"))
     }
 
-    /// Returns true f a given struct is an AggregatorSnapshot.
+    /// Returns true if a given struct is an AggregatorSnapshot.
     fn is_aggregator_snapshot_struct(&self, gidx: CachedStructIndex) -> bool {
         let struct_type = self.module_cache.read().struct_at(gidx);
         struct_type.module.address().eq(&AccountAddress::ONE)

@@ -4,5 +4,3 @@
 
 #[cfg(feature = "fuzzing")]
 mod identifier_prop_tests;
-#[cfg(test)]
-mod value_exchange_tests;

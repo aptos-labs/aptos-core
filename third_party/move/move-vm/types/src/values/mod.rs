@@ -5,7 +5,6 @@
 pub mod values_impl;
 
 #[cfg(test)]
-#[cfg(test)]
 mod value_tests;
 
 #[cfg(all(test, feature = "fuzzing"))]
