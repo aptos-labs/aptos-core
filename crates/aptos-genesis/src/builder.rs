@@ -520,7 +520,7 @@ impl Builder {
         let name = index.to_string();
 
         let mut config = template.clone();
-        let mut genesis_stake_amount = 1;
+        let mut genesis_stake_amount = 10;
         if let Some(init_config) = &self.init_config {
             (init_config)(index, &mut config, &mut genesis_stake_amount);
         }
@@ -610,7 +610,7 @@ impl Builder {
             employee_vesting_start: None,
             employee_vesting_period_duration: None,
             consensus_config: OnChainConsensusConfig::default(),
-            execution_config: OnChainExecutionConfig::default(),
+            execution_config: OnChainExecutionConfig::default_for_genesis(),
             gas_schedule: default_gas_schedule(),
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {

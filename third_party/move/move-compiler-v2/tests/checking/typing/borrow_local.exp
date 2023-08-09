@@ -1,0 +1,43 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct R {
+        dummy_field: bool,
+    }
+    struct S {
+        dummy_field: bool,
+    }
+    private fun t0(b: bool,u: u64,s: M::S,r: M::R) {
+        Borrow(Immutable)(b);
+        Borrow(Mutable)(b);
+        Borrow(Immutable)(u);
+        Borrow(Mutable)(u);
+        Borrow(Immutable)(s);
+        Borrow(Mutable)(s);
+        Borrow(Immutable)(r);
+        Borrow(Mutable)(r);
+        r
+    }
+    private fun t1() {
+        {
+          let b: bool = true;
+          {
+            let u: u64 = 0;
+            {
+              let s: M::S = pack M::S(false);
+              {
+                let r: M::R = pack M::R(false);
+                Borrow(Immutable)(b);
+                Borrow(Mutable)(b);
+                Borrow(Immutable)(u);
+                Borrow(Mutable)(u);
+                Borrow(Immutable)(s);
+                Borrow(Mutable)(s);
+                Borrow(Immutable)(r);
+                Borrow(Mutable)(r);
+                r
+              }
+            }
+          }
+        }
+    }
+} // end 0x8675309::M

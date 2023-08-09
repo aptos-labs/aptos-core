@@ -57,4 +57,4 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::voting`](voting.md#0x1_voting)
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

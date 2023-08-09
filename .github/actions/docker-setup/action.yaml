@@ -68,7 +68,9 @@ runs:
               all = true
               keepBytes = 900000000000
 
-    - uses: imjasonh/setup-crane@5146f708a817ea23476677995bf2133943b9be0b # pin@v0.1
+    - uses: imjasonh/setup-crane@00c9e93efa4e1138c9a7a5c594acd6c75a2fbf0c # pin@v0.3
+      with:
+        version: v0.15.2
 
     - id: auth
       name: "Authenticate to Google Cloud"
@@ -80,13 +82,6 @@ runs:
         workload_identity_provider: ${{ inputs.GCP_WORKLOAD_IDENTITY_PROVIDER }}
         service_account: ${{ inputs.GCP_SERVICE_ACCOUNT_EMAIL }}
         export_environment_variables: ${{ inputs.EXPORT_GCP_PROJECT_VARIABLES }}
-
-    - name: Login to us-west1 Google Artifact Registry
-      uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
-      with:
-        registry: us-west1-docker.pkg.dev
-        username: oauth2accesstoken
-        password: ${{ steps.auth.outputs.access_token }}
 
     - name: Login to US multi-region Google Artifact Registry
       uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2

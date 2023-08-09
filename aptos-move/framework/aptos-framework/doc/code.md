@@ -551,12 +551,15 @@ package.
     <b>let</b> allowed_deps = <a href="code.md#0x1_code_check_dependencies">check_dependencies</a>(addr, &pack);
 
     // Check package against conflicts
+    // To avoid prover compiler <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> on <b>spec</b>
+    // the package need <b>to</b> be an immutable variable
     <b>let</b> module_names = <a href="code.md#0x1_code_get_module_names">get_module_names</a>(&pack);
-    <b>let</b> packages = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(addr).packages;
-    <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(packages);
+    <b>let</b> package_immutable = &<b>borrow_global</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(addr).packages;
+    <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(package_immutable);
     <b>let</b> index = len;
     <b>let</b> upgrade_number = 0;
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_enumerate_ref">vector::enumerate_ref</a>(packages, |i, <b>old</b>| {
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_enumerate_ref">vector::enumerate_ref</a>(package_immutable
+    , |i, <b>old</b>| {
         <b>let</b> <b>old</b>: &<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a> = <b>old</b>;
         <b>if</b> (<b>old</b>.name == pack.name) {
             upgrade_number = <b>old</b>.upgrade_number + 1;
@@ -570,6 +573,7 @@ package.
     // Assign the upgrade counter.
     pack.upgrade_number = upgrade_number;
 
+    <b>let</b> packages = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(addr).packages;
     // Update registry
     <b>let</b> policy = pack.upgrade_policy;
     <b>if</b> (index &lt; len) {
@@ -918,7 +922,10 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+<b>modifies</b> <b>global</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(addr);
+<b>aborts_if</b> pack.upgrade_policy.policy &lt;= <a href="code.md#0x1_code_upgrade_policy_arbitrary">upgrade_policy_arbitrary</a>().policy;
 </code></pre>
 
 
@@ -950,7 +957,9 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>aborts_if</b> old_pack.upgrade_policy.policy &gt;= <a href="code.md#0x1_code_upgrade_policy_immutable">upgrade_policy_immutable</a>().policy;
+<b>aborts_if</b> !<a href="code.md#0x1_code_can_change_upgrade_policy_to">can_change_upgrade_policy_to</a>(old_pack.upgrade_policy, new_pack.upgrade_policy);
 </code></pre>
 
 
@@ -1037,4 +1046,4 @@ Native function to initiate module loading, including a list of allowed dependen
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

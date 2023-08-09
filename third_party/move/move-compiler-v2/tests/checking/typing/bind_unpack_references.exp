@@ -1,0 +1,46 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct R {
+        s1: M::S,
+        s2: M::S,
+    }
+    struct S {
+        f: u64,
+    }
+    private fun t0() {
+        {
+          let M::R{ s1: M::S{ f: f: u64 }, s2: s2: M::S } = pack M::R(pack M::S(0), pack M::S(1));
+          f;
+          s2;
+          f: u64 = 0;
+          s2: M::S = pack M::S(0);
+          f;
+          s2;
+          Tuple()
+        }
+    }
+    private fun t1() {
+        {
+          let M::R{ s1: M::S{ f: f: &u64 }, s2: s2: &M::S } = Borrow(Immutable)(pack M::R(pack M::S(0), pack M::S(1)));
+          f;
+          s2;
+          f: &u64 = Borrow(Immutable)(0);
+          s2: &M::S = Borrow(Immutable)(pack M::S(0));
+          f;
+          s2;
+          Tuple()
+        }
+    }
+    private fun t2() {
+        {
+          let M::R{ s1: M::S{ f: f: &mut u64 }, s2: s2: &mut M::S } = Borrow(Mutable)(pack M::R(pack M::S(0), pack M::S(1)));
+          f;
+          s2;
+          f: &mut u64 = Borrow(Mutable)(0);
+          s2: &mut M::S = Borrow(Mutable)(pack M::S(0));
+          f;
+          s2;
+          Tuple()
+        }
+    }
+} // end 0x8675309::M

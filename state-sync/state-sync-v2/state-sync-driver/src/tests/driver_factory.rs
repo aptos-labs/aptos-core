@@ -24,7 +24,6 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_temppath::TempPath;
 use aptos_time_service::TimeService;
-use aptos_types::on_chain_config::ON_CHAIN_CONFIG_REGISTRY;
 use aptos_vm::AptosVM;
 use futures::{FutureExt, StreamExt};
 use std::{collections::HashMap, sync::Arc};
@@ -54,13 +53,15 @@ fn test_new_initialized_configs() {
     let (_, consensus_listener) = new_consensus_notifier_listener_pair(0);
 
     // Create the event subscription service and a reconfig subscriber
-    let mut event_subscription_service = EventSubscriptionService::new(
-        ON_CHAIN_CONFIG_REGISTRY,
-        Arc::new(RwLock::new(db_rw.clone())),
-    );
+    let mut event_subscription_service =
+        EventSubscriptionService::new(Arc::new(RwLock::new(db_rw.clone())));
     let mut reconfiguration_subscriber = event_subscription_service
         .subscribe_to_reconfigurations()
         .unwrap();
+
+    // Create the storage service notifier and listener
+    let (storage_service_notifier, _storage_service_listener) =
+        aptos_storage_service_notifications::new_storage_service_notifier_listener_pair();
 
     // Create a test streaming service client
     let (streaming_service_client, _) = new_streaming_service_client_listener_pair();
@@ -91,6 +92,7 @@ fn test_new_initialized_configs() {
         db_rw,
         chunk_executor,
         mempool_notifier,
+        storage_service_notifier,
         metadata_storage,
         consensus_listener,
         event_subscription_service,

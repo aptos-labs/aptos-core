@@ -22,25 +22,25 @@ error: `wrong` not declared in schema
 19 │         include WrongTypeArgsIncluded<num>{wrong: 1};
    │                                            ^^^^^
 
-error: expected `num` but found `bool` in name expression
+error: expected `num` but found `bool`
    ┌─ tests/sources/schemas_err.move:24:47
    │
 24 │         include WrongTypeArgsIncluded<num>{x: y};
    │                                               ^
 
-error: expected `bool` but found `num` in expression
+error: expected `bool` but found `num`
    ┌─ tests/sources/schemas_err.move:28:48
    │
 28 │         include WrongTypeArgsIncluded<bool>{x: 1 + 2};
    │                                                ^^^^^
 
-error: expected `bool` but found `num` for `x` included from schema
+error: expected `bool` but found `num` (for `x` included from schema)
    ┌─ tests/sources/schemas_err.move:33:17
    │
 33 │         include WronglyTypedVarIncluded;
    │                 ^^^^^^^^^^^^^^^^^^^^^^^
 
-error: expected `bool` but found `num` for `x` included from schema
+error: expected `bool` but found `num` (for `x` included from schema)
    ┌─ tests/sources/schemas_err.move:41:17
    │
 41 │         include WronglyTypedInstantiationIncluded<num>;
@@ -52,7 +52,7 @@ error: cyclic schema dependency: Cycle1 -> Cycle2 -> Cycle3 -> Cycle1
 80 │         include Cycle1;
    │                 ^^^^^^
 
-error: expected `bool` but found `u256` in constant
+error: expected `bool` but found `u256`
    ┌─ tests/sources/schemas_err.move:84:17
    │
 84 │         include 22 ==> Condition;

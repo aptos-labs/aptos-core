@@ -32,6 +32,12 @@ spec aptos_framework::aggregator {
         aborts_if false;
     }
 
+    spec limit {
+        pragma opaque;
+        aborts_if false;
+        ensures [abstract] result == spec_get_limit(aggregator);
+    }
+
     spec native fun spec_read(aggregator: Aggregator): u128;
     spec native fun spec_get_limit(a: Aggregator): u128;
     spec native fun spec_get_handle(a: Aggregator): u128;

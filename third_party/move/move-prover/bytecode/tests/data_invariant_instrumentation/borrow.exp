@@ -95,7 +95,7 @@ public fun Test::test_borrow_imm<#0>(): u64 {
      var $t1: Test::R<#0>
      var $t2: num
      var $t3: u64
-  0: assume forall $rsc: ResourceDomain<Test::R<#0>>(): And(WellFormed($rsc), And(Gt(select Test::R.x($rsc), select Test::S.y(select Test::R.s($rsc))), Gt(select Test::S.y(select Test::R.s($rsc)), 0)))
+  0: assume forall $rsc: Test::R<#0>: ResourceDomain<Test::R<#0>>(): And(WellFormed($rsc), And(Gt(select Test::R.x($rsc), select Test::S.y(select Test::R.s($rsc))), Gt(select Test::S.y(select Test::R.s($rsc)), 0)))
   1: $t0 := 0x1
   2: $t1 := get_global<Test::R<#0>>($t0) on_abort goto 6 with $t2
   3: $t3 := get_field<Test::R<#0>>.x($t1)
@@ -118,7 +118,7 @@ public fun Test::test_borrow_mut<#0>(): u64 {
      var $t7: u64
      var $t8: &mut u64
      var $t9: u64
-  0: assume forall $rsc: ResourceDomain<Test::R<#0>>(): And(WellFormed($rsc), And(Gt(select Test::R.x($rsc), select Test::S.y(select Test::R.s($rsc))), Gt(select Test::S.y(select Test::R.s($rsc)), 0)))
+  0: assume forall $rsc: Test::R<#0>: ResourceDomain<Test::R<#0>>(): And(WellFormed($rsc), And(Gt(select Test::R.x($rsc), select Test::S.y(select Test::R.s($rsc))), Gt(select Test::S.y(select Test::R.s($rsc)), 0)))
   1: $t1 := 0x1
   2: $t2 := borrow_global<Test::R<#0>>($t1) on_abort goto 19 with $t3
   3: $t4 := 2

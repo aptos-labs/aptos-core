@@ -2,11 +2,6 @@ name: Test Coverage
 on:
   workflow_dispatch:
   workflow_call:
-  schedule:
-    # every day at 9am PST
-    - cron: "0 16 * * *"
-  pull_request:
-    types: [ labeled, opened, synchronize, reopened ]
 
 env:
   CARGO_INCREMENTAL: "0"

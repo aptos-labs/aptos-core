@@ -66,7 +66,7 @@ Use these external resources to learn about the Move programming language:
 
 * [Teach yourself Move on Aptos](https://github.com/econia-labs/teach-yourself-move).
 * [Formal Verification, the Move Language, and the Move Prover](https://www.certik.com/resources/blog/2wSOZ3mC55AB6CYol6Q2rP-formal-verification-the-move-language-and-the-move-prover)
-* [IMCODING Move Tutorials](https://imcoding.online/courses/move-language)
+* [IMCODING Move Tutorials](https://www.imcoding.online/tutorials?tag=Aptos)
 * [Pontem Move Playground](https://playground.pontem.network/)
 * [Collection of nestable Move resources](https://github.com/taoheorg/taohe)
 * [Move-Lang tag on Stack Overflow](https://stackoverflow.com/questions/tagged/move-lang)

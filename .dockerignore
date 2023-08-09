@@ -20,7 +20,7 @@
 !**/*.errmap
 !config/src/config/test_data
 !aptos-move/aptos-release-builder/data/release.yaml
-!aptos-move/aptos-release-builder/data/proposals/
+!aptos-move/aptos-release-builder/data/proposals/*
 !aptos-move/framework/
 !crates/aptos/src/move_tool/*.bpl
 !crates/aptos-faucet/doc/

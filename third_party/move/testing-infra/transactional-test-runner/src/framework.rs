@@ -4,9 +4,12 @@
 
 #![forbid(unsafe_code)]
 
-use crate::tasks::{
-    taskify, InitCommand, PrintBytecodeCommand, PrintBytecodeInputChoice, PublishCommand,
-    RunCommand, SyntaxChoice, TaskCommand, TaskInput, ViewCommand,
+use crate::{
+    tasks::{
+        taskify, InitCommand, PrintBytecodeCommand, PrintBytecodeInputChoice, PublishCommand,
+        RunCommand, SyntaxChoice, TaskCommand, TaskInput, ViewCommand,
+    },
+    vm_test_harness::TestRunConfig,
 };
 use anyhow::{anyhow, Result};
 use clap::Parser;
@@ -19,7 +22,10 @@ use move_command_line_common::{
     address::ParsedAddress,
     env::read_bool_env_var,
     files::{MOVE_EXTENSION, MOVE_IR_EXTENSION},
-    testing::{add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT},
+    testing::{
+        add_update_baseline_fix, format_diff, format_diff_no_color, read_env_update_baseline,
+        EXP_EXT,
+    },
     types::ParsedType,
     values::{ParsableValue, ParsedValue},
 };
@@ -117,8 +123,13 @@ pub trait MoveTestAdapter<'a>: Sized {
 
     fn compiled_state(&mut self) -> &mut CompiledState<'a>;
     fn default_syntax(&self) -> SyntaxChoice;
+    fn run_config(&self) -> TestRunConfig {
+        TestRunConfig::CompilerV1
+    }
     fn init(
         default_syntax: SyntaxChoice,
+        comparison_mode: bool,
+        run_config: TestRunConfig,
         option: Option<&'a FullyCompiledProgram>,
         init_data: Option<TaskInput<(InitCommand, Self::ExtraInitArgs)>>,
     ) -> (Self, Option<String>);
@@ -225,8 +236,23 @@ pub trait MoveTestAdapter<'a>: Sized {
                     ),
                 };
                 let data_path = data.path().to_str().unwrap();
+                let run_config = self.run_config();
                 let state = self.compiled_state();
                 let (named_addr_opt, module, warnings_opt) = match syntax {
+                    // Run the V2 compiler if requested
+                    SyntaxChoice::Source if run_config == TestRunConfig::CompilerV2 => {
+                        let ((module, _), warning_opt) = compile_source_unit_v2(
+                            state.named_address_mapping.clone(),
+                            &state.source_files().cloned().collect::<Vec<_>>(),
+                            data_path.to_owned(),
+                        )?;
+                        if let Some(module) = module {
+                            (None, module, warning_opt)
+                        } else {
+                            anyhow::bail!("expected a module but found a script")
+                        }
+                    },
+                    // In all other cases, run V1
                     SyntaxChoice::Source => {
                         let (unit, warnings_opt) = compile_source_unit(
                             state.pre_compiled_deps,
@@ -294,8 +320,23 @@ pub trait MoveTestAdapter<'a>: Sized {
                     ),
                 };
                 let data_path = data.path().to_str().unwrap();
+                let run_config = self.run_config();
                 let state = self.compiled_state();
                 let (script, warning_opt) = match syntax {
+                    // Run the V2 compiler if requested.
+                    SyntaxChoice::Source if run_config == TestRunConfig::CompilerV2 => {
+                        let ((_, script), warning_opt) = compile_source_unit_v2(
+                            state.named_address_mapping.clone(),
+                            &state.source_files().cloned().collect::<Vec<_>>(),
+                            data_path.to_owned(),
+                        )?;
+                        if let Some(script) = script {
+                            (script, warning_opt)
+                        } else {
+                            anyhow::bail!("expected a script but found a module")
+                        }
+                    },
+                    // In all other Source cases, run the V1 compiler
                     SyntaxChoice::Source => {
                         let (unit, warning_opt) = compile_source_unit(
                             state.pre_compiled_deps,
@@ -304,12 +345,12 @@ pub trait MoveTestAdapter<'a>: Sized {
                             data_path.to_owned(),
                         )?;
                         match unit {
-                        AnnotatedCompiledUnit::Script(annot_script) => (annot_script.named_script.script, warning_opt),
-                        AnnotatedCompiledUnit::Module(_) => panic!(
+                            AnnotatedCompiledUnit::Script(annot_script) => (annot_script.named_script.script, warning_opt),
+                            AnnotatedCompiledUnit::Module(_) => panic!(
                             "Expected a script text block, not a module, following 'run' starting on lines {}-{}",
                             start_line, command_lines_stop
-                        ),
-                    }
+                            ),
+                        }
                     },
                     SyntaxChoice::IR => (compile_ir_script(state.dep_modules(), data_path)?, None),
                 };
@@ -561,6 +602,46 @@ impl<'a> CompiledState<'a> {
     }
 }
 
+fn compile_source_unit_v2(
+    named_address_mapping: BTreeMap<String, NumericalAddress>,
+    deps: &[String],
+    path: String,
+) -> Result<(
+    (Option<CompiledModule>, Option<CompiledScript>),
+    Option<String>,
+)> {
+    let options = move_compiler_v2::Options {
+        sources: vec![path],
+        dependencies: deps.to_vec(),
+        named_address_mapping: named_address_mapping
+            .into_iter()
+            .map(|(alias, addr)| format!("{}={}", alias, addr))
+            .collect(),
+        ..move_compiler_v2::Options::default()
+    };
+    let mut error_writer = termcolor::Buffer::no_color();
+    let result = move_compiler_v2::run_move_compiler(&mut error_writer, options);
+    let error_str = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
+    let (mut modules, mut scripts) =
+        result.map_err(|_| anyhow::anyhow!("compilation errors:\n {}", error_str))?;
+    let unit = if modules.is_empty() && scripts.len() == 1 {
+        (None, scripts.pop())
+    } else if scripts.is_empty() && modules.len() == 1 {
+        (modules.pop(), None)
+    } else {
+        anyhow::bail!(
+            "expected either one script or one module: {} - {}",
+            modules.len(),
+            scripts.len()
+        )
+    };
+    if error_str.is_empty() {
+        Ok((unit, None))
+    } else {
+        Ok((unit, Some(error_str)))
+    }
+}
+
 fn compile_source_unit(
     pre_compiled_deps: Option<&FullyCompiledProgram>,
     named_address_mapping: BTreeMap<String, NumericalAddress>,
@@ -634,6 +715,7 @@ fn compile_ir_script<'a>(
 }
 
 pub fn run_test_impl<'a, Adapter>(
+    config: TestRunConfig,
     path: &Path,
     fully_compiled_program_opt: Option<&'a FullyCompiledProgram>,
 ) -> Result<(), Box<dyn std::error::Error>>
@@ -652,48 +734,77 @@ where
         assert!(extension == MOVE_EXTENSION);
         SyntaxChoice::Source
     };
-    let mut output = String::new();
-    let mut tasks = taskify::<
-        TaskCommand<
-            Adapter::ExtraInitArgs,
-            Adapter::ExtraPublishArgs,
-            Adapter::ExtraValueArgs,
-            Adapter::ExtraRunArgs,
-            Adapter::Subcommand,
-        >,
-    >(path)?
-    .into_iter()
-    .collect::<VecDeque<_>>();
-    assert!(!tasks.is_empty());
-    let num_tasks = tasks.len();
-    writeln!(
-        &mut output,
-        "processed {} task{}",
-        num_tasks,
-        if num_tasks > 1 { "s" } else { "" }
-    )
-    .unwrap();
 
-    let first_task = tasks.pop_front().unwrap();
-    let init_opt = match &first_task.command {
-        TaskCommand::Init(_, _) => Some(first_task.map(|known| match known {
-            TaskCommand::Init(command, extra_args) => (command, extra_args),
-            _ => unreachable!(),
-        })),
-        _ => {
-            tasks.push_front(first_task);
-            None
-        },
+    // Construct a sequence of compiler runs based on the given config.
+    let (runs, comparison_mode) = if config == TestRunConfig::ComparisonV1V2 {
+        (
+            vec![TestRunConfig::CompilerV1, TestRunConfig::CompilerV2],
+            true,
+        )
+    } else {
+        (vec![config], false) // either V1 or V2
     };
-    let (mut adapter, result_opt) =
-        Adapter::init(default_syntax, fully_compiled_program_opt, init_opt);
-    if let Some(result) = result_opt {
-        writeln!(output, "\ninit:\n{}", result)?;
+    let mut last_output = String::new();
+    for run_config in runs {
+        let mut output = String::new();
+        let mut tasks = taskify::<
+            TaskCommand<
+                Adapter::ExtraInitArgs,
+                Adapter::ExtraPublishArgs,
+                Adapter::ExtraValueArgs,
+                Adapter::ExtraRunArgs,
+                Adapter::Subcommand,
+            >,
+        >(path)?
+        .into_iter()
+        .collect::<VecDeque<_>>();
+        assert!(!tasks.is_empty());
+        let num_tasks = tasks.len();
+        writeln!(
+            &mut output,
+            "processed {} task{}",
+            num_tasks,
+            if num_tasks > 1 { "s" } else { "" }
+        )
+        .unwrap();
+        let first_task = tasks.pop_front().unwrap();
+        let init_opt = match &first_task.command {
+            TaskCommand::Init(_, _) => Some(first_task.map(|known| match known {
+                TaskCommand::Init(command, extra_args) => (command, extra_args),
+                _ => unreachable!(),
+            })),
+            _ => {
+                tasks.push_front(first_task);
+                None
+            },
+        };
+        let (mut adapter, result_opt) = Adapter::init(
+            default_syntax,
+            comparison_mode,
+            run_config,
+            fully_compiled_program_opt,
+            init_opt,
+        );
+        if let Some(result) = result_opt {
+            writeln!(output, "\ninit:\n{}", result)?;
+        }
+        for task in tasks {
+            handle_known_task(&mut output, &mut adapter, task);
+        }
+        // If there is a previous output, compare to that one
+        if !last_output.is_empty() && last_output != output {
+            let diff = format_diff_no_color(&last_output, &output);
+            let output = format!("comparison between v1 and v2 failed:\n{}", diff);
+            handle_expected_output(path, output)?;
+            return Ok(());
+        }
+        last_output = output
     }
-    for task in tasks {
-        handle_known_task(&mut output, &mut adapter, task);
+    if config == TestRunConfig::ComparisonV1V2 {
+        // Indicate in output that we passed comparison test
+        last_output += "\n==> Compiler v2 delivered same results!\n"
     }
-    handle_expected_output(path, output)?;
+    handle_expected_output(path, last_output)?;
     Ok(())
 }
 

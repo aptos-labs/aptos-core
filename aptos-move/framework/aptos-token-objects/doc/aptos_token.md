@@ -17,8 +17,11 @@ The key features are:
 -  [Resource `AptosToken`](#0x4_aptos_token_AptosToken)
 -  [Constants](#@Constants_0)
 -  [Function `create_collection`](#0x4_aptos_token_create_collection)
+-  [Function `create_collection_object`](#0x4_aptos_token_create_collection_object)
 -  [Function `mint`](#0x4_aptos_token_mint)
+-  [Function `mint_token_object`](#0x4_aptos_token_mint_token_object)
 -  [Function `mint_soul_bound`](#0x4_aptos_token_mint_soul_bound)
+-  [Function `mint_soul_bound_token_object`](#0x4_aptos_token_mint_soul_bound_token_object)
 -  [Function `mint_internal`](#0x4_aptos_token_mint_internal)
 -  [Function `borrow`](#0x4_aptos_token_borrow)
 -  [Function `are_properties_mutable`](#0x4_aptos_token_are_properties_mutable)
@@ -300,6 +303,64 @@ Create a new collection
     royalty_numerator: u64,
     royalty_denominator: u64,
 ) {
+    <a href="aptos_token.md#0x4_aptos_token_create_collection_object">create_collection_object</a>(
+        creator,
+        description,
+        max_supply,
+        name,
+        uri,
+        mutable_description,
+        mutable_royalty,
+        mutable_uri,
+        mutable_token_description,
+        mutable_token_name,
+        mutable_token_properties,
+        mutable_token_uri,
+        tokens_burnable_by_creator,
+        tokens_freezable_by_creator,
+        royalty_numerator,
+        royalty_denominator
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x4_aptos_token_create_collection_object"></a>
+
+## Function `create_collection_object`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_create_collection_object">create_collection_object</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, max_supply: u64, name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, mutable_description: bool, mutable_royalty: bool, mutable_uri: bool, mutable_token_description: bool, mutable_token_name: bool, mutable_token_properties: bool, mutable_token_uri: bool, tokens_burnable_by_creator: bool, tokens_freezable_by_creator: bool, royalty_numerator: u64, royalty_denominator: u64): <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="aptos_token.md#0x4_aptos_token_AptosCollection">aptos_token::AptosCollection</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_create_collection_object">create_collection_object</a>(
+    creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    description: String,
+    max_supply: u64,
+    name: String,
+    uri: String,
+    mutable_description: bool,
+    mutable_royalty: bool,
+    mutable_uri: bool,
+    mutable_token_description: bool,
+    mutable_token_name: bool,
+    mutable_token_properties: bool,
+    mutable_token_uri: bool,
+    tokens_burnable_by_creator: bool,
+    tokens_freezable_by_creator: bool,
+    royalty_numerator: u64,
+    royalty_denominator: u64,
+): Object&lt;<a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a>&gt; {
     <b>let</b> creator_addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator);
     <b>let</b> <a href="royalty.md#0x4_royalty">royalty</a> = <a href="royalty.md#0x4_royalty_create">royalty::create</a>(royalty_numerator, royalty_denominator, creator_addr);
     <b>let</b> constructor_ref = <a href="collection.md#0x4_collection_create_fixed_collection">collection::create_fixed_collection</a>(
@@ -337,6 +398,7 @@ Create a new collection
         tokens_freezable_by_creator,
     };
     <b>move_to</b>(&object_signer, aptos_collection);
+    <a href="../../aptos-framework/doc/object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>(&constructor_ref)
 }
 </code></pre>
 
@@ -370,6 +432,40 @@ With an existing collection, directly mint a viable token into the creators acco
     property_types: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
     property_values: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
 ) <b>acquires</b> <a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a>, <a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a> {
+    <a href="aptos_token.md#0x4_aptos_token_mint_token_object">mint_token_object</a>(creator, <a href="collection.md#0x4_collection">collection</a>, description, name, uri, property_keys, property_types, property_values);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x4_aptos_token_mint_token_object"></a>
+
+## Function `mint_token_object`
+
+Mint a token into an existing collection, and retrieve the object / address of the token.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_mint_token_object">mint_token_object</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="collection.md#0x4_collection">collection</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, property_keys: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, property_types: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, property_values: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;): <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="aptos_token.md#0x4_aptos_token_AptosToken">aptos_token::AptosToken</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_mint_token_object">mint_token_object</a>(
+    creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="collection.md#0x4_collection">collection</a>: String,
+    description: String,
+    name: String,
+    uri: String,
+    property_keys: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
+    property_types: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
+    property_values: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+): Object&lt;<a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a>&gt; <b>acquires</b> <a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a>, <a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a> {
     <b>let</b> constructor_ref = <a href="aptos_token.md#0x4_aptos_token_mint_internal">mint_internal</a>(
         creator,
         <a href="collection.md#0x4_collection">collection</a>,
@@ -382,15 +478,17 @@ With an existing collection, directly mint a viable token into the creators acco
     );
 
     <b>let</b> <a href="collection.md#0x4_collection">collection</a> = <a href="aptos_token.md#0x4_aptos_token_collection_object">collection_object</a>(creator, &<a href="collection.md#0x4_collection">collection</a>);
+
+    // If tokens are freezable, add a transfer ref <b>to</b> be able <b>to</b> <b>freeze</b> transfers
     <b>let</b> freezable_by_creator = <a href="aptos_token.md#0x4_aptos_token_are_collection_tokens_freezable">are_collection_tokens_freezable</a>(<a href="collection.md#0x4_collection">collection</a>);
-    <b>if</b> (!freezable_by_creator) {
-        <b>return</b>
+    <b>if</b> (freezable_by_creator) {
+        <b>let</b> aptos_token_addr = <a href="../../aptos-framework/doc/object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(&constructor_ref);
+        <b>let</b> <a href="aptos_token.md#0x4_aptos_token">aptos_token</a> = <b>borrow_global_mut</b>&lt;<a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a>&gt;(aptos_token_addr);
+        <b>let</b> transfer_ref = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_transfer_ref">object::generate_transfer_ref</a>(&constructor_ref);
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_fill">option::fill</a>(&<b>mut</b> <a href="aptos_token.md#0x4_aptos_token">aptos_token</a>.transfer_ref, transfer_ref);
     };
 
-    <b>let</b> aptos_token_addr = <a href="../../aptos-framework/doc/object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(&constructor_ref);
-    <b>let</b> <a href="aptos_token.md#0x4_aptos_token">aptos_token</a> = <b>borrow_global_mut</b>&lt;<a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a>&gt;(aptos_token_addr);
-    <b>let</b> transfer_ref = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_transfer_ref">object::generate_transfer_ref</a>(&constructor_ref);
-    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_fill">option::fill</a>(&<b>mut</b> <a href="aptos_token.md#0x4_aptos_token">aptos_token</a>.transfer_ref, transfer_ref);
+    <a href="../../aptos-framework/doc/object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>(&constructor_ref)
 }
 </code></pre>
 
@@ -425,6 +523,51 @@ With an existing collection, directly mint a soul bound token into the recipient
     property_values: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
     soul_bound_to: <b>address</b>,
 ) <b>acquires</b> <a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a> {
+    <a href="aptos_token.md#0x4_aptos_token_mint_soul_bound_token_object">mint_soul_bound_token_object</a>(
+        creator,
+        <a href="collection.md#0x4_collection">collection</a>,
+        description,
+        name,
+        uri,
+        property_keys,
+        property_types,
+        property_values,
+        soul_bound_to
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x4_aptos_token_mint_soul_bound_token_object"></a>
+
+## Function `mint_soul_bound_token_object`
+
+With an existing collection, directly mint a soul bound token into the recipient's account.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_mint_soul_bound_token_object">mint_soul_bound_token_object</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="collection.md#0x4_collection">collection</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, property_keys: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, property_types: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, property_values: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, soul_bound_to: <b>address</b>): <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="aptos_token.md#0x4_aptos_token_AptosToken">aptos_token::AptosToken</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_mint_soul_bound_token_object">mint_soul_bound_token_object</a>(
+    creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="collection.md#0x4_collection">collection</a>: String,
+    description: String,
+    name: String,
+    uri: String,
+    property_keys: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
+    property_types: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
+    property_values: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+    soul_bound_to: <b>address</b>,
+): Object&lt;<a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a>&gt; <b>acquires</b> <a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a> {
     <b>let</b> constructor_ref = <a href="aptos_token.md#0x4_aptos_token_mint_internal">mint_internal</a>(
         creator,
         <a href="collection.md#0x4_collection">collection</a>,
@@ -440,6 +583,8 @@ With an existing collection, directly mint a soul bound token into the recipient
     <b>let</b> linear_transfer_ref = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_linear_transfer_ref">object::generate_linear_transfer_ref</a>(&transfer_ref);
     <a href="../../aptos-framework/doc/object.md#0x1_object_transfer_with_ref">object::transfer_with_ref</a>(linear_transfer_ref, soul_bound_to);
     <a href="../../aptos-framework/doc/object.md#0x1_object_disable_ungated_transfer">object::disable_ungated_transfer</a>(&transfer_ref);
+
+    <a href="../../aptos-framework/doc/object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>(&constructor_ref)
 }
 </code></pre>
 
@@ -499,8 +644,8 @@ With an existing collection, directly mint a soul bound token into the recipient
 
     <b>let</b> mutator_ref = <b>if</b> (
         <a href="collection.md#0x4_collection">collection</a>.mutable_token_description
-        || <a href="collection.md#0x4_collection">collection</a>.mutable_token_name
-        || <a href="collection.md#0x4_collection">collection</a>.mutable_token_uri
+            || <a href="collection.md#0x4_collection">collection</a>.mutable_token_name
+            || <a href="collection.md#0x4_collection">collection</a>.mutable_token_uri
     ) {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="token.md#0x4_token_generate_mutator_ref">token::generate_mutator_ref</a>(&constructor_ref))
     } <b>else</b> {
@@ -829,7 +974,10 @@ With an existing collection, directly mint a soul bound token into the recipient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_unfreeze_transfer">unfreeze_transfer</a>&lt;T: key&gt;(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="token.md#0x4_token">token</a>: Object&lt;T&gt;) <b>acquires</b> <a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a>, <a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_unfreeze_transfer">unfreeze_transfer</a>&lt;T: key&gt;(
+    creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="token.md#0x4_token">token</a>: Object&lt;T&gt;
+) <b>acquires</b> <a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a>, <a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a> {
     <b>let</b> <a href="aptos_token.md#0x4_aptos_token">aptos_token</a> = <a href="aptos_token.md#0x4_aptos_token_authorized_borrow">authorized_borrow</a>(&<a href="token.md#0x4_token">token</a>, creator);
     <b>assert</b>!(
         <a href="aptos_token.md#0x4_aptos_token_are_collection_tokens_freezable">are_collection_tokens_freezable</a>(<a href="token.md#0x4_token_collection_object">token::collection_object</a>(<a href="token.md#0x4_token">token</a>))
@@ -1571,4 +1719,4 @@ With an existing collection, directly mint a soul bound token into the recipient
 </details>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY
