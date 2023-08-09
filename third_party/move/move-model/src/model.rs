@@ -3028,6 +3028,15 @@ impl<'env> FunctionEnv<'env> {
         )
     }
 
+    /// Gets full name with module address as string.
+    pub fn get_full_name_with_address(&self) -> String {
+        format!(
+            "{}::{}",
+            self.module_env.get_full_name_str(),
+            self.get_name_str()
+        )
+    }
+
     pub fn get_name_str(&self) -> String {
         self.get_name().display(self.symbol_pool()).to_string()
     }

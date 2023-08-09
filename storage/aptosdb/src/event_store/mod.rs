@@ -471,19 +471,19 @@ impl EventStore {
     ) -> anyhow::Result<()> {
         let mut current_version = start;
         for events in self.get_events_by_version_iter(start, (end - start) as usize)? {
-            for (current_index, event) in (events?).into_iter().enumerate().filter_map(|(i, e)| {
-                if let ContractEvent::V1(v1) = e {
-                    Some((i, v1))
-                } else {
-                    None
-                }
-            }) {
-                db_batch.delete::<EventByVersionSchema>(&(
-                    *event.key(),
-                    current_version,
-                    event.sequence_number(),
-                ))?;
-                db_batch.delete::<EventByKeySchema>(&(*event.key(), event.sequence_number()))?;
+            for event in (events?).into_iter().enumerate() {
+                let current_index = match event {
+                    (idx, ContractEvent::V1(v1)) => {
+                        db_batch.delete::<EventByVersionSchema>(&(
+                            *v1.key(),
+                            current_version,
+                            v1.sequence_number(),
+                        ))?;
+                        db_batch.delete::<EventByKeySchema>(&(*v1.key(), v1.sequence_number()))?;
+                        idx
+                    },
+                    (idx, ContractEvent::V2(v2)) => idx,
+                };
                 db_batch.delete::<EventSchema>(&(current_version, current_index as u64))?;
             }
             current_version += 1;
