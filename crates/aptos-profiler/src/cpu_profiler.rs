@@ -7,22 +7,35 @@ use crate::{
 };
 use anyhow::Result;
 use std::{path::PathBuf, thread, time};
+use pprof::ProfilerGuard;
 
-pub struct CpuProfiler {
+pub struct CpuProfiler<'a> {
     frequency: i32,
     svg_result_path: PathBuf,
+    guard: Option<ProfilerGuard<'a>>,
 }
 
-impl CpuProfiler {
+impl CpuProfiler<'_> {
     pub(crate) fn new(config: &CpuProfilerConfig) -> Self {
         Self {
             frequency: config.frequency,
             svg_result_path: config.svg_result_path.clone(),
+            guard: None,
         }
+    }
+
+    pub(crate) fn set_guard(&mut self, guard: ProfilerGuard)-> Result<()> {
+        self.guard = Some(guard);
+        Ok(())
+    }
+
+    pub(crate) fn destory_guard(&mut self)-> Result<()> {
+        self.guard = None;
+        Ok(())
     }
 }
 
-impl Profiler for CpuProfiler {
+impl Profiler for CpuProfiler<'_> {
     /// Perform CPU profiling for the given duration
     fn profile_for(&self, duration_secs: u64) -> Result<()> {
         let guard = pprof::ProfilerGuard::new(self.frequency).unwrap();
@@ -38,10 +51,8 @@ impl Profiler for CpuProfiler {
 
     /// Start profiling until it is stopped
     fn start_profiling(&self) -> Result<()> {
-        let _guard = pprof::ProfilerGuard::new(self.frequency).unwrap();
-        let duration = u64::MAX;
-        thread::sleep(time::Duration::from_secs(duration));
-
+        let guard = pprof::ProfilerGuard::new(self.frequency).unwrap();
+        self.set_guard(guard);
         Ok(())
     }
 
@@ -49,7 +60,16 @@ impl Profiler for CpuProfiler {
     fn end_profiling(&self) -> Result<()> {
         //TODO: pprof-rs crate may not have a direct way of stopping the profiling from another function.
         //Potential approach: return guard object to original scope and pass it here to stop and report results
-        todo!();
+        if let Ok(report) = self.guard.expect("REASON").report().build() {
+            let file = create_file_with_parents(self.svg_result_path.as_path())?;
+            let _result = report.flamegraph(file);
+        };
+        self.destory_guard();
+        if let Ok(report) = self.guard.expect("REASON").report().build() {
+            let file = create_file_with_parents(self.svg_result_path.as_path())?;
+            let _result = report.flamegraph(file);
+        };
+        Ok(())
     }
 
     /// Expose the results as TXT
