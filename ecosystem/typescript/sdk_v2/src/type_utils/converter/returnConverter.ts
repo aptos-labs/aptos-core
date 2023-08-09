@@ -3,8 +3,8 @@
  * for return value of view functions.
  */
 
-import { UnknownStruct } from "../common.js";
-import { MoveNonStructTypes, MovePrimitive } from "../moveTypes.js";
+import { UnknownStruct } from "../common";
+import { MoveNonStructTypes, MovePrimitive } from "../moveTypes";
 
 /**
  * Convert an array of return types.

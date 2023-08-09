@@ -1,10 +1,13 @@
-import { AptosConfig } from "./aptos_config";
-import { General } from "./general";
+import { Aptos } from "../../api";
+import { AptosConfig } from "../../api/aptos_config";
+import { Network } from "../../utils";
 
 // describe("type-safe tests", () => {
 //     test("view function", () => {
 async () => {
-    const client = new General(new AptosConfig());
+    const settings: AptosConfig = { network: Network.DEVNET, faucet: Network.DEVNET }
+    const aptos = new Aptos(settings);
+    const client = aptos.general;
 
     // a view function call without type-safety
     client.view({

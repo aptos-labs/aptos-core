@@ -50,12 +50,21 @@ export class General {
   async view(payload: Gen.ViewRequest, ledger_version?: string): Promise<Gen.MoveValue[]>
 
   /**
-   * Call for a move view function
+   * Call for a move view function with type safety
    *
+   * @template TABI - The ABI JSON you want to call
+   * @template TFuncName - The function name in the ABI you want to call
+   * 
    * @param payload Transaction payload
    * @param ledger_version (optional) Ledger version to lookup block information for
-   *
-   * @returns MoveValue[]
+   * @
+   * @returns A readonly array of the return types of the function you called
+   * @example
+   * const [balance] = await client.view<COIN_ABI, "balance">({
+   *     function: "0x1::coin::balance",
+   *     arguments: ["0x1"],
+   *     type_arguments: ["0x1"],
+   * });
    */
   async view<
     TABI extends ABIRoot,
