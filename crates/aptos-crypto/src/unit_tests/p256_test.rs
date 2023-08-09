@@ -142,11 +142,11 @@ proptest! {
         let mut s_bytes: [u8; 32] = [0u8; 32];
         s_bytes.copy_from_slice(&serialized[32..]);
 
-        // ed25519-dalek signing ensures a canonical S value.
+        // NIST-P256 signing ensures a canonical S value.
         let s = NonZeroScalar::try_from(&s_bytes[..]).unwrap();
         let order_half = NonZeroScalar::try_from(&ORDER_HALF[..]).unwrap();
 
-        // adding L (order of the base point) so that S + L > L
+        // adding ORDER_HALF (half the order of the base point) so that S + ORDER_HALF > ORDER_HALF
         let malleable_s = NonZeroScalar::new(*s + *order_half).unwrap();
         let malleable_s_bytes = malleable_s.to_bytes();
         // Update the signature (the S part).
@@ -154,26 +154,27 @@ proptest! {
 
         prop_assert_ne!(serialized_old, serialized);
 
-        // Check that malleable signatures will pass verification and deserialization in dalek.
-        // Construct the corresponding dalek public key.
-        let _dalek_public_key = p256::ecdsa::VerifyingKey::from_sec1_bytes(
+        // Check that malleable signatures will pass verification and deserialization in the RustCrypto
+        // p256 crate.
+        // Construct the corresponding RustCrypto p256 public key.
+        let rustcrypto_public_key = p256::ecdsa::VerifyingKey::from_sec1_bytes(
             &keypair.public_key.to_bytes()
         ).unwrap();
 
-        // Construct the corresponding dalek Signature. This signature is malleable.
-        let dalek_sig = p256::ecdsa::Signature::try_from(&serialized[..]);
+        // Construct the corresponding RustCrypto p256 Signature. This signature is malleable.
+        let rustcrypto_sig = p256::ecdsa::Signature::try_from(&serialized[..]);
 
-        // ed25519_dalek will (post 2.0) deserialize the malleable
+        // RustCrypto p256 will deserialize the malleable
         // signature. It does not detect it.
-        prop_assert!(dalek_sig.is_ok());
+        prop_assert!(rustcrypto_sig.is_ok());
 
         let msg_bytes = bcs::to_bytes(&message);
         prop_assert!(msg_bytes.is_ok());
 
-        let dalek_sig = dalek_sig.unwrap();
-        // ed25519_dalek verify will NOT accept the mauled signature
-        prop_assert!(_dalek_public_key.verify(msg_bytes.as_ref().unwrap(), &dalek_sig).is_err());
-        // ...therefore, neither will our own Ed25519Signature::verify_arbitrary_msg
+        let rustcrypto_sig = rustcrypto_sig.unwrap();
+        // RustCrypto p256 verify will NOT accept the mauled signature
+        prop_assert!(rustcrypto_public_key.verify(msg_bytes.as_ref().unwrap(), &rustcrypto_sig).is_err());
+        // ...therefore, neither will our own P256Signature::verify_arbitrary_msg
         let sig = P256Signature::from_bytes(&serialized).unwrap();
         prop_assert!(sig.verify(&message, &keypair.public_key).is_err());
 
@@ -185,7 +186,7 @@ proptest! {
             Err(CryptoMaterialError::CanonicalRepresentationError)
         );
 
-        // We expect from_bytes_unchecked deserialization to succeed, as dalek
+        // We expect from_bytes_unchecked deserialization to succeed, as RustCrypto p256
         // does not check for signature malleability. This method is pub(crate)
         // and only used for test purposes.
         let sig_unchecked = P256Signature::from_bytes(&serialized);
@@ -200,6 +201,4 @@ proptest! {
             Err(CryptoMaterialError::CanonicalRepresentationError)
         );
     }
-
-   
 }

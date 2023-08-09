@@ -102,10 +102,7 @@ impl P256Signature {
         let one = NonZeroScalar::from_uint(<NistP256 as Curve>::Uint::ONE).unwrap();
         // Dereferencing a NonZeroScalar makes it a Scalar, which implements subtraction
         let new_s = *order_minus_one - *s + *one;
-        //let new_s = s.invert().unwrap();
-        // TODO: Make sure this never panics
         let new_s_nonzero = NonZeroScalar::new(new_s).unwrap();
-        // TODO: Make sure this never panics
         let new_sig = p256::ecdsa::Signature::from_scalars(&r, &new_s_nonzero).unwrap();
         P256Signature(new_sig)
     }
