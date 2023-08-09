@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   run-gas-calibration:
-    if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests'))
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
