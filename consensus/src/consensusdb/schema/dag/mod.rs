@@ -9,14 +9,18 @@
 //! |   digest   |   node/certified node    |
 //! ```
 
-use crate::dag::{CertifiedNode, Node, NodeId, Vote};
+use crate::{
+    consensusdb::schema::ensure_slice_len_eq,
+    dag::{CertifiedNode, Node, NodeId, Vote},
+    define_schema,
+};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_schemadb::{
-    define_schema,
     schema::{KeyCodec, ValueCodec},
     ColumnFamilyName,
 };
+use std::mem::size_of;
 
 pub const NODE_CF_NAME: ColumnFamilyName = "node";
 
@@ -92,5 +96,30 @@ impl ValueCodec<CertifiedNodeSchema> for CertifiedNode {
 
     fn decode_value(data: &[u8]) -> Result<Self> {
         Ok(bcs::from_bytes(data)?)
+    }
+}
+
+pub const ORDERED_ANCHOR_ID_CF_NAME: ColumnFamilyName = "ordered_anchor_id";
+
+define_schema!(OrderedAnchorIdSchema, NodeId, (), ORDERED_ANCHOR_ID_CF_NAME);
+
+impl KeyCodec<OrderedAnchorIdSchema> for NodeId {
+    fn encode_key(&self) -> Result<Vec<u8>> {
+        Ok(bcs::to_bytes(&self)?)
+    }
+
+    fn decode_key(data: &[u8]) -> Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+impl ValueCodec<OrderedAnchorIdSchema> for () {
+    fn encode_value(&self) -> Result<Vec<u8>> {
+        Ok(vec![])
+    }
+
+    fn decode_value(data: &[u8]) -> Result<Self> {
+        ensure_slice_len_eq(data, size_of::<Self>())?;
+        Ok(())
     }
 }

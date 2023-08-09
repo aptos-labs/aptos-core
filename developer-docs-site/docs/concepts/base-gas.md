@@ -188,7 +188,7 @@ Basic instruction gas parameters are defined at [`instr.rs`] and include the fol
 | `vec_unpack_base`              | Base cost to unpack a vector             |
 | `vec_unpack_per_expected_elem` | Base cost to unpack a vector per element |
 
-Additional storage gas parameters are defined in [`table.rs`], [`move_stdlib.rs`], and other assorted source files in [`aptos-gas/src/`].
+Additional storage gas parameters are defined in [`table.rs`], [`move_stdlib.rs`], and other assorted source files in [`aptos-gas-schedule/src/`].
 
 ## Storage gas
 
@@ -226,7 +226,7 @@ Hence per the item-wise read methodology described above, reading the last eleme
 
 ## Payload gas
 
-Payload gas is defined in [`transaction/mod.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction/mod.rs), which incorporates storage gas with several payload- and pricing-associated parameters:
+Payload gas is defined in [`transaction.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas-schedule/src/gas_schedule/transaction.rs), which incorporates storage gas with several payload- and pricing-associated parameters:
 
 | Parameter                       | Meaning                                                                                |
 |---------------------------------|----------------------------------------------------------------------------------------|
@@ -247,13 +247,13 @@ Then, to convert from external gas units to octas, multiply by the "gas price", 
 
 ### Unit and pricing constants
 
-As of the time of this writing, `min_price_per_gas_unit` in [`transaction/mod.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction/mod.rs) is defined as [`aptos_global_constants`]`::GAS_UNIT_PRICE` (which is itself defined as 100), with other noteworthy [`transaction/mod.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction/mod.rs) constants as follows:
+As of the time of this writing, `min_price_per_gas_unit` in [`transaction.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas-schedule/src/gas_schedule/transaction.rs) is defined as [`aptos_global_constants`]`::GAS_UNIT_PRICE` (which is itself defined as 100), with other noteworthy [`transaction.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas-schedule/src/gas_schedule/transaction.rs) constants as follows:
 
 | Constant                  | Value  |
 |---------------------------|--------|
 | `min_price_per_gas_unit`  | 100    |
-| `max_price_per_gas_unit`  | 10,000 |
-| `gas_unit_scaling_factor` | 10,000 |
+| `max_price_per_gas_unit`  | 10,000,000,000 |
+| `gas_unit_scaling_factor` | 1,000,000 |
 
 See [Payload gas](#payload-gas) for the meaning of these constants.
 
@@ -264,7 +264,7 @@ As of the time of this writing, [`initialize()`] sets the following minimum stor
 | Data style | Operation | Symbol | Minimum internal gas |
 |------------|-----------|--------|----------------------|
 | Per item   | Read      | $r_i$  | 300,000              |
-| Per item   | Create    | $c_i$  | 5,000,000            |
+| Per item   | Create    | $c_i$  | 300,000              |
 | Per item   | Write     | $w_i$  | 300,000              |
 | Per byte   | Read      | $r_b$  | 300                  |
 | Per byte   | Create    | $c_b$  | 5,000                |
@@ -276,7 +276,7 @@ Hence, in terms of octas, initial mainnet gas costs can be estimated as follows 
 | Operation       | Operation | Minimum octas |
 |-----------------|-----------|---------------|
 | Per-item read   | $r_i$     | 3000          |
-| Per-item create | $c_i$     | 50,000        |
+| Per-item create | $c_i$     | 50,000          |
 | Per-item write  | $w_i$     | 3000          |
 | Per-byte read   | $r_b$     | 3             |
 | Per-byte create | $c_b$     | 50            |
@@ -326,23 +326,23 @@ In extreme cases it is possible for instruction gas to far outweigh storage gas,
 
 ### Payload gas
 
-As of the time of this writing, [`transaction/mod.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction/mod.rs) defines the minimum amount of internal gas per transaction as 1,500,000 internal units (15,000 octas at minimum), an amount that increases by 2,000 internal gas units (20 octas minimum) per byte for payloads larger than 600 bytes, with the maximum number of bytes permitted in a transaction set at 65536.
+As of the time of this writing, [`transaction/mod.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas-schedule/src/gas_schedule/transaction.rs) defines the minimum amount of internal gas per transaction as 1,500,000 internal units (15,000 octas at minimum), an amount that increases by 2,000 internal gas units (20 octas minimum) per byte for payloads larger than 600 bytes, with the maximum number of bytes permitted in a transaction set at 65536.
 Hence in practice, payload gas is unlikely to be a concern.
 
 <!--- Alphabetized reference links -->
 
 [#4540]:                           https://github.com/aptos-labs/aptos-core/pull/4540/files
-[`aptos-gas/src/`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/
+[`aptos-gas-schedule/src/`]:       https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas-schedule/src
 [`aptos_global_constants`]:        https://github.com/aptos-labs/aptos-core/blob/main/config/global-constants/src/lib.rs
 [`base_8192_exponential_curve()`]: https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md#0x1_storage_gas_base_8192_exponential_curve
 [BCS sequence specification]:      https://github.com/diem/bcs#fixed-and-variable-length-sequences
 [`gas_meter.rs`]:                  https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/gas_meter.rs
 [`initialize()`]:                  https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md#0x1_storage_gas_initialize
-[`instr.rs`]:                      https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/instr.rs
-[`move_stdlib.rs`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/move_stdlib.rs
+[`instr.rs`]:                      https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas-schedule/src/gas_schedule/instr.rs
+[`move_stdlib.rs`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas-schedule/src/gas_schedule/move_stdlib.rs
 [`on_reconfig()`]:                 https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md#@Specification_16_on_reconfig
 [`storage_gas.md`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md
 [`storage_gas.move`]:              https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/storage_gas.move
 [`StorageGas`]:                    https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md#resource-storagegas
-[`table.rs`]:                      https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/table.rs
-[`transaction.rs`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction.rs
+[`table.rs`]:                      https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas-schedule/src/gas_schedule/table.rs
+[`transaction.rs`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas-schedule/src/gas_schedule/transaction.rs

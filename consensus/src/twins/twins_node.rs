@@ -38,7 +38,8 @@ use aptos_network::{
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
-        ConsensusConfigV1, OnChainConfig, OnChainConfigPayload, OnChainConsensusConfig,
+        ConsensusConfigV1, InMemoryOnChainConfig, OnChainConfig, OnChainConfigPayload,
+        OnChainConsensusConfig,
         ProposerElectionType::{self, RoundProposer},
         ValidatorSet,
     },
@@ -125,7 +126,7 @@ impl SMRNode {
             // Requires double serialization, check deserialize_into_config for more details
             bcs::to_bytes(&bcs::to_bytes(&consensus_config).unwrap()).unwrap(),
         );
-        let payload = OnChainConfigPayload::new(1, Arc::new(configs));
+        let payload = OnChainConfigPayload::new(1, InMemoryOnChainConfig::new(configs));
 
         reconfig_sender
             .push((), ReconfigNotification {

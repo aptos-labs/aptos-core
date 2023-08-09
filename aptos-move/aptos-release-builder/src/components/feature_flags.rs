@@ -6,6 +6,8 @@ use anyhow::Result;
 use aptos_types::on_chain_config::{FeatureFlag as AptosFeatureFlag, Features as AptosFeatures};
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 #[derive(Clone, Deserialize, PartialEq, Eq, Serialize, Debug)]
 pub struct Features {
@@ -15,7 +17,7 @@ pub struct Features {
     pub disabled: Vec<FeatureFlag>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, Hash)]
+#[derive(Clone, Debug, Deserialize, EnumIter, PartialEq, Eq, Serialize, Hash)]
 #[allow(non_camel_case_types)]
 #[serde(rename_all = "snake_case")]
 pub enum FeatureFlag {
@@ -226,5 +228,20 @@ impl Features {
                 .disabled
                 .iter()
                 .any(|f| on_chain_features.is_enabled(AptosFeatureFlag::from(f.clone())))
+    }
+}
+
+impl From<&AptosFeatures> for Features {
+    fn from(features: &AptosFeatures) -> Features {
+        let mut enabled = vec![];
+        let mut disabled = vec![];
+        for feature in FeatureFlag::iter() {
+            if features.is_enabled(AptosFeatureFlag::from(feature.clone())) {
+                enabled.push(feature);
+            } else {
+                disabled.push(feature);
+            }
+        }
+        Features { enabled, disabled }
     }
 }

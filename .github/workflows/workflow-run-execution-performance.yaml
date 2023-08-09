@@ -25,55 +25,89 @@ on:
         default: executor-benchmark-runner 
         type: choice
         options:
-        - spot-runner
         - executor-benchmark-runner
         description: The name of the runner to use for the test.
 
 jobs:
+  # This job determines which files were changed
+  file_change_determinator:
+    runs-on: ubuntu-latest
+    outputs:
+      only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run the file change determinator
+        id: determine_file_changes
+        uses: ./.github/actions/file-change-determinator
+
+  # Run sequential execution performance tests
   sequential-execution-performance:
+    needs: file_change_determinator
     timeout-minutes: 30
     runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
 
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
 
       - name: Run sequential execution benchmark in performance build mode
         shell: bash
         run: testsuite/sequential_execution_performance.py
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
 
+      - run: echo "Skipping sequential execution performance! Unrelated changes detected."
+        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
+
+  # Run parallel execution performance tests
   parallel-execution-performance:
+    needs: file_change_determinator
     timeout-minutes: 60
     runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
 
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
 
       - name: Run parallel execution benchmark in performance build mode
         shell: bash
         run: testsuite/parallel_execution_performance.py
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
 
+      - run: echo "Skipping parallel execution performance! Unrelated changes detected."
+        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
+
+  # Run single node execution performance tests
   single-node-performance:
+    needs: file_change_determinator
     timeout-minutes: 60
     runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
 
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
 
       - name: Run single node execution benchmark in performance build mode
         shell: bash
         run: TABULATE_INSTALL=lib-only pip install tabulate && testsuite/single_node_performance.py
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+
+      - run: echo "Skipping single node execution performance! Unrelated changes detected."
+        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'

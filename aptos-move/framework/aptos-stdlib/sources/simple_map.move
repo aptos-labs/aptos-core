@@ -13,8 +13,6 @@ module aptos_std::simple_map {
     const EKEY_ALREADY_EXISTS: u64 = 1;
     /// Map key is not found
     const EKEY_NOT_FOUND: u64 = 2;
-    /// Lengths of keys and values do not match
-    const EMISMATCHED_LENGTHS: u64 = 3;
 
     struct SimpleMap<Key, Value> has copy, drop, store {
         data: vector<Element<Key, Value>>,
@@ -104,7 +102,6 @@ module aptos_std::simple_map {
         keys: vector<Key>,
         values: vector<Value>,
     ) {
-        assert!(vector::length(&keys) == vector::length(&values), error::invalid_argument(EMISMATCHED_LENGTHS));
         vector::zip(keys, values, |key, value| {
             add(map, key, value);
         });
@@ -122,7 +119,7 @@ module aptos_std::simple_map {
         while (i < len) {
             let element = vector::borrow(data, i);
             if (&element.key == &key) {
-                vector::push_back(data, Element { key, value});
+                vector::push_back(data, Element { key, value });
                 vector::swap(data, i, len);
                 let Element { key, value } = vector::pop_back(data);
                 return (std::option::some(key), std::option::some(value))
@@ -156,7 +153,11 @@ module aptos_std::simple_map {
         let keys: vector<Key> = vector::empty();
         let values: vector<Value> = vector::empty();
         let SimpleMap { data } = map;
-        vector::for_each(data, |e| { let Element { key, value } = e; vector::push_back(&mut keys, key); vector::push_back(&mut values, value); });
+        vector::for_each(data, |e| {
+            let Element { key, value } = e;
+            vector::push_back(&mut keys, key);
+            vector::push_back(&mut values, value);
+        });
         (keys, values)
     }
 
@@ -187,12 +188,12 @@ module aptos_std::simple_map {
     fun find<Key: store, Value: store>(
         map: &SimpleMap<Key, Value>,
         key: &Key,
-    ): option::Option<u64>{
+    ): option::Option<u64> {
         let leng = vector::length(&map.data);
         let i = 0;
         while (i < leng) {
             let element = vector::borrow(&map.data, i);
-            if (&element.key == key){
+            if (&element.key == key) {
                 return option::some(i)
             };
             i = i + 1;
@@ -239,7 +240,7 @@ module aptos_std::simple_map {
 
         assert!(length(&map) == 0, 0);
         add_all(&mut map, vector[1, 2, 3], vector[10, 20, 30]);
-        assert!(length(&map) ==3, 1);
+        assert!(length(&map) == 3, 1);
         assert!(borrow(&map, &1) == &10, 2);
         assert!(borrow(&map, &2) == &20, 3);
         assert!(borrow(&map, &3) == &30, 4);
@@ -296,9 +297,9 @@ module aptos_std::simple_map {
     public fun test_upsert_test() {
         let map = create<u64, u64>();
         // test adding 3 elements using upsert
-        upsert<u64, u64>(&mut map, 1, 1 );
-        upsert(&mut map, 2, 2 );
-        upsert(&mut map, 3, 3 );
+        upsert<u64, u64>(&mut map, 1, 1);
+        upsert(&mut map, 2, 2);
+        upsert(&mut map, 3, 3);
 
         assert!(length(&map) == 3, 0);
         assert!(contains_key(&map, &1), 1);
@@ -309,7 +310,7 @@ module aptos_std::simple_map {
         assert!(borrow(&map, &3) == &3, 6);
 
         // change mapping 1->1 to 1->4
-        upsert(&mut map, 1, 4 );
+        upsert(&mut map, 1, 4);
 
         assert!(length(&map) == 3, 7);
         assert!(contains_key(&map, &1), 8);
