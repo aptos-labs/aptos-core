@@ -73,20 +73,7 @@ impl ConflictingTxnTracker {
         self.finalized_all.insert(sharded_txn_idx);
     }
 
-    /// Check if there is a txn writing to the current storage location and its txn_id in the given range.
-    /// The txn list is considered a ring, and the range can be wrapped.
-    /// Below are some examples.
-    ///
-    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=3, end=4 => false
-    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=3, end=5 => true
-    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=3, end=6 => true
-    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=4, end=4 => false
-    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=4, end=6 => true
-    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=5, end=6 => false
-    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=7, end=9 => true
-    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=8, end=9 => false
-    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=12, end=4 => false
-    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=12, end=5 => true
+    /// Check if there is a txn writing to the current storage location and its txn_id in the given wrapped range [start, end).
     pub fn has_write_in_range(
         &self,
         start_txn_id: OriginalTxnIdx,
