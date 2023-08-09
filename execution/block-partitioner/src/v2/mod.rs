@@ -608,7 +608,7 @@ impl BlockPartitioner for PartitionerV2 {
                         } else {
                             rsets[txn_idx].write().unwrap().insert(key_idx);
                         }
-                        trackers
+                        let tracker_ref = trackers
                             .entry(key_idx)
                             .or_insert_with(|| {
                                 let anchor_shard_id =
@@ -617,10 +617,15 @@ impl BlockPartitioner for PartitionerV2 {
                                     storage_location.clone(),
                                     anchor_shard_id,
                                 ))
-                            })
+                            });
+                        let mut tracker = tracker_ref
                             .write()
-                            .unwrap()
-                            .add_candidate(txn_idx, is_write);
+                            .unwrap();
+                        if is_write {
+                            tracker.add_write_candidate(txn_idx);
+                        } else {
+                            tracker.add_read_candidate(txn_idx);
+                        }
                     }
                 });
         });

@@ -44,13 +44,13 @@ impl ConflictingTxnTracker {
         }
     }
 
-    pub fn add_candidate(&mut self, txn_id: OriginalTxnIdx, is_write: bool) {
-        if is_write {
-            self.pending_writes.insert(txn_id);
-            self.writer_set.insert(txn_id);
-        } else {
-            self.pending_reads.insert(txn_id);
-        }
+    pub fn add_read_candidate(&mut self, txn_id: OriginalTxnIdx) {
+        self.pending_reads.insert(txn_id);
+    }
+
+    pub fn add_write_candidate(&mut self, txn_id: OriginalTxnIdx) {
+        self.pending_writes.insert(txn_id);
+        self.writer_set.insert(txn_id);
     }
 
     /// Partitioner has finalized the position of a txn. Remove it from the pending txn list.
@@ -108,11 +108,11 @@ impl ConflictingTxnTracker {
 fn test_storage_location_helper() {
     let mut helper =
         ConflictingTxnTracker::new(StorageLocation::Specific(StateKey::raw(vec![])), 0);
-    helper.add_candidate(4, true);
-    helper.add_candidate(10, true);
-    helper.add_candidate(7, true);
-    helper.add_candidate(8, false);
-    helper.add_candidate(9, true);
+    helper.add_write_candidate(4);
+    helper.add_write_candidate(10);
+    helper.add_write_candidate(7);
+    helper.add_read_candidate(8);
+    helper.add_write_candidate(9);
     // candidates: T4(W), T7(W), T8(R), T9(W), T10(W)
     // promoted: -
     assert!(!helper.has_write_in_range(4, 4)); // 0-length interval
