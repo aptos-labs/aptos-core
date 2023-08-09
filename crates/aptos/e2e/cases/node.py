@@ -176,3 +176,111 @@ def test_node_update_validator_network_address(run_helper: RunHelper, test_name=
         raise TestError(
             f"Error: Expected validator network address [{expected_network_address}] but got [{result[0].get('validator_network_addresses')[0]}]"
         )
+
+
+@test_case
+def test_node_join_validator_set(run_helper: RunHelper, test_name=None):
+    # create new account to use as join validator
+    run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "init",
+            "--assume-yes",
+            "--network",
+            "local",
+            "--profile",
+            "join_validator",
+        ],
+        input="\n",
+    )
+
+    # initialize stake owner
+    run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "stake",
+            "initialize-stake-owner",
+            "--initial-stake-amount",
+            "1",
+            "--assume-yes",
+            "--profile",
+            "join_validator",
+        ],
+    )
+
+    # hardcode the bls12381 key
+    bls12381_public_key = "A1E52C80074B8C3EAE4877A817EC4859870BFF5E94B5ACE76FDEECA872394F3B4E4E7D62757FD0EAAA41E5CDB61E6B04"
+    bls12381_pop = "B3590F265A90DF2A63D0461F183CF92A58B913FBF3A3B5109C8D37D46D39149D6A5392D25D04B444F22E54682EFEA9F1124C55265C6B184D7DB784A14442BA273648CD780CE334E72AEBB5EEF75229DE038E69FB9E994C26FF10BCCA42D57067"
+
+    # run the update consensus key command
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "node",
+            "update-consensus-key",
+            "--profile",
+            "join_validator",
+            "--consensus-public-key",
+            bls12381_public_key,
+            "--proof-of-possession",
+            bls12381_pop,
+            "--assume-yes",
+        ],
+    )
+
+    # run show-validator-set to get current voting power
+    # and number of validators
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "node",
+            "show-validator-set",
+            "--profile",
+            "join_validator",
+        ],
+    )
+
+    result = json.loads(response.stdout)["Result"]
+    total_power = result.get("total_voting_power") + result.get("total_joining_power")
+
+    # run the join validator set command
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "node",
+            "join-validator-set",
+            "--profile",
+            "join_validator",
+            "--assume-yes",
+        ],
+    )
+
+    result = json.loads(response.stdout)["Result"]
+    if result.get("success") == None or result.get("success") != True:
+        raise TestError("Error: did not execute join-validator-set successfully")
+
+    # run show-validator-set to get updated number of validators
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "node",
+            "show-validator-set",
+            "--profile",
+            "join_validator",
+        ],
+    )
+
+    result = json.loads(response.stdout)["Result"]
+    total_power_after_join = result.get("total_voting_power") + result.get(
+        "total_joining_power"
+    )
+    if total_power_after_join != total_power + 1:
+        raise TestError(
+            f"Error: total voting power did not increase by 1 after join-validator-set"
+        )

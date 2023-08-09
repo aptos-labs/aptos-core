@@ -18,7 +18,7 @@ def test_stake_initialize_stake_owner(run_helper: RunHelper, test_name=None):
             "stake",
             "initialize-stake-owner",
             "--initial-stake-amount",
-            "1000000",
+            "1",
             "--assume-yes",
         ],
     )
@@ -42,7 +42,7 @@ def test_stake_initialize_stake_owner(run_helper: RunHelper, test_name=None):
     )
 
     result = json.loads(response.stdout)["Result"]
-    if result[0] == None or result[0].get("total_stake") != 1000000:
+    if result[0] == None or result[0].get("total_stake") != 1:
         raise TestError("Did not initialize stake owner successfully")
 
 
@@ -56,7 +56,7 @@ def test_stake_add_stake(run_helper: RunHelper, test_name=None):
             "stake",
             "add-stake",
             "--amount",
-            "1000000",
+            "1",
             "--assume-yes",
         ],
     )
@@ -78,9 +78,9 @@ def test_stake_add_stake(run_helper: RunHelper, test_name=None):
     )
 
     result = json.loads(response.stdout)["Result"]
-    if result[0].get("total_stake") != 2000000:  # initial 1M + added 1M
+    if result[0].get("total_stake") != 2:  # initial 1 + added 1
         raise TestError(
-            f"Did not add stake successfully. Expected 2000000, got {result[0].get('total_stake')}"
+            f"Did not add stake successfully. Expected 2, got {result[0].get('total_stake')}"
         )
 
 
@@ -108,7 +108,7 @@ def test_stake_withdraw_stake_before_unlock(run_helper: RunHelper, test_name=Non
             "stake",
             "withdraw-stake",
             "--amount",
-            "1000000",
+            "1",
             "--assume-yes",
         ],
     )
@@ -276,7 +276,7 @@ def test_stake_unlock_stake(run_helper: RunHelper, test_name=None):
     # run the unlock-stake command
     response = run_helper.run_command(
         test_name,
-        ["aptos", "stake", "unlock-stake", "--amount", "1000000", "--assume-yes"],
+        ["aptos", "stake", "unlock-stake", "--amount", "1", "--assume-yes"],
     )
 
     result = json.loads(response.stdout)["Result"]
@@ -301,7 +301,7 @@ def test_stake_withdraw_stake_after_unlock(run_helper: RunHelper, test_name=None
     current_stake = result[0].get("total_stake")
 
     # run the unlock-stake command
-    amount_to_withdraw = 1000000
+    amount_to_withdraw = 1
     response = run_helper.run_command(
         test_name,
         [
