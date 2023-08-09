@@ -81,27 +81,6 @@ impl VMExecutor for MockVM {
         state_view: &impl StateView,
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        if state_view.is_genesis() {
-            assert_eq!(
-                transactions.len(),
-                1,
-                "Genesis block should have only one transaction."
-            );
-            let output = TransactionOutput::new(
-                gen_genesis_writeset(),
-                // mock the validator set event
-                vec![ContractEvent::new(
-                    new_epoch_event_key(),
-                    0,
-                    TypeTag::Bool,
-                    bcs::to_bytes(&0).unwrap(),
-                )],
-                0,
-                KEEP_STATUS.clone(),
-            );
-            return Ok(vec![output]);
-        }
-
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
         let mut output_cache = HashMap::new();
