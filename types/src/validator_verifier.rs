@@ -243,7 +243,7 @@ impl ValidatorVerifier {
             pub_keys.push(validator.public_key());
         }
         // Verify the quorum voting power of the authors
-        self.check_voting_power(authors.iter())?;
+        self.check_voting_power(authors.iter(), true)?;
         #[cfg(any(test, feature = "fuzzing"))]
         {
             if self.quorum_voting_power == 0 {
@@ -286,7 +286,7 @@ impl ValidatorVerifier {
             pub_keys.push(validator.public_key());
         }
         // Verify the quorum voting power of the authors
-        self.check_voting_power(authors.iter())?;
+        self.check_voting_power(authors.iter(), true)?;
         // Verify empty aggregated signature
         let aggregated_sig = aggregated_signature
             .sig()
@@ -321,6 +321,7 @@ impl ValidatorVerifier {
     pub fn check_voting_power<'a>(
         &self,
         authors: impl Iterator<Item = &'a AccountAddress>,
+        check_super_majority: bool,
     ) -> std::result::Result<(), VerifyError> {
         // Add voting power for valid accounts, exiting early for unknown authors
         let mut aggregated_voting_power = 0;
@@ -331,10 +332,16 @@ impl ValidatorVerifier {
             }
         }
 
-        if aggregated_voting_power < self.quorum_voting_power {
+        let target = if check_super_majority {
+            self.quorum_voting_power
+        } else {
+            self.total_voting_power - self.quorum_voting_power + 1
+        };
+
+        if aggregated_voting_power < target {
             return Err(VerifyError::TooLittleVotingPower {
                 voting_power: aggregated_voting_power,
-                expected_voting_power: self.quorum_voting_power,
+                expected_voting_power: target,
             });
         }
         Ok(())
@@ -513,29 +520,54 @@ mod tests {
 
     #[test]
     fn test_check_voting_power() {
-        let (validator_signers, validator_verifier) = random_validator_verifier(2, None, false);
+        let total = 10;
+        let minority = (total - 1) / 3 + 1;
+        let majority = total * 2 / 3 + 1;
+        let (validator_signers, validator_verifier) = random_validator_verifier(total, None, false);
         let mut author_to_signature_map = BTreeMap::new();
 
-        assert_eq!(
-            validator_verifier
-                .check_voting_power(author_to_signature_map.keys())
-                .unwrap_err(),
-            VerifyError::TooLittleVotingPower {
-                voting_power: 0,
-                expected_voting_power: 2,
-            }
-        );
-
         let dummy_struct = TestAptosCrypto("Hello, World".to_string());
-        for validator in validator_signers.iter() {
+        for (i, validator) in validator_signers.iter().enumerate() {
+            if i < minority {
+                assert_eq!(
+                    validator_verifier.check_voting_power(author_to_signature_map.keys(), false),
+                    Err(VerifyError::TooLittleVotingPower {
+                        voting_power: i as u128,
+                        expected_voting_power: minority as u128,
+                    }),
+                );
+                assert_eq!(
+                    validator_verifier.check_voting_power(author_to_signature_map.keys(), true),
+                    Err(VerifyError::TooLittleVotingPower {
+                        voting_power: i as u128,
+                        expected_voting_power: majority as u128,
+                    })
+                );
+            } else if i < majority {
+                assert_eq!(
+                    validator_verifier.check_voting_power(author_to_signature_map.keys(), false),
+                    Ok(()),
+                );
+                assert_eq!(
+                    validator_verifier.check_voting_power(author_to_signature_map.keys(), true),
+                    Err(VerifyError::TooLittleVotingPower {
+                        voting_power: i as u128,
+                        expected_voting_power: majority as u128,
+                    })
+                );
+            } else {
+                assert_eq!(
+                    validator_verifier.check_voting_power(author_to_signature_map.keys(), false),
+                    Ok(()),
+                );
+                assert_eq!(
+                    validator_verifier.check_voting_power(author_to_signature_map.keys(), true),
+                    Ok(()),
+                );
+            }
             author_to_signature_map
                 .insert(validator.author(), validator.sign(&dummy_struct).unwrap());
         }
-
-        assert_eq!(
-            validator_verifier.check_voting_power(author_to_signature_map.keys()),
-            Ok(())
-        );
     }
 
     proptest! {
