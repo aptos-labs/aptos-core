@@ -7,29 +7,17 @@ use crate as aptos_crypto;
 use crate::{
     p256::{P256_SIGNATURE_LENGTH, P256PublicKey, P256_PUBLIC_KEY_LENGTH, P256_PRIVATE_KEY_LENGTH, P256PrivateKey, P256Signature, ORDER_HALF}, 
     test_utils::{
-        random_serializable_struct, small_order_pk_with_adversarial_message,
+        random_serializable_struct,
         uniform_keypair_strategy,
     },
     traits::*,
-    x25519,
 };
 use signature::Verifier;
-use p256::EncodedPoint;
+use p256::{EncodedPoint, NonZeroScalar};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use core::{
-    convert::TryFrom,
-    ops::{Add, Index, IndexMut, Mul, Neg},
-};
-use curve25519_dalek::{
-    constants::ED25519_BASEPOINT_POINT,
-    edwards::{CompressedEdwardsY, EdwardsPoint},
-    scalar::Scalar,
-};
-use digest::Digest;
-use ed25519_dalek::ed25519::signature::Verifier as _;
+use core::convert::TryFrom;
 use proptest::{collection::vec, prelude::*};
 use serde::{Deserialize, Serialize};
-use sha2::Sha512;
 
 #[derive(CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
 struct CryptoHashable(pub usize);
@@ -155,10 +143,11 @@ proptest! {
         s_bytes.copy_from_slice(&serialized[32..]);
 
         // ed25519-dalek signing ensures a canonical S value.
-        let s = Scalar52::from_bytes(&s_bytes);
+        let s = NonZeroScalar::try_from(&s_bytes[..]).unwrap();
+        let order_half = NonZeroScalar::try_from(&ORDER_HALF[..]).unwrap();
 
         // adding L (order of the base point) so that S + L > L
-        let malleable_s = Scalar52::add(&s, &Scalar52::from_bytes(&ORDER_HALF));
+        let malleable_s = NonZeroScalar::new(*s + *order_half).unwrap();
         let malleable_s_bytes = malleable_s.to_bytes();
         // Update the signature (the S part).
         serialized[32..].copy_from_slice(&malleable_s_bytes);
@@ -203,7 +192,7 @@ proptest! {
         prop_assert!(sig_unchecked.is_ok());
 
         // Update the signature by setting S = L to make it invalid.
-        serialized[32..].copy_from_slice(&L.to_bytes());
+        serialized[32..].copy_from_slice(&ORDER_HALF);
         let serialized_malleable_l: &[u8] = &serialized;
         // try_from will fail with CanonicalRepresentationError.
         prop_assert_eq!(
@@ -213,162 +202,4 @@ proptest! {
     }
 
    
-}
-
-// The 8-torsion subgroup E[8].
-//
-// In the case of Curve25519, it is cyclic; the i-th element of
-// the array is [i]P, where P is a point of order 8
-// generating E[8].
-//
-// Thus E[8] is the points indexed by `0,2,4,6`, and
-// E[2] is the points indexed by `0,4`.
-//
-// The following byte arrays have been ported from curve25519-dalek /backend/serial/u64/constants.rs
-// and they represent the serialised version of the CompressedEdwardsY points.
-
-pub const EIGHT_TORSION: [[u8; 32]; 8] = [
-    [
-        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0,
-    ],
-    [
-        199, 23, 106, 112, 61, 77, 216, 79, 186, 60, 11, 118, 13, 16, 103, 15, 42, 32, 83, 250, 44,
-        57, 204, 198, 78, 199, 253, 119, 146, 172, 3, 122,
-    ],
-    [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 128,
-    ],
-    [
-        38, 232, 149, 143, 194, 178, 39, 176, 69, 195, 244, 137, 242, 239, 152, 240, 213, 223, 172,
-        5, 211, 198, 51, 57, 177, 56, 2, 136, 109, 83, 252, 5,
-    ],
-    [
-        236, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 127,
-    ],
-    [
-        38, 232, 149, 143, 194, 178, 39, 176, 69, 195, 244, 137, 242, 239, 152, 240, 213, 223, 172,
-        5, 211, 198, 51, 57, 177, 56, 2, 136, 109, 83, 252, 133,
-    ],
-    [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0,
-    ],
-    [
-        199, 23, 106, 112, 61, 77, 216, 79, 186, 60, 11, 118, 13, 16, 103, 15, 42, 32, 83, 250, 44,
-        57, 204, 198, 78, 199, 253, 119, 146, 172, 3, 250,
-    ],
-];
-
-/// The `Scalar52` struct represents an element in
-/// ℤ/ℓℤ as 5 52-bit limbs.
-pub struct Scalar52(pub [u64; 5]);
-
-/// `L` is the order of base point, i.e. 2^252 + 27742317777372353535851937790883648493
-pub const L: Scalar52 = Scalar52([
-    0x0002_631A_5CF5_D3ED,
-    0x000D_EA2F_79CD_6581,
-    0x0000_0000_0014_DEF9,
-    0x0000_0000_0000_0000,
-    0x0000_1000_0000_0000,
-]);
-
-impl Scalar52 {
-    /// Return the zero scalar
-    fn zero() -> Scalar52 {
-        Scalar52([0, 0, 0, 0, 0])
-    }
-
-    /// Unpack a 32 byte / 256 bit scalar into 5 52-bit limbs.
-    pub fn from_bytes(bytes: &[u8; 32]) -> Scalar52 {
-        let mut words = [0u64; 4];
-        for i in 0..4 {
-            for j in 0..8 {
-                words[i] |= u64::from(bytes[(i * 8) + j]) << (j * 8) as u64;
-            }
-        }
-
-        let mask = (1u64 << 52) - 1;
-        let top_mask = (1u64 << 48) - 1;
-        let mut s = Scalar52::zero();
-
-        s[0] = words[0] & mask;
-        s[1] = ((words[0] >> 52) | (words[1] << 12)) & mask;
-        s[2] = ((words[1] >> 40) | (words[2] << 24)) & mask;
-        s[3] = ((words[2] >> 28) | (words[3] << 36)) & mask;
-        s[4] = (words[3] >> 16) & top_mask;
-
-        s
-    }
-
-    /// Pack the limbs of this `Scalar52` into 32 bytes
-    pub fn to_bytes(&self) -> [u8; 32] {
-        let mut s = [0u8; 32];
-
-        s[0] = self.0[0] as u8;
-        s[1] = (self.0[0] >> 8) as u8;
-        s[2] = (self.0[0] >> 16) as u8;
-        s[3] = (self.0[0] >> 24) as u8;
-        s[4] = (self.0[0] >> 32) as u8;
-        s[5] = (self.0[0] >> 40) as u8;
-        s[6] = ((self.0[0] >> 48) | (self.0[1] << 4)) as u8;
-        s[7] = (self.0[1] >> 4) as u8;
-        s[8] = (self.0[1] >> 12) as u8;
-        s[9] = (self.0[1] >> 20) as u8;
-        s[10] = (self.0[1] >> 28) as u8;
-        s[11] = (self.0[1] >> 36) as u8;
-        s[12] = (self.0[1] >> 44) as u8;
-        s[13] = self.0[2] as u8;
-        s[14] = (self.0[2] >> 8) as u8;
-        s[15] = (self.0[2] >> 16) as u8;
-        s[16] = (self.0[2] >> 24) as u8;
-        s[17] = (self.0[2] >> 32) as u8;
-        s[18] = (self.0[2] >> 40) as u8;
-        s[19] = ((self.0[2] >> 48) | (self.0[3] << 4)) as u8;
-        s[20] = (self.0[3] >> 4) as u8;
-        s[21] = (self.0[3] >> 12) as u8;
-        s[22] = (self.0[3] >> 20) as u8;
-        s[23] = (self.0[3] >> 28) as u8;
-        s[24] = (self.0[3] >> 36) as u8;
-        s[25] = (self.0[3] >> 44) as u8;
-        s[26] = self.0[4] as u8;
-        s[27] = (self.0[4] >> 8) as u8;
-        s[28] = (self.0[4] >> 16) as u8;
-        s[29] = (self.0[4] >> 24) as u8;
-        s[30] = (self.0[4] >> 32) as u8;
-        s[31] = (self.0[4] >> 40) as u8;
-
-        s
-    }
-
-    /// Compute `a + b` (without mod ℓ)
-    pub fn add(a: &Scalar52, b: &Scalar52) -> Scalar52 {
-        let mut sum = Scalar52::zero();
-        let mask = (1u64 << 52) - 1;
-
-        // a + b
-        let mut carry: u64 = 0;
-        for i in 0..5 {
-            carry = a[i] + b[i] + (carry >> 52);
-            sum[i] = carry & mask;
-        }
-
-        sum
-    }
-}
-
-impl Index<usize> for Scalar52 {
-    type Output = u64;
-
-    fn index(&self, _index: usize) -> &u64 {
-        &(self.0[_index])
-    }
-}
-
-impl IndexMut<usize> for Scalar52 {
-    fn index_mut(&mut self, _index: usize) -> &mut u64 {
-        &mut (self.0[_index])
-    }
 }

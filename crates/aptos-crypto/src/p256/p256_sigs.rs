@@ -168,6 +168,7 @@ impl TryFrom<&[u8]> for P256Signature {
     type Error = CryptoMaterialError;
 
     fn try_from(bytes: &[u8]) -> std::result::Result<P256Signature, CryptoMaterialError> {
+        P256Signature::check_s_malleability(bytes)?;
         P256Signature::from_bytes(bytes)
     }
 }
