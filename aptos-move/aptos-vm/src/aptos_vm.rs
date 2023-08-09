@@ -30,16 +30,16 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
-    block_executor::partitioner::SubBlocksForShard,
+    block_executor::partitioner::PartitionedTransactions,
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
     state_store::state_key::StateKey,
     transaction::{
-        analyzed_transaction::AnalyzedTransaction, EntryFunction, ExecutionError, ExecutionStatus,
-        ModuleBundle, Multisig, MultisigTransactionPayload, SignatureCheckedTransaction,
-        SignedTransaction, Transaction, TransactionOutput, TransactionPayload, TransactionStatus,
-        VMValidatorResult, WriteSetPayload,
+        EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
+        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
+        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
+        WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
     write_set::WriteOp,
@@ -1513,7 +1513,7 @@ impl VMExecutor for AptosVM {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>>(
         sharded_block_executor: &ShardedBlockExecutor<S, C>,
-        transactions: Vec<SubBlocksForShard<AnalyzedTransaction>>,
+        transactions: PartitionedTransactions,
         state_view: Arc<S>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
@@ -1521,10 +1521,10 @@ impl VMExecutor for AptosVM {
         info!(
             log_context,
             "Executing block, transaction count: {}",
-            transactions.iter().map(|s| s.num_txns()).sum::<usize>()
+            transactions.num_txns()
         );
 
-        let count = transactions.len();
+        let count = transactions.num_txns();
         let ret = sharded_block_executor.execute_block(
             state_view,
             transactions,
