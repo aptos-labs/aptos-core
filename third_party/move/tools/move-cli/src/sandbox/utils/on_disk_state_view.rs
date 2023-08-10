@@ -345,7 +345,7 @@ impl ModuleResolver for OnDiskStateView {
 }
 
 impl ResourceResolver for OnDiskStateView {
-    fn get_resource_with_metadata(
+    fn get_resource_bytes_with_metadata(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
