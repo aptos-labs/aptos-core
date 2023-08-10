@@ -69,11 +69,19 @@ struct TableData {
     tables: BTreeMap<TableHandle, Table>,
 }
 
+/// A structure containing information about the layout of a value
+/// stored in a table. Needed in order to lift aggregator and snapshot
+/// values from the value and replacing them with identifiers.
+struct LayoutInfo {
+    layout: MoveTypeLayout,
+    has_aggregator_lifting: bool,
+}
+
 /// A structure representing a single table.
 struct Table {
     handle: TableHandle,
     key_layout: MoveTypeLayout,
-    value_layout: MoveTypeLayout,
+    value_layout_info: LayoutInfo,
     content: BTreeMap<Vec<u8>, GlobalValue>,
 }
 
@@ -105,7 +113,7 @@ impl<'a> NativeTableContext<'a> {
         let mut changes = BTreeMap::new();
         for (handle, table) in tables {
             let Table {
-                value_layout,
+                value_layout_info,
                 content,
                 ..
             } = table;
@@ -116,13 +124,15 @@ impl<'a> NativeTableContext<'a> {
                     None => continue,
                 };
 
+                // TODO(aggregator): we should attach type layout to the outputs
+                // if there are lifted values.
                 match op {
                     Op::New(val) => {
-                        let bytes = serialize(&value_layout, &val)?;
+                        let bytes = serialize(&value_layout_info.layout, &val)?;
                         entries.insert(key, Op::New(bytes.into()));
                     },
                     Op::Modify(val) => {
-                        let bytes = serialize(&value_layout, &val)?;
+                        let bytes = serialize(&value_layout_info.layout, &val)?;
                         entries.insert(key, Op::Modify(bytes.into()));
                     },
                     Op::Delete => {
@@ -155,16 +165,27 @@ impl TableData {
         Ok(match self.tables.entry(handle) {
             Entry::Vacant(e) => {
                 let key_layout = context.type_to_type_layout(key_ty)?;
-                let value_layout = context.type_to_type_layout(value_ty)?;
+                let value_layout_info = LayoutInfo::from_value_ty(context, value_ty)?;
                 let table = Table {
                     handle,
                     key_layout,
-                    value_layout,
+                    value_layout_info,
                     content: Default::default(),
                 };
                 e.insert(table)
             },
             Entry::Occupied(e) => e.into_mut(),
+        })
+    }
+}
+
+impl LayoutInfo {
+    fn from_value_ty(context: &SafeNativeContext, value_ty: &Type) -> PartialVMResult<Self> {
+        let (layout, has_aggregator_lifting) =
+            context.type_to_type_layout_with_aggregator_lifting(value_ty)?;
+        Ok(Self {
+            layout,
+            has_aggregator_lifting,
         })
     }
 }
@@ -177,14 +198,26 @@ impl Table {
     ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
         Ok(match self.content.entry(key) {
             Entry::Vacant(entry) => {
-                let (gv, loaded) = match context
-                    .resolver
-                    .resolve_table_entry(&self.handle, entry.key())
-                    .map_err(|err| {
-                        partial_extension_error(format!("remote table resolver failure: {}", err))
-                    })? {
+                let resolved_data = if self.value_layout_info.has_aggregator_lifting {
+                    // There is an aggregator lifting: need to pass layout to ensure
+                    // it gets recorded.
+                    context.resolver.resolve_table_entry_value(
+                        &self.handle,
+                        entry.key(),
+                        &self.value_layout_info.layout,
+                    )
+                } else {
+                    context
+                        .resolver
+                        .resolve_table_entry_bytes(&self.handle, entry.key())
+                };
+                let data = resolved_data.map_err(|err| {
+                    partial_extension_error(format!("remote table resolver failure: {}", err))
+                })?;
+
+                let (gv, loaded) = match data {
                     Some(val_bytes) => {
-                        let val = deserialize(&self.value_layout, &val_bytes)?;
+                        let val = deserialize(&self.value_layout_info.layout, &val_bytes)?;
                         (
                             GlobalValue::cached(val)?,
                             Some(NumBytes::new(val_bytes.len() as u64)),
