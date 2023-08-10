@@ -6,8 +6,7 @@ module no_code_mint::mint_machine {
     use aptos_std::string_utils::{Self};
     use std::timestamp;
     use std::vector;
-    use aptos_framework::transaction_context;
-    use no_code_mint::whitelist;
+    use no_code_mint::allowlist;
     use no_code_mint::package_manager;
     use aptos_std::smart_vector::{Self, SmartVector};
     use aptos_std::smart_table::{Self, SmartTable};
@@ -19,7 +18,7 @@ module no_code_mint::mint_machine {
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// This resource stores the collection configuration information and the object refs for the object it's stored at.
     /// Most things that are stored here are things that can change post-collection creation.
-    /// We will also store the Whitelist resource at this Object's address.
+    /// We will also store the Allowlist resource at this Object's address.
     struct MintConfiguration has key {
         collection_name: String,          // Immutable
         collection_addr: address,         // The address of the collection object. Immutable
@@ -41,7 +40,7 @@ module no_code_mint::mint_machine {
 
     struct ReadyForLaunch {
         mint_config_exists: bool,
-        whitelist_exists: bool,
+        allowlist_exists: bool,
         has_valid_tier: bool,
         collection_exists: bool,
         metadata_complete: bool,
@@ -55,7 +54,7 @@ module no_code_mint::mint_machine {
     const ENOT_OWNER_OF_CREATOR_OBJECT: u64 = 3;
     /// The collection hasn't been created yet.
     const ECOLLECTION_OBJECT_NOT_FOUND: u64 = 4;
-    /// There are no valid tiers in the whitelist that a user can mint from.
+    /// There are no valid tiers in the allowlist that a user can mint from.
     const ENO_VALID_TIERS: u64 = 5;
     /// The input vector lengths aren't the same.
     const EVECTOR_LENGTHS_INCONSISTENT: u64 = 6;
@@ -69,12 +68,18 @@ module no_code_mint::mint_machine {
     const EMINTING_DISABLED: u64 = 10;
     /// Maximum supply exceeded.
     const EMAXIMUM_SUPPLY_EXCEEDED: u64 = 11;
+    /// Minting has already begun.
+    const EMINTING_ALREADY_BEGUN: u64 = 12;
+    /// Minting has not completed yet.
+    const EINCOMPLETE_MINT: u64 = 13;
+    /// One of the token uris is not in the list of token uris.
+    const ETOKEN_METADATA_NOT_FOUND: u64 = 13;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////
     //                                                                                      //
-    ///                                  Setup / pre-launch                                ///
+    //                                   Setup / pre-launch                                 //
     //                                                                                      //
     //////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////
@@ -102,15 +107,19 @@ module no_code_mint::mint_machine {
         royalty_denominator: u64,
         token_base_name: String,        // "Token #" => "Token #1", "Token #2", etc.
     ) {
+        // Create the creator object for the `admin` account.
         let constructor_ref = object::create_object_from_account(admin);
         let creator = object::generate_signer(&constructor_ref);
         let creator_addr = object::address_from_constructor_ref(&constructor_ref);
+        // Create the delete and extend refs to store in the MintConfiguration resource that's on the object itself
         let delete_ref = object::generate_delete_ref(&constructor_ref);
         let extend_ref = object::generate_extend_ref(&constructor_ref);
 
-        // Soulbound MintConfiguration. Can be deleted though
+        // Soulbound MintConfiguration
         object::disable_ungated_transfer(&object::generate_transfer_ref(&constructor_ref));
 
+        // Store the address of the creator object in the package manager
+        // The key is the normalized string representation of the admin's address
         package_manager::add_named_address(
             string_utils::to_string_with_canonical_addresses(&signer::address_of(admin)),
             creator_addr
@@ -134,6 +143,7 @@ module no_code_mint::mint_machine {
             royalty_denominator,
         );
 
+        // Move the MintConfiguration resource to the creator object with minting disabled and empty metadata/token uris
         move_to(&creator, MintConfiguration {
             collection_name: name,
             collection_addr: collection::create_collection_address(&creator_addr, &name),
@@ -147,6 +157,8 @@ module no_code_mint::mint_machine {
         });
     }
 
+    // Add or update a tier in the allowlist
+    // Note that you can do this while the minting machine is running, it is left up to the admin's discretion
     public entry fun upsert_tier(
         admin: &signer,
         tier_name: String,
@@ -156,7 +168,10 @@ module no_code_mint::mint_machine {
         end_time: u64,
         per_user_limit: u64,
     ) acquires MintConfiguration {
-        whitelist::upsert_tier_config(&get_creator(signer::address_of(admin)), tier_name, open_to_public, price, start_time, end_time, per_user_limit);
+        let admin_addr = signer::address_of(admin);
+        // You can only create an allowlist if minting hasn't begun
+        assert!(get_collection_supply(admin_addr) == 0, error::invalid_state(EMINTING_ALREADY_BEGUN));
+        allowlist::upsert_tier_config(&get_creator(admin_addr), tier_name, open_to_public, price, start_time, end_time, per_user_limit);
     }
 
     /// This function adds tokens indexed to a table with their uri as the key
@@ -171,14 +186,17 @@ module no_code_mint::mint_machine {
         property_types: vector<vector<String>>,
         safe: bool,
     ) acquires MintConfiguration {
-        // Correct serialization of the property maps should be covered by the SDK, but this is here
-        // as a sanity check.
-        // Note that this may seem like it could be covered in a unit test, but this issue only
-        // exists when serializing due to the unique nature of how property map values are serialized.
+        let admin_addr = signer::address_of(admin);
+        // You can only add token metadata if minting hasn't begun
+        assert!(get_collection_supply(admin_addr) == 0, error::invalid_state(EMINTING_ALREADY_BEGUN));
+        // Correct serialization of property maps is checked here
+        // Note that this may seem like it could be covered in a unit test, but this only an issue because
+        // the property maps are only checked for valid serialization upon mint. If you store an incorrectly serialized
+        // property map value in the metadata table, it would not be caught until minting.
         if (safe) {
             verify_valid_property_maps(property_keys, property_values, property_types);
         };
-        let mint_configuration = borrow_mut_config(signer::address_of(admin));
+        let mint_configuration = borrow_mut_config(admin_addr);
         let amount = vector::length(&uris);
         assert!(
             (amount == vector::length(&descriptions) &&
@@ -202,7 +220,6 @@ module no_code_mint::mint_machine {
             // but we would need to not push the token name onto the vector if it is an upsert.
             smart_vector::push_back(&mut mint_configuration.token_uris, *uri);
         });
-
     }
 
     public entry fun enable_minting(
@@ -219,7 +236,7 @@ module no_code_mint::mint_machine {
     public fun ready_for_launch(admin_addr: address): ReadyForLaunch acquires MintConfiguration {
         let ready_for_launch = ReadyForLaunch {
             mint_config_exists: false,
-            whitelist_exists: false,
+            allowlist_exists: false,
             has_valid_tier: false,
             collection_exists: false,
             metadata_complete: false,
@@ -229,10 +246,10 @@ module no_code_mint::mint_machine {
         ready_for_launch.mint_config_exists = true;
 
         let creator_addr = get_creator_addr(admin_addr);
-        if (!whitelist::wl_exists(creator_addr)) { return ready_for_launch };
-        ready_for_launch.whitelist_exists = true;
+        if (!allowlist::exists_at(creator_addr)) { return ready_for_launch };
+        ready_for_launch.allowlist_exists = true;
 
-        if (!whitelist::has_valid_tier(creator_addr)) { return ready_for_launch };
+        if (!allowlist::has_valid_tier(creator_addr)) { return ready_for_launch };
         ready_for_launch.has_valid_tier = true;
 
         if (!object::is_object(get_collection_addr(admin_addr))) { return ready_for_launch };
@@ -257,7 +274,8 @@ module no_code_mint::mint_machine {
 
     // Right now these functions need to be private entry, because they require single tx-specific context
     // Specifically, they need to declare a new auid_manager, otherwise it isn't possible to find the token
-    // object address to transfer it to the receiver
+    // object address to transfer it to the receiver.
+    // This also disallows abuse of the pseudo-random number generation based on the timestamp
     entry fun mint_multiple(
         receiver: &signer,
         admin_addr: address,
@@ -266,27 +284,27 @@ module no_code_mint::mint_machine {
         let auids = auid_manager::create();
         let i = 0;
         while(i < amount) {
-            mint_internal(receiver, admin_addr, i, &mut auids);
+            mint_internal(receiver, admin_addr, &mut auids);
             i = i + 1;
         };
     }
 
     // Right now these functions need to be private entry, because they require single tx-specific context
     // Specifically, they need to declare a new auid_manager, otherwise it isn't possible to find the token
-    // object address to transfer it to the receiver
+    // object address to transfer it to the receiver.
+    // This also disallows abuse of the pseudo-random number generation based on the timestamp
     entry fun mint(
         receiver: &signer,
         admin_addr: address,
     ) acquires MintConfiguration {
         let auids = auid_manager::create();
-        mint_internal(receiver, admin_addr, 0, &mut auids);
+        mint_internal(receiver, admin_addr, &mut auids);
     }
 
-    /// Mint an NFT to a receiver who requests it.
+    /// Mint an NFT to a receiver who requests it as long as they are eligible to do so
     fun mint_internal(
         receiver: &signer,
         admin_addr: address,
-        nonce: u64,
         auids: &mut AuidManager,
     ) acquires MintConfiguration {
         // must come first due to borrow
@@ -298,22 +316,24 @@ module no_code_mint::mint_machine {
         assert!(tokens_left > 0, error::invalid_argument(EMAXIMUM_SUPPLY_EXCEEDED));
 
         // internally handles mint counter per user, price, tier, start time, end time, etc
-        whitelist::increment(&creator, receiver);
+        allowlist::increment(&creator, receiver);
 
         let metadata_table = &mint_configuration.metadata_table;
-        let txn_hash_last_byte = (vector::pop_back(&mut transaction_context::get_transaction_hash()) as u64);
-        // TODO: remove timestamp, it is merely for testing purposes, may not even need it
+
+        // The timestamp is used as the "seed" in our pseudo-random number generation
         let now = timestamp::now_microseconds();
 
         let token_uris = &mut mint_configuration.token_uris;
-        let idx = (now + txn_hash_last_byte + nonce) % smart_vector::length(token_uris);
+        let idx = now % smart_vector::length(token_uris);
 
         let token_uri = smart_vector::swap_remove(token_uris, idx);
-        // TODO: Evaluate if each table value needs to be removed. The vector pops each value, so I don't see why this needs to.
+        // You could remove the uri borrowed from the token metadata table here, but to reduce the cost of minting, we put it off until later.
+        // The metadata vector pops each value, so nothing will be reused.
         let token_metadata = smart_table::borrow(metadata_table, token_uri);
 
         // Build token name and token uri from base versions + popped token metadata
         // "token_base_name#{n}" is the name where n = (max supply - the # of tokens left)
+        // that is: 0, 1, 2, ... max_supply - 1
         let full_token_name = concat_u64(mint_configuration.token_base_name, mint_configuration.max_supply - tokens_left);
 
         // mint token to the receiver
@@ -328,8 +348,10 @@ module no_code_mint::mint_machine {
             token_metadata.property_values,
         );
 
+        // Increment the auid manager counter and get the newest token address
         let token_address = auid_manager::increment(auids);
 
+        // Transfer the token object from the creator to the receiver/minter
         let token_object = object::address_to_object<AptosToken>(token_address);
         object::transfer(&creator, token_object, signer::address_of(receiver));
     }
@@ -344,7 +366,7 @@ module no_code_mint::mint_machine {
     ) acquires MintConfiguration {
         let i = 0;
         while(i < amount) {
-            mint_internal(receiver, admin_addr, i, auids);
+            mint_internal(receiver, admin_addr, auids);
             i = i + 1;
         };
     }
@@ -367,8 +389,8 @@ module no_code_mint::mint_machine {
 
     #[view]
     /// The creator is the object that creates the collection and has the MintConfiguration resource
-    /// each address can only have one allotted creator object. This is to simplify the contract
-    /// since most people will never need more than one mint machine at a time.
+    /// and the Allowlist resource. Each account address can only have one allotted creator object.
+    /// This is to simplify the contract since most people will never need more than one mint machine at a time.
     public fun get_creator_addr(admin_addr: address): address {
         let admin_addr_name = string_utils::to_string_with_canonical_addresses(&admin_addr);
         assert!(creator_exists(admin_addr), error::not_found(ECREATOR_OBJECT_NOT_FOUND));
@@ -430,6 +452,23 @@ module no_code_mint::mint_machine {
         borrow_mut_config(signer::address_of(admin)).token_base_name = token_base_name;
     }
 
+    // Returns the vector of all token uris in token metadata. Expensive call for large vectors.
+    #[view]
+    public fun view_token_uris(admin_addr: address): vector<String> acquires MintConfiguration {
+        smart_vector::to_vector(borrow_token_uris(admin_addr))
+    }
+
+    // Returns the vector of token metadata corresponding to the input token_uris vector. Ordered based on input vector.
+    #[view]
+    public fun view_token_metadatas(admin_addr: address, token_uris: vector<String>): vector<TokenMetadata> acquires MintConfiguration {
+        let metadata_table = borrow_metadata_table(admin_addr);
+        let metadata = vector::map(token_uris, |token_uri| {
+            assert!(smart_table::contains(metadata_table, token_uri), error::not_found(ETOKEN_METADATA_NOT_FOUND));
+            *smart_table::borrow(metadata_table, token_uri)
+        });
+        metadata
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////
@@ -447,7 +486,7 @@ module no_code_mint::mint_machine {
         tier_name: String,
         addresses: vector<address>,
     ) acquires MintConfiguration {
-        whitelist::add_to_tier(&get_creator(signer::address_of(admin)), tier_name, addresses);
+        allowlist::add_to_tier(&get_creator(signer::address_of(admin)), tier_name, addresses);
     }
 
     public entry fun remove_from_tier(
@@ -455,10 +494,10 @@ module no_code_mint::mint_machine {
         tier_name: String,
         addresses: vector<address>,
     ) acquires MintConfiguration {
-        whitelist::remove_from_tier(&get_creator(signer::address_of(admin)), tier_name, addresses);
+        allowlist::remove_from_tier(&get_creator(signer::address_of(admin)), tier_name, addresses);
     }
 
-    /// verifies that inputs to a property map work calling `prepare_input` for each property_map
+    /// Verifies that inputs to a property map work calling `prepare_input` for each property_map
     public entry fun verify_valid_property_maps(
         outer_keys: vector<vector<String>>,
         outer_values: vector<vector<vector<u8>>>,
@@ -476,6 +515,15 @@ module no_code_mint::mint_machine {
         });
     }
 
+    /// Destroys the allowlist and disables minting.
+    public entry fun destroy_allowlist(admin: &signer) acquires MintConfiguration {
+        let admin_addr = signer::address_of(admin);
+        let max_supply = borrow_config(admin_addr).max_supply;
+        assert!(get_collection_supply(admin_addr) == max_supply, error::invalid_state(EINCOMPLETE_MINT));
+        disable_minting(admin);
+        allowlist::destroy(&get_creator(admin_addr));
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////
@@ -488,8 +536,8 @@ module no_code_mint::mint_machine {
 
     public fun assert_ready_for_launch(admin_addr: address) acquires MintConfiguration {
         let creator_addr = get_creator_addr(admin_addr);
-        whitelist::assert_exists(creator_addr);
-        assert!(whitelist::has_valid_tier(creator_addr), error::not_found(ENO_VALID_TIERS));
+        allowlist::assert_exists(creator_addr);
+        assert!(allowlist::has_valid_tier(creator_addr), error::not_found(ENO_VALID_TIERS));
 
         assert!(object::is_object(get_collection_addr(admin_addr)), error::not_found(ECOLLECTION_OBJECT_NOT_FOUND));
         let table_length = smart_table::length(&borrow_config(admin_addr).metadata_table);
@@ -530,7 +578,7 @@ module no_code_mint::mint_machine {
 #[test_only]
 module no_code_mint::unit_tests {
     use std::string::{String, utf8 as str};
-    use no_code_mint::whitelist;
+    use no_code_mint::allowlist;
     use no_code_mint::package_manager;
     use no_code_mint::mint_machine;
     use no_code_mint::auid_manager::{Self, AuidManager};
@@ -586,7 +634,7 @@ module no_code_mint::unit_tests {
         package_manager::init_module_for_test(resource_signer);
 
         let (burn, mint) = aptos_framework::aptos_coin::initialize_for_test(aptos_framework);
-        whitelist::setup_account<AptosCoin>(minter_1, MINTER_STARTING_COINS, &mint);
+        allowlist::setup_account<AptosCoin>(minter_1, MINTER_STARTING_COINS, &mint);
         coin::destroy_burn_cap(burn);
         coin::destroy_mint_cap(mint);
 
@@ -643,8 +691,8 @@ module no_code_mint::unit_tests {
         mint_machine::enable_minting(admin);
 
         let minter_1_addr = signer::address_of(minter_1);
-        let whitelist_addr = mint_machine::get_creator_addr(admin_addr);
-        whitelist::assert_eligible_for_tier(whitelist_addr, minter_1_addr, str(b"public"));
+        let allowlist_addr = mint_machine::get_creator_addr(admin_addr);
+        allowlist::assert_eligible_for_tier(allowlist_addr, minter_1_addr, str(b"public"));
 
         let i = 0;
         while(i < MAX_SUPPLY) {
@@ -659,6 +707,10 @@ module no_code_mint::unit_tests {
             assert!(token::name(token_object) == mint_machine::concat_u64(str(TOKEN_BASE_NAME), i), i);
             i = i + 1;
         };
+
+        // destroy the allowlist, only possible if all tokens have been minted
+        mint_machine::destroy_allowlist(admin);
+        assert!(!allowlist::exists_at(admin_addr), 0);
     }
 
     fun add_test_metadata(

@@ -7,7 +7,7 @@ module no_code_mint::package_manager {
     use std::error;
     use std::signer;
     friend no_code_mint::mint_machine;
-    friend no_code_mint::whitelist;
+    friend no_code_mint::allowlist;
 
     /// The signer is not authorized to deploy this module.
     const ENOT_AUTHORIZED: u64 = 0;
