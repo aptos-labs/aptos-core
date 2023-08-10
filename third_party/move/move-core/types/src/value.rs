@@ -89,6 +89,14 @@ pub enum MoveStructLayout {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+pub enum LayoutTag {
+    /// The current type corresponds to an aggregator or a snapshot values
+    /// and requires special handling in serialization and deserialization.
+    AggregatorLifting,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
 pub enum MoveTypeLayout {
     #[serde(rename(serialize = "bool", deserialize = "bool"))]
     Bool,
@@ -114,6 +122,8 @@ pub enum MoveTypeLayout {
     U32,
     #[serde(rename(serialize = "u256", deserialize = "u256"))]
     U256,
+
+    Tagged(LayoutTag, Box<MoveTypeLayout>),
 }
 
 impl MoveValue {
@@ -328,6 +338,11 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
             MoveTypeLayout::Vector(layout) => Ok(MoveValue::Vector(
                 deserializer.deserialize_seq(VectorElementVisitor(layout))?,
             )),
+            MoveTypeLayout::Tagged(tag, layout) => match tag {
+                // Serialization ignores the tag for types which correspond to aggregator or
+                // snapshot values.
+                LayoutTag::AggregatorLifting => layout.deserialize(deserializer),
+            },
         }
     }
 }
@@ -529,6 +544,9 @@ impl fmt::Display for MoveTypeLayout {
             Vector(typ) => write!(f, "vector<{}>", typ),
             Struct(s) => write!(f, "{}", s),
             Signer => write!(f, "signer"),
+            Tagged(tag, typ) => match tag {
+                LayoutTag::AggregatorLifting => write!(f, "{}", typ),
+            },
         }
     }
 }
@@ -573,11 +591,11 @@ impl TryInto<TypeTag> for &MoveTypeLayout {
             MoveTypeLayout::U128 => TypeTag::U128,
             MoveTypeLayout::U256 => TypeTag::U256,
             MoveTypeLayout::Signer => TypeTag::Signer,
-            MoveTypeLayout::Vector(v) => {
-                let inner_type = &**v;
-                TypeTag::Vector(Box::new(inner_type.try_into()?))
-            },
+            MoveTypeLayout::Vector(v) => TypeTag::Vector(Box::new(v.as_ref().try_into()?)),
             MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
+            MoveTypeLayout::Tagged(tag, v) => match tag {
+                LayoutTag::AggregatorLifting => v.as_ref().try_into()?,
+            },
         })
     }
 }
