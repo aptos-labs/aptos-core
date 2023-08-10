@@ -751,7 +751,7 @@ class RestClient:
             "0x3::token::CollectionData",
             collection_name,
         )
-    
+
     async def transfer_object(
         self, owner: Account, object: AccountAddress, to: AccountAddress
     ) -> str:

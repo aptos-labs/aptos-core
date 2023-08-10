@@ -521,7 +521,7 @@ class AptosTokenClient:
     async def transfer_token(
         self, owner: Account, token: AccountAddress, to: AccountAddress
     ) -> str:
-        return await self.client.transfer_object(owner, token, to) # <:!:transfer_token
+        return await self.client.transfer_object(owner, token, to)  # <:!:transfer_token
 
     async def burn_token(self, creator: Account, token: AccountAddress) -> str:
         payload = EntryFunction.natural(
