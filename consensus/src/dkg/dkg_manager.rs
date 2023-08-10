@@ -122,7 +122,7 @@ impl DKGManager {
             &wc_1,
             &pp,
             &eks,
-            s.clone(),
+            &s,
             &DST_PVSS_TESTING_APP[..],
             &mut rng,
         );
@@ -136,7 +136,7 @@ impl DKGManager {
         //     .expect("serialized transcript should deserialize correctly");
         // assert_eq!(trx_1, deserialized);
 
-        let trx_2 = WT::deal(&wc_2, &pp, &eks, s, &DST_PVSS_TESTING_APP[..], &mut rng);
+        let trx_2 = WT::deal(&wc_2, &pp, &eks, &s, &DST_PVSS_TESTING_APP[..], &mut rng);
         trx_2
             .verify(&wc_2, &pp, &eks, &DST_PVSS_TESTING_APP[..])
             .expect("PVSS transcript failed verification");
@@ -147,7 +147,7 @@ impl DKGManager {
         //     .expect("serialized transcript should deserialize correctly");
         // assert_eq!(trx_2, deserialized);
 
-        let dkg_pvss_config = DKGPvssConfig::new(wc_1, wc_2, pp, eks, &DST_PVSS_TESTING_APP[..]);
+        let dkg_pvss_config = DKGPvssConfig::new(wc_1.clone(), wc_2.clone(), pp, eks, &DST_PVSS_TESTING_APP[..]);
         self.dkg_pvss_config.lock().replace(dkg_pvss_config);
 
         let dkg_trx_wrapper = DKGTranscriptWrapper {

@@ -35,12 +35,12 @@ impl DKGRounding {
     //     self.weights_of_two_third_stake
     // }
 
-    pub fn weighted_config_1(&self) -> &WeightedConfig {
-        &self.weighted_config_1
+    pub fn weighted_config_1(&self) -> WeightedConfig {
+        self.weighted_config_1.clone()
     }
 
-    pub fn weighted_config_2(&self) -> &WeightedConfig {
-        &self.weighted_config_2
+    pub fn weighted_config_2(&self) -> WeightedConfig {
+        self.weighted_config_2.clone()
     }
 }
 
