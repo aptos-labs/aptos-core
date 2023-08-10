@@ -101,6 +101,9 @@
 //!             +-----------------------------+
 //! ```
 
+#[cfg(test)]
+mod tests;
+
 mod access_path_cache;
 #[macro_use]
 pub mod counters;
