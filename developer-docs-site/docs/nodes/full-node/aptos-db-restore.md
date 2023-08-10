@@ -90,6 +90,11 @@ aptos node bootstrap-db \
 --command-adapter-config /path/to/s3-public.yaml \
 --target-db-dir /path/to/local/db
 ```
+
+:::tip
+If you don't specify the target_version (via `--target-version`), the tool will use the latest version in the backup as the target version.
+:::
+
 Disable the pruner in the node config to prevent the early history from being pruned when you start the node.
 ```Yaml
 storage:
