@@ -16,11 +16,15 @@ use aptos_crypto::{
 };
 use aptos_logger::info;
 use aptos_types::{
-    block_executor::partitioner::{RoundId, ShardId, SubBlocksForShard},
+    block_executor::partitioner::{
+        PartitionedTransactions, RoundId, ShardId, SubBlocksForShard, TransactionWithDependencies,
+        GLOBAL_ROUND_ID, GLOBAL_SHARD_ID,
+    },
     state_store::state_key::StateKey,
     transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
 };
 use move_core_types::account_address::AccountAddress;
+use once_cell::sync::Lazy;
 #[cfg(test)]
 use rand::thread_rng;
 #[cfg(test)]
@@ -28,10 +32,8 @@ use std::sync::Arc;
 use std::{
     collections::{hash_map::DefaultHasher, HashMap, HashSet},
     hash::{Hash, Hasher},
+    sync::RwLock,
 };
-use std::sync::RwLock;
-use once_cell::sync::Lazy;
-use aptos_types::block_executor::partitioner::{GLOBAL_ROUND_ID, GLOBAL_SHARD_ID, PartitionedTransactions, TransactionWithDependencies};
 use v2::config::PartitionerV2Config;
 
 pub trait BlockPartitioner: Send {
@@ -128,4 +130,5 @@ impl Default for PartitionerV1Config {
     }
 }
 
-static DEFAULT_PARTITIONER_CONFIG: Lazy<RwLock<PartitionerV1Config>> = Lazy::new(||RwLock::new(PartitionerV1Config::default()));
+static DEFAULT_PARTITIONER_CONFIG: Lazy<RwLock<PartitionerV1Config>> =
+    Lazy::new(|| RwLock::new(PartitionerV1Config::default()));

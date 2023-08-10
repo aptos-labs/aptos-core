@@ -13,7 +13,13 @@ pub struct PartitionerV2Config {
 
 impl PartitionerV2Config {
     pub fn build(self) -> PartitionerV2 {
-        PartitionerV2::new(self.num_threads, self.num_rounds_limit, self.avoid_pct, self.dashmap_num_shards, self.merge_discarded)
+        PartitionerV2::new(
+            self.num_threads,
+            self.num_rounds_limit,
+            self.avoid_pct,
+            self.dashmap_num_shards,
+            self.merge_discarded,
+        )
     }
 }
 
