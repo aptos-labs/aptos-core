@@ -63,10 +63,6 @@ where
         StateViewId::Miscellaneous
     }
 
-    fn is_genesis(&self) -> bool {
-        unreachable!();
-    }
-
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
         unreachable!();
     }
@@ -90,10 +86,6 @@ where
 
     fn id(&self) -> StateViewId {
         StateViewId::Miscellaneous
-    }
-
-    fn is_genesis(&self) -> bool {
-        unreachable!();
     }
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {

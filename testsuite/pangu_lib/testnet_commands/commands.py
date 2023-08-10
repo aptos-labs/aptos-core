@@ -5,10 +5,11 @@ from .get_testnet import get_testnet_main
 from .healthcheck import healthcheck_main
 from .update_nodes import update_nodes_main
 from .restart_nodes import restart_nodes_main
+from .transaction_emitter import transaction_emitter_main
 from test_framework.shell import LocalShell
 from test_framework.filesystem import LocalFilesystem
 from test_framework.kubernetes import LiveKubernetes
-from typing import Optional
+from typing import Optional, List
 import random
 import string
 import os
@@ -191,4 +192,35 @@ def update(testnet_name: str, pangu_node_configs_path: str):
         testnet_name,
         pangu_node_configs_path,
         SystemContext(LocalShell(), LocalFilesystem(), LiveKubernetes()),
+    )
+
+
+@click.command(
+    help="Create a transaction emitter for a testnet by name.",
+    context_settings=dict(ignore_unknown_options=True),
+)
+@click.argument("testnet_name")
+@click.option(
+    "--dry-run",
+    default=False,
+    help="Pass in true if you would like to run genesis without deploying on K8S. All k8s YAML files will be dumped to the workspace",
+)
+@click.option("--workspace", default="/tmp", help="Pass the path to the workspace.")
+@click.argument("args", nargs=-1, required=True)
+def transaction_emitter(
+    testnet_name: str, dry_run: bool, workspace: str, args: List[str]
+):
+    """Create a transaction emitter for a testnet by name.
+
+    Args:
+        testnet_name (str): the testnet to add a transaction emitter to
+        dry_run (bool): whether to deploy to kubernetes, or save the deployment instructions to the workspace
+        workspace (str): path to the folder you would like the genesis files to be generated (default is a temp folder).
+    """
+    transaction_emitter_main(
+        testnet_name,
+        dry_run,
+        workspace,
+        args,
+        system_context=SystemContext(LocalShell(), LocalFilesystem(), LiveKubernetes()),
     )
