@@ -284,3 +284,53 @@ def test_node_join_validator_set(run_helper: RunHelper, test_name=None):
         raise TestError(
             f"Error: total voting power did not increase by 1 after join-validator-set"
         )
+
+
+@test_case
+# Note: this test is dependent on test_node_join_validator_set
+def test_node_leave_validator_set(run_helper: RunHelper, test_name=None):
+    # run show-validator-set to get number of pending_inactive validators
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "node",
+            "show-validator-set",
+            "--profile",
+            "join_validator",
+        ],
+    )
+    result = json.loads(response.stdout)["Result"]
+    pending_inactive_validators = len(result.get("pending_inactive"))
+
+    # run the leave validator set command
+    run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "node",
+            "leave-validator-set",
+            "--profile",
+            "join_validator",  # This is the profile that was used to join the validator set
+            "--assume-yes",
+        ],
+    )
+
+    # run show-validator-set to get updated number of pending_inactive validators
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "node",
+            "show-validator-set",
+            "--profile",
+            "join_validator",
+        ],
+    )
+
+    result = json.loads(response.stdout)["Result"]
+    current_pending_inactive_validators = len(result.get("pending_inactive"))
+    if current_pending_inactive_validators != pending_inactive_validators + 1:
+        raise TestError(
+            "Error: expected pending_inactive validators to increase by 1 after leave-validator-set"
+        )
