@@ -11,7 +11,6 @@ use crate::{
     },
     network::{IncomingDAGRequest, TConsensusMsg},
     state_replication::PayloadClient,
-    util::time_service::TimeService,
 };
 use anyhow::bail;
 use aptos_channels::aptos_channel;
@@ -20,6 +19,7 @@ use aptos_infallible::RwLock;
 use aptos_logger::{error, warn};
 use aptos_network::protocols::network::RpcError;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
+use aptos_time_service::TimeService;
 use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
 use bytes::Bytes;
 use futures::StreamExt;
@@ -44,14 +44,13 @@ impl NetworkHandler {
         payload_client: Arc<dyn PayloadClient>,
         _dag_network_sender: Arc<dyn DAGNetworkSender>,
         rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
-        time_service: Arc<dyn TimeService>,
-        aptos_time_service: aptos_time_service::TimeService,
+        time_service: TimeService,
     ) -> Self {
         let rb = Arc::new(ReliableBroadcast::new(
             epoch_state.verifier.get_ordered_account_addresses().clone(),
             rb_network_sender,
             ExponentialBackoff::from_millis(10),
-            aptos_time_service,
+            time_service.clone(),
         ));
         Self {
             dag_rpc_rx,

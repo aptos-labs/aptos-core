@@ -12,12 +12,12 @@ use crate::{
         types::{CertificateAckState, CertifiedNode, Node, NodeCertificate, SignatureBuilder},
     },
     state_replication::PayloadClient,
-    util::time_service::TimeService,
 };
 use anyhow::bail;
 use aptos_consensus_types::common::{Author, Payload};
 use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{block_info::Round, epoch_state::EpochState};
 use futures::{
     future::{AbortHandle, Abortable},
@@ -40,7 +40,7 @@ pub(crate) struct DagDriver {
     payload_client: Arc<dyn PayloadClient>,
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
     current_round: Round,
-    time_service: Arc<dyn TimeService>,
+    time_service: TimeService,
     rb_abort_handle: Option<AbortHandle>,
     storage: Arc<dyn DAGStorage>,
 }
@@ -53,7 +53,7 @@ impl DagDriver {
         payload_client: Arc<dyn PayloadClient>,
         reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
         current_round: Round,
-        time_service: Arc<dyn TimeService>,
+        time_service: TimeService,
         storage: Arc<dyn DAGStorage>,
     ) -> Self {
         // TODO: rebroadcast nodes after recovery
@@ -104,7 +104,7 @@ impl DagDriver {
         // TODO: support pulling payload
         let payload = Payload::empty(false);
         // TODO: need to wait to pass median of parents timestamp
-        let timestamp = self.time_service.get_current_timestamp();
+        let timestamp = self.time_service.now_unix_time();
         self.current_round += 1;
         let new_node = Node::new(
             self.epoch_state.epoch,

@@ -10,11 +10,11 @@ use crate::{
         RpcHandler,
     },
     test_utils::MockPayloadManager,
-    util::mock_time_service::SimulatedTimeService,
 };
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
+use aptos_time_service::TimeService;
 use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
 use async_trait::async_trait;
 use claims::{assert_ok, assert_ok_eq};
@@ -77,7 +77,7 @@ fn test_certified_node_handler() {
         ExponentialBackoff::from_millis(10),
         aptos_time_service::TimeService::mock(),
     ));
-    let time_service = Arc::new(SimulatedTimeService::new());
+    let time_service = TimeService::mock();
     let mut driver = DagDriver::new(
         signers[0].author(),
         epoch_state,
