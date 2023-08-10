@@ -305,7 +305,8 @@ impl ApplyChunkOutput {
             state_updates_vec,
             hashes_vec
         ) {
-            let (write_set, events, reconfig_events, _dkg_events, gas_used, status) = txn_output.unpack();
+            let (write_set, events, reconfig_events, _dkg_events, gas_used, status) =
+                txn_output.unpack();
             let event_tree =
                 InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes);
 
@@ -410,7 +411,12 @@ impl ApplyChunkOutput {
             all_dkg_events.extend(per_txn_dkg_events);
             to_commit.push(Arc::new(txn_to_commit));
         }
-        (to_commit, txn_info_hashes, all_reconfig_events, all_dkg_events)
+        (
+            to_commit,
+            txn_info_hashes,
+            all_reconfig_events,
+            all_dkg_events,
+        )
     }
 
     fn calculate_events_and_writeset_hashes(

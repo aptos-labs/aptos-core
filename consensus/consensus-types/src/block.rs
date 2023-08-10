@@ -14,12 +14,13 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
+    dkg::DKGTranscriptWrapper,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
     randomness::Randomness,
     transaction::{SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
-    validator_verifier::ValidatorVerifier, dkg::DKGTranscriptWrapper,
+    validator_verifier::ValidatorVerifier,
 };
 use mirai_annotations::debug_checked_verify_eq;
 use serde::{Deserialize, Deserializer, Serialize};

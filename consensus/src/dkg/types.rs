@@ -1,16 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{network::TConsensusMsg, network_interface::ConsensusMsg};
 use anyhow::bail;
 pub use aptos_consensus_types::{common::Author, dkg_types::DKGAggNode};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
-use aptos_types::dkg::{DKGTranscriptWrapper, DKGPvssConfig};
+use aptos_types::dkg::{DKGPvssConfig, DKGTranscriptWrapper};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-
-use crate::{network::TConsensusMsg, network_interface::ConsensusMsg};
 
 pub trait TDKGMessage: Into<DKGMessage> + TryFrom<DKGMessage> {
     // dkg todo: pass in public keys for verification
@@ -38,14 +37,8 @@ pub struct DKGNodeMetadata {
 
 impl DKGNodeMetadata {
     #[cfg(test)]
-    pub fn new_for_test(
-        epoch: u64,
-        author: Author,
-    ) -> Self {
-        Self {
-            epoch,
-            author,
-        }
+    pub fn new_for_test(epoch: u64, author: Author) -> Self {
+        Self { epoch, author }
     }
 
     pub fn author(&self) -> &Author {
@@ -64,29 +57,16 @@ pub struct DKGNode {
 }
 
 impl DKGNode {
-    pub fn new(
-        epoch: u64,
-        author: Author,
-        trx: DKGTranscriptWrapper,
-    ) -> Self {
+    pub fn new(epoch: u64, author: Author, trx: DKGTranscriptWrapper) -> Self {
         Self {
-            metadata: DKGNodeMetadata {
-                epoch,
-                author,
-            },
+            metadata: DKGNodeMetadata { epoch, author },
             trx,
         }
     }
 
     #[cfg(test)]
-    pub fn new_for_test(
-        metadata: DKGNodeMetadata,
-        trx: DKGTranscriptWrapper,
-    ) -> Self {
-        Self {
-            metadata,
-            trx,
-        }
+    pub fn new_for_test(metadata: DKGNodeMetadata, trx: DKGTranscriptWrapper) -> Self {
+        Self { metadata, trx }
     }
 
     pub fn metadata(&self) -> &DKGNodeMetadata {
@@ -230,7 +210,6 @@ pub enum DKGMessage {
     DKGAggNodeAckMsg(DKGAggNodeAck),
     // dkg todo: If the on-chain verification of aggregated pvss transcript is too expensive, we can move it to off-chain.
     // We can let validators verify and sign the aggregated transcript off-chain, and only verify the multi-signature on-chain.
-
     #[cfg(test)]
     DKGTestMessage(DKGTestMessage),
     #[cfg(test)]

@@ -1,20 +1,30 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-use aptos_consensus_types::common::Author;
-use aptos_dkg::{utils::random::random_scalar, pvss::{test_utils, das, WeightedTranscript, traits::Transcript}, constants::DST_PVSS_TESTING_APP};
-use aptos_infallible::Mutex;
-use aptos_types::{epoch_state::EpochState, contract_event::ContractEvent, dkg::{DKGTranscriptWrapper, DKGPvssConfig}};
-use rand::{rngs::StdRng, SeedableRng, thread_rng};
+use super::{
+    dkg_rounding::DKGRounding,
+    dkg_store::DKGStore,
+    types::{DKGAggNode, DKGAggNodeAckState, DKGMessage, DKGNodeAckState, TDKGMessage},
+};
 use crate::dkg::types::DKGNode;
-use futures::future::{AbortHandle, Abortable};
-use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_consensus_types::common::Author;
+use aptos_dkg::{
+    constants::DST_PVSS_TESTING_APP,
+    pvss::{das, test_utils, traits::Transcript, WeightedTranscript},
+    utils::random::random_scalar,
+};
+use aptos_infallible::Mutex;
 use aptos_logger::error;
+use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_types::{
+    contract_event::ContractEvent,
+    dkg::{DKGPvssConfig, DKGTranscriptWrapper, StartDKGEvent},
+    epoch_state::EpochState,
+};
+use futures::future::{AbortHandle, Abortable};
+use rand::{rngs::StdRng, thread_rng, SeedableRng};
+use std::sync::Arc;
 use tokio_retry::strategy::ExponentialBackoff;
-use aptos_types::dkg::StartDKGEvent;
-
-use super::{types::{DKGAggNode, DKGNodeAckState, DKGAggNodeAckState, DKGMessage, TDKGMessage}, dkg_store::DKGStore, dkg_rounding::DKGRounding};
 
 // the transcript size is 3.25MB
 // const TRANSCRIPT_SIZE: usize = 3_250_000;
@@ -40,10 +50,10 @@ impl DKGManagerWrapper {
         match self {
             DKGManagerWrapper::NoDKG => {
                 error!("[DKG] No DKG manager!");
-            }
+            },
             DKGManagerWrapper::WithDKG(dkg_manager) => {
                 dkg_manager.start_dkg(dkg_events).await;
-            }
+            },
         }
     }
 
@@ -67,7 +77,11 @@ pub struct DKGManager {
 }
 
 impl DKGManager {
-    pub fn new(author: Author, epoch_state: Arc<EpochState>, reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>) -> Self {
+    pub fn new(
+        author: Author,
+        epoch_state: Arc<EpochState>,
+        reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
+    ) -> Self {
         Self {
             author,
             epoch_state,
@@ -82,7 +96,14 @@ impl DKGManager {
     pub async fn start_dkg(&self, dkg_events: Vec<ContractEvent>) {
         // thread::sleep(Duration::from_millis(TRANSCRIPT_COMPUTE_TIME_MS));
 
-        let dkg_rounding: DKGRounding = dkg_events.first().map(|e|StartDKGEvent::try_from(e).expect("[DKG]: Empty DKG events!").into()).expect("[DKG]: Convertion from DKG events to DKG Rounding failed!");
+        let dkg_rounding: DKGRounding = dkg_events
+            .first()
+            .map(|e| {
+                StartDKGEvent::try_from(e)
+                    .expect("[DKG]: Empty DKG events!")
+                    .into()
+            })
+            .expect("[DKG]: Convertion from DKG events to DKG Rounding failed!");
 
         // let consensus_keys = dkg_rounding.validator_consensus_keys().clone();
         let wc_1 = dkg_rounding.weighted_config_1().clone();
@@ -97,8 +118,16 @@ impl DKGManager {
         // dkg todo: use real encryption keys of the new validators
         let (pp, _dks, eks, s, _sk) = test_utils::setup_dealing::<WT, StdRng>(&wc_1, &mut rng);
 
-        let trx_1 = WT::deal(&wc_1, &pp, &eks, s.clone(), &DST_PVSS_TESTING_APP[..], &mut rng);
-        trx_1.verify(&wc_1, &pp, &eks, &DST_PVSS_TESTING_APP[..])
+        let trx_1 = WT::deal(
+            &wc_1,
+            &pp,
+            &eks,
+            s.clone(),
+            &DST_PVSS_TESTING_APP[..],
+            &mut rng,
+        );
+        trx_1
+            .verify(&wc_1, &pp, &eks, &DST_PVSS_TESTING_APP[..])
             .expect("PVSS transcript failed verification");
 
         // // Test transcript (de)serialization
@@ -108,7 +137,8 @@ impl DKGManager {
         // assert_eq!(trx_1, deserialized);
 
         let trx_2 = WT::deal(&wc_2, &pp, &eks, s, &DST_PVSS_TESTING_APP[..], &mut rng);
-        trx_2.verify(&wc_2, &pp, &eks, &DST_PVSS_TESTING_APP[..])
+        trx_2
+            .verify(&wc_2, &pp, &eks, &DST_PVSS_TESTING_APP[..])
             .expect("PVSS transcript failed verification");
 
         // // Test transcript (de)serialization
@@ -120,7 +150,10 @@ impl DKGManager {
         let dkg_pvss_config = DKGPvssConfig::new(wc_1, wc_2, pp, eks, &DST_PVSS_TESTING_APP[..]);
         self.dkg_pvss_config.lock().replace(dkg_pvss_config);
 
-        let dkg_trx_wrapper = DKGTranscriptWrapper {trx_one_third: trx_1, trx_two_third: trx_2};
+        let dkg_trx_wrapper = DKGTranscriptWrapper {
+            trx_one_third: trx_1,
+            trx_two_third: trx_2,
+        };
         let dkg_node = DKGNode::new(self.epoch_state.epoch, self.author, dkg_trx_wrapper);
         self.broadcast_node(dkg_node);
     }
@@ -132,9 +165,7 @@ impl DKGManager {
         }
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let ack_set = DKGNodeAckState::new(self.epoch_state.verifier.len());
-        let task = self
-            .reliable_broadcast
-            .broadcast(node.clone(), ack_set);
+        let task = self.reliable_broadcast.broadcast(node.clone(), ack_set);
         tokio::spawn(Abortable::new(task, abort_registration));
         self.rb_abort_handle.lock().replace(abort_handle);
     }
@@ -142,9 +173,7 @@ impl DKGManager {
     pub(crate) fn broadcast_agg_node(&self, agg_node: DKGAggNode) {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let ack_set = DKGAggNodeAckState::new(self.epoch_state.verifier.len());
-        let task = self
-            .reliable_broadcast
-            .broadcast(agg_node.clone(), ack_set);
+        let task = self.reliable_broadcast.broadcast(agg_node.clone(), ack_set);
         tokio::spawn(Abortable::new(task, abort_registration));
         // abort the current node broadcast
         // no concurrent agg_node broadcast guaranteed by OnceCell
@@ -159,17 +188,24 @@ impl DKGManager {
             // dkg todo: think more about what to do in this case
             anyhow::bail!("[DKG] DKG PVSS config is not ready!");
         }
-        if node.verify(self.dkg_pvss_config.lock().as_ref().unwrap()).is_ok() {
-            match self.dkg_store.lock().add_node(node, &self.epoch_state.verifier, self.dkg_pvss_config.lock().as_ref().unwrap()) {
+        if node
+            .verify(self.dkg_pvss_config.lock().as_ref().unwrap())
+            .is_ok()
+        {
+            match self.dkg_store.lock().add_node(
+                node,
+                &self.epoch_state.verifier,
+                self.dkg_pvss_config.lock().as_ref().unwrap(),
+            ) {
                 Ok(agg_node) => {
                     if let Some(agg_node) = agg_node {
                         self.add_agg_node(agg_node)?;
                     }
-                    return Ok(());
-                }
+                    Ok(())
+                },
                 Err(e) => {
                     anyhow::bail!("[DKG] Failed to add DKG node: {:?}", e);
-                }
+                },
             }
         } else {
             anyhow::bail!("[DKG] Failed to verify DKG node: {:?}", node);
@@ -180,18 +216,21 @@ impl DKGManager {
         if self.dkg_pvss_config.lock().is_none() {
             anyhow::bail!("[DKG] DKG PVSS config is not ready!");
         }
-        if agg_node.verify(self.dkg_pvss_config.lock().as_ref().unwrap()).is_ok() {
+        if agg_node
+            .verify(self.dkg_pvss_config.lock().as_ref().unwrap())
+            .is_ok()
+        {
             match self.dkg_store.lock().add_agg_node(agg_node) {
                 Ok(agg_node) => {
                     if let Some(agg_node) = agg_node {
                         // Broadcast only the first aggregated dkg node
                         self.broadcast_agg_node(agg_node);
                     }
-                    return Ok(());
-                }
+                    Ok(())
+                },
                 Err(e) => {
                     anyhow::bail!("[DKG] Failed to add DKG aggregated node: {:?}", e);
-                }
+                },
             }
         } else {
             anyhow::bail!("[DKG] Failed to verify DKG aggregated node: {:?}", agg_node);

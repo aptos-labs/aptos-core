@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{proof_of_store::{BatchInfo, ProofOfStore}, dkg_types::DKGAggNode};
+use crate::{
+    dkg_types::DKGAggNode,
+    proof_of_store::{BatchInfo, ProofOfStore},
+};
 use aptos_crypto::HashValue;
 use aptos_executor_types::Error;
 use aptos_infallible::Mutex;
@@ -98,13 +101,25 @@ pub struct DKGPayload {
 }
 
 impl DKGPayload {
-    pub fn new(dkg_agg_node: DKGAggNode) -> Self { DKGPayload { dkg_agg_node: dkg_agg_node } }
+    pub fn new(dkg_agg_node: DKGAggNode) -> Self {
+        DKGPayload { dkg_agg_node }
+    }
 
-    pub fn dkg_agg_node(&self) -> &DKGAggNode { &self.dkg_agg_node }
+    pub fn dkg_agg_node(&self) -> &DKGAggNode {
+        &self.dkg_agg_node
+    }
 
-    pub fn num_bytes(&self) -> usize { self.dkg_agg_node.num_bytes() }
+    pub fn num_bytes(&self) -> usize {
+        self.dkg_agg_node.num_bytes()
+    }
 
-    pub fn len(&self) -> usize { 1 }
+    pub fn is_empty(&self) -> bool {
+        false
+    }
+
+    pub fn len(&self) -> usize {
+        1
+    }
 }
 
 /// The payload in block.

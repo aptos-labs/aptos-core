@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    dkg::dkg_manager::DKGManagerWrapper,
     error::StateSyncError,
     experimental::{
         buffer_manager::{OrderedBlocks, ResetAck, ResetRequest},
@@ -11,7 +12,7 @@ use crate::{
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler, dkg::dkg_manager::DKGManagerWrapper,
+    transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, executed_block::ExecutedBlock};

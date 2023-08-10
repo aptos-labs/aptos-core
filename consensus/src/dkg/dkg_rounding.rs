@@ -48,15 +48,24 @@ impl From<StartDKGEvent> for DKGRounding {
     fn from(event: StartDKGEvent) -> Self {
         let validator_info = event.locked_new_validator_info;
         let validator_addresses = validator_info.iter().map(|vi| vi.account_address).collect();
-        let validator_stakes = validator_info.iter().map(|vi| vi.consensus_voting_power()).collect();
-        let validator_consensus_keys = validator_info.iter().map(|vi| vi.consensus_public_key().clone()).collect();
+        let validator_stakes: Vec<u64> = validator_info
+            .iter()
+            .map(|vi| vi.consensus_voting_power())
+            .collect();
+        let validator_consensus_keys = validator_info
+            .iter()
+            .map(|vi| vi.consensus_public_key().clone())
+            .collect();
         // let validator_indexes = validator_info.iter().map(|vi| vi.config().validator_index).collect();
 
-        let (validator_weights, weights_of_one_third_stake, weights_of_two_third_stake) = rounding_scheme(&validator_stakes, MAX_NUM_SHARES);
+        let (validator_weights, weights_of_one_third_stake, weights_of_two_third_stake) =
+            rounding_scheme(validator_stakes.clone(), MAX_NUM_SHARES);
 
         // dkg todo: can different weights for two transcripts help?
-        let weighted_config_1 = WeightedConfig::new(weights_of_one_third_stake, validator_weights.clone()).unwrap();
-        let weighted_config_2 = WeightedConfig::new(weights_of_two_third_stake, validator_weights.clone()).unwrap();
+        let weighted_config_1 =
+            WeightedConfig::new(weights_of_one_third_stake, validator_weights.clone()).unwrap();
+        let weighted_config_2 =
+            WeightedConfig::new(weights_of_two_third_stake, validator_weights.clone()).unwrap();
 
         Self {
             validator_addresses,
@@ -72,13 +81,23 @@ impl From<StartDKGEvent> for DKGRounding {
     }
 }
 
-pub fn rounding_scheme(validator_stakes: &Vec<u64>, _max_num_shares: usize) -> (Vec<usize>, usize, usize) {
+pub fn rounding_scheme(
+    validator_stakes: Vec<u64>,
+    _max_num_shares: usize,
+) -> (Vec<usize>, usize, usize) {
     // naive rounding by dividing an unit and round down
     // dkg todo: better rounding?
-    let validator_weights = validator_stakes.iter().map(|s| *s as usize / ROUNDING_UNIT).collect::<Vec<usize>>();
+    let validator_weights = validator_stakes
+        .iter()
+        .map(|s| *s as usize / ROUNDING_UNIT)
+        .collect::<Vec<usize>>();
     let total_weight = validator_weights.iter().sum::<usize>();
     // dkg todo: calculate the actual weights of one third stake and two third stake
     let weights_of_one_third_stake = total_weight / 3;
     let weights_of_two_third_stake = total_weight * 2 / 3;
-    (validator_weights, weights_of_one_third_stake, weights_of_two_third_stake)
+    (
+        validator_weights,
+        weights_of_one_third_stake,
+        weights_of_two_third_stake,
+    )
 }

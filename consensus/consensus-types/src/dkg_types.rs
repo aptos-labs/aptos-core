@@ -1,11 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::Author;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::dkg::DKGTranscriptWrapper;
 use serde::{Deserialize, Serialize};
-
-use crate::common::Author;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct DKGAggNodeMetadata {
@@ -15,14 +14,8 @@ pub struct DKGAggNodeMetadata {
 
 impl DKGAggNodeMetadata {
     #[cfg(test)]
-    pub fn new_for_test(
-        epoch: u64,
-        author: Author,
-    ) -> Self {
-        Self {
-            epoch,
-            author,
-        }
+    pub fn new_for_test(epoch: u64, author: Author) -> Self {
+        Self { epoch, author }
     }
 
     pub fn author(&self) -> &Author {
@@ -43,29 +36,16 @@ pub struct DKGAggNode {
 }
 
 impl DKGAggNode {
-    pub fn new(
-        epoch: u64,
-        author: Author,
-        agg_trx: DKGTranscriptWrapper,
-    ) -> Self {
+    pub fn new(epoch: u64, author: Author, agg_trx: DKGTranscriptWrapper) -> Self {
         Self {
-            metadata: DKGAggNodeMetadata {
-                epoch,
-                author,
-            },
+            metadata: DKGAggNodeMetadata { epoch, author },
             agg_trx,
         }
     }
 
     #[cfg(test)]
-    pub fn new_for_test(
-        metadata: DKGAggNodeMetadata,
-        agg_trx: DKGTranscriptWrapper,
-    ) -> Self {
-        Self {
-            metadata,
-            agg_trx,
-        }
+    pub fn new_for_test(metadata: DKGAggNodeMetadata, agg_trx: DKGTranscriptWrapper) -> Self {
+        Self { metadata, agg_trx }
     }
 
     pub fn metadata(&self) -> &DKGAggNodeMetadata {

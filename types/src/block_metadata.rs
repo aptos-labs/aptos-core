@@ -2,11 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{dkg::DKGTranscriptWrapper, randomness::Randomness};
 use aptos_crypto::HashValue;
 use move_core_types::{account_address::AccountAddress, value::MoveValue};
 use serde::{Deserialize, Serialize};
-
-use crate::{dkg::DKGTranscriptWrapper, randomness::Randomness};
 
 /// Struct that will be persisted on chain to store the information of the current block.
 ///
@@ -35,7 +34,7 @@ pub struct BlockMetadata {
 }
 
 fn serialize_transcript(_ts: &DKGTranscriptWrapper) -> Vec<u8> {
-    vec![3,3,3] //dkg todo: use something from aptos-dkg.
+    vec![3, 3, 3] //dkg todo: use something from aptos-dkg.
 }
 
 impl BlockMetadata {
@@ -92,7 +91,15 @@ impl BlockMetadata {
 
         //dkg todo: currently assuming the first transcript is valid.
         ret.push(MoveValue::Bool(!self.dkg_transcripts.is_empty()));
-        ret.push(MoveValue::Vector(self.dkg_transcripts.first().map(serialize_transcript).unwrap_or(vec![]).into_iter().map(MoveValue::U8).collect()));
+        ret.push(MoveValue::Vector(
+            self.dkg_transcripts
+                .first()
+                .map(serialize_transcript)
+                .unwrap_or(vec![])
+                .into_iter()
+                .map(MoveValue::U8)
+                .collect(),
+        ));
         // dkg todo: pass in randomness
         ret
     }

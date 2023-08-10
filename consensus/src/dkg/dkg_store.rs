@@ -1,13 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::{types::DKGAggNode, DKGNode};
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
-use aptos_types::{validator_verifier::ValidatorVerifier, dkg::{DKGTranscriptWrapper, DKGPvssConfig}};
+use aptos_types::{
+    dkg::{DKGPvssConfig, DKGTranscriptWrapper},
+    validator_verifier::ValidatorVerifier,
+};
 use dashmap::DashMap;
 use tokio::sync::OnceCell;
-
-use super::{DKGNode, types::DKGAggNode};
 
 pub struct DKGStore {
     author: Author,
@@ -31,13 +33,21 @@ impl DKGStore {
         }
     }
 
-    pub fn add_node(&self, node: DKGNode, validator_verifier: &ValidatorVerifier, dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<Option<DKGAggNode>> {
+    pub fn add_node(
+        &self,
+        node: DKGNode,
+        validator_verifier: &ValidatorVerifier,
+        dkg_pvss_config: &DKGPvssConfig,
+    ) -> anyhow::Result<Option<DKGAggNode>> {
         if self.agg_node.get().is_some() {
             return Ok(None);
         }
         let author = node.author();
         if self.nodes.contains_key(node.author()) {
-            return Err(anyhow::anyhow!("[DKG] Author {:?} sends multiple DKG nodes!", author));
+            return Err(anyhow::anyhow!(
+                "[DKG] Author {:?} sends multiple DKG nodes!",
+                author
+            ));
         }
         self.nodes.insert(*node.author(), node.clone());
 
@@ -46,13 +56,23 @@ impl DKGStore {
         if agg_trx.is_none() {
             *agg_trx = Some(node.transcript().clone());
         } else {
-            agg_trx.as_mut().unwrap().aggregate_with(dkg_pvss_config, node.transcript());
+            agg_trx
+                .as_mut()
+                .unwrap()
+                .aggregate_with(dkg_pvss_config, node.transcript());
         }
 
-        let authors: Vec<Author> = self.nodes.iter().map(|entry| entry.key().clone()).collect();
+        let authors: Vec<Author> = self.nodes.iter().map(|entry| *entry.key()).collect();
         // dkg todo: f+1 transcripts are sufficient to reconstruct the aggregated node
-        if validator_verifier.check_voting_power(authors.iter(), false).is_ok() {
-            let agg_node = DKGAggNode::new(node.epoch(), self.author, self.agg_trx.lock().take().unwrap());
+        if validator_verifier
+            .check_voting_power(authors.iter(), false)
+            .is_ok()
+        {
+            let agg_node = DKGAggNode::new(
+                node.epoch(),
+                self.author,
+                self.agg_trx.lock().take().unwrap(),
+            );
             return Ok(Some(agg_node));
         }
         Ok(None)

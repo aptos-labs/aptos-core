@@ -6,10 +6,11 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
     dag::DAGNetworkMessage,
+    dkg::DKGNetworkMessage,
     logging::LogEvent,
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
-    quorum_store::types::{Batch, BatchMsg, BatchRequest}, dkg::DKGNetworkMessage,
+    quorum_store::types::{Batch, BatchMsg, BatchRequest},
 };
 use anyhow::{anyhow, bail, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -29,7 +30,7 @@ use aptos_network::{
     protocols::{network::Event, rpc::error::RpcError},
     ProtocolId,
 };
-use aptos_reliable_broadcast::{RBNetworkSender, RBMessage};
+use aptos_reliable_broadcast::{RBMessage, RBNetworkSender};
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
@@ -43,8 +44,9 @@ use futures::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
+    marker::PhantomData,
     mem::{discriminant, Discriminant},
-    time::Duration, marker::PhantomData,
+    time::Duration,
 };
 
 pub trait TConsensusMsg: Sized + Clone + Serialize + DeserializeOwned {
@@ -356,7 +358,12 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
-    pub async fn send_rpc(&self, receiver: Author, message: ConsensusMsg, timeout: Duration) -> anyhow::Result<ConsensusMsg> {
+    pub async fn send_rpc(
+        &self,
+        receiver: Author,
+        message: ConsensusMsg,
+        timeout: Duration,
+    ) -> anyhow::Result<ConsensusMsg> {
         let response = self
             .consensus_network_client
             .send_rpc(receiver, message, timeout)
@@ -445,13 +452,11 @@ impl<M> RBNetworkSender<M> for NetworkSenderWrapper<M>
 where
     M: RBMessage + TConsensusMsg,
 {
-    async fn send_rpc(
-        &self,
-        receiver: Author,
-        message: M,
-        timeout: Duration,
-    ) -> anyhow::Result<M> {
-        let response = self.network_sender.send_rpc(receiver, message.into_network_message(), timeout).await?;
+    async fn send_rpc(&self, receiver: Author, message: M, timeout: Duration) -> anyhow::Result<M> {
+        let response = self
+            .network_sender
+            .send_rpc(receiver, message.into_network_message(), timeout)
+            .await?;
         TConsensusMsg::from_network_message(response)
     }
 }

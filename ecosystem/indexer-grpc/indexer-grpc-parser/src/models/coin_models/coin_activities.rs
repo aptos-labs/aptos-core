@@ -113,7 +113,7 @@ impl CoinActivity {
             .as_ref()
             .expect("Transaction timestamp doesn't exist!")
             .seconds;
-        let txn_timestamp = NaiveDateTime::from_timestamp(txn_timestamp, 0);
+        let txn_timestamp = NaiveDateTime::from_timestamp_opt(txn_timestamp, 0).unwrap();
 
         // Handling gas first
         let mut entry_function_id_str = None;

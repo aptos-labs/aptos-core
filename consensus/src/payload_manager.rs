@@ -12,7 +12,8 @@ use crate::{
 use aptos_consensus_types::{
     block::Block,
     common::{DataStatus, Payload},
-    proof_of_store::ProofOfStore, dkg_types::DKGAggNode,
+    dkg_types::DKGAggNode,
+    proof_of_store::ProofOfStore,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{Error::DataNotFound, *};
@@ -69,7 +70,7 @@ impl PayloadManager {
                     .into_iter()
                     .filter(|payload| match payload {
                         Payload::DKG(_) => false, // Skip DKG payloads
-                        _ => true, // Include other payloads
+                        _ => true,                // Include other payloads
                     })
                     .flat_map(|payload| match payload {
                         Payload::DirectMempool(_) => {
@@ -139,14 +140,19 @@ impl PayloadManager {
 
     /// Extract transaction and DKG Aggregated Node from a given block
     /// Assumes it is never called for the same block concurrently. Otherwise status can be None.
-    pub async fn get_transactions(&self, block: &Block) -> Result<(Vec<SignedTransaction>, Vec<DKGAggNode>), Error> {
+    pub async fn get_transactions(
+        &self,
+        block: &Block,
+    ) -> Result<(Vec<SignedTransaction>, Vec<DKGAggNode>), Error> {
         let payload = match block.payload() {
             Some(p) => p,
             None => return Ok((Vec::new(), vec![])),
         };
 
         match (self, payload) {
-            (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => Ok((txns.clone(), vec![])),
+            (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => {
+                Ok((txns.clone(), vec![]))
+            },
             (
                 PayloadManager::InQuorumStore(batch_store, _),
                 Payload::InQuorumStore(proof_with_data),
@@ -218,14 +224,11 @@ impl PayloadManager {
                     },
                 }
             },
-            (
-                PayloadManager::InQuorumStore(_batch_store, _),
-                Payload::DKG(dkg_payload),
-            ) => {
+            (PayloadManager::InQuorumStore(_batch_store, _), Payload::DKG(dkg_payload)) => {
                 // extract dkg transactions
                 // dkg todo: support multiple dkg agg nodes
                 Ok((vec![], vec![dkg_payload.dkg_agg_node().clone()]))
-            }
+            },
             (_, _) => unreachable!(
                 "Wrong payload {} epoch {}, round {}, id {}",
                 payload,

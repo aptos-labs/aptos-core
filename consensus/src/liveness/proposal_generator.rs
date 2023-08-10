@@ -12,15 +12,16 @@ use crate::{
         PROPOSER_DELAY_PROPOSAL, PROPOSER_PENDING_BLOCKS_COUNT,
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
+    dkg::dkg_manager::DKGManagerWrapper,
     state_replication::PayloadClient,
-    util::time_service::TimeService, dkg::dkg_manager::DKGManagerWrapper,
+    util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::{ChainHealthBackoffValues, PipelineBackpressureValues};
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockData,
-    common::{Author, Payload, PayloadFilter, Round, DKGPayload},
+    common::{Author, DKGPayload, Payload, PayloadFilter, Round},
     quorum_cert::QuorumCert,
 };
 use aptos_logger::{error, sample, sample::SampleRate, warn};

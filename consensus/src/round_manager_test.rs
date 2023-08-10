@@ -4,6 +4,7 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
+    dkg::dkg_manager::DKGManagerWrapper,
     experimental::buffer_manager::OrderedBlocks,
     liveness::{
         proposal_generator::{
@@ -24,7 +25,7 @@ use crate::{
         consensus_runtime, timed_block_on, MockPayloadManager, MockStateComputer, MockStorage,
         TreeInserter,
     },
-    util::time_service::{ClockTimeService, TimeService}, dkg::dkg_manager::DKGManagerWrapper,
+    util::time_service::{ClockTimeService, TimeService},
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{

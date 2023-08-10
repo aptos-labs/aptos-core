@@ -22,7 +22,9 @@ impl ParsedTransactionOutput {
 
     pub fn parse_dkg_events(events: &[ContractEvent]) -> impl Iterator<Item = &ContractEvent> {
         // dkg todo: using the new epoch event key for now, need to register for dkg event
-        events.iter().filter(|e: &&ContractEvent| *e.key() == *START_DKG_EVENT_KEY)
+        events
+            .iter()
+            .filter(|e: &&ContractEvent| *e.key() == *START_DKG_EVENT_KEY)
     }
 }
 
@@ -31,9 +33,8 @@ impl From<TransactionOutput> for ParsedTransactionOutput {
         let reconfig_events = Self::parse_reconfig_events(output.events())
             .cloned()
             .collect();
-        let dkg_events: Vec<ContractEvent> = Self::parse_dkg_events(output.events())
-            .cloned()
-            .collect();
+        let dkg_events: Vec<ContractEvent> =
+            Self::parse_dkg_events(output.events()).cloned().collect();
         Self {
             output,
             reconfig_events,
@@ -72,6 +73,13 @@ impl ParsedTransactionOutput {
         } = self;
         let (write_set, events, gas_used, status) = output.unpack();
 
-        (write_set, events, reconfig_events, dkg_events, gas_used, status)
+        (
+            write_set,
+            events,
+            reconfig_events,
+            dkg_events,
+            gas_used,
+            status,
+        )
     }
 }

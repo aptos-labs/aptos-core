@@ -4,6 +4,7 @@
 
 use crate::{
     block_storage::BlockStore,
+    dkg::dkg_manager::DKGManagerWrapper,
     liveness::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
@@ -18,7 +19,7 @@ use crate::{
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     round_manager::RoundManager,
     test_utils::{EmptyStateComputer, MockPayloadManager, MockStorage},
-    util::{mock_time_service::SimulatedTimeService, time_service::TimeService}, dkg::dkg_manager::DKGManagerWrapper,
+    util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{config::ConsensusConfig, network_id::NetworkId};

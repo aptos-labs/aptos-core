@@ -1,18 +1,21 @@
 // Copyright © Aptos Foundation
 
+use super::{
+    dkg_manager::DKGManager,
+    dkg_network::DKGRpcHandler,
+    dkg_reliable_broadcast::{DKGAggNodeHandler, DKGNodeHandler},
+    types::DKGMessage,
+};
+use crate::network::{IncomingDKGRequest, TConsensusMsg};
 use anyhow::bail;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
-use aptos_logger::{error, warn, info};
+use aptos_logger::{error, info, warn};
 use aptos_network::protocols::network::RpcError;
 use aptos_types::epoch_state::EpochState;
 use bytes::Bytes;
 use futures::StreamExt;
 use std::sync::Arc;
-
-use crate::network::{IncomingDKGRequest, TConsensusMsg};
-
-use super::{dkg_reliable_broadcast::{DKGNodeHandler, DKGAggNodeHandler}, types::DKGMessage, dkg_network::DKGRpcHandler, dkg_manager::DKGManager};
 
 pub struct DKGNetworkHandler {
     author: Author,
@@ -32,24 +35,28 @@ impl DKGNetworkHandler {
         Self {
             author,
             dkg_rpc_rx,
-            node_receiver: DKGNodeHandler::new(
-                dkg_manager.clone(),
-            ),
-            agg_node_receiver: DKGAggNodeHandler::new(
-                dkg_manager.clone(),
-            ),
+            node_receiver: DKGNodeHandler::new(dkg_manager.clone()),
+            agg_node_receiver: DKGAggNodeHandler::new(dkg_manager.clone()),
             epoch_state: epoch_state.clone(),
         }
     }
 
     pub async fn start(mut self) {
-        info!(epoch = self.epoch_state.epoch, author = self.author, "[DKG] DKGHandler started");
+        info!(
+            epoch = self.epoch_state.epoch,
+            author = self.author,
+            "[DKG] DKGHandler started"
+        );
         while let Some(msg) = self.dkg_rpc_rx.next().await {
             if let Err(e) = self.process_rpc(msg).await {
                 warn!(error = ?e, "[DKG] error processing rpc");
             }
         }
-        info!(epoch = self.epoch_state.epoch, author = self.author, "[DKG] DKGHandler stopped");
+        info!(
+            epoch = self.epoch_state.epoch,
+            author = self.author,
+            "[DKG] DKGHandler stopped"
+        );
     }
 
     async fn process_rpc(&mut self, rpc_request: IncomingDKGRequest) -> anyhow::Result<()> {
@@ -64,7 +71,9 @@ impl DKGNetworkHandler {
 
         let response: anyhow::Result<DKGMessage> = match dkg_message {
             DKGMessage::DKGNodeMsg(node) => self.node_receiver.process(node).map(|r| r.into()),
-            DKGMessage::DKGAggNodeMsg(agg_node) => self.agg_node_receiver.process(agg_node).map(|r| r.into()),
+            DKGMessage::DKGAggNodeMsg(agg_node) => {
+                self.agg_node_receiver.process(agg_node).map(|r| r.into())
+            },
             _ => {
                 error!("[DKG] unknown rpc message {:?}", dkg_message);
                 Err(anyhow::anyhow!("[DKG] unknown rpc message"))

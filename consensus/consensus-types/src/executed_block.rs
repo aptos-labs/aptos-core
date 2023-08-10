@@ -14,8 +14,9 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     contract_event::ContractEvent,
+    dkg::DKGTranscriptWrapper,
     randomness::Randomness,
-    transaction::{SignedTransaction, Transaction, TransactionStatus}, dkg::DKGTranscriptWrapper,
+    transaction::{SignedTransaction, Transaction, TransactionStatus},
 };
 use std::fmt::{Debug, Display, Formatter};
 

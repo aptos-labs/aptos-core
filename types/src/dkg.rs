@@ -1,12 +1,10 @@
 // Copyright © Aptos Foundation
 
-use move_core_types::ident_str;
-use move_core_types::identifier::IdentStr;
-use move_core_types::move_resource::MoveStructType;
 use crate::validator_info::ValidatorInfo;
-use serde::{Serialize, Deserialize};
 use anyhow::Result;
-use aptos_dkg::pvss::{das, WeightedTranscript, traits::Transcript};
+use aptos_dkg::pvss::{das, traits::Transcript, WeightedTranscript};
+use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StartDKGEvent {
@@ -58,21 +56,26 @@ pub struct DKGTranscriptWrapper {
 }
 
 impl DKGTranscriptWrapper {
-    pub fn verify(
-        &self,
-        dkg_pvss_config: &DKGPvssConfig,
-    ) -> anyhow::Result<()> {
-        self.trx_one_third.verify(&dkg_pvss_config.wc_1, &dkg_pvss_config.pp, &dkg_pvss_config.eks, dkg_pvss_config.dst)?;
-        self.trx_two_third.verify(&dkg_pvss_config.wc_2, &dkg_pvss_config.pp, &dkg_pvss_config.eks, dkg_pvss_config.dst)?;
+    pub fn verify(&self, dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
+        self.trx_one_third.verify(
+            &dkg_pvss_config.wc_1,
+            &dkg_pvss_config.pp,
+            &dkg_pvss_config.eks,
+            dkg_pvss_config.dst,
+        )?;
+        self.trx_two_third.verify(
+            &dkg_pvss_config.wc_2,
+            &dkg_pvss_config.pp,
+            &dkg_pvss_config.eks,
+            dkg_pvss_config.dst,
+        )?;
         Ok(())
     }
 
-    pub fn aggregate_with(
-        &mut self,
-        dkg_pvss_config: &DKGPvssConfig,
-        other: &Self
-    ){
-        self.trx_one_third.aggregate_with(&dkg_pvss_config.wc_1, &other.trx_one_third);
-        self.trx_two_third.aggregate_with(&dkg_pvss_config.wc_2, &other.trx_two_third);
+    pub fn aggregate_with(&mut self, dkg_pvss_config: &DKGPvssConfig, other: &Self) {
+        self.trx_one_third
+            .aggregate_with(&dkg_pvss_config.wc_1, &other.trx_one_third);
+        self.trx_two_third
+            .aggregate_with(&dkg_pvss_config.wc_2, &other.trx_two_third);
     }
 }

@@ -4,9 +4,13 @@
 // use aptos_logger::error;
 // use thiserror::Error as ThisError;
 
+use super::{
+    dkg_manager::DKGManager,
+    dkg_network::DKGRpcHandler,
+    types::{DKGAggNode, DKGAggNodeAck, DKGNodeAck},
+    DKGNode,
+};
 use aptos_logger::error;
-
-use super::{types::{DKGNodeAck, DKGAggNode, DKGAggNodeAck}, dkg_network::DKGRpcHandler, DKGNode, dkg_manager::DKGManager};
 
 // #[derive(ThisError, Debug)]
 // pub enum DKGNodeHandleError {
@@ -19,12 +23,8 @@ pub struct DKGNodeHandler {
 }
 
 impl DKGNodeHandler {
-    pub fn new(
-        dkg_manager: DKGManager,
-    ) -> Self {
-        Self {
-            dkg_manager,
-        }
+    pub fn new(dkg_manager: DKGManager) -> Self {
+        Self { dkg_manager }
     }
 }
 
@@ -40,7 +40,7 @@ impl DKGRpcHandler for DKGNodeHandler {
             Err(e) => {
                 error!("[DKG] Error when adding DKG node: {:?}", e);
                 Err(e)
-            }
+            },
         }
     }
 }
@@ -57,9 +57,7 @@ pub struct DKGAggNodeHandler {
 
 impl DKGAggNodeHandler {
     pub fn new(dkg_manager: DKGManager) -> Self {
-        Self {
-            dkg_manager,
-        }
+        Self { dkg_manager }
     }
 }
 
@@ -75,7 +73,7 @@ impl DKGRpcHandler for DKGAggNodeHandler {
             Err(e) => {
                 error!("[DKG] Error when adding DKG aggregated node: {:?}", e);
                 Err(e)
-            }
+            },
         }
     }
 }

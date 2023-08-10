@@ -4,6 +4,7 @@
 
 use crate::{
     block_storage::BlockReader,
+    dkg::dkg_manager::DKGManagerWrapper,
     liveness::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
@@ -12,7 +13,7 @@ use crate::{
         unequivocal_proposer_election::UnequivocalProposerElection,
     },
     test_utils::{build_empty_tree, MockPayloadManager, TreeInserter},
-    util::mock_time_service::SimulatedTimeService, dkg::dkg_manager::DKGManagerWrapper,
+    util::mock_time_service::SimulatedTimeService,
 };
 use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},

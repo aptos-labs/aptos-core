@@ -5,13 +5,14 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
+    dkg::dkg_manager::DKGManagerWrapper,
     error::StateSyncError,
     monitor,
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
-    txn_notifier::TxnNotifier, dkg::dkg_manager::DKGManagerWrapper,
+    txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
@@ -130,7 +131,10 @@ impl StateComputer for ExecutionProxy {
         let (txns, dkg_agg_nodes) = payload_manager.get_transactions(block).await?;
 
         // dkg todo: support multiple transcripts
-        let dkg_transcripts = dkg_agg_nodes.into_iter().map(|node| node.agg_trx().clone()).collect();
+        let dkg_transcripts = dkg_agg_nodes
+            .into_iter()
+            .map(|node| node.agg_trx().clone())
+            .collect();
 
         let deduped_txns = txn_deduper.dedup(txns);
         let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
@@ -209,12 +213,16 @@ impl StateComputer for ExecutionProxy {
                 payloads.push(payload.clone());
             }
 
-            let (signed_txns, dkg_agg_nodes) = payload_manager.get_transactions(block.block()).await?;
+            let (signed_txns, dkg_agg_nodes) =
+                payload_manager.get_transactions(block.block()).await?;
             let deduped_txns = txn_deduper.dedup(signed_txns);
             let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
             // dkg todo: support multiple transcripts
-            let dkg_transcripts = dkg_agg_nodes.into_iter().map(|node| node.agg_trx().clone()).collect();
+            let dkg_transcripts = dkg_agg_nodes
+                .into_iter()
+                .map(|node| node.agg_trx().clone())
+                .collect();
             let maybe_randomness = block.maybe_randomness();
 
             txns.extend(block.transactions_to_commit(

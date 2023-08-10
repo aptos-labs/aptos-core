@@ -4,6 +4,7 @@
 
 use crate::{
     account_config::{DepositEvent, NewBlockEvent, NewEpochEvent, WithdrawEvent},
+    dkg::StartDKGEvent,
     event::EventKey,
     transaction::Version,
 };
@@ -14,7 +15,6 @@ use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, ops::Deref};
-use crate::dkg::StartDKGEvent;
 
 /// Support versioning of the data structure.
 #[derive(Hash, Clone, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]

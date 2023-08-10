@@ -6,7 +6,8 @@
 
 use crate::{
     dag::DAGNetworkMessage,
-    quorum_store::types::{Batch, BatchMsg, BatchRequest}, dkg::DKGNetworkMessage,
+    dkg::DKGNetworkMessage,
+    quorum_store::types::{Batch, BatchMsg, BatchRequest},
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{

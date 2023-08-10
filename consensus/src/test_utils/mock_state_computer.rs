@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    dkg::dkg_manager::DKGManagerWrapper,
     error::StateSyncError,
     experimental::buffer_manager::OrderedBlocks,
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
     transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler, dkg::dkg_manager::DKGManagerWrapper,
+    transaction_shuffler::TransactionShuffler,
 };
 use anyhow::{format_err, Result};
 use aptos_consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
@@ -64,7 +65,8 @@ impl MockStateComputer {
                 .lock()
                 .remove(&block.id())
                 .ok_or_else(|| format_err!("Cannot find block"))?;
-            let mut payload_txns = self.payload_manager.get_transactions(block.block()).await?;
+            let (mut payload_txns, _) =
+                self.payload_manager.get_transactions(block.block()).await?;
             txns.append(&mut payload_txns);
         }
         // they may fail during shutdown

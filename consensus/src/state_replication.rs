@@ -3,10 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    dkg::dkg_manager::DKGManagerWrapper,
     error::{QuorumStoreError, StateSyncError},
     payload_manager::PayloadManager,
     transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler, dkg::dkg_manager::DKGManagerWrapper,
+    transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
 use aptos_consensus_types::{

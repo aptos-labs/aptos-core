@@ -13,7 +13,6 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-dkg = { path = "../../aptos-dkg" }
 anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-bounded-executor = { workspace = true }
@@ -23,6 +22,7 @@ aptos-consensus-notifications = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+aptos-dkg = { path = "../../aptos-dkg" }
 aptos-enum-conversion-derive = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-executor = { workspace = true }

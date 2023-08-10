@@ -43,6 +43,7 @@ pub enum FeatureFlag {
     GasPayerEnabled,
     AptosUniqueIdentifiers,
     BulletproofsNatives,
+    ReconfigureWithDKG,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -166,6 +167,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::GasPayerEnabled => AptosFeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::AptosUniqueIdentifiers => AptosFeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
             FeatureFlag::BulletproofsNatives => AptosFeatureFlag::BULLETPROOFS_NATIVES,
+            FeatureFlag::ReconfigureWithDKG => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
         }
     }
 }
@@ -212,6 +214,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::GAS_PAYER_ENABLED => FeatureFlag::GasPayerEnabled,
             AptosFeatureFlag::APTOS_UNIQUE_IDENTIFIERS => FeatureFlag::AptosUniqueIdentifiers,
             AptosFeatureFlag::BULLETPROOFS_NATIVES => FeatureFlag::BulletproofsNatives,
+            AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDKG, // dkg todo: update
         }
     }
 }
