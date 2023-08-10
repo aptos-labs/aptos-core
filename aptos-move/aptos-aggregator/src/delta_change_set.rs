@@ -117,7 +117,9 @@ impl DeltaOp {
             // Otherwise, given  the minimum value of -M and the shift of -V the new
             // minimum value becomes -(M+V), which of course can overflow on addition,
             // implying that we subtracted too much and there was an underflow.
-            DeltaUpdate::Minus(value) => addition(value, self.min_achieved_negative, self.max_value),
+            DeltaUpdate::Minus(value) => {
+                addition(value, self.min_achieved_negative, self.max_value)
+            },
         }
     }
 
