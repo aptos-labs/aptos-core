@@ -5,59 +5,48 @@ import * as Dom from 'graphql-request/dist/types.dom';
 export const CurrentTokenOwnershipFieldsFragmentDoc = `
     fragment CurrentTokenOwnershipFields on current_token_ownerships_v2 {
   token_standard
-  is_fungible_v2
-  is_soulbound_v2
-  property_version_v1
-  table_type_v1
   token_properties_mutated_v1
-  amount
-  last_transaction_timestamp
-  last_transaction_version
+  token_data_id
+  table_type_v1
   storage_id
+  property_version_v1
   owner_address
+  last_transaction_version
+  last_transaction_timestamp
+  is_soulbound_v2
+  is_fungible_v2
+  amount
   current_token_data {
-    token_name
-    token_data_id
-    token_uri
-    token_properties
-    supply
-    maximum
-    last_transaction_version
-    last_transaction_timestamp
+    collection_id
+    description
+    is_fungible_v2
     largest_property_version_v1
+    last_transaction_timestamp
+    last_transaction_version
+    maximum
+    supply
+    token_data_id
+    token_name
+    token_properties
+    token_standard
+    token_uri
     current_collection {
+      collection_id
       collection_name
       creator_address
-      description
-      uri
-      collection_id
-      last_transaction_version
       current_supply
+      description
+      last_transaction_timestamp
+      last_transaction_version
+      max_supply
       mutable_description
-      total_minted_v2
-      table_handle_v1
       mutable_uri
+      table_handle_v1
+      token_standard
+      total_minted_v2
+      uri
     }
   }
-}
-    `;
-export const TokenActivitiesFieldsFragmentDoc = `
-    fragment TokenActivitiesFields on token_activities_v2 {
-  after_value
-  before_value
-  entry_function_id_str
-  event_account_address
-  event_index
-  from_address
-  is_fungible_v2
-  property_version_v1
-  to_address
-  token_amount
-  token_data_id
-  token_standard
-  transaction_timestamp
-  transaction_version
-  type
 }
     `;
 export const TokenDataFieldsFragmentDoc = `
@@ -82,6 +71,25 @@ export const CollectionDataFieldsFragmentDoc = `
   creator_address
 }
     `;
+export const TokenActivitiesFieldsFragmentDoc = `
+    fragment TokenActivitiesFields on token_activities_v2 {
+  after_value
+  before_value
+  entry_function_id_str
+  event_account_address
+  event_index
+  from_address
+  is_fungible_v2
+  property_version_v1
+  to_address
+  token_amount
+  token_data_id
+  token_standard
+  transaction_timestamp
+  transaction_version
+  type
+}
+    `;
 export const GetAccountCoinsData = `
     query getAccountCoinsData($owner_address: String, $offset: Int, $limit: Int) {
   current_coin_balances(
@@ -91,10 +99,21 @@ export const GetAccountCoinsData = `
   ) {
     amount
     coin_type
+    coin_type_hash
+    last_transaction_timestamp
+    last_transaction_version
+    owner_address
     coin_info {
-      name
+      coin_type
+      coin_type_hash
+      creator_address
       decimals
+      name
+      supply_aggregator_table_handle
+      supply_aggregator_table_key
       symbol
+      transaction_created_timestamp
+      transaction_version_created
     }
   }
 }
@@ -154,6 +173,7 @@ export const GetAccountTransactionsData = `
       ...TokenActivitiesFields
     }
     transaction_version
+    account_address
   }
 }
     ${TokenActivitiesFieldsFragmentDoc}`;
@@ -166,11 +186,18 @@ export const GetCollectionData = `
     order_by: $order_by
   ) {
     collection_id
-    token_standard
     collection_name
     creator_address
     current_supply
     description
+    last_transaction_timestamp
+    last_transaction_version
+    max_supply
+    mutable_description
+    mutable_uri
+    table_handle_v1
+    token_standard
+    total_minted_v2
     uri
   }
 }
@@ -184,18 +211,29 @@ export const GetCollectionsWithOwnedTokens = `
     order_by: $order_by
   ) {
     current_collection {
-      creator_address
-      collection_name
-      token_standard
       collection_id
+      collection_name
+      creator_address
+      current_supply
       description
-      table_handle_v1
-      uri
-      total_minted_v2
+      last_transaction_timestamp
+      last_transaction_version
+      mutable_description
       max_supply
+      mutable_uri
+      table_handle_v1
+      token_standard
+      total_minted_v2
+      uri
     }
+    collection_id
+    collection_name
+    collection_uri
+    creator_address
     distinct_tokens
     last_transaction_version
+    owner_address
+    single_token_uri
   }
 }
     `;
@@ -227,6 +265,7 @@ export const GetNumberOfDelegators = `
     distinct_on: pool_address
   ) {
     num_active_delegator
+    pool_address
   }
 }
     `;
@@ -283,10 +322,10 @@ export const GetTokenCurrentOwnerData = `
     limit: $limit
     order_by: $order_by
   ) {
-    owner_address
+    ...CurrentTokenOwnershipFields
   }
 }
-    `;
+    ${CurrentTokenOwnershipFieldsFragmentDoc}`;
 export const GetTokenData = `
     query getTokenData($where_condition: current_token_datas_v2_bool_exp, $offset: Int, $limit: Int, $order_by: [current_token_datas_v2_order_by!]) {
   current_token_datas_v2(
@@ -295,23 +334,34 @@ export const GetTokenData = `
     limit: $limit
     order_by: $order_by
   ) {
+    collection_id
+    description
+    is_fungible_v2
+    largest_property_version_v1
+    last_transaction_timestamp
+    last_transaction_version
+    maximum
+    supply
     token_data_id
     token_name
-    token_uri
     token_properties
     token_standard
-    largest_property_version_v1
-    maximum
-    is_fungible_v2
-    supply
-    last_transaction_version
-    last_transaction_timestamp
+    token_uri
     current_collection {
       collection_id
       collection_name
       creator_address
-      uri
       current_supply
+      description
+      last_transaction_timestamp
+      last_transaction_version
+      max_supply
+      mutable_description
+      mutable_uri
+      table_handle_v1
+      token_standard
+      total_minted_v2
+      uri
     }
   }
 }
@@ -336,10 +386,10 @@ export const GetTokenOwnersData = `
     limit: $limit
     order_by: $order_by
   ) {
-    owner_address
+    ...CurrentTokenOwnershipFields
   }
 }
-    `;
+    ${CurrentTokenOwnershipFieldsFragmentDoc}`;
 export const GetTopUserTransactions = `
     query getTopUserTransactions($limit: Int) {
   user_transactions(limit: $limit, order_by: {version: desc}) {

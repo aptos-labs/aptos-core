@@ -48,15 +48,15 @@ describe("Indexer", () => {
     const fullNodeChainId = await provider.getChainId();
 
     console.log(
-      `\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo.ledger_infos[0].chain_id}`,
+      `\n devnet chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo.ledger_infos[0].chain_id}`,
     );
 
     if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
-      console.log(`\n fullnode chain id and indexer chain id are not synced, skipping rest of tests`);
+      console.log(`\n devnet chain id and indexer chain id are not synced, skipping rest of tests`);
       skipTest = true;
       runTests = describe.skip;
     } else {
-      console.log(`\n fullnode chain id and indexer chain id are in synced, running tests`);
+      console.log(`\n devnet chain id and indexer chain id are in synced, running tests`);
     }
 
     if (!skipTest) {
