@@ -150,16 +150,15 @@ module lottery::lottery {
 
         // Pick a random winner by permuting the vector [0, 1, 2, ..., n-1], and
         // where n = |lottery.tickets|
-        let rng = randomness::rng();
         let winner_idx = randomness::u64_range(
-            &mut rng,
             0,
             vector::length(&lottery.tickets)
         );
         let winner = *vector::borrow(&lottery.tickets, winner_idx);
 
         // Pay the winner
-        let signer = get_signer();
+        let creds = borrow_global<Credentials>(@lottery);
+        let signer = account::create_signer_with_capability(&creds.signer_cap);
         let balance = coin::balance<AptosCoin>(signer::address_of(&signer));
 
         coin::transfer<AptosCoin>(
@@ -169,12 +168,5 @@ module lottery::lottery {
         );
 
         winner
-    }
-
-    /// Returns a signer for the resource account.
-    fun get_signer(): signer acquires Credentials {
-        let info = borrow_global<Credentials>(@lottery);
-
-        account::create_signer_with_capability(&info.signer_cap)
     }
 }
