@@ -34,6 +34,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     resolver::{resource_size, ModuleResolver, ResourceResolver},
+    value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use std::{
@@ -221,7 +222,18 @@ impl<'a, S: StateView> TResourceGroupResolver for StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
-    fn get_resource_with_metadata(
+    fn get_resource_value_with_metadata(
+        &self,
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+        metadata: &[Metadata],
+        _layout: &MoveTypeLayout,
+    ) -> anyhow::Result<(Option<Bytes>, usize)> {
+        // TODO(aggregator): use layout for aggregator liftings.
+        self.get_resource_bytes_with_metadata(address, struct_tag, metadata)
+    }
+
+    fn get_resource_bytes_with_metadata(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
@@ -255,7 +267,17 @@ impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
-    fn resolve_table_entry(
+    fn resolve_table_entry_value(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+        _layout: &MoveTypeLayout,
+    ) -> Result<Option<Bytes>, Error> {
+        // TODO(aggregator): use layout for aggregator liftings.
+        self.resolve_table_entry_bytes(handle, key)
+    }
+
+    fn resolve_table_entry_bytes(
         &self,
         handle: &TableHandle,
         key: &[u8],

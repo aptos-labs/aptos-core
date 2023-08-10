@@ -63,6 +63,7 @@ tracing = { workspace = true }
 [dev-dependencies]
 aptos-language-e2e-tests = { workspace = true }
 aptos-types = { workspace = true }
+claims = { workspace = true }
 proptest = { workspace = true }
 
 [features]
