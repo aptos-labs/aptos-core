@@ -7,7 +7,6 @@ module no_code_mint::mint_machine {
     use std::timestamp;
     use std::vector;
     use aptos_framework::transaction_context;
-    //use aptos_framework::account;
     use no_code_mint::whitelist;
     use no_code_mint::package_manager;
     use aptos_std::smart_vector::{Self, SmartVector};
@@ -70,10 +69,6 @@ module no_code_mint::mint_machine {
     const EMINTING_DISABLED: u64 = 10;
     /// Maximum supply exceeded.
     const EMAXIMUM_SUPPLY_EXCEEDED: u64 = 11;
-    /// The maximum number of mints per transaction is 255.
-    const EMAXIMUM_NUMBER_OF_MINTS_PER_TX_EXCEEDED: u64 = 12;
-
-    const MAX_MINTS_PER_TX: u64 = 255;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////
@@ -232,7 +227,7 @@ module no_code_mint::mint_machine {
 
         if (!creator_exists(admin_addr)) { return ready_for_launch };
         ready_for_launch.mint_config_exists = true;
-        
+
         let creator_addr = get_creator_addr(admin_addr);
         if (!whitelist::wl_exists(creator_addr)) { return ready_for_launch };
         ready_for_launch.whitelist_exists = true;
@@ -261,33 +256,30 @@ module no_code_mint::mint_machine {
     //////////////////////////////////////////////////////////////////////////////////////////
 
     // Right now these functions need to be private entry, because they require single tx-specific context
-    // Specifically, they need to declare a new auid_manager and destroy it at the end
-    // otherwise it isn't possible to find the token object address to transfer it to the receiver
+    // Specifically, they need to declare a new auid_manager, otherwise it isn't possible to find the token
+    // object address to transfer it to the receiver
     entry fun mint_multiple(
         receiver: &signer,
         admin_addr: address,
         amount: u64
     ) acquires MintConfiguration {
-        assert!(amount < MAX_MINTS_PER_TX, error::invalid_argument(EMAXIMUM_NUMBER_OF_MINTS_PER_TX_EXCEEDED));
         let auids = auid_manager::create();
         let i = 0;
         while(i < amount) {
             mint_internal(receiver, admin_addr, i, &mut auids);
             i = i + 1;
         };
-        auid_manager::destroy(auids);
     }
 
     // Right now these functions need to be private entry, because they require single tx-specific context
-    // Specifically, they need to declare a new auid_manager and destroy it at the end
-    // otherwise it isn't possible to find the token object address to transfer it to the receiver
+    // Specifically, they need to declare a new auid_manager, otherwise it isn't possible to find the token
+    // object address to transfer it to the receiver
     entry fun mint(
         receiver: &signer,
         admin_addr: address,
     ) acquires MintConfiguration {
         let auids = auid_manager::create();
         mint_internal(receiver, admin_addr, 0, &mut auids);
-        auid_manager::destroy(auids);
     }
 
     /// Mint an NFT to a receiver who requests it.
@@ -350,7 +342,6 @@ module no_code_mint::mint_machine {
         amount: u64,
         auids: &mut AuidManager,
     ) acquires MintConfiguration {
-        assert!(amount < MAX_MINTS_PER_TX, error::invalid_argument(EMAXIMUM_NUMBER_OF_MINTS_PER_TX_EXCEEDED));
         let i = 0;
         while(i < amount) {
             mint_internal(receiver, admin_addr, i, auids);
@@ -668,8 +659,6 @@ module no_code_mint::unit_tests {
             assert!(token::name(token_object) == mint_machine::concat_u64(str(TOKEN_BASE_NAME), i), i);
             i = i + 1;
         };
-
-        auid_manager::destroy(auids);
     }
 
     fun add_test_metadata(

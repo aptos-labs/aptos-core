@@ -1,22 +1,17 @@
+/// This module currently exists as a workaround to the issue of not being able to know the address of a token object
+/// when it's generated as an auid address and the address isn't returned from the function it's minted from.
+/// The `aptos_token.move` module will eventually return the address, but for now, we must track it manually with this.
 module no_code_mint::auid_manager {
     use aptos_framework::transaction_context;
     use std::vector;
-    use std::error;
-
-    /// The amount of addresses we can generate in one transaction has been exceeded.
-    const EGREATER_THAN_U8_MAX: u64 = 0;
 
     const DERIVE_AUID_ADDRESS_SCHEME: u8 = 0xFB;
 
-    // We will use (vector::length(&addresses) + 1) as current increment value instead of tracking it
-    struct AuidManager {
-        addresses: vector<address>, // Already computed addresses
-    }
-
-    public fun destroy(auid_manager: AuidManager) {
-        let AuidManager {
-            addresses: _,
-        } = auid_manager;
+    // An unstorable list of auid generated addresses.
+    // It's only used to keep track of the addresses in a single transaction
+    // Since the values are only meaningful for one transaction, it's automatically destroyed at the end of the transaction
+    struct AuidManager has drop {
+        addresses: vector<address>,
     }
 
     public fun create(): AuidManager {
@@ -25,12 +20,16 @@ module no_code_mint::auid_manager {
         }
     }
 
-    // TODO: fix this so it works when n > 255, use bit shifting or something
+    // This function computes auid addresses using the same computation function
+    // the native `transaction_context::generate_auid_address` uses.
+    // It is also in the object::test_correct_auid unit test.
     public fun increment(auid_manager: &mut AuidManager): address {
         let bytes = transaction_context::get_transaction_hash();
-        let n = ((vector::length(&auid_manager.addresses) + 1) as u8);
-        assert!(n < 255, error::invalid_argument(EGREATER_THAN_U8_MAX));
-vector::append(&mut bytes, vector[n,0,0,0,0,0,0,0,DERIVE_AUID_ADDRESS_SCHEME]);
+        let n = vector::length(&auid_manager.addresses) + 1;
+        let bcs_n = std::bcs::to_bytes(&n);
+
+        vector::append(&mut bytes, bcs_n);
+        vector::push_back(&mut bytes, DERIVE_AUID_ADDRESS_SCHEME);
 
         let new_auid = aptos_framework::from_bcs::to_address(std::hash::sha3_256(bytes));
         vector::push_back(
@@ -65,7 +64,8 @@ vector::append(&mut bytes, vector[n,0,0,0,0,0,0,0,DERIVE_AUID_ADDRESS_SCHEME]);
 
         let auid_manager = create();
         let i = 0;
-        while (i < 50) {
+        // Test for the case where n > u8_max
+        while (i < 256) {
             increment(&mut auid_manager);
             i = i + 1;
         };
@@ -74,7 +74,5 @@ vector::append(&mut bytes, vector[n,0,0,0,0,0,0,0,DERIVE_AUID_ADDRESS_SCHEME]);
             let generated = transaction_context::generate_auid_address();
             assert!(*auid == generated, 0);
         });
-
-        destroy(auid_manager);
     }
 }
