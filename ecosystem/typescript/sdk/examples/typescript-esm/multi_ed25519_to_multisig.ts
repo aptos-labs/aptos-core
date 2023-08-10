@@ -14,16 +14,32 @@ import assert from "assert";
 const ED25519_ACCOUNT_SCHEME = 0;
 const MULTI_ED25519_ACCOUNT_SCHEME = 1;
 
-type MultiSigAccountCreationWithAuthKeyRevocationMessage = {
-  moduleAddress: TxnBuilderTypes.AccountAddress;
-  moduleName: string;
-  structName: string;
-  chainId: number;
-  multiSigAddress: TxnBuilderTypes.AccountAddress;
-  sequenceNumber: number;
-  owners: Array<TxnBuilderTypes.AccountAddress>;
-  numSignaturesRequired: number;
-};
+class MultiSigAccountCreationWithAuthKeyRevocationMessage {
+  public readonly moduleAddress: TxnBuilderTypes.AccountAddress = TxnBuilderTypes.AccountAddress.CORE_CODE_ADDRESS;
+  public readonly moduleName: string = "multisig_account";
+  public readonly structName: string = "MultisigAccountCreationWithAuthKeyRevocationMessage";
+  public readonly functionName: string = "create_with_existing_account_and_revoke_auth_key";
+
+  constructor(
+    public readonly chainId: number,
+    public readonly multiSigAddress: TxnBuilderTypes.AccountAddress,
+    public readonly sequenceNumber: number,
+    public readonly owners: Array<TxnBuilderTypes.AccountAddress>,
+    public readonly numSignaturesRequired: number,
+  ) {}
+
+  serialize(serializer: BCS.Serializer): void {
+    this.moduleAddress.serialize(serializer);
+    serializer.serializeStr(this.moduleName);
+    serializer.serializeStr(this.structName);
+    serializer.serializeU8(this.chainId);
+    this.multiSigAddress.serialize(serializer);
+    serializer.serializeU64(this.sequenceNumber);
+    serializer.serializeU32AsUleb128(this.owners.length);
+    this.owners.forEach((owner) => owner.serialize(serializer));
+    serializer.serializeU64(this.numSignaturesRequired);
+  }
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -90,24 +106,22 @@ const main = async () => {
 
   // Step 3.
   // Create a proof struct for at minimum K of the N accounts to sign
-  const proofStruct: MultiSigAccountCreationWithAuthKeyRevocationMessage = {
-    moduleAddress: TxnBuilderTypes.AccountAddress.fromHex("0x1"),
-    moduleName: "multisig_account",
-    structName: "MultisigAccountCreationWithAuthKeyRevocationMessage",
-    chainId: chainId,
-    multiSigAddress: multiSigAddress,
-    sequenceNumber: sequenceNumber,
-    owners: accountAddresses, // Note these are the *new* owners for the multisig account, not the original owners of the MultiEd25519 account. They can be the same of course
-    numSignaturesRequired: NUM_SIGNATURES_REQUIRED,
-  };
+  const proofStruct = new MultiSigAccountCreationWithAuthKeyRevocationMessage(
+    chainId,
+    multiSigAddress,
+    sequenceNumber,
+    accountAddresses,
+    NUM_SIGNATURES_REQUIRED,
+  );
 
   // Step 4.
   // Gather the signatures from the accounts
   // In an e2e dapp example, you'd be getting these from each account/client with a wallet prompt to sign a message.
-  const structSig1 = signStructForMultiSig(account1, proofStruct);
-  const structSig2 = signStructForMultiSig(account2, proofStruct);
-  const structSig3 = signStructForMultiSig(account3, proofStruct);
-  const structSignatures = [structSig1, structSig2, structSig3];
+  const bcsSerializedStruct = BCS.bcsToBytes(proofStruct);
+  const structSig1 = account1.signBuffer(bcsSerializedStruct);
+  const structSig2 = account2.signBuffer(bcsSerializedStruct);
+  const structSig3 = account3.signBuffer(bcsSerializedStruct);
+  const structSignatures = [structSig1, structSig2, structSig3].map((sig) => sig.toUint8Array());
 
   // This is the bitmap indicating which original owners are present as signers. It takes a diff of the original owners and the signing owners and creates the bitmap based on that.
   const bitmap = createBitmapFromDiff(accountAddresses, signingAddresses);
@@ -257,28 +271,6 @@ const createBitmapFromDiff = (
   // Bitmap masks which public key has signed transaction.
   // See https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.MultiEd25519Signature.html#createBitmap
   return TxnBuilderTypes.MultiEd25519Signature.createBitmap(bits);
-};
-
-// This is a helper function used for each individual account to sign the MultiSigAccountCreationWithAuthKeyRevocationMessage struct.
-const signStructForMultiSig = (
-  signer: AptosAccount,
-  struct: MultiSigAccountCreationWithAuthKeyRevocationMessage,
-): Uint8Array => {
-  const proofBytes = new Uint8Array([
-    ...BCS.bcsToBytes(struct.moduleAddress),
-    ...BCS.bcsSerializeStr(struct.moduleName),
-    ...BCS.bcsSerializeStr(struct.structName),
-    ...BCS.bcsSerializeU8(struct.chainId),
-    ...BCS.bcsToBytes(struct.multiSigAddress),
-    ...BCS.bcsSerializeUint64(struct.sequenceNumber),
-    ...BCS.serializeVectorWithFunc(
-      struct.owners.map((o) => o.address),
-      "serializeFixedBytes",
-    ),
-    ...BCS.bcsSerializeUint64(struct.numSignaturesRequired),
-  ]);
-
-  return signer.signBuffer(proofBytes).toUint8Array();
 };
 
 // This is solely used to create the entry function payload for the 0x1::multisig_account::create_with_existing_account_and_revoke_auth_key function
