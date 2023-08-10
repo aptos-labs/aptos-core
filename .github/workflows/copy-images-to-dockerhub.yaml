@@ -10,6 +10,9 @@ on:
         required: false
         type: string
         description: the git sha to use for the image tag. If not provided, the git sha of the triggering branch will be used
+      OVERWRITE:
+        type: boolean
+        description: Whether or not we should overwrite images
   workflow_dispatch:
     inputs:
       image_tag_prefix:
@@ -21,6 +24,9 @@ on:
         required: false
         type: string
         description: the git sha to use for the image tag. If not provided, the git sha of the triggering branch will be used
+      OVERWRITE:
+        type: boolean
+        description: Whether or not we should overwrite images
 
 permissions:
   contents: read
@@ -62,4 +68,5 @@ jobs:
           GCP_DOCKER_ARTIFACT_REPO_US: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO_US }}
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ECR_ACCOUNT_NUM }}
           IMAGE_TAG_PREFIX: ${{ inputs.image_tag_prefix }}
+          OVERWRITE: ${{ inputs.OVERWRITE }}
         run: ./docker/release-images.mjs --wait-for-image-seconds=3600

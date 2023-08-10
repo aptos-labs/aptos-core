@@ -80,7 +80,7 @@ const IMAGES_TO_RELEASE = {
 };
 
 import { execSync } from "node:child_process";
-import { dirname } from "node:path";
+import { dirname, parse } from "node:path";
 import { chdir } from "node:process";
 import { promisify } from "node:util";
 const sleep = promisify(setTimeout);
@@ -91,7 +91,7 @@ execSync("pnpm install --frozen-lockfile", { stdio: "inherit" });
 await import("zx/globals");
 
 const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "GCP_DOCKER_ARTIFACT_REPO_US", "AWS_ACCOUNT_ID", "IMAGE_TAG_PREFIX"];
-const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS"];
+const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS", "OVERWRITE"];
 
 const parsedArgs = {};
 
@@ -151,6 +151,12 @@ const ALL_TARGET_REGISTRIES = [
 
 // default 10 seconds
 parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
+parsedArgs.OVERWRITE = parsedArgs.OVERWRITE == "true"
+
+function shouldOverwrite(image) {
+  // Only overwrite if we specifically request it or we are not a release image
+  return parsedArgs.OVERWRITE || !image.includes("aptos-node-v")
+}
 
 for (const [image, imageConfig] of Object.entries(IMAGES_TO_RELEASE)) {
   for (const [profile, features] of Object.entries(imageConfig)) {
@@ -169,8 +175,17 @@ for (const [image, imageConfig] of Object.entries(IMAGES_TO_RELEASE)) {
         const imageTarget = `${targetRegistry}/${image}:${joinTagSegments(parsedArgs.IMAGE_TAG_PREFIX, profilePrefix, featureSuffix)}`;
         console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTarget}`));
         await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);
-        await $`${crane} copy ${imageSource} ${imageTarget}`;
-        await $`${crane} copy ${imageSource} ${joinTagSegments(imageTarget, parsedArgs.GIT_SHA)}`;
+        const imageExists = await imageExists(imageTarget);
+        const overwrite = shouldOverwrite(imageTarget);
+        if (imageExists || overwrite) {
+          await $`${crane} copy ${imageSource} ${imageTarget}`;
+          await $`${crane} copy ${imageSource} ${joinTagSegments(imageTarget, parsedArgs.GIT_SHA)}`;
+        } else {
+          if (!overwrite) {
+            console.log(`Refusing to overwrite existing image ${imageTarget}`);
+            console.log(`Rerun with OVERWRITE=true to overwrite anyway`);
+          }
+        }
       }
     }
   }
@@ -189,11 +204,10 @@ async function waitForImageToBecomeAvailable(imageToWaitFor, waitForImageSeconds
   }
   while (timeElapsedSeconds() < waitForImageSeconds) {
     try {
-      await $`${crane} manifest ${imageToWaitFor}`;
-      console.info(chalk.green(`INFO: image ${imageToWaitFor} is available`));
-      return;
-    } catch (e) {
-      if (e.exitCode === 1 && e.stderr.includes("MANIFEST_UNKNOWN")) {
+      if (await imageExists(imageToWaitFor)) {
+        console.info(chalk.green(`INFO: image ${imageToWaitFor} is available`));
+        return;
+      } else {
         console.log(
           chalk.yellow(
             // prettier-ignore
@@ -201,10 +215,10 @@ async function waitForImageToBecomeAvailable(imageToWaitFor, waitForImageSeconds
           ),
         );
         await sleep(WAIT_TIME_IN_BETWEEN_ATTEMPTS);
-      } else {
-        console.error(chalk.red(e.stderr ?? e));
-        process.exit(1);
       }
+    } catch (e) {
+      console.error(chalk.red(e.stderr ?? e));
+      process.exit(1);
     }
   }
   console.error(
@@ -214,3 +228,19 @@ async function waitForImageToBecomeAvailable(imageToWaitFor, waitForImageSeconds
   );
   process.exit(1);
 }
+
+async function imageExists(image) {
+  let image_exists = false;
+  try {
+    await $`${crane} digest ${image}`;
+  } catch (e) {
+    if (e.exitCode === 1 && e.stderr.includes("MANIFEST_UNKNOWN")) {
+      return false;
+    }
+    // Rethrow unrecognized error
+    throw Error(e)
+  }
+  // Image doesnt exist we can run
+  return image_exists
+}
+
