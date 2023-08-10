@@ -36,11 +36,10 @@ impl P256Signature {
         self.0.to_bytes().try_into().unwrap()
     }
 
-    /// Deserialize an P256Signature, checking for malleability
-    pub(crate) fn from_bytes(
+    /// Deserialize an P256Signature, without checking for malleability
+    pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256Signature, CryptoMaterialError> {
-        //P256Signature::check_s_malleability(bytes)?;
         match p256::ecdsa::Signature::try_from(bytes) {
             Ok(p256_signature) => Ok(P256Signature(p256_signature)),
             Err(_) => Err(CryptoMaterialError::DeserializationError),
@@ -50,7 +49,7 @@ impl P256Signature {
     /// return an all-zero signature (for test only)
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy_signature() -> Self {
-        Self::from_bytes(&[0u8; Self::LENGTH]).unwrap()
+        Self::from_bytes_unchecked(&[0u8; Self::LENGTH]).unwrap()
     }
 
     /// Check for correct size and third-party based signature malleability issues.
@@ -166,7 +165,7 @@ impl TryFrom<&[u8]> for P256Signature {
 
     fn try_from(bytes: &[u8]) -> std::result::Result<P256Signature, CryptoMaterialError> {
         P256Signature::check_s_malleability(bytes)?;
-        P256Signature::from_bytes(bytes)
+        P256Signature::from_bytes_unchecked(bytes)
     }
 }
 

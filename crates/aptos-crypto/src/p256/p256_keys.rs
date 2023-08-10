@@ -79,10 +79,8 @@ impl P256PublicKey {
         (*self.0.to_sec1_bytes()).try_into().unwrap()
     }
 
-    /// Deserialize a P256PublicKey without any validation checks apart from expected key size
-    /// and valid curve point, although not necessarily in the prime-order subgroup.
-    ///
-    /// This function does NOT check the public key for membership in a small subgroup.
+    /// Deserialize a P256PublicKey, checking expected key size
+    /// and that it is a valid curve point.
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256PublicKey, CryptoMaterialError> {
@@ -230,10 +228,7 @@ impl fmt::Debug for P256PublicKey {
 impl TryFrom<&[u8]> for P256PublicKey {
     type Error = CryptoMaterialError;
 
-    /// Deserialize a P256PublicKey. This method will NOT check for key validity, which means
-    /// the returned public key could be in a small subgroup. Nonetheless, our signature
-    /// verification implicitly checks if the public key lies in a small subgroup, so canonical
-    /// uses of this library will not be susceptible to small subgroup attacks.
+    /// Deserialize a P256PublicKey.
     fn try_from(bytes: &[u8]) -> std::result::Result<P256PublicKey, CryptoMaterialError> {
         P256PublicKey::from_bytes_unchecked(bytes)
     }

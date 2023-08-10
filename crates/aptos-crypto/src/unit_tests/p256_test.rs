@@ -174,8 +174,8 @@ proptest! {
         let rustcrypto_sig = rustcrypto_sig.unwrap();
         // RustCrypto p256 verify will NOT accept the mauled signature
         prop_assert!(rustcrypto_public_key.verify(msg_bytes.as_ref().unwrap(), &rustcrypto_sig).is_err());
-        // ...therefore, neither will our own P256Signature::verify_arbitrary_msg
-        let sig = P256Signature::from_bytes(&serialized).unwrap();
+        // ...therefore, neither will our own P256Signature::verify
+        let sig = P256Signature::from_bytes_unchecked(&serialized).unwrap();
         prop_assert!(sig.verify(&message, &keypair.public_key).is_err());
 
         let serialized_malleable: &[u8] = &serialized;
@@ -189,7 +189,7 @@ proptest! {
         // We expect from_bytes_unchecked deserialization to succeed, as RustCrypto p256
         // does not check for signature malleability. This method is pub(crate)
         // and only used for test purposes.
-        let sig_unchecked = P256Signature::from_bytes(&serialized);
+        let sig_unchecked = P256Signature::from_bytes_unchecked(&serialized);
         prop_assert!(sig_unchecked.is_ok());
 
         // Update the signature by setting S = L to make it invalid.
