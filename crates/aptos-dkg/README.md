@@ -1,0 +1,44 @@
+# TODOs
+
+ - PVSS transcript needs to contain a PoK of the dealt secret. Otherwise, last dealer can decide the randomness.
+ - PVSS transcript needs to contain a signature from the dealer on $g^s$, such that we can tell where an aggregated transcript was aggregated from.
+   + Ideally, these two can be combined into one, al a [GJM+21]
+ - accumulator_poly uses hard-coded FFT threshold to decide when to switch between slow/fast implementations
+
+# Workarounds
+
+## rand_core_hell
+
+`aptos_crypto` uses `rand_core 0.5.1`
+`blstrs` uses `rand_core 0.6`
+
+This spells disaster: we cannot pass the RNGs from `rand_core 0.6` into the `aptos_crypto` traits that expect a `0.5.1`-version RNG.
+
+We work around this by generating random seeds using the 0.5.1 RNG that we get from `aptos_crypto` and then create `Scalar`s and points from those seeds manually (e.g., by hashing the seed to a curve point).  
+
+## blst_hell
+
+`blstrs 0.7.0` has a bug (originally from `blst`) where size-1 multiexps (sometimes) don't output the correct result: see [this issue](https://github.com/filecoin-project/blstrs/issues/57) opened by Sourav Das.
+
+As a result, some of our 1 out of 1 weighted PVSS tests which did a secret reconstruction via a size-1 multiexp in G2 failed intermittently. (This test was called `weighted_fail` at commit `5cd69cba8908b6676cf4481457aae93850b6245e`; it runs in a loop until it fails; sometimes it doesn't fail; most of the times it does though.)
+
+We know this bug is patched in the latest `blst` but the change has not been pulled into `blstrs`.
+
+We patched this by clumsily checking for the input size before calling `blstrs`'s multiexp wrapper.
+
+# Notes
+
+We (mostly) rely on the `aptos-crypto` `SerializeKey` and `DeserializeKey` derives for safety during deserialization.
+Specifically, each cryptographic object (e.g., public key, public parameters, etc) must implement `ValidCryptoMaterial` for serialization and `TryFrom` for deserialization when these derives are used.
+
+The G1/G2 group elements in `blstrs` are deserialized safely via calls to `from_[un]compressed` rather than calls to `from_[un]compressed_unchecked` which does not check prime-order subgroup membership.
+
+Our structs use $(x, y, z)$ projective coordinates, for faster arithmetic operations.
+During serialization, we convert to more succinct $(x, y)$ affine coordinates.
+
+# Cargo flamegraphs
+
+Example: You indicate the benchmark group with `--bench` and then you append part of the benchmark name at the end (e.g., `accumulator_poly/` so as to exclude `accumulator_poly_slow/`)
+```
+sudo cargo flamegraph --bench 'crypto' -- --bench accumulator_poly/
+```

@@ -8,7 +8,6 @@ use crate::{
 };
 use aptos_api::context::Context;
 use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
-use aptos_indexer_grpc_utils::{chunk_transactions, constants::MESSAGE_SIZE_LIMIT};
 use aptos_logger::{error, info, sample, sample::SampleRate};
 use aptos_protos::{
     internal::fullnode::v1::{
@@ -92,22 +91,20 @@ impl IndexerStreamCoordinator {
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
                 // Wrap in stream response object and send to channel
                 for chunk in pb_txns.chunks(output_batch_size as usize) {
-                    for chunk in chunk_transactions(chunk.to_vec(), MESSAGE_SIZE_LIMIT) {
-                        let item = TransactionsFromNodeResponse {
-                            response: Some(transactions_from_node_response::Response::Data(
-                                TransactionsOutput {
-                                    transactions: chunk,
-                                },
-                            )),
-                            chain_id: ledger_chain_id as u32,
-                        };
-                        match transaction_sender.send(Result::<_, Status>::Ok(item)).await {
-                            Ok(_) => {},
-                            Err(_) => {
-                                // Client disconnects.
-                                return Err(Status::aborted("Client disconnected"));
+                    let item = TransactionsFromNodeResponse {
+                        response: Some(transactions_from_node_response::Response::Data(
+                            TransactionsOutput {
+                                transactions: chunk.to_vec(),
                             },
-                        }
+                        )),
+                        chain_id: ledger_chain_id as u32,
+                    };
+                    match transaction_sender.send(Result::<_, Status>::Ok(item)).await {
+                        Ok(_) => {},
+                        Err(_) => {
+                            // Client disconnects.
+                            return Err(Status::aborted("Client disconnected"));
+                        },
                     }
                 }
                 Ok(pb_txns.last().unwrap().version)

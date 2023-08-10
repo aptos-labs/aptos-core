@@ -1,0 +1,270 @@
+// Copyright © Aptos Foundation
+
+use crate::algebra::polynomials::shamir_secret_share;
+use crate::pvss::player::Player;
+use crate::pvss::scrape;
+use crate::pvss::scrape::{LowDegreeTest, SCRAPE_SK_IN_G2};
+use crate::pvss::threshold_config::ThresholdConfig;
+use crate::pvss::traits;
+use crate::pvss::{encryption_dlog, fiat_shamir};
+use crate::utils::g2_multi_exp;
+use crate::utils::random::{random_g1_point, random_g2_point};
+use anyhow::bail;
+use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
+use blstrs::{Bls12, G1Affine, G1Projective, G2Prepared, G2Projective, Gt, Scalar};
+use ff::Field;
+use group::{Curve, Group};
+use pairing::{MillerLoopResult, MultiMillerLoop};
+use serde::{Deserialize, Serialize};
+use std::ops::{Mul, Neg};
+
+/// A PVSS *transcript*.
+///
+/// We use the normal serde `Serialize` and `Deserialize` macros because `aptos_crypto`'s `SerializeKey`
+/// macros override serde's serialization to call into `ValidCryptoMaterial::to_bytes()`. This makes
+/// it difficult to serialize complex types because if we call serde serialization inside `to_bytes`
+/// on the struct itself, it triggers infinite recursion by having `serde` call back into `to_bytes`.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[allow(non_snake_case)]
+pub struct Transcript {
+    /// Commitment to $f(0)$: $\hat{u}_2 = \hat{u}_1^{a_0}$
+    u2_hat: G2Projective,
+    /// `A[0], ..., A[n-1]` are commitments to the $n$ evaluations of $f(X)$: $g_1^{f(\omega^i)}$
+    /// `A[n]` is a commitment to $f(0)$
+    A: Vec<G1Projective>,
+    /// $n$ encryptions, one for each player's share of $f(X)$: $ek^{f(\omega^i)}, \forall i\in[0,n)$
+    Y_hat: Vec<G2Projective>,
+}
+
+impl ValidCryptoMaterial for Transcript {
+    fn to_bytes(&self) -> Vec<u8> {
+        bcs::to_bytes(&self).expect("unexpected error during PVSS transcript serialization")
+    }
+}
+
+impl TryFrom<&[u8]> for Transcript {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        // NOTE: The `serde` implementation in `blstrs` already performs the necessary point validation
+        // by ultimately calling `GroupEncoding::from_bytes`.
+        bcs::from_bytes::<Transcript>(bytes).map_err(|_| CryptoMaterialError::DeserializationError)
+    }
+}
+
+impl traits::Transcript for Transcript {
+    type SecretSharingConfig = ThresholdConfig;
+    type PvssPublicParameters = scrape::PublicParameters;
+    type DealtSecretKeyShare = scrape::DealtSecretKeyShare;
+    type DealtPubKeyShare = scrape::DealtPubKeyShare;
+    type DealtSecretKey = scrape::DealtSecretKey;
+    type DealtPubKey = scrape::DealtPubKey;
+    type InputSecret = scrape::InputSecret;
+    type EncryptPubKey = encryption_dlog::g2::EncryptPubKey;
+    type DecryptPrivKey = encryption_dlog::g2::DecryptPrivKey;
+
+    fn scheme_name() -> String {
+        SCRAPE_SK_IN_G2.to_string()
+    }
+
+    fn deal<R: rand_core::RngCore + rand_core::CryptoRng>(
+        sc: &ThresholdConfig,
+        pp: &scrape::PublicParameters,
+        eks: &Vec<Self::EncryptPubKey>,
+        s: &Self::InputSecret,
+        _dst: &'static [u8], // DSTs are only needed in `Transcript::verify` for computing random challenges via Fiat-Shamir
+        rng: &mut R,
+    ) -> Self {
+        assert_eq!(eks.len(), sc.n);
+
+        let (f, f_evals) = shamir_secret_share(sc, s, rng);
+
+        let g1 = pp.get_commitment_base();
+        let u1_hat = pp.get_public_key_base();
+
+        Transcript {
+            u2_hat: u1_hat.mul(f[0]),
+            A: (0..sc.n)
+                .map(|i| g1.mul(f_evals[i]))
+                .chain([g1.mul(f[0])].into_iter())
+                .collect(),
+            Y_hat: (0..sc.n)
+                .map(|i| Into::<G2Projective>::into(&eks[i]).mul(f_evals[i]))
+                .collect(),
+        }
+    }
+
+    fn verify(
+        &self,
+        sc: &ThresholdConfig,
+        pp: &scrape::PublicParameters,
+        eks: &Vec<Self::EncryptPubKey>,
+        dst: &'static [u8],
+    ) -> anyhow::Result<()> {
+        if eks.len() != sc.n {
+            bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
+        }
+
+        if self.Y_hat.len() != sc.n {
+            bail!(
+                "Expected {} ciphertexts, but got {}",
+                sc.n,
+                self.Y_hat.len()
+            );
+        }
+
+        if self.A.len() != sc.n + 1 {
+            bail!(
+                "Expected {} (polynomial) commitment elements, but got {}",
+                sc.n + 1,
+                self.A.len()
+            );
+        }
+
+        // Derive challenges deterministically via Fiat-Shamir; it's easier to debug for distributed systems
+        let (f, r) = fiat_shamir::fiat_shamir(self, sc, pp, eks, dst, 1);
+        let r = r[0];
+
+        let ldt = LowDegreeTest::new(f, sc.t, sc.n + 1, true, sc.get_batch_evaluation_domain())?;
+
+        let _ = ldt.low_degree_test_on_g1(&self.A)?;
+
+        //
+        // Correctness of encryptions check
+        // (This could be done via DLEQ proofs too. Check out repo at [this commit](https://github.com/aptos-labs/aptos-dkg/commit/c04ab0d6fa73c3f6ca18d7fe3d6465ef722556b6).)
+        //
+
+        // We need to check the following equations hold:
+        //
+        //                    e(A_i,       ek_i) = e(g_1,        \hat{Y}_i),     \forall i \in [0,n) <=>
+        //                    e(A_i,       ek_i)   e(g_1^{-1},   \hat{Y}_i) = 1, \forall i \in [0,n) <=>
+        //  \prod_{i\in[0,n)} e(A_i^{r_i}, ek_i)   e(g_1^{-r_i}, \hat{Y}_i) = 1
+        //  \prod_{i\in[0,n)} e(A_i^{r_i}, ek_i)   e(g_1, \prod_{i\in[0,n)} \hat{Y}_i^{-r_i}) = 1
+        //
+        // Lastly, we can add the check for (\hat{u}_1, \hat{u}_2) against F_0 by appending its pairing
+        // equation to the multipairing check above:
+        //
+        //     e(F_0^{r_n}, \hat{u}_1) e(g_1^{-r_n}, \hat{u}_2)
+        //
+        // We let r_i = r^i, for a random r.
+
+        // TODO(Performance): Would storing elements in affine representation after deserializing help?
+        let g1_inverse = pp.get_commitment_base().neg();
+        let mut r_i = Vec::with_capacity(sc.n + 1);
+        let mut r_i_negated = Vec::with_capacity(sc.n + 1);
+        r_i.push(Scalar::ONE);
+        r_i_negated.push(-r_i[0]);
+
+        // First, compute r_i = r^i, for all i \in [0, n]
+        for _ in 0..sc.n {
+            r_i.push(r_i.last().unwrap().mul(&r));
+            r_i_negated.push(-*r_i.last().unwrap());
+        }
+
+        // The vector of left-hand-side inputs to each pairing in the multi-pairing.
+        let lhs = (0..sc.n)
+            .map(|i| self.A[i].mul(r_i[i]).to_affine())
+            .chain([pp.get_commitment_base().to_affine()].into_iter())
+            .chain([self.A[sc.n].mul(r_i[sc.n]).to_affine()].into_iter())
+            .chain([g1_inverse.mul(r_i[sc.n]).to_affine()].into_iter());
+
+        // The vector of right-hand-side inputs to each pairing in the multi-pairing.
+        let mexp = g2_multi_exp(self.Y_hat.as_slice(), r_i_negated.as_slice());
+        let rhs = eks
+            .iter()
+            .map(|ek| G2Prepared::from(Into::<G2Projective>::into(ek).to_affine()))
+            .chain([G2Prepared::from(mexp.to_affine())].into_iter())
+            .chain([G2Prepared::from(pp.get_public_key_base().to_affine())].into_iter())
+            .chain([G2Prepared::from(self.u2_hat.to_affine())].into_iter());
+
+        let res = <Bls12 as MultiMillerLoop>::multi_miller_loop(
+            lhs.zip(rhs)
+                .collect::<Vec<(G1Affine, G2Prepared)>>()
+                .iter()
+                .map(|(g1, g2)| (g1, g2))
+                .collect::<Vec<(&G1Affine, &G2Prepared)>>()
+                .as_slice(),
+        );
+
+        let res = res.final_exponentiation();
+        if res != Gt::identity() {
+            bail!("Expected zero, but got {} during multi-pairing check", {
+                res
+            });
+        }
+
+        return Ok(());
+    }
+
+    fn aggregate_with(&mut self, sc: &ThresholdConfig, other: &Transcript) {
+        debug_assert_eq!(self.A.len(), sc.n + 1);
+        debug_assert_eq!(self.Y_hat.len(), sc.n);
+
+        self.u2_hat += other.u2_hat;
+
+        for i in 0..sc.n {
+            self.A[i] += other.A[i];
+            self.Y_hat[i] += other.Y_hat[i];
+        }
+
+        debug_assert_eq!(self.A.len(), other.A.len());
+        debug_assert_eq!(self.Y_hat.len(), other.Y_hat.len());
+    }
+
+    fn get_dealt_public_key(&self) -> scrape::DealtPubKey {
+        scrape::DealtPubKey::new(*self.A.last().unwrap())
+    }
+
+    fn decrypt_own_share(
+        &self,
+        _sc: &ThresholdConfig,
+        player: &Player,
+        dk: &Self::DecryptPrivKey,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        // TODO(Security): Could get an out-of-bounds error here if the wrong Player is passed in. Maybe improve the design.
+        let ctxt = self.Y_hat[player.id]; // \hat{Y}_i = \ek_i^{f(\omega^i)}
+        let dealt_secret_key_share = ctxt.mul(dk.dk); // Y_i^{\dk_i} = \hat{h}_1^{f(\omega^i)} (because \ek_i = \hat{h}_1^{\dk_i^{-1}})
+        let dealt_pub_key_share = self.A[player.id]; // g_1^{f(\omega^i})
+
+        (
+            scrape::DealtSecretKeyShare(Self::DealtSecretKey::new(dealt_secret_key_share)),
+            scrape::DealtPubKeyShare(Self::DealtPubKey::new(dealt_pub_key_share)),
+        )
+    }
+
+    fn generate<R>(sc: &ThresholdConfig, rng: &mut R) -> Self
+    where
+        R: rand_core::RngCore + rand_core::CryptoRng,
+    {
+        //
+        // TODO(rand_core_hell): Since our random_g1_point and random_g2_point functions are
+        // slower than we want, we do not pick everything randomly. Instead, we generate a
+        // kind-of-random-looking transcript from a few random elliptic curve points by doubling them.
+        //
+        let g2 = random_g2_point(rng);
+        let mut acc_g2 = g2;
+        let g2_vec = (0..sc.n)
+            .map(|_| {
+                acc_g2 = acc_g2.double();
+                acc_g2
+            })
+            .collect::<Vec<G2Projective>>();
+
+        let mut acc_g1 = random_g1_point(rng);
+        let g1_vec = (0..sc.n + 1)
+            .map(|_| {
+                acc_g1 = acc_g1.double();
+                acc_g1
+            })
+            .collect::<Vec<G1Projective>>();
+
+        let r1 = random_g1_point(rng);
+        let r2 = random_g2_point(rng);
+
+        Transcript {
+            u2_hat: g2,
+            A: g1_vec.iter().map(|p| p + r1).collect(),
+            Y_hat: g2_vec.iter().map(|p| p + r2).collect(),
+        }
+    }
+}
