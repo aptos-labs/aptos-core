@@ -148,6 +148,14 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         self.resolver.type_to_type_layout(ty)
     }
 
+    pub fn type_to_type_layout_with_aggregator_lifting(
+        &self,
+        ty: &Type,
+    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
+        self.resolver
+            .type_to_type_layout_with_aggregator_lifting(ty)
+    }
+
     pub fn type_to_fully_annotated_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
         self.resolver.type_to_fully_annotated_layout(ty)
     }
