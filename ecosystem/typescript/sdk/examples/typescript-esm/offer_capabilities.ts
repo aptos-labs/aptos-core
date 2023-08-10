@@ -1,20 +1,53 @@
 import { AptosAccount, FaucetClient, Network, Provider, HexString, TxnBuilderTypes, BCS, Types } from "aptos";
 import assert from "assert";
 
-const CORE_CODE_ADDRESS = new HexString("0x0000000000000000000000000000000000000000000000000000000000000001");
 const ED25519_ACCOUNT_SCHEME = 0;
 
-// Works for both SignerCapabilityOffer and RotationCapabilityOffer
-// Except the structName fields are different and the chainId isn't used in SignerCapabilityOffer
-type CapabilityOfferProofChallengeV2 = {
-  accountAddress: TxnBuilderTypes.AccountAddress;
-  moduleName: string;
-  structName: string;
-  sequenceNumber: number;
-  sourceAddress: TxnBuilderTypes.AccountAddress;
-  recipientAddress: TxnBuilderTypes.AccountAddress;
-  chainId?: number; // not used in SignerCapabilityOffer
-};
+class SignerCapabilityOfferProofChallengeV2 {
+  public readonly moduleAddress: TxnBuilderTypes.AccountAddress = TxnBuilderTypes.AccountAddress.CORE_CODE_ADDRESS;
+  public readonly moduleName: string = "account";
+  public readonly structName: string = "SignerCapabilityOfferProofChallengeV2";
+  public readonly functionName: string = "offer_signer_capability";
+
+  constructor(
+    public readonly sequenceNumber: number,
+    public readonly sourceAddress: TxnBuilderTypes.AccountAddress,
+    public readonly recipientAddress: TxnBuilderTypes.AccountAddress,
+  ) {}
+
+  serialize(serializer: BCS.Serializer): void {
+    this.moduleAddress.serialize(serializer);
+    serializer.serializeStr(this.moduleName);
+    serializer.serializeStr(this.structName);
+    serializer.serializeU64(this.sequenceNumber);
+    this.sourceAddress.serialize(serializer);
+    this.recipientAddress.serialize(serializer);
+  }
+}
+
+class RotationCapabilityOfferProofChallengeV2 {
+  public readonly moduleAddress: TxnBuilderTypes.AccountAddress = TxnBuilderTypes.AccountAddress.CORE_CODE_ADDRESS;
+  public readonly moduleName: string = "account";
+  public readonly structName: string = "RotationCapabilityOfferProofChallengeV2";
+  public readonly functionName: string = "offer_rotation_capability";
+
+  constructor(
+    public readonly chainId: number,
+    public readonly sequenceNumber: number,
+    public readonly sourceAddress: TxnBuilderTypes.AccountAddress,
+    public readonly recipientAddress: TxnBuilderTypes.AccountAddress,
+  ) {}
+
+  serialize(serializer: BCS.Serializer): void {
+    this.moduleAddress.serialize(serializer);
+    serializer.serializeStr(this.moduleName);
+    serializer.serializeStr(this.structName);
+    serializer.serializeU8(this.chainId);
+    serializer.serializeU64(this.sequenceNumber);
+    this.sourceAddress.serialize(serializer);
+    this.recipientAddress.serialize(serializer);
+  }
+}
 
 const createAndFundAliceAndBob = async (
   faucetClient: FaucetClient,
@@ -42,25 +75,21 @@ const createAndFundAliceAndBob = async (
   const { alice, bob } = await createAndFundAliceAndBob(faucetClient);
   const aliceAccountAddress = TxnBuilderTypes.AccountAddress.fromHex(alice.address());
   const bobAccountAddress = TxnBuilderTypes.AccountAddress.fromHex(bob.address());
-  const moduleAddress = TxnBuilderTypes.AccountAddress.fromHex(CORE_CODE_ADDRESS);
 
   // Offer Alice's rotation capability to Bob
   {
     // Construct the RotationCapabilityOfferProofChallengeV2 struct
-    const rotationCapProof: CapabilityOfferProofChallengeV2 = {
-      accountAddress: moduleAddress,
-      moduleName: "account",
-      structName: "RotationCapabilityOfferProofChallengeV2",
-      sequenceNumber: Number((await provider.getAccount(alice.address())).sequence_number), // Get latest sequence number
-      sourceAddress: aliceAccountAddress,
-      recipientAddress: bobAccountAddress,
+    const rotationCapProof = new RotationCapabilityOfferProofChallengeV2(
       chainId,
-    };
+      Number((await provider.getAccount(alice.address())).sequence_number), // Get Alice's account's latest sequence number
+      aliceAccountAddress,
+      bobAccountAddress,
+    );
 
     console.log(`\n---------------  RotationCapabilityOfferProofChallengeV2 --------------\n`);
 
     // Sign the BCS-serialized struct, submit the transaction, and wait for the result.
-    const res = await signStructAndSubmitTransaction(provider, alice, "offer_rotation_capability", rotationCapProof);
+    const res = await signStructAndSubmitTransaction(provider, alice, rotationCapProof, ED25519_ACCOUNT_SCHEME);
 
     // Print the relevant transaction submission info
     const { hash, version, success, payload } = res;
@@ -80,20 +109,16 @@ const createAndFundAliceAndBob = async (
   // Offer Alice's signer capability to Bob
   {
     // Construct the SignerCapabilityOfferProofChallengeV2 struct
-    const signerCapProof: CapabilityOfferProofChallengeV2 = {
-      accountAddress: moduleAddress,
-      moduleName: "account",
-      structName: "SignerCapabilityOfferProofChallengeV2",
-      sequenceNumber: Number((await provider.getAccount(alice.address())).sequence_number), // Get latest sequence number
-      sourceAddress: aliceAccountAddress,
-      recipientAddress: bobAccountAddress,
-      // Note no chainId, the signer capability offer doesn't require it. We leave it undefined
-    };
+    const signerCapProof = new SignerCapabilityOfferProofChallengeV2(
+      Number((await provider.getAccount(alice.address())).sequence_number), // Get Alice's account's latest sequence number
+      aliceAccountAddress,
+      bobAccountAddress,
+    );
 
     console.log(`\n---------------  SignerCapabilityOfferProofChallengeV2 ---------------\n`);
 
     // Sign the BCS-serialized struct, submit the transaction, and wait for the result.
-    const res = await signStructAndSubmitTransaction(provider, alice, "offer_signer_capability", signerCapProof);
+    const res = await signStructAndSubmitTransaction(provider, alice, signerCapProof, ED25519_ACCOUNT_SCHEME);
 
     // Print the relevant transaction submission info
     const { hash, version, success, payload } = res;
@@ -114,40 +139,25 @@ const createAndFundAliceAndBob = async (
 const signStructAndSubmitTransaction = async (
   provider: Provider,
   signer: AptosAccount,
-  funcName: string,
-  struct: CapabilityOfferProofChallengeV2,
+  struct: SignerCapabilityOfferProofChallengeV2 | RotationCapabilityOfferProofChallengeV2,
+  accountScheme: number = ED25519_ACCOUNT_SCHEME,
 ): Promise<any> => {
-  // The proof bytes are just the individual BCS serialized
-  // data concatenated into a single byte array.
-  // Note that the proof bytes must be constructed in this specific order: the order of the struct data on-chain.
-  const proofBytes = new Uint8Array([
-    ...BCS.bcsToBytes(struct.accountAddress),
-    ...BCS.bcsSerializeStr(struct.moduleName),
-    ...BCS.bcsSerializeStr(struct.structName),
-    ...(struct.chainId ? BCS.bcsSerializeU8(struct.chainId) : []),
-    ...BCS.bcsSerializeUint64(struct.sequenceNumber),
-    ...BCS.bcsToBytes(struct.sourceAddress),
-    ...BCS.bcsToBytes(struct.recipientAddress),
-  ]);
+  const bcsStruct = BCS.bcsToBytes(struct);
+  const signedMessage = signer.signBuffer(bcsStruct);
 
-  // This is the actual signature of the struct.
-  const signedMessage = signer.signBuffer(proofBytes).toUint8Array();
-
-  // Note the hard-coded account scheme, this would not work for a MultiEd25519 account.
   const payload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
     TxnBuilderTypes.EntryFunction.natural(
-      `0x1::account`,
-      funcName,
+      `${struct.moduleAddress.toHexString()}::${struct.moduleName}`,
+      struct.functionName,
       [],
       [
-        BCS.bcsSerializeBytes(signedMessage),
-        BCS.bcsSerializeU8(ED25519_ACCOUNT_SCHEME),
+        BCS.bcsSerializeBytes(signedMessage.toUint8Array()),
+        BCS.bcsSerializeU8(accountScheme),
         BCS.bcsSerializeBytes(signer.pubKey().toUint8Array()),
         BCS.bcsToBytes(struct.recipientAddress),
       ],
     ),
   );
-
-  const txn = await provider.generateSignSubmitTransaction(signer, payload);
-  return (await provider.waitForTransactionWithResult(txn)) as Types.UserTransaction;
+  const txnResponse = await provider.generateSignSubmitWaitForTransaction(signer, payload);
+  return txnResponse as Types.UserTransaction;
 };
