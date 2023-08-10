@@ -366,6 +366,7 @@ export class IndexerClient {
 
     const whereCondition: any = {
       token_data_id: { _eq: tokenAddress },
+      amount: { _gt: "0" },
     };
 
     if (propertyVersion) {
