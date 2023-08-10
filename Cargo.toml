@@ -98,6 +98,9 @@ members = [
     "crates/moving-average",
     "crates/node-resource-metrics",
     "crates/num-variants",
+    "crates/peer-monitoring-service/client",
+    "crates/peer-monitoring-service/server",
+    "crates/peer-monitoring-service/types",
     "crates/proxy",
     "crates/reliable-broadcast",
     "crates/short-hex-str",
@@ -125,9 +128,6 @@ members = [
     "execution/executor-types",
     "mempool",
     "network",
-    "network/peer-monitoring-service/client",
-    "network/peer-monitoring-service/server",
-    "network/peer-monitoring-service/types",
     "sdk",
     "secure/net",
     "secure/storage",
@@ -357,10 +357,10 @@ aptos-node-resource-metrics = { path = "crates/node-resource-metrics" }
 aptos-num-variants = { path = "crates/num-variants" }
 aptos-openapi = { path = "crates/aptos-openapi" }
 aptos-package-builder = { path = "aptos-move/package-builder" }
-aptos-peer-monitoring-service-client = { path = "network/peer-monitoring-service/client" }
-aptos-peer-monitoring-service-server = { path = "network/peer-monitoring-service/server" }
+aptos-peer-monitoring-service-client = { path = "crates/peer-monitoring-service/client" }
+aptos-peer-monitoring-service-server = { path = "crates/peer-monitoring-service/server" }
 aptos-profiler = { path = "crates/aptos-profiler" }
-aptos-peer-monitoring-service-types = { path = "network/peer-monitoring-service/types" }
+aptos-peer-monitoring-service-types = { path = "crates/peer-monitoring-service/types" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "crates/aptos-protos" }
 aptos-proxy = { path = "crates/proxy" }
