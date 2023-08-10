@@ -149,79 +149,22 @@ const main = async () => {
 
   // Step 6.
   // Call the `0x1::multisig_account::create_with_existing_account_and_revoke_auth_key` function
-  // At this point, there are two options to submit the transaction:
   //   Since you've already authenticated the signed struct message with the required K of N accounts, you do not need to construct a MultiEd25519 authenticated signature.
-  //   You can submit the transaction as literally anyone, because the entry function does not check the sender. The transaction is validated with the multisig signed struct.
-  //   This is a much simpler flow, since it does not require that each of the owners in the original MultiEd25519 account sign the transaction.
-  const OPTION_ONE = false;
-  if (OPTION_ONE) {
-    //////////////////////////////////////////////////////////////////////////////////////////
-    //           Option 1: Submitting the transaction as a single Ed25519 account           //
-    //////////////////////////////////////////////////////////////////////////////////////////
-    const randomAccount = new AptosAccount();
-    await faucetClient.fundAccount(randomAccount.address(), 100_000_000);
+  //   You can submit the transaction as literally any account, because the entry function does not check the sender. The transaction is validated with the multisig signed struct.
+  const randomAccount = new AptosAccount();
+  await faucetClient.fundAccount(randomAccount.address(), 100_000_000);
 
-    // The sender here is essentially just paying for the gas fees.
-    const txn = await provider.generateSignSubmitTransaction(randomAccount, entryFunctionPayload, {
-      expireTimestamp: BigInt(Math.floor(Date.now() / 1000) + 60),
-    });
+  // The sender here is essentially just paying for the gas fees.
+  const txn = await provider.generateSignSubmitTransaction(randomAccount, entryFunctionPayload, {
+    expireTimestamp: BigInt(Math.floor(Date.now() / 1000) + 60),
+  });
 
-    // Step 7.
-    // Wait for the transaction to complete, then observe and assert that the authentication key for the original MultiEd25519 account
-    // has been rotated and all capabilities revoked.
-    const txnInfo = await provider.waitForTransactionWithResult(txn);
-    printRelevantTxInfo(txnInfo as Types.UserTransaction);
-    assertChangesAndPrint(provider, multiSigAddress, sequenceNumber, false, metadataKeys, metadataValues);
-  } else {
-    //////////////////////////////////////////////////////////////////////////////////////////
-    //           Option 2: Submitting the transaction as the MultiEd25519 account           //
-    //////////////////////////////////////////////////////////////////////////////////////////
-
-    // NOTE: As noted above, this flow is needlessly complex. It is shown here to demonstrate how to construct a MultiEd25519 authenticated signature
-    //       with a signed proof struct. This is the flow that would be used if the entry function checked that the sender/signer is the MultiEd25519 account.
-
-    // Now that we've constructed the entry payload by packing each signed struct together to make a multi-sig signed struct, we need
-    // to create the RawTxn from that payload.
-    const secondsTilExpiration = 60;
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      multiSigAddress,
-      BigInt(sequenceNumber),
-      entryFunctionPayload,
-      BigInt(200000),
-      BigInt(100),
-      BigInt(Math.floor(Date.now() / 1000) + secondsTilExpiration), // In an e2e flow, you may need to adjust this to account for the time it takes to gather the signatures.
-      new TxnBuilderTypes.ChainId(chainId),
-    );
-
-    const signingMessage = TransactionBuilder.getSigningMessage(rawTxn);
-    // The clients will each individually sign these from their own client in the e2e flow. The server gathers these hex string buffers later.
-    const rawTxnSignature1 = account1.signBuffer(signingMessage);
-    const rawTxnSignature2 = account2.signBuffer(signingMessage);
-    const rawTxnSignature3 = account3.signBuffer(signingMessage);
-
-    // Gather the signed hex buffers into Ed25519Signatures
-    const txnSig1 = new TxnBuilderTypes.Ed25519Signature(rawTxnSignature1.toUint8Array());
-    const txnSig2 = new TxnBuilderTypes.Ed25519Signature(rawTxnSignature2.toUint8Array());
-    const txnSig3 = new TxnBuilderTypes.Ed25519Signature(rawTxnSignature3.toUint8Array());
-
-    const multiEd25519Signature = new TxnBuilderTypes.MultiEd25519Signature([txnSig1, txnSig2, txnSig3], bitmap);
-
-    const multiEdAuthenticator = new TxnBuilderTypes.TransactionAuthenticatorMultiEd25519(
-      multiSigPublicKey,
-      multiEd25519Signature,
-    );
-    const signedTransaction = new TxnBuilderTypes.SignedTransaction(rawTxn, multiEdAuthenticator);
-    const bcsTxn = BCS.bcsToBytes(signedTransaction);
-
-    const transactionRes = await provider.submitSignedBCSTransaction(bcsTxn);
-
-    // Step 7.
-    // Wait for the transaction to complete, then observe and assert that the authentication key for the original MultiEd25519 account
-    // has been rotated and all capabilities revoked.
-    const txnInfo = await provider.waitForTransactionWithResult(transactionRes.hash);
-    printRelevantTxInfo(txnInfo as Types.UserTransaction);
-    assertChangesAndPrint(provider, multiSigAddress, sequenceNumber, true, metadataKeys, metadataValues);
-  }
+  // Step 7.
+  // Wait for the transaction to complete, then observe and assert that the authentication key for the original MultiEd25519 account
+  // has been rotated and all capabilities revoked.
+  const txnInfo = await provider.waitForTransactionWithResult(txn);
+  printRelevantTxInfo(txnInfo as Types.UserTransaction);
+  assertChangesAndPrint(provider, multiSigAddress, sequenceNumber, false, metadataKeys, metadataValues);
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////
