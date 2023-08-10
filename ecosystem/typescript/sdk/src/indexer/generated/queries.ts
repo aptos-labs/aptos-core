@@ -41,6 +41,25 @@ export const CurrentTokenOwnershipFieldsFragmentDoc = `
   }
 }
     `;
+export const TokenActivitiesFieldsFragmentDoc = `
+    fragment TokenActivitiesFields on token_activities_v2 {
+  after_value
+  before_value
+  entry_function_id_str
+  event_account_address
+  event_index
+  from_address
+  is_fungible_v2
+  property_version_v1
+  to_address
+  token_amount
+  token_data_id
+  token_standard
+  transaction_timestamp
+  transaction_version
+  type
+}
+    `;
 export const TokenDataFieldsFragmentDoc = `
     fragment TokenDataFields on current_token_datas {
   creator_address
@@ -116,10 +135,7 @@ export const GetAccountTokensCount = `
     `;
 export const GetAccountTransactionsCount = `
     query getAccountTransactionsCount($address: String) {
-  move_resources_aggregate(
-    where: {address: {_eq: $address}}
-    distinct_on: transaction_version
-  ) {
+  account_transactions_aggregate(where: {account_address: {_eq: $address}}) {
     aggregate {
       count
     }
@@ -127,18 +143,20 @@ export const GetAccountTransactionsCount = `
 }
     `;
 export const GetAccountTransactionsData = `
-    query getAccountTransactionsData($address: String, $limit: Int, $offset: Int) {
-  move_resources(
-    where: {address: {_eq: $address}}
-    order_by: {transaction_version: desc}
-    distinct_on: transaction_version
+    query getAccountTransactionsData($where_condition: account_transactions_bool_exp!, $offset: Int, $limit: Int, $order_by: [account_transactions_order_by!]) {
+  account_transactions(
+    where: $where_condition
+    order_by: $order_by
     limit: $limit
     offset: $offset
   ) {
+    token_activities_v2 {
+      ...TokenActivitiesFields
+    }
     transaction_version
   }
 }
-    `;
+    ${TokenActivitiesFieldsFragmentDoc}`;
 export const GetCollectionData = `
     query getCollectionData($where_condition: current_collections_v2_bool_exp!, $offset: Int, $limit: Int, $order_by: [current_collections_v2_order_by!]) {
   current_collections_v2(
@@ -244,24 +262,10 @@ export const GetTokenActivities = `
     offset: $offset
     limit: $limit
   ) {
-    after_value
-    before_value
-    entry_function_id_str
-    event_account_address
-    event_index
-    from_address
-    is_fungible_v2
-    property_version_v1
-    to_address
-    token_amount
-    token_data_id
-    token_standard
-    transaction_timestamp
-    transaction_version
-    type
+    ...TokenActivitiesFields
   }
 }
-    `;
+    ${TokenActivitiesFieldsFragmentDoc}`;
 export const GetTokenActivitiesCount = `
     query getTokenActivitiesCount($token_id: String) {
   token_activities_v2_aggregate(where: {token_data_id: {_eq: $token_id}}) {
@@ -344,11 +348,11 @@ export const GetTopUserTransactions = `
 }
     `;
 export const GetUserTransactions = `
-    query getUserTransactions($limit: Int, $start_version: bigint, $offset: Int) {
+    query getUserTransactions($where_condition: user_transactions_bool_exp!, $offset: Int, $limit: Int, $order_by: [user_transactions_order_by!]) {
   user_transactions(
+    order_by: $order_by
+    where: $where_condition
     limit: $limit
-    order_by: {version: desc}
-    where: {version: {_lte: $start_version}}
     offset: $offset
   ) {
     version
@@ -375,7 +379,7 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     getAccountTransactionsCount(variables?: Types.GetAccountTransactionsCountQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountTransactionsCountQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountTransactionsCountQuery>(GetAccountTransactionsCount, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountTransactionsCount', 'query');
     },
-    getAccountTransactionsData(variables?: Types.GetAccountTransactionsDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountTransactionsDataQuery> {
+    getAccountTransactionsData(variables: Types.GetAccountTransactionsDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountTransactionsDataQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountTransactionsDataQuery>(GetAccountTransactionsData, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountTransactionsData', 'query');
     },
     getCollectionData(variables: Types.GetCollectionDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetCollectionDataQuery> {
@@ -420,7 +424,7 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     getTopUserTransactions(variables?: Types.GetTopUserTransactionsQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetTopUserTransactionsQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetTopUserTransactionsQuery>(GetTopUserTransactions, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getTopUserTransactions', 'query');
     },
-    getUserTransactions(variables?: Types.GetUserTransactionsQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetUserTransactionsQuery> {
+    getUserTransactions(variables: Types.GetUserTransactionsQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetUserTransactionsQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetUserTransactionsQuery>(GetUserTransactions, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getUserTransactions', 'query');
     }
   };
