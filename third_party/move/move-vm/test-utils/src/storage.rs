@@ -10,6 +10,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     resolver::{resource_size, ModuleResolver, MoveResolver, ResourceResolver},
+    value::MoveTypeLayout,
 };
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
@@ -39,7 +40,17 @@ impl ModuleResolver for BlankStorage {
 }
 
 impl ResourceResolver for BlankStorage {
-    fn get_resource_with_metadata(
+    fn get_resource_value_with_metadata(
+        &self,
+        _address: &AccountAddress,
+        _tag: &StructTag,
+        _metadata: &[Metadata],
+        _layout: &MoveTypeLayout,
+    ) -> Result<(Option<Vec<u8>>, usize)> {
+        Ok((None, 0))
+    }
+
+    fn get_resource_bytes_with_metadata(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
@@ -51,7 +62,16 @@ impl ResourceResolver for BlankStorage {
 
 #[cfg(feature = "table-extension")]
 impl TableResolver for BlankStorage {
-    fn resolve_table_entry(
+    fn resolve_table_entry_value(
+        &self,
+        _handle: &TableHandle,
+        _key: &[u8],
+        _layout: &MoveTypeLayout,
+    ) -> Result<Option<Vec<u8>>, Error> {
+        Ok(None)
+    }
+
+    fn resolve_table_entry_bytes(
         &self,
         _handle: &TableHandle,
         _key: &[u8],
@@ -65,7 +85,7 @@ impl TableResolver for BlankStorage {
 #[derive(Debug, Clone)]
 pub struct DeltaStorage<'a, 'b, S> {
     base: &'a S,
-    delta: &'b ChangeSet,
+    change_set: &'b ChangeSet,
 }
 
 impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
@@ -74,7 +94,7 @@ impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
     }
 
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
-        if let Some(account_storage) = self.delta.accounts().get(module_id.address()) {
+        if let Some(account_storage) = self.change_set.accounts().get(module_id.address()) {
             if let Some(blob_opt) = account_storage.modules().get(module_id.name()) {
                 return Ok(blob_opt.clone().ok());
             }
@@ -85,40 +105,52 @@ impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
 }
 
 impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
-    fn get_resource_with_metadata(
+    fn get_resource_bytes_with_metadata(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
         metadata: &[Metadata],
     ) -> Result<(Option<Vec<u8>>, usize)> {
-        if let Some(account_storage) = self.delta.accounts().get(address) {
+        if let Some(account_storage) = self.change_set.accounts().get(address) {
             if let Some(blob_opt) = account_storage.resources().get(tag) {
                 let buf = blob_opt.clone().ok();
                 let buf_size = resource_size(&buf);
                 return Ok((buf, buf_size));
             }
         }
-
-        // TODO
-        self.base.get_resource_with_metadata(address, tag, metadata)
+        self.base
+            .get_resource_bytes_with_metadata(address, tag, metadata)
     }
 }
 
 #[cfg(feature = "table-extension")]
 impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
-    fn resolve_table_entry(
+    fn resolve_table_entry_value(
         &self,
         handle: &TableHandle,
         key: &[u8],
-    ) -> std::result::Result<Option<Vec<u8>>, Error> {
-        // TODO: No support for table deltas
-        self.base.resolve_table_entry(handle, key)
+        layout: &MoveTypeLayout,
+    ) -> Result<Option<Vec<u8>>, Error> {
+        // TODO: In addition to `change_set`, cache table outputs.
+        self.base.resolve_table_entry_value(handle, key, layout)
+    }
+
+    fn resolve_table_entry_bytes(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+    ) -> Result<Option<Vec<u8>>, Error> {
+        // TODO: In addition to `change_set`, cache table outputs.
+        self.base.resolve_table_entry_bytes(handle, key)
     }
 }
 
 impl<'a, 'b, S: MoveResolver> DeltaStorage<'a, 'b, S> {
     pub fn new(base: &'a S, delta: &'b ChangeSet) -> Self {
-        Self { base, delta }
+        Self {
+            base,
+            change_set: delta,
+        }
     }
 }
 
@@ -296,7 +328,7 @@ impl ModuleResolver for InMemoryStorage {
 }
 
 impl ResourceResolver for InMemoryStorage {
-    fn get_resource_with_metadata(
+    fn get_resource_bytes_with_metadata(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
@@ -313,7 +345,7 @@ impl ResourceResolver for InMemoryStorage {
 
 #[cfg(feature = "table-extension")]
 impl TableResolver for InMemoryStorage {
-    fn resolve_table_entry(
+    fn resolve_table_entry_bytes(
         &self,
         handle: &TableHandle,
         key: &[u8],
