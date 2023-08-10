@@ -173,7 +173,8 @@ impl<'r> TransactionDataCache<'r> {
                 },
             };
             // TODO(Gas): Shall we charge for this?
-            let ty_layout = loader.type_to_type_layout(ty)?;
+            let (ty_layout, has_aggregator_lifting) =
+                loader.type_to_type_layout_with_aggregator_lifting(ty)?;
 
             let module = loader.get_module(&ty_tag.module_id());
             let metadata: &[Metadata] = match &module {
@@ -181,13 +182,21 @@ impl<'r> TransactionDataCache<'r> {
                 None => &[],
             };
 
-            let (data, bytes_loaded) = self
-                .remote
-                .get_resource_with_metadata(&addr, &ty_tag, metadata)
-                .map_err(|err| {
-                    let msg = format!("Unexpected storage error: {:?}", err);
-                    PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
-                })?;
+            // If we need to process aggregator lifting, we pass type layout to remote.
+            // Remote, in turn ensures that all aggregator values are lifted if the resolved
+            // resource comes from storage.
+            let resolved_result = if has_aggregator_lifting {
+                self.remote
+                    .get_resource_value_with_metadata(&addr, &ty_tag, metadata, &ty_layout)
+            } else {
+                self.remote
+                    .get_resource_bytes_with_metadata(&addr, &ty_tag, metadata)
+            };
+
+            let (data, bytes_loaded) = resolved_result.map_err(|err| {
+                let msg = format!("Unexpected storage error: {:?}", err);
+                PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
+            })?;
             load_res = Some(NumBytes::new(bytes_loaded as u64));
 
             let gv = match data {
