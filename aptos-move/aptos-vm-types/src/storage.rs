@@ -96,10 +96,6 @@ pub struct StoragePricingV2 {
 }
 
 impl StoragePricingV2 {
-    pub fn zeros() -> Self {
-        Self::new_without_storage_curves(LATEST_GAS_FEATURE_VERSION, &AptosGasParameters::zeros())
-    }
-
     pub fn new_with_storage_curves(
         feature_version: u64,
         storage_gas_schedule: &StorageGasSchedule,
@@ -114,22 +110,6 @@ impl StoragePricingV2 {
             per_byte_read: storage_gas_schedule.per_byte_read.into(),
             per_byte_create: storage_gas_schedule.per_byte_create.into(),
             per_byte_write: storage_gas_schedule.per_byte_write.into(),
-        }
-    }
-
-    pub fn new_without_storage_curves(
-        feature_version: u64,
-        gas_params: &AptosGasParameters,
-    ) -> Self {
-        Self {
-            feature_version,
-            free_write_bytes_quota: Self::get_free_write_bytes_quota(feature_version, gas_params),
-            per_item_read: gas_params.vm.txn.storage_io_per_state_slot_read,
-            per_item_create: gas_params.vm.txn.storage_io_per_state_slot_write,
-            per_item_write: gas_params.vm.txn.storage_io_per_state_slot_write,
-            per_byte_read: gas_params.vm.txn.storage_io_per_state_byte_read,
-            per_byte_create: gas_params.vm.txn.storage_io_per_state_byte_write,
-            per_byte_write: gas_params.vm.txn.storage_io_per_state_byte_write,
         }
     }
 
@@ -253,10 +233,10 @@ impl StoragePricing {
                     gas_params,
                 )),
             },
-            10.. => V2(StoragePricingV2::new_without_storage_curves(
+            10.. => V3(StoragePricingV3 {
                 feature_version,
-                gas_params,
-            )),
+                free_write_bytes_quota: gas_params.vm.txn.free_write_bytes_quota,
+            }),
         }
     }
 
@@ -424,9 +404,12 @@ impl StorageGasParameters {
         }
     }
 
-    pub fn free_and_unlimited() -> Self {
+    pub fn unlimited(free_write_bytes_quota: NumBytes) -> Self {
         Self {
-            pricing: StoragePricing::V2(StoragePricingV2::zeros()),
+            pricing: StoragePricing::V3(StoragePricingV3 {
+                feature_version: LATEST_GAS_FEATURE_VERSION,
+                free_write_bytes_quota,
+            }),
             change_set_configs: ChangeSetConfigs::unlimited_at_gas_feature_version(
                 LATEST_GAS_FEATURE_VERSION,
             ),
