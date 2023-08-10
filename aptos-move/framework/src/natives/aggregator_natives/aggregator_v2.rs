@@ -40,19 +40,19 @@ fn native_create_aggregator(
     let id = AggregatorID::ephemeral(aggregator_data.generate_id());
     match ty_args[0] {
         Type::U128 => {
-            let limit = safely_pop_arg!(args, u128);
-            aggregator_data.create_new_aggregator(id, limit);
+            let max_value = safely_pop_arg!(args, u128);
+            aggregator_data.create_new_aggregator(id, max_value);
             Ok(smallvec![Value::struct_(Struct::pack(vec![
                 Value::u128(0),
-                Value::u128(limit),
+                Value::u128(max_value),
             ]))])
         },
         Type::U64 => {
-            let limit = safely_pop_arg!(args, u64);
-            aggregator_data.create_new_aggregator(id, limit as u128);
+            let max_value = safely_pop_arg!(args, u64);
+            aggregator_data.create_new_aggregator(id, max_value as u128);
             Ok(smallvec![Value::struct_(Struct::pack(vec![
                 Value::u64(0),
-                Value::u64(limit),
+                Value::u64(max_value),
             ]))])
         },
         _ => Err(PartialVMError::new(StatusCode::ABORTED)
@@ -80,15 +80,15 @@ fn native_try_add(
         Type::U128 => {
             // Get aggregator information and a value to add.
             let value = safely_pop_arg!(args, u128);
-            let (id, limit) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, limit)?;
+            let (id, max_value) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
+            let aggregator = aggregator_data.get_aggregator(id, max_value)?;
             Ok(smallvec![Value::bool(aggregator.try_add(value).is_ok())])
         },
         Type::U64 => {
             // Get aggregator information and a value to add.
             let value = safely_pop_arg!(args, u64);
-            let (id, limit) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, limit as u128)?;
+            let (id, max_value) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
+            let aggregator = aggregator_data.get_aggregator(id, max_value as u128)?;
             Ok(smallvec![Value::bool(
                 aggregator.try_add(value as u128).is_ok()
             )])
@@ -118,15 +118,15 @@ fn native_try_sub(
         Type::U128 => {
             // Get aggregator information and a value to subtract.
             let value = safely_pop_arg!(args, u128);
-            let (id, limit) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, limit)?;
+            let (id, max_value) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
+            let aggregator = aggregator_data.get_aggregator(id, max_value)?;
             Ok(smallvec![Value::bool(aggregator.try_sub(value).is_ok())])
         },
         Type::U64 => {
             // Get aggregator information and a value to subtract.
             let value = safely_pop_arg!(args, u64);
-            let (id, limit) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, limit as u128)?;
+            let (id, max_value) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
+            let aggregator = aggregator_data.get_aggregator(id, max_value as u128)?;
             Ok(smallvec![Value::bool(
                 aggregator.try_sub(value as u128).is_ok()
             )])
@@ -156,14 +156,14 @@ fn native_read(
     match ty_args[0] {
         Type::U128 => {
             // Extract information from aggregator struct reference.
-            let (id, limit) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, limit)?;
+            let (id, max_value) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
+            let aggregator = aggregator_data.get_aggregator(id, max_value)?;
             let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
             Ok(smallvec![Value::u128(value)])
         },
         Type::U64 => {
-            let (id, limit) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, limit as u128)?;
+            let (id, max_value) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
+            let aggregator = aggregator_data.get_aggregator(id, max_value as u128)?;
             let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
             if value > u64::MAX as u128 {
                 return Err(PartialVMError::new(StatusCode::ABORTED)
