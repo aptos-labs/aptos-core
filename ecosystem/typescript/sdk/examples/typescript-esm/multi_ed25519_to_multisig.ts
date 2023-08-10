@@ -57,11 +57,9 @@ class MultiSigAccountCreationWithAuthKeyRevocationMessage {
     4. Gather the signatures from the accounts.
     5. Assemble a MultiEd25519 signed proof struct with the gathered signatures.
     6. Call the `0x1::multisig_account::create_with_existing_account_and_revoke_auth_key` function with the assembled proof struct and other logistical information
-      - This function invocation is demonstrated in two ways: from any random Ed25519 account, and from the MultiEd25519 account
       - Because the function requires a signed proof by the MultiEd25519 account, it does not require or check the signer, meaning anyone can submit the transaction
         with the proof struct.
-      - The flow for submitting from an Ed25519 account is *much* simpler since it does not require gathering the signatures of the individual owners again to submit
-        the transaction.
+      - We submit it as a randomly generated account here to convey this.
     7. The transaction will be executed and the following occurs on chain:
       a. The MultiEd25519 account is converted into a MultiSig account.
       b. The resulting account can from then on be used as a MultiSig account, potentially with new owners and/or a new minimum signature threshold.
