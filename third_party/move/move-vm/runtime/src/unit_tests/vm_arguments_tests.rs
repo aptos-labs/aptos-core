@@ -261,7 +261,7 @@ impl ModuleResolver for RemoteStore {
 }
 
 impl ResourceResolver for RemoteStore {
-    fn get_resource_with_metadata(
+    fn get_resource_bytes_with_metadata(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
