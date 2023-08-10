@@ -70,6 +70,7 @@ members = [
     "crates/aptos-memsocket",
     "crates/aptos-metrics-core",
     "crates/aptos-netcore",
+    "crates/aptos-network-builder",
     "crates/aptos-network-checker",
     "crates/aptos-node-identity",
     "crates/aptos-openapi",
@@ -123,7 +124,6 @@ members = [
     "execution/executor-types",
     "mempool",
     "network",
-    "network/builder",
     "network/discovery",
     "network/peer-monitoring-service/client",
     "network/peer-monitoring-service/server",
@@ -346,7 +346,7 @@ aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "crates/aptos-netcore" }
 aptos-network = { path = "network" }
-aptos-network-builder = { path = "network/builder" }
+aptos-network-builder = { path = "crates/aptos-network-builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
 aptos-nft-metadata-crawler-parser = { path = "ecosystem/nft-metadata-crawler-parser" }
