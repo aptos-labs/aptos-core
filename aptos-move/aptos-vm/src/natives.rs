@@ -56,7 +56,7 @@ impl AggregatorResolver for AptosBlankStorage {
 
 #[cfg(feature = "testing")]
 impl TableResolver for AptosBlankStorage {
-    fn resolve_table_entry(
+    fn resolve_table_entry_bytes(
         &self,
         _handle: &TableHandle,
         _key: &[u8],
