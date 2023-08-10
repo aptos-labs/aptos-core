@@ -2,6 +2,8 @@ import * as Types from './types';
 
 export type CurrentTokenOwnershipFieldsFragment = { __typename?: 'current_token_ownerships_v2', token_standard: string, is_fungible_v2?: boolean | null, is_soulbound_v2?: boolean | null, property_version_v1: any, table_type_v1?: string | null, token_properties_mutated_v1?: any | null, amount: any, last_transaction_timestamp: any, last_transaction_version: any, storage_id: string, owner_address: string, current_token_data?: { __typename?: 'current_token_datas_v2', token_name: string, token_data_id: string, token_uri: string, token_properties: any, supply: any, maximum?: any | null, last_transaction_version: any, last_transaction_timestamp: any, largest_property_version_v1?: any | null, current_collection?: { __typename?: 'current_collections_v2', collection_name: string, creator_address: string, description: string, uri: string, collection_id: string, last_transaction_version: any, current_supply: any, mutable_description?: boolean | null, total_minted_v2?: any | null, table_handle_v1?: string | null, mutable_uri?: boolean | null } | null } | null };
 
+export type TokenActivitiesFieldsFragment = { __typename?: 'token_activities_v2', after_value?: string | null, before_value?: string | null, entry_function_id_str?: string | null, event_account_address: string, event_index: any, from_address?: string | null, is_fungible_v2?: boolean | null, property_version_v1: any, to_address?: string | null, token_amount: any, token_data_id: string, token_standard: string, transaction_timestamp: any, transaction_version: any, type: string };
+
 export type GetAccountCoinsDataQueryVariables = Types.Exact<{
   owner_address?: Types.InputMaybe<Types.Scalars['String']>;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
@@ -38,16 +40,17 @@ export type GetAccountTransactionsCountQueryVariables = Types.Exact<{
 }>;
 
 
-export type GetAccountTransactionsCountQuery = { __typename?: 'query_root', move_resources_aggregate: { __typename?: 'move_resources_aggregate', aggregate?: { __typename?: 'move_resources_aggregate_fields', count: number } | null } };
+export type GetAccountTransactionsCountQuery = { __typename?: 'query_root', account_transactions_aggregate: { __typename?: 'account_transactions_aggregate', aggregate?: { __typename?: 'account_transactions_aggregate_fields', count: number } | null } };
 
 export type GetAccountTransactionsDataQueryVariables = Types.Exact<{
-  address?: Types.InputMaybe<Types.Scalars['String']>;
-  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  where_condition: Types.Account_Transactions_Bool_Exp;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.Account_Transactions_Order_By> | Types.Account_Transactions_Order_By>;
 }>;
 
 
-export type GetAccountTransactionsDataQuery = { __typename?: 'query_root', move_resources: Array<{ __typename?: 'move_resources', transaction_version: any }> };
+export type GetAccountTransactionsDataQuery = { __typename?: 'query_root', account_transactions: Array<{ __typename?: 'account_transactions', transaction_version: any, token_activities_v2: Array<{ __typename?: 'token_activities_v2', after_value?: string | null, before_value?: string | null, entry_function_id_str?: string | null, event_account_address: string, event_index: any, from_address?: string | null, is_fungible_v2?: boolean | null, property_version_v1: any, to_address?: string | null, token_amount: any, token_data_id: string, token_standard: string, transaction_timestamp: any, transaction_version: any, type: string }> }> };
 
 export type GetCollectionDataQueryVariables = Types.Exact<{
   where_condition: Types.Current_Collections_V2_Bool_Exp;
@@ -174,9 +177,10 @@ export type GetTopUserTransactionsQueryVariables = Types.Exact<{
 export type GetTopUserTransactionsQuery = { __typename?: 'query_root', user_transactions: Array<{ __typename?: 'user_transactions', version: any }> };
 
 export type GetUserTransactionsQueryVariables = Types.Exact<{
-  limit?: Types.InputMaybe<Types.Scalars['Int']>;
-  start_version?: Types.InputMaybe<Types.Scalars['bigint']>;
+  where_condition: Types.User_Transactions_Bool_Exp;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.User_Transactions_Order_By> | Types.User_Transactions_Order_By>;
 }>;
 
 

@@ -4112,6 +4112,7 @@ export type Move_Resources_Variance_Fields = {
 export type Nft_Marketplace_V2_Current_Nft_Marketplace_Auctions = {
   __typename?: 'nft_marketplace_v2_current_nft_marketplace_auctions';
   buy_it_now_price?: Maybe<Scalars['numeric']>;
+  coin_type?: Maybe<Scalars['String']>;
   collection_id: Scalars['String'];
   contract_address: Scalars['String'];
   current_bid_price?: Maybe<Scalars['numeric']>;
@@ -4138,6 +4139,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Auctions_Bool_Exp = {
   _not?: InputMaybe<Nft_Marketplace_V2_Current_Nft_Marketplace_Auctions_Bool_Exp>;
   _or?: InputMaybe<Array<Nft_Marketplace_V2_Current_Nft_Marketplace_Auctions_Bool_Exp>>;
   buy_it_now_price?: InputMaybe<Numeric_Comparison_Exp>;
+  coin_type?: InputMaybe<String_Comparison_Exp>;
   collection_id?: InputMaybe<String_Comparison_Exp>;
   contract_address?: InputMaybe<String_Comparison_Exp>;
   current_bid_price?: InputMaybe<Numeric_Comparison_Exp>;
@@ -4160,6 +4162,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Auctions_Bool_Exp = {
 /** Ordering options when selecting data from "nft_marketplace_v2.current_nft_marketplace_auctions". */
 export type Nft_Marketplace_V2_Current_Nft_Marketplace_Auctions_Order_By = {
   buy_it_now_price?: InputMaybe<Order_By>;
+  coin_type?: InputMaybe<Order_By>;
   collection_id?: InputMaybe<Order_By>;
   contract_address?: InputMaybe<Order_By>;
   current_bid_price?: InputMaybe<Order_By>;
@@ -4183,6 +4186,8 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Auctions_Order_By = {
 export enum Nft_Marketplace_V2_Current_Nft_Marketplace_Auctions_Select_Column {
   /** column name */
   BuyItNowPrice = 'buy_it_now_price',
+  /** column name */
+  CoinType = 'coin_type',
   /** column name */
   CollectionId = 'collection_id',
   /** column name */
@@ -4230,6 +4235,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Auctions_Stream_Cursor_In
 /** Initial value of the column from where the streaming should start */
 export type Nft_Marketplace_V2_Current_Nft_Marketplace_Auctions_Stream_Cursor_Value_Input = {
   buy_it_now_price?: InputMaybe<Scalars['numeric']>;
+  coin_type?: InputMaybe<Scalars['String']>;
   collection_id?: InputMaybe<Scalars['String']>;
   contract_address?: InputMaybe<Scalars['String']>;
   current_bid_price?: InputMaybe<Scalars['numeric']>;
@@ -4253,6 +4259,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Auctions_Stream_Cursor_Va
 export type Nft_Marketplace_V2_Current_Nft_Marketplace_Collection_Offers = {
   __typename?: 'nft_marketplace_v2_current_nft_marketplace_collection_offers';
   buyer: Scalars['String'];
+  coin_type?: Maybe<Scalars['String']>;
   collection_id: Scalars['String'];
   collection_offer_id: Scalars['String'];
   contract_address: Scalars['String'];
@@ -4275,6 +4282,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Collection_Offers_Bool_Ex
   _not?: InputMaybe<Nft_Marketplace_V2_Current_Nft_Marketplace_Collection_Offers_Bool_Exp>;
   _or?: InputMaybe<Array<Nft_Marketplace_V2_Current_Nft_Marketplace_Collection_Offers_Bool_Exp>>;
   buyer?: InputMaybe<String_Comparison_Exp>;
+  coin_type?: InputMaybe<String_Comparison_Exp>;
   collection_id?: InputMaybe<String_Comparison_Exp>;
   collection_offer_id?: InputMaybe<String_Comparison_Exp>;
   contract_address?: InputMaybe<String_Comparison_Exp>;
@@ -4293,6 +4301,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Collection_Offers_Bool_Ex
 /** Ordering options when selecting data from "nft_marketplace_v2.current_nft_marketplace_collection_offers". */
 export type Nft_Marketplace_V2_Current_Nft_Marketplace_Collection_Offers_Order_By = {
   buyer?: InputMaybe<Order_By>;
+  coin_type?: InputMaybe<Order_By>;
   collection_id?: InputMaybe<Order_By>;
   collection_offer_id?: InputMaybe<Order_By>;
   contract_address?: InputMaybe<Order_By>;
@@ -4312,6 +4321,8 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Collection_Offers_Order_B
 export enum Nft_Marketplace_V2_Current_Nft_Marketplace_Collection_Offers_Select_Column {
   /** column name */
   Buyer = 'buyer',
+  /** column name */
+  CoinType = 'coin_type',
   /** column name */
   CollectionId = 'collection_id',
   /** column name */
@@ -4351,6 +4362,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Collection_Offers_Stream_
 /** Initial value of the column from where the streaming should start */
 export type Nft_Marketplace_V2_Current_Nft_Marketplace_Collection_Offers_Stream_Cursor_Value_Input = {
   buyer?: InputMaybe<Scalars['String']>;
+  coin_type?: InputMaybe<Scalars['String']>;
   collection_id?: InputMaybe<Scalars['String']>;
   collection_offer_id?: InputMaybe<Scalars['String']>;
   contract_address?: InputMaybe<Scalars['String']>;
@@ -4369,6 +4381,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Collection_Offers_Stream_
 /** columns and relationships of "nft_marketplace_v2.current_nft_marketplace_listings" */
 export type Nft_Marketplace_V2_Current_Nft_Marketplace_Listings = {
   __typename?: 'nft_marketplace_v2_current_nft_marketplace_listings';
+  coin_type?: Maybe<Scalars['String']>;
   collection_id: Scalars['String'];
   contract_address: Scalars['String'];
   current_token_data?: Maybe<Current_Token_Datas_V2>;
@@ -4391,6 +4404,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Listings_Bool_Exp = {
   _and?: InputMaybe<Array<Nft_Marketplace_V2_Current_Nft_Marketplace_Listings_Bool_Exp>>;
   _not?: InputMaybe<Nft_Marketplace_V2_Current_Nft_Marketplace_Listings_Bool_Exp>;
   _or?: InputMaybe<Array<Nft_Marketplace_V2_Current_Nft_Marketplace_Listings_Bool_Exp>>;
+  coin_type?: InputMaybe<String_Comparison_Exp>;
   collection_id?: InputMaybe<String_Comparison_Exp>;
   contract_address?: InputMaybe<String_Comparison_Exp>;
   entry_function_id_str?: InputMaybe<String_Comparison_Exp>;
@@ -4409,6 +4423,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Listings_Bool_Exp = {
 
 /** Ordering options when selecting data from "nft_marketplace_v2.current_nft_marketplace_listings". */
 export type Nft_Marketplace_V2_Current_Nft_Marketplace_Listings_Order_By = {
+  coin_type?: InputMaybe<Order_By>;
   collection_id?: InputMaybe<Order_By>;
   contract_address?: InputMaybe<Order_By>;
   entry_function_id_str?: InputMaybe<Order_By>;
@@ -4427,6 +4442,8 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Listings_Order_By = {
 
 /** select columns of table "nft_marketplace_v2.current_nft_marketplace_listings" */
 export enum Nft_Marketplace_V2_Current_Nft_Marketplace_Listings_Select_Column {
+  /** column name */
+  CoinType = 'coin_type',
   /** column name */
   CollectionId = 'collection_id',
   /** column name */
@@ -4467,6 +4484,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Listings_Stream_Cursor_In
 
 /** Initial value of the column from where the streaming should start */
 export type Nft_Marketplace_V2_Current_Nft_Marketplace_Listings_Stream_Cursor_Value_Input = {
+  coin_type?: InputMaybe<Scalars['String']>;
   collection_id?: InputMaybe<Scalars['String']>;
   contract_address?: InputMaybe<Scalars['String']>;
   entry_function_id_str?: InputMaybe<Scalars['String']>;
@@ -4487,6 +4505,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Listings_Stream_Cursor_Va
 export type Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers = {
   __typename?: 'nft_marketplace_v2_current_nft_marketplace_token_offers';
   buyer: Scalars['String'];
+  coin_type?: Maybe<Scalars['String']>;
   collection_id: Scalars['String'];
   contract_address: Scalars['String'];
   current_token_data?: Maybe<Current_Token_Datas_V2>;
@@ -4510,6 +4529,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers_Bool_Exp = {
   _not?: InputMaybe<Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers_Bool_Exp>;
   _or?: InputMaybe<Array<Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers_Bool_Exp>>;
   buyer?: InputMaybe<String_Comparison_Exp>;
+  coin_type?: InputMaybe<String_Comparison_Exp>;
   collection_id?: InputMaybe<String_Comparison_Exp>;
   contract_address?: InputMaybe<String_Comparison_Exp>;
   entry_function_id_str?: InputMaybe<String_Comparison_Exp>;
@@ -4529,6 +4549,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers_Bool_Exp = {
 /** Ordering options when selecting data from "nft_marketplace_v2.current_nft_marketplace_token_offers". */
 export type Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers_Order_By = {
   buyer?: InputMaybe<Order_By>;
+  coin_type?: InputMaybe<Order_By>;
   collection_id?: InputMaybe<Order_By>;
   contract_address?: InputMaybe<Order_By>;
   entry_function_id_str?: InputMaybe<Order_By>;
@@ -4549,6 +4570,8 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers_Order_By = {
 export enum Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers_Select_Column {
   /** column name */
   Buyer = 'buyer',
+  /** column name */
+  CoinType = 'coin_type',
   /** column name */
   CollectionId = 'collection_id',
   /** column name */
@@ -4590,6 +4613,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers_Stream_Curso
 /** Initial value of the column from where the streaming should start */
 export type Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers_Stream_Cursor_Value_Input = {
   buyer?: InputMaybe<Scalars['String']>;
+  coin_type?: InputMaybe<Scalars['String']>;
   collection_id?: InputMaybe<Scalars['String']>;
   contract_address?: InputMaybe<Scalars['String']>;
   entry_function_id_str?: InputMaybe<Scalars['String']>;
@@ -4610,6 +4634,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers_Stream_Curso
 export type Nft_Marketplace_V2_Nft_Marketplace_Activities = {
   __typename?: 'nft_marketplace_v2_nft_marketplace_activities';
   buyer?: Maybe<Scalars['String']>;
+  coin_type?: Maybe<Scalars['String']>;
   collection_id: Scalars['String'];
   collection_name: Scalars['String'];
   contract_address: Scalars['String'];
@@ -4638,6 +4663,7 @@ export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Bool_Exp = {
   _not?: InputMaybe<Nft_Marketplace_V2_Nft_Marketplace_Activities_Bool_Exp>;
   _or?: InputMaybe<Array<Nft_Marketplace_V2_Nft_Marketplace_Activities_Bool_Exp>>;
   buyer?: InputMaybe<String_Comparison_Exp>;
+  coin_type?: InputMaybe<String_Comparison_Exp>;
   collection_id?: InputMaybe<String_Comparison_Exp>;
   collection_name?: InputMaybe<String_Comparison_Exp>;
   contract_address?: InputMaybe<String_Comparison_Exp>;
@@ -4662,6 +4688,7 @@ export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Bool_Exp = {
 /** Ordering options when selecting data from "nft_marketplace_v2.nft_marketplace_activities". */
 export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Order_By = {
   buyer?: InputMaybe<Order_By>;
+  coin_type?: InputMaybe<Order_By>;
   collection_id?: InputMaybe<Order_By>;
   collection_name?: InputMaybe<Order_By>;
   contract_address?: InputMaybe<Order_By>;
@@ -4687,6 +4714,8 @@ export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Order_By = {
 export enum Nft_Marketplace_V2_Nft_Marketplace_Activities_Select_Column {
   /** column name */
   Buyer = 'buyer',
+  /** column name */
+  CoinType = 'coin_type',
   /** column name */
   CollectionId = 'collection_id',
   /** column name */
@@ -4738,6 +4767,7 @@ export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Stream_Cursor_Input = 
 /** Initial value of the column from where the streaming should start */
 export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Stream_Cursor_Value_Input = {
   buyer?: InputMaybe<Scalars['String']>;
+  coin_type?: InputMaybe<Scalars['String']>;
   collection_id?: InputMaybe<Scalars['String']>;
   collection_name?: InputMaybe<Scalars['String']>;
   contract_address?: InputMaybe<Scalars['String']>;
