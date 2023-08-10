@@ -153,7 +153,7 @@ impl<'a> FunctionGenerator<'a> {
                 if !bc.is_branch() && matches!(next_bc, Bytecode::Label(..)) {
                     // At block boundaries without a preceding branch, need to flush stack
                     // TODO: to avoid this, we should use the CFG for code generation.
-                    self.abstract_flush_stack(&bytecode_ctx, 0);
+                    self.abstract_flush_stack_after(&bytecode_ctx, 0);
                 }
             } else {
                 self.gen_bytecode(&bytecode_ctx, &bytecode[i], None)
@@ -262,7 +262,7 @@ impl<'a> FunctionGenerator<'a> {
                 self.abstract_pop(ctx);
             },
             Bytecode::Jump(_, label) => {
-                self.abstract_flush_stack(ctx, 0);
+                self.abstract_flush_stack_before(ctx, 0);
                 self.add_label_reference(*label);
                 self.emit(FF::Bytecode::Branch(0));
             },
@@ -297,7 +297,7 @@ impl<'a> FunctionGenerator<'a> {
         if self.stack.len() != result.len() {
             // Unfortunately, there is more on the stack than needed.
             // Need to flush and push again so the stack is empty after return.
-            self.abstract_flush_stack(ctx, 0);
+            self.abstract_flush_stack_before(ctx, 0);
             self.abstract_push_args(ctx, result.as_ref());
             assert_eq!(self.stack.len(), result.len())
         }
@@ -653,7 +653,7 @@ impl<'a> FunctionGenerator<'a> {
                 temps_to_push = temps;
             }
         }
-        self.abstract_flush_stack(ctx, stack_to_flush);
+        self.abstract_flush_stack_before(ctx, stack_to_flush);
         // Finally, push `temps_to_push` onto the stack.
         for temp in temps_to_push {
             let local = self.temp_to_local(fun_ctx, *temp);
@@ -668,12 +668,15 @@ impl<'a> FunctionGenerator<'a> {
     }
 
     /// Flush the abstract stack, ensuring that all values on the stack are stored in locals, if
-    /// they are still alive.
-    fn abstract_flush_stack(&mut self, ctx: &BytecodeContext, top: usize) {
+    /// they are still alive. The `before` parameter determines whether we care about
+    /// variables alive before or after the current program point.
+    fn abstract_flush_stack(&mut self, ctx: &BytecodeContext, top: usize, before: bool) {
         let fun_ctx = ctx.fun_ctx;
         while self.stack.len() > top {
             let temp = self.stack.pop().unwrap();
-            if ctx.is_alive_before(temp) || ctx.is_alive_after(temp) || self.pinned.contains(&temp)
+            if before && ctx.is_alive_before(temp)
+                || !before && ctx.is_alive_after(temp)
+                || self.pinned.contains(&temp)
             {
                 // Only need to save to a local if the temp is still used afterwards
                 let local = self.temp_to_local(fun_ctx, temp);
@@ -682,6 +685,16 @@ impl<'a> FunctionGenerator<'a> {
                 self.emit(FF::Bytecode::Pop)
             }
         }
+    }
+
+    /// Shortcut for `abstract_flush_stack(..., true)`
+    fn abstract_flush_stack_before(&mut self, ctx: &BytecodeContext, top: usize) {
+        self.abstract_flush_stack(ctx, top, true)
+    }
+
+    /// Shortcut for `abstract_flush_stack(..., false)`
+    fn abstract_flush_stack_after(&mut self, ctx: &BytecodeContext, top: usize) {
+        self.abstract_flush_stack(ctx, top, false)
     }
 
     /// Push the result of an operation to the abstract stack.
@@ -695,7 +708,7 @@ impl<'a> FunctionGenerator<'a> {
             self.stack.push(*temp);
         }
         if flush_mark != usize::MAX {
-            self.abstract_flush_stack(ctx, flush_mark)
+            self.abstract_flush_stack_after(ctx, flush_mark)
         }
     }
 
