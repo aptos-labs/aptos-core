@@ -49,25 +49,6 @@ export const CurrentTokenOwnershipFieldsFragmentDoc = `
   }
 }
     `;
-export const TokenActivitiesFieldsFragmentDoc = `
-    fragment TokenActivitiesFields on token_activities_v2 {
-  after_value
-  before_value
-  entry_function_id_str
-  event_account_address
-  event_index
-  from_address
-  is_fungible_v2
-  property_version_v1
-  to_address
-  token_amount
-  token_data_id
-  token_standard
-  transaction_timestamp
-  transaction_version
-  type
-}
-    `;
 export const TokenDataFieldsFragmentDoc = `
     fragment TokenDataFields on current_token_datas {
   creator_address
@@ -88,6 +69,25 @@ export const CollectionDataFieldsFragmentDoc = `
   collection_data_id_hash
   table_handle
   creator_address
+}
+    `;
+export const TokenActivitiesFieldsFragmentDoc = `
+    fragment TokenActivitiesFields on token_activities_v2 {
+  after_value
+  before_value
+  entry_function_id_str
+  event_account_address
+  event_index
+  from_address
+  is_fungible_v2
+  property_version_v1
+  to_address
+  token_amount
+  token_data_id
+  token_standard
+  transaction_timestamp
+  transaction_version
+  type
 }
     `;
 export const GetAccountCoinsData = `
@@ -173,7 +173,7 @@ export const GetAccountTransactionsData = `
       ...TokenActivitiesFields
     }
     transaction_version
-    address
+    account_address
   }
 }
     ${TokenActivitiesFieldsFragmentDoc}`;

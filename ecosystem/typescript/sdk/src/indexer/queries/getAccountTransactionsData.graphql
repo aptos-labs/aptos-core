@@ -10,6 +10,6 @@ query getAccountTransactionsData(
       ...TokenActivitiesFields
     }
     transaction_version
-    address
+    account_address
   }
 }
