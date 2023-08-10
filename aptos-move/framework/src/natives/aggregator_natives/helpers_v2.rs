@@ -48,6 +48,7 @@ pub(crate) fn aggregator_snapshot_u64_info(
 ) -> PartialVMResult<u64> {
     let value = get_aggregator_field(aggregator_snapshot, VALUE_FIELD_INDEX)?.value_as::<u64>()?;
     Ok(value)
+}
 
 /// Given a reference to `Aggregator` Move struct, returns a tuple of its
 /// fields: (`value`, `max_value`).
