@@ -9,6 +9,7 @@ edition = "2021"
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+# TODO: move these to workspace
 bellman = { version = "0.13.1", default-features = false }
 num-bigint = { version = "0.3.2", features = ["rand"] } # need this version because it in turn depends on the right version of `rand` and `rand_core`
 num-integer = "0.1.42"

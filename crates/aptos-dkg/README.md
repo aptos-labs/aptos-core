@@ -42,3 +42,6 @@ Example: You indicate the benchmark group with `--bench` and then you append par
 ```
 sudo cargo flamegraph --bench 'crypto' -- --bench accumulator_poly/
 ```
+# References
+
+[GJM+21e] Aggregatable Distributed Key Generation; by Kobi Gurkan and Philipp Jovanovic and Mary Maller and Sarah Meiklejohn and Gilad Stern and Alin Tomescu; in Cryptology ePrint Archive, Report 2021/005; 2021; https://eprint.iacr.org/2021/005
