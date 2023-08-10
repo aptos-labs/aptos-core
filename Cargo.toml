@@ -69,6 +69,7 @@ members = [
     "crates/aptos-logger",
     "crates/aptos-memsocket",
     "crates/aptos-metrics-core",
+    "crates/aptos-netcore",
     "crates/aptos-network-checker",
     "crates/aptos-node-identity",
     "crates/aptos-openapi",
@@ -124,7 +125,6 @@ members = [
     "network",
     "network/builder",
     "network/discovery",
-    "network/netcore",
     "network/peer-monitoring-service/client",
     "network/peer-monitoring-service/server",
     "network/peer-monitoring-service/types",
@@ -344,7 +344,7 @@ aptos-move-examples = { path = "aptos-move/move-examples" }
 aptos-moving-average = { path = "crates/moving-average" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
-aptos-netcore = { path = "network/netcore" }
+aptos-netcore = { path = "crates/aptos-netcore" }
 aptos-network = { path = "network" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
