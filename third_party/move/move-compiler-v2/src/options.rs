@@ -12,22 +12,17 @@ pub struct Options {
     /// Directories where to lookup dependencies.
     #[clap(
         short,
-        takes_value(true),
-        multiple_values(true),
-        multiple_occurrences(true)
+        num_args = 0..
     )]
     pub dependencies: Vec<String>,
     /// Named address mapping.
     #[clap(
         short,
-        takes_value(true),
-        multiple_values(true),
-        multiple_occurrences(true)
+        num_args = 0..
     )]
     pub named_address_mapping: Vec<String>,
     /// Output directory.
-    #[clap(short)]
-    #[clap(long, default_value = "")]
+    #[clap(short, long, default_value = "")]
     pub output_dir: String,
     /// Whether to dump intermediate bytecode for debugging.
     #[clap(long = "dump-bytecode")]
@@ -41,9 +36,7 @@ pub struct Options {
     #[clap(short)]
     #[clap(
         long = "experiment",
-        takes_value(true),
-        multiple_values(true),
-        multiple_occurrences(true)
+        num_args = 0..
     )]
     pub experiments: Vec<String>,
     /// Sources to compile (positional arg, therefore last)
