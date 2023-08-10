@@ -46,6 +46,7 @@ from cases.move import (
 )
 from cases.node import (
     test_node_join_validator_set,
+    test_node_leave_validator_set,
     test_node_show_validator_set,
     test_node_update_consensus_key,
     test_node_update_validator_network_address,
@@ -166,6 +167,7 @@ def run_tests(run_helper):
     test_node_update_consensus_key(run_helper)
     test_node_update_validator_network_address(run_helper)
     test_node_join_validator_set(run_helper)
+    test_node_leave_validator_set(run_helper)
 
     # WARNING: This has to stay at the end, else key will get rotated
     test_account_rotate_key(run_helper)

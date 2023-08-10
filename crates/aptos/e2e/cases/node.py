@@ -289,7 +289,7 @@ def test_node_join_validator_set(run_helper: RunHelper, test_name=None):
 @test_case
 # Note: this test is dependent on test_node_join_validator_set
 def test_node_leave_validator_set(run_helper: RunHelper, test_name=None):
-    # run show-validator-set to get number of pending_inactive validators
+    # run show-validator-set to get pre-leave information
     response = run_helper.run_command(
         test_name,
         [
@@ -301,7 +301,9 @@ def test_node_leave_validator_set(run_helper: RunHelper, test_name=None):
         ],
     )
     result = json.loads(response.stdout)["Result"]
-    pending_inactive_validators = len(result.get("pending_inactive"))
+    total_count = len(result.get("pending_active")) + len(
+        result.get("active_validators")
+    )
 
     # run the leave validator set command
     run_helper.run_command(
@@ -329,8 +331,10 @@ def test_node_leave_validator_set(run_helper: RunHelper, test_name=None):
     )
 
     result = json.loads(response.stdout)["Result"]
-    current_pending_inactive_validators = len(result.get("pending_inactive"))
-    if current_pending_inactive_validators != pending_inactive_validators + 1:
+    total_count_after = len(result.get("pending_active")) + len(
+        result.get("active_validators")
+    )
+    if total_count_after != total_count - 1:
         raise TestError(
-            "Error: expected pending_inactive validators to increase by 1 after leave-validator-set"
+            "Error: total active validator count did not decrease by 1 after leave-validator-set"
         )
