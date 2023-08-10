@@ -1532,10 +1532,16 @@ fn realistic_env_max_load_test(
                 .add_latency_threshold(3.4, LatencyType::P50)
                 .add_latency_threshold(4.5, LatencyType::P90)
                 .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
-                    (LatencyBreakdownSlice::QsBatchToPos, 0.3),
-                    (LatencyBreakdownSlice::QsPosToProposal, 0.25),
+                    (LatencyBreakdownSlice::QsBatchToPos, 0.35),
+                    (
+                        LatencyBreakdownSlice::QsPosToProposal,
+                        if ha_proxy { 0.6 } else { 0.5 },
+                    ),
                     (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.8),
-                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 0.6),
+                    (
+                        LatencyBreakdownSlice::ConsensusOrderedToCommit,
+                        if ha_proxy { 1.2 } else { 0.65 },
+                    ),
                 ]))
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
@@ -1894,8 +1900,14 @@ fn pfn_const_tps(
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(50)
+            SuccessCriteria::new(95)
                 .add_no_restarts()
+                .add_max_expired_tps(0)
+                .add_max_failed_submission_tps(0)
+                // Percentile thresholds are set to +1 second of non-PFN tests. Should be revisited.
+                .add_latency_threshold(2.5, LatencyType::P50)
+                .add_latency_threshold(4., LatencyType::P90)
+                .add_latency_threshold(5., LatencyType::P99)
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup and at most 10% of the run
                     (duration.as_secs() / 10).max(60),

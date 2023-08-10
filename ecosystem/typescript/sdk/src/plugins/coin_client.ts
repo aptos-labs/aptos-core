@@ -8,6 +8,8 @@ import { FungibleAssetClient } from "./fungible_asset_client";
 import { Provider } from "../providers";
 import { AccountAddress } from "../aptos_types";
 
+export const TRANSFER_COINS = "0x1::aptos_account::transfer_coins";
+export const COIN_TRANSFER = "0x1::coin::transfer";
 /**
  * Class for working with the coin module, such as transferring coins and
  * checking balances.
@@ -86,8 +88,13 @@ export class CoinClient {
     const coinTypeToTransfer = extraArgs?.coinType ?? APTOS_COIN;
 
     // If we should create the receiver account if it doesn't exist on-chain,
-    // use the `0x1::aptos_account::transfer` function.
-    const func = extraArgs?.createReceiverIfMissing ? "0x1::aptos_account::transfer_coins" : "0x1::coin::transfer";
+    // use the `0x1::aptos_account::transfer_coins` function.
+    let func: string;
+    if (extraArgs?.createReceiverIfMissing === undefined) {
+      func = TRANSFER_COINS;
+    } else {
+      func = extraArgs?.createReceiverIfMissing ? TRANSFER_COINS : COIN_TRANSFER;
+    }
 
     // Get the receiver address from the AptosAccount or MaybeHexString.
     const toAddress = getAddressFromAccountOrAddress(to);
