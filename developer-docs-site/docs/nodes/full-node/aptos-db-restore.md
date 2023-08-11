@@ -79,6 +79,19 @@ aptos node bootstrap-db \
 ```
 
 ### Restore a fullnode with full history from genesis
+**Resource Requirements**
+
+* Open File Limit: Set the open file limit to 10K.
+* Testnet:
+  * Disk: 1.5TB
+  * RAM: 32GB
+  * Duration: Approximately 10 hours to finish.
+* Mainnet:
+  * Disk: 1TB
+  * RAM: 32GB
+  * Duration: Approximately 5 hours to finish.
+
+
 To restore a fullnode with full history from genesis, set `ledger-history-start-version` to 0 and disable the pruner by [disabling the ledger pruner](../../guides/data-pruning.md).
 
 Example command: 
