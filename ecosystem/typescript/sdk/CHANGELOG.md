@@ -4,6 +4,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.18.0 (2023-08-10)
+
 - Fix default behavior for coin client to transfer and create account by default
 - Filter amount > 0 on `getTokenOwnersData`
 - Include missing fields for all Indexer queries
