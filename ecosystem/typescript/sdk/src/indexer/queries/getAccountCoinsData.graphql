@@ -2,10 +2,21 @@ query getAccountCoinsData($owner_address: String, $offset: Int, $limit: Int) {
   current_coin_balances(where: { owner_address: { _eq: $owner_address } }, offset: $offset, limit: $limit) {
     amount
     coin_type
+    coin_type_hash
+    last_transaction_timestamp
+    last_transaction_version
+    owner_address
     coin_info {
-      name
+      coin_type
+      coin_type_hash
+      creator_address
       decimals
+      name
+      supply_aggregator_table_handle
+      supply_aggregator_table_key
       symbol
+      transaction_created_timestamp
+      transaction_version_created
     }
   }
 }

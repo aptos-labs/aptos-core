@@ -4,15 +4,15 @@ import { AptosAccount } from "../account";
 import { AccountAddress } from "../aptos_types";
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
 
-const ansContractsMap: Record<string, string> = {
+export const ansContractsMap: Record<string, string> = {
   testnet: "0x5f8fd2347449685cf41d4db97926ec3a096eaf381332be4f1318ad4d16a8497c",
   mainnet: "0x867ed1f6bf916171b1de3ee92849b8978b7d1b9e0a8cc982a3d19d535dfd9c0c",
 };
 
 // Each name component can only have lowercase letters, number or hyphens, and cannot start or end with a hyphen.
-const nameComponentPattern = /^[a-z\d][a-z\d-]{1,61}[a-z\d]$/;
+export const nameComponentPattern = /^[a-z\d][a-z\d-]{1,61}[a-z\d]$/;
 
-const namePattern = new RegExp(
+export const namePattern = new RegExp(
   "^" +
     // Optional subdomain (cannot be followed by .apt)
     "(?:(?<subdomain>[^.]+)\\.(?!apt$))?" +
@@ -23,19 +23,19 @@ const namePattern = new RegExp(
     "$",
 );
 
-type ReverseLookupRegistryV1 = {
+export type ReverseLookupRegistryV1 = {
   registry: {
     handle: string;
   };
 };
 
-type NameRegistryV1 = {
+export type NameRegistryV1 = {
   registry: {
     handle: string;
   };
 };
 
-type AnsRegistry = {
+export type AnsRegistry = {
   expirationTimestampSeconds: number;
   target: string | null;
 };

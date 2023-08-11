@@ -94,6 +94,12 @@ pub struct Loc {
     span: Span,
 }
 
+impl AsRef<Loc> for Loc {
+    fn as_ref(&self) -> &Loc {
+        self
+    }
+}
+
 impl Loc {
     pub fn new(file_id: FileId, span: Span) -> Loc {
         Loc { file_id, span }
@@ -1070,6 +1076,49 @@ impl GlobalEnv {
                 && &*self.symbol_pool.string(struct_env.get_name()) == "EventHandle"
         } else {
             false
+        }
+    }
+
+    /// Computes the abilities associated with the given type.
+    pub fn type_abilities(&self, ty: &Type, ty_params: &[TypeParameter]) -> AbilitySet {
+        match ty {
+            Type::Primitive(p) => match p {
+                PrimitiveType::Bool
+                | PrimitiveType::U8
+                | PrimitiveType::U16
+                | PrimitiveType::U32
+                | PrimitiveType::U64
+                | PrimitiveType::U128
+                | PrimitiveType::U256
+                | PrimitiveType::Num
+                | PrimitiveType::Range
+                | PrimitiveType::EventStore
+                | PrimitiveType::Address => AbilitySet::PRIMITIVES,
+                PrimitiveType::Signer => AbilitySet::SIGNER,
+            },
+            Type::Vector(et) => AbilitySet::VECTOR.intersect(self.type_abilities(et, ty_params)),
+            Type::Struct(mid, sid, inst) => {
+                let struct_env = self.get_struct(mid.qualified(*sid));
+                let mut abilities = struct_env.get_abilities();
+                for inst_ty in inst {
+                    abilities = abilities.intersect(self.type_abilities(inst_ty, ty_params))
+                }
+                abilities
+            },
+            Type::TypeParameter(i) => {
+                if let Some(tp) = ty_params.get(*i as usize) {
+                    tp.1.abilities
+                } else {
+                    AbilitySet::EMPTY
+                }
+            },
+            Type::Reference(_, _) => AbilitySet::REFERENCES,
+            Type::Fun(_, _)
+            | Type::Tuple(_)
+            | Type::TypeDomain(_)
+            | Type::ResourceDomain(_, _, _)
+            | Type::Error
+            | Type::Var(_) => AbilitySet::EMPTY,
         }
     }
 
@@ -3341,22 +3390,23 @@ impl<'env> FunctionEnv<'env> {
     /// is attached. If the local is an argument, use that for naming, otherwise generate
     /// a unique name.
     pub fn get_local_name(&self, idx: usize) -> Option<Symbol> {
-        if idx < self.data.params.len() {
-            return Some(self.data.params[idx].0);
-        }
-        // Try to obtain name from source map.
-        let source_map = self.module_env.data.source_map.as_ref()?;
-        if let Ok(fmap) = source_map.get_function_source_map(self.data.def_idx?) {
-            if let Some((ident, _)) = fmap.get_parameter_or_local_name(idx as u64) {
-                // The Move compiler produces temporary names of the form `<foo>%#<num>`,
-                // where <num> seems to be generated non-deterministically.
-                // Substitute this by a deterministic name which the backend accepts.
-                let clean_ident = if ident.contains("%#") {
-                    format!("tmp#${}", idx)
-                } else {
-                    ident
-                };
-                return Some(self.module_env.env.symbol_pool.make(clean_ident.as_str()));
+        // Try to obtain user name
+        if let Some(source_map) = &self.module_env.data.source_map {
+            if idx < self.data.params.len() {
+                return Some(self.data.params[idx].0);
+            }
+            if let Ok(fmap) = source_map.get_function_source_map(self.data.def_idx?) {
+                if let Some((ident, _)) = fmap.get_parameter_or_local_name(idx as u64) {
+                    // The Move compiler produces temporary names of the form `<foo>%#<num>`,
+                    // where <num> seems to be generated non-deterministically.
+                    // Substitute this by a deterministic name which the backend accepts.
+                    let clean_ident = if ident.contains("%#") {
+                        format!("tmp#${}", idx)
+                    } else {
+                        ident
+                    };
+                    return Some(self.module_env.env.symbol_pool.make(clean_ident.as_str()));
+                }
             }
         }
         Some(self.module_env.env.symbol_pool.make(&format!("$t{}", idx)))

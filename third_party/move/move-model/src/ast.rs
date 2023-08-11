@@ -9,9 +9,9 @@ use crate::{
     model::{
         EnvDisplay, FieldId, FunId, FunctionEnv, GlobalEnv, GlobalId, Loc, ModuleId, NodeId,
         Parameter, QualifiedId, QualifiedInstId, SchemaId, SpecFunId, StructId, TypeParameter,
-        GHOST_MEMORY_PREFIX,
+        GHOST_MEMORY_PREFIX, SCRIPT_MODULE_NAME,
     },
-    symbol::Symbol,
+    symbol::{Symbol, SymbolPool},
     ty::{ReferenceKind, Type, TypeDisplayContext},
 };
 use internment::LocalIntern;
@@ -1337,8 +1337,17 @@ impl ModuleName {
         self.1
     }
 
-    /// Determine whether this is a script. The move-compiler infrastructure uses MAX_ADDR
-    /// for pseudo modules created from scripts, so use this address to check.
+    /// Return the pseudo module name used for scripts. The move-compiler infrastructure uses MAX_ADDR
+    /// for pseudo modules created from scripts.
+    pub fn pseudo_script_name(pool: &SymbolPool) -> ModuleName {
+        let name = pool.make(SCRIPT_MODULE_NAME);
+        ModuleName(
+            Address::Numerical(AccountAddress::new([0xFF; AccountAddress::LENGTH])),
+            name,
+        )
+    }
+
+    /// Determine whether this is a script.
     pub fn is_script(&self) -> bool {
         self.0 == Address::Numerical(AccountAddress::new([0xFF; AccountAddress::LENGTH]))
     }
