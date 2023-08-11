@@ -234,7 +234,7 @@ impl AptosVM {
     pub fn failed_transaction_cleanup(
         &self,
         error_code: VMStatus,
-        gas_meter: &mut impl AptosGasMeter,
+        gas_meter: &impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         resolver: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
@@ -279,7 +279,7 @@ impl AptosVM {
     fn failed_transaction_cleanup_and_keep_vm_status(
         &self,
         error_code: VMStatus,
-        gas_meter: &mut impl AptosGasMeter,
+        gas_meter: &impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         resolver: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
@@ -312,6 +312,7 @@ impl AptosVM {
                     },
                     _ => status,
                 };
+                let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
                 // The transaction should be charged for gas, so run the epilogue to do that.
                 // This is running in a new session that drops any side effects from the
                 // attempted transaction (e.g., spending funds that were needed to pay for gas),
@@ -326,7 +327,6 @@ impl AptosVM {
                 ) {
                     return discard_error_vm_status(e);
                 }
-                let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
                 let txn_output = get_transaction_output(
                     &mut (),
                     session,
@@ -347,17 +347,17 @@ impl AptosVM {
     fn success_transaction_cleanup(
         &self,
         mut respawned_session: RespawnedSession,
-        gas_meter: &mut impl AptosGasMeter,
+        gas_meter: &impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
         respawned_session.execute(|session| {
             self.0
                 .run_success_epilogue(session, gas_meter.balance(), txn_data, log_context)
         })?;
         let change_set = respawned_session.finish(change_set_configs)?;
-        let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
         let output = VMOutput::new(
             change_set,
             fee_statement,
@@ -1869,7 +1869,7 @@ impl AptosSimulationVM {
 
                                 self.0.success_transaction_cleanup(
                                     respawned_session,
-                                    &mut gas_meter,
+                                    &gas_meter,
                                     &txn_data,
                                     log_context,
                                     &storage_gas_params.change_set_configs,
@@ -1918,7 +1918,7 @@ impl AptosSimulationVM {
                 } else {
                     let (vm_status, output) = self.0.failed_transaction_cleanup_and_keep_vm_status(
                         err,
-                        &mut gas_meter,
+                        &gas_meter,
                         &txn_data,
                         resolver,
                         log_context,
