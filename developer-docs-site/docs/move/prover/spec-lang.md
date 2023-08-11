@@ -237,7 +237,7 @@ function in such a situation, one can use the notation `::len(v)`.
 In MSL, expressions have partial semantics. This is in contrast to Move program expressions, which
 have total semantics, since they either deliver a value or abort.
 
-An expression `e[X]` that depends on some some variables `X` may have a known interpretation for
+An expression `e[X]` that depends on some variables `X` may have a known interpretation for
 some assignments to variables in `X` but is unknown for others. An unknown interpretation for a
 sub-expression causes no issue if its value is not needed for the overall expression result.
 Therefore it does not matter if we say `y != 0 && x / y > 0`
