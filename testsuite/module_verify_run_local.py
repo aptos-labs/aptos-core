@@ -17,9 +17,9 @@ import module_verify
 def local_setup():
     # Take these from the expected replay verify run
     envs = {
-        "BUCKET": "aptos-testnet-backup-2223d95b",
+        "BUCKET": "aptos-testnet-backup-b7b1ad7a",
         "SUB_DIR": "e1",
-        "BACKUP_CONFIG_TEMPLATE_PATH": "terraform/helm/fullnode/files/backup/s3-public.yaml",
+        "BACKUP_CONFIG_TEMPLATE_PATH": "terraform/helm/fullnode/files/backup/gcs.yaml",
     }
 
     # build backup tools

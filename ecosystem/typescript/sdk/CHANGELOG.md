@@ -4,6 +4,31 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.18.0 (2023-08-10)
+
+- Fix default behavior for coin client to transfer and create account by default
+- Filter amount > 0 on `getTokenOwnersData`
+- Include missing fields for all Indexer queries
+
+## 1.17.0 (2023-08-04)
+
+- Add support for a fee payer transaction
+- Return transaction message error when transaction has failed when `checkSuccess` is set to true
+
+## 1.16.0 (2023-08-02)
+
+- Export all remaining types and functions in TS SDK
+- Add improvements for `IndexerClient`
+  - Export indexer types - `export * from "/indexer/generated/types"`
+  - Support for token v2 activities - `getTokenActivities`, response structure has changed
+  - Aggregate query suports token v2 activities - `getTokenActivitiesCount`
+  - Support for sorting indexer queries - `orderBy` optional argument in `extraArgs` arguments
+  - Support for get owned tokens by token address or token data id - `getOwnedTokensByTokenData`
+- Add support for local/custom networks without an indexer client
+- Move to use `account_transactions` query in `getAccountTransactionsData` on `IndexerClient`
+- Move to use `account_transaction_aggregate` query in `getAccountTransactionsCount` on `IndexerClient`
+- Optional `startVersion` argument on `getUserTransactions` is not positional and part of the object param
+
 ## 1.15.0 (2023-07-28)
 
 - Implementing `TransactionWorker` - a layer for managing and submitting as many transactions from a single account at once

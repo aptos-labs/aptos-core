@@ -122,10 +122,6 @@ impl TStateView for FakeDataStore {
         Ok(self.state_data.get(state_key).cloned())
     }
 
-    fn is_genesis(&self) -> bool {
-        self.state_data.is_empty()
-    }
-
     fn get_usage(&self) -> Result<StateStorageUsage> {
         let mut usage = StateStorageUsage::new_untracked();
         for (k, v) in self.state_data.iter() {
