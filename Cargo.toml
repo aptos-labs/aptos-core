@@ -127,7 +127,7 @@ members = [
     "execution/executor-test-helpers",
     "execution/executor-types",
     "mempool",
-    "network",
+    "network/framework",
     "sdk",
     "secure/net",
     "secure/storage",
@@ -345,7 +345,7 @@ aptos-moving-average = { path = "crates/moving-average" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "crates/aptos-netcore" }
-aptos-network = { path = "network" }
+aptos-network = { path = "network/framework" }
 aptos-network-builder = { path = "crates/aptos-network-builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "crates/aptos-network-discovery" }
