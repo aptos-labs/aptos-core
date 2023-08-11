@@ -12,6 +12,11 @@ on:
         required: false
         default: executor-benchmark-runner 
         type: string
+      RUN_ONLY_SINGLE_NODE_PERF:
+        required: false
+        default: false
+        type: boolean
+        description: Only run the single node performance tests
   # This allows the workflow to be triggered manually from the Github UI or CLI
   # NOTE: because the "number" type is not supported, we default to 720 minute timeout
   workflow_dispatch:
@@ -27,6 +32,11 @@ on:
         options:
         - executor-benchmark-runner
         description: The name of the runner to use for the test.
+      RUN_ONLY_SINGLE_NODE_PERF:
+        required: false
+        default: false
+        type: boolean
+        description: Only run the single node performance tests
 
 jobs:
   # This job determines which files were changed
@@ -49,20 +59,20 @@ jobs:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: ${{ needs.file_change_determinator.outputs.only_docs_changed != 'true' && !inputs.RUN_ONLY_SINGLE_NODE_PERF }}
 
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: ${{ needs.file_change_determinator.outputs.only_docs_changed != 'true' && !inputs.RUN_ONLY_SINGLE_NODE_PERF }}
 
       - name: Run sequential execution benchmark in performance build mode
         shell: bash
         run: testsuite/sequential_execution_performance.py
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: ${{ needs.file_change_determinator.outputs.only_docs_changed != 'true' && !inputs.RUN_ONLY_SINGLE_NODE_PERF }}
 
-      - run: echo "Skipping sequential execution performance! Unrelated changes detected."
-        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
+      - run: echo "Skipping sequential execution performance!"
+        if: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' || inputs.RUN_ONLY_SINGLE_NODE_PERF }}
 
   # Run parallel execution performance tests
   parallel-execution-performance:
@@ -73,20 +83,20 @@ jobs:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: ${{ needs.file_change_determinator.outputs.only_docs_changed != 'true' && !inputs.RUN_ONLY_SINGLE_NODE_PERF }}
 
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: ${{ needs.file_change_determinator.outputs.only_docs_changed != 'true' && !inputs.RUN_ONLY_SINGLE_NODE_PERF }}
 
       - name: Run parallel execution benchmark in performance build mode
         shell: bash
         run: testsuite/parallel_execution_performance.py
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: ${{ needs.file_change_determinator.outputs.only_docs_changed != 'true' && !inputs.RUN_ONLY_SINGLE_NODE_PERF }}
 
-      - run: echo "Skipping parallel execution performance! Unrelated changes detected."
-        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
+      - run: echo "Skipping parallel execution performance!"
+        if: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' || inputs.RUN_ONLY_SINGLE_NODE_PERF }}
 
   # Run single node execution performance tests
   single-node-performance:
