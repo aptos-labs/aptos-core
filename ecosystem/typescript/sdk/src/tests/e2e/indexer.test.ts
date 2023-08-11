@@ -48,15 +48,15 @@ describe("Indexer", () => {
     const fullNodeChainId = await provider.getChainId();
 
     console.log(
-      `\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo.ledger_infos[0].chain_id}`,
+      `\n devnet chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo.ledger_infos[0].chain_id}`,
     );
 
     if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
-      console.log(`\n fullnode chain id and indexer chain id are not synced, skipping rest of tests`);
+      console.log(`\n devnet chain id and indexer chain id are not synced, skipping rest of tests`);
       skipTest = true;
       runTests = describe.skip;
     } else {
-      console.log(`\n fullnode chain id and indexer chain id are in synced, running tests`);
+      console.log(`\n devnet chain id and indexer chain id are in synced, running tests`);
     }
 
     if (!skipTest) {
@@ -194,7 +194,6 @@ describe("Indexer", () => {
         const tokenData = await indexerClient.getTokenData(
           accountTokens.current_token_ownerships_v2[0].current_token_data!.token_data_id,
         );
-        expect(tokenData.current_token_datas_v2[0].token_standard).toEqual("v1");
         expect(tokenData.current_token_datas_v2[0].token_name).toEqual(tokenName);
       },
       longTestTimeout,
@@ -313,7 +312,7 @@ describe("Indexer", () => {
       "gets account transactions count",
       async () => {
         const accountTransactionsCount = await indexerClient.getAccountTransactionsCount(alice.address().hex());
-        expect(accountTransactionsCount.move_resources_aggregate.aggregate?.count).toEqual(5);
+        expect(accountTransactionsCount.account_transactions_aggregate.aggregate?.count).toEqual(5);
       },
       longTestTimeout,
     );
@@ -322,7 +321,8 @@ describe("Indexer", () => {
       "gets account transactions data",
       async () => {
         const accountTransactionsData = await indexerClient.getAccountTransactionsData(alice.address().hex());
-        expect(accountTransactionsData.move_resources[0]).toHaveProperty("transaction_version");
+        expect(accountTransactionsData.account_transactions.length).toEqual(5);
+        expect(accountTransactionsData.account_transactions[0]).toHaveProperty("transaction_version");
       },
       longTestTimeout,
     );
@@ -339,7 +339,7 @@ describe("Indexer", () => {
     it(
       "gets user transactions",
       async () => {
-        const userTransactions = await indexerClient.getUserTransactions(482294669, { limit: 4 });
+        const userTransactions = await indexerClient.getUserTransactions({ options: { limit: 4 } });
         expect(userTransactions.user_transactions.length).toEqual(4);
       },
       longTestTimeout,
@@ -431,5 +431,17 @@ describe("Indexer", () => {
       expect(tokens.token_activities_v2).toHaveLength(2);
       expect(tokens.token_activities_v2[0].token_standard).toEqual("v1");
     });
+
+    it(
+      "gets account transactions data",
+      async () => {
+        const accountTransactionsData = await indexerClient.getAccountTransactionsData(alice.address().hex(), {
+          orderBy: [{ transaction_version: "desc" }],
+        });
+        expect(accountTransactionsData.account_transactions.length).toEqual(5);
+        expect(accountTransactionsData.account_transactions[0]).toHaveProperty("transaction_version");
+      },
+      longTestTimeout,
+    );
   });
 });

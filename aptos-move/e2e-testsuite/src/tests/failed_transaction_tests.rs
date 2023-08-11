@@ -38,7 +38,8 @@ fn failed_transaction_cleanup_test() {
     };
 
     let gas_params = AptosGasParameters::zeros();
-    let storage_gas_params = StorageGasParameters::free_and_unlimited();
+    let storage_gas_params =
+        StorageGasParameters::unlimited(gas_params.vm.txn.free_write_bytes_quota);
 
     let change_set_configs = storage_gas_params.change_set_configs.clone();
 
