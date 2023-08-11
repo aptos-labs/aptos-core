@@ -95,17 +95,18 @@ spec aptos_framework::reconfiguration {
         include features::spec_periodical_reward_rate_decrease_enabled() ==> staking_config::StakingRewardsConfigEnabledRequirement;
         include features::spec_collect_and_distribute_gas_fees_enabled() ==> aptos_coin::ExistsAptosCoin;
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
-        include staking_config::StakingRewardsConfigRequirement;
         aborts_if false;
 
         // The ensure conditions of the reconfigure function are not fully written, because there is a new cycle in it,
         // but its existing ensure conditions satisfy hp.
         let success = !(chain_status::is_genesis() || timestamp::spec_now_microseconds() == 0 || !reconfiguration_enabled())
             && timestamp::spec_now_microseconds() != global<Configuration>(@aptos_framework).last_reconfiguration_time;
+        // The property below is not proved within 500s and still cause an timeout
         // property 3: Synchronization of NewEpochEvent counter with configuration epoch.
         ensures success ==> global<Configuration>(@aptos_framework).epoch == old(global<Configuration>(@aptos_framework).epoch) + 1;
         ensures success ==> global<Configuration>(@aptos_framework).last_reconfiguration_time == timestamp::spec_now_microseconds();
-        // property 4: Only performs reconfiguration if genesis has started and reconfiguration is enabled.
+        // We remove the ensures of event increment due to inconsisency
+        // TODO: property 4: Only performs reconfiguration if genesis has started and reconfiguration is enabled.
         // Also, the last reconfiguration must not be the current time, returning early without further actions otherwise.
         // property 5: Consecutive reconfigurations without the passage of time are not permitted.
         ensures !success ==> global<Configuration>(@aptos_framework).epoch == old(global<Configuration>(@aptos_framework).epoch);
