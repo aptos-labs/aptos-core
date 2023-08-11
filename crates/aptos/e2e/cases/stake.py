@@ -359,7 +359,7 @@ def test_stake_withdraw_stake_after_unlock(run_helper: RunHelper, test_name=None
 
 
 @test_case
-def test_stake_request_commisson(run_helper: RunHelper, test_name=None):
+def test_stake_request_commission(run_helper: RunHelper, test_name=None):
     # create a new account
     run_helper.run_command(
         test_name,
@@ -367,7 +367,7 @@ def test_stake_request_commisson(run_helper: RunHelper, test_name=None):
             "aptos",
             "init",
             "--profile",
-            "request_comisson",
+            "request_commission",
             "--assume-yes",
             "--network",
             "local",
@@ -383,11 +383,11 @@ def test_stake_request_commisson(run_helper: RunHelper, test_name=None):
             "stake",
             "create-staking-contract",
             "--profile",
-            "request_comisson",
+            "request_commission",
             "--operator",
-            "request_comisson",
+            "request_commission",
             "--voter",
-            "request_comisson",
+            "request_commission",
             "--amount",
             "3",
             "--commission-percentage",
@@ -404,11 +404,11 @@ def test_stake_request_commisson(run_helper: RunHelper, test_name=None):
             "stake",
             "request-commission",
             "--profile",
-            "request_comisson",
+            "request_commission",
             "--owner-address",
-            "request_comisson",
+            "request_commission",
             "--operator-address",
-            "request_comisson",
+            "request_commission",
             "--assume-yes",
         ],
     )
