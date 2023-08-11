@@ -1,25 +1,37 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{storage::DAGStorage, types::DAGMessage};
+use super::{
+    storage::DAGStorage,
+    types::{CertifiedAck, DAGMessage},
+    RpcHandler,
+};
 use crate::{
     dag::{
         dag_store::Dag,
         types::{CertificateAckState, CertifiedNode, Node, NodeCertificate, SignatureBuilder},
     },
     state_replication::PayloadClient,
-    util::time_service::TimeService,
 };
+use anyhow::bail;
 use aptos_consensus_types::common::{Author, Payload};
 use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{block_info::Round, epoch_state::EpochState};
 use futures::{
     future::{AbortHandle, Abortable},
     FutureExt,
 };
 use std::sync::Arc;
+use thiserror::Error as ThisError;
 use tokio_retry::strategy::ExponentialBackoff;
+
+#[derive(Debug, ThisError)]
+pub enum DagDriverError {
+    #[error("missing parents")]
+    MissingParents,
+}
 
 pub(crate) struct DagDriver {
     author: Author,
@@ -28,7 +40,7 @@ pub(crate) struct DagDriver {
     payload_client: Arc<dyn PayloadClient>,
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
     current_round: Round,
-    time_service: Arc<dyn TimeService>,
+    time_service: TimeService,
     rb_abort_handle: Option<AbortHandle>,
     storage: Arc<dyn DAGStorage>,
 }
@@ -41,7 +53,7 @@ impl DagDriver {
         payload_client: Arc<dyn PayloadClient>,
         reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
         current_round: Round,
-        time_service: Arc<dyn TimeService>,
+        time_service: TimeService,
         storage: Arc<dyn DAGStorage>,
     ) -> Self {
         // TODO: rebroadcast nodes after recovery
@@ -58,21 +70,33 @@ impl DagDriver {
         }
     }
 
+    pub fn try_enter_new_round(&mut self) {
+        // In case of a new epoch, kickstart building the DAG by entering the next round
+        // without any parents.
+        if self.current_round == 0 {
+            self.enter_new_round(vec![]);
+        }
+        // TODO: add logic to handle building DAG from the middle, etc.
+    }
+
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
         let mut dag_writer = self.dag.write();
         let round = node.metadata().round();
-        if dag_writer.all_exists(node.parents_metadata()) {
-            dag_writer.add_node(node)?;
-            if self.current_round == round {
-                let maybe_strong_links = dag_writer
-                    .get_strong_links_for_round(self.current_round, &self.epoch_state.verifier);
-                drop(dag_writer);
-                if let Some(strong_links) = maybe_strong_links {
-                    self.enter_new_round(strong_links);
-                }
+
+        if !dag_writer.all_exists(node.parents_metadata()) {
+            // TODO(ibalajiarun): implement fetching logic.
+            bail!(DagDriverError::MissingParents);
+        }
+
+        dag_writer.add_node(node)?;
+        if self.current_round == round {
+            let maybe_strong_links = dag_writer
+                .get_strong_links_for_round(self.current_round, &self.epoch_state.verifier);
+            drop(dag_writer);
+            if let Some(strong_links) = maybe_strong_links {
+                self.enter_new_round(strong_links);
             }
         }
-        // TODO: handle fetching missing dependencies
         Ok(())
     }
 
@@ -80,7 +104,7 @@ impl DagDriver {
         // TODO: support pulling payload
         let payload = Payload::empty(false);
         // TODO: need to wait to pass median of parents timestamp
-        let timestamp = self.time_service.get_current_timestamp();
+        let timestamp = self.time_service.now_unix_time();
         self.current_round += 1;
         let new_node = Node::new(
             self.epoch_state.epoch,
@@ -113,5 +137,24 @@ impl DagDriver {
         if let Some(prev_handle) = self.rb_abort_handle.replace(abort_handle) {
             prev_handle.abort();
         }
+    }
+}
+
+impl RpcHandler for DagDriver {
+    type Request = CertifiedNode;
+    type Response = CertifiedAck;
+
+    fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
+        let epoch = node.metadata().epoch();
+        {
+            let dag_reader = self.dag.read();
+            if dag_reader.exists(node.metadata()) {
+                return Ok(CertifiedAck::new(node.metadata().epoch()));
+            }
+        }
+
+        self.add_node(node)?;
+
+        Ok(CertifiedAck::new(epoch))
     }
 }
