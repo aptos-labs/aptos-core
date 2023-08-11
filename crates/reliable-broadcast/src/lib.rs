@@ -11,7 +11,12 @@ pub trait RBMessage: Send + Sync + Clone {}
 
 #[async_trait]
 pub trait RBNetworkSender<M: RBMessage>: Send + Sync {
-    async fn send_rpc(&self, receiver: Author, message: M, timeout: Duration) -> anyhow::Result<M>;
+    async fn send_rb_rpc(
+        &self,
+        receiver: Author,
+        message: M,
+        timeout: Duration,
+    ) -> anyhow::Result<M>;
 }
 
 pub trait BroadcastStatus<M: RBMessage> {
@@ -74,7 +79,7 @@ where
                     (
                         receiver,
                         network_sender
-                            .send_rpc(receiver, message, Duration::from_millis(500))
+                            .send_rb_rpc(receiver, message, Duration::from_millis(500))
                             .await,
                     )
                 }

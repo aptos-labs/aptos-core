@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+anyhow = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-id-generator = { workspace = true }
 aptos-infallible = { workspace = true }

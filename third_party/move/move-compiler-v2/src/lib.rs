@@ -6,7 +6,9 @@ mod bytecode_generator;
 mod experiments;
 mod file_format_generator;
 mod options;
+pub mod pipeline;
 
+use crate::pipeline::livevar_analysis_processor::LiveVarAnalysisProcessor;
 use anyhow::anyhow;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
 pub use experiments::*;
@@ -121,9 +123,9 @@ pub fn run_file_format_gen(
 
 /// Returns the bytecode processing pipeline.
 pub fn bytecode_pipeline(_env: &GlobalEnv) -> FunctionTargetPipeline {
-    // TODO: insert processors here as we proceed.
-    // Use `env.get_extension::<Options>()` to access compiler options
-    FunctionTargetPipeline::default()
+    let mut pipeline = FunctionTargetPipeline::default();
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor()));
+    pipeline
 }
 
 /// Report any diags in the env to the writer and fail if there are errors.

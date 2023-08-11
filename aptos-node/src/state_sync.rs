@@ -9,7 +9,9 @@ use aptos_data_streaming_service::{
     streaming_client::{new_streaming_service_client_listener_pair, StreamingServiceClient},
     streaming_service::DataStreamingService,
 };
-use aptos_event_notifications::{EventSubscriptionService, ReconfigNotificationListener};
+use aptos_event_notifications::{
+    DbBackedOnChainConfig, EventSubscriptionService, ReconfigNotificationListener,
+};
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_infallible::RwLock;
 use aptos_mempool_notifications::MempoolNotificationListener;
@@ -29,7 +31,7 @@ use aptos_storage_service_server::{
 };
 use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
-use aptos_types::{on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint};
+use aptos_types::waypoint::Waypoint;
 use aptos_vm::AptosVM;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -41,14 +43,12 @@ pub fn create_event_subscription_service(
     db_rw: &DbReaderWriter,
 ) -> (
     EventSubscriptionService,
-    ReconfigNotificationListener,
-    Option<ReconfigNotificationListener>,
+    ReconfigNotificationListener<DbBackedOnChainConfig>,
+    Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
 ) {
     // Create the event subscription service
-    let mut event_subscription_service = EventSubscriptionService::new(
-        ON_CHAIN_CONFIG_REGISTRY,
-        Arc::new(RwLock::new(db_rw.clone())),
-    );
+    let mut event_subscription_service =
+        EventSubscriptionService::new(Arc::new(RwLock::new(db_rw.clone())));
 
     // Create a reconfiguration subscription for mempool
     let mempool_reconfig_subscription = event_subscription_service

@@ -6,7 +6,9 @@ use crate::{
         nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
     },
     utils::{
-        database::{establish_connection_pool, run_migrations, upsert_uris},
+        database::{
+            check_or_update_chain_id, establish_connection_pool, run_migrations, upsert_uris,
+        },
         gcs::{write_image_to_gcs, write_json_to_gcs},
         image_optimizer::ImageOptimizer,
         json_parser::JSONParser,
@@ -40,7 +42,7 @@ use tracing::{error, info};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ParserConfig {
-    pub google_application_credentials: String,
+    pub google_application_credentials: Option<String>,
     pub bucket: String,
     pub subscription_name: String,
     pub database_url: String,
@@ -49,6 +51,7 @@ pub struct ParserConfig {
     pub num_parsers: usize,
     pub max_file_size_bytes: u32,
     pub image_quality: u8, // Quality up to 100
+    pub ack_parsed_uris: Option<bool>,
 }
 
 /// Subscribes to PubSub and sends URIs to Channel
@@ -60,27 +63,51 @@ async fn consume_pubsub_entries_to_channel_loop(
     subscription: Subscription,
     pool: Pool<ConnectionManager<PgConnection>>,
 ) -> anyhow::Result<()> {
+    let mut db_chain_id = None;
     let mut stream = subscription.subscribe(None).await?;
     while let Some(msg) = stream.next().await {
         // Parse metadata from Pubsub message and create worker
         let ack = msg.ack_id();
         let entry_string = String::from_utf8(msg.message.clone().data)?;
         let parts: Vec<&str> = entry_string.split(',').collect();
-        let entry = Worker::new(
+
+        let mut conn = pool.get()?;
+        let grpc_chain_id = parts[4].parse::<u64>()?;
+
+        if let Some(existing_id) = db_chain_id {
+            if grpc_chain_id != existing_id {
+                error!(
+                    chain_id = grpc_chain_id,
+                    existing_id = existing_id,
+                    "[NFT Metadata Crawler] Stream somehow changed chain id!",
+                );
+                panic!("[NFT Metadata Crawler] Stream somehow changed chain id!");
+            }
+        } else {
+            db_chain_id = Some(
+                check_or_update_chain_id(&mut conn, grpc_chain_id as i64)
+                    .expect("Chain id should match"),
+            );
+        }
+
+        let worker = Worker::new(
             parser_config.clone(),
-            pool.get()?,
+            conn,
             parts[0].to_string(),
             parts[1].to_string(),
             parts[2].to_string().parse()?,
             NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S %Z").unwrap_or(
                 NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S%.f %Z")?,
             ),
-            parts[4].parse::<bool>().unwrap_or(false),
+            parts[5].parse::<bool>().unwrap_or(false),
         );
 
         // Send worker to channel
-        sender.send((entry, ack.to_string())).unwrap_or_else(|e| {
-            error!("Failed to send entry to channel: {:?}", e);
+        sender.send((worker, ack.to_string())).unwrap_or_else(|e| {
+            error!(
+                error = ?e,
+                "[NFT Metadata Crawler] Failed to send PubSub entry to channel"
+            );
         });
     }
 
@@ -92,16 +119,26 @@ async fn spawn_parser(
     semaphore: Arc<Semaphore>,
     receiver: Arc<Mutex<Receiver<(Worker, String)>>>,
     subscription: Subscription,
+    release: bool,
 ) -> anyhow::Result<()> {
     loop {
         let _ = semaphore.acquire().await?;
 
         // Pulls worker from Channel
-        let (mut parser, ack) = receiver.lock().await.recv()?;
-        parser.parse().await?;
+        let (mut worker, ack) = receiver.lock().await.recv()?;
+        worker.parse().await?;
 
-        // Sends ack to PubSub
-        subscription.ack(vec![ack]).await?;
+        // Sends ack to PubSub only if running on release mode
+        if release {
+            info!(
+                token_data_id = worker.token_data_id,
+                token_uri = worker.token_uri,
+                last_transaction_version = worker.last_transaction_version,
+                force = worker.force,
+                "[NFT Metadata Crawler] Acking message"
+            );
+            subscription.ack(vec![ack]).await?;
+        }
 
         sleep(Duration::from_millis(500)).await;
     }
@@ -111,6 +148,11 @@ async fn spawn_parser(
 impl RunnableConfig for ParserConfig {
     /// Main driver function that establishes a connection to Pubsub and parses the Pubsub entries in parallel
     async fn run(&self) -> anyhow::Result<()> {
+        info!(
+            "[NFT Metadata Crawler] Starting parser with config: {:?}",
+            self
+        );
+
         info!("[NFT Metadata Crawler] Connecting to database");
         let pool = establish_connection_pool(self.database_url.clone());
         info!("[NFT Metadata Crawler] Database connection successful");
@@ -119,10 +161,12 @@ impl RunnableConfig for ParserConfig {
         run_migrations(&pool);
         info!("[NFT Metadata Crawler] Finished migrations");
 
-        std::env::set_var(
-            "GOOGLE_APPLICATION_CREDENTIALS",
-            self.google_application_credentials.clone(),
-        );
+        if let Some(google_application_credentials) = self.google_application_credentials.clone() {
+            std::env::set_var(
+                "GOOGLE_APPLICATION_CREDENTIALS",
+                google_application_credentials,
+            );
+        }
 
         // Establish gRPC client
         let config = ClientConfig::default().with_auth().await?;
@@ -149,6 +193,7 @@ impl RunnableConfig for ParserConfig {
                 Arc::clone(&semaphore),
                 Arc::clone(&receiver),
                 subscription.clone(),
+                self.ack_parsed_uris.unwrap_or(false),
             ));
 
             workers.push(worker);
@@ -212,7 +257,7 @@ impl Worker {
     pub async fn parse(&mut self) -> anyhow::Result<()> {
         info!(
             last_transaction_version = self.last_transaction_version,
-            "[NFT Metadata Crawler] Starting parser"
+            "[NFT Metadata Crawler] Starting worker"
         );
 
         // Deduplicate token_uri
@@ -250,11 +295,24 @@ impl Worker {
 
             // Save parsed JSON to GCS
             if json != Value::Null {
-                let cdn_json_uri =
+                let cdn_json_uri_result =
                     write_json_to_gcs(self.config.bucket.clone(), self.token_data_id.clone(), json)
-                        .await
-                        .map(|value| format!("{}{}", self.config.cdn_prefix, value))
-                        .ok();
+                        .await;
+
+                if let Err(e) = cdn_json_uri_result.as_ref() {
+                    error!(
+                        token_data_id=self.token_data_id,
+                        token_uri=self.token_uri,
+                        last_transaction_version = self.last_transaction_version,
+                        force = self.force,
+                        error = ?e,
+                        "[NFT Metadata Crawler] Failed to write JSON to GCS"
+                    );
+                }
+
+                let cdn_json_uri = cdn_json_uri_result
+                    .map(|value| format!("{}{}", self.config.cdn_prefix, value))
+                    .ok();
                 self.model.set_cdn_json_uri(cdn_json_uri);
             }
 
@@ -281,8 +339,8 @@ impl Worker {
                 .model
                 .get_raw_image_uri()
                 .unwrap_or(self.model.get_token_uri());
-            let img_uri = URIParser::parse(self.config.ipfs_prefix.clone(), raw_image_uri)
-                .unwrap_or(self.model.get_token_uri());
+            let img_uri = URIParser::parse(self.config.ipfs_prefix.clone(), raw_image_uri.clone())
+                .unwrap_or(raw_image_uri);
 
             // Resize and optimize image and animation
             let (image, format) = ImageOptimizer::optimize(
@@ -304,26 +362,39 @@ impl Worker {
 
             if !image.is_empty() {
                 // Save resized and optimized image to GCS
-                let cdn_image_uri = write_image_to_gcs(
+                let cdn_image_uri_result = write_image_to_gcs(
                     format,
                     self.config.bucket.clone(),
                     self.token_data_id.clone(),
                     image,
                 )
-                .await
-                .map(|value| format!("{}{}", self.config.cdn_prefix, value))
-                .ok();
+                .await;
+
+                if let Err(e) = cdn_image_uri_result.as_ref() {
+                    error!(
+                        token_data_id=self.token_data_id,
+                        token_uri=self.token_uri,
+                        last_transaction_version = self.last_transaction_version,
+                        force = self.force,
+                        error = ?e,
+                        "[NFT Metadata Crawler] Failed to write image to GCS"
+                    );
+                }
+
+                let cdn_image_uri = cdn_image_uri_result
+                    .map(|value| format!("{}{}", self.config.cdn_prefix, value))
+                    .ok();
                 self.model.set_cdn_image_uri(cdn_image_uri);
             }
+        }
 
-            // Commit model to Postgres
-            if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
-                error!(
-                    last_transaction_version = self.last_transaction_version,
-                    error = ?e,
-                    "[NFT Metadata Crawler] Commit to Postgres failed"
-                );
-            }
+        // Commit model to Postgres
+        if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
+            error!(
+                last_transaction_version = self.last_transaction_version,
+                error = ?e,
+                "[NFT Metadata Crawler] Commit to Postgres failed"
+            );
         }
 
         // Deduplicate raw_animation_uri
@@ -365,26 +436,39 @@ impl Worker {
 
             // Save resized and optimized animation to GCS
             if !animation.is_empty() {
-                let cdn_animation_uri = write_image_to_gcs(
+                let cdn_animation_uri_result = write_image_to_gcs(
                     format,
                     self.config.bucket.clone(),
                     self.token_data_id.clone(),
                     animation,
                 )
-                .await
-                .map(|value| format!("{}{}", self.config.cdn_prefix, value))
-                .ok();
+                .await;
+
+                if let Err(e) = cdn_animation_uri_result.as_ref() {
+                    error!(
+                        token_data_id=self.token_data_id,
+                        token_uri=self.token_uri,
+                        last_transaction_version = self.last_transaction_version,
+                        force = self.force,
+                        error = ?e,
+                        "[NFT Metadata Crawler] Failed to write animation to GCS"
+                    );
+                }
+
+                let cdn_animation_uri = cdn_animation_uri_result
+                    .map(|value| format!("{}{}", self.config.cdn_prefix, value))
+                    .ok();
                 self.model.set_cdn_animation_uri(cdn_animation_uri);
             }
+        }
 
-            // Commit model to Postgres
-            if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
-                error!(
-                    last_transaction_version = self.last_transaction_version,
-                    error = ?e,
-                    "[NFT Metadata Crawler] Commit to Postgres failed"
-                );
-            }
+        // Commit model to Postgres
+        if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
+            error!(
+                last_transaction_version = self.last_transaction_version,
+                error = ?e,
+                "[NFT Metadata Crawler] Commit to Postgres failed"
+            );
         }
 
         Ok(())

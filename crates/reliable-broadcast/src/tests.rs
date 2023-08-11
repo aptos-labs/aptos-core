@@ -87,7 +87,7 @@ where
     TestAck: TryFrom<M> + Into<M>,
     TestMessage: TryFrom<M, Error = anyhow::Error> + Into<M>,
 {
-    async fn send_rpc(
+    async fn send_rb_rpc(
         &self,
         receiver: Author,
         message: M,

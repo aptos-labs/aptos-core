@@ -54,7 +54,7 @@ Example command:
 ```bash
 aptos node bootstrap-db \ 
     --target-version 500000000 \
-    --command-adapter-config /path/to/s3-public.yaml \
+    --command-adapter-config /path/to/gcs.yaml \
     --target-db-dir /path/to/local/db
 ```
 
@@ -74,7 +74,7 @@ Example command:
 aptos node bootstrap-db \ 
     --ledger-history-start-version 150000000 \
     --target-version 155000000 
-    --command-adapter-config /path/to/s3-public.yaml \
+    --command-adapter-config /path/to/gcs.yaml \
     --target-db-dir /path/to/local/db
 ```
 
@@ -87,9 +87,14 @@ Example command:
 aptos node bootstrap-db \
 --ledger-history-start-version 0 \
 --target-version use_the_largest_version_in_backup \
---command-adapter-config /path/to/s3-public.yaml \
+--command-adapter-config /path/to/gcs.yaml \
 --target-db-dir /path/to/local/db
 ```
+
+:::tip
+If you don't specify the target_version (via `--target-version`), the tool will use the latest version in the backup as the target version.
+:::
+
 Disable the pruner in the node config to prevent the early history from being pruned when you start the node.
 ```Yaml
 storage:
