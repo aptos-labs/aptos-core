@@ -48,6 +48,8 @@ pub struct IndexerGrpcDataServiceConfig {
     // The address for TLS and non-TLS gRPC server to listen on.
     pub data_service_grpc_tls_config: Option<TlsConfig>,
     pub data_service_grpc_non_tls_config: Option<NonTlsConfig>,
+    // The size of the response channel that response can be buffered.
+    pub data_service_response_channel_size: Option<usize>,
     // A list of auth tokens that are allowed to access the service.
     pub whitelisted_auth_tokens: Vec<String>,
     // File store config.
@@ -91,6 +93,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
         let server = RawDataServerWrapper::new(
             self.redis_read_replica_address.clone(),
             self.file_store_config.clone(),
+            self.data_service_response_channel_size,
         );
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Gzip)

@@ -49,6 +49,75 @@ fun globals::write($t0: address, $t1: u64): u64 {
   6: return $t2
 }
 
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun globals::check($t0: address): bool {
+     var $t1: bool
+     # live vars: $t0
+  0: $t1 := exists<globals::R>($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun globals::publish($t0: &signer) {
+     var $t1: globals::R
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := pack globals::R($t2)
+     # live vars: $t0, $t1
+  2: move_to<globals::R>($t0, $t1)
+     # live vars:
+  3: return ()
+}
+
+
+[variant baseline]
+fun globals::read($t0: address): u64 {
+     var $t1: u64
+     var $t2: &globals::R
+     var $t3: &globals::R
+     var $t4: &u64
+     # live vars: $t0
+  0: $t3 := borrow_global<globals::R>($t0)
+     # live vars: $t3
+  1: $t2 := move($t3)
+     # live vars: $t2
+  2: $t4 := borrow_field<globals::R>.f($t2)
+     # live vars: $t4
+  3: $t1 := read_ref($t4)
+     # live vars: $t1
+  4: return $t1
+}
+
+
+[variant baseline]
+fun globals::write($t0: address, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &mut globals::R
+     var $t4: &mut globals::R
+     var $t5: u64
+     var $t6: &mut u64
+     # live vars: $t0
+  0: $t4 := borrow_global<globals::R>($t0)
+     # live vars: $t4
+  1: $t3 := move($t4)
+     # live vars: $t3
+  2: $t5 := 2
+     # live vars: $t3, $t5
+  3: $t6 := borrow_field<globals::R>.f($t3)
+     # live vars: $t5, $t6
+  4: write_ref($t6, $t5)
+     # live vars:
+  5: $t2 := 9
+     # live vars: $t2
+  6: return $t2
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v6
@@ -59,7 +128,7 @@ struct R has store {
 
 check(Arg0: address): bool {
 B0:
-	0: CopyLoc[0](Arg0: address)
+	0: MoveLoc[0](Arg0: address)
 	1: Exists[0](R)
 	2: Ret
 }
@@ -68,28 +137,28 @@ B0:
 	0: LdConst[0](U64: [1, 0, 0, 0, 0, 0, 0, 0])
 	1: Pack[0](R)
 	2: StLoc[1](loc0: R)
-	3: CopyLoc[0](Arg0: &signer)
+	3: MoveLoc[0](Arg0: &signer)
 	4: MoveLoc[1](loc0: R)
 	5: MoveTo[0](R)
 	6: Ret
 }
 read(Arg0: address): u64 {
 B0:
-	0: CopyLoc[0](Arg0: address)
+	0: MoveLoc[0](Arg0: address)
 	1: ImmBorrowGlobal[0](R)
 	2: StLoc[1](loc0: &R)
-	3: CopyLoc[1](loc0: &R)
+	3: MoveLoc[1](loc0: &R)
 	4: ImmBorrowField[0](R.f: u64)
 	5: ReadRef
 	6: Ret
 }
 write(Arg0: address, Arg1: u64): u64 {
 B0:
-	0: CopyLoc[0](Arg0: address)
+	0: MoveLoc[0](Arg0: address)
 	1: MutBorrowGlobal[0](R)
 	2: StLoc[2](loc0: &mut R)
 	3: LdConst[1](U64: [2, 0, 0, 0, 0, 0, 0, 0])
-	4: CopyLoc[2](loc0: &mut R)
+	4: MoveLoc[2](loc0: &mut R)
 	5: MutBorrowField[0](R.f: u64)
 	6: WriteRef
 	7: LdConst[2](U64: [9, 0, 0, 0, 0, 0, 0, 0])

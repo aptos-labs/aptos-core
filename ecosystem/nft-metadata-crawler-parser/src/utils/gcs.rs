@@ -72,8 +72,7 @@ pub async fn write_image_to_gcs(
             buffer,
             &upload_type,
         )
-        .await
-        .context("Error uploading image to GCS")?;
+        .await?;
 
     Ok(filename)
 }

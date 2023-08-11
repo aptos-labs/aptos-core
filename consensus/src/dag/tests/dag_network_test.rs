@@ -7,6 +7,7 @@ use crate::dag::{
 use anyhow::{anyhow, bail};
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
+use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::validator_verifier::random_validator_verifier;
 use async_trait::async_trait;
@@ -25,6 +26,18 @@ enum TestPeerState {
 struct MockDAGNetworkSender {
     time_service: TimeService,
     test_peer_state: Arc<Mutex<HashMap<Author, TestPeerState>>>,
+}
+
+#[async_trait]
+impl RBNetworkSender<DAGMessage> for MockDAGNetworkSender {
+    async fn send_rb_rpc(
+        &self,
+        _receiver: Author,
+        _message: DAGMessage,
+        _timeout: Duration,
+    ) -> anyhow::Result<DAGMessage> {
+        unimplemented!()
+    }
 }
 
 #[async_trait]
