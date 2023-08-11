@@ -730,9 +730,6 @@ impl BlockPartitioner for PartitionerV2 {
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> PartitionedTransactions {
-        let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["preprocess"])
-            .start_timer();
         let num_txns = txns.len();
         let pre_partitioned = uniform_partition(num_txns, num_executor_shards);
         let mut session = WorkSession::new(
@@ -744,30 +741,17 @@ impl BlockPartitioner for PartitionerV2 {
             pre_partitioned,
         );
         session.init();
-        let _duration = timer.stop_and_record();
 
-        let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["multi_rounds"])
-            .start_timer();
         let (finalized_txn_matrix, start_index_matrix, new_idxs) =
             session.flatten_to_rounds(self.num_rounds_limit, self.avoid_pct, self.merge_discarded);
-        let _duration = timer.stop_and_record();
 
-        let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["add_edges"])
-            .start_timer();
         let ret = session.add_edges(&finalized_txn_matrix, &start_index_matrix, &new_idxs);
-        let _duration = timer.stop_and_record();
-        let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["drop"])
-            .start_timer();
         self.thread_pool.spawn(move || {
             drop(session);
             drop(finalized_txn_matrix);
             drop(start_index_matrix);
             drop(new_idxs);
         });
-        let _duration = timer.stop_and_record();
         ret
     }
 }
