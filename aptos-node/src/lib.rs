@@ -39,7 +39,8 @@ use std::{
 };
 use tokio::runtime::Runtime;
 
-const EPOCH_LENGTH_SECS: u64 = 60;
+// dkg todo
+const EPOCH_LENGTH_SECS: u64 = 30;
 
 /// Runs an Aptos validator or fullnode
 #[derive(Clone, Debug, Parser)]

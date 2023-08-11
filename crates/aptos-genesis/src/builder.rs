@@ -523,7 +523,7 @@ impl Builder {
         let name = index.to_string();
 
         let mut config = template.clone();
-        let mut genesis_stake_amount = 1;
+        let mut genesis_stake_amount = 1000000;
         if let Some(init_config) = &self.init_config {
             (init_config)(index, &mut config, &mut genesis_stake_amount);
         }
@@ -600,7 +600,7 @@ impl Builder {
 
         let mut genesis_config = GenesisConfiguration {
             allow_new_validators: false,
-            epoch_duration_secs: ONE_DAY,
+            epoch_duration_secs: 10, // dkg todo
             is_test: true,
             min_stake: 0,
             min_voting_threshold: 0,

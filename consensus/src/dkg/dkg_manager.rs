@@ -14,7 +14,7 @@ use aptos_dkg::{
     utils::random::random_scalar,
 };
 use aptos_infallible::Mutex;
-use aptos_logger::error;
+use aptos_logger::{error, debug};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -95,7 +95,6 @@ impl DKGManager {
 
     pub async fn start_dkg(&self, dkg_events: Vec<ContractEvent>) {
         // thread::sleep(Duration::from_millis(TRANSCRIPT_COMPUTE_TIME_MS));
-
         let dkg_rounding: DKGRounding = dkg_events
             .first()
             .map(|e| {
@@ -104,6 +103,15 @@ impl DKGManager {
                     .into()
             })
             .expect("[DKG]: Convertion from DKG events to DKG Rounding failed!");
+
+        debug!("[DKG] Starting DKG with the following parameters: \n
+        number of validators: {:?} \n
+        validator stakes: \n {:?} \n
+        validator weights: \n {:?} \n ",
+        dkg_rounding.validator_stakes().len(),
+        dkg_rounding.validator_stakes(),
+        dkg_rounding.validator_weights());
+
 
         let consensus_keys: Vec<<das::Transcript as Transcript>::EncryptPubKey> = dkg_rounding.validator_consensus_keys().iter().map(|k| k.to_bytes().as_slice().try_into().unwrap()).collect::<Vec<_>>();
 
@@ -156,6 +164,8 @@ impl DKGManager {
             trx_two_third: trx_2,
         };
         let dkg_node = DKGNode::new(self.epoch_state.epoch, self.author, dkg_trx_wrapper);
+
+        debug!("[DKG] Node {:?} finish computing DKG Node of epoch {:?}", self.author, dkg_node.epoch());
         self.broadcast_node(dkg_node);
     }
 
@@ -169,6 +179,7 @@ impl DKGManager {
         let task = self.reliable_broadcast.broadcast(node.clone(), ack_set);
         tokio::spawn(Abortable::new(task, abort_registration));
         self.rb_abort_handle.lock().replace(abort_handle);
+        debug!("[DKG] Node {:?} broadcast DKG Node of epoch {:?}", self.author, node.epoch());
     }
 
     pub(crate) fn broadcast_agg_node(&self, agg_node: DKGAggNode) {
@@ -181,6 +192,7 @@ impl DKGManager {
         if let Some(prev_handle) = self.rb_abort_handle.lock().replace(abort_handle) {
             prev_handle.abort();
         }
+        debug!("[DKG] Node {:?} broadcast DKG Aggregated Node of epoch {:?}", self.author, agg_node.epoch());
         // dkg todo: abort the broadcast when DKG is done
     }
 

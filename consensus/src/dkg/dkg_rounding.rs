@@ -22,12 +22,15 @@ pub struct DKGRounding {
 }
 
 impl DKGRounding {
+    pub fn validator_stakes(&self) -> &Vec<u64> {
+        &self.validator_stakes
+    }
     pub fn validator_consensus_keys(&self) -> &Vec<bls12381::PublicKey> {
         &self.validator_consensus_keys
     }
-    // pub fn validator_weights(&self) -> &Vec<usize> {
-    //     &self.validator_weights
-    // }
+    pub fn validator_weights(&self) -> &Vec<usize> {
+        &self.validator_weights
+    }
     // pub fn weights_of_one_third_stake(&self) -> usize {
     //     self.weights_of_one_third_stake
     // }

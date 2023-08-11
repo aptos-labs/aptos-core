@@ -10,7 +10,7 @@ use super::{
     types::{DKGAggNode, DKGAggNodeAck, DKGNodeAck},
     DKGNode,
 };
-use aptos_logger::error;
+use aptos_logger::{error, debug};
 
 // #[derive(ThisError, Debug)]
 // pub enum DKGNodeHandleError {
@@ -34,6 +34,7 @@ impl DKGRpcHandler for DKGNodeHandler {
 
     fn process(&mut self, node: Self::DKGRequest) -> anyhow::Result<Self::DKGResponse> {
         let epoch = node.epoch();
+        debug!("[DKG] Process DKG Node from {:?}", node.author());
         // dkg todo: persist the dkg nodes
         match self.dkg_manager.add_node(node) {
             Ok(_) => Ok(DKGNodeAck::new(epoch)),
@@ -67,6 +68,7 @@ impl DKGRpcHandler for DKGAggNodeHandler {
 
     fn process(&mut self, agg_node: Self::DKGRequest) -> anyhow::Result<Self::DKGResponse> {
         let epoch = agg_node.epoch();
+        debug!("[DKG] Process DKG Aggregated Node: {:?}", agg_node);
         // dkg todo: persist the dkg nodes
         match self.dkg_manager.add_agg_node(agg_node) {
             Ok(_) => Ok(DKGAggNodeAck::new(epoch)),

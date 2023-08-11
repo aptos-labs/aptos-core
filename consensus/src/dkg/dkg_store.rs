@@ -4,6 +4,7 @@
 use super::{types::DKGAggNode, DKGNode};
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
+use aptos_logger::debug;
 use aptos_types::{
     dkg::{DKGPvssConfig, DKGTranscriptWrapper},
     validator_verifier::ValidatorVerifier,
@@ -40,6 +41,7 @@ impl DKGStore {
         dkg_pvss_config: &DKGPvssConfig,
     ) -> anyhow::Result<Option<DKGAggNode>> {
         if self.agg_node.get().is_some() {
+            debug!("[DKG] Adding DKG Node failed due to agg node already available");
             return Ok(None);
         }
         let author = node.author();
@@ -49,6 +51,8 @@ impl DKGStore {
                 author
             ));
         }
+        debug!("[DKG] Adding DKG Node from author {:?}", author);
+
         self.nodes.insert(*node.author(), node.clone());
 
         // Aggregate the transcripts
@@ -61,8 +65,19 @@ impl DKGStore {
                 .unwrap()
                 .aggregate_with(dkg_pvss_config, node.transcript());
         }
+        debug!("[DKG] Aggregating DKG trx from author {:?}", author);
 
         let authors: Vec<Author> = self.nodes.iter().map(|entry| *entry.key()).collect();
+
+        let mut aggregated_voting_power = 0;
+        for account_address in authors.clone() {
+            match validator_verifier.get_voting_power(&account_address) {
+                Some(voting_power) => aggregated_voting_power += voting_power as u128,
+                None => (),
+            }
+        }
+        debug!("[DKG] Node {:?} has aggregated stake {:?}, threshold stake {:?}", self.author, aggregated_voting_power, validator_verifier.total_voting_power() - validator_verifier.quorum_voting_power());
+
         // dkg todo: f+1 transcripts are sufficient to reconstruct the aggregated node
         if validator_verifier
             .check_voting_power(authors.iter(), false)
@@ -72,6 +87,10 @@ impl DKGStore {
                 node.epoch(),
                 self.author,
                 self.agg_trx.lock().take().unwrap(),
+            );
+            debug!(
+                "[DKG] Aggregated transcript is ready for epoch {:?}",
+                node.epoch()
             );
             return Ok(Some(agg_node));
         }
@@ -83,12 +102,16 @@ impl DKGStore {
             return Ok(None);
         }
         if self.agg_node.set(agg_node.clone()).is_ok() {
+            debug!("[DKG] Adding DKG Aggregated Node for epoch {:?}", agg_node.epoch());
             return Ok(Some(agg_node));
         }
         Ok(None)
     }
 
     pub fn take_agg_node(&mut self) -> Option<DKGAggNode> {
+        if let Some(agg_node) = self.agg_node.get() {
+            debug!("[DKG] Taking DKG Aggregated Node for epoch {:?}", agg_node.epoch());
+        }
         self.agg_node.take()
     }
 }
