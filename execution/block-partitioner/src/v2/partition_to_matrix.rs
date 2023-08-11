@@ -18,7 +18,7 @@ impl PartitionerV2 {
     /// in a way that avoid in-round cross-shard conflicts.
     pub(crate) fn partition_to_matrix(state: &mut PartitionState) {
         let _timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["flatten_to_rounds"])
+            .with_label_values(&["partition_to_matrix"])
             .start_timer();
 
         let mut remaining_txns = mem::take(&mut state.pre_partitioned);
@@ -35,6 +35,10 @@ impl PartitionerV2 {
                 break;
             }
         }
+
+        let _timer = MISC_TIMERS_SECONDS
+            .with_label_values(&["last_round"])
+            .start_timer();
 
         if state.merge_discarded {
             trace!("Merging txns after discarding stopped.");
@@ -61,7 +65,6 @@ impl PartitionerV2 {
                 });
         });
         state.finalized_txn_matrix.push(remaining_txns);
-        Self::build_index_from_txn_matrix(state);
     }
 
     /// Given some pre-partitioned txns, pull some off from each shard to avoid cross-shard conflict.
@@ -149,6 +152,10 @@ impl PartitionerV2 {
     }
 
     pub(crate) fn build_index_from_txn_matrix(state: &mut PartitionState) {
+        let _timer = MISC_TIMERS_SECONDS
+            .with_label_values(&["build_index_from_txn_matrix"])
+            .start_timer();
+
         let num_rounds = state.finalized_txn_matrix.len();
         state.start_index_matrix = vec![vec![0; state.num_executor_shards]; num_rounds];
         let mut global_counter: TxnIndex = 0;
