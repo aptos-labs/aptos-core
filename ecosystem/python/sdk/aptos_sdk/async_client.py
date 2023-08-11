@@ -232,6 +232,7 @@ class RestClient:
         self,
         transaction: RawTransaction,
         sender: Account,
+        estimate_gas_usage: bool = False,
     ) -> Dict[str, Any]:
         # Note that simulated transactions are not signed and have all 0 signatures!
         authenticator = Authenticator(
@@ -243,8 +244,16 @@ class RestClient:
         signed_transaction = SignedTransaction(transaction, authenticator)
 
         headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
+        params = {}
+        if estimate_gas_usage:
+            params = {
+                "estimate_gas_unit_price": "true",
+                "estimate_max_gas_amount": "true",
+            }
+
         response = await self.client.post(
             f"{self.base_url}/transactions/simulate",
+            params=params,
             headers=headers,
             content=signed_transaction.bytes(),
         )
@@ -742,6 +751,27 @@ class RestClient:
             "0x3::token::CollectionData",
             collection_name,
         )
+
+    async def transfer_object(
+        self, owner: Account, object: AccountAddress, to: AccountAddress
+    ) -> str:
+        transaction_arguments = [
+            TransactionArgument(object, Serializer.struct),
+            TransactionArgument(to, Serializer.struct),
+        ]
+
+        payload = EntryFunction.natural(
+            "0x1::object",
+            "transfer_call",
+            [],
+            transaction_arguments,
+        )
+
+        signed_transaction = await self.create_bcs_signed_transaction(
+            owner,
+            TransactionPayload(payload),
+        )
+        return await self.submit_bcs_transaction(signed_transaction)
 
 
 class FaucetClient:

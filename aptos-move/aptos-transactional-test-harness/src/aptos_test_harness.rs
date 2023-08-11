@@ -46,7 +46,7 @@ use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use move_transactional_test_runner::{
     framework::{run_test_impl, CompiledState, MoveTestAdapter},
     tasks::{InitCommand, SyntaxChoice, TaskInput},
-    vm_test_harness::view_resource_in_move_storage,
+    vm_test_harness::{view_resource_in_move_storage, TestRunConfig},
 };
 use move_vm_runtime::session::SerializedReturnValues;
 use once_cell::sync::Lazy;
@@ -553,6 +553,8 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
     fn init(
         default_syntax: SyntaxChoice,
+        _comparison_mode: bool,
+        _run_config: TestRunConfig,
         pre_compiled_deps: Option<&'a FullyCompiledProgram>,
         task_opt: Option<TaskInput<(InitCommand, Self::ExtraInitArgs)>>,
     ) -> (Self, Option<String>) {
@@ -959,5 +961,9 @@ fn render_events(events: &[ContractEvent]) -> Option<String> {
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     // TODO: remove once bundles removed
     aptos_vm::aptos_vm::allow_module_bundle_for_test();
-    run_test_impl::<AptosTestAdapter>(path, Some(&*PRECOMPILED_APTOS_FRAMEWORK))
+    run_test_impl::<AptosTestAdapter>(
+        TestRunConfig::CompilerV1,
+        path,
+        Some(&*PRECOMPILED_APTOS_FRAMEWORK),
+    )
 }

@@ -29,7 +29,7 @@ pub fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
 }
 
 //// sign transaction to create a Module and return transaction status
-pub fn sign_module_txn(
+pub fn execute_module_txn(
     executor: &mut FakeExecutor,
     account: &Account,
     payload: TransactionPayload,
@@ -61,11 +61,10 @@ pub fn sign_module_txn(
 }
 
 //// sign user transaction and only records the body of the transaction
-pub fn sign_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, function_name: &str) {
-    let start = Instant::now();
-    executor.exec_module(module_name, function_name, vec![], vec![]);
-    let elapsed = start.elapsed();
-    println!("running time (microseconds): {}", elapsed.as_micros());
+pub fn execute_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, function_name: &str) {
+    let elapsed =
+        executor.exec_func_record_running_time(module_name, function_name, vec![], vec![], 10);
+    println!("running time (microseconds): {}", elapsed);
 }
 
 //// publish module under user and sign user transaction
@@ -92,12 +91,12 @@ pub fn publish(
         print!("Signing txn for module... ");
         let module_payload = generate_module_payload(package);
         let counter = sequence_num_counter.try_into().unwrap();
-        sign_module_txn(executor, &creator, module_payload, counter);
+        execute_module_txn(executor, &creator, module_payload, counter);
 
         //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
         print!("Signing user txn... ");
         let module_name = get_module_name(address, identifier, &func_identifier);
-        sign_user_txn(executor, &module_name, &func_identifier);
+        execute_user_txn(executor, &module_name, &func_identifier);
     }
 }
 

@@ -1,0 +1,363 @@
+// !!! GENERATED FILE -- DO NOT EDIT MANUALLY !!!
+module 0xcafe.Call {
+    // Calling function with 0 args & 0 locals.
+    a0_l0() {
+        
+    label b0:
+        return;
+    }
+
+    public calibrate_call_a0_l0_impl(n: u64) {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        Self.a0_l0();
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_call_a0_l0_x100() {
+    label b0:
+        Self.calibrate_call_a0_l0_impl(10);
+        return;       
+    }
+
+    public entry calibrate_a0_l0_x500() {
+    label b0:
+        Self.calibrate_call_a0_l0_impl(50);
+        return;       
+    }
+
+    public entry calibrate_a0_l0_x1000() {
+    label b0:
+        Self.calibrate_call_a0_l0_impl(100);
+        return;       
+    }
+
+    // Calling function with 4 args & 0 locals.
+    a4_l0(a0: u64, a1: u64, a2: u64, a3: u64) {
+        
+    label b0:
+        return;
+    }
+
+    public calibrate_call_a4_l0_impl(n: u64) {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        Self.a4_l0(0, 0, 0, 0);
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_call_a4_l0_x100() {
+    label b0:
+        Self.calibrate_call_a4_l0_impl(10);
+        return;       
+    }
+
+    public entry calibrate_a4_l0_x500() {
+    label b0:
+        Self.calibrate_call_a4_l0_impl(50);
+        return;       
+    }
+
+    public entry calibrate_a4_l0_x1000() {
+    label b0:
+        Self.calibrate_call_a4_l0_impl(100);
+        return;       
+    }
+
+    // Calling function with 16 args & 0 locals.
+    a16_l0(a0: u64, a1: u64, a2: u64, a3: u64, a4: u64, a5: u64, a6: u64, a7: u64, a8: u64, a9: u64, a10: u64, a11: u64, a12: u64, a13: u64, a14: u64, a15: u64) {
+        
+    label b0:
+        return;
+    }
+
+    public calibrate_call_a16_l0_impl(n: u64) {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        Self.a16_l0(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_call_a16_l0_x100() {
+    label b0:
+        Self.calibrate_call_a16_l0_impl(10);
+        return;       
+    }
+
+    public entry calibrate_a16_l0_x500() {
+    label b0:
+        Self.calibrate_call_a16_l0_impl(50);
+        return;       
+    }
+
+    public entry calibrate_a16_l0_x1000() {
+    label b0:
+        Self.calibrate_call_a16_l0_impl(100);
+        return;       
+    }
+
+    // Calling function with 64 args & 0 locals.
+    a64_l0(a0: u64, a1: u64, a2: u64, a3: u64, a4: u64, a5: u64, a6: u64, a7: u64, a8: u64, a9: u64, a10: u64, a11: u64, a12: u64, a13: u64, a14: u64, a15: u64, a16: u64, a17: u64, a18: u64, a19: u64, a20: u64, a21: u64, a22: u64, a23: u64, a24: u64, a25: u64, a26: u64, a27: u64, a28: u64, a29: u64, a30: u64, a31: u64, a32: u64, a33: u64, a34: u64, a35: u64, a36: u64, a37: u64, a38: u64, a39: u64, a40: u64, a41: u64, a42: u64, a43: u64, a44: u64, a45: u64, a46: u64, a47: u64, a48: u64, a49: u64, a50: u64, a51: u64, a52: u64, a53: u64, a54: u64, a55: u64, a56: u64, a57: u64, a58: u64, a59: u64, a60: u64, a61: u64, a62: u64, a63: u64) {
+        
+    label b0:
+        return;
+    }
+
+    public calibrate_call_a64_l0_impl(n: u64) {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        Self.a64_l0(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_call_a64_l0_x100() {
+    label b0:
+        Self.calibrate_call_a64_l0_impl(10);
+        return;       
+    }
+
+    public entry calibrate_a64_l0_x500() {
+    label b0:
+        Self.calibrate_call_a64_l0_impl(50);
+        return;       
+    }
+
+    public entry calibrate_a64_l0_x1000() {
+    label b0:
+        Self.calibrate_call_a64_l0_impl(100);
+        return;       
+    }
+
+    // Calling function with 0 args & 4 locals.
+    a0_l4() {
+        let l0: u64;
+        let l1: u64;
+        let l2: u64;
+        let l3: u64;
+    label b0:
+        return;
+    }
+
+    public calibrate_call_a0_l4_impl(n: u64) {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        Self.a0_l4();
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_call_a0_l4_x100() {
+    label b0:
+        Self.calibrate_call_a0_l4_impl(10);
+        return;       
+    }
+
+    public entry calibrate_a0_l4_x500() {
+    label b0:
+        Self.calibrate_call_a0_l4_impl(50);
+        return;       
+    }
+
+    public entry calibrate_a0_l4_x1000() {
+    label b0:
+        Self.calibrate_call_a0_l4_impl(100);
+        return;       
+    }
+
+    // Calling function with 0 args & 16 locals.
+    a0_l16() {
+        let l0: u64;
+        let l1: u64;
+        let l2: u64;
+        let l3: u64;
+        let l4: u64;
+        let l5: u64;
+        let l6: u64;
+        let l7: u64;
+        let l8: u64;
+        let l9: u64;
+        let l10: u64;
+        let l11: u64;
+        let l12: u64;
+        let l13: u64;
+        let l14: u64;
+        let l15: u64;
+    label b0:
+        return;
+    }
+
+    public calibrate_call_a0_l16_impl(n: u64) {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        Self.a0_l16();
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_call_a0_l16_x100() {
+    label b0:
+        Self.calibrate_call_a0_l16_impl(10);
+        return;       
+    }
+
+    public entry calibrate_a0_l16_x500() {
+    label b0:
+        Self.calibrate_call_a0_l16_impl(50);
+        return;       
+    }
+
+    public entry calibrate_a0_l16_x1000() {
+    label b0:
+        Self.calibrate_call_a0_l16_impl(100);
+        return;       
+    }
+
+    // Calling function with 0 args & 64 locals.
+    a0_l64() {
+        let l0: u64;
+        let l1: u64;
+        let l2: u64;
+        let l3: u64;
+        let l4: u64;
+        let l5: u64;
+        let l6: u64;
+        let l7: u64;
+        let l8: u64;
+        let l9: u64;
+        let l10: u64;
+        let l11: u64;
+        let l12: u64;
+        let l13: u64;
+        let l14: u64;
+        let l15: u64;
+        let l16: u64;
+        let l17: u64;
+        let l18: u64;
+        let l19: u64;
+        let l20: u64;
+        let l21: u64;
+        let l22: u64;
+        let l23: u64;
+        let l24: u64;
+        let l25: u64;
+        let l26: u64;
+        let l27: u64;
+        let l28: u64;
+        let l29: u64;
+        let l30: u64;
+        let l31: u64;
+        let l32: u64;
+        let l33: u64;
+        let l34: u64;
+        let l35: u64;
+        let l36: u64;
+        let l37: u64;
+        let l38: u64;
+        let l39: u64;
+        let l40: u64;
+        let l41: u64;
+        let l42: u64;
+        let l43: u64;
+        let l44: u64;
+        let l45: u64;
+        let l46: u64;
+        let l47: u64;
+        let l48: u64;
+        let l49: u64;
+        let l50: u64;
+        let l51: u64;
+        let l52: u64;
+        let l53: u64;
+        let l54: u64;
+        let l55: u64;
+        let l56: u64;
+        let l57: u64;
+        let l58: u64;
+        let l59: u64;
+        let l60: u64;
+        let l61: u64;
+        let l62: u64;
+        let l63: u64;
+    label b0:
+        return;
+    }
+
+    public calibrate_call_a0_l64_impl(n: u64) {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        Self.a0_l64();
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_call_a0_l64_x100() {
+    label b0:
+        Self.calibrate_call_a0_l64_impl(10);
+        return;       
+    }
+
+    public entry calibrate_a0_l64_x500() {
+    label b0:
+        Self.calibrate_call_a0_l64_impl(50);
+        return;       
+    }
+
+    public entry calibrate_a0_l64_x1000() {
+    label b0:
+        Self.calibrate_call_a0_l64_impl(100);
+        return;       
+    }
+}
