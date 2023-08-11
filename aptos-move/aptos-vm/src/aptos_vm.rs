@@ -290,6 +290,7 @@ impl AptosVM {
         let mut session = self
             .0
             .new_session(resolver, SessionId::epilogue_meta(txn_data));
+        let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
 
         match TransactionStatus::from_vm_status(
             error_code.clone(),
@@ -314,7 +315,6 @@ impl AptosVM {
                     },
                     _ => status,
                 };
-                let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
                 // The transaction should be charged for gas, so run the epilogue to do that.
                 // This is running in a new session that drops any side effects from the
                 // attempted transaction (e.g., spending funds that were needed to pay for gas),
@@ -324,6 +324,7 @@ impl AptosVM {
                 if let Err(e) = self.0.run_failure_epilogue(
                     &mut session,
                     gas_meter.balance(),
+                    fee_statement,
                     txn_data,
                     log_context,
                 ) {
@@ -356,8 +357,13 @@ impl AptosVM {
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
         respawned_session.execute(|session| {
-            self.0
-                .run_success_epilogue(session, gas_meter.balance(), txn_data, log_context)
+            self.0.run_success_epilogue(
+                session,
+                gas_meter.balance(),
+                fee_statement,
+                txn_data,
+                log_context,
+            )
         })?;
         let change_set = respawned_session.finish(change_set_configs)?;
         let output = VMOutput::new(

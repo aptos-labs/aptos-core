@@ -6,6 +6,7 @@ module aptos_framework::transaction_fee {
     use aptos_framework::system_addresses;
     use std::error;
     use std::option::{Self, Option};
+    use aptos_framework::event;
 
     friend aptos_framework::block;
     friend aptos_framework::genesis;
@@ -30,6 +31,23 @@ module aptos_framework::transaction_fee {
         amount: AggregatableCoin<AptosCoin>,
         proposer: Option<address>,
         burn_percentage: u8,
+    }
+
+    #[event]
+    /// Summary of the fees charged and refunds issued for a transaction.
+    ///
+    /// This is meant to emitted as a module event.
+    struct FeeStatement has drop, store {
+        /// Total gas charge.
+        total_charge_gas_units: u64,
+        /// Execution gas charge.
+        execution_gas_units: u64,
+        /// IO gas charge.
+        io_gas_units: u64,
+        /// Storage fee charge.
+        storage_fee_octas: u64,
+        /// Storage fee refund.
+        storage_fee_refund_octas: u64,
     }
 
     /// Initializes the resource storing information about gas fees collection and
@@ -178,6 +196,11 @@ module aptos_framework::transaction_fee {
     public(friend) fun store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         move_to(aptos_framework, AptosCoinCapabilities { burn_cap })
+    }
+
+    // Called by the VM after epilogue.
+    fun emit_fee_statement(fee_statement: FeeStatement) {
+        event::emit(fee_statement)
     }
 
     #[test_only]
