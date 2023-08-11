@@ -51,8 +51,8 @@ mod build_edge;
 pub mod config;
 mod conflicting_txn_tracker;
 mod counters;
-mod flatten_to_rounds;
 mod init;
+mod partition_to_matrix;
 pub(crate) mod state;
 pub mod types;
 
@@ -127,7 +127,8 @@ impl BlockPartitioner for PartitionerV2 {
             self.merge_discarded,
         );
         Self::init(&mut state);
-        Self::flatten_to_rounds(&mut state);
+        Self::partition_to_matrix(&mut state);
+        Self::build_index_from_txn_matrix(&mut state);
         let ret = Self::add_edges(&mut state);
 
         self.thread_pool.spawn(move || {

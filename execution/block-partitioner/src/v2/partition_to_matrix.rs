@@ -16,8 +16,7 @@ use std::{mem, sync::RwLock};
 impl PartitionerV2 {
     /// Populate `state.finalized_txn_matrix` with txns flattened into a matrix (num_rounds by num_shards),
     /// in a way that avoid in-round cross-shard conflicts.
-    pub(crate) fn flatten_to_rounds(state: &mut PartitionState) {
-        //TODO rename to partitione
+    pub(crate) fn partition_to_matrix(state: &mut PartitionState) {
         let _timer = MISC_TIMERS_SECONDS
             .with_label_values(&["flatten_to_rounds"])
             .start_timer();

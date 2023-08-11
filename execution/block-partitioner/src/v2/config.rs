@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::BlockPartitioner;
-use crate::v2::PartitionerV2;
+use crate::{v2::PartitionerV2, BlockPartitioner};
 
 #[derive(Clone, Copy, Debug)]
 pub struct PartitionerV2Config {
