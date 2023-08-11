@@ -88,6 +88,130 @@ fun borrow::mut_param($t0: u64): u64 {
   5: return $t1
 }
 
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun borrow::field($t0: &borrow::S): u64 {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: &u64
+     # live vars: $t0
+  0: $t3 := borrow_field<borrow::S>.f($t0)
+     # live vars: $t3
+  1: $t2 := move($t3)
+     # live vars: $t2
+  2: $t1 := read_ref($t2)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun borrow::local($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: &u64
+     var $t5: &u64
+     # live vars:
+  0: $t3 := 33
+     # live vars: $t3
+  1: $t2 := move($t3)
+     # live vars: $t2
+  2: $t5 := borrow_local($t2)
+     # live vars: $t5
+  3: $t4 := move($t5)
+     # live vars: $t4
+  4: $t1 := read_ref($t4)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+fun borrow::param($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: &u64
+     # live vars: $t0
+  0: $t3 := borrow_local($t0)
+     # live vars: $t3
+  1: $t2 := move($t3)
+     # live vars: $t2
+  2: $t1 := read_ref($t2)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun borrow::mut_field($t0: &mut borrow::S): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t3 := borrow_field<borrow::S>.f($t0)
+     # live vars: $t3
+  1: $t2 := move($t3)
+     # live vars: $t2
+  2: $t4 := 22
+     # live vars: $t2, $t4
+  3: write_ref($t2, $t4)
+     # live vars: $t2
+  4: $t1 := read_ref($t2)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+fun borrow::mut_local($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: &mut u64
+     var $t5: &mut u64
+     var $t6: u64
+     # live vars:
+  0: $t3 := 33
+     # live vars: $t3
+  1: $t2 := move($t3)
+     # live vars: $t2
+  2: $t5 := borrow_local($t2)
+     # live vars: $t5
+  3: $t4 := move($t5)
+     # live vars: $t4
+  4: $t6 := 22
+     # live vars: $t4, $t6
+  5: write_ref($t4, $t6)
+     # live vars: $t4
+  6: $t1 := read_ref($t4)
+     # live vars: $t1
+  7: return $t1
+}
+
+
+[variant baseline]
+fun borrow::mut_param($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t3 := borrow_local($t0)
+     # live vars: $t3
+  1: $t2 := move($t3)
+     # live vars: $t2
+  2: $t4 := 22
+     # live vars: $t2, $t4
+  3: write_ref($t2, $t4)
+     # live vars: $t2
+  4: $t1 := read_ref($t2)
+     # live vars: $t1
+  5: return $t1
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v6
@@ -98,10 +222,10 @@ struct S {
 
 field(Arg0: &S): u64 {
 B0:
-	0: CopyLoc[0](Arg0: &S)
+	0: MoveLoc[0](Arg0: &S)
 	1: ImmBorrowField[0](S.f: u64)
 	2: StLoc[1](loc0: &u64)
-	3: CopyLoc[1](loc0: &u64)
+	3: MoveLoc[1](loc0: &u64)
 	4: ReadRef
 	5: Ret
 }
@@ -112,7 +236,7 @@ B0:
 	1: StLoc[1](loc0: u64)
 	2: ImmBorrowLoc[1](loc0: u64)
 	3: StLoc[2](loc1: &u64)
-	4: CopyLoc[2](loc1: &u64)
+	4: MoveLoc[2](loc1: &u64)
 	5: ReadRef
 	6: Ret
 }
@@ -120,19 +244,19 @@ param(Arg0: u64): u64 {
 B0:
 	0: ImmBorrowLoc[0](Arg0: u64)
 	1: StLoc[1](loc0: &u64)
-	2: CopyLoc[1](loc0: &u64)
+	2: MoveLoc[1](loc0: &u64)
 	3: ReadRef
 	4: Ret
 }
 mut_field(Arg0: &mut S): u64 {
 B0:
-	0: CopyLoc[0](Arg0: &mut S)
+	0: MoveLoc[0](Arg0: &mut S)
 	1: MutBorrowField[0](S.f: u64)
 	2: StLoc[1](loc0: &mut u64)
 	3: LdConst[1](U64: [22, 0, 0, 0, 0, 0, 0, 0])
 	4: CopyLoc[1](loc0: &mut u64)
 	5: WriteRef
-	6: CopyLoc[1](loc0: &mut u64)
+	6: MoveLoc[1](loc0: &mut u64)
 	7: ReadRef
 	8: Ret
 }
@@ -146,7 +270,7 @@ B0:
 	4: LdConst[1](U64: [22, 0, 0, 0, 0, 0, 0, 0])
 	5: CopyLoc[2](loc1: &mut u64)
 	6: WriteRef
-	7: CopyLoc[2](loc1: &mut u64)
+	7: MoveLoc[2](loc1: &mut u64)
 	8: ReadRef
 	9: Ret
 }
@@ -157,7 +281,7 @@ B0:
 	2: LdConst[1](U64: [22, 0, 0, 0, 0, 0, 0, 0])
 	3: CopyLoc[1](loc0: &mut u64)
 	4: WriteRef
-	5: CopyLoc[1](loc0: &mut u64)
+	5: MoveLoc[1](loc0: &mut u64)
 	6: ReadRef
 	7: Ret
 }

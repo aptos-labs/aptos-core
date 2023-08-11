@@ -71,6 +71,7 @@ members = [
     "crates/aptos-network-checker",
     "crates/aptos-node-identity",
     "crates/aptos-openapi",
+    "crates/aptos-profiler",
     "crates/aptos-proptest-helpers",
     "crates/aptos-push-metrics",
     "crates/aptos-rate-limiter",
@@ -358,6 +359,7 @@ aptos-openapi = { path = "crates/aptos-openapi" }
 aptos-package-builder = { path = "aptos-move/package-builder" }
 aptos-peer-monitoring-service-client = { path = "network/peer-monitoring-service/client" }
 aptos-peer-monitoring-service-server = { path = "network/peer-monitoring-service/server" }
+aptos-profiler = { path = "crates/aptos-profiler" }
 aptos-peer-monitoring-service-types = { path = "network/peer-monitoring-service/types" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "crates/aptos-protos" }
@@ -446,7 +448,7 @@ chrono = { version = "0.4.19", features = ["clock", "serde"] }
 cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 claims = "0.7"
-clap = { version = "4.3.5", features = ["derive", "unstable-styles"] }
+clap = { version = "4.3.9", features = ["derive", "unstable-styles"] }
 clap_complete = "4.3.1"
 cloud-storage = { version = "0.11.1", features = ["global-client"] }
 codespan-reporting = "0.11.1"

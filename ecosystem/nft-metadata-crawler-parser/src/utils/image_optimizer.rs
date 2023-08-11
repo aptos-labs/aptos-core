@@ -76,6 +76,7 @@ impl ImageOptimizer {
             Err(e) => {
                 error!(
                     uri = uri,
+                    error = ?e,
                     "[NFT Metadata Crawler] Exponential backoff timed out, skipping image"
                 );
                 Err(e)
