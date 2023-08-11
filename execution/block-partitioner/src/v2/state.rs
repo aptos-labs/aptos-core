@@ -23,6 +23,7 @@ use rayon::{
 };
 use std::{
     collections::HashSet,
+    mem,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc, Mutex, RwLock,
@@ -149,6 +150,13 @@ impl PartitionState {
         self.key_counter.load(Ordering::SeqCst)
     }
 
+    pub(crate) fn reset_min_discard_table(&mut self) {
+        let table = mem::take(&mut self.min_discards_by_sender);
+        self.thread_pool.spawn(move || {
+            drop(table);
+        });
+    }
+
     pub(crate) fn storage_location(&self, key_idx: StorageKeyIdx) -> StorageLocation {
         let tracker_ref = self.trackers.get(&key_idx).unwrap();
         let tracker = tracker_ref.read().unwrap();
@@ -166,11 +174,7 @@ impl PartitionState {
             .or_insert_with(|| self.sender_counter.fetch_add(1, Ordering::SeqCst))
     }
 
-    pub(crate) fn shard_is_currently_follower_for_key(
-        &self,
-        shard_id: ShardId,
-        key: StorageKeyIdx,
-    ) -> bool {
+    pub(crate) fn key_owned_by_another_shard(&self, shard_id: ShardId, key: StorageKeyIdx) -> bool {
         let tracker_ref = self.trackers.get(&key).unwrap();
         let tracker = tracker_ref.read().unwrap();
         let range_start = self.start_txn_idxs_by_shard[tracker.anchor_shard_id];
@@ -225,7 +229,7 @@ impl PartitionState {
         }
     }
 
-    /// Get the last txn inside `sub_block` that writes to a given key.
+    /// Get the last txn inside `sub_block` that writes a given key.
     pub(crate) fn last_writer(
         &self,
         key: StorageKeyIdx,
@@ -243,7 +247,7 @@ impl PartitionState {
         ret
     }
 
-    /// Get the 1st txn after `since` that writes to a given key.
+    /// Get the 1st txn after `since` that writes a given key.
     pub(crate) fn first_writer(
         &self,
         key: StorageKeyIdx,
@@ -254,7 +258,8 @@ impl PartitionState {
         tracker.finalized_writes.range(since..).next().copied()
     }
 
-    pub(crate) fn all_accepted_txns(
+    /// Get all txns that access a certain key in a sub-block range.
+    pub(crate) fn all_txns_in_sub_block_range(
         &self,
         key: StorageKeyIdx,
         start: ShardedTxnIndexV2,
@@ -319,7 +324,7 @@ impl PartitionState {
                     Some(idx) => ShardedTxnIndexV2::new(idx.round_id(), idx.shard_id() + 1, 0),
                 };
                 for follower_txn_idx in
-                    self.all_accepted_txns(key_idx, start_of_next_sub_block, end_follower)
+                    self.all_txns_in_sub_block_range(key_idx, start_of_next_sub_block, end_follower)
                 {
                     let final_sub_blk_idx =
                         self.final_sub_block_idx(follower_txn_idx.sub_block_idx);

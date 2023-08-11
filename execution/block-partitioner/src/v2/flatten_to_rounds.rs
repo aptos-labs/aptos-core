@@ -64,47 +64,54 @@ impl PartitionerV2 {
     ) -> (Vec<Vec<PreParedTxnIdx>>, Vec<Vec<PreParedTxnIdx>>) {
         let num_shards = remaining_txns.len();
         let mut discarded: Vec<RwLock<Vec<PreParedTxnIdx>>> = Vec::with_capacity(num_shards);
-        let mut potentially_accepted: Vec<RwLock<Vec<PreParedTxnIdx>>> =
+        let mut tentatively_accepted: Vec<RwLock<Vec<PreParedTxnIdx>>> =
             Vec::with_capacity(num_shards);
         let mut finally_accepted: Vec<RwLock<Vec<PreParedTxnIdx>>> = Vec::with_capacity(num_shards);
         for txns in remaining_txns.iter() {
-            potentially_accepted.push(RwLock::new(Vec::with_capacity(txns.len())));
+            tentatively_accepted.push(RwLock::new(Vec::with_capacity(txns.len())));
             finally_accepted.push(RwLock::new(Vec::with_capacity(txns.len())));
             discarded.push(RwLock::new(Vec::with_capacity(txns.len())));
         }
 
-        state.min_discards_by_sender = DashMap::new();
+        state.reset_min_discard_table();
 
         state.thread_pool.install(|| {
-            (0..state.num_executor_shards)
+            // Move some txns to the next round (stored in `discarded`).
+            // For those who remain in the current round (`tentatively_accepted`),
+            // it's guaranteed to have no cross-shard conflicts.
+            remaining_txns
+                .into_iter()
+                .enumerate()
+                .collect::<Vec<_>>()
                 .into_par_iter()
-                .for_each(|shard_id| {
-                    remaining_txns[shard_id].par_iter().for_each(|&txn_idx| {
-                        let in_round_conflict_detected =
-                            state.all_hints(txn_idx).iter().any(|&key_idx| {
-                                state.shard_is_currently_follower_for_key(shard_id, key_idx)
-                            });
+                .for_each(|(shard_id, txn_idxs)| {
+                    txn_idxs.into_par_iter().for_each(|txn_idx| {
+                        let in_round_conflict_detected = state
+                            .all_hints(txn_idx)
+                            .into_iter()
+                            .any(|key_idx| state.key_owned_by_another_shard(shard_id, key_idx));
                         if in_round_conflict_detected {
                             let sender = state.sender_idx(txn_idx);
                             state.update_min_discarded_txn_idx(sender, txn_idx);
                             discarded[shard_id].write().unwrap().push(txn_idx);
                         } else {
-                            potentially_accepted[shard_id]
+                            tentatively_accepted[shard_id]
                                 .write()
                                 .unwrap()
                                 .push(txn_idx);
                         }
                     });
                 });
-        });
 
-        state.thread_pool.install(|| {
-            (0..num_shards).into_par_iter().for_each(|shard_id| {
-                potentially_accepted[shard_id]
-                    .read()
-                    .unwrap()
-                    .par_iter()
-                    .for_each(|&ori_txn_idx| {
+            // Additional discarding to preserve relative txn order for the same sender.
+            tentatively_accepted
+                .into_iter()
+                .enumerate()
+                .collect::<Vec<_>>()
+                .into_par_iter()
+                .for_each(|(shard_id, txn_idxs)| {
+                    let txn_idxs = mem::take(&mut *txn_idxs.write().unwrap());
+                    txn_idxs.into_par_iter().for_each(|ori_txn_idx| {
                         let sender_idx = state.sender_idx(ori_txn_idx);
                         if ori_txn_idx
                             < state.min_discard(sender_idx).unwrap_or(PreParedTxnIdx::MAX)
@@ -118,20 +125,13 @@ impl PartitionerV2 {
                             discarded[shard_id].write().unwrap().push(ori_txn_idx);
                         }
                     });
-            });
+                });
         });
 
-        let ret = (
+        (
             extract_and_sort(finally_accepted),
             extract_and_sort(discarded),
-        );
-        let min_discards_by_sender = mem::take(&mut state.min_discards_by_sender);
-        state.thread_pool.spawn(move || {
-            drop(remaining_txns);
-            drop(potentially_accepted);
-            drop(min_discards_by_sender);
-        });
-        ret
+        )
     }
 
     pub(crate) fn build_new_index_tables(state: &mut PartitionState) {

@@ -14,7 +14,6 @@ use rayon::{
 use std::sync::Mutex;
 
 impl PartitionerV2 {
-    ///
     pub(crate) fn add_edges(state: &mut PartitionState) -> PartitionedTransactions {
         state.sub_block_matrix = state.thread_pool.install(|| {
             (0..state.num_rounds())
