@@ -4,6 +4,7 @@ use crate::{
     pre_partition::start_txn_idxs,
     v2::{
         conflicting_txn_tracker::ConflictingTxnTracker,
+        counters::MISC_TIMERS_SECONDS,
         types::{PreParedTxnIdx, SenderIdx, ShardedTxnIndexV2, StorageKeyIdx, SubBlockIdx},
     },
     Sender,
@@ -87,6 +88,9 @@ impl PartitionState {
         avoid_pct: u64,
         merge_discarded: bool,
     ) -> Self {
+        let _timer = MISC_TIMERS_SECONDS
+            .with_label_values(&["new"])
+            .start_timer();
         let num_txns = txns.len();
         let sender_counter = AtomicUsize::new(0);
         let key_counter = AtomicUsize::new(0);

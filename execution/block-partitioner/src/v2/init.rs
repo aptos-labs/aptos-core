@@ -3,8 +3,8 @@
 use crate::{
     get_anchor_shard_id,
     v2::{
-        conflicting_txn_tracker::ConflictingTxnTracker, state::PartitionState,
-        types::PreParedTxnIdx, PartitionerV2,
+        conflicting_txn_tracker::ConflictingTxnTracker, counters::MISC_TIMERS_SECONDS,
+        state::PartitionState, types::PreParedTxnIdx, PartitionerV2,
     },
 };
 use rayon::{iter::ParallelIterator, prelude::IntoParallelIterator};
@@ -12,6 +12,10 @@ use std::sync::RwLock;
 
 impl PartitionerV2 {
     pub(crate) fn init(state: &mut PartitionState) {
+        let _timer = MISC_TIMERS_SECONDS
+            .with_label_values(&["init"])
+            .start_timer();
+
         state.thread_pool.install(|| {
             (0..state.num_txns())
                 .into_par_iter()

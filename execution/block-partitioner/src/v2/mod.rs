@@ -91,6 +91,17 @@ impl PartitionerV2 {
             merge_discarded,
         }
     }
+
+    fn pre_partition(
+        &self,
+        txns: &[AnalyzedTransaction],
+        num_shards: usize,
+    ) -> Vec<Vec<PreParedTxnIdx>> {
+        let _timer = MISC_TIMERS_SECONDS
+            .with_label_values(&["pre_partition"])
+            .start_timer();
+        self.pre_partitioner.pre_partition(txns, num_shards)
+    }
 }
 
 impl BlockPartitioner for PartitionerV2 {
@@ -99,9 +110,11 @@ impl BlockPartitioner for PartitionerV2 {
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> PartitionedTransactions {
-        let pre_partitioned = self
-            .pre_partitioner
-            .pre_partition(txns.as_slice(), num_executor_shards);
+        let _timer = MISC_TIMERS_SECONDS
+            .with_label_values(&["total"])
+            .start_timer();
+
+        let pre_partitioned = self.pre_partition(txns.as_slice(), num_executor_shards);
 
         let mut state = PartitionState::new(
             self.thread_pool.clone(),

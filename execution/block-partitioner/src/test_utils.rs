@@ -284,6 +284,7 @@ pub fn verify_partitioner_output(
     println!("MATRIX_REPORT: total_comm_cost={}", total_comm_cost);
 }
 
+#[cfg(test)]
 fn is_sorted(arr: &Vec<usize>) -> bool {
     let num = arr.len();
     for i in 1..num {

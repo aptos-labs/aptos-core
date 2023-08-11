@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::v2::{extract_and_sort, state::PartitionState, types::PreParedTxnIdx, PartitionerV2};
+use crate::v2::{
+    counters::MISC_TIMERS_SECONDS, extract_and_sort, state::PartitionState, types::PreParedTxnIdx,
+    PartitionerV2,
+};
 use aptos_logger::trace;
 use aptos_types::block_executor::partitioner::{RoundId, TxnIndex};
 use dashmap::DashMap;
@@ -14,6 +17,10 @@ impl PartitionerV2 {
     /// Populate `state.finalized_txn_matrix` with txns flattened into a matrix (num_rounds by num_shards),
     /// in a way that avoid in-round cross-shard conflicts.
     pub(crate) fn flatten_to_rounds(state: &mut PartitionState) {
+        let _timer = MISC_TIMERS_SECONDS
+            .with_label_values(&["flatten_to_rounds"])
+            .start_timer();
+
         let mut remaining_txns = mem::take(&mut state.pre_partitioned);
         assert_eq!(state.num_executor_shards, remaining_txns.len());
 
@@ -64,6 +71,10 @@ impl PartitionerV2 {
         round_id: RoundId,
         remaining_txns: Vec<Vec<PreParedTxnIdx>>,
     ) -> (Vec<Vec<PreParedTxnIdx>>, Vec<Vec<PreParedTxnIdx>>) {
+        let _timer = MISC_TIMERS_SECONDS
+            .with_label_values(&[format!("round_{round_id}").as_str()])
+            .start_timer();
+
         let num_shards = remaining_txns.len();
         let mut discarded: Vec<RwLock<Vec<PreParedTxnIdx>>> = Vec::with_capacity(num_shards);
         let mut tentatively_accepted: Vec<RwLock<Vec<PreParedTxnIdx>>> =
