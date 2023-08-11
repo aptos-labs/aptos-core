@@ -43,97 +43,12 @@ use std::{
         Arc, Mutex, RwLock,
     },
 };
+use types::{OriginalTxnIdx, SenderIdx, ShardedTxnIndex2, StorageKeyIdx, SubBlockIdx};
 
 pub mod config;
 mod conflicting_txn_tracker;
 mod counters;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct SubBlockIdx {
-    pub round_id: RoundId,
-    pub shard_id: ShardId,
-}
-
-impl Ord for SubBlockIdx {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        (self.round_id, self.shard_id).cmp(&(
-            other.round_id,
-            other.shard_id,
-        ))
-    }
-}
-
-impl PartialOrd for SubBlockIdx {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        (self.round_id, self.shard_id).partial_cmp(&(
-            other.round_id,
-            other.shard_id,
-        ))
-    }
-}
-
-impl SubBlockIdx {
-    fn new(round_id: RoundId, shard_id: ShardId) -> Self {
-        SubBlockIdx { round_id, shard_id }
-    }
-    fn global() -> SubBlockIdx {
-        SubBlockIdx::new(GLOBAL_ROUND_ID, GLOBAL_SHARD_ID)
-    }
-}
-
-/// The position of a txn in the block *before partitioning*.
-type OriginalTxnIdx = usize;
-
-/// Represent a specific storage location in a partitioning session.
-type StorageKeyIdx = usize;
-
-/// Represent a sender in a partitioning session.
-type SenderIdx = usize;
-
-/// Represent a txn after its position is finalized.
-/// Different from `aptos_types::block_executor::partitioner::ShardedTxnIndex`,
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ShardedTxnIndex2 {
-    pub sub_block_idx: SubBlockIdx,
-    pub ori_txn_idx: OriginalTxnIdx,
-}
-
-impl Ord for ShardedTxnIndex2 {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        (self.sub_block_idx, self.ori_txn_idx).cmp(&(
-            other.sub_block_idx,
-            other.ori_txn_idx,
-        ))
-    }
-}
-
-impl PartialOrd for ShardedTxnIndex2 {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        (self.sub_block_idx, self.ori_txn_idx).partial_cmp(&(
-            other.sub_block_idx,
-            other.ori_txn_idx,
-        ))
-    }
-}
-
-impl ShardedTxnIndex2 {
-    pub fn round_id(&self) -> RoundId {
-        self.sub_block_idx.round_id
-    }
-
-    pub fn shard_id(&self) -> ShardId {
-        self.sub_block_idx.shard_id
-    }
-}
-
-impl ShardedTxnIndex2 {
-    pub fn new(round_id: RoundId, shard_id: ShardId, ori_txn_idx: OriginalTxnIdx) -> Self {
-        Self {
-            sub_block_idx: SubBlockIdx::new(round_id, shard_id),
-            ori_txn_idx,
-        }
-    }
-}
+pub mod types;
 
 /// Basically `ShardedBlockPartitioner` but:
 /// - Not pre-partitioned by txn sender.
@@ -600,6 +515,7 @@ impl WorkSession {
             sub_blk_idx
         }
     }
+
     fn add_edges(&mut self) -> PartitionedTransactions {
         let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = self.thread_pool.install(|| {
             mem::take(&mut self.txns)
@@ -634,76 +550,87 @@ impl WorkSession {
 
         self.thread_pool.install(|| {
             (0..self.num_rounds()).into_par_iter().for_each(|round_id| {
-                (0..self.num_executor_shards).into_par_iter().for_each(|shard_id| {
-                    let cur_sub_block_size = self.finalized_txn_matrix[round_id][shard_id].len();
-                    let mut twds: Vec<TransactionWithDependencies<AnalyzedTransaction>> =
-                        Vec::with_capacity(cur_sub_block_size);
-                    (0..cur_sub_block_size).for_each(|pos_in_sub_block| {
-                        let ori_txn_idx =
-                            self.finalized_txn_matrix[round_id][shard_id][pos_in_sub_block];
-                        let txn = txns[ori_txn_idx].lock().unwrap().take().unwrap();
-                        let mut deps = CrossShardDependencies::default();
-                        for key_idx in self.all_hints(ori_txn_idx) {
-                            let tracker_ref = self.trackers.get(&key_idx).unwrap();
-                            let tracker = tracker_ref.read().unwrap();
-                            if let Some(txn_idx) = tracker
-                                .finalized_writes
-                                .range(..ShardedTxnIndex2::new(round_id, shard_id, 0))
-                                .last()
-                            {
-                                let src_txn_idx = ShardedTxnIndex {
-                                    txn_index: *self.new_txn_idxs[txn_idx.ori_txn_idx]
-                                        .read()
-                                        .unwrap(),
-                                    shard_id: txn_idx.sub_block_idx.shard_id,
-                                    round_id: txn_idx.sub_block_idx.round_id,
-                                };
-                                deps.add_required_edge(
-                                    src_txn_idx,
-                                    tracker.storage_location.clone(),
-                                );
-                            }
-                        }
-                        for key_idx in self.write_hints(ori_txn_idx) {
-                            if Some(ori_txn_idx)
-                                == self.last_writer(key_idx, SubBlockIdx { round_id, shard_id })
-                            {
-                                let start_of_next_sub_block =
-                                    ShardedTxnIndex2::new(round_id, shard_id + 1, 0);
-                                let next_writer =
-                                    self.first_writer(key_idx, start_of_next_sub_block);
-                                let end_follower = match next_writer {
-                                    None => ShardedTxnIndex2::new(self.num_rounds(), self.num_executor_shards, 0), // Guaranteed to be greater than any invalid idx...
-                                    Some(idx) => {
-                                        ShardedTxnIndex2::new(idx.round_id(), idx.shard_id() + 1, 0)
-                                    },
-                                };
-                                for follower_txn_idx in self.all_accepted_txns(
-                                    key_idx,
-                                    start_of_next_sub_block,
-                                    end_follower,
-                                ) {
-                                    let actual_sub_blk_idx = self.actual_sub_block_idx(follower_txn_idx.sub_block_idx);
-                                    let dst_txn_idx = ShardedTxnIndex {
-                                        txn_index: *self.new_txn_idxs[follower_txn_idx.ori_txn_idx]
+                (0..self.num_executor_shards)
+                    .into_par_iter()
+                    .for_each(|shard_id| {
+                        let cur_sub_block_size =
+                            self.finalized_txn_matrix[round_id][shard_id].len();
+                        let mut twds: Vec<TransactionWithDependencies<AnalyzedTransaction>> =
+                            Vec::with_capacity(cur_sub_block_size);
+                        (0..cur_sub_block_size).for_each(|pos_in_sub_block| {
+                            let ori_txn_idx =
+                                self.finalized_txn_matrix[round_id][shard_id][pos_in_sub_block];
+                            let txn = txns[ori_txn_idx].lock().unwrap().take().unwrap();
+                            let mut deps = CrossShardDependencies::default();
+                            for key_idx in self.all_hints(ori_txn_idx) {
+                                let tracker_ref = self.trackers.get(&key_idx).unwrap();
+                                let tracker = tracker_ref.read().unwrap();
+                                if let Some(txn_idx) = tracker
+                                    .finalized_writes
+                                    .range(..ShardedTxnIndex2::new(round_id, shard_id, 0))
+                                    .last()
+                                {
+                                    let src_txn_idx = ShardedTxnIndex {
+                                        txn_index: *self.new_txn_idxs[txn_idx.ori_txn_idx]
                                             .read()
                                             .unwrap(),
-                                        shard_id: actual_sub_blk_idx.shard_id,
-                                        round_id: actual_sub_blk_idx.round_id,
+                                        shard_id: txn_idx.sub_block_idx.shard_id,
+                                        round_id: txn_idx.sub_block_idx.round_id,
                                     };
-                                    deps.add_dependent_edge(dst_txn_idx, vec![
-                                        self.storage_location(key_idx)
-                                    ]);
+                                    deps.add_required_edge(
+                                        src_txn_idx,
+                                        tracker.storage_location.clone(),
+                                    );
                                 }
                             }
-                        }
-                        let twd = TransactionWithDependencies::new(txn, deps);
-                        twds.push(twd);
+                            for key_idx in self.write_hints(ori_txn_idx) {
+                                if Some(ori_txn_idx)
+                                    == self.last_writer(key_idx, SubBlockIdx { round_id, shard_id })
+                                {
+                                    let start_of_next_sub_block =
+                                        ShardedTxnIndex2::new(round_id, shard_id + 1, 0);
+                                    let next_writer =
+                                        self.first_writer(key_idx, start_of_next_sub_block);
+                                    let end_follower = match next_writer {
+                                        None => ShardedTxnIndex2::new(
+                                            self.num_rounds(),
+                                            self.num_executor_shards,
+                                            0,
+                                        ), // Guaranteed to be greater than any invalid idx...
+                                        Some(idx) => ShardedTxnIndex2::new(
+                                            idx.round_id(),
+                                            idx.shard_id() + 1,
+                                            0,
+                                        ),
+                                    };
+                                    for follower_txn_idx in self.all_accepted_txns(
+                                        key_idx,
+                                        start_of_next_sub_block,
+                                        end_follower,
+                                    ) {
+                                        let actual_sub_blk_idx = self
+                                            .actual_sub_block_idx(follower_txn_idx.sub_block_idx);
+                                        let dst_txn_idx = ShardedTxnIndex {
+                                            txn_index: *self.new_txn_idxs
+                                                [follower_txn_idx.ori_txn_idx]
+                                                .read()
+                                                .unwrap(),
+                                            shard_id: actual_sub_blk_idx.shard_id,
+                                            round_id: actual_sub_blk_idx.round_id,
+                                        };
+                                        deps.add_dependent_edge(dst_txn_idx, vec![
+                                            self.storage_location(key_idx)
+                                        ]);
+                                    }
+                                }
+                            }
+                            let twd = TransactionWithDependencies::new(txn, deps);
+                            twds.push(twd);
+                        });
+                        let sub_block =
+                            SubBlock::new(self.start_index_matrix[round_id][shard_id], twds);
+                        *sub_block_matrix[round_id][shard_id].lock().unwrap() = Some(sub_block);
                     });
-                    let sub_block =
-                        SubBlock::new(self.start_index_matrix[round_id][shard_id], twds);
-                    *sub_block_matrix[round_id][shard_id].lock().unwrap() = Some(sub_block);
-                });
             });
         });
 
@@ -724,7 +651,8 @@ impl WorkSession {
             };
 
         let num_rounds = sub_block_matrix.len();
-        let sharded_txns: Vec<SubBlocksForShard<AnalyzedTransaction>> = (0..self.num_executor_shards)
+        let sharded_txns: Vec<SubBlocksForShard<AnalyzedTransaction>> = (0..self
+            .num_executor_shards)
             .map(|shard_id| {
                 let sub_blocks: Vec<SubBlock<AnalyzedTransaction>> = (0..num_rounds)
                     .map(|round_id| {
