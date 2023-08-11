@@ -113,7 +113,13 @@ jobs:
   file_change_determinator:
     runs-on: ubuntu-latest
     outputs:
-      only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
+      # Outputs related to documentation changes
+      any_docs_changes: ${{ steps.determine_file_changes.outputs.any_docs_changes }}
+      only_docs_changes: ${{ steps.determine_file_changes.outputs.only_docs_changes }}
+
+      # Outputs related to Rust changes
+      any_rust_changes: ${{ steps.determine_file_changes.outputs.any_rust_changes }}
+      only_rust_changes: ${{ steps.determine_file_changes.outputs.only_rust_changes }}
     steps:
       - uses: actions/checkout@v3
       - name: Run the file change determinator

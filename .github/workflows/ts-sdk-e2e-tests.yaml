@@ -36,24 +36,36 @@ jobs:
   file_change_determinator:
     runs-on: ubuntu-latest
     outputs:
-      only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
+      # Outputs related to documentation changes
+      any_docs_changes: ${{ steps.determine_file_changes.outputs.any_docs_changes }}
+      only_docs_changes: ${{ steps.determine_file_changes.outputs.only_docs_changes }}
+
+      # Outputs related to Rust changes
+      any_rust_changes: ${{ steps.determine_file_changes.outputs.any_rust_changes }}
+      only_rust_changes: ${{ steps.determine_file_changes.outputs.only_rust_changes }}
     steps:
       - uses: actions/checkout@v3
       - name: Run the file change determinator
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
 
-  # This is a PR required job.
+  # This is a PR required job. We should only run this job
+  # if we detect non-docs changes in the PR.
   run-tests-main-branch:
     needs: [permission-check, file_change_determinator]
     runs-on: high-perf-docker
     steps:
+      # Skip this job if we only detect docs changes
+      - run: echo "Skipping the tests on the main branch! Unrelated changes detected."
+        if: needs.file_change_determinator.outputs.only_docs_changes == 'true'
+
+      # Otherwise, run the tests
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: needs.file_change_determinator.outputs.only_docs_changes != 'true'
         with:
           ref: ${{ env.GIT_SHA }}
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: needs.file_change_determinator.outputs.only_docs_changes != 'true'
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
@@ -62,12 +74,10 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - uses: ./.github/actions/run-ts-sdk-e2e-tests
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: needs.file_change_determinator.outputs.only_docs_changes != 'true'
         with:
           BRANCH: main
           GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
-      - run: echo "Skipping the tests on the main branch! Unrelated changes detected."
-        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
   # Run the TS SDK indexer tests. Note: Unlike the above tests where everything is self
   # contained because we run a local testnet, these tests operate against the

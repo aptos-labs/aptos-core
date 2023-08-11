@@ -29,46 +29,76 @@ jobs:
   file_change_determinator:
     runs-on: ubuntu-latest
     outputs:
-      only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
+      # Outputs related to documentation changes
+      any_docs_changes: ${{ steps.determine_file_changes.outputs.any_docs_changes }}
+      only_docs_changes: ${{ steps.determine_file_changes.outputs.only_docs_changes }}
+
+      # Outputs related to Rust changes
+      any_rust_changes: ${{ steps.determine_file_changes.outputs.any_rust_changes }}
+      only_rust_changes: ${{ steps.determine_file_changes.outputs.only_rust_changes }}
     steps:
       - uses: actions/checkout@v3
       - name: Run the file change determinator
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
 
-  # Run all general lints (i.e., non-rust and docs lints). This is a PR required job.
+  # Run all general lints (i.e., non-rust and non-docs lints). This is a PR
+  # required job. We should only run this job if we detect non-docs or
+  # non-rust changes.
   general-lints:
     needs: file_change_determinator
     runs-on: ubuntu-latest
     steps:
+      # Skip this job if we only detect docs or rust changes
+      - run: echo "Skipping general lints! Unrelated changes detected."
+        if: |
+          needs.file_change_determinator.outputs.only_docs_changes == 'true' ||
+          needs.file_change_determinator.outputs.only_rust_changes == 'true'
+
+      # Otherwise, run the general lints
       - uses: actions/checkout@v3
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: |
+          needs.file_change_determinator.outputs.only_docs_changes != 'true' ||
+          needs.file_change_determinator.outputs.only_rust_changes != 'true'
       - name: Run general lints
         uses: ./.github/actions/general-lints
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: |
+          needs.file_change_determinator.outputs.only_docs_changes != 'true' ||
+          needs.file_change_determinator.outputs.only_rust_changes != 'true'
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - run: echo "Skipping general lints! Unrelated changes detected."
-        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
   # Run the docs linter. This is a PR required job.
+  # We should only run this job if we detect docs changes.
   docs-lint:
+    needs: file_change_determinator
     runs-on: ubuntu-latest
     steps:
+      # Skip this job if we don't detect any docs changes
+      - run: echo "Skipping docs lints! Unrelated changes detected."
+        if: needs.file_change_determinator.outputs.any_docs_changes != 'true'
+
+      # Otherwise, run the docs linter
       - uses: actions/checkout@v3
+        if: needs.file_change_determinator.outputs.any_docs_changes == 'true'
       - uses: actions/setup-node@v3
+        if: needs.file_change_determinator.outputs.any_docs_changes == 'true'
         with:
           node-version-file: .node-version
       - uses: pnpm/action-setup@v2
+        if: needs.file_change_determinator.outputs.any_docs_changes == 'true'
       - run: pnpm lint
+        if: needs.file_change_determinator.outputs.any_docs_changes == 'true'
         working-directory: developer-docs-site
       - run: sudo apt update -y && sudo apt install -y aspell aspell-en
+        if: needs.file_change_determinator.outputs.any_docs_changes == 'true'
       - run: pnpm spellcheck
+        if: needs.file_change_determinator.outputs.any_docs_changes == 'true'
         working-directory: developer-docs-site
 
-  # Run the crypto hasher domain separation checks
+  # Run the crypto hasher domain separation checks.
+  # This is not a PR required job.
   rust-cryptohasher-domain-separation-check:
-    needs: file_change_determinator
     runs-on: high-perf-docker
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     steps:
@@ -80,21 +110,26 @@ jobs:
       - run: python3 scripts/check-cryptohasher-symbols.py
 
   # Run all rust lints. This is a PR required job.
+  # We should only run this job if we detect rust changes.
   rust-lints:
     needs: file_change_determinator
     runs-on: high-perf-docker
     steps:
+      # Skip this job if we don't detect any rust changes
+      - run: echo "Skipping rust lints! Unrelated changes detected."
+        if: needs.file_change_determinator.outputs.any_rust_changes != 'true'
+
+      # Otherwise, run the rust lints
       - uses: actions/checkout@v3
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: needs.file_change_determinator.outputs.any_rust_changes == 'true'
       - name: Run rust lints
         uses: ./.github/actions/rust-lints
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: needs.file_change_determinator.outputs.any_rust_changes == 'true'
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - run: echo "Skipping rust lints! Unrelated changes detected."
-        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
   # Run all rust smoke tests. This is a PR required job.
+  # We should only run this job if we detect rust changes.
   rust-smoke-tests:
     needs: file_change_determinator
     if: | # Only run on each PR once an appropriate event occurs
@@ -107,21 +142,30 @@ jobs:
       )
     runs-on: high-perf-docker
     steps:
+      # Skip this job if we don't detect any rust changes
+      - run: echo "Skipping rust smoke tests! Unrelated changes detected."
+        if: needs.file_change_determinator.outputs.any_rust_changes != 'true'
+
+      # Otherwise, run the rust smoke tests
       - uses: actions/checkout@v3
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: needs.file_change_determinator.outputs.any_rust_changes == 'true'
       - name: Run rust smoke tests
         uses: ./.github/actions/rust-smoke-tests
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        if: needs.file_change_determinator.outputs.any_rust_changes == 'true'
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - run: echo "Skipping rust smoke tests! Unrelated changes detected."
-        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
   # Run all rust unit tests. This is a PR required job.
+  # We should only run this job if we detect rust changes.
   rust-unit-tests:
     needs: file_change_determinator
     runs-on: high-perf-docker
     steps:
+      # Skip this job if we don't detect any rust changes
+      - run: echo "Skipping rust unit tests! Unrelated changes detected."
+        if: needs.file_change_determinator.outputs.any_rust_changes != 'true'
+
+      # Otherwise, run the rust unit tests
       - uses: actions/checkout@v3
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
       - name: Run rust unit tests
@@ -129,10 +173,9 @@ jobs:
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - run: echo "Skipping rust unit tests! Unrelated changes detected."
-        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
-  # Run the consensus only unit tests
+  # Run the consensus only unit tests.
+  # This is not a PR required job.
   rust-consensus-only-unit-test:
     runs-on: high-perf-docker
     if: contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
@@ -150,7 +193,8 @@ jobs:
         env:
           RUST_MIN_STACK: 4297152
 
-  # Run the rust network performance unit tests
+  # Run the rust network performance unit tests.
+  # This is not a PR required job.
   rust-network-perf-unit-test:
     runs-on: high-perf-docker
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
@@ -168,7 +212,8 @@ jobs:
           cargo nextest run --locked -p aptos-peer-monitoring-service-client --no-fail-fast -F network-perf-test
           cargo nextest run --locked -p aptos-peer-monitoring-service-server --no-fail-fast -F network-perf-test
 
-  # Run the consensus only smoke test
+  # Run the consensus only smoke test.
+  # This is not a PR required job.
   rust-consensus-only-smoke-test:
     runs-on: high-perf-docker
     if: contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
@@ -196,7 +241,8 @@ jobs:
             !/tmp/.tmp*/**/db/
           retention-days: 14
 
-  # Run the network performance smoke test
+  # Run the network performance smoke test.
+  # This is not a PR required job.
   rust-network-perf-smoke-test:
     runs-on: high-perf-docker
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')

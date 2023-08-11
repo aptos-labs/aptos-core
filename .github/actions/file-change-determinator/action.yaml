@@ -1,17 +1,73 @@
 name: File Change Determinator
 description: Runs the file change determinator (to identify which files changed in a pull request)
 outputs:
-  only_docs_changed:
-    description: "Returns true if only docs files were changed in the pull request"
-    value: ${{ steps.doc_change_determinator.outputs.should_skip }}
+  # Doc outputs
+  any_docs_changes:
+    description: "Returns true iff any docs files were changed in the pull request"
+    value: ${{ steps.doc_change_determinator.outputs.should_skip != 'true' }}
+  only_docs_changes:
+    description: "Returns true iff only docs files were changed in the pull request"
+    value: ${{ steps.doc_change_determinator.outputs.only_docs_changed == 'true' }}
+
+  # Python outputs
+  any_python_changes:
+    description: "Returns true iff any python files were changed in the pull request"
+    value: ${{ steps.python_change_determinator.outputs.should_skip != 'true' }}
+
+  # Rust outputs
+  any_rust_changes:
+    description: "Returns true iff any rust files were changed in the pull request"
+    value: ${{ steps.rust_change_determinator.outputs.should_skip != 'true' }}
+
+  # Shell outputs
+  any_shell_changes:
+    description: "Returns true iff any shell files were changed in the pull request"
+    value: ${{ steps.shell_change_determinator.outputs.should_skip != 'true' }}
+
+  # Typescript outputs
+  any_typescript_changes:
+    description: "Returns true iff any typescript files were changed in the pull request"
+    value: ${{ steps.typescript_change_determinator.outputs.should_skip != 'true' }}
 
 runs:
   using: composite
   steps:
-    # Run the docs only change determinator
+    # Run the docs change determinator
     - id: doc_change_determinator
       continue-on-error: true # Avoid skipping any checks if this job fails (see: https://github.com/fkirc/skip-duplicate-actions/issues/301)
       uses: fkirc/skip-duplicate-actions@v5
       with:
         skip_after_successful_duplicate: false # Don't skip if the action is a duplicate (this may cause false positives)
-        paths_ignore: '["**/*.md", "developer-docs-site/**"]'
+        paths: '["developer-docs-site/**"]'
+
+    # Run the python change determinator
+    - id: python_change_determinator
+      continue-on-error: true # Avoid skipping any checks if this job fails (see: https://github.com/fkirc/skip-duplicate-actions/issues/301)
+      uses: fkirc/skip-duplicate-actions@v5
+      with:
+        skip_after_successful_duplicate: false # Don't skip if the action is a duplicate (this may cause false positives)
+        paths: '["**/*.py", "**/requirements.txt", "**/requirements-dev.txt" ]'
+
+    # Run the rust change determinator
+    - id: rust_change_determinator
+      continue-on-error: true # Avoid skipping any checks if this job fails (see: https://github.com/fkirc/skip-duplicate-actions/issues/301)
+      uses: fkirc/skip-duplicate-actions@v5
+      with:
+        skip_after_successful_duplicate: false # Don't skip if the action is a duplicate (this may cause false positives)
+        paths: '["**/*.rs", "**/Cargo.toml", "**/Cargo.lock", "**/rust-toolchain" ]'
+
+    # Run the shell change determinator
+    - id: shell_change_determinator
+      continue-on-error: true # Avoid skipping any checks if this job fails (see: https://github.com/fkirc/skip-duplicate-actions/issues/301)
+      uses: fkirc/skip-duplicate-actions@v5
+      with:
+          skip_after_successful_duplicate: false # Don't skip if the action is a duplicate (this may cause false positives)
+          paths: '["**/*.sh", "**/*.bash", "**/*.zsh"]'
+
+    # Run the typescript change determinator
+    - id: typescript_change_determinator
+      continue-on-error: true # Avoid skipping any checks if this job fails (see: https://github.com/fkirc/skip-duplicate-actions/issues/301)
+      uses: fkirc/skip-duplicate-actions@v5
+      with:
+          skip_after_successful_duplicate: false # Don't skip if the action is a duplicate (this may cause false positives)
+          paths: '["**/*.ts", "**/package.json", "**/package-lock.json", "**/tsconfig.json" ]'
