@@ -105,7 +105,8 @@ impl DKGManager {
             })
             .expect("[DKG]: Convertion from DKG events to DKG Rounding failed!");
 
-        // let consensus_keys = dkg_rounding.validator_consensus_keys().clone();
+        let consensus_keys: Vec<<das::Transcript as Transcript>::EncryptPubKey> = dkg_rounding.validator_consensus_keys().iter().map(|k| k.to_bytes().as_slice().try_into().unwrap()).collect::<Vec<_>>();
+
         let wc_1 = dkg_rounding.weighted_config_1().clone();
         let wc_2 = dkg_rounding.weighted_config_2().clone();
         self.dkg_rounding.lock().replace(dkg_rounding);
@@ -116,18 +117,18 @@ impl DKGManager {
 
         // dkg todo: generate these parameters
         // dkg todo: use real encryption keys of the new validators
-        let (pp, _dks, eks, s, _sk) = test_utils::setup_dealing::<WT, StdRng>(&wc_1, &mut rng);
+        let (pp, _dks, _eks, s, _sk) = test_utils::setup_dealing::<WT, StdRng>(&wc_1, &mut rng);
 
         let trx_1 = WT::deal(
             &wc_1,
             &pp,
-            &eks,
+            &consensus_keys,
             &s,
             &DST_PVSS_TESTING_APP[..],
             &mut rng,
         );
         trx_1
-            .verify(&wc_1, &pp, &eks, &DST_PVSS_TESTING_APP[..])
+            .verify(&wc_1, &pp, &consensus_keys, &DST_PVSS_TESTING_APP[..])
             .expect("PVSS transcript failed verification");
 
         // // Test transcript (de)serialization
@@ -136,9 +137,9 @@ impl DKGManager {
         //     .expect("serialized transcript should deserialize correctly");
         // assert_eq!(trx_1, deserialized);
 
-        let trx_2 = WT::deal(&wc_2, &pp, &eks, &s, &DST_PVSS_TESTING_APP[..], &mut rng);
+        let trx_2 = WT::deal(&wc_2, &pp, &consensus_keys, &s, &DST_PVSS_TESTING_APP[..], &mut rng);
         trx_2
-            .verify(&wc_2, &pp, &eks, &DST_PVSS_TESTING_APP[..])
+            .verify(&wc_2, &pp, &consensus_keys, &DST_PVSS_TESTING_APP[..])
             .expect("PVSS transcript failed verification");
 
         // // Test transcript (de)serialization
@@ -147,7 +148,7 @@ impl DKGManager {
         //     .expect("serialized transcript should deserialize correctly");
         // assert_eq!(trx_2, deserialized);
 
-        let dkg_pvss_config = DKGPvssConfig::new(wc_1.clone(), wc_2.clone(), pp, eks, &DST_PVSS_TESTING_APP[..]);
+        let dkg_pvss_config = DKGPvssConfig::new(wc_1.clone(), wc_2.clone(), pp, consensus_keys, &DST_PVSS_TESTING_APP[..]);
         self.dkg_pvss_config.lock().replace(dkg_pvss_config);
 
         let dkg_trx_wrapper = DKGTranscriptWrapper {
