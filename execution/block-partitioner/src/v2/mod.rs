@@ -544,14 +544,10 @@ impl WorkSession {
                 (0..self.num_executor_shards)
                     .into_par_iter()
                     .for_each(|shard_id| {
-                        let cur_sub_block_size =
-                            self.finalized_txn_matrix[round_id][shard_id].len();
-                        let twds: Vec<TransactionWithDependencies<AnalyzedTransaction>> = (0
-                            ..cur_sub_block_size)
-                            .into_par_iter()
-                            .map(|pos_in_sub_block| {
-                                let ori_txn_idx =
-                                    self.finalized_txn_matrix[round_id][shard_id][pos_in_sub_block];
+                        let twds: Vec<TransactionWithDependencies<AnalyzedTransaction>> = self
+                            .finalized_txn_matrix[round_id][shard_id]
+                            .par_iter()
+                            .map(|&ori_txn_idx| {
                                 self.make_txn_with_dep(round_id, shard_id, ori_txn_idx)
                             })
                             .collect();
