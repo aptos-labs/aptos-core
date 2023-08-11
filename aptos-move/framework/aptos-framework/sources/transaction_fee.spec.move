@@ -113,12 +113,16 @@ spec aptos_framework::transaction_fee {
         let proposer = option::spec_borrow(collected_fees.proposer);
         let fee_to_add = pre_amount - pre_amount * collected_fees.burn_percentage / 100;
         ensures is_fees_collection_enabled() ==> option::spec_is_none(post_collected_fees.proposer) && post_amount == 0;
-        ensures is_fees_collection_enabled() && aggregator::spec_read(collected_fees.amount.value) > 0 && 
-            option::spec_is_some(collected_fees.proposer) && proposer != @vm_reserved ==>
-            if (table::spec_contains(fees_table, proposer)) {
-                table::spec_get(post_fees_table, proposer).value == table::spec_get(fees_table, proposer).value + fee_to_add
-            } else {
+        ensures is_fees_collection_enabled() && aggregator::spec_read(collected_fees.amount.value) > 0 &&
+            option::spec_is_some(collected_fees.proposer) ==>
+            if (proposer != @vm_reserved) {
+                if (table::spec_contains(fees_table, proposer)) {
+                    table::spec_get(post_fees_table, proposer).value == table::spec_get(fees_table, proposer).value + fee_to_add
+                } else {
                 table::spec_get(post_fees_table, proposer).value == fee_to_add
+                }
+            } else {
+                option::spec_is_none(post_collected_fees.proposer) && post_amount == 0
             };
     }
 

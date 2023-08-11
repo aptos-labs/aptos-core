@@ -9,8 +9,11 @@ use crate::metrics::{
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
+    chunk_transactions,
     config::IndexerGrpcFileStoreConfig,
-    constants::{BLOB_STORAGE_SIZE, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER},
+    constants::{
+        BLOB_STORAGE_SIZE, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER, MESSAGE_SIZE_LIMIT,
+    },
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
     time_diff_since_pb_timestamp_in_secs, EncodedTransactionWithVersion,
 };
@@ -46,9 +49,8 @@ const AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS: u64 = 50;
 // TODO(larry): fix all errors treated as transient errors.
 const TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS: u64 = 1000;
 
-// Up to MAX_RESPONSE_CHANNEL_SIZE response can be buffered in the channel. If the channel is full,
-// the server will not fetch more data from the cache and file store until the channel is not full.
-const MAX_RESPONSE_CHANNEL_SIZE: usize = 40;
+// Default max response channel size.
+const DEFAULT_MAX_RESPONSE_CHANNEL_SIZE: usize = 3;
 
 // The server will retry to send the response to the client and give up after RESPONSE_CHANNEL_SEND_TIMEOUT.
 // This is to prevent the server from being occupied by a slow client.
@@ -59,16 +61,22 @@ const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
 pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
+    pub data_service_response_channel_size: Option<usize>,
 }
 
 impl RawDataServerWrapper {
-    pub fn new(redis_address: String, file_store_config: IndexerGrpcFileStoreConfig) -> Self {
+    pub fn new(
+        redis_address: String,
+        file_store_config: IndexerGrpcFileStoreConfig,
+        data_service_response_channel_size: Option<usize>,
+    ) -> Self {
         Self {
             redis_client: Arc::new(
                 redis::Client::open(format!("redis://{}", redis_address))
                     .expect("Create redis client failed."),
             ),
             file_store_config,
+            data_service_response_channel_size,
         }
     }
 }
@@ -111,7 +119,10 @@ impl RawData for RawDataServerWrapper {
         let transactions_count = request.transactions_count;
 
         // Response channel to stream the data to the client.
-        let (tx, rx) = channel(MAX_RESPONSE_CHANNEL_SIZE);
+        let (tx, rx) = channel(
+            self.data_service_response_channel_size
+                .unwrap_or(DEFAULT_MAX_RESPONSE_CHANNEL_SIZE),
+        );
         let mut current_version = match &request.starting_version {
             Some(version) => *version,
             None => {
@@ -249,25 +260,21 @@ impl RawData for RawDataServerWrapper {
                         }
                     };
                     // 2. Push the data to the response channel, i.e. stream the data to the client.
-                    let resp_item =
-                        get_transactions_response_builder(transaction_data, chain_id as u32);
-                    let current_batch_size = resp_item.transactions.as_slice().len();
-                    let end_of_batch_version =
-                        resp_item.transactions.as_slice().last().unwrap().version;
-                    let data_latency_in_secs = resp_item
+                    let current_batch_size = transaction_data.as_slice().len();
+                    let end_of_batch_version = transaction_data.as_slice().last().unwrap().1;
+                    let resp_items =
+                        get_transactions_responses_builder(transaction_data, chain_id as u32);
+                    let data_latency_in_secs = resp_items
+                        .last()
+                        .unwrap()
                         .transactions
-                        .first()
+                        .last()
                         .unwrap()
                         .timestamp
                         .as_ref()
                         .map(time_diff_since_pb_timestamp_in_secs);
-                    match tx
-                        .send_timeout(
-                            Result::<TransactionsResponse, Status>::Ok(resp_item),
-                            RESPONSE_CHANNEL_SEND_TIMEOUT,
-                        )
-                        .await
-                    {
+
+                    match channel_send_multiple_with_timeout(resp_items, tx.clone()).await {
                         Ok(_) => {
                             PROCESSED_BATCH_SIZE
                                 .with_label_values(&[
@@ -343,21 +350,26 @@ impl RawData for RawDataServerWrapper {
 }
 
 /// Builds the response for the get transactions request. Partial batch is ok, i.e., a batch with transactions < 1000.
-fn get_transactions_response_builder(
+fn get_transactions_responses_builder(
     data: Vec<EncodedTransactionWithVersion>,
     chain_id: u32,
-) -> TransactionsResponse {
-    TransactionsResponse {
-        chain_id: Some(chain_id as u64),
-        transactions: data
-            .into_iter()
-            .map(|(encoded, _)| {
-                let decoded_transaction = base64::decode(encoded).unwrap();
-                let transaction = Transaction::decode(&*decoded_transaction);
-                transaction.unwrap()
-            })
-            .collect(),
-    }
+) -> Vec<TransactionsResponse> {
+    let transactions: Vec<Transaction> = data
+        .into_iter()
+        .map(|(encoded, _)| {
+            let decoded_transaction = base64::decode(encoded).unwrap();
+            let transaction = Transaction::decode(&*decoded_transaction);
+            transaction.unwrap()
+        })
+        .collect();
+    let chunks = chunk_transactions(transactions, MESSAGE_SIZE_LIMIT);
+    chunks
+        .into_iter()
+        .map(|chunk| TransactionsResponse {
+            chain_id: Some(chain_id as u64),
+            transactions: chunk,
+        })
+        .collect::<Vec<TransactionsResponse>>()
 }
 
 /// Fetches data from cache or the file store. It returns the data if it is ready in the cache or file store.
@@ -467,4 +479,23 @@ fn get_request_metadata(req: &Request<GetTransactionsRequest>) -> tonic::Result<
         // TODO: after launch, support 'core', 'partner', 'community' and remove 'testing_v1'.
         request_source: "testing_v1".to_string(),
     })
+}
+
+async fn channel_send_multiple_with_timeout(
+    resp_items: Vec<TransactionsResponse>,
+    tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
+) -> Result<(), SendTimeoutError<Result<TransactionsResponse, Status>>> {
+    for resp_item in resp_items {
+        let current_instant = std::time::Instant::now();
+        tx.send_timeout(
+            Result::<TransactionsResponse, Status>::Ok(resp_item),
+            RESPONSE_CHANNEL_SEND_TIMEOUT,
+        )
+        .await?;
+        info!(
+            "[data service] response waiting time in seconds: {}",
+            current_instant.elapsed().as_secs_f64()
+        );
+    }
+    Ok(())
 }

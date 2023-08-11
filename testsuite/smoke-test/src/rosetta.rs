@@ -15,7 +15,7 @@ use aptos_crypto::{
     HashValue, PrivateKey,
 };
 use aptos_forge::{AptosPublicInfo, LocalSwarm, Node, NodeExt, Swarm};
-use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
+use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_genesis::builder::InitConfigFn;
 use aptos_global_constants::GAS_UNIT_PRICE;
 use aptos_rest_client::{
@@ -728,7 +728,7 @@ async fn test_block() {
         feature_version,
     )
     .unwrap();
-    let min_gas_price = u64::from(gas_params.txn.min_price_per_gas_unit);
+    let min_gas_price = u64::from(gas_params.vm.txn.min_price_per_gas_unit);
 
     let private_key_0 = cli.private_key(0);
     let private_key_1 = cli.private_key(1);
@@ -890,6 +890,11 @@ async fn test_block() {
     reset_lockup_and_wait(&node_clients, private_key_2, Some(account_id_3))
         .await
         .expect("Should successfully reset lockup");
+
+    // Update commission
+    update_commission_and_wait(&node_clients, private_key_2, Some(account_id_3), Some(50))
+        .await
+        .expect("Should successfully update commission");
 
     // Successfully, and fail setting a voter
     set_voter_and_wait(
@@ -1397,6 +1402,60 @@ async fn parse_operations(
                             bcs::from_bytes(payload.args().first().unwrap()).unwrap();
                         let operator = operation.operator().unwrap();
                         assert_eq!(actual_operator_address, operator)
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
+            },
+            OperationType::UpdateCommission => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful update commission operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed update commission operation"
+                    );
+                }
+
+                // Check that update commmission was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator);
+
+                        let new_commission = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .commission_percentage
+                            .as_ref()
+                            .unwrap()
+                            .0;
+                        let actual_new_commission: u64 =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                        assert_eq!(actual_new_commission, new_commission);
                     } else {
                         panic!("Not an entry function");
                     }
@@ -2167,6 +2226,31 @@ async fn reset_lockup_and_wait(
                 node_clients.network,
                 sender_key,
                 operator,
+                expiry_time,
+                None,
+                None,
+                None,
+            )
+        },
+    )
+    .await
+}
+
+async fn update_commission_and_wait(
+    node_clients: &NodeClients<'_>,
+    sender_key: &Ed25519PrivateKey,
+    operator: Option<AccountAddress>,
+    new_commission_percentage: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    submit_transaction(
+        node_clients.rest_client,
+        DEFAULT_MAX_WAIT_DURATION,
+        |expiry_time| {
+            node_clients.rosetta_client.update_commission(
+                node_clients.network,
+                sender_key,
+                operator,
+                new_commission_percentage,
                 expiry_time,
                 None,
                 None,

@@ -4,18 +4,14 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::helpers::make_module_natives;
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::{
-    account_address::AccountAddress,
-    gas_algebra::{InternalGas, InternalGasPerArg, NumArgs},
+use aptos_native_interface::{
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
-use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
-};
-use smallvec::smallvec;
-use std::{collections::VecDeque, sync::Arc};
+use move_core_types::account_address::AccountAddress;
+use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use smallvec::{smallvec, SmallVec};
+use std::collections::VecDeque;
 
 /***************************************************************************************************
  * native fun create_signers_for_testing
@@ -30,54 +26,33 @@ fn to_le_bytes(i: u64) -> [u8; AccountAddress::LENGTH] {
     result
 }
 
-#[derive(Debug, Clone)]
-pub struct CreateSignersForTestingGasParameters {
-    pub base_cost: InternalGas,
-    pub unit_cost: InternalGasPerArg,
-}
-
 fn native_create_signers_for_testing(
-    gas_params: &CreateSignersForTestingGasParameters,
-    _context: &mut NativeContext,
+    _context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    let num_signers = pop_arg!(args, u64);
+    let num_signers = safely_pop_arg!(args, u64);
+
     let signers = Value::vector_for_testing_only(
         (0..num_signers).map(|i| Value::signer(AccountAddress::new(to_le_bytes(i)))),
     );
 
-    let cost = gas_params.base_cost + gas_params.unit_cost * NumArgs::new(num_signers);
-
-    Ok(NativeResult::ok(cost, smallvec![signers]))
-}
-
-pub fn make_native_create_signers_for_testing(
-    gas_params: CreateSignersForTestingGasParameters,
-) -> NativeFunction {
-    Arc::new(
-        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_create_signers_for_testing(&gas_params, context, ty_args, args)
-        },
-    )
+    Ok(smallvec![signers])
 }
 
 /***************************************************************************************************
  * module
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub create_signers_for_testing: CreateSignersForTestingGasParameters,
-}
-
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all(
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [(
         "create_signers_for_testing",
-        make_native_create_signers_for_testing(gas_params.create_signers_for_testing),
+        native_create_signers_for_testing as RawSafeNative,
     )];
 
-    make_module_natives(natives)
+    builder.make_named_natives(natives)
 }

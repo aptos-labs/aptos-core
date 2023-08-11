@@ -101,7 +101,9 @@ impl StateKvDb {
         COMMIT_POOL.scope(|s| {
             let mut batches = sharded_state_kv_batches.into_iter();
             for shard_id in 0..NUM_STATE_SHARDS {
-                let state_kv_batch = batches.next().unwrap();
+                let state_kv_batch = batches
+                    .next()
+                    .expect("Not sufficient number of sharded state kv batches");
                 s.spawn(move |_| {
                     // TODO(grao): Consider propagating the error instead of panic, if necessary.
                     self.commit_single_shard(version, shard_id as u8, state_kv_batch)
@@ -114,11 +116,6 @@ impl StateKvDb {
             .write_schemas(state_kv_metadata_batch)?;
 
         self.write_progress(version)
-    }
-
-    pub(crate) fn commit_raw_batch(&self, state_kv_batch: SchemaBatch) -> Result<()> {
-        // TODO(grao): Support sharding here.
-        self.state_kv_metadata_db.write_schemas(state_kv_batch)
     }
 
     pub(crate) fn write_progress(&self, version: Version) -> Result<()> {

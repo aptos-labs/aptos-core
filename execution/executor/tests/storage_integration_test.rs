@@ -31,7 +31,7 @@ fn test_genesis() {
     let path = aptos_temppath::TempPath::new();
     path.create_as_dir().unwrap();
     let genesis = aptos_vm_genesis::test_genesis_transaction();
-    let (_, db, _executor, waypoint) = create_db_and_executor(path.path(), &genesis);
+    let (_, db, _executor, waypoint) = create_db_and_executor(path.path(), &genesis, false);
 
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
     let state_proof = db.reader.get_state_proof(trusted_state.version()).unwrap();
@@ -77,7 +77,7 @@ fn test_reconfiguration() {
     let (genesis, validators) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_key = &aptos_vm_genesis::GENESIS_KEYPAIR.0;
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-    let (_, db, executor, _waypoint) = create_db_and_executor(path.path(), &genesis_txn);
+    let (_, db, executor, _waypoint) = create_db_and_executor(path.path(), &genesis_txn, false);
     let parent_block_id = executor.committed_block_id();
     let signer = ValidatorSigner::new(
         validators[0].data.owner_address,

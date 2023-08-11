@@ -50,13 +50,17 @@ In the future, we might support additional features:
 -  [Function `point_identity_compressed`](#0x1_ristretto255_point_identity_compressed)
 -  [Function `point_identity`](#0x1_ristretto255_point_identity)
 -  [Function `basepoint_compressed`](#0x1_ristretto255_basepoint_compressed)
+-  [Function `hash_to_point_base`](#0x1_ristretto255_hash_to_point_base)
 -  [Function `basepoint`](#0x1_ristretto255_basepoint)
 -  [Function `basepoint_mul`](#0x1_ristretto255_basepoint_mul)
 -  [Function `new_compressed_point_from_bytes`](#0x1_ristretto255_new_compressed_point_from_bytes)
 -  [Function `new_point_from_bytes`](#0x1_ristretto255_new_point_from_bytes)
+-  [Function `compressed_point_to_bytes`](#0x1_ristretto255_compressed_point_to_bytes)
 -  [Function `new_point_from_sha512`](#0x1_ristretto255_new_point_from_sha512)
+-  [Function `new_point_from_sha2_512`](#0x1_ristretto255_new_point_from_sha2_512)
 -  [Function `new_point_from_64_uniform_bytes`](#0x1_ristretto255_new_point_from_64_uniform_bytes)
 -  [Function `point_decompress`](#0x1_ristretto255_point_decompress)
+-  [Function `point_clone`](#0x1_ristretto255_point_clone)
 -  [Function `point_compress`](#0x1_ristretto255_point_compress)
 -  [Function `point_to_bytes`](#0x1_ristretto255_point_to_bytes)
 -  [Function `point_mul`](#0x1_ristretto255_point_mul)
@@ -69,10 +73,13 @@ In the future, we might support additional features:
 -  [Function `point_neg`](#0x1_ristretto255_point_neg)
 -  [Function `point_neg_assign`](#0x1_ristretto255_point_neg_assign)
 -  [Function `point_equals`](#0x1_ristretto255_point_equals)
+-  [Function `double_scalar_mul`](#0x1_ristretto255_double_scalar_mul)
 -  [Function `multi_scalar_mul`](#0x1_ristretto255_multi_scalar_mul)
 -  [Function `new_scalar_from_bytes`](#0x1_ristretto255_new_scalar_from_bytes)
 -  [Function `new_scalar_from_sha512`](#0x1_ristretto255_new_scalar_from_sha512)
+-  [Function `new_scalar_from_sha2_512`](#0x1_ristretto255_new_scalar_from_sha2_512)
 -  [Function `new_scalar_from_u8`](#0x1_ristretto255_new_scalar_from_u8)
+-  [Function `new_scalar_from_u32`](#0x1_ristretto255_new_scalar_from_u32)
 -  [Function `new_scalar_from_u64`](#0x1_ristretto255_new_scalar_from_u64)
 -  [Function `new_scalar_from_u128`](#0x1_ristretto255_new_scalar_from_u128)
 -  [Function `new_scalar_reduced_from_32_bytes`](#0x1_ristretto255_new_scalar_reduced_from_32_bytes)
@@ -97,6 +104,7 @@ In the future, we might support additional features:
 -  [Function `point_is_canonical_internal`](#0x1_ristretto255_point_is_canonical_internal)
 -  [Function `point_identity_internal`](#0x1_ristretto255_point_identity_internal)
 -  [Function `point_decompress_internal`](#0x1_ristretto255_point_decompress_internal)
+-  [Function `point_clone_internal`](#0x1_ristretto255_point_clone_internal)
 -  [Function `point_compress_internal`](#0x1_ristretto255_point_compress_internal)
 -  [Function `point_mul_internal`](#0x1_ristretto255_point_mul_internal)
 -  [Function `basepoint_mul_internal`](#0x1_ristretto255_basepoint_mul_internal)
@@ -104,6 +112,7 @@ In the future, we might support additional features:
 -  [Function `point_add_internal`](#0x1_ristretto255_point_add_internal)
 -  [Function `point_sub_internal`](#0x1_ristretto255_point_sub_internal)
 -  [Function `point_neg_internal`](#0x1_ristretto255_point_neg_internal)
+-  [Function `double_scalar_mul_internal`](#0x1_ristretto255_double_scalar_mul_internal)
 -  [Function `multi_scalar_mul_internal`](#0x1_ristretto255_multi_scalar_mul_internal)
 -  [Function `scalar_is_canonical_internal`](#0x1_ristretto255_scalar_is_canonical_internal)
 -  [Function `scalar_from_u64_internal`](#0x1_ristretto255_scalar_from_u64_internal)
@@ -123,6 +132,7 @@ In the future, we might support additional features:
     -  [Function `point_is_canonical_internal`](#@Specification_1_point_is_canonical_internal)
     -  [Function `point_identity_internal`](#@Specification_1_point_identity_internal)
     -  [Function `point_decompress_internal`](#@Specification_1_point_decompress_internal)
+    -  [Function `point_clone_internal`](#@Specification_1_point_clone_internal)
     -  [Function `point_compress_internal`](#@Specification_1_point_compress_internal)
     -  [Function `point_mul_internal`](#@Specification_1_point_mul_internal)
     -  [Function `basepoint_mul_internal`](#@Specification_1_basepoint_mul_internal)
@@ -130,6 +140,7 @@ In the future, we might support additional features:
     -  [Function `point_add_internal`](#@Specification_1_point_add_internal)
     -  [Function `point_sub_internal`](#@Specification_1_point_sub_internal)
     -  [Function `point_neg_internal`](#@Specification_1_point_neg_internal)
+    -  [Function `double_scalar_mul_internal`](#@Specification_1_double_scalar_mul_internal)
     -  [Function `multi_scalar_mul_internal`](#@Specification_1_multi_scalar_mul_internal)
     -  [Function `scalar_is_canonical_internal`](#@Specification_1_scalar_is_canonical_internal)
     -  [Function `scalar_from_u64_internal`](#@Specification_1_scalar_from_u64_internal)
@@ -145,6 +156,7 @@ In the future, we might support additional features:
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
@@ -246,61 +258,12 @@ immutable references to the same RistrettoPoint, of course.
 ## Constants
 
 
-<a name="0x1_ristretto255_A_PLUS_B_POINT"></a>
+<a name="0x1_ristretto255_E_NATIVE_FUN_NOT_AVAILABLE"></a>
+
+The native function has not been deployed yet.
 
 
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_A_PLUS_B_POINT">A_PLUS_B_POINT</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [112, 207, 55, 83, 71, 91, 159, 243, 62, 47, 132, 65, 62, 214, 181, 5, 32, 115, 188, 204, 10, 10, 129, 120, 157, 62, 86, 117, 220, 37, 128, 86];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_A_PLUS_B_SCALAR"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_A_PLUS_B_SCALAR">A_PLUS_B_SCALAR</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [8, 56, 57, 221, 73, 30, 87, 197, 116, 55, 16, 195, 154, 145, 214, 229, 2, 202, 179, 207, 14, 39, 154, 228, 23, 217, 31, 242, 203, 99, 62, 7];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_A_POINT"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_A_POINT">A_POINT</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [232, 127, 237, 161, 153, 215, 43, 131, 222, 79, 91, 45, 69, 211, 72, 5, 197, 112, 25, 198, 197, 156, 66, 203, 112, 238, 61, 25, 170, 153, 111, 117];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_A_SCALAR"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_A_SCALAR">A_SCALAR</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [26, 14, 151, 138, 144, 246, 98, 45, 55, 71, 2, 63, 138, 216, 38, 77, 167, 88, 170, 27, 136, 224, 64, 209, 88, 158, 123, 127, 35, 118, 239, 9];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_A_TIMES_BASE_POINT"></a>
-
-A_SCALAR * BASE_POINT, computed by modifying a test in curve25519-dalek in src/edwards.rs to do:
-```
-let comp = RistrettoPoint(A_TIMES_BASEPOINT.decompress().unwrap()).compress();
-println!("hex: {:x?}", comp.to_bytes());
-```
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_A_TIMES_BASE_POINT">A_TIMES_BASE_POINT</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [150, 213, 45, 146, 98, 238, 30, 26, 174, 121, 251, 174, 232, 193, 217, 6, 139, 13, 1, 191, 154, 69, 121, 230, 24, 9, 12, 61, 16, 136, 174, 16];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_A_TIMES_B_SCALAR"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_A_TIMES_B_SCALAR">A_TIMES_B_SCALAR</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [42, 181, 14, 56, 61, 124, 33, 15, 116, 213, 56, 115, 48, 115, 95, 24, 49, 81, 18, 209, 13, 251, 152, 252, 206, 30, 38, 32, 192, 192, 20, 2];
+<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>: u64 = 5;
 </code></pre>
 
 
@@ -311,24 +274,6 @@ The basepoint (generator) of the Ristretto255 group
 
 
 <pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_BASE_POINT">BASE_POINT</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [226, 242, 174, 10, 106, 188, 78, 113, 168, 132, 169, 97, 197, 0, 81, 95, 88, 227, 11, 106, 165, 130, 221, 141, 182, 166, 89, 69, 224, 141, 45, 118];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_B_POINT"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_B_POINT">B_POINT</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [250, 11, 54, 36, 176, 129, 198, 47, 54, 77, 11, 40, 57, 220, 199, 109, 124, 58, 176, 226, 126, 49, 190, 178, 185, 237, 118, 101, 117, 242, 142, 118];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_B_SCALAR"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_B_SCALAR">B_SCALAR</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [219, 253, 151, 175, 211, 138, 6, 240, 19, 141, 5, 39, 239, 178, 142, 173, 91, 113, 9, 180, 134, 70, 89, 19, 191, 58, 164, 114, 168, 237, 78, 13];
 </code></pre>
 
 
@@ -373,30 +318,22 @@ Expected more than zero scalars as input.
 
 
 
+<a name="0x1_ristretto255_HASH_BASE_POINT"></a>
+
+The hash of the basepoint of the Ristretto255 group using SHA3_512
+
+
+<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_HASH_BASE_POINT">HASH_BASE_POINT</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [140, 146, 64, 180, 86, 169, 230, 220, 101, 195, 119, 161, 4, 141, 116, 95, 148, 160, 140, 219, 127, 68, 203, 205, 123, 70, 243, 64, 72, 135, 17, 52];
+</code></pre>
+
+
+
 <a name="0x1_ristretto255_L_MINUS_ONE"></a>
 
 <code><a href="ristretto255.md#0x1_ristretto255_ORDER_ELL">ORDER_ELL</a></code> - 1: i.e., the "largest", reduced scalar in the field
 
 
 <pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_L_MINUS_ONE">L_MINUS_ONE</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [236, 211, 245, 92, 26, 99, 18, 88, 214, 156, 247, 162, 222, 249, 222, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_L_PLUS_ONE"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_L_PLUS_ONE">L_PLUS_ONE</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [238, 211, 245, 92, 26, 99, 18, 88, 214, 156, 247, 162, 222, 249, 222, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_L_PLUS_TWO"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_L_PLUS_TWO">L_PLUS_TWO</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [239, 211, 245, 92, 26, 99, 18, 88, 214, 156, 247, 162, 222, 249, 222, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16];
 </code></pre>
 
 
@@ -431,84 +368,12 @@ The maximum size in bytes of a canonically-encoded Scalar is 32 bytes.
 
 
 
-<a name="0x1_ristretto255_NON_CANONICAL_ALL_ONES"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_NON_CANONICAL_ALL_ONES">NON_CANONICAL_ALL_ONES</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255];
-</code></pre>
-
-
-
 <a name="0x1_ristretto255_ORDER_ELL"></a>
 
 The order of the Ristretto255 group and its scalar field, in little-endian.
 
 
 <pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_ORDER_ELL">ORDER_ELL</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [237, 211, 245, 92, 26, 99, 18, 88, 214, 156, 247, 162, 222, 249, 222, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_REDUCED_2_256_MINUS_1_SCALAR"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_REDUCED_2_256_MINUS_1_SCALAR">REDUCED_2_256_MINUS_1_SCALAR</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [28, 149, 152, 141, 116, 49, 236, 214, 112, 207, 125, 115, 244, 91, 239, 198, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 15];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_REDUCED_X_PLUS_2_TO_256_TIMES_X_SCALAR"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_REDUCED_X_PLUS_2_TO_256_TIMES_X_SCALAR">REDUCED_X_PLUS_2_TO_256_TIMES_X_SCALAR</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [216, 154, 179, 139, 210, 121, 2, 71, 69, 99, 158, 216, 23, 173, 63, 100, 204, 0, 91, 50, 219, 153, 57, 249, 28, 82, 31, 197, 100, 165, 192, 8];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_TWO_SCALAR"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_TWO_SCALAR">TWO_SCALAR</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_X_INV_SCALAR"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_X_INV_SCALAR">X_INV_SCALAR</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [28, 220, 23, 252, 224, 233, 165, 187, 217, 36, 126, 86, 187, 1, 99, 71, 187, 186, 49, 237, 213, 169, 187, 150, 213, 11, 205, 122, 63, 150, 42, 15];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_X_SCALAR"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_X_SCALAR">X_SCALAR</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [78, 90, 180, 52, 93, 71, 8, 132, 89, 19, 180, 100, 27, 194, 125, 82, 82, 165, 133, 16, 27, 204, 66, 68, 212, 73, 244, 168, 121, 217, 242, 4];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_X_TIMES_Y_SCALAR"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_X_TIMES_Y_SCALAR">X_TIMES_Y_SCALAR</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [108, 51, 116, 161, 137, 79, 98, 33, 10, 170, 47, 225, 134, 166, 249, 44, 224, 170, 117, 194, 119, 149, 129, 194, 149, 252, 8, 23, 154, 115, 148, 12];
-</code></pre>
-
-
-
-<a name="0x1_ristretto255_Y_SCALAR"></a>
-
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_Y_SCALAR">Y_SCALAR</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [144, 118, 51, 254, 28, 75, 102, 164, 162, 141, 45, 215, 103, 131, 134, 195, 83, 208, 222, 84, 85, 212, 252, 157, 232, 239, 122, 195, 31, 53, 187, 5];
 </code></pre>
 
 
@@ -587,6 +452,33 @@ Returns the basepoint (generator) of the Ristretto255 group as a compressed poin
     <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a> {
         data: <a href="ristretto255.md#0x1_ristretto255_BASE_POINT">BASE_POINT</a>
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_ristretto255_hash_to_point_base"></a>
+
+## Function `hash_to_point_base`
+
+Returns the hash-to-point result of serializing the basepoint of the Ristretto255 group.
+For use as the random value basepoint in Pedersen commitments
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_hash_to_point_base">hash_to_point_base</a>(): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_hash_to_point_base">hash_to_point_base</a>(): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+    <b>let</b> comp_res = <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a> { data: <a href="ristretto255.md#0x1_ristretto255_HASH_BASE_POINT">HASH_BASE_POINT</a> };
+    <a href="ristretto255.md#0x1_ristretto255_point_decompress">point_decompress</a>(&comp_res)
 }
 </code></pre>
 
@@ -714,14 +606,14 @@ returns None.
 
 </details>
 
-<a name="0x1_ristretto255_new_point_from_sha512"></a>
+<a name="0x1_ristretto255_compressed_point_to_bytes"></a>
 
-## Function `new_point_from_sha512`
+## Function `compressed_point_to_bytes`
 
-Hashes the input to a uniformly-at-random RistrettoPoint via SHA512.
+Given a compressed ristretto point <code>point</code>, returns the byte representation of that point
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha512">new_point_from_sha512</a>(sha512: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_compressed_point_to_bytes">compressed_point_to_bytes</a>(point: <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -730,9 +622,61 @@ Hashes the input to a uniformly-at-random RistrettoPoint via SHA512.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha512">new_point_from_sha512</a>(sha512: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_compressed_point_to_bytes">compressed_point_to_bytes</a>(point: <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    point.data
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_ristretto255_new_point_from_sha512"></a>
+
+## Function `new_point_from_sha512`
+
+DEPRECATED: Use the more clearly-named <code>new_point_from_sha2_512</code>
+
+Hashes the input to a uniformly-at-random RistrettoPoint via SHA512.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha512">new_point_from_sha512</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha512">new_point_from_sha512</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+    <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha2_512">new_point_from_sha2_512</a>(sha2_512_input)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_ristretto255_new_point_from_sha2_512"></a>
+
+## Function `new_point_from_sha2_512`
+
+Hashes the input to a uniformly-at-random RistrettoPoint via SHA2-512.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha2_512">new_point_from_sha2_512</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha2_512">new_point_from_sha2_512</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
     <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-        handle: <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha512_internal">new_point_from_sha512_internal</a>(sha512)
+        handle: <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha512_internal">new_point_from_sha512_internal</a>(sha2_512_input)
     }
 }
 </code></pre>
@@ -794,6 +738,37 @@ Decompresses a CompressedRistretto from storage into a RistrettoPoint which can 
     // <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>
     <b>let</b> (handle, _) = <a href="ristretto255.md#0x1_ristretto255_point_decompress_internal">point_decompress_internal</a>(point.data);
     <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> { handle }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_ristretto255_point_clone"></a>
+
+## Function `point_clone`
+
+Clones a RistrettoPoint.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_clone">point_clone</a>(point: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_clone">point_clone</a>(point: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+    <b>if</b>(!<a href="../../move-stdlib/doc/features.md#0x1_features_bulletproofs_enabled">features::bulletproofs_enabled</a>()) {
+        <b>abort</b>(std::error::invalid_state(<a href="ristretto255.md#0x1_ristretto255_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>))
+    };
+
+    <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+        handle: <a href="ristretto255.md#0x1_ristretto255_point_clone_internal">point_clone_internal</a>(point.handle)
+    }
 }
 </code></pre>
 
@@ -912,10 +887,10 @@ Sets a *= point and returns 'a'.
 
 ## Function `basepoint_double_mul`
 
-Returns (a * some_point + b * base_point), where base_point is the Ristretto basepoint encoded in <code><a href="ristretto255.md#0x1_ristretto255_BASE_POINT">BASE_POINT</a></code>.
+Returns (a * a_base + b * base_point), where base_point is the Ristretto basepoint encoded in <code><a href="ristretto255.md#0x1_ristretto255_BASE_POINT">BASE_POINT</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_basepoint_double_mul">basepoint_double_mul</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, some_point: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_basepoint_double_mul">basepoint_double_mul</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, a_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
 </code></pre>
 
 
@@ -924,9 +899,9 @@ Returns (a * some_point + b * base_point), where base_point is the Ristretto bas
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_basepoint_double_mul">basepoint_double_mul</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, some_point: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_basepoint_double_mul">basepoint_double_mul</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, a_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
     <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-        handle: <a href="ristretto255.md#0x1_ristretto255_basepoint_double_mul_internal">basepoint_double_mul_internal</a>(a.data, some_point, b.data)
+        handle: <a href="ristretto255.md#0x1_ristretto255_basepoint_double_mul_internal">basepoint_double_mul_internal</a>(a.data, a_base, b.data)
     }
 }
 </code></pre>
@@ -1117,6 +1092,38 @@ Returns true if the two RistrettoPoints are the same points on the elliptic curv
 
 </details>
 
+<a name="0x1_ristretto255_double_scalar_mul"></a>
+
+## Function `double_scalar_mul`
+
+Computes a double-scalar multiplication, returning a_1 p_1 + a_2 p_2
+This function is much faster than computing each a_i p_i using <code>point_mul</code> and adding up the results using <code>point_add</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_double_scalar_mul">double_scalar_mul</a>(scalar1: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, point1: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, scalar2: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, point2: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_double_scalar_mul">double_scalar_mul</a>(scalar1: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, point1: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, scalar2: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, point2: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+    <b>if</b>(!<a href="../../move-stdlib/doc/features.md#0x1_features_bulletproofs_enabled">features::bulletproofs_enabled</a>()) {
+        <b>abort</b>(std::error::invalid_state(<a href="ristretto255.md#0x1_ristretto255_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>))
+    };
+
+    <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+        handle: <a href="ristretto255.md#0x1_ristretto255_double_scalar_mul_internal">double_scalar_mul_internal</a>(point1.handle, point2.handle, scalar1.data, scalar2.data)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_ristretto255_multi_scalar_mul"></a>
 
 ## Function `multi_scalar_mul`
@@ -1185,10 +1192,12 @@ Otherwise, returns None.
 
 ## Function `new_scalar_from_sha512`
 
-Hashes the input to a uniformly-at-random Scalar via SHA512
+DEPRECATED: Use the more clearly-named <code>new_scalar_from_sha2_512</code>
+
+Hashes the input to a uniformly-at-random Scalar via SHA2-512
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_sha512">new_scalar_from_sha512</a>(sha512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_sha512">new_scalar_from_sha512</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
@@ -1197,9 +1206,34 @@ Hashes the input to a uniformly-at-random Scalar via SHA512
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_sha512">new_scalar_from_sha512</a>(sha512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_sha512">new_scalar_from_sha512</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
+    <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_sha2_512">new_scalar_from_sha2_512</a>(sha2_512_input)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_ristretto255_new_scalar_from_sha2_512"></a>
+
+## Function `new_scalar_from_sha2_512`
+
+Hashes the input to a uniformly-at-random Scalar via SHA2-512
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_sha2_512">new_scalar_from_sha2_512</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_sha2_512">new_scalar_from_sha2_512</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
     <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
-        data: <a href="ristretto255.md#0x1_ristretto255_scalar_from_sha512_internal">scalar_from_sha512_internal</a>(sha512_input)
+        data: <a href="ristretto255.md#0x1_ristretto255_scalar_from_sha512_internal">scalar_from_sha512_internal</a>(sha2_512_input)
     }
 }
 </code></pre>
@@ -1230,6 +1264,33 @@ Creates a Scalar from an u8.
     *byte_zero = byte;
 
     s
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_ristretto255_new_scalar_from_u32"></a>
+
+## Function `new_scalar_from_u32`
+
+Creates a Scalar from an u32.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_u32">new_scalar_from_u32</a>(four_bytes: u32): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_u32">new_scalar_from_u32</a>(four_bytes: u32): <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
+    <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
+        data: <a href="ristretto255.md#0x1_ristretto255_scalar_from_u64_internal">scalar_from_u64_internal</a>((four_bytes <b>as</b> u64))
+    }
 }
 </code></pre>
 
@@ -1762,7 +1823,7 @@ Returns the byte-representation of the scalar.
 
 
 
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha512_internal">new_point_from_sha512_internal</a>(sha512: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha512_internal">new_point_from_sha512_internal</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
 </code></pre>
 
 
@@ -1771,7 +1832,7 @@ Returns the byte-representation of the scalar.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha512_internal">new_point_from_sha512_internal</a>(sha512: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha512_internal">new_point_from_sha512_internal</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
 
@@ -1860,6 +1921,28 @@ Returns the byte-representation of the scalar.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_decompress_internal">point_decompress_internal</a>(maybe_non_canonical_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (u64, bool);
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_ristretto255_point_clone_internal"></a>
+
+## Function `point_clone_internal`
+
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_clone_internal">point_clone_internal</a>(point_handle: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_clone_internal">point_clone_internal</a>(point_handle: u64): u64;
 </code></pre>
 
 
@@ -2014,6 +2097,28 @@ Returns the byte-representation of the scalar.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_neg_internal">point_neg_internal</a>(a: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, in_place: bool): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_ristretto255_double_scalar_mul_internal"></a>
+
+## Function `double_scalar_mul_internal`
+
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_double_scalar_mul_internal">double_scalar_mul_internal</a>(point1: u64, point2: u64, scalar1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_double_scalar_mul_internal">double_scalar_mul_internal</a>(point1: u64, point2: u64, scalar1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
 
@@ -2184,7 +2289,7 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_from_sha512_internal">scalar_from_sha512_internal</a>(sha512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_from_sha512_internal">scalar_from_sha512_internal</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -2193,7 +2298,7 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_from_sha512_internal">scalar_from_sha512_internal</a>(sha512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_from_sha512_internal">scalar_from_sha512_internal</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -2314,7 +2419,7 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `new_point_from_sha512_internal`
 
 
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha512_internal">new_point_from_sha512_internal</a>(sha512: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha512_internal">new_point_from_sha512_internal</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
 </code></pre>
 
 
@@ -2379,6 +2484,22 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_decompress_internal">point_decompress_internal</a>(maybe_non_canonical_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (u64, bool)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_1_point_clone_internal"></a>
+
+### Function `point_clone_internal`
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_clone_internal">point_clone_internal</a>(point_handle: u64): u64
 </code></pre>
 
 
@@ -2491,6 +2612,22 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_neg_internal">point_neg_internal</a>(a: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, in_place: bool): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_1_double_scalar_mul_internal"></a>
+
+### Function `double_scalar_mul_internal`
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_double_scalar_mul_internal">double_scalar_mul_internal</a>(point1: u64, point2: u64, scalar1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
 </code></pre>
 
 
@@ -2618,7 +2755,7 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `scalar_from_sha512_internal`
 
 
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_from_sha512_internal">scalar_from_sha512_internal</a>(sha512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_from_sha512_internal">scalar_from_sha512_internal</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -2692,4 +2829,4 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

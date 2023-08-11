@@ -115,9 +115,11 @@ use unions::*;
 pub fn silent_display(source: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(source).expect("Incorrect macro input");
     let name = &ast.ident;
+    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
+
     let gen = quote! {
         // In order to ensure that secrets are never leaked, Display is elided
-        impl ::std::fmt::Display for #name {
+        impl #impl_generics ::std::fmt::Display for #name #ty_generics #where_clause {
             fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                 write!(f, "<elided secret for {}>", stringify!(#name))
             }
@@ -130,9 +132,11 @@ pub fn silent_display(source: TokenStream) -> TokenStream {
 pub fn silent_debug(source: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(source).expect("Incorrect macro input");
     let name = &ast.ident;
+    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
+
     let gen = quote! {
         // In order to ensure that secrets are never leaked, Debug is elided
-        impl ::std::fmt::Debug for #name {
+        impl #impl_generics ::std::fmt::Debug for #name #ty_generics #where_clause {
             fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                 write!(f, "<elided secret for {}>", stringify!(#name))
             }

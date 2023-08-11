@@ -1,0 +1,37 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct Nat {
+        f: #0,
+    }
+    struct R {
+        s: M::S,
+        f: u64,
+        n1: M::Nat<u64>,
+        n2: M::Nat<M::S>,
+    }
+    struct S {
+        f: u64,
+    }
+    private fun t0() {
+        pack M::S(0);
+        {
+          let s: M::S = pack M::S(0);
+          M::R{ s: _, f: _, n1: _, n2: _ } = pack M::R(pack M::S(0), 0, pack M::Nat<u64>(0), pack M::Nat<M::S>(s));
+          {
+            let f: u64 = 0;
+            {
+              let s: M::S = pack M::S(0);
+              {
+                let n1: M::Nat<u64> = pack M::Nat<u64>(f);
+                {
+                  let n2: M::Nat<M::S> = pack M::Nat<M::S>(Deref(Borrow(Immutable)(s)));
+                  M::R{ s: _, f: _, n1: _, n2: _ } = pack M::R(s, f, n1, n2);
+                  pack M::Nat<M::Nat<M::Nat<M::S>>>(pack M::Nat<M::Nat<M::S>>(pack M::Nat<M::S>(pack M::S(f))));
+                  Tuple()
+                }
+              }
+            }
+          }
+        }
+    }
+} // end 0x8675309::M

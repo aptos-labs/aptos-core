@@ -93,11 +93,6 @@ fn sanitize_failpoints_config(
                 "Failpoints are disabled, but the failpoints config is not empty!".into(),
             ));
         }
-    } else if failpoints_enabled {
-        return Err(Error::ConfigSanitizerFailed(
-            sanitizer_name,
-            "Failpoints are enabled, but the failpoints config is None!".into(),
-        ));
     }
 
     Ok(())

@@ -1,0 +1,9 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct S {
+        f: u64,
+    }
+    private fun t0(s: &M::S,s_mut: &mut M::S,s_mut2: &mut M::S) {
+        Tuple(Borrow(Immutable)(select M::S.f(s)), Borrow(Immutable)(select M::S.f(s_mut)), Borrow(Mutable)(select M::S.f(s_mut2)))
+    }
+} // end 0x8675309::M

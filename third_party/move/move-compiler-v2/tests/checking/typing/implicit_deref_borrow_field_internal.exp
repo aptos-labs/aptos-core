@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: field `f` of struct `X::S` is private to its module
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_internal.move:13:17
+   │
+13 │         (X::s().f: u64);
+   │                 ^
+
+error: field `f` of struct `X::S` is private to its module
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_internal.move:15:12
+   │
+15 │         (s.f: u64);
+   │            ^

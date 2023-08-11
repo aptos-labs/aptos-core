@@ -4,18 +4,23 @@ use crate::{
     abort_unless_feature_flag_enabled,
     natives::{
         cryptography::algebra::{
-            abort_invariant_violated, gas::GasParameters, AlgebraContext, Structure,
-            E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
-            MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+            abort_invariant_violated, AlgebraContext, Structure, E_TOO_MUCH_MEMORY_USED,
+            MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING,
+            MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
-        helpers::{log2_ceil, SafeNativeContext, SafeNativeError, SafeNativeResult},
+        helpers::log2_ceil,
     },
-    safe_borrow_element, safely_pop_arg, store_element, structure_from_ty_arg,
+    safe_borrow_element, store_element, structure_from_ty_arg,
+};
+use aptos_gas_algebra::{Arg, GasExpression};
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_ec::{CurveGroup, Group};
 use ark_ff::Field;
-use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
+use move_core_types::gas_algebra::NumArgs;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
@@ -64,21 +69,19 @@ fn ark_msm_window_size(num_entries: usize) -> usize {
     }
 }
 
-/// The approximate cost model of https://github.com/arkworks-rs/algebra/blob/v0.4.0/ec/src/scalar_mul/variable_base/mod.rs#L89.
-pub fn ark_msm_bigint_wnaf_cost(
-    cost_add: InternalGasPerArg,
-    cost_double: InternalGasPerArg,
-    num_entries: usize,
-) -> InternalGas {
-    let window_size = ark_msm_window_size(num_entries);
-    let num_windows = (255 + window_size - 1) / window_size;
-    let num_buckets = 1_usize << window_size;
-    cost_add * NumArgs::from(((num_entries + num_buckets + 1) * num_windows) as u64)
-        + cost_double * NumArgs::from((num_buckets * num_windows) as u64)
+/// The approximate cost model of <https://github.com/arkworks-rs/algebra/blob/v0.4.0/ec/src/scalar_mul/variable_base/mod.rs#L89>.
+macro_rules! ark_msm_bigint_wnaf_cost {
+    ($cost_add:expr, $cost_double:expr, $num_entries:expr $(,)?) => {{
+        let num_entries: usize = $num_entries;
+        let window_size = ark_msm_window_size(num_entries);
+        let num_windows = (255 + window_size - 1) / window_size;
+        let num_buckets = 1_usize << window_size;
+        $cost_add * NumArgs::from(((num_entries + num_buckets + 1) * num_windows) as u64)
+            + $cost_double * NumArgs::from((num_buckets * num_windows) as u64)
+    }};
 }
 
 pub fn scalar_mul_internal(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -95,7 +98,7 @@ pub fn scalar_mul_internal(
                 ark_bls12_381::G1Projective,
                 ark_bls12_381::Fr,
                 mul_bigint,
-                gas_params.ark_bls12_381_g1_proj_scalar_mul * NumArgs::one()
+                ALGEBRA_ARK_BLS12_381_G1_PROJ_SCALAR_MUL
             )
         },
         (Some(Structure::BLS12381G2), Some(Structure::BLS12381Fr)) => {
@@ -105,7 +108,7 @@ pub fn scalar_mul_internal(
                 ark_bls12_381::G2Projective,
                 ark_bls12_381::Fr,
                 mul_bigint,
-                gas_params.ark_bls12_381_g2_proj_scalar_mul * NumArgs::one()
+                ALGEBRA_ARK_BLS12_381_G2_PROJ_SCALAR_MUL
             )
         },
         (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fr)) => {
@@ -126,7 +129,7 @@ pub fn scalar_mul_internal(
                 scalar
             );
             let scalar_bigint: ark_ff::BigInteger256 = (*scalar).into();
-            context.charge(gas_params.ark_bls12_381_fq12_pow_u256 * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_FQ12_POW_U256)?;
             let new_element = element.pow(scalar_bigint);
             let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])
@@ -173,7 +176,7 @@ macro_rules! ark_msm_internal {
             safe_borrow_element!($context, handle as usize, $scalar_typ, scalar_ptr, scalar);
             scalars.push(scalar.clone());
         }
-        $context.charge(ark_msm_bigint_wnaf_cost(
+        $context.charge(ark_msm_bigint_wnaf_cost!(
             $proj_add_cost,
             $proj_double_cost,
             num_elements,
@@ -186,7 +189,6 @@ macro_rules! ark_msm_internal {
 }
 
 pub fn multi_scalar_mul_internal(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -200,9 +202,9 @@ pub fn multi_scalar_mul_internal(
             ark_msm_internal!(
                 context,
                 args,
-                gas_params.ark_bls12_381_g1_proj_to_affine,
-                gas_params.ark_bls12_381_g1_proj_add,
-                gas_params.ark_bls12_381_g1_proj_double,
+                ALGEBRA_ARK_BLS12_381_G1_PROJ_TO_AFFINE.per::<Arg>(),
+                ALGEBRA_ARK_BLS12_381_G1_PROJ_ADD.per::<Arg>(),
+                ALGEBRA_ARK_BLS12_381_G1_PROJ_DOUBLE.per::<Arg>(),
                 ark_bls12_381::G1Projective,
                 ark_bls12_381::Fr
             )
@@ -211,9 +213,9 @@ pub fn multi_scalar_mul_internal(
             ark_msm_internal!(
                 context,
                 args,
-                gas_params.ark_bls12_381_g2_proj_to_affine,
-                gas_params.ark_bls12_381_g2_proj_add,
-                gas_params.ark_bls12_381_g2_proj_double,
+                ALGEBRA_ARK_BLS12_381_G2_PROJ_TO_AFFINE.per::<Arg>(),
+                ALGEBRA_ARK_BLS12_381_G2_PROJ_ADD.per::<Arg>(),
+                ALGEBRA_ARK_BLS12_381_G2_PROJ_DOUBLE.per::<Arg>(),
                 ark_bls12_381::G2Projective,
                 ark_bls12_381::Fr
             )

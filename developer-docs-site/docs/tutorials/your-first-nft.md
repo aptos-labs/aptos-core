@@ -63,7 +63,7 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
   Install the necessary dependencies:
   ```bash
   curl -sSL https://install.python-poetry.org | python3
-  poetry update
+  poetry install
   ```
 
   Run the Python [`simple-nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple-nft.py) example:
@@ -321,9 +321,9 @@ Your application will call `create_collection`:
 :!: static/sdks/python/examples/simple-nft.py section_4
 ```
 
-The is the function signature of `create_collection`. It returns a transaction hash:
+This is the function signature of `create_collection`. It returns a transaction hash:
 ```python
-:!: static/sdks/python/aptos_sdk/client.py create_collection
+:!: static/sdks/python/aptos_sdk/async_client.py create_collection
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">
@@ -360,7 +360,7 @@ Your application will call `create_token`:
 
 The is the function signature of `create_token`. It returns a transaction hash:
 ```python
-:!: static/sdks/python/aptos_sdk/client.py create_token
+:!: static/sdks/python/aptos_sdk/async_client.py create_token
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">
@@ -408,7 +408,7 @@ To read a token's metadata:
 
 Here's how `get_token_data` queries the token metadata:
 ```python
-:!: static/sdks/python/aptos_sdk/client.py read_token_data_table
+:!: static/sdks/python/aptos_sdk/async_client.py read_token_data_table
 ```
 
   </TabItem>

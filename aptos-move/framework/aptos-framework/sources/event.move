@@ -54,4 +54,13 @@ module aptos_framework::event {
     public fun destroy_handle<T: drop + store>(handle: EventHandle<T>) {
         EventHandle<T> { counter: _, guid: _ } = handle;
     }
+
+    #[test_only]
+    public native fun emitted_events_by_handle<T: drop + store>(handle: &EventHandle<T>): vector<T>;
+
+    #[test_only]
+    public fun was_event_emitted_by_handle<T: drop + store>(handle: &EventHandle<T>, msg: &T): bool {
+        use std::vector;
+        vector::contains(&emitted_events_by_handle(handle), msg)
+    }
 }
