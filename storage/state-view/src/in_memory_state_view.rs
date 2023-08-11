@@ -29,10 +29,6 @@ impl TStateView for InMemoryStateView {
         Ok(self.state_data.get(state_key).cloned())
     }
 
-    fn is_genesis(&self) -> bool {
-        unimplemented!("is_genesis is not implemented for InMemoryStateView")
-    }
-
     fn get_usage(&self) -> Result<StateStorageUsage> {
         Ok(StateStorageUsage::new_untracked())
     }

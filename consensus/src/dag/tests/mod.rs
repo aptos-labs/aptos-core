@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+mod dag_driver_tests;
 mod dag_network_test;
 mod dag_test;
 mod fetcher_test;
