@@ -39,7 +39,7 @@ impl PrePartitioner for UniformPartitioner {
 fn test_uniform_partitioner() {
     let block_gen = P2PBlockGenerator::new(10);
     let mut rng = thread_rng();
-    let txns = block_gen.rand_block(&mut rng,18);
+    let txns = block_gen.rand_block(&mut rng, 18);
     let partitioner = UniformPartitioner {};
     let actual = partitioner.pre_partition(txns.as_slice(), 5);
     assert_eq!(

@@ -44,7 +44,7 @@ use std::{
         Arc, Mutex, RwLock,
     },
 };
-use types::{OriginalTxnIdx, SenderIdx, ShardedTxnIndex2, StorageKeyIdx, SubBlockIdx};
+use types::{OriginalTxnIdx, SenderIdx, ShardedTxnIndexV2, StorageKeyIdx, SubBlockIdx};
 
 pub mod config;
 mod conflicting_txn_tracker;
@@ -182,6 +182,7 @@ pub struct PartitionState {
     finalized_txn_matrix: Vec<Vec<Vec<OriginalTxnIdx>>>,
     start_index_matrix: Vec<Vec<OriginalTxnIdx>>,
     new_txn_idxs: Vec<RwLock<TxnIndex>>,
+    sub_block_matrix: Vec<Vec<Mutex<Option<SubBlock<AnalyzedTransaction>>>>>,
 }
 
 impl PartitionState {
@@ -236,9 +237,10 @@ impl PartitionState {
             avoid_pct,
             num_rounds_limit,
             finalized_txn_matrix: Vec::with_capacity(num_rounds_limit),
-            new_txn_idxs: Vec::with_capacity(num_txns),
-            start_index_matrix: Vec::with_capacity(num_rounds_limit),
+            new_txn_idxs: vec![],
+            start_index_matrix: vec![],
             txns: takable_txns,
+            sub_block_matrix: vec![],
         }
     }
 
@@ -371,8 +373,8 @@ impl PartitionState {
     fn last_writer(&self, key: StorageKeyIdx, sub_block: SubBlockIdx) -> Option<OriginalTxnIdx> {
         let tracker_ref = self.trackers.get(&key).unwrap();
         let tracker = tracker_ref.read().unwrap();
-        let start = ShardedTxnIndex2::new(sub_block.round_id, sub_block.shard_id, 0);
-        let end = ShardedTxnIndex2::new(sub_block.round_id, sub_block.shard_id + 1, 0);
+        let start = ShardedTxnIndexV2::new(sub_block.round_id, sub_block.shard_id, 0);
+        let end = ShardedTxnIndexV2::new(sub_block.round_id, sub_block.shard_id + 1, 0);
         let ret = tracker
             .finalized_writes
             .range(start..end)
@@ -384,8 +386,8 @@ impl PartitionState {
     fn first_writer(
         &self,
         key: StorageKeyIdx,
-        since: ShardedTxnIndex2,
-    ) -> Option<ShardedTxnIndex2> {
+        since: ShardedTxnIndexV2,
+    ) -> Option<ShardedTxnIndexV2> {
         let tracker_ref = self.trackers.get(&key).unwrap();
         let tracker = tracker_ref.read().unwrap();
         let ret = tracker.finalized_writes.range(since..).next().copied();
@@ -395,9 +397,9 @@ impl PartitionState {
     fn all_accepted_txns(
         &self,
         key: StorageKeyIdx,
-        start: ShardedTxnIndex2,
-        end: ShardedTxnIndex2,
-    ) -> Vec<ShardedTxnIndex2> {
+        start: ShardedTxnIndexV2,
+        end: ShardedTxnIndexV2,
+    ) -> Vec<ShardedTxnIndexV2> {
         let tracker_ref = self.trackers.get(&key).unwrap();
         let tracker = tracker_ref.read().unwrap();
         let ret = tracker.finalized_all.range(start..end).copied().collect();
@@ -420,7 +422,8 @@ impl PartitionState {
         }
     }
 
-    fn make_txn_with_dep(
+    /// Take a txn out and, wrap it as a `TransactionWithDependencies`.
+    fn take_txn_with_dep(
         &self,
         round_id: RoundId,
         shard_id: ShardId,
@@ -433,7 +436,7 @@ impl PartitionState {
             let tracker = tracker_ref.read().unwrap();
             if let Some(txn_idx) = tracker
                 .finalized_writes
-                .range(..ShardedTxnIndex2::new(round_id, shard_id, 0))
+                .range(..ShardedTxnIndexV2::new(round_id, shard_id, 0))
                 .last()
             {
                 let src_txn_idx = ShardedTxnIndex {
@@ -446,11 +449,11 @@ impl PartitionState {
         }
         for key_idx in self.write_hints(ori_txn_idx) {
             if Some(ori_txn_idx) == self.last_writer(key_idx, SubBlockIdx { round_id, shard_id }) {
-                let start_of_next_sub_block = ShardedTxnIndex2::new(round_id, shard_id + 1, 0);
+                let start_of_next_sub_block = ShardedTxnIndexV2::new(round_id, shard_id + 1, 0);
                 let next_writer = self.first_writer(key_idx, start_of_next_sub_block);
                 let end_follower = match next_writer {
-                    None => ShardedTxnIndex2::new(self.num_rounds(), self.num_executor_shards, 0), // Guaranteed to be greater than any invalid idx...
-                    Some(idx) => ShardedTxnIndex2::new(idx.round_id(), idx.shard_id() + 1, 0),
+                    None => ShardedTxnIndexV2::new(self.num_rounds(), self.num_executor_shards, 0), // Guaranteed to be greater than any invalid idx...
+                    Some(idx) => ShardedTxnIndexV2::new(idx.round_id(), idx.shard_id() + 1, 0),
                 };
                 for follower_txn_idx in
                     self.all_accepted_txns(key_idx, start_of_next_sub_block, end_follower)

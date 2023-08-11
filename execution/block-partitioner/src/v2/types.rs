@@ -6,6 +6,8 @@ use aptos_types::block_executor::partitioner::{
 use serde::{Deserialize, Serialize};
 use std::cmp;
 
+/// Represent which sub-block a txn is assigned to.
+/// TODO: switch to enum to better represent the sub-block assigned to the global executor.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SubBlockIdx {
     pub round_id: RoundId,
@@ -34,7 +36,7 @@ impl SubBlockIdx {
     }
 }
 
-/// The position of a txn in the block *before partitioning*.
+/// The position of a txn in the block after `pre_partition` and before `flatten_to_rounds`.
 pub type OriginalTxnIdx = usize;
 
 /// Represent a specific storage location in a partitioning session.
@@ -43,28 +45,29 @@ pub type StorageKeyIdx = usize;
 /// Represent a sender in a partitioning session.
 pub type SenderIdx = usize;
 
-/// Represent a txn after its position is finalized.
+/// Represents positions of a txn after it is assigned to a sub-block.
+///
 /// Different from `aptos_types::block_executor::partitioner::ShardedTxnIndex`,
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ShardedTxnIndex2 {
+pub struct ShardedTxnIndexV2 {
     pub sub_block_idx: SubBlockIdx,
     pub ori_txn_idx: OriginalTxnIdx,
 }
 
-impl Ord for ShardedTxnIndex2 {
+impl Ord for ShardedTxnIndexV2 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         (self.sub_block_idx, self.ori_txn_idx).cmp(&(other.sub_block_idx, other.ori_txn_idx))
     }
 }
 
-impl PartialOrd for ShardedTxnIndex2 {
+impl PartialOrd for ShardedTxnIndexV2 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         (self.sub_block_idx, self.ori_txn_idx)
             .partial_cmp(&(other.sub_block_idx, other.ori_txn_idx))
     }
 }
 
-impl ShardedTxnIndex2 {
+impl ShardedTxnIndexV2 {
     pub fn round_id(&self) -> RoundId {
         self.sub_block_idx.round_id
     }
@@ -74,7 +77,7 @@ impl ShardedTxnIndex2 {
     }
 }
 
-impl ShardedTxnIndex2 {
+impl ShardedTxnIndexV2 {
     pub fn new(round_id: RoundId, shard_id: ShardId, ori_txn_idx: OriginalTxnIdx) -> Self {
         Self {
             sub_block_idx: SubBlockIdx::new(round_id, shard_id),

@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::v2::types::{OriginalTxnIdx, ShardedTxnIndex2};
+use crate::v2::types::{OriginalTxnIdx, ShardedTxnIndexV2};
 #[cfg(test)]
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::{
@@ -26,9 +26,9 @@ pub struct ConflictingTxnTracker {
     /// Txns that write the current storage location.
     pub writer_set: HashSet<OriginalTxnIdx>,
     /// Txns that have been accepted.
-    pub finalized_all: BTreeSet<ShardedTxnIndex2>,
+    pub finalized_all: BTreeSet<ShardedTxnIndexV2>,
     /// Txns that (1) write the current storage location and (2) have been accepted.
-    pub finalized_writes: BTreeSet<ShardedTxnIndex2>,
+    pub finalized_writes: BTreeSet<ShardedTxnIndexV2>,
 }
 
 impl ConflictingTxnTracker {
@@ -60,7 +60,7 @@ impl ConflictingTxnTracker {
         round_id: RoundId,
         shard_id: ShardId,
     ) {
-        let sharded_txn_idx = ShardedTxnIndex2::new(round_id, shard_id, txn_id);
+        let sharded_txn_idx = ShardedTxnIndexV2::new(round_id, shard_id, txn_id);
         if self.pending_writes.remove(&txn_id) {
             self.finalized_writes.insert(sharded_txn_idx);
         } else {
@@ -119,36 +119,36 @@ fn test_conflicting_txn_tracker() {
     // promoted: (99,10)/T9(W), (99,20)/T4(W), (99,20)/T7(W), (99,30)/T8(R), (99,30)/T10(W)
     assert_eq!(
         vec![
-            ShardedTxnIndex2::new(99, 10, 9),
-            ShardedTxnIndex2::new(99, 20, 4),
-            ShardedTxnIndex2::new(99, 20, 7)
+            ShardedTxnIndexV2::new(99, 10, 9),
+            ShardedTxnIndexV2::new(99, 20, 4),
+            ShardedTxnIndexV2::new(99, 20, 7)
         ],
         tracker
             .finalized_all
-            .range(ShardedTxnIndex2::new(98, 0, 0)..ShardedTxnIndex2::new(99, 20, 8))
+            .range(ShardedTxnIndexV2::new(98, 0, 0)..ShardedTxnIndexV2::new(99, 20, 8))
             .copied()
             .collect::<Vec<_>>()
     );
     assert_eq!(
         vec![
-            ShardedTxnIndex2::new(99, 20, 7),
-            ShardedTxnIndex2::new(99, 30, 8),
-            ShardedTxnIndex2::new(99, 30, 10)
+            ShardedTxnIndexV2::new(99, 20, 7),
+            ShardedTxnIndexV2::new(99, 30, 8),
+            ShardedTxnIndexV2::new(99, 30, 10)
         ],
         tracker
             .finalized_all
-            .range(ShardedTxnIndex2::new(99, 20, 7)..)
+            .range(ShardedTxnIndexV2::new(99, 20, 7)..)
             .copied()
             .collect::<Vec<_>>()
     );
     assert_eq!(
         vec![
-            ShardedTxnIndex2::new(99, 20, 7),
-            ShardedTxnIndex2::new(99, 30, 10)
+            ShardedTxnIndexV2::new(99, 20, 7),
+            ShardedTxnIndexV2::new(99, 30, 10)
         ],
         tracker
             .finalized_writes
-            .range(ShardedTxnIndex2::new(99, 20, 7)..ShardedTxnIndex2::new(99, 40, 0))
+            .range(ShardedTxnIndexV2::new(99, 20, 7)..ShardedTxnIndexV2::new(99, 40, 0))
             .copied()
             .collect::<Vec<_>>()
     );
