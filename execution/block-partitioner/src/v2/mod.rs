@@ -11,7 +11,7 @@ use crate::{
     BlockPartitioner, Sender,
 };
 use aptos_crypto::hash::CryptoHash;
-use aptos_logger::{info, trace};
+use aptos_logger::{debug, info, trace};
 use aptos_types::{
     block_executor::partitioner::{
         CrossShardDependencies, PartitionedTransactions, RoundId, ShardId, ShardedTxnIndex,
@@ -76,7 +76,6 @@ impl PartitionerV2 {
         dashmap_num_shards: usize,
         merge_discarded: bool,
     ) -> Self {
-        info!("Creating a PartitionerV2 instance with num_threads={num_threads}, num_rounds_limit={num_rounds_limit}, avoid_pct={avoid_pct}, dashmap_num_shards={dashmap_num_shards}, merge_discarded={merge_discarded}");
         let thread_pool = Arc::new(
             ThreadPoolBuilder::new()
                 .num_threads(num_threads)

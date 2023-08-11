@@ -28,9 +28,9 @@ impl PartitionerV2 {
                         .for_each(|(storage_location, is_write)| {
                             let key_idx = state.add_key(storage_location.state_key());
                             if is_write {
-                                state.wsets[txn_idx].write().unwrap().insert(key_idx);
+                                state.write_sets[txn_idx].write().unwrap().insert(key_idx);
                             } else {
-                                state.rsets[txn_idx].write().unwrap().insert(key_idx);
+                                state.read_sets[txn_idx].write().unwrap().insert(key_idx);
                             }
                             let tracker_ref = state.trackers.entry(key_idx).or_insert_with(|| {
                                 let anchor_shard_id = get_anchor_shard_id(

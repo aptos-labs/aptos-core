@@ -49,8 +49,8 @@ pub struct PartitionState {
 
     // The discretized txn info, populated in `init()`.
     pub(crate) sender_idxs: Vec<RwLock<Option<SenderIdx>>>,
-    pub(crate) wsets: Vec<RwLock<HashSet<StorageKeyIdx>>>,
-    pub(crate) rsets: Vec<RwLock<HashSet<StorageKeyIdx>>>,
+    pub(crate) write_sets: Vec<RwLock<HashSet<StorageKeyIdx>>>,
+    pub(crate) read_sets: Vec<RwLock<HashSet<StorageKeyIdx>>>,
 
     // Used in `init()` to discretize senders.
     pub(crate) sender_counter: AtomicUsize,
@@ -119,8 +119,8 @@ impl PartitionState {
             sender_counter,
             key_counter,
             sender_idxs: senders,
-            wsets,
-            rsets,
+            write_sets: wsets,
+            read_sets: rsets,
             sender_idx_table,
             key_idx_table,
             trackers,
@@ -183,14 +183,14 @@ impl PartitionState {
     }
 
     pub(crate) fn all_hints(&self, txn_idx: PreParedTxnIdx) -> Vec<StorageKeyIdx> {
-        let wset = self.wsets[txn_idx].read().unwrap();
-        let rset = self.rsets[txn_idx].read().unwrap();
+        let wset = self.write_sets[txn_idx].read().unwrap();
+        let rset = self.read_sets[txn_idx].read().unwrap();
         let all: Vec<StorageKeyIdx> = wset.iter().chain(rset.iter()).copied().collect();
         all
     }
 
     pub(crate) fn write_hints(&self, txn_idx: PreParedTxnIdx) -> Vec<StorageKeyIdx> {
-        self.wsets[txn_idx]
+        self.write_sets[txn_idx]
             .read()
             .unwrap()
             .iter()
