@@ -699,7 +699,7 @@ mod test {
         assert_eq!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER).unwrap(), 50);
     }
     #[test]
-    fn test_successful_try_add_in_delta_mode() {
+    fn test_successful_operations_in_delta_mode() {
         let mut aggregator_data = AggregatorData::default();
         let mut sample_resolver: AggregatorStore = AggregatorStore::default();
         sample_resolver.set_from_id(aggregator_id_for_test(600), 100);
@@ -730,14 +730,26 @@ mod test {
                 max_underflow_negative_delta: None,
             }
         });
-        assert_eq!(aggregator.read_most_recent_aggregator_value(&sample_resolver).unwrap(), 500);
+        assert_ok!(aggregator.try_sub(470));
+        assert_eq!(aggregator.state, AggregatorState::Delta{
+            speculative_start_value: 100,
+            speculative_source: SpeculativeValueSource::LastCommittedValue,
+            delta: DeltaValue::Negative(70),
+            history: DeltaHistory {
+                max_achieved_positive_delta: 400,
+                min_achieved_negative_delta: 70,
+                min_overflow_positive_delta: None,
+                max_underflow_negative_delta: None,
+            }
+        });
+        assert_eq!(aggregator.read_most_recent_aggregator_value(&sample_resolver).unwrap(), 30);
         assert_eq!(aggregator.state, AggregatorState::Delta{
             speculative_start_value: 100,
             speculative_source: SpeculativeValueSource::AggregatedValue,
-            delta: DeltaValue::Positive(400),
+            delta: DeltaValue::Negative(70),
             history: DeltaHistory {
                 max_achieved_positive_delta: 400,
-                min_achieved_negative_delta: 0,
+                min_achieved_negative_delta: 70,
                 min_overflow_positive_delta: None,
                 max_underflow_negative_delta: None,
             }
@@ -745,16 +757,14 @@ mod test {
     }
 
     #[test]
-    fn test_successful_try_sub_in_delta_mode() {
+    fn test_history_updates() {
         let mut aggregator_data = AggregatorData::default();
         let mut sample_resolver: AggregatorStore = AggregatorStore::default();
-        sample_resolver.set_from_id(aggregator_id_for_test(600), 300);
-
-        let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(600), &sample_resolver, 600)
-            .expect("Get aggregator failed");
+        sample_resolver.set_from_id(aggregator_id_for_test(600), 100);
+        
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), &sample_resolver, 600).expect("Get aggregator failed");
         assert_eq!(aggregator.state, AggregatorState::Delta {
-            speculative_start_value: 300,
+            speculative_start_value: 100,
             speculative_source: SpeculativeValueSource::LastCommittedValue,
             delta: DeltaValue::Positive(0),
             history: DeltaHistory {
@@ -764,320 +774,155 @@ mod test {
                 max_underflow_negative_delta: None,
             }
         });
-        assert_ok!(aggregator.try_sub(200));
-        assert_eq!(aggregator.state, AggregatorState::Delta{
-            speculative_start_value: 300,
-            speculative_source: SpeculativeValueSource::LastCommittedValue,
-            delta: DeltaValue::Negative(200),
-            history: DeltaHistory {
-                max_achieved_positive_delta: 0,
-                min_achieved_negative_delta: 200,
-                min_overflow_positive_delta: None,
-                max_underflow_negative_delta: None,
-            }
-        });
-        assert_eq!(aggregator.read_most_recent_aggregator_value(&sample_resolver).unwrap(), 100);
-        assert_eq!(aggregator.state, AggregatorState::Delta{
-            speculative_start_value: 300,
-            speculative_source: SpeculativeValueSource::AggregatedValue,
-            delta: DeltaValue::Negative(200),
-            history: DeltaHistory {
-                max_achieved_positive_delta: 0,
-                min_achieved_negative_delta: 200,
-                min_overflow_positive_delta: None,
-                max_underflow_negative_delta: None,
-            }
-        });
-    }
-
-    #[test]
-    fn test_materialize_underflow() {
-        let mut aggregator_data = AggregatorData::default();
-
-        // +0 to -400 is ok, but materialization fails with 300 - 400 < 0!
-        let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(600), &*TEST_RESOLVER, 600)
-            .expect("Get aggregator failed");
         assert_ok!(aggregator.try_add(300));
-        assert_ok!(aggregator.try_sub(200));
-        assert_ok!(aggregator.try_sub(100));
-        assert_err!(aggregator.try_sub(1));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
-            0
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
-            300
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
-            Some(1)
-        );
-        assert_ok!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
-    }
-
-    #[test]
-    fn test_materialize_non_monotonic_1() {
-        let mut aggregator_data = AggregatorData::default();
-
-        // +0 to +400 to +0 is ok, but materialization fails since we had 300 + 400 > 600!
-        let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(600), &*TEST_RESOLVER, 600)
-            .expect("Get aggregator failed");
-        assert_ok!(aggregator.try_add(400));
-        assert_ok!(aggregator.try_sub(300));
-        assert_eq!(aggregator.get_delta().unwrap(), DeltaValue::Positive(100));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
-            400
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
-            None
-        );
-        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
-    }
-
-    #[test]
-    fn test_materialize_non_monotonic_2() {
-        let mut aggregator_data = AggregatorData::default();
-
-        // +0 to -301 to -300 is ok, but materialization fails since we had 300 - 301 < 0!
-        let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(600), &*TEST_RESOLVER, 600)
-            .expect("Get aggregator failed");
-        assert_ok!(aggregator.try_sub(301));
-        assert_ok!(aggregator.try_add(1));
-        assert_eq!(aggregator.get_delta().unwrap(), DeltaValue::Negative(300));
-        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
-    }
-
-    #[test]
-    fn test_add_overflow() {
-        let mut aggregator_data = AggregatorData::default();
-
-        let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(600), &*TEST_RESOLVER, 600)
-            .expect("Get aggregator failed");
-
-        // +0 to +800 > 600!
-        assert_err!(aggregator.try_add(800));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
-            0
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
-            Some(800)
-        );
-
-        // +0 + 300 < 600
-        assert_ok!(aggregator.try_add(300));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
-            300
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
-            Some(800)
-        );
-
-        // +300 + 400 > 600!
-        assert_err!(aggregator.try_add(400));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
-            300
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
-            Some(700)
-        );
-
-        let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(200), &*TEST_RESOLVER, 200)
-            .expect("Get aggregator failed");
-
-        // 0 + 100 < 200
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 300,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        });
         assert_ok!(aggregator.try_add(100));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
-            100
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
-            None
-        );
-
-        // 100 + 200 > 200!
-        assert_err!(aggregator.try_add(200));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
-            100
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
-            Some(300)
-        );
-
-        // 100 + 150 > 200!
-        assert_err!(aggregator.try_add(150));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
-            100
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
-            Some(250)
-        );
-
-        // 100 + u128::MAX > 200!
-        assert_err!(aggregator.try_add(u128::MAX));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
-            100
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
-            Some(250)
-        );
-
-        let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(300), &*TEST_RESOLVER,300)
-            .expect("Get aggregator failed");
-
-        // 0 + 100 < 300!
-        assert_ok!(aggregator.try_add(100));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
-            100
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
-            None
-        );
-
-        // 100 + u128::MAX > 300!
-        assert_err!(aggregator.try_add(u128::MAX));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
-            100
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
-            None
-        );
-
-        // 100 + 250 > 300!
-        assert_err!(aggregator.try_add(250));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
-            100
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
-            Some(350)
-        );
-    }
-
-    #[test]
-    fn test_sub_underflow() {
-        let mut aggregator_data = AggregatorData::default();
-        aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
-
-        // +0 to -601 is impossible!
-        let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(600), &*TEST_RESOLVER, 600)
-            .expect("Get aggregator failed");
-        assert_err!(aggregator.try_sub(700));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
-            0
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
-            Some(700)
-        );
-
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 400,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        });
+        assert_ok!(aggregator.try_sub(450));
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 400,
+            min_achieved_negative_delta: 50,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        });
         assert_ok!(aggregator.try_add(200));
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 400,
+            min_achieved_negative_delta: 50,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        });
+        assert_ok!(aggregator.try_add(350));
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 500,
+            min_achieved_negative_delta: 50,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        });
+        assert_ok!(aggregator.try_sub(600));
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 500,
+            min_achieved_negative_delta: 100,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        });
 
-        assert_ok!(aggregator.try_sub(300));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
-            100
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
-            Some(700)
-        );
+    }
 
+    #[test]
+    fn test_aggregator_overflows() {
+        let mut aggregator_data = AggregatorData::default();
+        let mut sample_resolver: AggregatorStore = AggregatorStore::default();
+        sample_resolver.set_from_id(aggregator_id_for_test(600), 100);
+        
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), &sample_resolver, 600).expect("Get aggregator failed");
+        assert_ok!(aggregator.try_add(400));
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 400,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        });
+        assert_ok!(aggregator.try_sub(450));
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 400,
+            min_achieved_negative_delta: 50,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        });
+        assert_err!(aggregator.try_add(601));
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 400,
+            min_achieved_negative_delta: 50,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        });
+        assert_err!(aggregator.try_add(575));
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 400,
+            min_achieved_negative_delta: 50,
+            min_overflow_positive_delta: Some(525),
+            max_underflow_negative_delta: None,
+        });
+        assert_err!(aggregator.try_add(551));
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 400,
+            min_achieved_negative_delta: 50,
+            min_overflow_positive_delta: Some(501),
+            max_underflow_negative_delta: None,
+        });
+        assert_err!(aggregator.try_add(570));
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 400,
+            min_achieved_negative_delta: 50,
+            min_overflow_positive_delta: Some(501),
+            max_underflow_negative_delta: None,
+        });
+    }
+
+    #[test]
+    fn test_aggregator_underflows() {
+        let mut aggregator_data = AggregatorData::default();
+        let mut sample_resolver: AggregatorStore = AggregatorStore::default();
+        sample_resolver.set_from_id(aggregator_id_for_test(600), 200);
+        
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), &sample_resolver, 600).expect("Get aggregator failed");
+        assert_ok!(aggregator.try_add(300));
+        assert_eq!(aggregator.get_value().unwrap(), 500);
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 300,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        });
+        assert_err!(aggregator.try_sub(650));
+        assert_eq!(aggregator.get_value().unwrap(), 500);
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 300,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        });
         assert_err!(aggregator.try_sub(550));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
-            100
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
-            Some(650)
-        );
-
-        assert_err!(aggregator.try_sub(800));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
-            100
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
-            Some(650)
-        );
-
-        // Similarly, we cannot subtract anything from 0...
-        let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(200), &*TEST_RESOLVER, 200)
-            .expect("Get aggregator failed");
-
-        assert_err!(aggregator.try_sub(2));
-
-        // Similarly, we cannot subtract anything from 0...
-        let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(300), &*TEST_RESOLVER, 300)
-            .expect("Get aggregator failed");
-
-        assert_ok!(aggregator.try_sub(100));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
-            100
-        );
-
-        assert_err!(aggregator.try_sub(u128::MAX));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
-            100
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
-            None
-        );
-
-        assert_ok!(aggregator.try_sub(100));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
-            200
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
-            None
-        );
-
-        assert_err!(aggregator.try_sub(101));
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
-            200
-        );
-        assert_eq!(
-            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
-            Some(301)
-        );
+        assert_eq!(aggregator.get_value().unwrap(), 500);
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 300,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: Some(250),
+        });
+        assert_err!(aggregator.try_sub(525));
+        assert_eq!(aggregator.get_value().unwrap(), 500);
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 300,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: Some(225),
+        });
+        assert_err!(aggregator.try_sub(540));
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 300,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: Some(225),
+        });
+        assert_err!(aggregator.try_sub(501));
+        assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
+            max_achieved_positive_delta: 300,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: Some(201),
+        });
     }
 
     #[test]
