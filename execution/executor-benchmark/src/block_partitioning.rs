@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::pipeline::ExecuteBlockMessage;
-use aptos_block_partitioner::{sharded_block_partitioner::ShardedBlockPartitioner, PartitionerV1Config, BlockPartitioner, PartitionerConfig};
+use aptos_block_partitioner::{BlockPartitioner, PartitionerConfig, sharded_block_partitioner::ShardedBlockPartitioner};
 use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_types::{
@@ -9,6 +9,7 @@ use aptos_types::{
     transaction::Transaction,
 };
 use std::time::Instant;
+use aptos_block_partitioner::sharded_block_partitioner::config::PartitionerV1Config;
 use crate::metrics::TIMER;
 
 pub(crate) struct BlockPartitioningStage {

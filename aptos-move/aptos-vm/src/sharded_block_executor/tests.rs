@@ -8,8 +8,9 @@ use crate::{
     ShardedBlockExecutor,
 };
 use aptos_state_view::StateView;
-use aptos_block_partitioner::{PartitionerV1Config, sharded_block_partitioner::ShardedBlockPartitioner, v2::PartitionerV2};
-use rand::{rngs::OsRng, Rng};
+use aptos_block_partitioner::{sharded_block_partitioner::ShardedBlockPartitioner, v2::PartitionerV2};
+use rand::{Rng, rngs::OsRng};
+use aptos_block_partitioner::sharded_block_partitioner::config::PartitionerV1Config;
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
 
 fn setup_sharded_block_executor<S: StateView + Sync + Send + 'static>(

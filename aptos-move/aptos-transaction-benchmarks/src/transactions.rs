@@ -4,12 +4,10 @@
 
 use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
-use aptos_block_partitioner::{
-    sharded_block_partitioner::ShardedBlockPartitioner, PartitionerV1Config,
-};
+use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
-    account_universe::{AUTransactionGen, AccountPickStyle, AccountUniverse, AccountUniverseGen},
+    account_universe::{AccountPickStyle, AccountUniverse, AccountUniverseGen, AUTransactionGen},
     data_store::FakeDataStore,
     executor::FakeExecutor,
     gas_costs::TXN_RESERVED,
@@ -31,7 +29,7 @@ use aptos_vm::{
         ShardedBlockExecutor,
     },
 };
-use criterion::{measurement::Measurement, BatchSize, Bencher};
+use criterion::{BatchSize, Bencher, measurement::Measurement};
 use once_cell::sync::Lazy;
 use proptest::{
     collection::vec,
@@ -39,6 +37,7 @@ use proptest::{
     test_runner::TestRunner,
 };
 use std::{net::SocketAddr, sync::Arc, time::Instant};
+use aptos_block_partitioner::sharded_block_partitioner::config::PartitionerV1Config;
 
 pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(

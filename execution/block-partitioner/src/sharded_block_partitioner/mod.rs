@@ -41,6 +41,7 @@ mod dependency_analysis;
 mod dependent_edges;
 mod messages;
 mod partitioning_shard;
+pub mod config;
 
 /// A sharded block partitioner that partitions a block into multiple transaction chunks.
 /// On a high level, the partitioning process is as follows:
