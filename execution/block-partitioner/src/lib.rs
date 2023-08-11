@@ -71,8 +71,8 @@ impl Default for PartitionerConfig {
 impl PartitionerConfig {
     pub fn build(self) -> Box<dyn BlockPartitioner> {
         match self {
-            PartitionerConfig::V1(c) => Box::new(c.build()),
-            PartitionerConfig::V2(c) => Box::new(c.build()),
+            PartitionerConfig::V1(c) => c.build(),
+            PartitionerConfig::V2(c) => c.build(),
         }
     }
 }
@@ -115,13 +115,13 @@ impl PartitionerV1Config {
         self
     }
 
-    pub fn build(self) -> ShardedBlockPartitioner {
-        ShardedBlockPartitioner::new(
+    pub fn build(self) -> Box<dyn BlockPartitioner> {
+        Box::new(ShardedBlockPartitioner::new(
             self.num_shards,
             self.max_partitioning_rounds,
             self.cross_shard_dep_avoid_threshold,
             self.partition_last_round,
-        )
+        ))
     }
 }
 
@@ -129,4 +129,8 @@ impl Default for PartitionerV1Config {
     fn default() -> Self {
         Self::new()
     }
+}
+
+trait PartitionerBuilder {
+    fn build(self) -> Box<dyn BlockPartitioner>;
 }

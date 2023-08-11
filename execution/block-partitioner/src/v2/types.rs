@@ -40,6 +40,7 @@ impl SubBlockIdx {
 pub type PreParedTxnIdx = usize;
 
 /// Represent a specific storage location in a partitioning session.
+/// TODO: ensure this type can support max num of unique state keys in a block.
 pub type StorageKeyIdx = usize;
 
 /// Represent a sender in a partitioning session.

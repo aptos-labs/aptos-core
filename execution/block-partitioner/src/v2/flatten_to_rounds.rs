@@ -17,6 +17,7 @@ impl PartitionerV2 {
     /// Populate `state.finalized_txn_matrix` with txns flattened into a matrix (num_rounds by num_shards),
     /// in a way that avoid in-round cross-shard conflicts.
     pub(crate) fn flatten_to_rounds(state: &mut PartitionState) {
+        //TODO rename to partitione
         let _timer = MISC_TIMERS_SECONDS
             .with_label_values(&["flatten_to_rounds"])
             .start_timer();
@@ -103,6 +104,7 @@ impl PartitionerV2 {
                             .all_hints(txn_idx)
                             .into_iter()
                             .any(|key_idx| state.key_owned_by_another_shard(shard_id, key_idx));
+                        //TODO: early stop.
                         if in_round_conflict_detected {
                             let sender = state.sender_idx(txn_idx);
                             state.update_min_discarded_txn_idx(sender, txn_idx);

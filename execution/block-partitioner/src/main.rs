@@ -29,7 +29,7 @@ struct Args {
     #[clap(long, default_value_t = 9)]
     pub num_blocks: usize,
 
-    #[clap(long, default_value_t = 60)]
+    #[clap(long, default_value_t = 48)]
     pub num_shards: usize,
 }
 

@@ -8,10 +8,9 @@ use crate::{
     ShardedBlockExecutor,
 };
 use aptos_state_view::StateView;
-use aptos_block_partitioner::{
-    sharded_block_partitioner::ShardedBlockPartitioner, v2::PartitionerV2,
-};
+use aptos_block_partitioner::{PartitionerV1Config, sharded_block_partitioner::ShardedBlockPartitioner, v2::PartitionerV2};
 use rand::{rngs::OsRng, Rng};
+use aptos_block_partitioner::v2::config::PartitionerV2Config;
 
 fn setup_sharded_block_executor<S: StateView + Sync + Send + 'static>(
     num_shards: usize,
@@ -26,7 +25,7 @@ fn setup_sharded_block_executor<S: StateView + Sync + Send + 'static>(
 fn test_sharded_block_executor_no_conflict() {
     let num_shards = 8;
     for last_round_partition in [true, false] {
-        let mut partitioner = Box::new(ShardedBlockPartitioner::new(num_shards, 2, 0.9, last_round_partition));
+        let mut partitioner = PartitionerV1Config::new().num_shards(num_shards).max_partitioning_rounds(2).cross_shard_dep_avoid_threshold(0.9).partition_last_round(last_round_partition).build();
         let sharded_block_executor = setup_sharded_block_executor(num_shards, Some(4));
         test_utils::test_sharded_block_executor_no_conflict(
             partitioner,
@@ -41,7 +40,7 @@ fn test_sharded_block_executor_no_conflict() {
 fn test_sharded_block_executor_with_conflict_parallel() {
     let num_shards = 7;
     for last_round_partition in [true, false] {
-        let mut partitioner = Box::new(ShardedBlockPartitioner::new(num_shards, 8, 0.9, last_round_partition));
+        let mut partitioner = PartitionerV1Config::default().num_shards(num_shards).max_partitioning_rounds(8).cross_shard_dep_avoid_threshold(0.9).partition_last_round(last_round_partition).build();
         let sharded_block_executor = setup_sharded_block_executor(num_shards, Some(4));
         test_utils::sharded_block_executor_with_conflict(
             partitioner,
@@ -55,7 +54,7 @@ fn test_sharded_block_executor_with_conflict_parallel() {
 fn test_sharded_block_executor_with_conflict_sequential() {
     let num_shards = 7;
     for last_round_partition in [true, false] {
-        let mut partitioner = Box::new(ShardedBlockPartitioner::new(num_shards, 8, 0.9, last_round_partition));
+        let partitioner = PartitionerV1Config::default().num_shards(8).cross_shard_dep_avoid_threshold(0.9).partition_last_round(last_round_partition).build();
         let sharded_block_executor = setup_sharded_block_executor(num_shards, Some(1));
         test_utils::sharded_block_executor_with_conflict(
             partitioner,
@@ -72,7 +71,7 @@ fn test_sharded_block_executor_with_random_transfers_parallel() {
         let max_num_shards = 32;
         let num_shards = rng.gen_range(1, max_num_shards);
         let sharded_block_executor = setup_sharded_block_executor(num_shards, Some(4));
-        let mut partitioner = Box::new(ShardedBlockPartitioner::new(num_shards, 8, 0.9, last_round_partition));
+        let partitioner = PartitionerV1Config::default().num_shards(8).cross_shard_dep_avoid_threshold(0.9).partition_last_round(last_round_partition).build();
         test_utils::sharded_block_executor_with_random_transfers(
             partitioner,
             sharded_block_executor,
@@ -88,7 +87,7 @@ fn test_sharded_block_executor_with_random_transfers_sequential() {
         let max_num_shards = 32;
         let num_shards = rng.gen_range(1, max_num_shards);
         let sharded_block_executor = setup_sharded_block_executor(num_shards, Some(1));
-        let mut partitioner = Box::new(ShardedBlockPartitioner::new(num_shards, 8, 0.9, last_round_partition));
+        let partitioner = PartitionerV1Config::new().num_shards(num_shards).max_partitioning_rounds(8).cross_shard_dep_avoid_threshold(0.9).partition_last_round(last_round_partition).build();
         test_utils::sharded_block_executor_with_random_transfers(
             partitioner,
             sharded_block_executor,
@@ -103,7 +102,7 @@ fn test_partitioner_v2_sharded_block_executor_no_conflict() {
         let num_shards = 8;
         let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(2));
         let sharded_block_executor = ShardedBlockExecutor::new(client);
-        let partitioner = Box::new(PartitionerV2::new(2, 4, 10, 64, merge_discard));
+        let partitioner = PartitionerV2Config::default().num_threads(2).num_rounds_limit(4).avoid_pct(10).dashmap_num_shards(64).merge_discarded(merge_discard).build();
         test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor);
     }
 }
@@ -116,7 +115,7 @@ fn test_partitioner_v2_sharded_block_executor_with_conflict_parallel() {
         let num_shards = 7;
         let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(4));
         let sharded_block_executor = ShardedBlockExecutor::new(client);
-        let partitioner = Box::new(PartitionerV2::new(8, 4, 10, 64, merge_discard));
+        let partitioner = PartitionerV2Config::default().num_threads(8).num_rounds_limit(4).avoid_pct(10).dashmap_num_shards(64).merge_discarded(merge_discard).build();
         test_utils::sharded_block_executor_with_conflict(partitioner, sharded_block_executor, 4);
     }
 }
@@ -127,7 +126,7 @@ fn test_partitioner_v2_sharded_block_executor_with_conflict_sequential() {
         let num_shards = 7;
         let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(1));
         let sharded_block_executor = ShardedBlockExecutor::new(client);
-        let partitioner = Box::new(PartitionerV2::new(8, 4, 10, 64, merge_discard));
+        let partitioner = PartitionerV2Config::default().num_threads(8).num_rounds_limit(4).avoid_pct(10).dashmap_num_shards(64).merge_discarded(merge_discard).build();
         test_utils::sharded_block_executor_with_conflict(partitioner, sharded_block_executor, 1)
     }
 }
@@ -138,7 +137,7 @@ fn test_partitioner_v2_sharded_block_executor_with_random_transfers_parallel() {
         let num_shards = 3;
         let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(4));
         let sharded_block_executor = ShardedBlockExecutor::new(client);
-        let partitioner = Box::new(PartitionerV2::new(8, 4, 10, 64, merge_discard));
+        let partitioner = PartitionerV2Config::default().num_threads(8).num_rounds_limit(4).avoid_pct(10).dashmap_num_shards(64).merge_discarded(merge_discard).build();
         test_utils::sharded_block_executor_with_random_transfers(partitioner, sharded_block_executor, 4)
     }
 }
@@ -151,7 +150,7 @@ fn test_partitioner_v2_sharded_block_executor_with_random_transfers_sequential()
         let num_shards = rng.gen_range(1, max_num_shards);
         let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(1));
         let sharded_block_executor = ShardedBlockExecutor::new(client);
-        let partitioner = Box::new(PartitionerV2::new(8, 4, 10, 64, merge_discard));
+        let partitioner = PartitionerV2Config::default().num_threads(8).num_rounds_limit(4).avoid_pct(10).dashmap_num_shards(64).merge_discarded(merge_discard).build();
         test_utils::sharded_block_executor_with_random_transfers(partitioner, sharded_block_executor, 1)
     }
 }
