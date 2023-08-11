@@ -23,8 +23,6 @@ pub struct ConflictingTxnTracker {
     pending_reads: BTreeSet<PreParedTxnIdx>,
     /// Txns that (1) write the current storage location and (2) have not been accepted.
     pending_writes: BTreeSet<PreParedTxnIdx>,
-    /// Txns that write the current storage location.
-    pub writer_set: HashSet<PreParedTxnIdx>,
     /// Txns that have been accepted.
     pub finalized_all: BTreeSet<ShardedTxnIndexV2>,
     /// Txns that (1) write the current storage location and (2) have been accepted.
@@ -38,7 +36,6 @@ impl ConflictingTxnTracker {
             anchor_shard_id,
             pending_reads: Default::default(),
             pending_writes: Default::default(),
-            writer_set: Default::default(),
             finalized_all: Default::default(),
             finalized_writes: Default::default(),
         }
@@ -50,7 +47,6 @@ impl ConflictingTxnTracker {
 
     pub fn add_write_candidate(&mut self, txn_id: PreParedTxnIdx) {
         self.pending_writes.insert(txn_id);
-        self.writer_set.insert(txn_id);
     }
 
     /// Partitioner has finalized the position of a txn. Remove it from the pending txn list.
