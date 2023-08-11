@@ -111,6 +111,165 @@ fun fields::write_val($t0: fields::S): fields::S {
   6: return $t1
 }
 
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun fields::read_ref($t0: &fields::S): u64 {
+     var $t1: u64
+     var $t2: &fields::T
+     var $t3: &u64
+     # live vars: $t0
+  0: $t2 := borrow_field<fields::S>.g($t0)
+     # live vars: $t2
+  1: $t3 := borrow_field<fields::T>.h($t2)
+     # live vars: $t3
+  2: $t1 := read_ref($t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun fields::read_val($t0: fields::S): u64 {
+     var $t1: u64
+     var $t2: &fields::T
+     var $t3: &fields::S
+     var $t4: &u64
+     # live vars: $t0
+  0: $t3 := borrow_local($t0)
+     # live vars: $t3
+  1: $t2 := borrow_field<fields::S>.g($t3)
+     # live vars: $t2
+  2: $t4 := borrow_field<fields::T>.h($t2)
+     # live vars: $t4
+  3: $t1 := read_ref($t4)
+     # live vars: $t1
+  4: return $t1
+}
+
+
+[variant baseline]
+fun fields::write_local_direct(): fields::S {
+     var $t0: fields::S
+     var $t1: fields::S
+     var $t2: fields::S
+     var $t3: u64
+     var $t4: fields::T
+     var $t5: u64
+     var $t6: u64
+     var $t7: &mut u64
+     var $t8: &mut fields::T
+     var $t9: &mut fields::S
+     # live vars:
+  0: $t3 := 0
+     # live vars: $t3
+  1: $t5 := 0
+     # live vars: $t3, $t5
+  2: $t4 := pack fields::T($t5)
+     # live vars: $t3, $t4
+  3: $t2 := pack fields::S($t3, $t4)
+     # live vars: $t2
+  4: $t1 := move($t2)
+     # live vars: $t1
+  5: $t6 := 42
+     # live vars: $t1, $t6
+  6: $t9 := borrow_local($t1)
+     # live vars: $t1, $t6, $t9
+  7: $t8 := borrow_field<fields::S>.g($t9)
+     # live vars: $t1, $t6, $t8
+  8: $t7 := borrow_field<fields::T>.h($t8)
+     # live vars: $t1, $t6, $t7
+  9: write_ref($t7, $t6)
+     # live vars: $t1
+ 10: $t0 := move($t1)
+     # live vars: $t0
+ 11: return $t0
+}
+
+
+[variant baseline]
+fun fields::write_local_via_ref(): fields::S {
+     var $t0: fields::S
+     var $t1: fields::S
+     var $t2: fields::S
+     var $t3: u64
+     var $t4: fields::T
+     var $t5: u64
+     var $t6: &mut fields::S
+     var $t7: &mut fields::S
+     var $t8: u64
+     var $t9: &mut u64
+     var $t10: &mut fields::T
+     # live vars:
+  0: $t3 := 0
+     # live vars: $t3
+  1: $t5 := 0
+     # live vars: $t3, $t5
+  2: $t4 := pack fields::T($t5)
+     # live vars: $t3, $t4
+  3: $t2 := pack fields::S($t3, $t4)
+     # live vars: $t2
+  4: $t1 := move($t2)
+     # live vars: $t1
+  5: $t7 := borrow_local($t1)
+     # live vars: $t1, $t7
+  6: $t6 := move($t7)
+     # live vars: $t1, $t6
+  7: $t8 := 42
+     # live vars: $t1, $t6, $t8
+  8: $t10 := borrow_field<fields::S>.g($t6)
+     # live vars: $t1, $t8, $t10
+  9: $t9 := borrow_field<fields::T>.h($t10)
+     # live vars: $t1, $t8, $t9
+ 10: write_ref($t9, $t8)
+     # live vars: $t1
+ 11: $t0 := move($t1)
+     # live vars: $t0
+ 12: return $t0
+}
+
+
+[variant baseline]
+fun fields::write_param($t0: &mut fields::S) {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut fields::T
+     # live vars: $t0
+  0: $t1 := 42
+     # live vars: $t0, $t1
+  1: $t3 := borrow_field<fields::S>.g($t0)
+     # live vars: $t1, $t3
+  2: $t2 := borrow_field<fields::T>.h($t3)
+     # live vars: $t1, $t2
+  3: write_ref($t2, $t1)
+     # live vars:
+  4: return ()
+}
+
+
+[variant baseline]
+fun fields::write_val($t0: fields::S): fields::S {
+     var $t1: fields::S
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: &mut fields::T
+     var $t5: &mut fields::S
+     # live vars: $t0
+  0: $t2 := 42
+     # live vars: $t0, $t2
+  1: $t5 := borrow_local($t0)
+     # live vars: $t0, $t2, $t5
+  2: $t4 := borrow_field<fields::S>.g($t5)
+     # live vars: $t0, $t2, $t4
+  3: $t3 := borrow_field<fields::T>.h($t4)
+     # live vars: $t0, $t2, $t3
+  4: write_ref($t3, $t2)
+     # live vars: $t0
+  5: $t1 := move($t0)
+     # live vars: $t1
+  6: return $t1
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v6
@@ -125,7 +284,7 @@ struct S {
 
 read_ref(Arg0: &S): u64 {
 B0:
-	0: CopyLoc[0](Arg0: &S)
+	0: MoveLoc[0](Arg0: &S)
 	1: ImmBorrowField[0](S.g: T)
 	2: ImmBorrowField[1](T.h: u64)
 	3: ReadRef
@@ -171,7 +330,7 @@ B0:
 	5: MutBorrowLoc[0](loc0: S)
 	6: StLoc[1](loc1: &mut S)
 	7: LdConst[1](U64: [42, 0, 0, 0, 0, 0, 0, 0])
-	8: CopyLoc[1](loc1: &mut S)
+	8: MoveLoc[1](loc1: &mut S)
 	9: MutBorrowField[0](S.g: T)
 	10: MutBorrowField[1](T.h: u64)
 	11: WriteRef
@@ -183,7 +342,7 @@ B0:
 write_param(Arg0: &mut S) {
 B0:
 	0: LdConst[1](U64: [42, 0, 0, 0, 0, 0, 0, 0])
-	1: CopyLoc[0](Arg0: &mut S)
+	1: MoveLoc[0](Arg0: &mut S)
 	2: MutBorrowField[0](S.g: T)
 	3: MutBorrowField[1](T.h: u64)
 	4: WriteRef
