@@ -35,6 +35,7 @@ use std::{
     sync::RwLock,
 };
 use v2::config::PartitionerV2Config;
+mod pre_partition;
 
 pub trait BlockPartitioner: Send {
     fn partition(
@@ -129,6 +130,3 @@ impl Default for PartitionerV1Config {
         Self::new()
     }
 }
-
-static DEFAULT_PARTITIONER_CONFIG: Lazy<RwLock<PartitionerV1Config>> =
-    Lazy::new(|| RwLock::new(PartitionerV1Config::default()));

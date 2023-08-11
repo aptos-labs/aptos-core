@@ -6,6 +6,7 @@ use crate::test_utils::assert_deterministic_result;
 use crate::test_utils::P2PBlockGenerator;
 use crate::{
     get_anchor_shard_id,
+    pre_partition::{uniform, uniform::UniformPartitioner, PrePartitioner},
     v2::{conflicting_txn_tracker::ConflictingTxnTracker, counters::MISC_TIMERS_SECONDS},
     BlockPartitioner, Sender,
 };
@@ -54,6 +55,7 @@ pub mod types;
 /// - Not pre-partitioned by txn sender.
 /// - implemented more efficiently.
 pub struct PartitionerV2 {
+    pre_partitioner: Box<dyn PrePartitioner>,
     thread_pool: Arc<ThreadPool>,
     num_rounds_limit: usize,
     avoid_pct: u64,
@@ -77,6 +79,7 @@ impl PartitionerV2 {
                 .unwrap(),
         );
         Self {
+            pre_partitioner: Box::new(UniformPartitioner {}),
             thread_pool,
             num_rounds_limit,
             avoid_pct,
@@ -89,8 +92,7 @@ impl PartitionerV2 {
 struct WorkSession {
     thread_pool: Arc<ThreadPool>,
     num_executor_shards: ShardId,
-    txns: Vec<AnalyzedTransaction>,
-    takable_txns: Vec<RwLock<Option<AnalyzedTransaction>>>,
+    txns: Vec<RwLock<Option<AnalyzedTransaction>>>,
     pre_partitioned: Vec<Vec<OriginalTxnIdx>>,
     start_txn_idxs_by_shard: Vec<OriginalTxnIdx>,
     sender_counter: AtomicUsize,
@@ -147,12 +149,16 @@ impl WorkSession {
             wsets.push(RwLock::new(HashSet::with_capacity(txn.write_hints().len())));
             rsets.push(RwLock::new(HashSet::with_capacity(txn.read_hints().len())));
         }
+        let takable_txns = thread_pool.install(|| {
+            txns.into_par_iter()
+                .map(|txn| RwLock::new(Some(txn)))
+                .collect()
+        });
         let start_txn_idxs_by_shard = start_txn_idxs(&pre_partitioned);
         Self {
             merge_discarded,
             thread_pool,
             num_executor_shards,
-            txns,
             pre_partitioned,
             start_txn_idxs_by_shard,
             sender_counter,
@@ -169,7 +175,7 @@ impl WorkSession {
             finalized_txn_matrix: Vec::with_capacity(num_rounds_limit),
             new_txn_idxs: Vec::with_capacity(num_txns),
             start_index_matrix: Vec::with_capacity(num_rounds_limit),
-            takable_txns: vec![],
+            txns: takable_txns,
         }
     }
 
@@ -234,7 +240,8 @@ impl WorkSession {
             (0..self.num_txns())
                 .into_par_iter()
                 .for_each(|txn_idx: OriginalTxnIdx| {
-                    let txn = &self.txns[txn_idx];
+                    let txn_ref = self.txns[txn_idx].read().unwrap();
+                    let txn = txn_ref.as_ref().unwrap();
                     let sender_idx = self.add_sender(txn.sender());
                     *self.senders[txn_idx].write().unwrap() = Some(sender_idx);
 
@@ -519,13 +526,6 @@ impl WorkSession {
     }
 
     fn add_edges(&mut self) -> PartitionedTransactions {
-        self.takable_txns = self.thread_pool.install(|| {
-            mem::take(&mut self.txns)
-                .into_par_iter()
-                .map(|t| RwLock::new(Some(t)))
-                .collect()
-        });
-
         let mut sub_block_matrix: Vec<Vec<Mutex<Option<SubBlock<AnalyzedTransaction>>>>> =
             self.thread_pool.install(|| {
                 (0..self.num_rounds())
@@ -604,11 +604,7 @@ impl WorkSession {
         shard_id: ShardId,
         ori_txn_idx: OriginalTxnIdx,
     ) -> TransactionWithDependencies<AnalyzedTransaction> {
-        let txn = self.takable_txns[ori_txn_idx]
-            .write()
-            .unwrap()
-            .take()
-            .unwrap();
+        let txn = self.txns[ori_txn_idx].write().unwrap().take().unwrap();
         let mut deps = CrossShardDependencies::default();
         for key_idx in self.all_hints(ori_txn_idx) {
             let tracker_ref = self.trackers.get(&key_idx).unwrap();
@@ -659,6 +655,7 @@ impl WorkSession {
         self.add_edges()
     }
 }
+
 impl BlockPartitioner for PartitionerV2 {
     fn partition(
         &self,
@@ -666,7 +663,9 @@ impl BlockPartitioner for PartitionerV2 {
         num_executor_shards: usize,
     ) -> PartitionedTransactions {
         let num_txns = txns.len();
-        let pre_partitioned = uniform_partition(num_txns, num_executor_shards);
+        let pre_partitioned = self
+            .pre_partitioner
+            .pre_partition(txns.as_slice(), num_executor_shards);
         let mut session = WorkSession::new(
             self.thread_pool.clone(),
             self.dashmap_num_shards,
@@ -708,39 +707,6 @@ fn test_partitioner_v2_determinism() {
         let partitioner = Arc::new(PartitionerV2::new(4, 4, 10, 64, merge_discarded));
         assert_deterministic_result(partitioner);
     }
-}
-
-/// Evenly divide 0..n-1. Example: uniform_partition(11,3) == [[0,1,2,3],[4,5,6,7],[8,9,10]]
-fn uniform_partition(num_items: usize, num_chunks: usize) -> Vec<Vec<OriginalTxnIdx>> {
-    let num_big_chunks = num_items % num_chunks;
-    let small_chunk_size = num_items / num_chunks;
-    let mut ret = Vec::with_capacity(num_chunks);
-    let mut next_chunk_start = 0;
-    for chunk_id in 0..num_chunks {
-        let extra = if chunk_id < num_big_chunks { 1 } else { 0 };
-        let next_chunk_end = next_chunk_start + small_chunk_size + extra;
-        let chunk: Vec<usize> = (next_chunk_start..next_chunk_end).collect();
-        next_chunk_start = next_chunk_end;
-        ret.push(chunk);
-    }
-    ret
-}
-
-#[test]
-fn test_uniform_partition() {
-    let actual = uniform_partition(18, 5);
-    assert_eq!(
-        vec![4, 4, 4, 3, 3],
-        actual.iter().map(|v| v.len()).collect::<Vec<usize>>()
-    );
-    assert_eq!((0..18).collect::<Vec<usize>>(), actual.concat());
-
-    let actual = uniform_partition(18, 3);
-    assert_eq!(
-        vec![6, 6, 6],
-        actual.iter().map(|v| v.len()).collect::<Vec<usize>>()
-    );
-    assert_eq!((0..18).collect::<Vec<usize>>(), actual.concat());
 }
 
 fn extract_and_sort(arr_2d: Vec<RwLock<Vec<usize>>>) -> Vec<Vec<usize>> {
