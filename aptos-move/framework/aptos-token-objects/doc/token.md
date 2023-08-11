@@ -11,6 +11,7 @@ token are:
 
 
 -  [Resource `Token`](#0x4_token_Token)
+-  [Resource `TokenAppendix1`](#0x4_token_TokenAppendix1)
 -  [Struct `BurnRef`](#0x4_token_BurnRef)
 -  [Struct `MutatorRef`](#0x4_token_MutatorRef)
 -  [Struct `MutationEvent`](#0x4_token_MutationEvent)
@@ -32,6 +33,8 @@ token are:
 -  [Function `name`](#0x4_token_name)
 -  [Function `uri`](#0x4_token_uri)
 -  [Function `royalty`](#0x4_token_royalty)
+-  [Function `index_snapshot`](#0x4_token_index_snapshot)
+-  [Function `index_view`](#0x4_token_index_view)
 -  [Function `borrow_mut`](#0x4_token_borrow_mut)
 -  [Function `burn`](#0x4_token_burn)
 -  [Function `set_description`](#0x4_token_set_description)
@@ -39,7 +42,8 @@ token are:
 -  [Function `set_uri`](#0x4_token_set_uri)
 
 
-<pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2">0x1::aggregator_v2</a>;
+<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-framework/doc/event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-framework/doc/object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -77,9 +81,12 @@ Represents the common fields to all tokens.
  The collection from which this token resides.
 </dd>
 <dt>
-<code>index: u64</code>
+<code>deprecated_index: u64</code>
 </dt>
 <dd>
+ Deprecated in favor of index inside TokenAppendix1.
+ Will be populated until concurrent_token_v2_enabled feature flag is enabled.
+
  Unique identifier within the collection, optional, 0 means unassigned
 </dd>
 <dt>
@@ -107,6 +114,35 @@ Represents the common fields to all tokens.
 </dt>
 <dd>
  Emitted upon any mutation of the token.
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x4_token_TokenAppendix1"></a>
+
+## Resource `TokenAppendix1`
+
+Represents first addition to the common fields for all tokens
+
+
+<pre><code>#[resource_group_member(#[group = <a href="../../aptos-framework/doc/object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<b>struct</b> <a href="token.md#0x4_token_TokenAppendix1">TokenAppendix1</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>index: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;u64&gt;</code>
+</dt>
+<dd>
+ Unique identifier within the collection, optional, 0 means unassigned
 </dd>
 </dl>
 
@@ -344,15 +380,21 @@ The token name is over the maximum length
     <b>let</b> <a href="collection.md#0x4_collection">collection</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Collection&gt;(collection_addr);
     <b>let</b> id = <a href="collection.md#0x4_collection_increment_supply">collection::increment_supply</a>(&<a href="collection.md#0x4_collection">collection</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&object_signer));
 
+    <b>let</b> index = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_get_with_default">option::get_with_default</a>(&<b>mut</b> id, 0);
     <b>let</b> <a href="token.md#0x4_token">token</a> = <a href="token.md#0x4_token_Token">Token</a> {
         <a href="collection.md#0x4_collection">collection</a>,
-        index: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_get_with_default">option::get_with_default</a>(&<b>mut</b> id, 0),
+        deprecated_index: index,
         description,
         name,
         uri,
         mutation_events: <a href="../../aptos-framework/doc/object.md#0x1_object_new_event_handle">object::new_event_handle</a>(&object_signer),
     };
     <b>move_to</b>(&object_signer, <a href="token.md#0x4_token">token</a>);
+
+    <b>let</b> token_appendix_1 = <a href="token.md#0x4_token_TokenAppendix1">TokenAppendix1</a> {
+        index: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>(index),
+    };
+    <b>move_to</b>(&object_signer, token_appendix_1);
 
     <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="royalty.md#0x4_royalty">royalty</a>)) {
         <a href="royalty.md#0x4_royalty_init">royalty::init</a>(constructor_ref, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> <a href="royalty.md#0x4_royalty">royalty</a>))
@@ -830,6 +872,63 @@ Extracts the tokens address from a BurnRef.
 
 </details>
 
+<a name="0x4_token_index_snapshot"></a>
+
+## Function `index_snapshot`
+
+This method allows minting to happen in parallel, making it efficient.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_index_snapshot">index_snapshot</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: &<a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_index_snapshot">index_snapshot</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: &Object&lt;T&gt;): AggregatorSnapshot&lt;u64&gt; <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a>, <a href="token.md#0x4_token_TokenAppendix1">TokenAppendix1</a> {
+    <b>let</b> token_address = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(<a href="token.md#0x4_token">token</a>);
+    <b>if</b> (<b>exists</b>&lt;<a href="token.md#0x4_token_TokenAppendix1">TokenAppendix1</a>&gt;(token_address)) {
+        <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_copy_snapshot">aggregator_v2::copy_snapshot</a>(&<b>borrow_global</b>&lt;<a href="token.md#0x4_token_TokenAppendix1">TokenAppendix1</a>&gt;(token_address).index)
+    } <b>else</b> {
+        <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>(<a href="token.md#0x4_token_borrow">borrow</a>(<a href="token.md#0x4_token">token</a>).deprecated_index)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x4_token_index_view"></a>
+
+## Function `index_view`
+
+Avoid this method in the same transaction as the token is minted
+as that would prohibit transactions to be executed in parallel.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="token.md#0x4_token_index_view">index_view</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_index_view">index_view</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: Object&lt;T&gt;): u64 <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a>, <a href="token.md#0x4_token_TokenAppendix1">TokenAppendix1</a> {
+    <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_snapshot">aggregator_v2::read_snapshot</a>(&<a href="token.md#0x4_token_index_snapshot">index_snapshot</a>(&<a href="token.md#0x4_token">token</a>))
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x4_token_borrow_mut"></a>
 
 ## Function `borrow_mut`
@@ -873,7 +972,7 @@ Extracts the tokens address from a BurnRef.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_burn">burn</a>(burn_ref: <a href="token.md#0x4_token_BurnRef">BurnRef</a>) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_burn">burn</a>(burn_ref: <a href="token.md#0x4_token_BurnRef">BurnRef</a>) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a>, <a href="token.md#0x4_token_TokenAppendix1">TokenAppendix1</a> {
     <b>let</b> addr = <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&burn_ref.inner)) {
         <b>let</b> delete_ref = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> burn_ref.inner);
         <b>let</b> addr = <a href="../../aptos-framework/doc/object.md#0x1_object_address_from_delete_ref">object::address_from_delete_ref</a>(&delete_ref);
@@ -889,12 +988,21 @@ Extracts the tokens address from a BurnRef.
 
     <b>let</b> <a href="token.md#0x4_token_Token">Token</a> {
         <a href="collection.md#0x4_collection">collection</a>,
-        index,
+        deprecated_index,
         description: _,
         name: _,
         uri: _,
         mutation_events,
     } = <b>move_from</b>&lt;<a href="token.md#0x4_token_Token">Token</a>&gt;(addr);
+
+    <b>let</b> index = <b>if</b> (<b>exists</b>&lt;<a href="token.md#0x4_token_TokenAppendix1">TokenAppendix1</a>&gt;(addr)) {
+        <b>let</b> <a href="token.md#0x4_token_TokenAppendix1">TokenAppendix1</a> {
+            index,
+        } = <b>move_from</b>&lt;<a href="token.md#0x4_token_TokenAppendix1">TokenAppendix1</a>&gt;(addr);
+        <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_snapshot">aggregator_v2::read_snapshot</a>(&index)
+    } <b>else</b> {
+        deprecated_index
+    };
 
     <a href="../../aptos-framework/doc/event.md#0x1_event_destroy_handle">event::destroy_handle</a>(mutation_events);
     <a href="collection.md#0x4_collection_decrement_supply">collection::decrement_supply</a>(&<a href="collection.md#0x4_collection">collection</a>, addr, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(index));
