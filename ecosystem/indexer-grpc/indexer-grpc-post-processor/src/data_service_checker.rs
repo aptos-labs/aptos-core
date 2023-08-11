@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 
-use crate::metrics::{DATA_SERVICE_CHECKER_TRANSACTION_COUNT, DATA_SERVICE_CHECKER_TRANSACTION_TPS};
+use crate::metrics::{
+    DATA_SERVICE_CHECKER_TRANSACTION_COUNT, DATA_SERVICE_CHECKER_TRANSACTION_TPS,
+};
 use anyhow::Result;
 use aptos_indexer_grpc_utils::constants::GRPC_AUTH_TOKEN_HEADER;
+use aptos_moving_average::MovingAverage;
 use aptos_protos::indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest};
 use futures::StreamExt;
 use rand::Rng;
-use aptos_moving_average::MovingAverage;
 pub struct DataServiceChecker {
     pub indexer_grpc_address: String,
     pub indexer_grpc_auth_token: String,

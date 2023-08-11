@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }
 aptos-runtimes = { workspace = true }
 async-trait = { workspace = true }
@@ -37,4 +38,3 @@ toml = { workspace = true }
 tonic = { workspace = true }
 tracing =  { workspace = true }
 tracing-subscriber = { workspace = true }
-aptos-moving-average = { workspace = true }
