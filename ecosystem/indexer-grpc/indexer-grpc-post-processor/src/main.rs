@@ -4,7 +4,7 @@
 use anyhow::Result;
 use aptos_indexer_grpc_post_processor::{
     file_storage_verifier::FileStorageVerifier, metrics::TASK_FAILURE_COUNT,
-    pfn_ledger_checker::PfnLedgerChecker,
+    pfn_ledger_checker::PfnLedgerChecker, processor_status_checker::ProcessorStatusChecker,
 };
 use aptos_indexer_grpc_server_framework::{RunnableConfig, ServerArgs};
 use aptos_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
@@ -28,12 +28,19 @@ pub struct IndexerGrpcFileStorageVerifierConfig {
     pub chain_id: u64,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProcessorStatusCheckerConfig {
+    pub hasura_rest_api_endpoint: String,
+}
+
 // TODO: change this to match pattern.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexerGrpcPostProcessorConfig {
     pub pfn_checker_config: Option<IndexerGrpcPFNCheckerConfig>,
     pub file_storage_verifier: Option<IndexerGrpcFileStorageVerifierConfig>,
+    pub processor_status_checker_config: Option<ProcessorStatusCheckerConfig>,
 }
 
 #[async_trait::async_trait]
@@ -86,6 +93,23 @@ impl RunnableConfig for IndexerGrpcPostProcessorConfig {
                     }
                 }
             }));
+        }
+
+        if let Some(config) = &self.processor_status_checker_config {
+            tasks.push(tokio::spawn({
+                let config = config.clone();
+                async move {
+                    let checker =
+                        ProcessorStatusChecker::new(config.hasura_rest_api_endpoint.clone());
+                    info!("Starting ProcessorStatusChecker");
+                    if let Err(err) = checker.run().await {
+                        tracing::error!("ProcessorStatusChecker failed: {:?}", err);
+                        TASK_FAILURE_COUNT
+                            .with_label_values(&["processor_status_checker"])
+                            .inc();
+                    }
+                }
+            }))
         }
 
         let _ = futures::future::join_all(tasks).await;

@@ -1,0 +1,21 @@
+health_check_port: 8088
+server_config:
+    file_storage_verifier:
+        chain_id: 61
+        file_store_config:
+            file_store_type: GcsFileStore
+            gcs_file_store_bucket_name: bucket_name_for_file_store
+            gcs_file_store_service_account_key_path: /path/to/service_account.json
+    pfn_checker_config:
+        public_fullnode_addresses:
+            - http://fullnode.1.address/v1
+            - http://fullnode.2.address/v1
+            - http://fullnode.3.address/v1
+        indexer_grpc_address: IP:PORT
+        indexer_grpc_auth_token: AUTH_TOKEN
+    processor_status_checker_config:
+        # "{endpoint}/api/rest/get_lastest_processor_status" where endpoint is one of:
+        #     - https://indexer.mainnet.aptoslabs.com,
+        #     - https://indexer-testnet.staging.gcp.aptosdev.com
+        #     - https://indexer-devnet.staging.gcp.aptosdev.com
+        hasura_rest_api_endpoint: "https://indexer.mainnet.aptoslabs.com/api/rest/get_lastest_processor_status"

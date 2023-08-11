@@ -4,3 +4,4 @@
 pub mod file_storage_verifier;
 pub mod metrics;
 pub mod pfn_ledger_checker;
+pub mod processor_status_checker;

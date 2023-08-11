@@ -35,3 +35,13 @@ pub static TASK_FAILURE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+// Processor last update time latency to current time in seconds.
+pub static PROCESSOR_LAST_UPDATED_TIME_LATENCY_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_processors_processor_last_updated_time_latency_in_secs",
+        "Processor last update time latency to current time in seconds.",
+        &["processor_name"],
+    )
+    .unwrap()
+});
