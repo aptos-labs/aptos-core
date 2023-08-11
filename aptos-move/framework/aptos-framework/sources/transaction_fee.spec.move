@@ -3,8 +3,7 @@ spec aptos_framework::transaction_fee {
         use aptos_framework::chain_status;
         pragma verify = true;
         pragma aborts_if_is_strict;
-
-        // property 1: Given the blockchain is in an operating state, it guarantees that the Aptos framework signer may burn Aptos coins. 
+        // property 1: Given the blockchain is in an operating state, it guarantees that the Aptos framework signer may burn Aptos coins.
         invariant [suspendable] chain_status::is_operating() ==> exists<AptosCoinCapabilities>(@aptos_framework);
     }
 
