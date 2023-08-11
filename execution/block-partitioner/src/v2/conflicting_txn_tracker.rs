@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::v2::types::{OriginalTxnIdx, ShardedTxnIndexV2};
+use crate::v2::types::{PreParedTxnIdx, ShardedTxnIndexV2};
 #[cfg(test)]
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::{
@@ -20,11 +20,11 @@ pub struct ConflictingTxnTracker {
     /// A randomly chosen owner shard of the storage location, for conflict resolution purpose.
     pub anchor_shard_id: ShardId,
     /// Txns that (1) read the current storage location and (2) have not been accepted.
-    pending_reads: BTreeSet<OriginalTxnIdx>,
+    pending_reads: BTreeSet<PreParedTxnIdx>,
     /// Txns that (1) write the current storage location and (2) have not been accepted.
-    pending_writes: BTreeSet<OriginalTxnIdx>,
+    pending_writes: BTreeSet<PreParedTxnIdx>,
     /// Txns that write the current storage location.
-    pub writer_set: HashSet<OriginalTxnIdx>,
+    pub writer_set: HashSet<PreParedTxnIdx>,
     /// Txns that have been accepted.
     pub finalized_all: BTreeSet<ShardedTxnIndexV2>,
     /// Txns that (1) write the current storage location and (2) have been accepted.
@@ -44,11 +44,11 @@ impl ConflictingTxnTracker {
         }
     }
 
-    pub fn add_read_candidate(&mut self, txn_id: OriginalTxnIdx) {
+    pub fn add_read_candidate(&mut self, txn_id: PreParedTxnIdx) {
         self.pending_reads.insert(txn_id);
     }
 
-    pub fn add_write_candidate(&mut self, txn_id: OriginalTxnIdx) {
+    pub fn add_write_candidate(&mut self, txn_id: PreParedTxnIdx) {
         self.pending_writes.insert(txn_id);
         self.writer_set.insert(txn_id);
     }
@@ -56,7 +56,7 @@ impl ConflictingTxnTracker {
     /// Partitioner has finalized the position of a txn. Remove it from the pending txn list.
     pub fn mark_txn_ordered(
         &mut self,
-        txn_id: OriginalTxnIdx,
+        txn_id: PreParedTxnIdx,
         round_id: RoundId,
         shard_id: ShardId,
     ) {
@@ -72,8 +72,8 @@ impl ConflictingTxnTracker {
     /// Check if there is a txn writing to the current storage location and its txn_id in the given wrapped range [start, end).
     pub fn has_write_in_range(
         &self,
-        start_txn_id: OriginalTxnIdx,
-        end_txn_id: OriginalTxnIdx,
+        start_txn_id: PreParedTxnIdx,
+        end_txn_id: PreParedTxnIdx,
     ) -> bool {
         if start_txn_id <= end_txn_id {
             self.pending_writes

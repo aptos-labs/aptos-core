@@ -37,7 +37,7 @@ impl SubBlockIdx {
 }
 
 /// The position of a txn in the block after `pre_partition` and before `flatten_to_rounds`.
-pub type OriginalTxnIdx = usize;
+pub type PreParedTxnIdx = usize;
 
 /// Represent a specific storage location in a partitioning session.
 pub type StorageKeyIdx = usize;
@@ -51,7 +51,7 @@ pub type SenderIdx = usize;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ShardedTxnIndexV2 {
     pub sub_block_idx: SubBlockIdx,
-    pub ori_txn_idx: OriginalTxnIdx,
+    pub ori_txn_idx: PreParedTxnIdx,
 }
 
 impl Ord for ShardedTxnIndexV2 {
@@ -78,7 +78,7 @@ impl ShardedTxnIndexV2 {
 }
 
 impl ShardedTxnIndexV2 {
-    pub fn new(round_id: RoundId, shard_id: ShardId, ori_txn_idx: OriginalTxnIdx) -> Self {
+    pub fn new(round_id: RoundId, shard_id: ShardId, ori_txn_idx: PreParedTxnIdx) -> Self {
         Self {
             sub_block_idx: SubBlockIdx::new(round_id, shard_id),
             ori_txn_idx,

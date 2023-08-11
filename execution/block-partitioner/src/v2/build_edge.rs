@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::v2::{PartitionState, PartitionerV2};
+use crate::v2::{state::PartitionState, PartitionerV2};
 use aptos_types::{
     block_executor::partitioner::{
         PartitionedTransactions, SubBlock, SubBlocksForShard, TransactionWithDependencies,
@@ -14,6 +14,7 @@ use rayon::{
 use std::sync::Mutex;
 
 impl PartitionerV2 {
+    ///
     pub(crate) fn add_edges(state: &mut PartitionState) -> PartitionedTransactions {
         state.sub_block_matrix = state.thread_pool.install(|| {
             (0..state.num_rounds())
@@ -66,8 +67,7 @@ impl PartitionerV2 {
             };
 
         let final_num_rounds = state.sub_block_matrix.len();
-        let sharded_txns: Vec<SubBlocksForShard<AnalyzedTransaction>> = (0..state
-            .num_executor_shards)
+        let sharded_txns = (0..state.num_executor_shards)
             .map(|shard_id| {
                 let sub_blocks: Vec<SubBlock<AnalyzedTransaction>> = (0..final_num_rounds)
                     .map(|round_id| {

@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 
-use crate::v2::{extract_and_sort, types::OriginalTxnIdx, PartitionState, PartitionerV2};
+use crate::v2::{extract_and_sort, state::PartitionState, types::PreParedTxnIdx, PartitionerV2};
 use aptos_logger::trace;
-use aptos_types::block_executor::partitioner::RoundId;
+use aptos_types::block_executor::partitioner::{RoundId, TxnIndex};
 use dashmap::DashMap;
 use rayon::{
     iter::ParallelIterator,
@@ -29,7 +29,7 @@ impl PartitionerV2 {
 
         if state.merge_discarded {
             trace!("Merging txns after discarding stopped.");
-            let last_round_txns: Vec<OriginalTxnIdx> =
+            let last_round_txns: Vec<PreParedTxnIdx> =
                 remaining_txns.into_iter().flatten().collect();
             remaining_txns = vec![vec![]; state.num_executor_shards];
             remaining_txns[state.num_executor_shards - 1] = last_round_txns;
@@ -52,9 +52,7 @@ impl PartitionerV2 {
                 });
         });
         state.finalized_txn_matrix.push(remaining_txns);
-
-        (state.start_index_matrix, state.new_txn_idxs) =
-            state.build_new_index_tables(&state.finalized_txn_matrix);
+        Self::build_new_index_tables(state);
     }
 
     /// Given some pre-partitioned txns, pull some off from each shard to avoid cross-shard conflict.
@@ -62,13 +60,13 @@ impl PartitionerV2 {
     pub(crate) fn discarding_round(
         state: &mut PartitionState,
         round_id: RoundId,
-        remaining_txns: Vec<Vec<OriginalTxnIdx>>,
-    ) -> (Vec<Vec<OriginalTxnIdx>>, Vec<Vec<OriginalTxnIdx>>) {
+        remaining_txns: Vec<Vec<PreParedTxnIdx>>,
+    ) -> (Vec<Vec<PreParedTxnIdx>>, Vec<Vec<PreParedTxnIdx>>) {
         let num_shards = remaining_txns.len();
-        let mut discarded: Vec<RwLock<Vec<OriginalTxnIdx>>> = Vec::with_capacity(num_shards);
-        let mut potentially_accepted: Vec<RwLock<Vec<OriginalTxnIdx>>> =
+        let mut discarded: Vec<RwLock<Vec<PreParedTxnIdx>>> = Vec::with_capacity(num_shards);
+        let mut potentially_accepted: Vec<RwLock<Vec<PreParedTxnIdx>>> =
             Vec::with_capacity(num_shards);
-        let mut finally_accepted: Vec<RwLock<Vec<OriginalTxnIdx>>> = Vec::with_capacity(num_shards);
+        let mut finally_accepted: Vec<RwLock<Vec<PreParedTxnIdx>>> = Vec::with_capacity(num_shards);
         for txns in remaining_txns.iter() {
             potentially_accepted.push(RwLock::new(Vec::with_capacity(txns.len())));
             finally_accepted.push(RwLock::new(Vec::with_capacity(txns.len())));
@@ -109,7 +107,7 @@ impl PartitionerV2 {
                     .for_each(|&ori_txn_idx| {
                         let sender_idx = state.sender_idx(ori_txn_idx);
                         if ori_txn_idx
-                            < state.min_discard(sender_idx).unwrap_or(OriginalTxnIdx::MAX)
+                            < state.min_discard(sender_idx).unwrap_or(PreParedTxnIdx::MAX)
                         {
                             state.update_trackers_on_accepting(ori_txn_idx, round_id, shard_id);
                             finally_accepted[shard_id]
@@ -134,5 +132,37 @@ impl PartitionerV2 {
             drop(min_discards_by_sender);
         });
         ret
+    }
+
+    pub(crate) fn build_new_index_tables(state: &mut PartitionState) {
+        let num_rounds = state.finalized_txn_matrix.len();
+        state.start_index_matrix = vec![vec![0; state.num_executor_shards]; num_rounds];
+        let mut global_counter: TxnIndex = 0;
+        for (round_id, row) in state.finalized_txn_matrix.iter().enumerate() {
+            for (shard_id, txns) in row.iter().enumerate() {
+                state.start_index_matrix[round_id][shard_id] = global_counter;
+                global_counter += txns.len();
+            }
+        }
+
+        state.new_txn_idxs = (0..state.num_txns()).map(|_tid| RwLock::new(0)).collect();
+
+        state.thread_pool.install(|| {
+            (0..num_rounds).into_par_iter().for_each(|round_id| {
+                (0..state.num_executor_shards)
+                    .into_par_iter()
+                    .for_each(|shard_id| {
+                        let sub_block_size = state.finalized_txn_matrix[round_id][shard_id].len();
+                        (0..sub_block_size)
+                            .into_par_iter()
+                            .for_each(|pos_in_sub_block| {
+                                let txn_idx = state.finalized_txn_matrix[round_id][shard_id]
+                                    [pos_in_sub_block];
+                                *state.new_txn_idxs[txn_idx].write().unwrap() =
+                                    state.start_index_matrix[round_id][shard_id] + pos_in_sub_block;
+                            });
+                    });
+            });
+        });
     }
 }

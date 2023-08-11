@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    pre_partition::PrePartitioner, test_utils::P2PBlockGenerator, v2::types::OriginalTxnIdx,
+    pre_partition::PrePartitioner, test_utils::P2PBlockGenerator, v2::types::PreParedTxnIdx,
 };
 use aptos_types::{
     block_executor::partitioner::ShardId, transaction::analyzed_transaction::AnalyzedTransaction,
@@ -17,7 +17,7 @@ impl PrePartitioner for UniformPartitioner {
         &self,
         transactions: &[AnalyzedTransaction],
         num_shards: usize,
-    ) -> Vec<Vec<OriginalTxnIdx>> {
+    ) -> Vec<Vec<PreParedTxnIdx>> {
         let num_items = transactions.len();
         let num_chunks = num_shards;
         let num_big_chunks = num_items % num_chunks;
