@@ -4,6 +4,7 @@ use crate::{
     dag::{
         anchor_election::RoundRobinAnchorElection,
         dag_driver::{DagDriver, DagDriverError},
+        dag_fetcher::DagFetcher,
         dag_network::{DAGNetworkSender, RpcWithFallback},
         dag_store::Dag,
         order_rule::OrderRule,
@@ -75,9 +76,10 @@ fn test_certified_node_handler() {
 
     let zeroth_round_node = new_certified_node(0, signers[0].author(), vec![]);
 
+    let network_sender = Arc::new(MockNetworkSender {});
     let rb = Arc::new(ReliableBroadcast::new(
         signers.iter().map(|s| s.author()).collect(),
-        Arc::new(MockNetworkSender {}),
+        network_sender.clone(),
         ExponentialBackoff::from_millis(10),
         aptos_time_service::TimeService::mock(),
     ));
@@ -91,6 +93,15 @@ fn test_certified_node_handler() {
         Box::new(RoundRobinAnchorElection::new(validators)),
         ordered_nodes_sender,
     );
+
+    let (_, fetch_requester, _, _) = DagFetcher::new(
+        epoch_state.clone(),
+        network_sender,
+        dag.clone(),
+        aptos_time_service::TimeService::mock(),
+    );
+    let fetch_requester = Arc::new(fetch_requester);
+
     let mut driver = DagDriver::new(
         signers[0].author(),
         epoch_state,
@@ -101,6 +112,7 @@ fn test_certified_node_handler() {
         time_service,
         storage,
         order_rule,
+        fetch_requester,
     );
 
     // expect an ack for a valid message

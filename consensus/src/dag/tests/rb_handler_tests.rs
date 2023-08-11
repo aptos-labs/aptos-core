@@ -3,7 +3,7 @@
 
 use crate::dag::{
     dag_store::Dag,
-    reliable_broadcast::{NodeBroadcastHandleError, NodeBroadcastHandler},
+    rb_handler::{NodeBroadcastHandleError, NodeBroadcastHandler},
     storage::DAGStorage,
     tests::{dag_test::MockStorage, helpers::new_node},
     types::NodeCertificate,
