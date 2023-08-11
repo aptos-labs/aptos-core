@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_counter, register_gauge_vec, register_int_counter, register_int_counter_vec, Counter,
-    GaugeVec, IntCounter, IntCounterVec,
+    register_counter, register_gauge_vec, register_gauge,register_int_counter, register_int_counter_vec, Counter,
+    GaugeVec, IntCounter, IntCounterVec, Gauge,
 };
 use once_cell::sync::Lazy;
 
@@ -41,6 +41,15 @@ pub static DATA_SERVICE_CHECKER_TRANSACTION_COUNT: Lazy<IntCounter> = Lazy::new(
     register_int_counter!(
         "indexer_grpc_post_processor_data_service_checker_transaction_count",
         "Data Service Checker transaction count.",
+    )
+    .unwrap()
+});
+
+/// Data Service Checker transaction tps gauge.
+pub static DATA_SERVICE_CHECKER_TRANSACTION_TPS: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!(
+        "indexer_grpc_post_processor_data_service_checker_transaction_tps",
+        "Data Service Checker transaction tps.",
     )
     .unwrap()
 });

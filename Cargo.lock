@@ -1971,6 +1971,7 @@ dependencies = [
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
+ "aptos-moving-average",
  "aptos-protos",
  "aptos-runtimes",
  "async-trait",

@@ -37,3 +37,4 @@ toml = { workspace = true }
 tonic = { workspace = true }
 tracing =  { workspace = true }
 tracing-subscriber = { workspace = true }
+aptos-moving-average = { workspace = true }
