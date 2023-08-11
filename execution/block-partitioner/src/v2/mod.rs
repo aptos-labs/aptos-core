@@ -223,9 +223,9 @@ impl WorkSession {
             min_discards_by_sender: DashMap::new(),
             avoid_pct,
             num_rounds_limit,
-            finalized_txn_matrix: vec![],
-            new_txn_idxs: vec![],
-            start_index_matrix: vec![],
+            finalized_txn_matrix: Vec::with_capacity(num_rounds_limit),
+            new_txn_idxs: Vec::with_capacity(num_txns),
+            start_index_matrix: Vec::with_capacity(num_rounds_limit),
         }
     }
 
@@ -285,7 +285,7 @@ impl WorkSession {
             .collect()
     }
 
-    fn init(&self) {
+    fn build_index(&self) {
         self.thread_pool.install(|| {
             (0..self.num_txns())
                 .into_par_iter()
@@ -712,7 +712,7 @@ impl WorkSession {
     }
 
     fn run(&mut self) -> PartitionedTransactions {
-        self.init();
+        self.build_index();
         self.flatten_to_rounds();
         self.add_edges()
     }
