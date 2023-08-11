@@ -327,19 +327,20 @@ impl WorkSession {
             .fetch_min(txn_idx, Ordering::SeqCst);
     }
 
-    fn mark_txn_accepted_in_tracker(
+    fn update_trackers_on_accepting(
         &self,
-        key_idx: StorageKeyIdx,
         ori_txn_idx: OriginalTxnIdx,
         round_id: RoundId,
         shard_id: ShardId,
     ) {
-        self.trackers
-            .get(&key_idx)
-            .unwrap()
-            .write()
-            .unwrap()
-            .mark_txn_ordered(ori_txn_idx, round_id, shard_id);
+        for key_idx in self.all_hints(ori_txn_idx) {
+            self.trackers
+                .get(&key_idx)
+                .unwrap()
+                .write()
+                .unwrap()
+                .mark_txn_ordered(ori_txn_idx, round_id, shard_id);
+        }
     }
 
     fn build_new_index_tables(
@@ -405,11 +406,6 @@ impl WorkSession {
         self.min_discards_by_sender = DashMap::new();
         let _duration = timer.stop_and_record();
 
-        let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&[
-                format!("multi_rounds__round_{round_id}__resolve_conflict").as_str()
-            ])
-            .start_timer();
         self.thread_pool.install(|| {
             (0..self.num_executor_shards)
                 .into_par_iter()
@@ -432,13 +428,6 @@ impl WorkSession {
                     });
                 });
         });
-        let _duration = timer.stop_and_record();
-
-        let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&[
-                format!("multi_rounds__round_{round_id}__keep_relative_order").as_str(),
-            ])
-            .start_timer();
 
         self.thread_pool.install(|| {
             (0..num_shards).into_par_iter().for_each(|shard_id| {
@@ -450,14 +439,7 @@ impl WorkSession {
                         let sender_idx = self.sender_idx(ori_txn_idx);
                         if ori_txn_idx < self.min_discard(sender_idx).unwrap_or(OriginalTxnIdx::MAX)
                         {
-                            for key_idx in self.all_hints(ori_txn_idx) {
-                                self.mark_txn_accepted_in_tracker(
-                                    key_idx,
-                                    ori_txn_idx,
-                                    round_id,
-                                    shard_id,
-                                );
-                            }
+                            self.update_trackers_on_accepting(ori_txn_idx, round_id, shard_id);
                             finally_accepted[shard_id]
                                 .write()
                                 .unwrap()
@@ -468,16 +450,11 @@ impl WorkSession {
                     });
             });
         });
-        let _duration = timer.stop_and_record();
 
-        let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&[format!("multi_rounds__round_{round_id}__return_obj").as_str()])
-            .start_timer();
         let ret = (
             extract_and_sort(finally_accepted),
             extract_and_sort(discarded),
         );
-        let _duration = timer.stop_and_record();
         let min_discards_by_sender = mem::take(&mut self.min_discards_by_sender);
         self.thread_pool.spawn(move || {
             drop(remaining_txns);
@@ -517,10 +494,6 @@ impl WorkSession {
             }
         }
 
-        let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["multi_rounds__handle_discarded"])
-            .start_timer();
-
         if merge_discarded {
             trace!("Merging txns after discarding stopped.");
             let last_round_txns: Vec<OriginalTxnIdx> =
@@ -534,35 +507,17 @@ impl WorkSession {
             (0..self.num_executor_shards)
                 .into_par_iter()
                 .for_each(|shard_id| {
-                    remaining_txns[shard_id].par_iter().for_each(|txn_idx_ref| {
-                        let txn_idx = *txn_idx_ref;
-                        for key_idx_ref in self.rsets[txn_idx]
-                            .read()
-                            .unwrap()
-                            .iter()
-                            .chain(self.wsets[txn_idx].read().unwrap().iter())
-                        {
-                            let key_idx = *key_idx_ref;
-                            let tracker = self.trackers.get(&key_idx).unwrap();
-                            tracker.write().unwrap().mark_txn_ordered(
-                                txn_idx,
-                                last_round_id,
-                                shard_id,
-                            );
-                        }
-                    });
+                    remaining_txns[shard_id]
+                        .par_iter()
+                        .for_each(|&ori_txn_idx| {
+                            self.update_trackers_on_accepting(ori_txn_idx, last_round_id, shard_id);
+                        });
                 });
         });
         accepted_txn_matrix.push(remaining_txns);
 
-        let _duration = timer.stop_and_record();
-
-        let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["multi_rounds__new_tid_table"])
-            .start_timer();
         let (start_index_matrix, finalized_indexs) =
             self.build_new_index_tables(&accepted_txn_matrix);
-        let _duration = timer.stop_and_record();
         (accepted_txn_matrix, start_index_matrix, finalized_indexs)
     }
 
