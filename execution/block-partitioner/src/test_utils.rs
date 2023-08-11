@@ -1,9 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{ed25519::ed25519_keys::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+use crate::{BlockPartitioner, Sender};
+use aptos_crypto::{
+    ed25519::ed25519_keys::Ed25519PrivateKey,
+    hash::{CryptoHash, TestOnlyHash},
+    HashValue, PrivateKey, SigningKey, Uniform,
+};
+use aptos_logger::info;
 use aptos_types::{
+    block_executor::partitioner::{
+        PartitionedTransactions, RoundId, ShardId, TransactionWithDependencies, GLOBAL_ROUND_ID,
+        GLOBAL_SHARD_ID,
+    },
     chain_id::ChainId,
+    state_store::state_key::StateKey,
     transaction::{
         analyzed_transaction::AnalyzedTransaction, EntryFunction, RawTransaction,
         SignedTransaction, Transaction, TransactionPayload,
@@ -13,15 +24,12 @@ use aptos_types::{
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
 };
-use rand::{Rng, thread_rng};
+use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, prelude::IntoParallelIterator};
-use std::sync::{Arc, Mutex};
-use aptos_types::block_executor::partitioner::{GLOBAL_ROUND_ID, GLOBAL_SHARD_ID, PartitionedTransactions, RoundId, ShardId, TransactionWithDependencies};
-use std::collections::{HashMap, HashSet};
-use aptos_crypto::hash::{CryptoHash, TestOnlyHash};
-use aptos_logger::info;
-use aptos_types::state_store::state_key::StateKey;
-use crate::{BlockPartitioner, Sender};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, Mutex},
+};
 
 #[derive(Debug)]
 pub struct TestAccount {
@@ -142,7 +150,8 @@ pub fn verify_partitioner_output(
     let mut total_comm_cost = 0;
     let num_txns = input.len();
     let num_shards = output.sharded_txns().len();
-    let num_rounds = output.sharded_txns()
+    let num_rounds = output
+        .sharded_txns()
         .first()
         .map(|sbs| sbs.sub_blocks.len())
         .unwrap_or(0);
@@ -156,15 +165,16 @@ pub fn verify_partitioner_output(
     let mut edge_set_from_dst_view: HashSet<(usize, usize, usize, HashValue, usize, usize, usize)> =
         HashSet::new();
 
-    let mut for_each_sub_block = |round_id: usize, shard_id: usize, start_txn_idx: usize, sub_block_txns: &[TransactionWithDependencies<AnalyzedTransaction>]| {
-        let mut cur_sub_block_inbound_costs: HashMap<
-            (RoundId, ShardId, StateKey),
-            u64,
-        > = HashMap::new();
-        let mut cur_sub_block_outbound_costs: HashMap<
-            (RoundId, ShardId, StateKey),
-            u64,
-        > = HashMap::new();
+    let mut for_each_sub_block = |round_id: usize,
+                                  shard_id: usize,
+                                  start_txn_idx: usize,
+                                  sub_block_txns: &[TransactionWithDependencies<
+        AnalyzedTransaction,
+    >]| {
+        let mut cur_sub_block_inbound_costs: HashMap<(RoundId, ShardId, StateKey), u64> =
+            HashMap::new();
+        let mut cur_sub_block_outbound_costs: HashMap<(RoundId, ShardId, StateKey), u64> =
+            HashMap::new();
         for (pos_in_sub_block, txn_with_dep) in sub_block_txns.iter().enumerate() {
             let sender = txn_with_dep.txn.sender();
             let old_txn_idx = *old_txn_id_by_txn_hash
@@ -184,7 +194,11 @@ pub fn verify_partitioner_output(
                     round_id, shard_id, old_txn_idx, new_txn_idx, key_str
                 );
             }
-            for (src_txn_idx, locs) in txn_with_dep.cross_shard_dependencies.required_edges().iter() {
+            for (src_txn_idx, locs) in txn_with_dep
+                .cross_shard_dependencies
+                .required_edges()
+                .iter()
+            {
                 for loc in locs.iter() {
                     let key = loc.clone().into_state_key();
                     let key_str = CryptoHash::hash(&key).to_hex();
@@ -208,7 +222,11 @@ pub fn verify_partitioner_output(
                     *value += 1;
                 }
             }
-            for (dst_tid, locs) in txn_with_dep.cross_shard_dependencies.dependent_edges().iter() {
+            for (dst_tid, locs) in txn_with_dep
+                .cross_shard_dependencies
+                .dependent_edges()
+                .iter()
+            {
                 for loc in locs.iter() {
                     let key = loc.clone().into_state_key();
                     let key_str = CryptoHash::hash(&key).to_hex();
@@ -233,14 +251,8 @@ pub fn verify_partitioner_output(
                 }
             }
         }
-        let inbound_cost: u64 = cur_sub_block_inbound_costs
-            .values()
-            .copied()
-            .sum();
-        let outbound_cost: u64 = cur_sub_block_outbound_costs
-            .values()
-            .copied()
-            .sum();
+        let inbound_cost: u64 = cur_sub_block_inbound_costs.values().copied().sum();
+        let outbound_cost: u64 = cur_sub_block_outbound_costs.values().copied().sum();
         println!("MATRIX_REPORT: round={}, shard={}, sub_block_size={}, inbound_cost={}, outbound_cost={}", round_id, shard_id, sub_block_txns.len(), inbound_cost, outbound_cost);
         if round_id == 0 {
             assert_eq!(0, inbound_cost);
@@ -251,10 +263,20 @@ pub fn verify_partitioner_output(
     for round_id in 0..num_rounds {
         for (shard_id, sub_block_list) in output.sharded_txns().iter().enumerate() {
             let sub_block = sub_block_list.get_sub_block(round_id).unwrap();
-            for_each_sub_block(round_id, shard_id, sub_block.start_index, sub_block.transactions_with_deps().as_slice())
+            for_each_sub_block(
+                round_id,
+                shard_id,
+                sub_block.start_index,
+                sub_block.transactions_with_deps().as_slice(),
+            )
         }
     }
-    for_each_sub_block(GLOBAL_ROUND_ID, GLOBAL_SHARD_ID, output.num_sharded_txns(), output.global_txns.as_slice());
+    for_each_sub_block(
+        GLOBAL_ROUND_ID,
+        GLOBAL_SHARD_ID,
+        output.num_sharded_txns(),
+        output.global_txns.as_slice(),
+    );
 
     assert_eq!(HashSet::from_iter(0..num_txns), old_txn_idxs_seen);
     assert_eq!(edge_set_from_src_view, edge_set_from_dst_view);

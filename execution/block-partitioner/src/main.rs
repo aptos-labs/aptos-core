@@ -1,16 +1,18 @@
 // Copyright © Aptos Foundation
 
-use aptos_block_partitioner::{PartitionerV1Config, test_utils::{create_signed_p2p_transaction, generate_test_account, TestAccount}};
+use aptos_block_partitioner::{
+    test_utils::{
+        create_signed_p2p_transaction, generate_test_account, P2PBlockGenerator, TestAccount,
+    },
+    v2::PartitionerV2,
+    BlockPartitioner, PartitionerV1Config,
+};
 use aptos_logger::info;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use clap::Parser;
-use rand::rngs::OsRng;
+use rand::{rngs::OsRng, thread_rng};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{sync::Mutex, time::Instant};
-use rand::thread_rng;
-use aptos_block_partitioner::v2::PartitionerV2;
-use aptos_block_partitioner::BlockPartitioner;
-use aptos_block_partitioner::test_utils::P2PBlockGenerator;
 
 #[cfg(unix)]
 #[global_allocator]

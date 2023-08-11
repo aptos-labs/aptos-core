@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::v2::{OriginalTxnIdx, ShardedTxnIndex2};
+use crate::v2::types::{PreParedTxnIdx, ShardedTxnIndexV2};
 #[cfg(test)]
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::{
@@ -20,15 +20,15 @@ pub struct ConflictingTxnTracker {
     /// A randomly chosen owner shard of the storage location, for conflict resolution purpose.
     pub anchor_shard_id: ShardId,
     /// Txns that (1) read the current storage location and (2) have not been accepted.
-    pending_reads: BTreeSet<OriginalTxnIdx>,
+    pending_reads: BTreeSet<PreParedTxnIdx>,
     /// Txns that (1) write the current storage location and (2) have not been accepted.
-    pending_writes: BTreeSet<OriginalTxnIdx>,
+    pending_writes: BTreeSet<PreParedTxnIdx>,
     /// Txns that write the current storage location.
-    pub writer_set: HashSet<OriginalTxnIdx>,
+    pub writer_set: HashSet<PreParedTxnIdx>,
     /// Txns that have been accepted.
-    pub finalized_all: BTreeSet<ShardedTxnIndex2>,
+    pub finalized_all: BTreeSet<ShardedTxnIndexV2>,
     /// Txns that (1) write the current storage location and (2) have been accepted.
-    pub finalized_writes: BTreeSet<ShardedTxnIndex2>,
+    pub finalized_writes: BTreeSet<ShardedTxnIndexV2>,
 }
 
 impl ConflictingTxnTracker {
@@ -44,11 +44,11 @@ impl ConflictingTxnTracker {
         }
     }
 
-    pub fn add_read_candidate(&mut self, txn_id: OriginalTxnIdx) {
+    pub fn add_read_candidate(&mut self, txn_id: PreParedTxnIdx) {
         self.pending_reads.insert(txn_id);
     }
 
-    pub fn add_write_candidate(&mut self, txn_id: OriginalTxnIdx) {
+    pub fn add_write_candidate(&mut self, txn_id: PreParedTxnIdx) {
         self.pending_writes.insert(txn_id);
         self.writer_set.insert(txn_id);
     }
@@ -56,15 +56,11 @@ impl ConflictingTxnTracker {
     /// Partitioner has finalized the position of a txn. Remove it from the pending txn list.
     pub fn mark_txn_ordered(
         &mut self,
-        txn_id: OriginalTxnIdx,
+        txn_id: PreParedTxnIdx,
         round_id: RoundId,
         shard_id: ShardId,
     ) {
-        let sharded_txn_idx = ShardedTxnIndex2 {
-            round_id,
-            shard_id,
-            ori_txn_idx: txn_id,
-        };
+        let sharded_txn_idx = ShardedTxnIndexV2::new(round_id, shard_id, txn_id);
         if self.pending_writes.remove(&txn_id) {
             self.finalized_writes.insert(sharded_txn_idx);
         } else {
@@ -76,8 +72,8 @@ impl ConflictingTxnTracker {
     /// Check if there is a txn writing to the current storage location and its txn_id in the given wrapped range [start, end).
     pub fn has_write_in_range(
         &self,
-        start_txn_id: OriginalTxnIdx,
-        end_txn_id: OriginalTxnIdx,
+        start_txn_id: PreParedTxnIdx,
+        end_txn_id: PreParedTxnIdx,
     ) -> bool {
         if start_txn_id <= end_txn_id {
             self.pending_writes
@@ -123,36 +119,36 @@ fn test_conflicting_txn_tracker() {
     // promoted: (99,10)/T9(W), (99,20)/T4(W), (99,20)/T7(W), (99,30)/T8(R), (99,30)/T10(W)
     assert_eq!(
         vec![
-            ShardedTxnIndex2::new(99, 10, 9),
-            ShardedTxnIndex2::new(99, 20, 4),
-            ShardedTxnIndex2::new(99, 20, 7)
+            ShardedTxnIndexV2::new(99, 10, 9),
+            ShardedTxnIndexV2::new(99, 20, 4),
+            ShardedTxnIndexV2::new(99, 20, 7)
         ],
         tracker
             .finalized_all
-            .range(ShardedTxnIndex2::new(98, 0, 0)..ShardedTxnIndex2::new(99, 20, 8))
+            .range(ShardedTxnIndexV2::new(98, 0, 0)..ShardedTxnIndexV2::new(99, 20, 8))
             .copied()
             .collect::<Vec<_>>()
     );
     assert_eq!(
         vec![
-            ShardedTxnIndex2::new(99, 20, 7),
-            ShardedTxnIndex2::new(99, 30, 8),
-            ShardedTxnIndex2::new(99, 30, 10)
+            ShardedTxnIndexV2::new(99, 20, 7),
+            ShardedTxnIndexV2::new(99, 30, 8),
+            ShardedTxnIndexV2::new(99, 30, 10)
         ],
         tracker
             .finalized_all
-            .range(ShardedTxnIndex2::new(99, 20, 7)..)
+            .range(ShardedTxnIndexV2::new(99, 20, 7)..)
             .copied()
             .collect::<Vec<_>>()
     );
     assert_eq!(
         vec![
-            ShardedTxnIndex2::new(99, 20, 7),
-            ShardedTxnIndex2::new(99, 30, 10)
+            ShardedTxnIndexV2::new(99, 20, 7),
+            ShardedTxnIndexV2::new(99, 30, 10)
         ],
         tracker
             .finalized_writes
-            .range(ShardedTxnIndex2::new(99, 20, 7)..ShardedTxnIndex2::new(99, 40, 0))
+            .range(ShardedTxnIndexV2::new(99, 20, 7)..ShardedTxnIndexV2::new(99, 40, 0))
             .copied()
             .collect::<Vec<_>>()
     );

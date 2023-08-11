@@ -474,10 +474,7 @@ impl BlockPartitioner for ShardedBlockPartitioner {
         num_shards: usize,
     ) -> PartitionedTransactions {
         assert_eq!(self.num_shards, num_shards);
-        ShardedBlockPartitioner::partition(
-            self,
-            transactions,
-        )
+        ShardedBlockPartitioner::partition(self, transactions)
     }
 }
 
