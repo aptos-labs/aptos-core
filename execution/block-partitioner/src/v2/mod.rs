@@ -145,7 +145,6 @@ impl PartitionerV2 {
 }
 
 struct WorkSession {
-    merge_discarded: bool,
     thread_pool: Arc<ThreadPool>,
     num_executor_shards: ShardId,
     txns: Vec<AnalyzedTransaction>,
@@ -160,6 +159,12 @@ struct WorkSession {
     key_idx_table: DashMap<StateKey, StorageKeyIdx>,
     trackers: DashMap<StorageKeyIdx, RwLock<ConflictingTxnTracker>>,
     min_discards_by_sender: DashMap<SenderIdx, AtomicUsize>,
+    num_rounds_limit: usize,
+    avoid_pct: u64,
+    merge_discarded: bool,
+    finalized_txn_matrix: Vec<Vec<Vec<OriginalTxnIdx>>>,
+    start_index_matrix: Vec<Vec<OriginalTxnIdx>>,
+    new_txn_idxs: Vec<RwLock<TxnIndex>>,
 }
 
 fn start_txn_idxs(pre_partitioned: &Vec<Vec<OriginalTxnIdx>>) -> Vec<OriginalTxnIdx> {
@@ -173,12 +178,14 @@ fn start_txn_idxs(pre_partitioned: &Vec<Vec<OriginalTxnIdx>>) -> Vec<OriginalTxn
 
 impl WorkSession {
     fn new(
-        merge_discarded: bool,
         thread_pool: Arc<ThreadPool>,
         dashmap_num_shards: usize,
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: ShardId,
         pre_partitioned: Vec<Vec<OriginalTxnIdx>>,
+        num_rounds_limit: usize,
+        avoid_pct: u64,
+        merge_discarded: bool,
     ) -> Self {
         let num_txns = txns.len();
         let sender_counter = AtomicUsize::new(0);
@@ -214,6 +221,11 @@ impl WorkSession {
             key_idx_table,
             trackers,
             min_discards_by_sender: DashMap::new(),
+            avoid_pct,
+            num_rounds_limit,
+            finalized_txn_matrix: vec![],
+            new_txn_idxs: vec![],
+            start_index_matrix: vec![],
         }
     }
 
@@ -464,37 +476,27 @@ impl WorkSession {
         ret
     }
 
-    fn flatten_to_rounds(
-        &mut self,
-        num_rounds_limit: usize,
-        avoid_pct: u64,
-        merge_discarded: bool,
-    ) -> (
-        Vec<Vec<Vec<OriginalTxnIdx>>>,
-        Vec<Vec<OriginalTxnIdx>>,
-        Vec<RwLock<TxnIndex>>,
-    ) {
+    fn flatten_to_rounds(&mut self) {
         let mut remaining_txns = mem::take(&mut self.pre_partitioned);
         assert_eq!(self.num_executor_shards, remaining_txns.len());
 
-        let mut accepted_txn_matrix: Vec<Vec<Vec<OriginalTxnIdx>>> = Vec::new();
         let mut num_remaining_txns = usize::MAX;
-        for round_id in 0..(num_rounds_limit - 1) {
+        for round_id in 0..(self.num_rounds_limit - 1) {
             let timer = MISC_TIMERS_SECONDS
                 .with_label_values(&[format!("multi_rounds__round_{round_id}").as_str()])
                 .start_timer();
             let (accepted, discarded) = self.discarding_round(round_id, remaining_txns);
-            accepted_txn_matrix.push(accepted);
+            self.finalized_txn_matrix.push(accepted);
             remaining_txns = discarded;
             num_remaining_txns = remaining_txns.iter().map(|ts| ts.len()).sum();
             let _duration = timer.stop_and_record();
 
-            if num_remaining_txns < avoid_pct as usize * self.num_txns() / 100 {
+            if num_remaining_txns < self.avoid_pct as usize * self.num_txns() / 100 {
                 break;
             }
         }
 
-        if merge_discarded {
+        if self.merge_discarded {
             trace!("Merging txns after discarding stopped.");
             let last_round_txns: Vec<OriginalTxnIdx> =
                 remaining_txns.into_iter().flatten().collect();
@@ -502,7 +504,7 @@ impl WorkSession {
             remaining_txns[self.num_executor_shards - 1] = last_round_txns;
         }
 
-        let last_round_id = accepted_txn_matrix.len();
+        let last_round_id = self.finalized_txn_matrix.len();
         self.thread_pool.install(|| {
             (0..self.num_executor_shards)
                 .into_par_iter()
@@ -514,11 +516,10 @@ impl WorkSession {
                         });
                 });
         });
-        accepted_txn_matrix.push(remaining_txns);
+        self.finalized_txn_matrix.push(remaining_txns);
 
-        let (start_index_matrix, finalized_indexs) =
-            self.build_new_index_tables(&accepted_txn_matrix);
-        (accepted_txn_matrix, start_index_matrix, finalized_indexs)
+        (self.start_index_matrix, self.new_txn_idxs) =
+            self.build_new_index_tables(&self.finalized_txn_matrix);
     }
 
     fn last_writer(&self, key: StorageKeyIdx, sub_block: SubBlockIdx) -> Option<OriginalTxnIdx> {
@@ -557,23 +558,15 @@ impl WorkSession {
         ret
     }
 
-    fn add_edges(
-        &mut self,
-        txn_id_matrix: &[Vec<Vec<OriginalTxnIdx>>],
-        start_index_matrix: &[Vec<OriginalTxnIdx>],
-        new_indices: &[RwLock<TxnIndex>],
-    ) -> PartitionedTransactions {
-        let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["add_edges__init"])
-            .start_timer();
+    fn add_edges(&mut self) -> PartitionedTransactions {
         let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = self.thread_pool.install(|| {
             mem::take(&mut self.txns)
                 .into_par_iter()
                 .map(|t| Mutex::new(Some(t)))
                 .collect()
         });
-        let num_rounds = txn_id_matrix.len();
-        let num_shards = txn_id_matrix.first().unwrap().len();
+        let num_rounds = self.finalized_txn_matrix.len();
+        let num_shards = self.finalized_txn_matrix.first().unwrap().len();
         let actual_sub_block_position = |round_id: usize, shard_id: usize| -> (usize, usize) {
             if self.merge_discarded {
                 if round_id == num_rounds - 1 {
@@ -598,19 +591,16 @@ impl WorkSession {
                     })
                     .collect()
             });
-        let _duration = timer.stop_and_record();
 
-        let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["add_edges__main"])
-            .start_timer();
         self.thread_pool.install(|| {
             (0..num_rounds).into_par_iter().for_each(|round_id| {
                 (0..num_shards).into_par_iter().for_each(|shard_id| {
-                    let cur_sub_block_size = txn_id_matrix[round_id][shard_id].len();
+                    let cur_sub_block_size = self.finalized_txn_matrix[round_id][shard_id].len();
                     let mut twds: Vec<TransactionWithDependencies<AnalyzedTransaction>> =
                         Vec::with_capacity(cur_sub_block_size);
                     (0..cur_sub_block_size).for_each(|pos_in_sub_block| {
-                        let ori_txn_idx = txn_id_matrix[round_id][shard_id][pos_in_sub_block];
+                        let ori_txn_idx =
+                            self.finalized_txn_matrix[round_id][shard_id][pos_in_sub_block];
                         let txn = txns[ori_txn_idx].lock().unwrap().take().unwrap();
                         let mut deps = CrossShardDependencies::default();
                         for key_idx in self.all_hints(ori_txn_idx) {
@@ -622,7 +612,9 @@ impl WorkSession {
                                 .last()
                             {
                                 let src_txn_idx = ShardedTxnIndex {
-                                    txn_index: *new_indices[txn_idx.ori_txn_idx].read().unwrap(),
+                                    txn_index: *self.new_txn_idxs[txn_idx.ori_txn_idx]
+                                        .read()
+                                        .unwrap(),
                                     shard_id: txn_idx.shard_id,
                                     round_id: txn_idx.round_id,
                                 };
@@ -657,7 +649,7 @@ impl WorkSession {
                                             follower_txn_idx.shard_id,
                                         );
                                     let dst_txn_idx = ShardedTxnIndex {
-                                        txn_index: *new_indices[follower_txn_idx.ori_txn_idx]
+                                        txn_index: *self.new_txn_idxs[follower_txn_idx.ori_txn_idx]
                                             .read()
                                             .unwrap(),
                                         shard_id: actual_shard_id,
@@ -672,16 +664,12 @@ impl WorkSession {
                         let twd = TransactionWithDependencies::new(txn, deps);
                         twds.push(twd);
                     });
-                    let sub_block = SubBlock::new(start_index_matrix[round_id][shard_id], twds);
+                    let sub_block =
+                        SubBlock::new(self.start_index_matrix[round_id][shard_id], twds);
                     *sub_block_matrix[round_id][shard_id].lock().unwrap() = Some(sub_block);
                 });
             });
         });
-        let _duration = timer.stop_and_record();
-
-        let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["add_edges__return_obj"])
-            .start_timer();
 
         let global_txns: Vec<TransactionWithDependencies<AnalyzedTransaction>> =
             if self.merge_discarded {
@@ -715,13 +703,18 @@ impl WorkSession {
             })
             .collect();
         let ret = PartitionedTransactions::new(sharded_txns, global_txns);
-        let _duration = timer.stop_and_record();
 
         self.thread_pool.spawn(move || {
             drop(sub_block_matrix);
             drop(txns);
         });
         ret
+    }
+
+    fn run(&mut self) -> PartitionedTransactions {
+        self.init();
+        self.flatten_to_rounds();
+        self.add_edges()
     }
 }
 impl BlockPartitioner for PartitionerV2 {
@@ -733,24 +726,18 @@ impl BlockPartitioner for PartitionerV2 {
         let num_txns = txns.len();
         let pre_partitioned = uniform_partition(num_txns, num_executor_shards);
         let mut session = WorkSession::new(
-            self.merge_discarded,
             self.thread_pool.clone(),
             self.dashmap_num_shards,
             txns,
             num_executor_shards,
             pre_partitioned,
+            self.num_rounds_limit,
+            self.avoid_pct,
+            self.merge_discarded,
         );
-        session.init();
-
-        let (finalized_txn_matrix, start_index_matrix, new_idxs) =
-            session.flatten_to_rounds(self.num_rounds_limit, self.avoid_pct, self.merge_discarded);
-
-        let ret = session.add_edges(&finalized_txn_matrix, &start_index_matrix, &new_idxs);
+        let ret = session.run();
         self.thread_pool.spawn(move || {
             drop(session);
-            drop(finalized_txn_matrix);
-            drop(start_index_matrix);
-            drop(new_idxs);
         });
         ret
     }
