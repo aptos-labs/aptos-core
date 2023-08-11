@@ -51,7 +51,7 @@ mod build_edge;
 pub mod config;
 mod conflicting_txn_tracker;
 mod counters;
-mod flatten;
+mod flatten_to_rounds;
 mod init;
 pub(crate) mod state;
 pub mod types;
