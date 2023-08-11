@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use super::{
-    dag_fetcher::FetchRequestHandler, reliable_broadcast::CertifiedNodeHandler,
+    dag_driver::DagDriver, dag_fetcher::FetchRequestHandler, dag_network::DAGNetworkSender,
     storage::DAGStorage, types::TDAGMessage,
 };
 use crate::{
@@ -10,6 +10,7 @@ use crate::{
         types::DAGMessage,
     },
     network::{IncomingDAGRequest, TConsensusMsg},
+    state_replication::PayloadClient,
 };
 use anyhow::bail;
 use aptos_channels::aptos_channel;
@@ -17,15 +18,18 @@ use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_logger::{error, warn};
 use aptos_network::protocols::network::RpcError;
+use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
+use aptos_time_service::TimeService;
 use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
 use bytes::Bytes;
 use futures::StreamExt;
 use std::sync::Arc;
+use tokio_retry::strategy::ExponentialBackoff;
 
 struct NetworkHandler {
     dag_rpc_rx: aptos_channel::Receiver<Author, IncomingDAGRequest>,
     node_receiver: NodeBroadcastHandler,
-    certified_node_receiver: CertifiedNodeHandler,
+    dag_driver: DagDriver,
     fetch_receiver: FetchRequestHandler,
     epoch_state: Arc<EpochState>,
 }
@@ -37,22 +41,43 @@ impl NetworkHandler {
         signer: ValidatorSigner,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
+        payload_client: Arc<dyn PayloadClient>,
+        _dag_network_sender: Arc<dyn DAGNetworkSender>,
+        rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
+        time_service: TimeService,
     ) -> Self {
+        let rb = Arc::new(ReliableBroadcast::new(
+            epoch_state.verifier.get_ordered_account_addresses().clone(),
+            rb_network_sender,
+            ExponentialBackoff::from_millis(10),
+            time_service.clone(),
+        ));
         Self {
             dag_rpc_rx,
             node_receiver: NodeBroadcastHandler::new(
                 dag.clone(),
-                signer,
+                signer.clone(),
                 epoch_state.clone(),
+                storage.clone(),
+            ),
+            dag_driver: DagDriver::new(
+                signer.author(),
+                epoch_state.clone(),
+                dag.clone(),
+                payload_client,
+                rb,
+                1,
+                time_service,
                 storage,
             ),
-            certified_node_receiver: CertifiedNodeHandler::new(dag.clone()),
             epoch_state: epoch_state.clone(),
             fetch_receiver: FetchRequestHandler::new(dag, epoch_state),
         }
     }
 
     async fn start(mut self) {
+        self.dag_driver.try_enter_new_round();
+
         // TODO(ibalajiarun): clean up Reliable Broadcast storage periodically.
         while let Some(msg) = self.dag_rpc_rx.next().await {
             if let Err(e) = self.process_rpc(msg).await {
@@ -78,7 +103,7 @@ impl NetworkHandler {
                 .map(|r| r.into()),
             DAGMessage::CertifiedNodeMsg(node) => node
                 .verify(&self.epoch_state.verifier)
-                .and_then(|_| self.certified_node_receiver.process(node))
+                .and_then(|_| self.dag_driver.process(node))
                 .map(|r| r.into()),
             DAGMessage::FetchRequest(request) => request
                 .verify(&self.epoch_state.verifier)

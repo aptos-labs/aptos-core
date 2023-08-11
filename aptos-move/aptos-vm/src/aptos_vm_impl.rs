@@ -90,25 +90,33 @@ impl AptosVMImpl {
                 let storage_gas_params =
                     StorageGasParameters::new(gas_feature_version, gas_params, &storage);
 
-                if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
-                    // Overwrite table io gas parameters with global io pricing.
-                    let g = &mut gas_params.natives.table;
-                    match gas_feature_version {
-                        0..=1 => (),
-                        2..=6 => {
+                // Overwrite table io gas parameters with global io pricing.
+                let g = &mut gas_params.natives.table;
+                match gas_feature_version {
+                    0..=1 => (),
+                    2..=6 => {
+                        if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
                             g.common_load_base_legacy = pricing.per_item_read * NumArgs::new(1);
                             g.common_load_base_new = 0.into();
                             g.common_load_per_byte = pricing.per_byte_read;
                             g.common_load_failure = 0.into();
-                        },
-                        7.. => {
+                        }
+                    }
+                    7..=9 => {
+                        if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
                             g.common_load_base_legacy = 0.into();
                             g.common_load_base_new = pricing.per_item_read * NumArgs::new(1);
                             g.common_load_per_byte = pricing.per_byte_read;
                             g.common_load_failure = 0.into();
-                        },
+                        }
                     }
-                }
+                    10.. => {
+                        g.common_load_base_legacy = 0.into();
+                        g.common_load_base_new = gas_params.vm.txn.storage_io_per_state_slot_read * NumArgs::new(1);
+                        g.common_load_per_byte = gas_params.vm.txn.storage_io_per_state_byte_read;
+                        g.common_load_failure = 0.into();
+                    }
+                };
                 Ok(storage_gas_params)
             },
             Err(err) => Err(format!("Failed to initialize storage gas params due to failure to load main gas parameters: {}", err)),

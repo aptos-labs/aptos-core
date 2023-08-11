@@ -1,5 +1,5 @@
 query getAccountTransactionsCount($address: String) {
-  move_resources_aggregate(where: { address: { _eq: $address } }, distinct_on: transaction_version) {
+  account_transactions_aggregate(where: { account_address: { _eq: $address } }) {
     aggregate {
       count
     }
