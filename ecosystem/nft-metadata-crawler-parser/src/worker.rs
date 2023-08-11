@@ -263,11 +263,14 @@ impl Worker {
         // Deduplicate token_uri
         // Proceed if force or if token_uri has not been parsed
         if self.force
-            || NFTMetadataCrawlerURIsQuery::get_by_token_uri(
-                self.token_uri.clone(),
-                &mut self.conn,
-            )?
-            .is_none()
+            || NFTMetadataCrawlerURIsQuery::get_by_token_uri(self.token_uri.clone(), &mut self.conn)
+                .map_or(true, |uri| match uri {
+                    Some(uris) => {
+                        self.model.set_cdn_json_uri(uris.cdn_json_uri);
+                        false
+                    },
+                    None => true,
+                })
         {
             // Parse token_uri
             self.model.set_token_uri(self.token_uri.clone());
