@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
+    dag_fetcher::FetchRequester,
     order_rule::OrderRule,
     storage::DAGStorage,
     types::{CertifiedAck, DAGMessage},
@@ -14,9 +15,10 @@ use crate::{
     },
     state_replication::PayloadClient,
 };
-use anyhow::bail;
+use anyhow::{bail, Ok};
 use aptos_consensus_types::common::{Author, Payload};
 use aptos_infallible::RwLock;
+use aptos_logger::error;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{block_info::Round, epoch_state::EpochState};
@@ -45,6 +47,7 @@ pub(crate) struct DagDriver {
     rb_abort_handle: Option<AbortHandle>,
     storage: Arc<dyn DAGStorage>,
     order_rule: OrderRule,
+    fetch_requester: Arc<FetchRequester>,
 }
 
 impl DagDriver {
@@ -58,6 +61,7 @@ impl DagDriver {
         time_service: TimeService,
         storage: Arc<dyn DAGStorage>,
         order_rule: OrderRule,
+        fetch_requester: Arc<FetchRequester>,
     ) -> Self {
         // TODO: rebroadcast nodes after recovery
         Self {
@@ -71,6 +75,7 @@ impl DagDriver {
             rb_abort_handle: None,
             storage,
             order_rule,
+            fetch_requester,
         }
     }
 
@@ -88,7 +93,9 @@ impl DagDriver {
         let round = node.metadata().round();
 
         if !dag_writer.all_exists(node.parents_metadata()) {
-            // TODO(ibalajiarun): implement fetching logic.
+            if let Err(err) = self.fetch_requester.request_for_certified_node(node) {
+                error!("request to fetch failed: {}", err);
+            }
             bail!(DagDriverError::MissingParents);
         }
 
