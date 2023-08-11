@@ -6,13 +6,10 @@
 #[macro_use]
 extern crate criterion;
 
+use aptos_block_partitioner::{test_utils::P2PBlockGenerator, v2::PartitionerV2, BlockPartitioner};
 use criterion::{BenchmarkId, Criterion};
-use std::thread::sleep;
-use std::time::Duration;
 use rand::thread_rng;
-use aptos_block_partitioner::BlockPartitioner;
-use aptos_block_partitioner::test_utils::P2PBlockGenerator;
-use aptos_block_partitioner::v2::PartitionerV2;
+use std::{thread::sleep, time::Duration};
 
 fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("v2");
@@ -29,7 +26,13 @@ fn bench_group(c: &mut Criterion) {
 
     let mut rng = thread_rng();
     let block_gen = P2PBlockGenerator::new(num_accounts);
-    let partitioner = PartitionerV2::new(num_threads, num_rounds_limit, avoid_pct, dashmap_num_shards, merge_discards);
+    let partitioner = PartitionerV2::new(
+        num_threads,
+        num_rounds_limit,
+        avoid_pct,
+        dashmap_num_shards,
+        merge_discards,
+    );
     group.bench_function(format!("acc={num_accounts},blk={block_size},shd={num_shards}/thr={num_threads},rnd={num_rounds_limit},avd={avoid_pct},mds={merge_discards}"), move |b| {
         b.iter_with_setup(
             || {

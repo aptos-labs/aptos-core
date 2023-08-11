@@ -33,7 +33,7 @@ use rayon::{
 use serde::{Deserialize, Serialize};
 use std::{
     cmp,
-    collections::HashSet,
+    collections::{btree_set::Range, HashSet},
     iter::Chain,
     mem,
     mem::swap,
@@ -43,7 +43,6 @@ use std::{
         Arc, Mutex, RwLock,
     },
 };
-use std::collections::btree_set::Range;
 
 pub mod config;
 mod conflicting_txn_tracker;
@@ -52,12 +51,12 @@ mod counters;
 #[derive(Clone, Copy)]
 struct SubBlockIdx {
     round_id: RoundId,
-    shard_id: ShardId
+    shard_id: ShardId,
 }
 
 impl SubBlockIdx {
     fn new(round_id: RoundId, shard_id: ShardId) -> Self {
-        SubBlockIdx {round_id, shard_id}
+        SubBlockIdx { round_id, shard_id }
     }
 }
 
@@ -222,6 +221,13 @@ impl WorkSession {
         self.txns.len()
     }
 
+    fn add_key(&self, key: &StateKey) -> StorageKeyIdx {
+        *self
+            .key_idx_table
+            .entry(key.clone())
+            .or_insert_with(|| self.key_counter.fetch_add(1, Ordering::SeqCst))
+    }
+
     fn num_keys(&self) -> usize {
         self.key_counter.load(Ordering::SeqCst)
     }
@@ -234,6 +240,13 @@ impl WorkSession {
 
     fn sender_idx(&self, txn_idx: OriginalTxnIdx) -> SenderIdx {
         *self.senders[txn_idx].read().unwrap().as_ref().unwrap()
+    }
+
+    fn add_sender(&self, sender: Sender) -> SenderIdx {
+        *self
+            .sender_idx_table
+            .entry(sender)
+            .or_insert_with(|| self.sender_counter.fetch_add(1, Ordering::SeqCst))
     }
 
     fn shard_is_currently_follower_for_key(&self, shard_id: ShardId, key: StorageKeyIdx) -> bool {
@@ -252,38 +265,12 @@ impl WorkSession {
     }
 
     fn write_hints(&self, txn_idx: OriginalTxnIdx) -> Vec<StorageKeyIdx> {
-        self.wsets[txn_idx].read().unwrap().iter().copied().collect()
-    }
-
-    fn init_by_access(
-        &self,
-        txn_idx: OriginalTxnIdx,
-        storage_location: &StorageLocation,
-        is_write: bool,
-    ) {
-        let key = storage_location.state_key().clone();
-        let key_idx = *self
-            .key_idx_table
-            .entry(key)
-            .or_insert_with(|| self.key_counter.fetch_add(1, Ordering::SeqCst));
-        if is_write {
-            self.wsets[txn_idx].write().unwrap().insert(key_idx);
-        } else {
-            self.rsets[txn_idx].write().unwrap().insert(key_idx);
-        }
-        let tracker_ref = self.trackers.entry(key_idx).or_insert_with(|| {
-            let anchor_shard_id = get_anchor_shard_id(storage_location, self.num_executor_shards);
-            RwLock::new(ConflictingTxnTracker::new(
-                storage_location.clone(),
-                anchor_shard_id,
-            ))
-        });
-        let mut tracker = tracker_ref.write().unwrap();
-        if is_write {
-            tracker.add_write_candidate(txn_idx);
-        } else {
-            tracker.add_read_candidate(txn_idx);
-        }
+        self.wsets[txn_idx]
+            .read()
+            .unwrap()
+            .iter()
+            .copied()
+            .collect()
     }
 
     fn init(&self) {
@@ -292,19 +279,35 @@ impl WorkSession {
                 .into_par_iter()
                 .for_each(|txn_idx: OriginalTxnIdx| {
                     let txn = &self.txns[txn_idx];
-                    let sender = txn.sender();
-                    let sender_idx = *self
-                        .sender_idx_table
-                        .entry(sender)
-                        .or_insert_with(|| self.sender_counter.fetch_add(1, Ordering::SeqCst));
+                    let sender_idx = self.add_sender(txn.sender());
                     *self.senders[txn_idx].write().unwrap() = Some(sender_idx);
 
-                    txn.read_hints()
-                        .iter()
-                        .for_each(|storage_loc| self.init_by_access(txn_idx, storage_loc, false));
-                    txn.write_hints()
-                        .iter()
-                        .for_each(|storage_loc| self.init_by_access(txn_idx, storage_loc, true));
+                    let reads = txn.read_hints.iter().map(|loc| (loc, false));
+                    let writes = txn.write_hints.iter().map(|loc| (loc, true));
+                    reads
+                        .chain(writes)
+                        .for_each(|(storage_location, is_write)| {
+                            let key_idx = self.add_key(storage_location.state_key());
+                            if is_write {
+                                self.wsets[txn_idx].write().unwrap().insert(key_idx);
+                            } else {
+                                self.rsets[txn_idx].write().unwrap().insert(key_idx);
+                            }
+                            let tracker_ref = self.trackers.entry(key_idx).or_insert_with(|| {
+                                let anchor_shard_id =
+                                    get_anchor_shard_id(storage_location, self.num_executor_shards);
+                                RwLock::new(ConflictingTxnTracker::new(
+                                    storage_location.clone(),
+                                    anchor_shard_id,
+                                ))
+                            });
+                            let mut tracker = tracker_ref.write().unwrap();
+                            if is_write {
+                                tracker.add_write_candidate(txn_idx);
+                            } else {
+                                tracker.add_read_candidate(txn_idx);
+                            }
+                        });
                 });
         });
     }
@@ -339,7 +342,10 @@ impl WorkSession {
             .mark_txn_ordered(ori_txn_idx, round_id, shard_id);
     }
 
-    fn build_new_index_tables(&self, accepted_txn_matrix: &Vec<Vec<Vec<OriginalTxnIdx>>>) -> (Vec<Vec<TxnIndex>>, Vec<RwLock<TxnIndex>>) {
+    fn build_new_index_tables(
+        &self,
+        accepted_txn_matrix: &Vec<Vec<Vec<OriginalTxnIdx>>>,
+    ) -> (Vec<Vec<TxnIndex>>, Vec<RwLock<TxnIndex>>) {
         let num_rounds = accepted_txn_matrix.len();
         let mut start_index_matrix: Vec<Vec<TxnIndex>> =
             vec![vec![0; self.num_executor_shards]; num_rounds];
@@ -554,7 +560,8 @@ impl WorkSession {
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["multi_rounds__new_tid_table"])
             .start_timer();
-        let (start_index_matrix, finalized_indexs) = self.build_new_index_tables(&accepted_txn_matrix);
+        let (start_index_matrix, finalized_indexs) =
+            self.build_new_index_tables(&accepted_txn_matrix);
         let _duration = timer.stop_and_record();
         (accepted_txn_matrix, start_index_matrix, finalized_indexs)
     }
@@ -564,18 +571,31 @@ impl WorkSession {
         let tracker = tracker_ref.read().unwrap();
         let start = ShardedTxnIndex2::new(sub_block.round_id, sub_block.shard_id, 0);
         let end = ShardedTxnIndex2::new(sub_block.round_id, sub_block.shard_id + 1, 0);
-        let ret = tracker.finalized_writes.range(start..end).last().map(|t|t.ori_txn_idx);
+        let ret = tracker
+            .finalized_writes
+            .range(start..end)
+            .last()
+            .map(|t| t.ori_txn_idx);
         ret
     }
 
-    fn first_writer(&self, key: StorageKeyIdx, since: ShardedTxnIndex2) -> Option<ShardedTxnIndex2> {
+    fn first_writer(
+        &self,
+        key: StorageKeyIdx,
+        since: ShardedTxnIndex2,
+    ) -> Option<ShardedTxnIndex2> {
         let tracker_ref = self.trackers.get(&key).unwrap();
         let tracker = tracker_ref.read().unwrap();
         let ret = tracker.finalized_writes.range(since..).next().copied();
         ret
     }
 
-    fn all_accepted_txns(&self, key: StorageKeyIdx, start: ShardedTxnIndex2, end: ShardedTxnIndex2) -> Vec<ShardedTxnIndex2> {
+    fn all_accepted_txns(
+        &self,
+        key: StorageKeyIdx,
+        start: ShardedTxnIndex2,
+        end: ShardedTxnIndex2,
+    ) -> Vec<ShardedTxnIndex2> {
         let tracker_ref = self.trackers.get(&key).unwrap();
         let tracker = tracker_ref.read().unwrap();
         let ret = tracker.finalized_all.range(start..end).copied().collect();
@@ -658,15 +678,26 @@ impl WorkSession {
                             }
                         }
                         for key_idx in self.write_hints(ori_txn_idx) {
-                            if  Some(ori_txn_idx) == self.last_writer(key_idx, SubBlockIdx{round_id, shard_id}) {
-                                let start_of_next_sub_block = ShardedTxnIndex2::new(round_id, shard_id + 1, 0);
-                                let next_writer = self.first_writer(key_idx, start_of_next_sub_block);
+                            if Some(ori_txn_idx)
+                                == self.last_writer(key_idx, SubBlockIdx { round_id, shard_id })
+                            {
+                                let start_of_next_sub_block =
+                                    ShardedTxnIndex2::new(round_id, shard_id + 1, 0);
+                                let next_writer =
+                                    self.first_writer(key_idx, start_of_next_sub_block);
                                 let end_follower = match next_writer {
                                     None => ShardedTxnIndex2::new(num_rounds, num_shards, 0), // Guaranteed to be greater than any invalid idx...
-                                    Some(idx) => ShardedTxnIndex2::new(idx.round_id, idx.shard_id + 1, 0),
+                                    Some(idx) => {
+                                        ShardedTxnIndex2::new(idx.round_id, idx.shard_id + 1, 0)
+                                    },
                                 };
-                                for follower_txn_idx in self.all_accepted_txns(key_idx, start_of_next_sub_block, end_follower) {
-                                    let (actual_round_id, actual_shard_id) = actual_sub_block_position(
+                                for follower_txn_idx in self.all_accepted_txns(
+                                    key_idx,
+                                    start_of_next_sub_block,
+                                    end_follower,
+                                ) {
+                                    let (actual_round_id, actual_shard_id) =
+                                        actual_sub_block_position(
                                             follower_txn_idx.round_id,
                                             follower_txn_idx.shard_id,
                                         );
@@ -677,7 +708,9 @@ impl WorkSession {
                                         shard_id: actual_shard_id,
                                         round_id: actual_round_id,
                                     };
-                                    deps.add_dependent_edge(dst_txn_idx, vec![self.storage_location(key_idx)]);
+                                    deps.add_dependent_edge(dst_txn_idx, vec![
+                                        self.storage_location(key_idx)
+                                    ]);
                                 }
                             }
                         }
