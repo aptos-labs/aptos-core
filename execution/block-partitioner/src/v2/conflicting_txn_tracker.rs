@@ -60,11 +60,7 @@ impl ConflictingTxnTracker {
         round_id: RoundId,
         shard_id: ShardId,
     ) {
-        let sharded_txn_idx = ShardedTxnIndex2 {
-            round_id,
-            shard_id,
-            ori_txn_idx: txn_id,
-        };
+        let sharded_txn_idx = ShardedTxnIndex2::new(round_id, shard_id,txn_id);
         if self.pending_writes.remove(&txn_id) {
             self.finalized_writes.insert(sharded_txn_idx);
         } else {
