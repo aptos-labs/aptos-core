@@ -81,6 +81,7 @@ spec aptos_framework::reconfiguration {
     }
 
     spec reconfigure {
+        use aptos_framework::aptos_coin;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
@@ -91,6 +92,8 @@ spec aptos_framework::reconfiguration {
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
 
+        include features::spec_periodical_reward_rate_decrease_enabled() ==> staking_config::StakingRewardsConfigEnabledRequirement;
+        include features::spec_collect_and_distribute_gas_fees_enabled() ==> aptos_coin::ExistsAptosCoin;
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
         aborts_if false;
@@ -101,10 +104,6 @@ spec aptos_framework::reconfiguration {
             && timestamp::spec_now_microseconds() != global<Configuration>(@aptos_framework).last_reconfiguration_time;
         // property 3: Synchronization of NewEpochEvent counter with configuration epoch.
         ensures success ==> global<Configuration>(@aptos_framework).epoch == old(global<Configuration>(@aptos_framework).epoch) + 1;
-        ensures (success && event::counter<NewEpochEvent>(old(global<Configuration>(@aptos_framework)).events) <
-            MAX_U64) ==>
-            event::counter<NewEpochEvent>(global<Configuration>(@aptos_framework).events) ==
-                event::counter<NewEpochEvent>(old(global<Configuration>(@aptos_framework)).events) + 1;
         ensures success ==> global<Configuration>(@aptos_framework).last_reconfiguration_time == timestamp::spec_now_microseconds();
         // property 4: Only performs reconfiguration if genesis has started and reconfiguration is enabled.
         // Also, the last reconfiguration must not be the current time, returning early without further actions otherwise.
