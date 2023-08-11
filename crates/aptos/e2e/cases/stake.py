@@ -356,3 +356,63 @@ def test_stake_withdraw_stake_after_unlock(run_helper: RunHelper, test_name=None
         raise TestError(
             f"The stake should be decreased by {amount_to_withdraw}. Expected {current_stake - amount_to_withdraw}, got {result[0].get('total_stake')}"
         )
+
+
+@test_case
+def test_stake_request_commisson(run_helper: RunHelper, test_name=None):
+    # create a new account
+    run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "init",
+            "--profile",
+            "request_comisson",
+            "--assume-yes",
+            "--network",
+            "local",
+        ],
+        input="\n",
+    )
+
+    # create staking contract
+    run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "stake",
+            "create-staking-contract",
+            "--profile",
+            "request_comisson",
+            "--operator",
+            "request_comisson",
+            "--voter",
+            "request_comisson",
+            "--amount",
+            "3",
+            "--commission-percentage",
+            "1",
+            "--assume-yes",
+        ],
+    )
+
+    # run the request-commission command
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "stake",
+            "request-commission",
+            "--profile",
+            "request_comisson",
+            "--owner-address",
+            "request_comisson",
+            "--operator-address",
+            "request_comisson",
+            "--assume-yes",
+        ],
+    )
+
+    result = json.loads(response.stdout)["Result"]
+    if result.get("success") != True:
+        raise TestError("Did not execute [request-commission] successfully")
