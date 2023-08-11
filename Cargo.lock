@@ -547,6 +547,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "clap 4.3.5",
+ "criterion",
  "dashmap",
  "itertools",
  "jemallocator",
