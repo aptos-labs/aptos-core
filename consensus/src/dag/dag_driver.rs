@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
+    order_rule::OrderRule,
     storage::DAGStorage,
     types::{CertifiedAck, DAGMessage},
     RpcHandler,
@@ -43,6 +44,7 @@ pub(crate) struct DagDriver {
     time_service: TimeService,
     rb_abort_handle: Option<AbortHandle>,
     storage: Arc<dyn DAGStorage>,
+    order_rule: OrderRule,
 }
 
 impl DagDriver {
@@ -55,6 +57,7 @@ impl DagDriver {
         current_round: Round,
         time_service: TimeService,
         storage: Arc<dyn DAGStorage>,
+        order_rule: OrderRule,
     ) -> Self {
         // TODO: rebroadcast nodes after recovery
         Self {
@@ -67,6 +70,7 @@ impl DagDriver {
             time_service,
             rb_abort_handle: None,
             storage,
+            order_rule,
         }
     }
 
@@ -149,11 +153,13 @@ impl RpcHandler for DagDriver {
         {
             let dag_reader = self.dag.read();
             if dag_reader.exists(node.metadata()) {
-                return Ok(CertifiedAck::new(node.metadata().epoch()));
+                return Ok(CertifiedAck::new(epoch));
             }
         }
 
-        self.add_node(node)?;
+        let node_metadata = node.metadata().clone();
+        self.add_node(node)
+            .map(|_| self.order_rule.process_new_node(&node_metadata))?;
 
         Ok(CertifiedAck::new(epoch))
     }

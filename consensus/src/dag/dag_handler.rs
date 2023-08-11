@@ -2,7 +2,7 @@
 
 use super::{
     dag_driver::DagDriver, dag_fetcher::FetchRequestHandler, dag_network::DAGNetworkSender,
-    storage::DAGStorage, types::TDAGMessage,
+    order_rule::OrderRule, storage::DAGStorage, types::TDAGMessage,
 };
 use crate::{
     dag::{
@@ -45,6 +45,7 @@ impl NetworkHandler {
         _dag_network_sender: Arc<dyn DAGNetworkSender>,
         rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
         time_service: TimeService,
+        order_rule: OrderRule,
     ) -> Self {
         let rb = Arc::new(ReliableBroadcast::new(
             epoch_state.verifier.get_ordered_account_addresses().clone(),
@@ -69,6 +70,7 @@ impl NetworkHandler {
                 1,
                 time_service,
                 storage,
+                order_rule,
             ),
             epoch_state: epoch_state.clone(),
             fetch_receiver: FetchRequestHandler::new(dag, epoch_state),
