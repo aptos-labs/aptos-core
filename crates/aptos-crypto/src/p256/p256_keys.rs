@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! This file implements traits for Ed25519 private keys and public keys.
+//! This file implements traits for P256 private keys and public keys.
 
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::test_utils::{self, KeyPair};
