@@ -41,7 +41,7 @@ impl Default for BenchmarkConfig {
             enable_rpc_testing: true,
             rpc_data_size: 100_000,
             rpc_per_second: 1_000,
-            rpc_in_flight: 8,
+            rpc_in_flight: 16,
         }
     }
 }
