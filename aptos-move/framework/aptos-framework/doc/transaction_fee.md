@@ -8,6 +8,7 @@ This module provides an interface to burn or collect and redistribute transactio
 
 -  [Resource `AptosCoinCapabilities`](#0x1_transaction_fee_AptosCoinCapabilities)
 -  [Resource `CollectedFeesPerBlock`](#0x1_transaction_fee_CollectedFeesPerBlock)
+-  [Struct `FeeStatement`](#0x1_transaction_fee_FeeStatement)
 -  [Constants](#@Constants_0)
 -  [Function `initialize_fee_collection_and_distribution`](#0x1_transaction_fee_initialize_fee_collection_and_distribution)
 -  [Function `is_fees_collection_enabled`](#0x1_transaction_fee_is_fees_collection_enabled)
@@ -18,6 +19,7 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Function `burn_fee`](#0x1_transaction_fee_burn_fee)
 -  [Function `collect_fee`](#0x1_transaction_fee_collect_fee)
 -  [Function `store_aptos_coin_burn_cap`](#0x1_transaction_fee_store_aptos_coin_burn_cap)
+-  [Function `emit_fee_statement`](#0x1_transaction_fee_emit_fee_statement)
 -  [Specification](#@Specification_1)
     -  [Resource `CollectedFeesPerBlock`](#@Specification_1_CollectedFeesPerBlock)
     -  [Function `initialize_fee_collection_and_distribution`](#@Specification_1_initialize_fee_collection_and_distribution)
@@ -33,6 +35,7 @@ This module provides an interface to burn or collect and redistribute transactio
 <pre><code><b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
@@ -103,6 +106,61 @@ collected when executing the block.
 </dt>
 <dd>
 
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_transaction_fee_FeeStatement"></a>
+
+## Struct `FeeStatement`
+
+Summary of the fees charged and refunds issued for a transaction.
+
+This is meant to emitted as a module event.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">FeeStatement</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>total_charge_gas_units: u64</code>
+</dt>
+<dd>
+ Total gas charge.
+</dd>
+<dt>
+<code>execution_gas_units: u64</code>
+</dt>
+<dd>
+ Execution gas charge.
+</dd>
+<dt>
+<code>io_gas_units: u64</code>
+</dt>
+<dd>
+ IO gas charge.
+</dd>
+<dt>
+<code>storage_fee_octas: u64</code>
+</dt>
+<dd>
+ Storage fee charge.
+</dd>
+<dt>
+<code>storage_fee_refund_octas: u64</code>
+</dt>
+<dd>
+ Storage fee refund.
 </dd>
 </dl>
 
@@ -456,6 +514,30 @@ Only called during genesis.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">store_aptos_coin_burn_cap</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, burn_cap: BurnCapability&lt;AptosCoin&gt;) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>move_to</b>(aptos_framework, <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> { burn_cap })
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_transaction_fee_emit_fee_statement"></a>
+
+## Function `emit_fee_statement`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_emit_fee_statement">emit_fee_statement</a>(fee_statement: <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">transaction_fee::FeeStatement</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_emit_fee_statement">emit_fee_statement</a>(fee_statement: <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">FeeStatement</a>) {
+    <a href="event.md#0x1_event_emit">event::emit</a>(fee_statement)
 }
 </code></pre>
 

@@ -6,7 +6,10 @@ use crate::{
     access_path_cache::AccessPathCache,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionExt, SessionId},
-    system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
+    system_module_names::{
+        EMIT_FEE_STATEMENT, MULTISIG_ACCOUNT_MODULE, TRANSACTION_FEE_MODULE,
+        VALIDATE_MULTISIG_TRANSACTION,
+    },
     transaction_metadata::TransactionMetadata,
     transaction_validation::APTOS_TRANSACTION_VALIDATION,
 };
@@ -503,6 +506,7 @@ impl AptosVMImpl {
         &self,
         session: &mut SessionExt,
         gas_remaining: Gas,
+        fee_statement: FeeStatement,
         txn_data: &TransactionMetadata,
     ) -> VMResult<()> {
         let txn_gas_price = txn_data.gas_unit_price();
@@ -544,7 +548,30 @@ impl AptosVMImpl {
             )
         }
         .map(|_return_vals| ())
-        .map_err(expect_no_verification_errors)
+        .map_err(expect_no_verification_errors)?;
+
+        // Emit the FeeStatement event
+        if self.features.is_emit_fee_statement_enabled() {
+            self.emit_fee_statement(session, fee_statement)?;
+        }
+
+        Ok(())
+    }
+
+    fn emit_fee_statement(
+        &self,
+        session: &mut SessionExt,
+        fee_statement: FeeStatement,
+    ) -> VMResult<()> {
+        session
+            .execute_function_bypass_visibility(
+                &TRANSACTION_FEE_MODULE,
+                EMIT_FEE_STATEMENT,
+                vec![],
+                vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
+                &mut UnmeteredGasMeter,
+            )
+            .map(|_return_vals| ())
     }
 
     /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
@@ -553,6 +580,7 @@ impl AptosVMImpl {
         &self,
         session: &mut SessionExt,
         gas_remaining: Gas,
+        fee_statement: FeeStatement,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -563,7 +591,7 @@ impl AptosVMImpl {
             ))
         });
 
-        self.run_epilogue(session, gas_remaining, txn_data)
+        self.run_epilogue(session, gas_remaining, fee_statement, txn_data)
             .or_else(|err| convert_epilogue_error(err, log_context))
     }
 
@@ -573,10 +601,11 @@ impl AptosVMImpl {
         &self,
         session: &mut SessionExt,
         gas_remaining: Gas,
+        fee_statement: FeeStatement,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        self.run_epilogue(session, gas_remaining, txn_data)
+        self.run_epilogue(session, gas_remaining, fee_statement, txn_data)
             .or_else(|e| {
                 expect_only_successful_execution(
                     e,

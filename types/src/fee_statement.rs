@@ -3,9 +3,18 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+/// Breakdown of fee charge and refund for a transaction.
+/// The structure is:
+///
+/// - Net charge or refund (not in the statement)
+///   - total charge: total_charge_gas_units, matches `gas_used` in the on-chain `TransactionInfo`.
+///     - gas charge for execution (CPU time): execution_gas_units
+///     - gas charge for IO (storage random access): io_gas_units
+///     - storage fee charge (storage space): storage_fee_octas, when included in total_charge, this number is converted to gas units according to the user specified gas unit price.
+///   - storage deletion refund: storage_fee_refund_octas, this is not included in `gas_used` or `total_charge_gas_units`, the net charge / refund is calculated by total_charge_gas_units * gas_unit_price - storage_fee_refund_octas.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FeeStatement {
-    /// Total gas charge.
+    /// Total gas charge, not including
     total_charge_gas_units: u64,
     /// Execution gas charge.
     execution_gas_units: u64,
@@ -44,16 +53,6 @@ impl FeeStatement {
         }
     }
 
-    pub fn new_from_fee_statement(fee_statement: &FeeStatement) -> Self {
-        Self {
-            total_charge_gas_units: fee_statement.total_charge_gas_units,
-            execution_gas_units: fee_statement.execution_gas_units,
-            io_gas_units: fee_statement.io_gas_units,
-            storage_fee_octas: fee_statement.storage_fee_octas,
-            storage_fee_refund_octas: fee_statement.storage_fee_refund_octas,
-        }
-    }
-
     pub fn gas_used(&self) -> u64 {
         self.total_charge_gas_units
     }
@@ -80,9 +79,5 @@ impl FeeStatement {
         self.io_gas_units += other.io_gas_units;
         self.storage_fee_octas += other.storage_fee_octas;
         self.storage_fee_refund_octas += other.storage_fee_refund_octas;
-    }
-
-    pub fn fee_statement(&self) -> FeeStatement {
-        self.clone()
     }
 }
