@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::graph::{NodeIndex, WeightedUndirectedGraph};
-use crate::graph_partitioner::GraphPartitioner;
+use crate::graph_partitioner::{GraphPartitioner, PartitionId};
 use nonmax::NonMaxUsize;
 use rand::seq::SliceRandom;
 
@@ -71,8 +71,7 @@ impl FennelGraphPartitioner {
     fn alpha(gamma: f64, total_edge_weight: f64) -> usize {
         // See: page 4 of the Fennel paper.
         // This formula is generalized for weighted graphs.
-        let alpha = 1. / (gamma - 1.);
-        alpha.ceil() as usize
+        todo!()
     }
 
     fn partition_impl<G>(
@@ -80,7 +79,7 @@ impl FennelGraphPartitioner {
         nodes: impl IntoIterator<Item = NodeIndex>,
         graph: &G,
         n_partitions: usize,
-    ) -> Vec<usize>
+    ) -> anyhow::Result<Vec<PartitionId>>
     where
         G: WeightedUndirectedGraph,
         G::NodeWeight: Into<f64>,
@@ -122,8 +121,9 @@ impl FennelGraphPartitioner {
                     let old_load = old_load as f64;
                     delta_e - alpha * ((old_load + 1.).powf(gamma) - old_load.powf(gamma))
                 })
-                .position_max_by(|x, y| x.partial_cmp(y).unwrap())
-                .unwrap();
+                .position_max_by(|x, y| x.partial_cmp(y).unwrap());
+
+            // TODO: match choice
 
             partition[node] = Some(NonMaxUsize::new(choice).unwrap());
             load[choice] += 1;
@@ -140,7 +140,12 @@ where
     G::NodeWeight: Into<f64>,
     G::EdgeWeight: Into<f64>,
 {
-    fn partition(&self, graph: &G, n_partitions: usize) -> Vec<usize> {
+    type Error = anyhow::Error;
+
+    fn partition(&self, graph: &G, n_partitions: usize) -> anyhow::Result<Vec<PartitionId>> {
+        assert!(self.gamma > 1.);
+        assert!(self.balance_constraint >= 0.);
+
         match self.stream_order {
             StreamOrder::Random => {
                 let mut nodes: Vec<NodeIndex> = graph.nodes().collect();

@@ -2,7 +2,7 @@
 
 // In stable Rust, there are no good ways to implement "number" traits.
 // Hence, NodeIndex is a fixed type alias and not a generic parameter or an associated type.
-pub type NodeIndex = usize;
+pub type NodeIndex = u32;
 
 /// A simple trait for an undirected graph.
 pub trait UndirectedGraph {
@@ -24,7 +24,7 @@ pub trait UndirectedGraph {
     /// A convenience function that returns the range of node indices.
     /// Must be equivalent to 0..self.node_count().
     fn nodes(&self) -> std::ops::Range<NodeIndex> {
-        0..self.node_count()
+        0..self.node_count() as NodeIndex
     }
 }
 
@@ -101,19 +101,20 @@ impl<G> WeightedNodes for TriviallyWeightedGraph<G>
 where
     G: UndirectedGraph,
 {
-    type NodeWeight = usize;
-    type WeightedNodesIter = std::iter::Map<std::ops::Range<usize>, fn(NodeIndex) -> (NodeIndex, usize)>;
+    type NodeWeight = NodeIndex;
+    type WeightedNodesIter =
+        std::iter::Map<std::ops::Range<NodeIndex>, fn(NodeIndex) -> (NodeIndex, Self::NodeWeight)>;
 
     fn node_weight(&self) -> Self::NodeWeight {
         1
     }
 
     fn total_node_weight(&self) -> Self::NodeWeight {
-        self.node_count()
+        self.node_count() as Self::NodeWeight
     }
 
     fn weighted_nodes(&self) -> Self::WeightedNodesIter {
-        self.graph.nodes().map(|node| (node, 1))
+        self.graph.nodes().map(|node| (node, 1 as Self::NodeWeight))
     }
 }
 
@@ -122,7 +123,8 @@ where
     G: UndirectedGraph,
 {
     type EdgeWeight = usize;
-    type WeightedNeighboursIter = std::iter::Map<G::NeighboursIter, fn(NodeIndex) -> (NodeIndex, usize)>;
+    type WeightedNeighboursIter =
+        std::iter::Map<G::NeighboursIter, fn(NodeIndex) -> (NodeIndex, usize)>;
 
     fn total_edge_weight(&self) -> Self::EdgeWeight {
         self.edge_count()
