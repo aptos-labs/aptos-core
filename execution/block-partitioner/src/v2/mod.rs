@@ -6,7 +6,7 @@ use crate::test_utils::assert_deterministic_result;
 use crate::test_utils::P2PBlockGenerator;
 use crate::{
     get_anchor_shard_id,
-    pre_partition::{uniform, uniform::UniformPartitioner, PrePartitioner},
+    pre_partition::{start_txn_idxs, uniform, uniform::UniformPartitioner, PrePartitioner},
     v2::{conflicting_txn_tracker::ConflictingTxnTracker, counters::MISC_TIMERS_SECONDS},
     BlockPartitioner, Sender,
 };
@@ -89,7 +89,79 @@ impl PartitionerV2 {
     }
 }
 
-struct WorkSession {
+mod build_edge;
+mod flatten;
+mod init;
+
+impl BlockPartitioner for PartitionerV2 {
+    fn partition(
+        &self,
+        txns: Vec<AnalyzedTransaction>,
+        num_executor_shards: usize,
+    ) -> PartitionedTransactions {
+        let pre_partitioned = self
+            .pre_partitioner
+            .pre_partition(txns.as_slice(), num_executor_shards);
+
+        let mut session = PartitionState::new(
+            self.thread_pool.clone(),
+            self.dashmap_num_shards,
+            txns,
+            num_executor_shards,
+            pre_partitioned,
+            self.num_rounds_limit,
+            self.avoid_pct,
+            self.merge_discarded,
+        );
+        Self::init(&mut session);
+        Self::flatten_to_rounds(&mut session);
+        let ret = Self::add_edges(&mut session);
+
+        self.thread_pool.spawn(move || {
+            drop(session);
+        });
+        ret
+    }
+}
+
+#[test]
+fn test_partitioner_v2_correctness() {
+    for merge_discarded in [false, true] {
+        let block_generator = P2PBlockGenerator::new(100);
+        let partitioner = PartitionerV2::new(8, 4, 10, 64, merge_discarded);
+        let mut rng = thread_rng();
+        for _run_id in 0..20 {
+            let block_size = 10_u64.pow(rng.gen_range(0, 4)) as usize;
+            let num_shards = rng.gen_range(1, 10);
+            let block = block_generator.rand_block(&mut rng, block_size);
+            let block_clone = block.clone();
+            let partitioned = partitioner.partition(block, num_shards);
+            crate::test_utils::verify_partitioner_output(&block_clone, &partitioned);
+        }
+    }
+}
+
+#[test]
+fn test_partitioner_v2_determinism() {
+    for merge_discarded in [false, true] {
+        let partitioner = Arc::new(PartitionerV2::new(4, 4, 10, 64, merge_discarded));
+        assert_deterministic_result(partitioner);
+    }
+}
+
+fn extract_and_sort(arr_2d: Vec<RwLock<Vec<usize>>>) -> Vec<Vec<usize>> {
+    arr_2d
+        .into_iter()
+        .map(|arr_1d| {
+            let mut arr_1d_guard = arr_1d.write().unwrap();
+            let mut arr_1d_value = std::mem::take(&mut *arr_1d_guard);
+            arr_1d_value.sort();
+            arr_1d_value
+        })
+        .collect::<Vec<_>>()
+}
+
+pub struct PartitionState {
     thread_pool: Arc<ThreadPool>,
     num_executor_shards: ShardId,
     txns: Vec<RwLock<Option<AnalyzedTransaction>>>,
@@ -112,17 +184,8 @@ struct WorkSession {
     new_txn_idxs: Vec<RwLock<TxnIndex>>,
 }
 
-fn start_txn_idxs(pre_partitioned: &Vec<Vec<OriginalTxnIdx>>) -> Vec<OriginalTxnIdx> {
-    let num_shards = pre_partitioned.len();
-    let mut ret: Vec<OriginalTxnIdx> = vec![0; num_shards];
-    for shard_id in 1..num_shards {
-        ret[shard_id] = ret[shard_id - 1] + pre_partitioned[shard_id - 1].len();
-    }
-    ret
-}
-
-impl WorkSession {
-    fn new(
+impl PartitionState {
+    pub fn new(
         thread_pool: Arc<ThreadPool>,
         dashmap_num_shards: usize,
         txns: Vec<AnalyzedTransaction>,
@@ -235,46 +298,6 @@ impl WorkSession {
             .collect()
     }
 
-    fn build_index(&self) {
-        self.thread_pool.install(|| {
-            (0..self.num_txns())
-                .into_par_iter()
-                .for_each(|txn_idx: OriginalTxnIdx| {
-                    let txn_ref = self.txns[txn_idx].read().unwrap();
-                    let txn = txn_ref.as_ref().unwrap();
-                    let sender_idx = self.add_sender(txn.sender());
-                    *self.senders[txn_idx].write().unwrap() = Some(sender_idx);
-
-                    let reads = txn.read_hints.iter().map(|loc| (loc, false));
-                    let writes = txn.write_hints.iter().map(|loc| (loc, true));
-                    reads
-                        .chain(writes)
-                        .for_each(|(storage_location, is_write)| {
-                            let key_idx = self.add_key(storage_location.state_key());
-                            if is_write {
-                                self.wsets[txn_idx].write().unwrap().insert(key_idx);
-                            } else {
-                                self.rsets[txn_idx].write().unwrap().insert(key_idx);
-                            }
-                            let tracker_ref = self.trackers.entry(key_idx).or_insert_with(|| {
-                                let anchor_shard_id =
-                                    get_anchor_shard_id(storage_location, self.num_executor_shards);
-                                RwLock::new(ConflictingTxnTracker::new(
-                                    storage_location.clone(),
-                                    anchor_shard_id,
-                                ))
-                            });
-                            let mut tracker = tracker_ref.write().unwrap();
-                            if is_write {
-                                tracker.add_write_candidate(txn_idx);
-                            } else {
-                                tracker.add_read_candidate(txn_idx);
-                            }
-                        });
-                });
-        });
-    }
-
     fn min_discard(&self, sender: SenderIdx) -> Option<OriginalTxnIdx> {
         self.min_discards_by_sender
             .get(&sender)
@@ -345,134 +368,6 @@ impl WorkSession {
         (start_index_matrix, finalized_indexs)
     }
 
-    /// Given some pre-partitioned txns, pull some off from each shard to avoid cross-shard conflict.
-    /// The pulled off txns become the pre-partitioned txns for the next round.
-    fn discarding_round(
-        &mut self,
-        round_id: RoundId,
-        remaining_txns: Vec<Vec<OriginalTxnIdx>>,
-    ) -> (Vec<Vec<OriginalTxnIdx>>, Vec<Vec<OriginalTxnIdx>>) {
-        let timer = MISC_TIMERS_SECONDS
-            .with_label_values(&[format!("multi_rounds__round_{round_id}__init").as_str()])
-            .start_timer();
-        let num_shards = remaining_txns.len();
-        let mut discarded: Vec<RwLock<Vec<OriginalTxnIdx>>> = Vec::with_capacity(num_shards);
-        let mut potentially_accepted: Vec<RwLock<Vec<OriginalTxnIdx>>> =
-            Vec::with_capacity(num_shards);
-        let mut finally_accepted: Vec<RwLock<Vec<OriginalTxnIdx>>> = Vec::with_capacity(num_shards);
-        for txns in remaining_txns.iter() {
-            potentially_accepted.push(RwLock::new(Vec::with_capacity(txns.len())));
-            finally_accepted.push(RwLock::new(Vec::with_capacity(txns.len())));
-            discarded.push(RwLock::new(Vec::with_capacity(txns.len())));
-        }
-
-        self.min_discards_by_sender = DashMap::new();
-        let _duration = timer.stop_and_record();
-
-        self.thread_pool.install(|| {
-            (0..self.num_executor_shards)
-                .into_par_iter()
-                .for_each(|shard_id| {
-                    remaining_txns[shard_id].par_iter().for_each(|&txn_idx| {
-                        let in_round_conflict_detected =
-                            self.all_hints(txn_idx).iter().any(|&key_idx| {
-                                self.shard_is_currently_follower_for_key(shard_id, key_idx)
-                            });
-                        if in_round_conflict_detected {
-                            let sender = self.sender_idx(txn_idx);
-                            self.update_min_discarded_txn_idx(sender, txn_idx);
-                            discarded[shard_id].write().unwrap().push(txn_idx);
-                        } else {
-                            potentially_accepted[shard_id]
-                                .write()
-                                .unwrap()
-                                .push(txn_idx);
-                        }
-                    });
-                });
-        });
-
-        self.thread_pool.install(|| {
-            (0..num_shards).into_par_iter().for_each(|shard_id| {
-                potentially_accepted[shard_id]
-                    .read()
-                    .unwrap()
-                    .par_iter()
-                    .for_each(|&ori_txn_idx| {
-                        let sender_idx = self.sender_idx(ori_txn_idx);
-                        if ori_txn_idx < self.min_discard(sender_idx).unwrap_or(OriginalTxnIdx::MAX)
-                        {
-                            self.update_trackers_on_accepting(ori_txn_idx, round_id, shard_id);
-                            finally_accepted[shard_id]
-                                .write()
-                                .unwrap()
-                                .push(ori_txn_idx);
-                        } else {
-                            discarded[shard_id].write().unwrap().push(ori_txn_idx);
-                        }
-                    });
-            });
-        });
-
-        let ret = (
-            extract_and_sort(finally_accepted),
-            extract_and_sort(discarded),
-        );
-        let min_discards_by_sender = mem::take(&mut self.min_discards_by_sender);
-        self.thread_pool.spawn(move || {
-            drop(remaining_txns);
-            drop(potentially_accepted);
-            drop(min_discards_by_sender);
-        });
-        ret
-    }
-
-    fn flatten_to_rounds(&mut self) {
-        let mut remaining_txns = mem::take(&mut self.pre_partitioned);
-        assert_eq!(self.num_executor_shards, remaining_txns.len());
-
-        let mut num_remaining_txns = usize::MAX;
-        for round_id in 0..(self.num_rounds_limit - 1) {
-            let timer = MISC_TIMERS_SECONDS
-                .with_label_values(&[format!("multi_rounds__round_{round_id}").as_str()])
-                .start_timer();
-            let (accepted, discarded) = self.discarding_round(round_id, remaining_txns);
-            self.finalized_txn_matrix.push(accepted);
-            remaining_txns = discarded;
-            num_remaining_txns = remaining_txns.iter().map(|ts| ts.len()).sum();
-            let _duration = timer.stop_and_record();
-
-            if num_remaining_txns < self.avoid_pct as usize * self.num_txns() / 100 {
-                break;
-            }
-        }
-
-        if self.merge_discarded {
-            trace!("Merging txns after discarding stopped.");
-            let last_round_txns: Vec<OriginalTxnIdx> =
-                remaining_txns.into_iter().flatten().collect();
-            remaining_txns = vec![vec![]; self.num_executor_shards];
-            remaining_txns[self.num_executor_shards - 1] = last_round_txns;
-        }
-
-        let last_round_id = self.finalized_txn_matrix.len();
-        self.thread_pool.install(|| {
-            (0..self.num_executor_shards)
-                .into_par_iter()
-                .for_each(|shard_id| {
-                    remaining_txns[shard_id]
-                        .par_iter()
-                        .for_each(|&ori_txn_idx| {
-                            self.update_trackers_on_accepting(ori_txn_idx, last_round_id, shard_id);
-                        });
-                });
-        });
-        self.finalized_txn_matrix.push(remaining_txns);
-
-        (self.start_index_matrix, self.new_txn_idxs) =
-            self.build_new_index_tables(&self.finalized_txn_matrix);
-    }
-
     fn last_writer(&self, key: StorageKeyIdx, sub_block: SubBlockIdx) -> Option<OriginalTxnIdx> {
         let tracker_ref = self.trackers.get(&key).unwrap();
         let tracker = tracker_ref.read().unwrap();
@@ -525,79 +420,6 @@ impl WorkSession {
         }
     }
 
-    fn add_edges(&mut self) -> PartitionedTransactions {
-        let mut sub_block_matrix: Vec<Vec<Mutex<Option<SubBlock<AnalyzedTransaction>>>>> =
-            self.thread_pool.install(|| {
-                (0..self.num_rounds())
-                    .into_par_iter()
-                    .map(|_round_id| {
-                        (0..self.num_executor_shards)
-                            .into_par_iter()
-                            .map(|_shard_id| Mutex::new(None))
-                            .collect()
-                    })
-                    .collect()
-            });
-
-        self.thread_pool.install(|| {
-            (0..self.num_rounds()).into_par_iter().for_each(|round_id| {
-                (0..self.num_executor_shards)
-                    .into_par_iter()
-                    .for_each(|shard_id| {
-                        let twds: Vec<TransactionWithDependencies<AnalyzedTransaction>> = self
-                            .finalized_txn_matrix[round_id][shard_id]
-                            .par_iter()
-                            .map(|&ori_txn_idx| {
-                                self.make_txn_with_dep(round_id, shard_id, ori_txn_idx)
-                            })
-                            .collect();
-                        let sub_block =
-                            SubBlock::new(self.start_index_matrix[round_id][shard_id], twds);
-                        *sub_block_matrix[round_id][shard_id].lock().unwrap() = Some(sub_block);
-                    });
-            });
-        });
-
-        let global_txns: Vec<TransactionWithDependencies<AnalyzedTransaction>> =
-            if self.merge_discarded {
-                sub_block_matrix
-                    .pop()
-                    .unwrap()
-                    .last()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
-                    .take()
-                    .unwrap()
-                    .into_transactions_with_deps()
-            } else {
-                vec![]
-            };
-
-        let num_rounds = sub_block_matrix.len();
-        let sharded_txns: Vec<SubBlocksForShard<AnalyzedTransaction>> = (0..self
-            .num_executor_shards)
-            .map(|shard_id| {
-                let sub_blocks: Vec<SubBlock<AnalyzedTransaction>> = (0..num_rounds)
-                    .map(|round_id| {
-                        sub_block_matrix[round_id][shard_id]
-                            .lock()
-                            .unwrap()
-                            .take()
-                            .unwrap()
-                    })
-                    .collect();
-                SubBlocksForShard::new(shard_id, sub_blocks)
-            })
-            .collect();
-        let ret = PartitionedTransactions::new(sharded_txns, global_txns);
-
-        self.thread_pool.spawn(move || {
-            drop(sub_block_matrix);
-        });
-        ret
-    }
-
     fn make_txn_with_dep(
         &self,
         round_id: RoundId,
@@ -648,75 +470,4 @@ impl WorkSession {
         }
         TransactionWithDependencies::new(txn, deps)
     }
-
-    fn run(&mut self) -> PartitionedTransactions {
-        self.build_index();
-        self.flatten_to_rounds();
-        self.add_edges()
-    }
-}
-
-impl BlockPartitioner for PartitionerV2 {
-    fn partition(
-        &self,
-        txns: Vec<AnalyzedTransaction>,
-        num_executor_shards: usize,
-    ) -> PartitionedTransactions {
-        let num_txns = txns.len();
-        let pre_partitioned = self
-            .pre_partitioner
-            .pre_partition(txns.as_slice(), num_executor_shards);
-        let mut session = WorkSession::new(
-            self.thread_pool.clone(),
-            self.dashmap_num_shards,
-            txns,
-            num_executor_shards,
-            pre_partitioned,
-            self.num_rounds_limit,
-            self.avoid_pct,
-            self.merge_discarded,
-        );
-        let ret = session.run();
-        self.thread_pool.spawn(move || {
-            drop(session);
-        });
-        ret
-    }
-}
-
-#[test]
-fn test_partitioner_v2_correctness() {
-    for merge_discarded in [false, true] {
-        let block_generator = P2PBlockGenerator::new(100);
-        let partitioner = PartitionerV2::new(8, 4, 10, 64, merge_discarded);
-        let mut rng = thread_rng();
-        for _run_id in 0..20 {
-            let block_size = 10_u64.pow(rng.gen_range(0, 4)) as usize;
-            let num_shards = rng.gen_range(1, 10);
-            let block = block_generator.rand_block(&mut rng, block_size);
-            let block_clone = block.clone();
-            let partitioned = partitioner.partition(block, num_shards);
-            crate::test_utils::verify_partitioner_output(&block_clone, &partitioned);
-        }
-    }
-}
-
-#[test]
-fn test_partitioner_v2_determinism() {
-    for merge_discarded in [false, true] {
-        let partitioner = Arc::new(PartitionerV2::new(4, 4, 10, 64, merge_discarded));
-        assert_deterministic_result(partitioner);
-    }
-}
-
-fn extract_and_sort(arr_2d: Vec<RwLock<Vec<usize>>>) -> Vec<Vec<usize>> {
-    arr_2d
-        .into_iter()
-        .map(|arr_1d| {
-            let mut arr_1d_guard = arr_1d.write().unwrap();
-            let mut arr_1d_value = std::mem::take(&mut *arr_1d_guard);
-            arr_1d_value.sort();
-            arr_1d_value
-        })
-        .collect::<Vec<_>>()
 }

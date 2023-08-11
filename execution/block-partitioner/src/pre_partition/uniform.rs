@@ -7,8 +7,9 @@ use aptos_types::{
     block_executor::partitioner::ShardId, transaction::analyzed_transaction::AnalyzedTransaction,
 };
 use itertools::Itertools;
+use rand::thread_rng;
 
-/// Evenly divide 0..n-1. Example: uniform_partition(11,3) == [[0,1,2,3],[4,5,6,7],[8,9,10]]
+/// Evenly divide txns. Example: processing txns 0..11 results in [[0,1,2,3],[4,5,6,7],[8,9,10]].
 pub struct UniformPartitioner {}
 
 impl PrePartitioner for UniformPartitioner {
@@ -37,16 +38,17 @@ impl PrePartitioner for UniformPartitioner {
 #[test]
 fn test_uniform_partitioner() {
     let block_gen = P2PBlockGenerator::new(10);
-    let txns = block_gen.rand_block(18);
+    let mut rng = thread_rng();
+    let txns = block_gen.rand_block(&mut rng,18);
     let partitioner = UniformPartitioner {};
-    let actual = partitioner.partition(txns, 5);
+    let actual = partitioner.pre_partition(txns.as_slice(), 5);
     assert_eq!(
         vec![4, 4, 4, 3, 3],
         actual.iter().map(|v| v.len()).collect::<Vec<usize>>()
     );
     assert_eq!((0..18).collect::<Vec<usize>>(), actual.concat());
 
-    let actual = uniform_partition(18, 3);
+    let actual = partitioner.pre_partition(txns.as_slice(), 3);
     assert_eq!(
         vec![6, 6, 6],
         actual.iter().map(|v| v.len()).collect::<Vec<usize>>()
