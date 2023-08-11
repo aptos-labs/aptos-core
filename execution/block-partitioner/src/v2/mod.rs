@@ -523,17 +523,6 @@ impl WorkSession {
                 .map(|t| Mutex::new(Some(t)))
                 .collect()
         });
-        let actual_sub_block_position = |round_id: usize, shard_id: usize| -> (usize, usize) {
-            if self.merge_discarded {
-                if round_id == self.num_rounds() - 1 {
-                    (GLOBAL_ROUND_ID, GLOBAL_SHARD_ID)
-                } else {
-                    (round_id, shard_id)
-                }
-            } else {
-                (round_id, shard_id)
-            }
-        };
 
         let mut sub_block_matrix: Vec<Vec<Mutex<Option<SubBlock<AnalyzedTransaction>>>>> =
             self.thread_pool.install(|| {
