@@ -28,6 +28,7 @@ futures = { workspace = true }
 hostname = { workspace = true }
 once_cell = { workspace = true }
 prost = { workspace = true }
+rand = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json =  { workspace = true }

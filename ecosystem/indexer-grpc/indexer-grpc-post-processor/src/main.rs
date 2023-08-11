@@ -3,8 +3,8 @@
 
 use anyhow::Result;
 use aptos_indexer_grpc_post_processor::{
-    file_storage_verifier::FileStorageVerifier, metrics::TASK_FAILURE_COUNT,
-    pfn_ledger_checker::PfnLedgerChecker,
+    data_service_checker::DataServiceChecker, file_storage_verifier::FileStorageVerifier,
+    metrics::TASK_FAILURE_COUNT, pfn_ledger_checker::PfnLedgerChecker,
 };
 use aptos_indexer_grpc_server_framework::{RunnableConfig, ServerArgs};
 use aptos_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
@@ -28,12 +28,21 @@ pub struct IndexerGrpcFileStorageVerifierConfig {
     pub chain_id: u64,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IndexerGrpcDataServiceCheckerConfig {
+    pub indexer_grpc_address: String,
+    pub indexer_grpc_auth_token: String,
+    pub ledger_version: u64,
+}
+
 // TODO: change this to match pattern.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexerGrpcPostProcessorConfig {
     pub pfn_checker_config: Option<IndexerGrpcPFNCheckerConfig>,
     pub file_storage_verifier: Option<IndexerGrpcFileStorageVerifierConfig>,
+    pub data_service_checker: Option<IndexerGrpcDataServiceCheckerConfig>,
 }
 
 #[async_trait::async_trait]
@@ -82,6 +91,27 @@ impl RunnableConfig for IndexerGrpcPostProcessorConfig {
                         tracing::error!("FileStorageVerifier failed: {:?}", err);
                         TASK_FAILURE_COUNT
                             .with_label_values(&["file_storage_verifier"])
+                            .inc();
+                    }
+                }
+            }));
+        }
+
+        if let Some(config) = &self.data_service_checker {
+            tasks.push(tokio::spawn({
+                let config = config.clone();
+                async move {
+                    let checker = DataServiceChecker::new(
+                        config.indexer_grpc_address.clone(),
+                        config.indexer_grpc_auth_token.clone(),
+                        config.ledger_version,
+                    )
+                    .expect("Failed to initialize DataServiceChecker");
+                    info!("Starting DataServiceChecker");
+                    if let Err(err) = checker.run().await {
+                        tracing::error!("DataServiceChecker failed: {:?}", err);
+                        TASK_FAILURE_COUNT
+                            .with_label_values(&["data_service_checker"])
                             .inc();
                     }
                 }
