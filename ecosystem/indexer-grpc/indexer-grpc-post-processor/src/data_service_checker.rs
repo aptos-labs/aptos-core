@@ -30,7 +30,8 @@ impl DataServiceChecker {
 
     pub async fn run(&self) -> anyhow::Result<()> {
         let mut client = RawDataClient::connect(self.indexer_grpc_address.clone()).await?;
-        let starting_version = rand::thread_rng().gen_range(self.ledger_version - 3_000_000, self.ledger_version);
+        let starting_version =
+            rand::thread_rng().gen_range(self.ledger_version - 3_000_000, self.ledger_version);
         let mut request = tonic::Request::new(GetTransactionsRequest {
             starting_version: Some(starting_version),
             ..GetTransactionsRequest::default()
