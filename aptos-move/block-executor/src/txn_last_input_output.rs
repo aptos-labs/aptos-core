@@ -51,9 +51,9 @@ enum ReadKind {
     /// that entry.
     Version(TxnIndex, Incarnation),
     /// Read resolved a delta.
-    Resolved(u128),
+    DeltaResolved(u128),
     /// Read occurred from storage.
-    Storage,
+    FromStorage,
     /// Read triggered a delta application failure.
     DeltaApplicationFailure,
 }
@@ -76,14 +76,14 @@ impl<K: ModulePath> ReadDescriptor<K> {
     pub fn from_resolved(access_path: K, value: u128) -> Self {
         Self {
             access_path,
-            kind: ReadKind::Resolved(value),
+            kind: ReadKind::DeltaResolved(value),
         }
     }
 
     pub fn from_storage(access_path: K) -> Self {
         Self {
             access_path,
-            kind: ReadKind::Storage,
+            kind: ReadKind::FromStorage,
         }
     }
 
@@ -110,12 +110,12 @@ impl<K: ModulePath> ReadDescriptor<K> {
 
     // Does the read descriptor describe a read from MVHashMap w. a resolved delta.
     pub fn validate_resolved(&self, value: u128) -> bool {
-        self.kind == ReadKind::Resolved(value)
+        self.kind == ReadKind::DeltaResolved(value)
     }
 
     // Does the read descriptor describe a read from storage.
     pub fn validate_storage(&self) -> bool {
-        self.kind == ReadKind::Storage
+        self.kind == ReadKind::FromStorage
     }
 
     // Does the read descriptor describe to a read with a delta application failure.
@@ -135,7 +135,7 @@ pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
     module_writes: DashSet<AccessPath>,
     module_reads: DashSet<AccessPath>,
 
-    module_read_write_intersection: AtomicBool,
+    are_module_reads_and_writes_colliding: AtomicBool,
 }
 
 impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputOutput<K, T, E> {
@@ -149,24 +149,26 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
                 .collect(),
             module_writes: DashSet::new(),
             module_reads: DashSet::new(),
-            module_read_write_intersection: AtomicBool::new(false),
+            are_module_reads_and_writes_colliding: AtomicBool::new(false),
         }
     }
 
-    fn append_and_check(
+    fn try_colision_free_insert(
         paths: Vec<AccessPath>,
-        set_to_append: &DashSet<AccessPath>,
-        set_to_check: &DashSet<AccessPath>,
+        destination_set: &DashSet<AccessPath>,
+        conflicting_set: &DashSet<AccessPath>,
     ) -> bool {
         for path in paths {
-            // Standard flags, first show, then look.
-            set_to_append.insert(path.clone());
+            // IMPORTANT: Need to insert to the destination set first,
+            // to allow concurrent insertions to the conflicting_set
+            // to detect conflicts
+            destination_set.insert(path.clone());
 
-            if set_to_check.contains(&path) {
-                return true;
+            if conflicting_set.contains(&path) {
+                return false;
             }
         }
-        false
+        true
     }
 
     /// Returns an error if a module path that was read was previously written to, and vice versa.
@@ -198,12 +200,21 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
             ExecutionStatus::Abort(_) => Vec::new(),
         };
 
-        if !self.module_read_write_intersection.load(Ordering::Relaxed) {
+        if !self
+            .are_module_reads_and_writes_colliding
+            .load(Ordering::Acquire)
+        {
             // Check if adding new read & write modules leads to intersections.
-            if Self::append_and_check(read_modules, &self.module_reads, &self.module_writes)
-                || Self::append_and_check(written_modules, &self.module_writes, &self.module_reads)
-            {
-                self.module_read_write_intersection
+            if !Self::try_colision_free_insert(
+                read_modules,
+                &self.module_reads,
+                &self.module_writes,
+            ) || !Self::try_colision_free_insert(
+                written_modules,
+                &self.module_writes,
+                &self.module_reads,
+            ) {
+                self.are_module_reads_and_writes_colliding
                     .store(true, Ordering::Release);
                 return Err(anyhow!(
                     "[BlockSTM]: Detect module r/w intersection, will fallback to sequential execution"
@@ -218,7 +229,8 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     }
 
     pub(crate) fn module_publishing_may_race(&self) -> bool {
-        self.module_read_write_intersection.load(Ordering::Acquire)
+        self.are_module_reads_and_writes_colliding
+            .load(Ordering::Relaxed)
     }
 
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<Vec<ReadDescriptor<K>>>> {

@@ -119,7 +119,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
                     // Determine the behavior of the latest incarnation of the transaction. The index
                     // is based on the value of the incarnation counter prior to the fetch_add during
                     // the last mock execution, and is >= 1 because there is at least one execution.
-                    let last_incarnation = (incarnation_counter.load(Ordering::SeqCst) - 1)
+                    let last_incarnation = (incarnation_counter.load(Ordering::Relaxed) - 1)
                         % incarnation_behaviors.len();
 
                     match incarnation_behaviors[last_incarnation]

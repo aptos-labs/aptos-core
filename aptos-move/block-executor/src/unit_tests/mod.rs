@@ -361,7 +361,7 @@ fn scheduler_tasks() {
 
     // Make sure everything can be committed.
     for i in 0..5 {
-        assert_some_eq!(s.try_commit(), i);
+        assert_some_eq!(s.next_commit_ready_txn(), i);
     }
 
     assert!(matches!(s.next_task(), SchedulerTask::Done));
@@ -627,7 +627,7 @@ fn scheduler_basic() {
 
     // make sure everything can be committed.
     for i in 0..3 {
-        assert_some_eq!(s.try_commit(), i);
+        assert_some_eq!(s.next_commit_ready_txn(), i);
     }
 
     assert!(matches!(s.next_task(), SchedulerTask::Done));
@@ -677,7 +677,7 @@ fn scheduler_drain_idx() {
 
     // make sure everything can be committed.
     for i in 0..3 {
-        assert_some_eq!(s.try_commit(), i);
+        assert_some_eq!(s.next_commit_ready_txn(), i);
     }
 
     assert!(matches!(s.next_task(), SchedulerTask::Done));
@@ -721,7 +721,7 @@ fn rolling_commit_wave() {
     // finish validating txn 0 with proper wave
     s.finish_validation(0, 1);
     // txn 0 can be committed
-    assert_some_eq!(s.try_commit(), 0);
+    assert_some_eq!(s.next_commit_ready_txn(), 0);
     assert_eq!(s.commit_state(), (1, 0));
 
     // This increases the wave, but only sets max_triggered_wave for transaction 2.
@@ -734,13 +734,13 @@ fn rolling_commit_wave() {
     // finish validating txn 1 with lower wave
     s.finish_validation(1, 0);
     // txn 1 cannot be committed
-    assert!(s.try_commit().is_none());
+    assert!(s.next_commit_ready_txn().is_none());
     assert_eq!(s.commit_state(), (1, 0));
 
     // finish validating txn 1 with proper wave
     s.finish_validation(1, 1);
     // txn 1 can be committed
-    assert_some_eq!(s.try_commit(), 1);
+    assert_some_eq!(s.next_commit_ready_txn(), 1);
     assert_eq!(s.commit_state(), (2, 0));
 
     // No validation task because index is already 2.
@@ -750,11 +750,11 @@ fn rolling_commit_wave() {
     ));
     // finish validating with a lower wave.
     s.finish_validation(2, 0);
-    assert!(s.try_commit().is_none());
+    assert!(s.next_commit_ready_txn().is_none());
     assert_eq!(s.commit_state(), (2, 1));
     // Finish validation with appropriate wave.
     s.finish_validation(2, 1);
-    assert_some_eq!(s.try_commit(), 2);
+    assert_some_eq!(s.next_commit_ready_txn(), 2);
     assert_eq!(s.commit_state(), (3, 1));
 
     // All txns have been committed.
@@ -801,8 +801,9 @@ fn no_conflict_task_count() {
                         tasks.insert(rng.gen::<u32>(), (false, txn_idx));
                     },
                     SchedulerTask::NoTask => break,
-                    // Unreachable because we never call try_commit.
+                    // Unreachable because we never call next_commit_ready_txn.
                     SchedulerTask::Done => unreachable!(),
+                    SchedulerTask::CommitTask(_) => unreachable!(),
                 }
             }
 
@@ -840,7 +841,7 @@ fn no_conflict_task_count() {
         assert_eq!(num_val_tasks, num_txns);
 
         for i in 0..num_txns {
-            assert_some_eq!(s.try_commit(), i);
+            assert_some_eq!(s.next_commit_ready_txn(), i);
             assert_eq!(s.commit_state(), (i + 1, 0));
         }
         assert!(matches!(s.next_task(), SchedulerTask::Done));

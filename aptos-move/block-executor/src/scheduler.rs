@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
@@ -5,6 +8,7 @@
 use crate::counters::GET_NEXT_TASK_SECONDS;
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
+use concurrent_queue::{ConcurrentQueue, PopError};
 use crossbeam::utils::CachePadded;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
@@ -55,6 +59,7 @@ pub enum ExecutionTaskType {
 pub enum SchedulerTask {
     ExecutionTask(Version, ExecutionTaskType),
     ValidationTask(Version, Wave),
+    CommitTask(u32),
     NoTask,
     Done,
 }
@@ -158,7 +163,7 @@ impl PartialEq for ExecutionStatus {
 ///
 /// In 'commit_state', the first element records the next transaction to commit, and the
 /// second element records the lower bound on the wave of a validation that must be successful
-/// in order to commit the next transaction. The wave is updated in try_commit, upon seeing an
+/// in order to commit the next transaction. The wave is updated in next_commit_ready_txn, upon seeing an
 /// executed txn with higher max_triggered_wave. Note that the wave is *not* updated with the
 /// required_wave of the txn that is being committed.
 ///
@@ -239,6 +244,8 @@ pub struct Scheduler {
     done_marker: CachePadded<AtomicBool>,
 
     coordinating_commits_flag: CachePadded<AtomicBool>,
+
+    commit_queue: ConcurrentQueue<u32>,
 }
 
 /// Public Interfaces for the Scheduler
@@ -265,7 +272,18 @@ impl Scheduler {
             validation_idx: AtomicU64::new(0),
             done_marker: CachePadded::new(AtomicBool::new(false)),
             coordinating_commits_flag: CachePadded::new(AtomicBool::new(false)),
+            commit_queue: ConcurrentQueue::<u32>::bounded(num_txns as usize),
         }
+    }
+
+    pub fn add_to_commit_queue(&self, txn_idx: u32) {
+        self.commit_queue
+            .push(txn_idx)
+            .expect("Pushing to the commit_queue should never fail");
+    }
+
+    pub fn pop_from_commit_queue(&self) -> Result<u32, PopError> {
+        self.commit_queue.pop()
     }
 
     pub fn num_txns(&self) -> TxnIndex {
@@ -284,12 +302,18 @@ impl Scheduler {
     }
 
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
-    /// The current implementation has one dedicated thread to try_commit.
+    /// The current implementation has one dedicated thread to next_commit_ready_txn.
     /// Should not be called after the last transaction is committed.
-    pub fn try_commit(&self) -> Option<TxnIndex> {
+    pub fn next_commit_ready_txn(&self) -> Option<TxnIndex> {
         let mut commit_state_mutex = self.commit_state.lock();
+
         let commit_state = commit_state_mutex.deref_mut();
         let (commit_idx, commit_wave) = (&mut commit_state.0, &mut commit_state.1);
+
+        //if self.done_marker.load(Ordering::Relaxed)
+        if *commit_idx == self.num_txns {
+            return None;
+        }
 
         if let Some(validation_status) = self.txn_status[*commit_idx as usize].1.try_read() {
             // Acquired the validation status read lock.
@@ -316,7 +340,7 @@ impl Scheduler {
                             *commit_idx += 1;
                             if *commit_idx == self.num_txns {
                                 // All txns have been committed, the parallel execution can finish.
-                                self.done_marker.store(true, Ordering::SeqCst);
+                                self.done_marker.store(true, Ordering::Release);
                             }
                             return Some(*commit_idx - 1);
                         }
@@ -358,6 +382,10 @@ impl Scheduler {
     pub fn next_task(&self) -> SchedulerTask {
         let _timer = GET_NEXT_TASK_SECONDS.start_timer();
         loop {
+            if let Ok(txn_idx) = self.commit_queue.pop() {
+                return SchedulerTask::CommitTask(txn_idx);
+            }
+
             if self.done() {
                 // No more tasks.
                 return SchedulerTask::Done;
@@ -365,10 +393,10 @@ impl Scheduler {
 
             let (idx_to_validate, wave) =
                 Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
-            let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
+            let idx_to_execute = self.get_bounded_execution_idx(Ordering::Acquire);
 
-            let prefer_validate = idx_to_validate < min(idx_to_execute, self.num_txns)
-                && !self.never_executed(idx_to_validate);
+            let prefer_validate =
+                idx_to_validate < idx_to_execute && !self.never_executed(idx_to_validate);
 
             if !prefer_validate && idx_to_execute >= self.num_txns {
                 return SchedulerTask::NoTask;
@@ -491,7 +519,7 @@ impl Scheduler {
             // Decrease the execution index as necessary to ensure resolved dependencies
             // get a chance to be re-executed.
             self.execution_idx
-                .fetch_min(execution_target_idx, Ordering::SeqCst);
+                .fetch_min(execution_target_idx, Ordering::AcqRel);
         }
 
         let (cur_val_idx, mut cur_wave) =
@@ -528,7 +556,7 @@ impl Scheduler {
             //
             // Also, as a convention, we always acquire validation status lock before execution
             // status lock, as we have to have a consistent order and this order is easier to
-            // provide correctness between finish_execution & try_commit.
+            // provide correctness between finish_execution & next_commit_ready_txn.
             let _validation_status = self.txn_status[txn_idx as usize].1.write();
 
             self.set_aborted_status(txn_idx, incarnation);
@@ -574,7 +602,7 @@ impl Scheduler {
         // The first thread that sets done_marker to be true will be reponsible for
         // resolving the conditional variables, to help other theads that may be pending
         // on the read dependency. See the comment of the function resolve_condvar().
-        if !self.done_marker.swap(true, Ordering::SeqCst) {
+        if !self.done_marker.swap(true, Ordering::Release) {
             for txn_idx in 0..self.num_txns {
                 self.resolve_condvar(txn_idx);
             }
@@ -626,7 +654,7 @@ impl Scheduler {
 
         if let Ok(prev_val_idx) =
             self.validation_idx
-                .fetch_update(Ordering::Acquire, Ordering::SeqCst, |val_idx| {
+                .fetch_update(Ordering::Release, Ordering::Relaxed, |val_idx| {
                     let (txn_idx, wave) = Self::unpack_validation_idx(val_idx);
                     if txn_idx > target_idx {
                         let mut validation_status = self.txn_status[target_idx as usize].1.write();
@@ -734,14 +762,14 @@ impl Scheduler {
         // but if we used fetch-and-increment, two threads can arrive in a cloned state and
         // both increment, effectively skipping over the 'never_executed' transaction index.
         let validation_idx = (idx_to_validate as u64) | ((wave as u64) << 32);
-        let new_validation_idx = ((idx_to_validate + 1) as u64) | ((wave as u64) << 32);
+        let new_validation_idx = validation_idx + 1; // equivalent to ((idx_to_validate + 1) as u64) | ((wave as u64) << 32);
         if self
             .validation_idx
             .compare_exchange(
                 validation_idx,
                 new_validation_idx,
-                Ordering::Acquire,
-                Ordering::SeqCst,
+                Ordering::Release,
+                Ordering::Relaxed,
             )
             .is_ok()
         {
@@ -756,6 +784,10 @@ impl Scheduler {
         None
     }
 
+    fn get_bounded_execution_idx(&self, ordering: Ordering) -> u32 {
+        min(self.execution_idx.load(ordering), self.num_txns)
+    }
+
     /// Grab an index to try and execute next (by fetch-and-incrementing execution_idx).
     /// - If the index is out of bounds, return None (and invoke a check of whether
     /// all txns can be committed).
@@ -764,7 +796,11 @@ impl Scheduler {
     /// return the version to the caller for the corresponding ExecutionTask.
     /// - Otherwise, return None.
     fn try_execute_next_version(&self) -> Option<(Version, ExecutionTaskType)> {
-        let idx_to_execute = self.execution_idx.fetch_add(1, Ordering::SeqCst);
+        if self.execution_idx.load(Ordering::Relaxed) >= self.num_txns {
+            return None;
+        }
+
+        let idx_to_execute = self.execution_idx.fetch_add(1, Ordering::Relaxed);
 
         if idx_to_execute >= self.num_txns {
             return None;
@@ -841,7 +877,7 @@ impl Scheduler {
         *status = ExecutionStatus::Ready(incarnation + 1, ExecutionTaskType::Execution);
     }
 
-    /// Checks whether the done marker is set. The marker can only be set by 'try_commit'.
+    /// Checks whether the done marker is set. The marker can only be set by 'next_commit_ready_txn'.
     fn done(&self) -> bool {
         self.done_marker.load(Ordering::Acquire)
     }
