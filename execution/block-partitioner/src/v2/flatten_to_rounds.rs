@@ -11,6 +11,8 @@ use rayon::{
 use std::{mem, sync::RwLock};
 
 impl PartitionerV2 {
+    /// Populate `state.finalized_txn_matrix` with txns flattened into a matrix (num_rounds by num_shards),
+    /// in a way that avoid in-round cross-shard conflicts.
     pub(crate) fn flatten_to_rounds(state: &mut PartitionState) {
         let mut remaining_txns = mem::take(&mut state.pre_partitioned);
         assert_eq!(state.num_executor_shards, remaining_txns.len());
@@ -52,7 +54,7 @@ impl PartitionerV2 {
                 });
         });
         state.finalized_txn_matrix.push(remaining_txns);
-        Self::build_new_index_tables(state);
+        Self::build_index_from_txn_matrix(state);
     }
 
     /// Given some pre-partitioned txns, pull some off from each shard to avoid cross-shard conflict.
@@ -134,7 +136,7 @@ impl PartitionerV2 {
         )
     }
 
-    pub(crate) fn build_new_index_tables(state: &mut PartitionState) {
+    pub(crate) fn build_index_from_txn_matrix(state: &mut PartitionState) {
         let num_rounds = state.finalized_txn_matrix.len();
         state.start_index_matrix = vec![vec![0; state.num_executor_shards]; num_rounds];
         let mut global_counter: TxnIndex = 0;
