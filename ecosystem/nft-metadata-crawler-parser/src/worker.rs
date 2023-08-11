@@ -460,15 +460,15 @@ impl Worker {
                     .ok();
                 self.model.set_cdn_animation_uri(cdn_animation_uri);
             }
+        }
 
-            // Commit model to Postgres
-            if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
-                error!(
-                    last_transaction_version = self.last_transaction_version,
-                    error = ?e,
-                    "[NFT Metadata Crawler] Commit to Postgres failed"
-                );
-            }
+        // Commit model to Postgres
+        if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
+            error!(
+                last_transaction_version = self.last_transaction_version,
+                error = ?e,
+                "[NFT Metadata Crawler] Commit to Postgres failed"
+            );
         }
 
         Ok(())
