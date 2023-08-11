@@ -3,13 +3,13 @@
 
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
+use aptos_table_natives::TableResolver;
 use aptos_types::on_chain_config::ConfigStorage;
 use aptos_utils::aptos_try;
 use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, resolver::MoveResolver,
 };
-use move_table_extension::TableResolver;
 use std::collections::BTreeMap;
 
 pub trait MoveResolverExt:

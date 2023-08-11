@@ -42,7 +42,7 @@ mod log_ingest;
 mod metrics;
 mod prometheus_push_metrics;
 mod remote_config;
-#[cfg(any(test))]
+#[cfg(test)]
 pub(crate) mod tests;
 pub mod types;
 mod validator_cache;

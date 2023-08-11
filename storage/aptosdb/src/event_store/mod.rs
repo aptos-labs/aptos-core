@@ -382,7 +382,7 @@ impl EventStore {
         };
 
         // overflow not possible
-        #[allow(clippy::integer_arithmetic)]
+        #[allow(clippy::arithmetic_side_effects)]
         {
             let mut count = end - begin;
             while count > 0 {

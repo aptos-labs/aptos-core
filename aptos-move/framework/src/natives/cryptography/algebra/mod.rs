@@ -5,26 +5,21 @@
 
 #[cfg(feature = "testing")]
 use crate::natives::cryptography::algebra::rand::rand_insecure_internal;
-#[cfg(feature = "testing")]
-use crate::natives::helpers::make_test_only_native_from_func;
-use crate::natives::{
-    cryptography::algebra::{
-        arithmetics::{
-            add::add_internal, double::double_internal, mul::mul_internal, neg::neg_internal,
-            sqr::sqr_internal, sub::sub_internal,
-        },
-        casting::{downcast_internal, upcast_internal},
-        constants::{one_internal, order_internal, zero_internal},
-        eq::eq_internal,
-        gas::HashToGasParameters,
-        hash_to_structure::hash_to_internal,
-        new::from_u64_internal,
-        pairing::{multi_pairing_internal, pairing_internal},
-        serialization::{deserialize_internal, serialize_internal},
+use crate::natives::cryptography::algebra::{
+    arithmetics::{
+        add::add_internal, double::double_internal, mul::mul_internal, neg::neg_internal,
+        sqr::sqr_internal, sub::sub_internal,
     },
-    helpers::make_safe_native,
+    casting::{downcast_internal, upcast_internal},
+    constants::{one_internal, order_internal, zero_internal},
+    eq::eq_internal,
+    hash_to_structure::hash_to_internal,
+    new::from_u64_internal,
+    pairing::{multi_pairing_internal, pairing_internal},
+    serialization::{deserialize_internal, serialize_internal},
 };
-use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatures};
+use aptos_native_interface::{RawSafeNative, SafeNativeBuilder};
+use aptos_types::on_chain_config::FeatureFlag;
 use arithmetics::{
     div::div_internal,
     inv::inv_internal,
@@ -36,13 +31,12 @@ use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
 use move_vm_runtime::native_functions::NativeFunction;
 use once_cell::sync::Lazy;
-use std::{any::Any, hash::Hash, rc::Rc, sync::Arc};
+use std::{any::Any, hash::Hash, rc::Rc};
 
 pub mod arithmetics;
 pub mod casting;
 pub mod constants;
 pub mod eq;
-pub mod gas;
 pub mod hash_to_structure;
 pub mod new;
 pub mod pairing;
@@ -266,219 +260,44 @@ static BLS12381_Q12_LENDIAN: Lazy<Vec<u8>> = Lazy::new(|| {
 });
 
 pub fn make_all(
-    move_gas_params: aptos_move_stdlib::natives::GasParameters,
-    gas_params: crate::natives::cryptography::algebra::gas::GasParameters,
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let mut natives = vec![];
 
-    // Always-on natives.
-    natives.append(&mut vec![
+    natives.extend([
         (
             "deserialize_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                deserialize_internal,
-            ),
+            deserialize_internal as RawSafeNative,
         ),
-        (
-            "downcast_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                downcast_internal,
-            ),
-        ),
-        (
-            "eq_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                eq_internal,
-            ),
-        ),
-        (
-            "add_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                add_internal,
-            ),
-        ),
-        (
-            "div_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                div_internal,
-            ),
-        ),
-        (
-            "inv_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                inv_internal,
-            ),
-        ),
-        (
-            "mul_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                mul_internal,
-            ),
-        ),
-        (
-            "neg_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                neg_internal,
-            ),
-        ),
-        (
-            "one_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                one_internal,
-            ),
-        ),
-        (
-            "sqr_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                sqr_internal,
-            ),
-        ),
-        (
-            "sub_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                sub_internal,
-            ),
-        ),
-        (
-            "zero_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                zero_internal,
-            ),
-        ),
-        (
-            "from_u64_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                from_u64_internal,
-            ),
-        ),
-        (
-            "double_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                double_internal,
-            ),
-        ),
-        (
-            "multi_scalar_mul_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                multi_scalar_mul_internal,
-            ),
-        ),
-        (
-            "order_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                order_internal,
-            ),
-        ),
-        (
-            "scalar_mul_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                scalar_mul_internal,
-            ),
-        ),
-        (
-            "hash_to_internal",
-            make_safe_native(
-                HashToGasParameters {
-                    algebra: gas_params.clone(),
-                    sha2: move_gas_params.hash.sha2_256,
-                },
-                timed_features.clone(),
-                features.clone(),
-                hash_to_internal,
-            ),
-        ),
-        (
-            "multi_pairing_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                multi_pairing_internal,
-            ),
-        ),
-        (
-            "pairing_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                pairing_internal,
-            ),
-        ),
-        (
-            "serialize_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                serialize_internal,
-            ),
-        ),
-        (
-            "upcast_internal",
-            make_safe_native(gas_params, timed_features, features, upcast_internal),
-        ),
+        ("downcast_internal", downcast_internal),
+        ("eq_internal", eq_internal),
+        ("add_internal", add_internal),
+        ("div_internal", div_internal),
+        ("inv_internal", inv_internal),
+        ("mul_internal", mul_internal),
+        ("neg_internal", neg_internal),
+        ("one_internal", one_internal),
+        ("sqr_internal", sqr_internal),
+        ("sub_internal", sub_internal),
+        ("zero_internal", zero_internal),
+        ("from_u64_internal", from_u64_internal),
+        ("double_internal", double_internal),
+        ("multi_scalar_mul_internal", multi_scalar_mul_internal),
+        ("order_internal", order_internal),
+        ("scalar_mul_internal", scalar_mul_internal),
+        ("hash_to_internal", hash_to_internal),
+        ("multi_pairing_internal", multi_pairing_internal),
+        ("pairing_internal", pairing_internal),
+        ("serialize_internal", serialize_internal),
+        ("upcast_internal", upcast_internal),
     ]);
 
     // Test-only natives.
     #[cfg(feature = "testing")]
-    natives.append(&mut vec![(
+    natives.extend([(
         "rand_insecure_internal",
-        make_test_only_native_from_func(rand_insecure_internal),
+        rand_insecure_internal as RawSafeNative,
     )]);
 
-    crate::natives::helpers::make_module_natives(natives)
+    builder.make_named_natives(natives)
 }
