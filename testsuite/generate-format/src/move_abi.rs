@@ -20,5 +20,9 @@ pub fn get_registry() -> Result<Registry> {
     // 2. Trace the main entry point(s) + every enum separately.
     tracer.trace_type::<transaction::EntryABI>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
+
+    // aliases within StructTag
+    tracer.ignore_aliases("StructTag", "type_args", &["type_params"])?;
+
     tracer.registry()
 }
