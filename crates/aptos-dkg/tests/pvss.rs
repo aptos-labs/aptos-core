@@ -102,6 +102,11 @@ fn transcript_size() {
     }
 }
 
+#[test]
+fn pok_of_input_secret_test() {
+    panic!("This test is just a reminder that all implemented PVSS schemes are not safe for a PVSS-based DKG without a PoK of the dealt input secret. Consult [GJM+21e] in README.md.")
+}
+
 fn print_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(t: usize, n: usize) {
     let name = T::scheme_name();
     let expected_size = expected_transcript_size::<T>(t, n);
