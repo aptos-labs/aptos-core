@@ -108,7 +108,7 @@ pub struct StructTag {
     pub module: Identifier,
     pub name: Identifier,
     // alias for compatibility with old json serialized data.
-    #[serde(rename = "type_args", alias = "type_params")]
+    #[serde(rename = "type_args")]
     pub type_params: Vec<TypeTag>,
 }
 
