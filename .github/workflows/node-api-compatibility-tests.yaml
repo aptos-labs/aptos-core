@@ -114,8 +114,10 @@ jobs:
         if: ${{ !inputs.SKIP_JOB }}
 
       # Ensure any changes to the generated client were checked in.
-      - run: |
-          cd ./ecosystem/typescript/sdk && pnpm generate-client -o /tmp/generated_client
+      - run: cd ./ecosystem/typescript/sdk && pnpm generate-client -o /tmp/generated_client
+        if: ${{ !inputs.SKIP_JOB }}
+
+      - run:
           echo "If this step fails, run the following command locally to fix it:"
           echo "cd ecosystem/typescript/sdk && pnpm generate-client"
           git diff --no-index --ignore-space-at-eol --ignore-blank-lines ./ecosystem/typescript/sdk/src/generated/ /tmp/generated_client/

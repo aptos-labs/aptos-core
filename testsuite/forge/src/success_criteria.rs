@@ -114,10 +114,17 @@ impl LatencyBreakdownThreshold {
         }
     }
 
-    pub fn ensure_threshold(&self, metrics: &LatencyBreakdown) -> anyhow::Result<()> {
+    pub fn ensure_threshold(
+        &self,
+        metrics: &LatencyBreakdown,
+        traffic_name_addition: &String,
+    ) -> anyhow::Result<()> {
         for (slice, threshold) in &self.thresholds {
             let samples = metrics.get_samples(slice);
-            threshold.ensure_metrics_threshold(&format!("{:?}", slice), samples.get())?;
+            threshold.ensure_metrics_threshold(
+                &format!("{:?}{}", slice, traffic_name_addition),
+                samples.get(),
+            )?;
         }
         Ok(())
     }
@@ -220,7 +227,8 @@ impl SuccessCriteriaChecker {
             &traffic_name_addition,
         )?;
         if let Some(latency_breakdown_thresholds) = &success_criteria.latency_breakdown_thresholds {
-            latency_breakdown_thresholds.ensure_threshold(latency_breakdown.unwrap())?;
+            latency_breakdown_thresholds
+                .ensure_threshold(latency_breakdown.unwrap(), &traffic_name_addition)?;
         }
         Ok(())
     }
@@ -244,22 +252,24 @@ impl SuccessCriteriaChecker {
         );
         let stats_rate = stats.rate();
 
+        let no_traffic_name_addition = "".to_string();
         Self::check_throughput(
             success_criteria.min_avg_tps,
             success_criteria.max_expired_tps,
             success_criteria.max_failed_submission_tps,
             &stats_rate,
-            &"".to_string(),
+            &no_traffic_name_addition,
         )?;
 
         Self::check_latency(
             &success_criteria.latency_thresholds,
             &stats_rate,
-            &"".to_string(),
+            &no_traffic_name_addition,
         )?;
 
         if let Some(latency_breakdown_thresholds) = &success_criteria.latency_breakdown_thresholds {
-            latency_breakdown_thresholds.ensure_threshold(latency_breakdown)?;
+            latency_breakdown_thresholds
+                .ensure_threshold(latency_breakdown, &no_traffic_name_addition)?;
         }
 
         if let Some(timeout) = success_criteria.wait_for_all_nodes_to_catchup {
