@@ -1321,7 +1321,7 @@ fn network_bandwidth() -> ForgeConfig {
 fn gather_metrics() -> ForgeConfig {
     ForgeConfig::default()
         .add_network_test(GatherMetrics)
-        .add_network_test(Delay::new(9*60)) // TODO: how can we maket this configurable from forge command line? use environment variable?
+        .add_network_test(Delay::new(9 * 60)) // TODO: how can we maket this configurable from forge command line? use environment variable?
         .add_network_test(GatherMetrics)
 }
 
