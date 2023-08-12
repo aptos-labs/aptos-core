@@ -170,7 +170,7 @@ fn delta_chains() {
                             0,
                             0,
                             None,
-                            None
+                            None,
                         ),
                     )),
                     false => None,
