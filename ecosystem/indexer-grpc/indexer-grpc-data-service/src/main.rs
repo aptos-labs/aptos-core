@@ -26,7 +26,7 @@ use tonic::{
 // tonic server: https://docs.rs/tonic/latest/tonic/transport/server/struct.Server.html#method.http2_keepalive_interval
 const HTTP2_PING_INTERVAL_DURATION: std::time::Duration = std::time::Duration::from_secs(60);
 const HTTP2_PING_TIMEOUT_DURATION: std::time::Duration = std::time::Duration::from_secs(10);
-
+const INITIAL_STREAM_WINDOW_SIZE: u32 = 10 * 1024 * 1024;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TlsConfig {
@@ -120,6 +120,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                 Server::builder()
                     .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
                     .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION))
+                    .initial_stream_window_size(INITIAL_STREAM_WINDOW_SIZE)
                     .add_service(svc_with_interceptor_clone)
                     .add_service(reflection_service_clone)
                     .serve(grpc_address)
@@ -147,6 +148,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                 Server::builder()
                     .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
                     .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION))
+                    .initial_stream_window_size(INITIAL_STREAM_WINDOW_SIZE)
                     .tls_config(tonic::transport::ServerTlsConfig::new().identity(identity))?
                     .add_service(svc_with_interceptor)
                     .add_service(reflection_service)
