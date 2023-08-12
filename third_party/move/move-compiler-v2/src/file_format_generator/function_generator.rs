@@ -523,7 +523,7 @@ impl<'a> FunctionGenerator<'a> {
             let idx = self.gen.function_instantiation_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
-                fun_ctx.fun.func_env,
+                &fun_ctx.module.env.get_function(id),
                 inst.to_vec(),
             );
             self.emit(FF::Bytecode::CallGeneric(idx))

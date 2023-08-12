@@ -242,6 +242,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     // Run the V2 compiler if requested
                     SyntaxChoice::Source if run_config == TestRunConfig::CompilerV2 => {
                         let ((module, _), warning_opt) = compile_source_unit_v2(
+                            state.pre_compiled_deps,
                             state.named_address_mapping.clone(),
                             &state.source_files().cloned().collect::<Vec<_>>(),
                             data_path.to_owned(),
@@ -326,6 +327,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     // Run the V2 compiler if requested.
                     SyntaxChoice::Source if run_config == TestRunConfig::CompilerV2 => {
                         let ((_, script), warning_opt) = compile_source_unit_v2(
+                            state.pre_compiled_deps,
                             state.named_address_mapping.clone(),
                             &state.source_files().cloned().collect::<Vec<_>>(),
                             data_path.to_owned(),
@@ -603,6 +605,7 @@ impl<'a> CompiledState<'a> {
 }
 
 fn compile_source_unit_v2(
+    pre_compiled_deps: Option<&FullyCompiledProgram>,
     named_address_mapping: BTreeMap<String, NumericalAddress>,
     deps: &[String],
     path: String,
@@ -610,9 +613,26 @@ fn compile_source_unit_v2(
     (Option<CompiledModule>, Option<CompiledScript>),
     Option<String>,
 )> {
+    let deps = if let Some(p) = pre_compiled_deps {
+        // The v2 compiler does not (and perhaps never) supports precompiled programs, so
+        // compile from the sources again, computing the directories where they are found.
+        let mut dirs: BTreeSet<_> = p
+            .files
+            .iter()
+            .filter_map(|(_, (file_name, _))| {
+                Path::new(file_name.as_str())
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+            })
+            .collect();
+        dirs.extend(deps.iter().cloned());
+        dirs.into_iter().collect()
+    } else {
+        deps.to_vec()
+    };
     let options = move_compiler_v2::Options {
         sources: vec![path],
-        dependencies: deps.to_vec(),
+        dependencies: deps,
         named_address_mapping: named_address_mapping
             .into_iter()
             .map(|(alias, addr)| format!("{}={}", alias, addr))
