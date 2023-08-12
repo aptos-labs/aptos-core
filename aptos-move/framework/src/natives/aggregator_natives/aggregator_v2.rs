@@ -81,14 +81,19 @@ fn native_try_add(
             // Get aggregator information and a value to add.
             let value = safely_pop_arg!(args, u128);
             let (id, max_value) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, max_value)?;
+            let aggregator =
+                aggregator_data.get_aggregator(id, aggregator_context.resolver, max_value)?;
             Ok(smallvec![Value::bool(aggregator.try_add(value).is_ok())])
         },
         Type::U64 => {
             // Get aggregator information and a value to add.
             let value = safely_pop_arg!(args, u64);
             let (id, max_value) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, max_value as u128)?;
+            let aggregator = aggregator_data.get_aggregator(
+                id,
+                aggregator_context.resolver,
+                max_value as u128,
+            )?;
             Ok(smallvec![Value::bool(
                 aggregator.try_add(value as u128).is_ok()
             )])
@@ -118,14 +123,19 @@ fn native_try_sub(
             // Get aggregator information and a value to subtract.
             let value = safely_pop_arg!(args, u128);
             let (id, max_value) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, max_value)?;
+            let aggregator =
+                aggregator_data.get_aggregator(id, aggregator_context.resolver, max_value)?;
             Ok(smallvec![Value::bool(aggregator.try_sub(value).is_ok())])
         },
         Type::U64 => {
             // Get aggregator information and a value to subtract.
             let value = safely_pop_arg!(args, u64);
             let (id, max_value) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, max_value as u128)?;
+            let aggregator = aggregator_data.get_aggregator(
+                id,
+                aggregator_context.resolver,
+                max_value as u128,
+            )?;
             Ok(smallvec![Value::bool(
                 aggregator.try_sub(value as u128).is_ok()
             )])
@@ -156,14 +166,21 @@ fn native_read(
         Type::U128 => {
             // Extract information from aggregator struct reference.
             let (id, max_value) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, max_value)?;
-            let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
+            let aggregator =
+                aggregator_data.get_aggregator(id, aggregator_context.resolver, max_value)?;
+            let value =
+                aggregator.read_most_recent_aggregator_value(aggregator_context.resolver)?;
             Ok(smallvec![Value::u128(value)])
         },
         Type::U64 => {
             let (id, max_value) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, max_value as u128)?;
-            let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
+            let aggregator = aggregator_data.get_aggregator(
+                id,
+                aggregator_context.resolver,
+                max_value as u128,
+            )?;
+            let value =
+                aggregator.read_most_recent_aggregator_value(aggregator_context.resolver)?;
             if value > u64::MAX as u128 {
                 return Err(PartialVMError::new(StatusCode::ABORTED)
                     .with_message("Aggregator<u64>::read() output exceeds u64::MAX".to_string())

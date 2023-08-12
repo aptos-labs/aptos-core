@@ -14,7 +14,10 @@ use crate::{
     scheduler::{DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask},
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_aggregator::{delta_change_set::{delta_add, delta_sub, DeltaOp}, aggregator_extension::DeltaValue};
+use aptos_aggregator::{
+    aggregator_extension::DeltaValue,
+    delta_change_set::{delta_add, delta_sub, DeltaOp},
+};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     contract_event::ReadWriteEvent,

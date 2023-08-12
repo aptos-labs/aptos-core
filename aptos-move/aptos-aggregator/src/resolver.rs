@@ -7,8 +7,14 @@ use crate::aggregator_extension::AggregatorID;
 ///   - Ok(..)       if aggregator value exists
 ///   - Err(..)      otherwise.
 pub trait AggregatorResolver {
-    fn resolve_last_committed_aggregator_value(&self, id: &AggregatorID) -> Result<u128, anyhow::Error>;
-    fn resolve_most_recent_aggregator_value(&self, id: &AggregatorID) -> Result<u128, anyhow::Error>;
+    fn resolve_last_committed_aggregator_value(
+        &self,
+        id: &AggregatorID,
+    ) -> Result<u128, anyhow::Error>;
+    fn resolve_most_recent_aggregator_value(
+        &self,
+        id: &AggregatorID,
+    ) -> Result<u128, anyhow::Error>;
 }
 
 // Utils to store aggregator values in data store. Here, we
@@ -54,7 +60,10 @@ pub mod test_utils {
     }
 
     impl AggregatorResolver for AggregatorStore {
-        fn resolve_last_committed_aggregator_value(&self, id: &AggregatorID) -> Result<u128, anyhow::Error> {
+        fn resolve_last_committed_aggregator_value(
+            &self,
+            id: &AggregatorID,
+        ) -> Result<u128, anyhow::Error> {
             let state_key = id
                 .as_state_key()
                 .expect("Only table-based IDs can be accessed in tests.");
@@ -66,7 +75,10 @@ pub mod test_utils {
             }
         }
 
-        fn resolve_most_recent_aggregator_value(&self, id: &AggregatorID) -> Result<u128, anyhow::Error> {
+        fn resolve_most_recent_aggregator_value(
+            &self,
+            id: &AggregatorID,
+        ) -> Result<u128, anyhow::Error> {
             let state_key = id
                 .as_state_key()
                 .expect("Only table-based IDs can be accessed in tests.");

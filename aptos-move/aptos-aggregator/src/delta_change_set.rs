@@ -5,7 +5,7 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
-use crate::{module::AGGREGATOR_MODULE, aggregator_extension::DeltaValue};
+use crate::{aggregator_extension::DeltaValue, module::AGGREGATOR_MODULE};
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
@@ -20,7 +20,7 @@ pub(crate) const EADD_OVERFLOW: u64 = 0x02_0001;
 /// When `Subtraction` operation goes below zero.
 pub(crate) const ESUB_UNDERFLOW: u64 = 0x02_0002;
 
-/// When updating the aggregator start value (due to read operations 
+/// When updating the aggregator start value (due to read operations
 /// or at the end of the transaction), we realize that mistakenly raised
 /// an overflow in one of the previus try_add operation.
 pub(crate) const EEXPECTED_OVERFLOW: u64 = 0x02_0003;
@@ -29,7 +29,6 @@ pub(crate) const EEXPECTED_OVERFLOW: u64 = 0x02_0003;
 /// or at the end of the transaction), we realize that mistakenly raised
 /// an underflow in one of the previus try_sub operation.
 pub(crate) const EEXPECTED_UNDERFLOW: u64 = 0x02_0004;
-
 
 /// Represents an update from aggregator's operation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
@@ -96,7 +95,9 @@ impl DeltaOp {
         match delta.update {
             // Suppose that maximum value seen is +M and we shift by +V. Then the
             // new maximum value is M+V provided addition do no overflow.
-            DeltaValue::Positive(value) => addition(value, self.max_achieved_positive, self.max_value),
+            DeltaValue::Positive(value) => {
+                addition(value, self.max_achieved_positive, self.max_value)
+            },
             // Suppose that maximum value seen is +M and we shift by -V this time.
             // If M >= V, the result is +(M-V). Otherwise, `self` should have never
             // reached any positive value. By convention, we use 0 for the latter
@@ -121,7 +122,9 @@ impl DeltaOp {
             // Otherwise, given  the minimum value of -M and the shift of -V the new
             // minimum value becomes -(M+V), which of course can overflow on addition,
             // implying that we subtracted too much and there was an underflow.
-            DeltaValue::Negative(value) => addition(value, self.min_achieved_negative, self.max_value),
+            DeltaValue::Negative(value) => {
+                addition(value, self.min_achieved_negative, self.max_value)
+            },
         }
     }
 

@@ -151,7 +151,9 @@ impl AggregatorChangeSet {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::{aggregator_id_for_test, AggregatorStore};
+    use aptos_aggregator::{
+        aggregator_extension::DeltaValue, aggregator_id_for_test, AggregatorStore,
+    };
     use claims::{assert_matches, assert_ok};
 
     fn get_test_resolver() -> AggregatorStore {
@@ -185,8 +187,16 @@ mod test {
         aggregator_data.create_new_aggregator(aggregator_id_for_test(300), 300);
         aggregator_data.create_new_aggregator(aggregator_id_for_test(400), 400);
 
-        assert_ok!(aggregator_data.get_aggregator(aggregator_id_for_test(100), context.resolver, 100));
-        assert_ok!(aggregator_data.get_aggregator(aggregator_id_for_test(200), context.resolver, 200));
+        assert_ok!(aggregator_data.get_aggregator(
+            aggregator_id_for_test(100),
+            context.resolver,
+            100
+        ));
+        assert_ok!(aggregator_data.get_aggregator(
+            aggregator_id_for_test(200),
+            context.resolver,
+            200
+        ));
         aggregator_data
             .get_aggregator(aggregator_id_for_test(500), context.resolver, 500)
             .unwrap()
@@ -232,12 +242,12 @@ mod test {
             changes.get(&aggregator_id_for_test(500)).unwrap(),
             AggregatorChange::Delete
         );
-        let delta_100 = DeltaOp::new(DeltaUpdate::Plus(100), 600, 100, 0, None, None);
+        let delta_100 = DeltaOp::new(DeltaValue::Positive(100), 600, 100, 0, None, None);
         assert_eq!(
             *changes.get(&aggregator_id_for_test(600)).unwrap(),
             AggregatorChange::Merge(delta_100)
         );
-        let delta_200 = DeltaOp::new(DeltaUpdate::Plus(200), 700, 200, 0, None, None);
+        let delta_200 = DeltaOp::new(DeltaValue::Positive(200), 700, 200, 0, None, None);
         assert_eq!(
             *changes.get(&aggregator_id_for_test(700)).unwrap(),
             AggregatorChange::Merge(delta_200)
