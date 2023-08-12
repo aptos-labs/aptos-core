@@ -13,7 +13,7 @@ use crate::{
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
-    view::{LatestView, MVHashMapView},
+    view::LatestView,
 };
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_logger::{debug, info};
@@ -30,6 +30,7 @@ use rayon::ThreadPool;
 use std::{
     marker::PhantomData,
     sync::{
+        atomic::AtomicU32,
         mpsc,
         mpsc::{Receiver, Sender},
         Arc,
@@ -116,21 +117,15 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
         executor: &E,
-        base_view: &S,
+        sync_view: &mut LatestView<T, S, X>,
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let (idx_to_execute, incarnation) = version;
         let txn = &signature_verified_block[idx_to_execute as usize];
 
-        let speculative_view = MVHashMapView::new(versioned_cache, scheduler);
-
         // VM execution.
-        let execute_result = executor.execute_transaction(
-            &LatestView::<T, S, X>::new_mv_view(base_view, &speculative_view, idx_to_execute),
-            txn,
-            idx_to_execute,
-            false,
-        );
+        sync_view.update_txn_idx(idx_to_execute);
+        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute, false);
         let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
@@ -181,7 +176,7 @@ where
         }
 
         if last_input_output
-            .record(idx_to_execute, speculative_view.take_reads(), result)
+            .record(idx_to_execute, sync_view.take_reads(), result)
             .is_err()
         {
             // When there is module publishing r/w intersection, can early halt BlockSTM to
@@ -364,6 +359,8 @@ where
             let committed_delta = versioned_cache
                 .materialize_delta(&k, txn_idx)
                 .unwrap_or_else(|op| {
+                    // TODO: this logic should improve with the new AGGR data structure
+                    // TODO: and the ugly base_view parameter will also disappear.
                     let storage_value = base_view
                         .get_state_value_u128(&k)
                         .expect("Error reading the base value for committed delta in storage")
@@ -403,7 +400,9 @@ where
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
+        // TODO: should not need to pass base view.
         base_view: &S,
+        sync_view: &mut LatestView<T, S, X>,
         role: CommitRole,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
@@ -462,7 +461,7 @@ where
                         versioned_cache,
                         scheduler,
                         &executor,
-                        base_view,
+                        sync_view,
                     )
                 },
                 SchedulerTask::ExecutionTask(_, ExecutionTaskType::Wakeup(condvar)) => {
@@ -508,6 +507,7 @@ where
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_cache = MVHashMap::new();
+        let shared_counter = AtomicU32::new(0);
 
         if signature_verified_block.is_empty() {
             return Ok(vec![]);
@@ -536,6 +536,13 @@ where
             for _ in 0..self.concurrency_level {
                 let role = roles.pop().expect("Role must be set for all threads");
                 s.spawn(|_| {
+                    let mut sync_view = LatestView::<T, S, X>::new_sync_view(
+                        base_view,
+                        &versioned_cache,
+                        &scheduler,
+                        &shared_counter,
+                    );
+
                     self.work_task_with_scope(
                         &executor_initial_arguments,
                         signature_verified_block,
@@ -543,6 +550,7 @@ where
                         &versioned_cache,
                         &scheduler,
                         base_view,
+                        &mut sync_view,
                         role,
                     );
                 });
@@ -602,19 +610,17 @@ where
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(executor_arguments);
         drop(init_timer);
+
         let data_map = UnsyncMap::new();
+        let mut unsync_view = LatestView::<T, S, X>::new_unsync_view(base_view, &data_map);
 
         let mut ret = Vec::with_capacity(num_txns);
 
         let mut accumulated_fee_statement = FeeStatement::zero();
 
         for (idx, txn) in signature_verified_block.iter().enumerate() {
-            let res = executor.execute_transaction(
-                &LatestView::<T, S, X>::new_btree_view(base_view, &data_map, idx as TxnIndex),
-                txn,
-                idx as TxnIndex,
-                true,
-            );
+            unsync_view.update_txn_idx(idx as TxnIndex);
+            let res = executor.execute_transaction(&unsync_view, txn, idx as TxnIndex, true);
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
