@@ -92,10 +92,8 @@ const main = async () => {
   // Initialize a MultiEd25519 account with the created accounts as owners and a signature threshold K as NUM_SIGNATURES_REQUIRED
   await initializeMultiEd25519(faucetClient, accounts, NUM_SIGNATURES_REQUIRED);
 
-  const multiSigPublicKey = new TxnBuilderTypes.MultiEd25519PublicKey(
-    accounts.map((acc) => new TxnBuilderTypes.Ed25519PublicKey(acc.signingKey.publicKey)),
-    NUM_SIGNATURES_REQUIRED,
-  );
+  const publicKeys = accounts.map((acc) => new TxnBuilderTypes.Ed25519PublicKey(acc.signingKey.publicKey));
+  const multiSigPublicKey = new TxnBuilderTypes.MultiEd25519PublicKey(publicKeys, NUM_SIGNATURES_REQUIRED);
   const authKey = TxnBuilderTypes.AuthenticationKey.fromMultiEd25519PublicKey(multiSigPublicKey);
   const multiSigAddress = TxnBuilderTypes.AccountAddress.fromHex(authKey.derivedAddress());
 
@@ -121,14 +119,11 @@ const main = async () => {
   const structSig3 = account3.signBuffer(bcsSerializedStruct);
   const structSignatures = [structSig1, structSig2, structSig3].map((sig) => sig.toUint8Array());
 
-  // This is the bitmap indicating which original owners are present as signers. It takes a diff of the original owners and the signing owners and creates the bitmap based on that.
-  const bitmap = createBitmapFromDiff(accountAddresses, signingAddresses);
-
   // Step 5.
   // Assemble a MultiEd25519 signed proof struct with the gathered signatures.
   // This represents the multisig signed struct by all owners. This is used as proof of authentication by the overall MultiEd25519 account, since there's no signer
   // checked in the entry function we're using.
-  const multiSigStruct = createMultiSigStructFromSignedStructs(structSignatures, bitmap);
+  const multiSigStruct = createMultiSigStructFromSignedStructs(accountAddresses, signingAddresses, structSignatures);
 
   // Create test metadata for the multisig account post-creation
   const metadataKeys = ["key 123", "key 456", "key 789"];
@@ -250,12 +245,19 @@ const createWithExistingAccountAndRevokeAuthKeyPayload = (
 
 // We create the multisig struct by concatenating the individually signed structs together
 // Then we append the bitmap at the end.
-const createMultiSigStructFromSignedStructs = (signatures: Array<Uint8Array>, bitmap: Uint8Array): Uint8Array => {
+const createMultiSigStructFromSignedStructs = (
+  accountAddresses: Array<TxnBuilderTypes.AccountAddress>,
+  signingAddresses: Array<TxnBuilderTypes.AccountAddress>,
+  signatures: Array<Uint8Array>,
+): Uint8Array => {
   // Flatten the signatures into a single byte array
   let flattenedSignatures = new Uint8Array();
   signatures.forEach((sig) => {
     flattenedSignatures = new Uint8Array([...flattenedSignatures, ...sig]);
   });
+
+  // This is the bitmap indicating which original owners are present as signers. It takes a diff of the original owners and the signing owners and creates the bitmap based on that.
+  const bitmap = createBitmapFromDiff(accountAddresses, signingAddresses);
 
   // Add the bitmap to the end of the byte array
   return new Uint8Array([...flattenedSignatures, ...bitmap]);
