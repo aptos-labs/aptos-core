@@ -187,30 +187,22 @@ mod test {
         aggregator_data.create_new_aggregator(aggregator_id_for_test(300), 300);
         aggregator_data.create_new_aggregator(aggregator_id_for_test(400), 400);
 
-        assert_ok!(aggregator_data.get_aggregator(
-            aggregator_id_for_test(100),
-            context.resolver,
-            100
-        ));
-        assert_ok!(aggregator_data.get_aggregator(
-            aggregator_id_for_test(200),
-            context.resolver,
-            200
-        ));
+        assert_ok!(aggregator_data.get_aggregator(aggregator_id_for_test(100), 100));
+        assert_ok!(aggregator_data.get_aggregator(aggregator_id_for_test(200), 200));
         aggregator_data
-            .get_aggregator(aggregator_id_for_test(500), context.resolver, 500)
+            .get_aggregator(aggregator_id_for_test(500), 500)
             .unwrap()
-            .try_add(150)
+            .try_add(context.resolver, 150)
             .unwrap();
         aggregator_data
-            .get_aggregator(aggregator_id_for_test(600), context.resolver, 600)
+            .get_aggregator(aggregator_id_for_test(600), 600)
             .unwrap()
-            .try_add(100)
+            .try_add(context.resolver, 100)
             .unwrap();
         aggregator_data
-            .get_aggregator(aggregator_id_for_test(700), context.resolver, 700)
+            .get_aggregator(aggregator_id_for_test(700), 700)
             .unwrap()
-            .try_add(200)
+            .try_add(context.resolver, 200)
             .unwrap();
 
         aggregator_data.remove_aggregator(aggregator_id_for_test(100));
