@@ -1,10 +1,11 @@
 // Copyright © Aptos Foundation
 
-mod graph_partitioner;
+pub mod graph_partitioner;
 // mod fennel;
-mod graph;
-mod batched_stream;
-mod metis;
+pub mod graph;
+pub mod batched_stream;
+pub mod metis;
+pub mod graph_stream;
 
 use std::collections::HashMap;
 use std::hash::Hash;

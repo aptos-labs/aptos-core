@@ -37,7 +37,7 @@ pub trait WeightedNodes: UndirectedGraph {
     type WeightedNodesIter: Iterator<Item = (NodeIndex, Self::NodeWeight)>;
 
     /// Returns the weight of a node.
-    fn node_weight(&self) -> Self::NodeWeight;
+    fn node_weight(&self, node: NodeIndex) -> Self::NodeWeight;
 
     /// Returns the total weight of all nodes in the graph.
     /// Depending on the implementation, may take non-constant time.
@@ -49,7 +49,10 @@ pub trait WeightedNodes: UndirectedGraph {
 
 // A trait for an undirected graph with weighted edges.
 pub trait WeightedEdges: UndirectedGraph {
+    /// The weight of an edge.
     type EdgeWeight;
+
+    /// An iterator over the neighbors of a node with their edge weights.
     type WeightedNeighboursIter: Iterator<Item = (NodeIndex, Self::EdgeWeight)>;
 
     fn total_edge_weight(&self) -> Self::EdgeWeight;
@@ -105,7 +108,7 @@ where
     type WeightedNodesIter =
         std::iter::Map<std::ops::Range<NodeIndex>, fn(NodeIndex) -> (NodeIndex, Self::NodeWeight)>;
 
-    fn node_weight(&self) -> Self::NodeWeight {
+    fn node_weight(&self, _node: NodeIndex) -> Self::NodeWeight {
         1
     }
 
