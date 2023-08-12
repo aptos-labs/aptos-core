@@ -1,5 +1,5 @@
 [package]
-name = "aptos-streaming-partitioner"
+name = "aptos-graphs"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
@@ -13,11 +13,7 @@ rust-version.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-block-executor = { workspace = true }
-aptos-block-partitioner = { workspace = true }
-aptos-transaction-orderer = { workspace = true }
 aptos-types = { workspace = true }
-itertools = { workspace = true }
-nonmax = { workspace = true }
+metis = { workspace = true }
 rand = { workspace = true }
-smallvec = { workspace = true }
+

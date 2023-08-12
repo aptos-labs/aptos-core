@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::graph::{UndirectedGraph, WeightedUndirectedGraph};
-use crate::graph_partitioner::{GraphPartitioner, PartitionId};
+use crate::partitioning::{GraphPartitioner, PartitionId};
 
 /// A weighted undirected graph in the format expected by the Metis library.
 struct MetisGraph {
