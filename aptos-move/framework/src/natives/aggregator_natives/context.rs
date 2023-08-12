@@ -83,7 +83,7 @@ impl<'a> NativeAggregatorContext<'a> {
 
             let change = match state {
                 AggregatorState::Data { value } => AggregatorChange::Write(value),
-                AggregatorState::Delta { speculative_start_value, speculative_source, delta, history } => {
+                AggregatorState::Delta { delta, history, .. } => {
                     let delta_op = DeltaOp::new(
                         delta,
                         max_value,
