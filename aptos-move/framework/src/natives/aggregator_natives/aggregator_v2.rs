@@ -23,7 +23,7 @@ use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
 /***************************************************************************************************
- * native fun create_aggregator(max_value: u128): Aggregator;
+ * native fun create_aggregator<Element>(limit: Element): Aggregator<Element>;
  **************************************************************************************************/
 
 fn native_create_aggregator(
@@ -63,7 +63,7 @@ fn native_create_aggregator(
 }
 
 /***************************************************************************************************
- * native fun try_add(aggregator: &mut Aggregator, value: u128): bool;
+ * native fun try_add<Element>(aggregator: &mut Aggregator<Element>, value: Element): bool;
  **************************************************************************************************/
 fn native_try_add(
     context: &mut SafeNativeContext,
@@ -101,7 +101,7 @@ fn native_try_add(
 }
 
 /***************************************************************************************************
- * native fun try_sub(aggregator: &mut Aggregator, value: u128): bool;
+ * native fun try_sub<Element>(aggregator: &mut Aggregator<Element>, value: Element): bool;
  **************************************************************************************************/
 fn native_try_sub(
     context: &mut SafeNativeContext,
@@ -139,7 +139,7 @@ fn native_try_sub(
 }
 
 /***************************************************************************************************
- * native fun read(aggregator: &Aggregator): u128;
+ * native fun read<Element>(aggregator: &Aggregator<Element>): Element;
  **************************************************************************************************/
 
 fn native_read(
