@@ -113,7 +113,7 @@ function serializeAddress(argVal: any, serializer: Serializer) {
   addr.serialize(serializer);
 }
 
-function serializeVector(argVal: any, argType: TypeTagVector, serializer: Serializer, depth: number) {
+export function serializeVector(argVal: any, argType: TypeTagVector, serializer: Serializer, depth: number) {
   // We are serializing a vector<u8>
   if (argType.value instanceof TypeTagU8) {
     if (argVal instanceof Uint8Array) {
@@ -134,10 +134,14 @@ function serializeVector(argVal: any, argType: TypeTagVector, serializer: Serial
   if (!Array.isArray(argVal)) {
     throw new Error("Invalid vector args.");
   }
-
   serializer.serializeU32AsUleb128(argVal.length);
-
-  argVal.forEach((arg) => serializeArgInner(arg, argType.value, serializer, depth + 1));
+  if (argVal[0] instanceof Array) {
+    // If we are serializing a vector of vectors, we merely serialize the length of the outer vectors and then continue traversing deeper
+    argVal.forEach((arg) => serializeVector(arg, argType, serializer, depth + 1));
+  } else {
+    // When the innermost element is reached, we finally serialize it.
+    argVal.forEach((arg) => serializeArgInner(arg, argType.value, serializer, depth + 1));
+  }
 }
 
 function serializeStruct(argVal: any, argType: TypeTag, serializer: Serializer, depth: number) {

@@ -1,12 +1,25 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+import { TypeTag, TypeTagVector } from "../aptos_types";
 import { Deserializer } from "./deserializer";
 import { Serializer } from "./serializer";
 import { AnyNumber, Bytes, Seq, Uint16, Uint32, Uint8 } from "./types";
+import { serializeVector as smartSerializeVectorWithDepth } from "../transaction_builder/builder_utils";
 
 interface Serializable {
   serialize(serializer: Serializer): void;
+}
+
+/**
+ * Serializes a vector of any depth with the corresponding serialization function for the specified TypeTag.
+ */
+export function smartSerializeVector(argVal: any, typeTag: TypeTag): Bytes {
+  // The depth is not used in the function below, so we can just pass 0.
+  const serializer = new Serializer();
+  const typeTagVector = new TypeTagVector(typeTag);
+  smartSerializeVectorWithDepth(argVal, typeTagVector, serializer, 0);
+  return serializer.getBytes();
 }
 
 /**
