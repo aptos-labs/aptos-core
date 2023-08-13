@@ -17,7 +17,7 @@ module whitelist_example::whitelist {
     /// the corresponding MintTier's start time, ascending.
     /// The mint price for a tier that comes after another must be higher; that is, both the
     /// times and the prices of the MintTiers are in ascending order.
-    /// This module is agnostic to whether or not the creator is an object or an account. It merely manages the whitelist.
+    /// This module does not manage the owning object, it just manages the whitelist resource in it.
     struct Whitelist has key {
         map: SimpleMap<String, MintTier>,
         sorted_tiers: vector<String>,
@@ -48,6 +48,14 @@ module whitelist_example::whitelist {
     const ETIERS_MUST_INCREASE_IN_PRICE_AND_TIME: u64 = 5;
     /// The per user limit must be greater than zero.
     const EINVALID_PER_USER_LIMIT: u64 = 6;
+    /// The tier has not begun.
+    const ETIER_NOT_STARTED: u64 = 7;
+    /// The tier has already ended.
+    const ETIER_HAS_ENDED: u64 = 8;
+    /// The user has exceeded their per user limit.
+    const ENONE_LEFT: u64 = 9;
+    /// The requested end time is not after the present timestamp
+    const ENOW_AFTER_END_TIME: u64 = 10;
 
     public entry fun init_whitelist(
         creator: &signer,
@@ -73,9 +81,10 @@ module whitelist_example::whitelist {
     ) acquires Whitelist {
         assert!(per_user_limit > 0, error::invalid_argument(EINVALID_PER_USER_LIMIT));
         assert!(start_time < end_time, error::invalid_argument(ESTART_TIME_AFTER_END_TIME));
+        assert!(end_time > timestamp::now_seconds(), error::invalid_argument(ENOW_AFTER_END_TIME));
         let creator_addr = signer::address_of(creator);
 
-        if (!exists<Whitelist>(creator_addr)) {
+        if (!exists_at(creator_addr)) {
             init_whitelist(creator);
         };
 
@@ -131,6 +140,23 @@ module whitelist_example::whitelist {
             // note that this will abort in `table` if the address is not found
             smart_table::remove(&mut mint_tier.addresses, user_addr);
         });
+    }
+
+    #[view]
+    /// Check if the whitelist has at least one tier open to the public or at least one address in it.
+    public fun has_valid_tier(creator_addr: address): bool acquires Whitelist {
+        let keys = borrow_whitelist(creator_addr).sorted_tiers;
+        let (any_valid_tiers, _) = vector::find(&keys, |k| {
+            let is_open_to_public = open_to_public(creator_addr, *k);
+            let tier = borrow_tier(creator_addr, *k);
+            is_open_to_public || smart_table::length(&tier.addresses) >= 1
+        });
+        any_valid_tiers
+    }
+
+    #[view]
+    public fun exists_at(creator_addr: address): bool {
+        exists<Whitelist>(creator_addr)
     }
 
     #[view]
@@ -190,9 +216,12 @@ module whitelist_example::whitelist {
         let creator_addr = signer::address_of(creator);
         let minter_addr = signer::address_of(minter);
 
-        let tier_name = &mut get_earliest_tier_available(creator_addr, minter_addr);
-        assert!(option::is_some(tier_name), error::permission_denied(EACCOUNT_NOT_ELIGIBLE));
-        let mint_tier = borrow_mut_tier(creator_addr, option::extract(tier_name));
+        let tier_name_option = &mut get_earliest_tier_available(creator_addr, minter_addr);
+        assert!(option::is_some(tier_name_option), error::permission_denied(EACCOUNT_NOT_ELIGIBLE));
+
+        let tier_name = option::extract(tier_name_option);
+
+        let mint_tier = borrow_mut_tier(creator_addr, tier_name);
 
         // ensure minter has enough coins
         assert!(coin::balance<AptosCoin>(minter_addr) >= mint_tier.price, error::permission_denied(ENOT_ENOUGH_COINS));
@@ -268,13 +297,17 @@ module whitelist_example::whitelist {
         *&mut borrow_mut_whitelist(creator_addr).sorted_tiers = keys;
     }
 
+    public fun assert_exists(creator_addr: address) {
+        assert!(exists_at(creator_addr), error::not_found(EWHITELIST_NOT_FOUND));
+    }
+
     inline fun borrow_whitelist(creator_addr: address): &Whitelist acquires Whitelist {
-        assert!(exists<Whitelist>(creator_addr), error::not_found(EWHITELIST_NOT_FOUND));
+        assert!(exists_at(creator_addr), error::not_found(EWHITELIST_NOT_FOUND));
         borrow_global<Whitelist>(creator_addr)
     }
 
     inline fun borrow_mut_whitelist(creator_addr: address): &mut Whitelist acquires Whitelist {
-        assert!(exists<Whitelist>(creator_addr), error::not_found(EWHITELIST_NOT_FOUND));
+        assert!(exists_at(creator_addr), error::not_found(EWHITELIST_NOT_FOUND));
         borrow_global_mut<Whitelist>(creator_addr)
     }
 
@@ -309,14 +342,50 @@ module whitelist_example::whitelist {
     }
 
     #[view]
+    public fun address_eligible_for_tier(
+        creator_addr: address,
+        account_addr: address,
+        tier_name: String,
+    ): (bool, bool, bool, bool, bool) acquires Whitelist {
+        let in_tier = {
+            let tier = borrow_tier(creator_addr, tier_name);
+            smart_table::contains(&tier.addresses, account_addr) || tier.open_to_public
+        };
+
+        if (!in_tier) {
+            (false, false, false, false, false)
+        } else {
+            let num_used = num_used(creator_addr, account_addr, tier_name);
+            let tier = borrow_tier(creator_addr, tier_name); // must be after num_used because of acquires
+            let has_any_left = num_used < tier.per_user_limit;
+            let now = timestamp::now_seconds();
+            let not_too_early = now > tier.start_time;
+            let not_too_late = now < tier.end_time;
+            let has_enough_coins = coin::balance<AptosCoin>(account_addr) >= tier.price;
+
+            (in_tier, has_any_left, not_too_early, not_too_late, has_enough_coins)
+        }
+    }
+
+    #[view]
     public fun num_used(
         creator_addr: address,
         account_addr: address,
         tier_name: String,
     ): u64 acquires Whitelist {
-        assert!(address_in_tier(creator_addr, account_addr, tier_name), error::permission_denied(EACCOUNT_NOT_ELIGIBLE));
-        let tier = borrow_tier(creator_addr, tier_name);
-        *smart_table::borrow(&tier.addresses, account_addr)
+        let address_in_tier = address_in_tier(creator_addr, account_addr, tier_name);
+        let open_to_public = open_to_public(creator_addr, tier_name);
+
+        if (address_in_tier) {
+            let tier = borrow_tier(creator_addr, tier_name);
+            *smart_table::borrow(&tier.addresses, account_addr)
+        } else {
+            if (open_to_public) {
+                0
+            } else {
+                abort error::permission_denied(EACCOUNT_NOT_ELIGIBLE)
+            }
+        }
     }
 
     #[view]
@@ -342,6 +411,21 @@ module whitelist_example::whitelist {
     #[view]
     public fun per_user_limit(creator_addr: address, tier_name: String): u64 acquires Whitelist {
         borrow_tier(creator_addr, tier_name).per_user_limit
+    }
+
+    #[view]
+    public fun tier_info(
+        creator_addr: address,
+        tier_name: String
+    ): (bool, u64, u64, u64, u64) acquires Whitelist {
+        let tier = borrow_tier(creator_addr, tier_name);
+        (
+            tier.open_to_public,
+            tier.price,
+            tier.start_time,
+            tier.end_time,
+            tier.per_user_limit,
+        )
     }
 
     #[test_only]
@@ -371,6 +455,22 @@ module whitelist_example::whitelist {
         assert!(ascending, error::invalid_argument(ETIERS_MUST_INCREASE_IN_PRICE_AND_TIME));
     }
 
+    #[test_only]
+    public fun assert_eligible_for_tier(
+        creator_addr: address,
+        account_addr: address,
+        tier_name: String,
+    ) acquires Whitelist {
+        let (in_tier, has_any_left, not_too_early, not_too_late, has_enough_coins) =
+            address_eligible_for_tier(creator_addr, account_addr, tier_name);
+
+        assert!(in_tier, error::permission_denied(EACCOUNT_NOT_ELIGIBLE));
+        assert!(has_any_left, error::permission_denied(ENONE_LEFT));
+        assert!(not_too_early, error::permission_denied(ETIER_NOT_STARTED));
+        assert!(not_too_late, error::permission_denied(ETIER_HAS_ENDED));
+        assert!(has_enough_coins, error::permission_denied(ENOT_ENOUGH_COINS));
+    }
+
     // dependencies only used in test, if we link without #[test_only], the compiler will warn us
     #[test_only]
     use std::account;
@@ -385,7 +485,7 @@ module whitelist_example::whitelist {
     const DEFAULT_END_TIME: u64 = 3;
 
     #[test_only]
-    fun fast_forward_secs(seconds: u64) {
+    public fun fast_forward_secs(seconds: u64) {
         timestamp::update_global_time_for_test_secs(timestamp::now_seconds() + seconds);
     }
 
@@ -509,7 +609,7 @@ module whitelist_example::whitelist {
         assert_ascending_tiers(creator_addr);
 
         destroy(creator);
-        assert!(!exists<Whitelist>(creator_addr), 8);
+        assert!(!exists_at(creator_addr), 8);
     }
 
     #[test(creator = @0xAA, account_a = @0xFA, account_b = @0xFB, account_c = @0xFC, aptos_framework = @0x1)]
@@ -658,7 +758,7 @@ module whitelist_example::whitelist {
         let open_to_public = true;
         upsert_tier_config(creator, tier_n(1), open_to_public, 0, DEFAULT_START_TIME, DEFAULT_END_TIME, 1);
         increment(creator, account_a);//, tier_n(1));
-        upsert_tier_config(creator, tier_n(2), open_to_public, 0, DEFAULT_START_TIME, DEFAULT_END_TIME - 1, 1);
+        fast_forward_secs(1);
         increment(creator, account_a);//, tier_n(2));
         assert_ascending_tiers(signer::address_of(creator));
     }
@@ -697,6 +797,25 @@ module whitelist_example::whitelist {
     }
 
     #[test(creator = @0xAA, account_a = @0xFA, account_b = @0xFB, account_c = @0xFC, aptos_framework = @0x1)]
+    #[expected_failure(abort_code = 0x1000a, location = whitelist_example::whitelist)]
+    public fun test_end_time_after_now(
+        creator: &signer,
+        account_a: &signer,
+        account_b: &signer,
+        account_c: &signer,
+        aptos_framework: &signer,
+    ) acquires Whitelist {
+        setup_test(creator, account_a, account_b, account_c, aptos_framework, DEFAULT_CURRENT_TIME, 1);
+        init_whitelist(creator);
+        let open_to_public = true;
+        upsert_tier_config(creator, tier_n(1), open_to_public, 100000000, DEFAULT_START_TIME, DEFAULT_END_TIME, 1);
+        // Fast forward N seconds where N = DEFAULT_END_TIME - now
+        fast_forward_secs(DEFAULT_END_TIME - timestamp::now_seconds());
+        upsert_tier_config(creator, tier_n(1), open_to_public, 100000000, DEFAULT_START_TIME, DEFAULT_END_TIME, 1);
+        assert_ascending_tiers(signer::address_of(creator));
+    }
+
+    #[test(creator = @0xAA, account_a = @0xFA, account_b = @0xFB, account_c = @0xFC, aptos_framework = @0x1)]
     #[expected_failure(abort_code = 0x60004, location = whitelist_example::whitelist)]
     public fun test_whitelist_obj_doesnt_exist(
         creator: &signer,
@@ -724,14 +843,14 @@ module whitelist_example::whitelist {
         setup_test(creator, account_a, account_b, account_c, aptos_framework, DEFAULT_CURRENT_TIME, 1);
         let creator_addr = signer::address_of(creator);
         init_whitelist(creator);
-        upsert_tier_config(creator, tier_n(1), false, 9001, 0, 1, 1337);
-        upsert_tier_config(creator, tier_n(2), false, 9001, 0, 1, 1337);
+        upsert_tier_config(creator, tier_n(1), false, 9001, DEFAULT_START_TIME, DEFAULT_END_TIME, 1337);
+        upsert_tier_config(creator, tier_n(2), false, 9001, DEFAULT_START_TIME, DEFAULT_END_TIME, 1337);
         add_to_tier(creator, tier_n(1), vector<address> [@0x0]);
         add_to_tier(creator, tier_n(2), vector<address> [@0x0]);
         assert_ascending_tiers(creator_addr);
         destroy(creator);
         init_whitelist(creator);
         destroy(creator);
-        assert!(!exists<Whitelist>(creator_addr), 0);
+        assert!(!exists_at(creator_addr), 0);
     }
 }

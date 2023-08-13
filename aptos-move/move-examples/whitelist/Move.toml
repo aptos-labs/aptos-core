@@ -9,3 +9,7 @@ AptosTokenObjects = { local = "../../framework/aptos-token-objects" }
 [addresses]
 aptos_framework = "0x1"
 aptos_token_objects = "0x4"
+whitelist_example = "_"
+
+[dev-addresses]
+whitelist_example = "0xfa"
