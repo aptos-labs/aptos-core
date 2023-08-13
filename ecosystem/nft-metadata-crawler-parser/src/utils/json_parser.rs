@@ -21,16 +21,15 @@ impl JSONParser {
     ) -> anyhow::Result<(Option<String>, Option<String>, Value)> {
         let (mime, size) = get_uri_metadata(uri.clone()).await?;
         if ImageFormat::from_mime_type(mime.clone()).is_some() {
-            let error_msg = format!("JSON parser received image file: {}, skipping", mime);
-            error!(uri = uri, "[NFT Metadata Crawler] {}", error_msg);
-            return Err(anyhow::anyhow!(error_msg));
+            return Err(anyhow::anyhow!(format!(
+                "JSON parser received image file: {}, skipping",
+                mime
+            )));
         } else if size > max_file_size_bytes {
-            let error_msg = format!(
+            return Err(anyhow::anyhow!(format!(
                 "JSON parser received file too large: {} bytes, skipping",
                 size
-            );
-            error!(uri = uri, "[NFT Metadata Crawler] {}", error_msg);
-            return Err(anyhow::anyhow!(error_msg));
+            )));
         }
 
         let op = || {
