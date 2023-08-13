@@ -15,7 +15,7 @@ use aptos_mvhashmap::{
     unsync_map::UnsyncMap,
     MVHashMap,
 };
-use aptos_state_view::{StateViewId, TStateView};
+use aptos_state_view::StateViewId;
 use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
@@ -240,65 +240,51 @@ impl<
         T: Transaction,
         S: TResourceView<Key = T::Key> + TModuleView<Key = T::Key> + StorageView,
         X: Executable,
-    > TStateView for LatestView<'a, T, S, X>
+    > TResourceView for LatestView<'a, T, S, X>
 {
     type Key = T::Key;
 
-    fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
+    fn get_resource_state_value_from_view(
+        &self,
+        state_key: &Self::Key,
+    ) -> Result<Option<StateValue>> {
         match self.latest_view {
-            ViewMapKind::MultiVersion(map) => match state_key.module_path() {
-                Some(_) => {
-                    use MVModulesError::*;
-                    use MVModulesOutput::*;
+            ViewMapKind::MultiVersion(map) => {
+                let mut mv_value = map.fetch_data(state_key, self.txn_idx);
 
-                    match map.fetch_module(state_key, self.txn_idx) {
-                        Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
-                        Ok(Module((v, _))) => Ok(v.as_state_value()),
-                        Err(Dependency(_)) => {
-                            // Return anything (e.g. module does not exist) to avoid waiting,
-                            // because parallel execution will fall back to sequential anyway.
-                            Ok(None)
-                        },
-                        Err(NotFound) => self.base_view.get_module_state_value_from_view(state_key),
-                    }
-                },
-                None => {
-                    let mut mv_value = map.fetch_data(state_key, self.txn_idx);
+                if matches!(mv_value, ReadResult::Unresolved) {
+                    let from_storage = self
+                        .base_view
+                        .get_resource_bytes_from_view(state_key)?
+                        .map_or(
+                            Err(VMStatus::error(StatusCode::STORAGE_ERROR, None)),
+                            |bytes| Ok(deserialize(&bytes)),
+                        )?;
 
-                    if matches!(mv_value, ReadResult::Unresolved) {
-                        let from_storage = self
-                            .base_view
-                            .get_resource_bytes_from_view(state_key)?
-                            .map_or(
-                                Err(VMStatus::error(StatusCode::STORAGE_ERROR, None)),
-                                |bytes| Ok(deserialize(&bytes)),
-                            )?;
+                    // Store base value in the versioned data-structure directly, so subsequent
+                    // reads can be resolved to U128 directly without storage calls.
+                    map.set_aggregator_base_value(state_key, from_storage);
 
-                        // Store base value in the versioned data-structure directly, so subsequent
-                        // reads can be resolved to U128 directly without storage calls.
-                        map.set_aggregator_base_value(state_key, from_storage);
+                    mv_value = map.fetch_data(state_key, self.txn_idx);
+                }
 
-                        mv_value = map.fetch_data(state_key, self.txn_idx);
-                    }
-
-                    match mv_value {
-                        ReadResult::Value(v) => Ok(v.as_state_value()),
-                        ReadResult::U128(v) => Ok(Some(StateValue::new_legacy(serialize(&v)))),
-                        // ExecutionHalted indicates that the parallel execution is halted.
-                        // The read should return immediately and log the error.
-                        // For now we use STORAGE_ERROR as the VM will not log the speculative eror,
-                        // so no actual error will be logged once the execution is halted and
-                        // the speculative logging is flushed.
-                        ReadResult::ExecutionHalted => Err(anyhow::Error::new(VMStatus::error(
-                            StatusCode::STORAGE_ERROR,
-                            Some("Speculative error to halt BlockSTM early.".to_string()),
-                        ))),
-                        ReadResult::None => self.get_base_value(state_key),
-                        ReadResult::Unresolved => unreachable!(
-                            "Must be resolved as base value is recorded in the MV data structure"
-                        ),
-                    }
-                },
+                match mv_value {
+                    ReadResult::Value(v) => Ok(v.as_state_value()),
+                    ReadResult::U128(v) => Ok(Some(StateValue::new_legacy(serialize(&v)))),
+                    // ExecutionHalted indicates that the parallel execution is halted.
+                    // The read should return immediately and log the error.
+                    // For now we use STORAGE_ERROR as the VM will not log the speculative eror,
+                    // so no actual error will be logged once the execution is halted and
+                    // the speculative logging is flushed.
+                    ReadResult::ExecutionHalted => Err(anyhow::Error::new(VMStatus::error(
+                        StatusCode::STORAGE_ERROR,
+                        Some("Speculative error to halt BlockSTM early.".to_string()),
+                    ))),
+                    ReadResult::None => self.get_base_value(state_key),
+                    ReadResult::Unresolved => unreachable!(
+                        "Must be resolved as base value is recorded in the MV data structure"
+                    ),
+                }
             },
             ViewMapKind::Unsync(map) => map.fetch_data(state_key).map_or_else(
                 || self.get_base_value(state_key),
@@ -306,12 +292,57 @@ impl<
             ),
         }
     }
+}
 
-    fn id(&self) -> StateViewId {
+impl<
+        'a,
+        T: Transaction,
+        S: TResourceView<Key = T::Key> + TModuleView<Key = T::Key> + StorageView,
+        X: Executable,
+    > StorageView for LatestView<'a, T, S, X>
+{
+    fn view_id(&self) -> StateViewId {
         self.base_view.view_id()
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_storage_usage(&self) -> Result<StateStorageUsage> {
         self.base_view.get_storage_usage()
+    }
+}
+
+impl<
+        'a,
+        T: Transaction,
+        S: TResourceView<Key = T::Key> + TModuleView<Key = T::Key> + StorageView,
+        X: Executable,
+    > TModuleView for LatestView<'a, T, S, X>
+{
+    type Key = T::Key;
+
+    fn get_module_state_value_from_view(
+        &self,
+        state_key: &Self::Key,
+    ) -> Result<Option<StateValue>> {
+        match self.latest_view {
+            ViewMapKind::MultiVersion(map) => {
+                use MVModulesError::*;
+                use MVModulesOutput::*;
+
+                match map.fetch_module(state_key, self.txn_idx) {
+                    Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
+                    Ok(Module((v, _))) => Ok(v.as_state_value()),
+                    Err(Dependency(_)) => {
+                        // Return anything (e.g. module does not exist) to avoid waiting,
+                        // because parallel execution will fall back to sequential anyway.
+                        Ok(None)
+                    },
+                    Err(NotFound) => self.base_view.get_module_state_value_from_view(state_key),
+                }
+            },
+            ViewMapKind::Unsync(map) => map.fetch_data(state_key).map_or_else(
+                || self.get_base_value(state_key),
+                |v| Ok(v.as_state_value()),
+            ),
+        }
     }
 }

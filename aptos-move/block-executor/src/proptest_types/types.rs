@@ -19,6 +19,7 @@ use aptos_types::{
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
+use aptos_vm_types::view::{StorageView, TModuleView, TResourceView};
 use claims::assert_ok;
 use move_core_types::language_storage::TypeTag;
 use once_cell::sync::OnceCell;
@@ -510,7 +511,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = K>,
+        view: &(impl TResourceView<Key = K> + TModuleView<Key = K> + StorageView),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,
@@ -532,7 +533,8 @@ where
                 let mut reads_result = vec![];
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
-                    match view.get_state_value_bytes(k) {
+                    // TODO: test modules, etc?
+                    match view.get_resource_bytes_from_view(k) {
                         Ok(v) => reads_result.push(v),
                         Err(_) => reads_result.push(None),
                     }
