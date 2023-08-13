@@ -338,6 +338,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-storage-interface",
  "aptos-types",
+ "aptos-utils",
  "aptos-vm",
  "async-trait",
  "bcs 0.1.4",
