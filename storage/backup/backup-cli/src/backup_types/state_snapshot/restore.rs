@@ -242,7 +242,9 @@ impl StateSnapshotRestoreController {
             if let StateKeyInner::AccessPath(p) = key.inner() {
                 if let Path::Code(module_id) = p.get_path() {
                     if let Ok(module) = CompiledModule::deserialize(value.bytes()) {
-                        if let Err(err) = verify_module_with_config(&config, &module) {
+                        if let Err(err) =
+                            verify_module_with_config(&config, &module, Some(value.bytes().len()))
+                        {
                             error!("Module {:?} failed validation: {:?}", module_id, err);
                         }
                     } else {

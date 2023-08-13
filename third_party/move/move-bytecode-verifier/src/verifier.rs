@@ -38,6 +38,8 @@ pub struct VerifierConfig {
     pub max_per_fun_meter_units: Option<u128>,
     pub max_per_mod_meter_units: Option<u128>,
     pub use_signature_checker_v2: bool,
+    pub sig_checker_v2_fix_script_ty_param_count: bool,
+    pub sig_checker_v2_meter_budget: Option<(u64, u64, u64)>,
 }
 
 /// Helper for a "canonical" verification of a module.
@@ -51,7 +53,7 @@ pub struct VerifierConfig {
 /// minimize the code locations that need to be updated should a new checker
 /// is introduced.
 pub fn verify_module(module: &CompiledModule) -> VMResult<()> {
-    verify_module_with_config(&VerifierConfig::default(), module)
+    verify_module_with_config(&VerifierConfig::default(), module, None)
 }
 
 pub fn verify_module_with_config_for_test(
@@ -63,7 +65,7 @@ pub fn verify_module_with_config_for_test(
     let mut bytes = vec![];
     module.serialize(&mut bytes).unwrap();
     let now = Instant::now();
-    let result = verify_module_with_config(config, module);
+    let result = verify_module_with_config(config, module, Some(bytes.len()));
     eprintln!(
         "--> {}: verification time: {:.3}ms, result: {}, size: {}kb",
         name,
@@ -85,7 +87,11 @@ pub fn verify_module_with_config_for_test(
     result
 }
 
-pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModule) -> VMResult<()> {
+pub fn verify_module_with_config(
+    config: &VerifierConfig,
+    module: &CompiledModule,
+    module_size: Option<usize>,
+) -> VMResult<()> {
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
         BoundsChecker::verify_module(module).map_err(|e| {
@@ -97,7 +103,7 @@ pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModul
         DuplicationChecker::verify_module(module)?;
 
         if config.use_signature_checker_v2 {
-            signature_v2::verify_module(module)?;
+            signature_v2::verify_module(config, module, module_size)?;
         } else {
             SignatureChecker::verify_module(module)?;
         }
@@ -139,10 +145,14 @@ pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModul
 /// minimize the code locations that need to be updated should a new checker
 /// is introduced.
 pub fn verify_script(script: &CompiledScript) -> VMResult<()> {
-    verify_script_with_config(&VerifierConfig::default(), script)
+    verify_script_with_config(&VerifierConfig::default(), script, None)
 }
 
-pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScript) -> VMResult<()> {
+pub fn verify_script_with_config(
+    config: &VerifierConfig,
+    script: &CompiledScript,
+    script_size: Option<usize>,
+) -> VMResult<()> {
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
         BoundsChecker::verify_script(script).map_err(|e| e.finish(Location::Script))?;
@@ -150,7 +160,7 @@ pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScrip
         DuplicationChecker::verify_script(script)?;
 
         if config.use_signature_checker_v2 {
-            signature_v2::verify_script(script)?;
+            signature_v2::verify_script(config, script, script_size)?;
         } else {
             SignatureChecker::verify_script(script)?;
         }
@@ -208,6 +218,8 @@ impl Default for VerifierConfig {
             max_per_mod_meter_units: None,
 
             use_signature_checker_v2: true,
+            sig_checker_v2_fix_script_ty_param_count: true,
+            sig_checker_v2_meter_budget: Some((2048, 1, 2)),
         }
     }
 }
@@ -247,6 +259,8 @@ impl VerifierConfig {
             max_per_mod_meter_units: Some(1000 * 8000),
 
             use_signature_checker_v2: true,
+            sig_checker_v2_fix_script_ty_param_count: true,
+            sig_checker_v2_meter_budget: Some((2048, 1, 2)),
         }
     }
 }

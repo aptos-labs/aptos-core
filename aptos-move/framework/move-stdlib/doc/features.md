@@ -345,6 +345,28 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_SIGNATURE_CHECKER_V2_METERING"></a>
+
+Whether to enable to pesudo metering for signature checker v2.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SIGNATURE_CHECKER_V2_METERING">SIGNATURE_CHECKER_V2_METERING</a>: u64 = 26;
+</code></pre>
+
+
+
+<a name="0x1_features_SIGNATURE_CHECKER_V2_SCRIPT_FIX"></a>
+
+Whether the fix for a counting bug in the script path of the signature checker pass is enabled.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SIGNATURE_CHECKER_V2_SCRIPT_FIX">SIGNATURE_CHECKER_V2_SCRIPT_FIX</a>: u64 = 25;
+</code></pre>
+
+
+
 <a name="0x1_features_STRUCT_CONSTRUCTORS"></a>
 
 Whether struct constructors are enabled

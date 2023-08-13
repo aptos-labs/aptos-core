@@ -1,6 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::verifier::VerifierConfig;
 use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
@@ -21,9 +22,271 @@ use std::{
 };
 use typed_arena::Arena;
 
+/***************************************************************************************************
+ * Pseudo Metering
+ *
+ **************************************************************************************************/
+/// A meter that calculates the cost of performing the signature check for a binary. The computed
+/// cost is an over-estimation to ensure that the running time of this process remains within
+/// `O(n)` time complexity, where `n` is the size of the binary.
+///
+/// If the cost exceeds the allowed budget, the binary will be rejected with the error
+/// `PROGRAM_TOO_COMPLEX`. It's important to note that no direct gas charges are applied based on
+/// this meter. Therefore it is considered a pseudo metering mechanism.
+struct Meter<'a> {
+    resolver: BinaryIndexedView<'a>,
+
+    cached_signature_sizes: RefCell<BTreeMap<SignatureIndex, usize>>,
+    balance: RefCell<u64>,
+}
+
+/// Calculates the allowed budget based on the size of a binary.
+///
+/// Formula: `base + per_byte * size`.
+fn calculate_budget(base: u64, per_byte: (u64, u64), size: usize) -> u64 {
+    base.saturating_add(u128::min(
+        (per_byte.0 as u128 * size as u128) / per_byte.1 as u128,
+        u64::MAX as u128,
+    ) as u64)
+}
+
+impl<'a> Meter<'a> {
+    fn charge(&self, amount: u64) -> PartialVMResult<()> {
+        let mut balance = self.balance.borrow_mut();
+        match balance.checked_sub(amount) {
+            Some(new_balance) => {
+                *balance = new_balance;
+                Ok(())
+            },
+            None => {
+                *balance = 0;
+                Err(PartialVMError::new(StatusCode::PROGRAM_TOO_COMPLEX)
+                    .with_message("program too complex for signature checker v2".to_string()))
+            },
+        }
+    }
+
+    fn meter_signature(&self, idx: SignatureIndex) -> PartialVMResult<()> {
+        let size = match self.cached_signature_sizes.borrow_mut().entry(idx) {
+            btree_map::Entry::Occupied(entry) => *entry.into_mut(),
+            btree_map::Entry::Vacant(entry) => {
+                let sig = self.resolver.signature_at(idx);
+                let size = sig
+                    .0
+                    .iter()
+                    .fold(0, |acc: usize, ty| acc.saturating_add(ty.num_nodes()));
+
+                *entry.insert(size)
+            },
+        };
+
+        self.charge(size as u64)?;
+
+        Ok(())
+    }
+
+    fn meter_signatures(&self) -> PartialVMResult<()> {
+        for sig_idx in 0..self.resolver.signatures().len() {
+            self.meter_signature(SignatureIndex(sig_idx as u16))?;
+        }
+        Ok(())
+    }
+
+    fn meter_function_instantiation(
+        &self,
+        func_inst_idx: FunctionInstantiationIndex,
+    ) -> PartialVMResult<()> {
+        let func_inst = self.resolver.function_instantiation_at(func_inst_idx);
+        self.meter_signature(func_inst.type_parameters)
+    }
+
+    fn meter_function_instantiations(&self) -> PartialVMResult<()> {
+        for func_inst_idx in 0..self.resolver.function_instantiations().len() {
+            self.meter_function_instantiation(FunctionInstantiationIndex(func_inst_idx as u16))?;
+        }
+        Ok(())
+    }
+
+    fn meter_struct_instantiation(
+        &self,
+        struct_inst_idx: StructDefInstantiationIndex,
+    ) -> PartialVMResult<()> {
+        let struct_inst = self
+            .resolver
+            .struct_instantiation_at(struct_inst_idx)
+            .expect("struct instantiation should exist");
+        self.meter_signature(struct_inst.type_parameters)
+    }
+
+    fn meter_struct_instantiations(&self) -> PartialVMResult<()> {
+        for struct_inst_idx in 0..self
+            .resolver
+            .struct_instantiations()
+            .expect("struct instantiations should exist")
+            .len()
+        {
+            self.meter_struct_instantiation(StructDefInstantiationIndex(struct_inst_idx as u16))?;
+        }
+        Ok(())
+    }
+
+    fn meter_field_instantiation(
+        &self,
+        field_inst_idx: FieldInstantiationIndex,
+    ) -> PartialVMResult<()> {
+        let field_inst = self
+            .resolver
+            .field_instantiation_at(field_inst_idx)
+            .expect("field instantiation should exist");
+        self.meter_signature(field_inst.type_parameters)
+    }
+
+    fn meter_field_instantiations(&self) -> PartialVMResult<()> {
+        for field_inst_idx in 0..self
+            .resolver
+            .field_instantiations()
+            .expect("field instantiations should exist")
+            .len()
+        {
+            self.meter_field_instantiation(FieldInstantiationIndex(field_inst_idx as u16))?;
+        }
+        Ok(())
+    }
+
+    fn meter_function_handles(&self) -> PartialVMResult<()> {
+        for fh in self.resolver.function_handles() {
+            self.meter_signature(fh.parameters)?;
+            self.meter_signature(fh.return_)?;
+        }
+        Ok(())
+    }
+
+    fn meter_struct_defs(&self) -> PartialVMResult<()> {
+        for sdef in self
+            .resolver
+            .struct_defs()
+            .expect("struct defs should exist")
+        {
+            let fields = match &sdef.field_information {
+                StructFieldInformation::Native => continue,
+                StructFieldInformation::Declared(fields) => fields,
+            };
+
+            for field in fields {
+                self.charge(field.signature.0.num_nodes() as u64)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn meter_code(&self, code: &CodeUnit) -> PartialVMResult<()> {
+        use Bytecode::*;
+
+        self.meter_signature(code.locals)?;
+
+        for instr in &code.code {
+            match instr {
+                CallGeneric(idx) => {
+                    self.meter_function_instantiation(*idx)?;
+                },
+                PackGeneric(idx) | UnpackGeneric(idx) => {
+                    self.meter_struct_instantiation(*idx)?;
+                },
+                ExistsGeneric(idx)
+                | MoveFromGeneric(idx)
+                | MoveToGeneric(idx)
+                | ImmBorrowGlobalGeneric(idx)
+                | MutBorrowGlobalGeneric(idx) => {
+                    self.meter_struct_instantiation(*idx)?;
+                },
+                ImmBorrowFieldGeneric(idx) | MutBorrowFieldGeneric(idx) => {
+                    self.meter_field_instantiation(*idx)?;
+                },
+                VecPack(idx, _)
+                | VecLen(idx)
+                | VecImmBorrow(idx)
+                | VecMutBorrow(idx)
+                | VecPushBack(idx)
+                | VecPopBack(idx)
+                | VecUnpack(idx, _)
+                | VecSwap(idx) => {
+                    self.meter_signature(*idx)?;
+                },
+
+                // List out the other options explicitly so there's a compile error if a new
+                // bytecode gets added.
+                Pop | Ret | Branch(_) | BrTrue(_) | BrFalse(_) | LdU8(_) | LdU16(_) | LdU32(_)
+                | LdU64(_) | LdU128(_) | LdU256(_) | LdConst(_) | CastU8 | CastU16 | CastU32
+                | CastU64 | CastU128 | CastU256 | LdTrue | LdFalse | Call(_) | Pack(_)
+                | Unpack(_) | ReadRef | WriteRef | FreezeRef | Add | Sub | Mul | Mod | Div
+                | BitOr | BitAnd | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le
+                | Ge | CopyLoc(_) | MoveLoc(_) | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_)
+                | MutBorrowField(_) | ImmBorrowField(_) | MutBorrowGlobal(_)
+                | ImmBorrowGlobal(_) | Exists(_) | MoveTo(_) | MoveFrom(_) | Abort | Nop => (),
+            }
+        }
+        Ok(())
+    }
+
+    fn meter_function_defs(&self) -> PartialVMResult<()> {
+        for func_def in self
+            .resolver
+            .function_defs()
+            .expect("function defs should exist")
+        {
+            if let Some(code) = &func_def.code {
+                self.meter_code(code)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn meter_module(module: &CompiledModule, budget: u64) -> PartialVMResult<()> {
+    let meter = Meter {
+        resolver: BinaryIndexedView::Module(module),
+        cached_signature_sizes: RefCell::new(BTreeMap::new()),
+        balance: RefCell::new(budget),
+    };
+
+    meter.meter_signatures()?;
+    meter.meter_function_instantiations()?;
+    meter.meter_struct_instantiations()?;
+    meter.meter_field_instantiations()?;
+
+    meter.meter_function_handles()?;
+    meter.meter_function_defs()?;
+    meter.meter_struct_defs()?;
+
+    Ok(())
+}
+
+fn meter_script(script: &CompiledScript, budget: u64) -> PartialVMResult<()> {
+    let meter = Meter {
+        resolver: BinaryIndexedView::Script(script),
+        cached_signature_sizes: RefCell::new(BTreeMap::new()),
+        balance: RefCell::new(budget),
+    };
+
+    meter.meter_signatures()?;
+    meter.meter_function_instantiations()?;
+
+    meter.meter_function_handles()?;
+    meter.meter_code(&script.code)?;
+
+    Ok(())
+}
+
+/***************************************************************************************************
+ * Bitset Representation of Type Parameter Constraints
+ *
+ **************************************************************************************************/
 const NUM_ABILITIES: usize = 4;
 const NUM_PARAMS_PER_WORD: usize = 64 / NUM_ABILITIES;
 
+/// A collection of ability constraints for a list of type parameters.
+///
+/// The Bitset-based implementation allow for super-fast merge and subset operations.
 #[derive(Debug)]
 struct BitsetTypeParameterConstraints<const N: usize> {
     words: [u64; N],
@@ -51,10 +314,6 @@ impl<'a, const N: usize> From<&'a [AbilitySet]> for BitsetTypeParameterConstrain
     }
 }
 
-/// This defines a generic collection of type parameter constraints, which is used
-/// by the signature checking algorithm.
-///
-/// The Bitset-based implementation allow for super-fast merge and subset operations.
 impl<const N: usize> BitsetTypeParameterConstraints<N> {
     /// Creates an empty set of type parameter constraints.
     fn new() -> Self {
@@ -105,6 +364,10 @@ impl<const N: usize> BitsetTypeParameterConstraints<N> {
     }
 }
 
+/***************************************************************************************************
+ * Signature Checker Implementation
+ *
+ **************************************************************************************************/
 /// Checks if the given type is well formed and has the required abilities.
 ///
 /// This function does NOT require the context (type parameter abilities) to be specified.
@@ -934,6 +1197,10 @@ fn verify_script_impl<const N: usize>(script: &CompiledScript) -> PartialVMResul
     Ok(())
 }
 
+/***************************************************************************************************
+ * Entry Points
+ *
+ **************************************************************************************************/
 fn max_num_of_ty_params_or_args(resolver: BinaryIndexedView) -> usize {
     let mut n = 0;
 
@@ -972,7 +1239,23 @@ fn max_num_of_ty_params_or_args(resolver: BinaryIndexedView) -> usize {
     n
 }
 
-pub fn verify_module(module: &CompiledModule) -> VMResult<()> {
+/// Checks if all type signatures in the module are well-formed and satisfy the required ability
+/// constraints.
+pub fn verify_module(
+    config: &VerifierConfig,
+    module: &CompiledModule,
+    module_size: Option<usize>,
+) -> VMResult<()> {
+    if let (Some(module_size), Some((base, nominator, denominator))) =
+        (module_size, config.sig_checker_v2_meter_budget)
+    {
+        meter_module(
+            module,
+            calculate_budget(base, (nominator, denominator), module_size),
+        )
+        .map_err(|e| e.finish(Location::Module(module.self_id())))?;
+    }
+
     let max_num = max_num_of_ty_params_or_args(BinaryIndexedView::Module(module));
 
     let res = if max_num <= NUM_PARAMS_PER_WORD {
@@ -992,8 +1275,27 @@ pub fn verify_module(module: &CompiledModule) -> VMResult<()> {
     res.map_err(|e| e.finish(Location::Module(module.self_id())))
 }
 
-pub fn verify_script(script: &CompiledScript) -> VMResult<()> {
-    let max_num = max_num_of_ty_params_or_args(BinaryIndexedView::Script(script));
+/// Checks if all type signatures in the script are well-formed and satisfy the required ability
+/// constraints.
+pub fn verify_script(
+    config: &VerifierConfig,
+    script: &CompiledScript,
+    script_size: Option<usize>,
+) -> VMResult<()> {
+    if let (Some(module_size), Some((base, nominator, denominator))) =
+        (script_size, config.sig_checker_v2_meter_budget)
+    {
+        meter_script(
+            script,
+            calculate_budget(base, (nominator, denominator), module_size),
+        )
+        .map_err(|e| e.finish(Location::Script))?;
+    }
+
+    let mut max_num = max_num_of_ty_params_or_args(BinaryIndexedView::Script(script));
+    if config.sig_checker_v2_fix_script_ty_param_count {
+        max_num = max_num.max(script.type_parameters.len());
+    }
 
     let res = if max_num <= NUM_PARAMS_PER_WORD {
         verify_script_impl::<1>(script)

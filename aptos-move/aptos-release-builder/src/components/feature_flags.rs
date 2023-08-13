@@ -45,6 +45,8 @@ pub enum FeatureFlag {
     GasPayerEnabled,
     AptosUniqueIdentifiers,
     BulletproofsNatives,
+    SignatureCheckerV2ScriptFix,
+    SignatureCheckerV2Metering,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -168,6 +170,12 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::GasPayerEnabled => AptosFeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::AptosUniqueIdentifiers => AptosFeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
             FeatureFlag::BulletproofsNatives => AptosFeatureFlag::BULLETPROOFS_NATIVES,
+            FeatureFlag::SignatureCheckerV2ScriptFix => {
+                AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX
+            },
+            FeatureFlag::SignatureCheckerV2Metering => {
+                AptosFeatureFlag::SIGNATURE_CHECKER_V2_METERING
+            },
         }
     }
 }
@@ -214,6 +222,12 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::GAS_PAYER_ENABLED => FeatureFlag::GasPayerEnabled,
             AptosFeatureFlag::APTOS_UNIQUE_IDENTIFIERS => FeatureFlag::AptosUniqueIdentifiers,
             AptosFeatureFlag::BULLETPROOFS_NATIVES => FeatureFlag::BulletproofsNatives,
+            AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX => {
+                FeatureFlag::SignatureCheckerV2ScriptFix
+            },
+            AptosFeatureFlag::SIGNATURE_CHECKER_V2_METERING => {
+                FeatureFlag::SignatureCheckerV2Metering
+            },
         }
     }
 }

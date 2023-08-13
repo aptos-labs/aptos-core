@@ -245,18 +245,27 @@ fn big_vec_unpacks() {
     module.serialize(&mut mvbytes).unwrap();
     let module = CompiledModule::deserialize(&mvbytes).unwrap();
 
-    let res = verify_module_with_config_for_test(
-        "big_vec_unpacks",
-        &VerifierConfig {
-            max_loop_depth: Some(5),
-            max_generic_instantiation_length: Some(32),
-            max_function_parameters: Some(128),
-            max_basic_blocks: Some(1024),
-            max_push_size: Some(10000),
-            ..Default::default()
-        },
-        &module,
+    let mut config = VerifierConfig {
+        max_loop_depth: Some(5),
+        max_generic_instantiation_length: Some(32),
+        max_function_parameters: Some(128),
+        max_basic_blocks: Some(1024),
+        max_push_size: Some(10000),
+        ..Default::default()
+    };
+
+    // Normally this should be rejected by the signature checker v2
+    // since it's too complex to analyze.
+    let res = verify_module_with_config_for_test("big_vec_unpacks", &config, &module);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::PROGRAM_TOO_COMPLEX
     );
+
+    // However even if the metering for signature checker v2 is disabled, it should still
+    // be caught by the stack safety pass.
+    config.sig_checker_v2_meter_budget = None;
+    let res = verify_module_with_config_for_test("big_vec_unpacks", &config, &module);
     assert_eq!(
         res.unwrap_err().major_status(),
         StatusCode::VALUE_STACK_PUSH_OVERFLOW

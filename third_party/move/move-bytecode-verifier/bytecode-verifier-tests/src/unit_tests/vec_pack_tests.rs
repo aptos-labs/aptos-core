@@ -59,11 +59,22 @@ fn test_vec_pack() {
             .cloned()
             .collect();
 
+    // Normally this should be rejected by the signature checker v2
+    // since it's too complex to analyze.
     let res = move_bytecode_verifier::verify_module_with_config_for_test(
         "test_vec_pack",
         &VerifierConfig::production(),
         &m,
     )
     .unwrap_err();
+    assert_eq!(res.major_status(), StatusCode::PROGRAM_TOO_COMPLEX);
+
+    // However even if the metering for signature checker v2 is disabled, it should still
+    // be caught by the stack safety pass.
+    let mut config = VerifierConfig::production();
+    config.sig_checker_v2_meter_budget = None;
+    let res =
+        move_bytecode_verifier::verify_module_with_config_for_test("test_vec_pack", &config, &m)
+            .unwrap_err();
     assert_eq!(res.major_status(), StatusCode::VALUE_STACK_PUSH_OVERFLOW);
 }

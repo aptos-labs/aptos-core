@@ -220,6 +220,14 @@ module std::features {
         is_enabled(BULLETPROOFS_NATIVES)
     }
 
+    /// Whether the fix for a counting bug in the script path of the signature checker pass is enabled.
+    /// Lifetime: transient
+    const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 25;
+
+    /// Whether to enable to pesudo metering for signature checker v2.
+    /// Lifetime: transient
+    const SIGNATURE_CHECKER_V2_METERING: u64 = 26;
+
     // ============================================================================================
     // Feature Flag Implementation
 
