@@ -24,7 +24,7 @@ use aptos_block_executor::{
     txn_commit_hook::TransactionCommitHook,
 };
 use aptos_infallible::Mutex;
-use aptos_state_view::{StateView, StateViewId};
+use aptos_state_view::StateViewId;
 use aptos_types::{
     contract_event::ContractEvent,
     executable::ExecutableTestType,
@@ -34,7 +34,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
-use aptos_vm_types::output::VMOutput;
+use aptos_vm_types::{output::VMOutput, view::StateView};
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
@@ -188,7 +188,7 @@ impl BlockAptosVM {
         drop(signature_verification_timer);
 
         let num_txns = signature_verified_block.len();
-        if state_view.id() != StateViewId::Miscellaneous {
+        if state_view.view_id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.
             init_speculative_logs(num_txns);
@@ -219,7 +219,7 @@ impl BlockAptosVM {
                 // Flush the speculative logs of the committed transactions.
                 let pos = output_vec.partition_point(|o| !o.status().is_retry());
 
-                if state_view.id() != StateViewId::Miscellaneous {
+                if state_view.view_id() != StateViewId::Miscellaneous {
                     // Speculation is disabled in Miscellaneous context, which is used by testing and
                     // can even lead to concurrent execute_block invocations, leading to errors on flush.
                     flush_speculative_logs(pos);

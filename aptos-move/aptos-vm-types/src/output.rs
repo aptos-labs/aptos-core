@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::change_set::VMChangeSet;
-use aptos_state_view::StateView;
+use crate::{change_set::VMChangeSet, view::StateView};
 use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,

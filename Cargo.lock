@@ -534,6 +534,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "arc-swap",
  "bcs 0.1.4",
  "claims",
@@ -1137,6 +1138,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "aptos-vm-types",
  "arr_macro",
  "bcs 0.1.4",
  "dashmap",
@@ -3843,6 +3845,7 @@ dependencies = [
  "either",
  "move-binary-format",
  "move-core-types",
+ "once_cell",
 ]
 
 [[package]]
@@ -3864,6 +3867,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "aptos-vm-types",
  "fail 0.5.0",
  "move-core-types",
  "rand 0.7.3",

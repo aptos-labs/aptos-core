@@ -26,3 +26,4 @@ move-core-types = { workspace = true }
 [dev-dependencies]
 aptos-language-e2e-tests = { workspace = true }
 claims = { workspace = true }
+once_cell = { workspace = true }

@@ -13,7 +13,7 @@ use aptos_aggregator::{
     aggregator_extension::AggregatorID, delta_change_set::deserialize, resolver::AggregatorResolver,
 };
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
-use aptos_state_view::{StateView, TStateView};
+use aptos_state_view::StateViewId;
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
@@ -22,6 +22,7 @@ use aptos_types::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
 };
+use aptos_vm_types::view::{StateView, StorageView, TModuleView, TResourceView};
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
@@ -88,12 +89,6 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         s
     }
 
-    pub fn get(&self, access_path: AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
-        self.state_store
-            .get_state_value_bytes(&StateKey::access_path(access_path))
-            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
-    }
-
     fn get_any_resource(
         &self,
         address: &AccountAddress,
@@ -145,8 +140,11 @@ impl<'a, S: StateView> AptosMoveResolver for StorageAdapter<'a, S> {
         address: &AccountAddress,
         resource_group: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError> {
-        let ap = AccessPath::resource_group_access_path(*address, resource_group.clone());
-        self.get(ap).map_err(|e| e.finish(Location::Undefined))
+        let access_path = AccessPath::resource_group_access_path(*address, resource_group.clone());
+        let state_key = StateKey::access_path(access_path);
+        self.state_store
+            .get_resource_bytes_from_view(&state_key)
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined))
     }
 
     fn get_standard_resource(
@@ -154,10 +152,14 @@ impl<'a, S: StateView> AptosMoveResolver for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError> {
-        let ap = AccessPath::resource_access_path(*address, struct_tag.clone()).map_err(|_| {
-            PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Undefined)
-        })?;
-        self.get(ap).map_err(|e| e.finish(Location::Undefined))
+        let access_path =
+            AccessPath::resource_access_path(*address, struct_tag.clone()).map_err(|_| {
+                PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Undefined)
+            })?;
+        let state_key = StateKey::access_path(access_path);
+        self.state_store
+            .get_resource_bytes_from_view(&state_key)
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined))
     }
 
     fn release_resource_group_cache(
@@ -196,8 +198,14 @@ impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
 
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         // REVIEW: cache this?
-        let ap = AccessPath::from(module_id);
-        Ok(self.get(ap).map_err(|e| e.finish(Location::Undefined))?)
+        let access_path = AccessPath::from(module_id);
+        let state_key = StateKey::access_path(access_path);
+        Ok(self
+            .state_store
+            .get_module_bytes_from_view(&state_key)
+            .map_err(|_| {
+                PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
+            })?)
     }
 }
 
@@ -207,7 +215,7 @@ impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
         handle: &TableHandle,
         key: &[u8],
     ) -> Result<Option<Vec<u8>>, Error> {
-        self.get_state_value_bytes(&StateKey::table_item((*handle).into(), key.to_vec()))
+        self.get_resource_bytes_from_view(&StateKey::table_item((*handle).into(), key.to_vec()))
     }
 }
 
@@ -215,7 +223,7 @@ impl<'a, S: StateView> AggregatorResolver for StorageAdapter<'a, S> {
     fn resolve_aggregator_value(&self, id: &AggregatorID) -> Result<u128, Error> {
         let AggregatorID { handle, key } = id;
         let state_key = StateKey::table_item(*handle, key.0.to_vec());
-        match self.get_state_value_bytes(&state_key)? {
+        match self.get_resource_bytes_from_view(&state_key)? {
             Some(bytes) => Ok(deserialize(&bytes)),
             None => {
                 anyhow::bail!("Could not find the value of the aggregator")
@@ -226,13 +234,14 @@ impl<'a, S: StateView> AggregatorResolver for StorageAdapter<'a, S> {
 
 impl<'a, S: StateView> ConfigStorage for StorageAdapter<'a, S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
-        self.get(access_path).ok()?
+        let state_key = StateKey::access_path(access_path);
+        self.get_resource_bytes_from_view(&state_key).ok()?
     }
 }
 
 impl<'a, S: StateView> StateStorageUsageResolver for StorageAdapter<'a, S> {
     fn get_state_storage_usage(&self) -> Result<StateStorageUsage, Error> {
-        self.get_usage()
+        self.state_store.get_storage_usage()
     }
 }
 
@@ -246,14 +255,35 @@ impl<S: StateView> AsMoveResolver<S> for S {
     }
 }
 
-impl<'a, S: StateView> TStateView for StorageAdapter<'a, S> {
+impl<'a, S: StateView> TResourceView for StorageAdapter<'a, S> {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-        self.state_store.get_state_value(state_key)
+    fn get_resource_state_value_from_view(
+        &self,
+        state_key: &Self::Key,
+    ) -> anyhow::Result<Option<StateValue>> {
+        self.state_store
+            .get_resource_state_value_from_view(state_key)
+    }
+}
+
+impl<'a, S: StateView> TModuleView for StorageAdapter<'a, S> {
+    type Key = StateKey;
+
+    fn get_module_state_value_from_view(
+        &self,
+        state_key: &Self::Key,
+    ) -> anyhow::Result<Option<StateValue>> {
+        self.state_store.get_module_state_value_from_view(state_key)
+    }
+}
+
+impl<'a, S: StateView> StorageView for StorageAdapter<'a, S> {
+    fn view_id(&self) -> StateViewId {
+        self.state_store.view_id()
     }
 
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-        self.state_store.get_usage()
+    fn get_storage_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        self.state_store.get_storage_usage()
     }
 }

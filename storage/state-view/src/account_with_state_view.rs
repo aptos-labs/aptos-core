@@ -1,17 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::StateView;
+use crate::RawStateView;
 use aptos_types::{
     account_address::AccountAddress, account_view::AccountView, state_store::state_key::StateKey,
 };
 
 pub struct AccountWithStateView<'a> {
     account_address: &'a AccountAddress,
-    state_view: &'a dyn StateView,
+    state_view: &'a dyn RawStateView,
 }
 
 impl<'a> AccountWithStateView<'a> {
-    pub fn new(account_address: &'a AccountAddress, state_view: &'a dyn StateView) -> Self {
+    pub fn new(account_address: &'a AccountAddress, state_view: &'a dyn RawStateView) -> Self {
         Self {
             account_address,
             state_view,

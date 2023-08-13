@@ -8,7 +8,6 @@ mod mock_vm_test;
 use crate::{block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput};
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -35,6 +34,7 @@ use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     VMExecutor,
 };
+use aptos_vm_types::view::StateView;
 use move_core_types::{language_storage::TypeTag, move_resource::MoveResource};
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Arc};
@@ -233,7 +233,7 @@ fn read_seqnum_from_storage(state_view: &impl StateView, seqnum_access_path: &Ac
 
 fn read_u64_from_storage(state_view: &impl StateView, access_path: &AccessPath) -> u64 {
     state_view
-        .get_state_value_bytes(&StateKey::access_path(access_path.clone()))
+        .get_resource_bytes_from_view(&StateKey::access_path(access_path.clone()))
         .expect("Failed to query storage.")
         .map_or(0, |bytes| decode_bytes(&bytes))
 }
@@ -243,7 +243,7 @@ fn read_state_value_from_storage(
     access_path: &AccessPath,
 ) -> Option<Vec<u8>> {
     state_view
-        .get_state_value_bytes(&StateKey::access_path(access_path.clone()))
+        .get_resource_bytes_from_view(&StateKey::access_path(access_path.clone()))
         .expect("Failed to query storage.")
 }
 

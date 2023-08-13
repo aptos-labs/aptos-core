@@ -7,7 +7,7 @@ use crate::{
     },
     ShardedBlockExecutor,
 };
-use aptos_state_view::StateView;
+use aptos_vm_types::view::StateView;
 use rand::{rngs::OsRng, Rng};
 
 fn setup_sharded_block_executor<S: StateView + Sync + Send + 'static>(

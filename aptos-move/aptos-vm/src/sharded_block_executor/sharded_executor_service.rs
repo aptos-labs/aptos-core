@@ -12,13 +12,13 @@ use crate::{
     },
 };
 use aptos_logger::{info, trace};
-use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{
         ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies,
     },
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
+use aptos_vm_types::view::StateView;
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;

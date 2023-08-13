@@ -22,9 +22,9 @@ use aptos_mvhashmap::{
     unsync_map::UnsyncMap,
     MVHashMap,
 };
-use aptos_state_view::TStateView;
 use aptos_types::{executable::Executable, fee_statement::FeeStatement, write_set::WriteOp};
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
+use aptos_vm_types::view::{StorageView, TModuleView, TResourceView};
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
@@ -82,7 +82,7 @@ impl<T, E, S, L, X> BlockExecutor<T, E, S, L, X>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
-    S: TStateView<Key = T::Key> + Sync,
+    S: TResourceView<Key = T::Key> + TModuleView<Key = T::Key> + StorageView + Sync,
     L: TransactionCommitHook<Output = E::Output>,
     X: Executable + 'static,
 {
@@ -365,7 +365,7 @@ where
                 .materialize_delta(&k, txn_idx)
                 .unwrap_or_else(|op| {
                     let storage_value = base_view
-                        .get_state_value_bytes(&k)
+                        .get_resource_bytes_from_view(&k)
                         .expect("No base value for committed delta in storage")
                         .map(|bytes| deserialize(&bytes))
                         .expect("Cannot deserialize base value for committed delta");

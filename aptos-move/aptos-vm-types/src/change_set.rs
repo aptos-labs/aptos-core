@@ -1,9 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::check_change_set::CheckChangeSet;
+use crate::{check_change_set::CheckChangeSet, view::StateView};
 use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaOp};
-use aptos_state_view::StateView;
 use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::{StateKey, StateKeyInner},
@@ -188,6 +187,45 @@ impl VMChangeSet {
         &self.events
     }
 
+    /// Consumes a single delta and tries to materialize it with a given state
+    /// key. If materialization succeeds, a write op is produced. Otherwise, an
+    /// error VM status is returned.
+    pub fn try_into_write_op(
+        delta: DeltaOp,
+        state_view: &dyn StateView,
+        state_key: &StateKey,
+    ) -> anyhow::Result<WriteOp, VMStatus> {
+        // In case storage fails to fetch the value, return immediately.
+        let maybe_value = state_view
+            .get_resource_bytes_from_view(state_key)
+            .map_err(|e| VMStatus::error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?;
+
+        // Otherwise we have to apply delta to the storage value.
+        match maybe_value {
+            Some(bytes) => {
+                let base = deserialize(&bytes);
+                delta
+                    .apply_to(base)
+                    .map_err(|partial_error| {
+                        // If delta application fails, transform partial VM
+                        // error into an appropriate VM status.
+                        partial_error
+                            // TODO(aggregator): We need an aggregator error type
+                            // which can be converted on extension side.
+                            .finish(Location::Undefined)
+                            .into_vm_status()
+                    })
+                    .map(|result| WriteOp::Modification(serialize(&result)))
+            },
+            // Something is wrong, the value to which we apply delta should
+            // always exist. Guard anyway.
+            None => Err(VMStatus::error(
+                StatusCode::STORAGE_ERROR,
+                Some("Aggregator value does not exist in storage.".to_string()),
+            )),
+        }
+    }
+
     /// Materializes this change set: all deltas are converted into writes and
     /// are combined with existing aggregator writes.
     pub fn try_materialize(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
@@ -201,7 +239,7 @@ impl VMChangeSet {
 
         let into_write =
             |(state_key, delta): (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
-                let write = delta.try_into_write_op(state_view, &state_key)?;
+                let write = Self::try_into_write_op(delta, state_view, &state_key)?;
                 Ok((state_key, write))
             };
 

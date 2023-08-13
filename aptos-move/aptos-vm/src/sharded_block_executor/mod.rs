@@ -10,11 +10,11 @@ use crate::sharded_block_executor::{
     executor_client::ExecutorClient,
 };
 use aptos_logger::{info, trace};
-use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{PartitionedTransactions, SubBlocksForShard},
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
+use aptos_vm_types::view::StateView;
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
 

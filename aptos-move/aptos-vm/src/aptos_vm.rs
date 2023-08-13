@@ -26,7 +26,6 @@ use aptos_gas_meter::{AptosGasMeter, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::VMGasParameters;
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
-use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
@@ -34,7 +33,6 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
-    state_store::state_key::StateKey,
     transaction::{
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
@@ -42,7 +40,6 @@ use aptos_types::{
         WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
-    write_set::WriteOp,
 };
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
@@ -50,6 +47,7 @@ use aptos_vm_types::{
     change_set::VMChangeSet,
     output::VMOutput,
     storage::{ChangeSetConfigs, StorageGasParameters},
+    view::StateView,
 };
 use fail::fail_point;
 use move_binary_format::{
@@ -126,7 +124,7 @@ impl AptosVM {
 
     pub fn new_for_validation(state_view: &impl StateView) -> Self {
         info!(
-            AdapterLogSchema::new(state_view.id(), 0),
+            AdapterLogSchema::new(state_view.view_id(), 0),
             "Adapter created for Validation"
         );
         Self::new(state_view)
@@ -1233,18 +1231,24 @@ impl AptosVM {
         }
     }
 
-    fn read_writeset<'a>(
+    fn read_writeset(
         &self,
         state_view: &impl StateView,
-        write_set: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+        change_set: &VMChangeSet,
     ) -> Result<(), VMStatus> {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
-        for (state_key, _) in write_set.into_iter() {
+        for state_key in change_set.resource_write_set().keys() {
             state_view
-                .get_state_value_bytes(state_key)
+                .get_resource_state_value_from_view(state_key)
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         }
+        for state_key in change_set.module_write_set().keys() {
+            state_view
+                .get_module_state_value_from_view(state_key)
+                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+        }
+        // TODO(aggregator): There should be no aggregator writes.
         Ok(())
     }
 
@@ -1287,7 +1291,7 @@ impl AptosVM {
         )?;
 
         Self::validate_waypoint_change_set(&change_set, log_context)?;
-        self.read_writeset(resolver, change_set.write_set_iter())?;
+        self.read_writeset(resolver, &change_set)?;
         assert!(
             change_set.aggregator_write_set().is_empty(),
             "Waypoint change set should not have any aggregator writes."
@@ -1357,7 +1361,7 @@ impl AptosVM {
     ) -> (VMStatus, TransactionOutput) {
         let vm = AptosVM::new(state_view);
         let simulation_vm = AptosSimulationVM(vm);
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let log_context = AdapterLogSchema::new(state_view.view_id(), 0);
 
         let (vm_status, vm_output) = simulation_vm.simulate_signed_transaction(
             &simulation_vm.0.as_move_resolver(state_view),
@@ -1381,7 +1385,7 @@ impl AptosVM {
         gas_budget: u64,
     ) -> Result<Vec<Vec<u8>>> {
         let vm = AptosVM::new(state_view);
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let log_context = AdapterLogSchema::new(state_view.view_id(), 0);
         let mut gas_meter =
             MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
                 vm.0.get_gas_feature_version(),
@@ -1486,7 +1490,7 @@ impl VMExecutor for AptosVM {
                 None,
             ))
         });
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let log_context = AdapterLogSchema::new(state_view.view_id(), 0);
         info!(
             log_context,
             "Executing block, transaction count: {}",
@@ -1518,7 +1522,7 @@ impl VMExecutor for AptosVM {
         state_view: Arc<S>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let log_context = AdapterLogSchema::new(state_view.view_id(), 0);
         info!(
             log_context,
             "Executing block, transaction count: {}",
@@ -1559,7 +1563,7 @@ impl VMValidator for AptosVM {
         state_view: &impl StateView,
     ) -> VMValidatorResult {
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let log_context = AdapterLogSchema::new(state_view.view_id(), 0);
         let txn = match Self::check_signature(transaction) {
             Ok(t) => t,
             _ => {

@@ -12,13 +12,13 @@ use crate::sharded_block_executor::{
     ExecutorShardCommand,
 };
 use aptos_logger::trace;
-use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{
         PartitionedTransactions, RoundId, ShardId, GLOBAL_ROUND_ID, MAX_ALLOWED_PARTITIONING_ROUNDS,
     },
     transaction::TransactionOutput,
 };
+use aptos_vm_types::view::StateView;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};

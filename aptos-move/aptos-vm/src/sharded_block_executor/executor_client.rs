@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::PartitionedTransactions, transaction::TransactionOutput,
 };
+use aptos_vm_types::view::StateView;
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
 

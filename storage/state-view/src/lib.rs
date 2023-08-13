@@ -4,7 +4,7 @@
 
 #![forbid(unsafe_code)]
 
-//! This crate defines [`trait StateView`](StateView).
+//! This crate defines [`trait StateView`](RawStateView).
 
 use crate::{
     account_with_state_view::{AccountWithStateView, AsAccountWithStateView},
@@ -53,9 +53,9 @@ pub trait TStateView {
     }
 }
 
-pub trait StateView: TStateView<Key = StateKey> {}
+pub trait RawStateView: TStateView<Key = StateKey> {}
 
-impl<T: TStateView<Key = StateKey>> StateView for T {}
+impl<T: TStateView<Key = StateKey>> RawStateView for T {}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StateViewId {
@@ -89,7 +89,7 @@ where
     }
 }
 
-impl<'a, S: 'a + StateView> AsAccountWithStateView<'a> for S {
+impl<'a, S: 'a + RawStateView> AsAccountWithStateView<'a> for S {
     fn as_account_with_state_view(
         &'a self,
         account_address: &'a AccountAddress,

@@ -7,14 +7,18 @@ use crate::{
     move_vm_ext::{SessionExt, SessionId},
 };
 use anyhow::{bail, Result};
-use aptos_state_view::{StateView, StateViewId, TStateView};
+use aptos_state_view::StateViewId;
 use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     write_set::TransactionWrite,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
+use aptos_vm_types::{
+    change_set::VMChangeSet,
+    storage::ChangeSetConfigs,
+    view::{StateView, StorageView, TModuleView, TResourceView},
+};
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 
 /// We finish the session after the user transaction is done running to get the change set and
@@ -91,20 +95,33 @@ impl<'r> ChangeSetStateView<'r> {
     }
 }
 
-impl<'r> TStateView for ChangeSetStateView<'r> {
+impl<'r> TModuleView for ChangeSetStateView<'r> {
     type Key = StateKey;
 
-    fn id(&self) -> StateViewId {
-        self.base.id()
+    fn get_module_state_value_from_view(
+        &self,
+        state_key: &Self::Key,
+    ) -> Result<Option<StateValue>> {
+        match self.change_set.module_write_set().get(state_key) {
+            Some(write_op) => Ok(write_op.as_state_value()),
+            None => self.base.get_module_state_value_from_view(state_key),
+        }
     }
+}
 
-    fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>> {
-        // TODO: `get_state_value` should differentiate between different write types.
+impl<'r> TResourceView for ChangeSetStateView<'r> {
+    type Key = StateKey;
+
+    fn get_resource_state_value_from_view(
+        &self,
+        state_key: &Self::Key,
+    ) -> Result<Option<StateValue>> {
         match self.change_set.aggregator_delta_set().get(state_key) {
-            Some(delta_op) => Ok(delta_op
-                .try_into_write_op(self.base, state_key)?
-                .as_state_value()),
+            Some(delta_op) => Ok(
+                VMChangeSet::try_into_write_op(*delta_op, self.base, state_key)?.as_state_value(),
+            ),
             None => {
+                // TODO: Split aggregators and resources!
                 let cached_value = self
                     .change_set
                     .write_set_iter()
@@ -112,13 +129,19 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
                     .map(|(_, v)| v);
                 match cached_value {
                     Some(write_op) => Ok(write_op.as_state_value()),
-                    None => self.base.get_state_value(state_key),
+                    None => self.base.get_resource_state_value_from_view(state_key),
                 }
             },
         }
     }
+}
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+impl<'r> StorageView for ChangeSetStateView<'r> {
+    fn view_id(&self) -> StateViewId {
+        self.base.view_id()
+    }
+
+    fn get_storage_usage(&self) -> Result<StateStorageUsage> {
         bail!("Unexpected access to get_usage()")
     }
 }
@@ -149,8 +172,21 @@ mod test {
         WriteOp::Modification(serialize(&v))
     }
 
-    fn read(view: &ChangeSetStateView, s: impl ToString) -> u128 {
-        let bytes = view.get_state_value(&key(s)).unwrap().unwrap().into_bytes();
+    fn read_module(view: &ChangeSetStateView, s: impl ToString) -> u128 {
+        let bytes = view
+            .get_module_state_value_from_view(&key(s))
+            .unwrap()
+            .unwrap()
+            .into_bytes();
+        deserialize(&bytes)
+    }
+
+    fn read_resource(view: &ChangeSetStateView, s: impl ToString) -> u128 {
+        let bytes = view
+            .get_resource_state_value_from_view(&key(s))
+            .unwrap()
+            .unwrap()
+            .into_bytes();
         deserialize(&bytes)
     }
 
@@ -196,17 +232,17 @@ mod test {
         .unwrap();
         let view = ChangeSetStateView::new(&base_view, change_set).unwrap();
 
-        assert_eq!(read(&view, "module_base"), 10);
-        assert_eq!(read(&view, "module_both"), 100);
-        assert_eq!(read(&view, "module_write_set"), 110);
+        assert_eq!(read_module(&view, "module_base"), 10);
+        assert_eq!(read_module(&view, "module_both"), 100);
+        assert_eq!(read_module(&view, "module_write_set"), 110);
 
-        assert_eq!(read(&view, "resource_base"), 30);
-        assert_eq!(read(&view, "resource_both"), 80);
-        assert_eq!(read(&view, "resource_write_set"), 90);
+        assert_eq!(read_resource(&view, "resource_base"), 30);
+        assert_eq!(read_resource(&view, "resource_both"), 80);
+        assert_eq!(read_resource(&view, "resource_write_set"), 90);
 
-        assert_eq!(read(&view, "aggregator_base"), 50);
-        assert_eq!(read(&view, "aggregator_both"), 120);
-        assert_eq!(read(&view, "aggregator_write_set"), 130);
-        assert_eq!(read(&view, "aggregator_delta_set"), 71);
+        assert_eq!(read_resource(&view, "aggregator_base"), 50);
+        assert_eq!(read_resource(&view, "aggregator_both"), 120);
+        assert_eq!(read_resource(&view, "aggregator_write_set"), 130);
+        assert_eq!(read_resource(&view, "aggregator_delta_set"), 71);
     }
 }

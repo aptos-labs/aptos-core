@@ -5,14 +5,8 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
-use crate::module::AGGREGATOR_MODULE;
-use aptos_state_view::StateView;
-use aptos_types::{
-    state_store::state_key::StateKey,
-    vm_status::{StatusCode, VMStatus},
-    write_set::WriteOp,
-};
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
+use aptos_types::vm_status::StatusCode;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 
 /// When `Addition` operation overflows the `limit`.
 const EADD_OVERFLOW: u64 = 0x02_0001;
@@ -176,42 +170,6 @@ impl DeltaOp {
         self.merge_with_previous_delta(previous_delta)?;
         Ok(())
     }
-
-    /// Consumes a single delta and tries to materialize it with a given state
-    /// key. If materialization succeeds, a write op is produced. Otherwise, an
-    /// error VM status is returned.
-    pub fn try_into_write_op(
-        self,
-        state_view: &dyn StateView,
-        state_key: &StateKey,
-    ) -> anyhow::Result<WriteOp, VMStatus> {
-        // In case storage fails to fetch the value, return immediately.
-        let maybe_value = state_view
-            .get_state_value_bytes(state_key)
-            .map_err(|e| VMStatus::error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?;
-
-        // Otherwise we have to apply delta to the storage value.
-        match maybe_value {
-            Some(bytes) => {
-                let base = deserialize(&bytes);
-                self.apply_to(base)
-                    .map_err(|partial_error| {
-                        // If delta application fails, transform partial VM
-                        // error into an appropriate VM status.
-                        partial_error
-                            .finish(Location::Module(AGGREGATOR_MODULE.clone()))
-                            .into_vm_status()
-                    })
-                    .map(|result| WriteOp::Modification(serialize(&result)))
-            },
-            // Something is wrong, the value to which we apply delta should
-            // always exist. Guard anyway.
-            None => Err(VMStatus::error(
-                StatusCode::STORAGE_ERROR,
-                Some("Aggregator value does not exist in storage.".to_string()),
-            )),
-        }
-    }
 }
 
 /// Implements application of `Addition` to `base`.
@@ -290,13 +248,7 @@ pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::AggregatorStore;
-    use aptos_state_view::TStateView;
-    use aptos_types::state_store::{
-        state_storage_usage::StateStorageUsage, state_value::StateValue,
-    };
-    use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq};
-    use once_cell::sync::Lazy;
+    use claims::{assert_err, assert_ok, assert_ok_eq};
 
     fn delta_add_with_history(v: u128, limit: u128, max: u128, min: u128) -> DeltaOp {
         let mut delta = delta_add(v, limit);
@@ -537,87 +489,5 @@ mod test {
         assert_ok!(c.merge_with_next_delta(d));
         assert_eq!(b, c);
         assert_eq!(b.update, Minus(1));
-    }
-
-    static KEY: Lazy<StateKey> = Lazy::new(|| StateKey::raw(String::from("test-key").into_bytes()));
-
-    #[test]
-    fn test_failed_write_op_conversion_because_of_empty_storage() {
-        let state_view = AggregatorStore::default();
-        let delta_op = delta_add(10, 1000);
-        assert_matches!(
-            delta_op.try_into_write_op(&state_view, &KEY),
-            Err(VMStatus::Error {
-                status_code: StatusCode::STORAGE_ERROR,
-                message: Some(_),
-                sub_status: None
-            })
-        );
-    }
-
-    struct BadStorage;
-
-    impl TStateView for BadStorage {
-        type Key = StateKey;
-
-        fn get_state_value(&self, _state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-            Err(anyhow::Error::new(VMStatus::error(
-                StatusCode::STORAGE_ERROR,
-                Some("Error message from BadStorage.".to_string()),
-            )))
-        }
-
-        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-            unreachable!()
-        }
-    }
-
-    #[test]
-    fn test_failed_write_op_conversion_because_of_storage_error() {
-        let state_view = BadStorage;
-        let delta_op = delta_add(10, 1000);
-        assert_matches!(
-            delta_op.try_into_write_op(&state_view, &KEY),
-            Err(VMStatus::Error {
-                status_code: StatusCode::STORAGE_ERROR,
-                message: Some(_),
-                sub_status: None
-            })
-        );
-    }
-
-    #[test]
-    fn test_successful_write_op_conversion() {
-        let mut state_view = AggregatorStore::default();
-        state_view.set_from_state_key(KEY.clone(), 100);
-
-        // Both addition and subtraction should succeed!
-        let add_op = delta_add(100, 200);
-        let sub_op = delta_sub(100, 200);
-
-        let add_result = add_op.try_into_write_op(&state_view, &KEY);
-        assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200)));
-
-        let sub_result = sub_op.try_into_write_op(&state_view, &KEY);
-        assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0)));
-    }
-
-    #[test]
-    fn test_unsuccessful_write_op_conversion() {
-        let mut state_view = AggregatorStore::default();
-        state_view.set_from_state_key(KEY.clone(), 100);
-
-        // Both addition and subtraction should fail!
-        let add_op = delta_add(15, 100);
-        let sub_op = delta_sub(101, 1000);
-
-        assert_matches!(
-            add_op.try_into_write_op(&state_view, &KEY),
-            Err(VMStatus::MoveAbort(_, EADD_OVERFLOW))
-        );
-        assert_matches!(
-            sub_op.try_into_write_op(&state_view, &KEY),
-            Err(VMStatus::MoveAbort(_, ESUB_UNDERFLOW))
-        );
     }
 }

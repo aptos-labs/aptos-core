@@ -10,8 +10,8 @@ use crate::{
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::StateView;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use aptos_vm_types::view::StateView;
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
@@ -61,7 +61,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
-        let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
+        let log_context = AdapterLogSchema::new(self.base_view.view_id(), txn_idx as usize);
 
         match self
             .vm

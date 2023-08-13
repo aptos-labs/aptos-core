@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use anyhow::Result;
 use aptos_logger::trace;
-use aptos_state_view::{StateView, TStateView};
+use aptos_state_view::StateViewId;
 use aptos_types::{
     block_executor::partitioner::TransactionWithDependencies,
     state_store::{
@@ -11,6 +11,7 @@ use aptos_types::{
     },
     transaction::analyzed_transaction::AnalyzedTransaction,
 };
+use aptos_vm_types::view::{StateView, StorageView, TModuleView, TResourceView};
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Condvar, Mutex},
@@ -121,17 +122,40 @@ impl<'a, S: StateView + Sync + Send> CrossShardStateView<'a, S> {
     }
 }
 
-impl<'a, S: StateView + Sync + Send> TStateView for CrossShardStateView<'a, S> {
+impl<'a, S: StateView + Sync + Send> TResourceView for CrossShardStateView<'a, S> {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
+    fn get_resource_state_value_from_view(
+        &self,
+        state_key: &Self::Key,
+    ) -> Result<Option<StateValue>> {
         if let Some(value) = self.cross_shard_data.get(state_key) {
             return Ok(value.get_value());
         }
-        self.base_view.get_state_value(state_key)
+        self.base_view.get_resource_state_value_from_view(state_key)
+    }
+}
+
+impl<'a, S: StateView + Sync + Send> TModuleView for CrossShardStateView<'a, S> {
+    type Key = StateKey;
+
+    fn get_module_state_value_from_view(
+        &self,
+        state_key: &Self::Key,
+    ) -> Result<Option<StateValue>> {
+        if let Some(value) = self.cross_shard_data.get(state_key) {
+            return Ok(value.get_value());
+        }
+        self.base_view.get_module_state_value_from_view(state_key)
+    }
+}
+
+impl<'a, S: StateView + Sync + Send> StorageView for CrossShardStateView<'a, S> {
+    fn view_id(&self) -> StateViewId {
+        StateViewId::Miscellaneous
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_storage_usage(&self) -> Result<StateStorageUsage> {
         Ok(StateStorageUsage::new_untracked())
     }
 }
@@ -139,8 +163,9 @@ impl<'a, S: StateView + Sync + Send> TStateView for CrossShardStateView<'a, S> {
 #[cfg(test)]
 mod tests {
     use crate::sharded_block_executor::cross_shard_state_view::CrossShardStateView;
-    use aptos_state_view::{in_memory_state_view::InMemoryStateView, TStateView};
+    use aptos_state_view::in_memory_state_view::InMemoryStateView;
     use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
+    use aptos_vm_types::view::TResourceView;
     use once_cell::sync::Lazy;
     use std::{
         collections::{HashMap, HashSet},
@@ -166,7 +191,8 @@ mod tests {
         let cross_shard_state_view_clone = cross_shard_state_view.clone();
 
         let wait_thread = thread::spawn(move || {
-            let value = cross_shard_state_view_clone.get_state_value(&state_key_clone);
+            let value =
+                cross_shard_state_view_clone.get_resource_state_value_from_view(&state_key_clone);
             assert_eq!(value.unwrap(), Some(state_value_clone));
         });
 

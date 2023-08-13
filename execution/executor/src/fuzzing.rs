@@ -9,7 +9,6 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_state_view::StateView;
 use aptos_storage_interface::{
     cached_state_view::CachedStateView, state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter,
 };
@@ -24,6 +23,7 @@ use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     VMExecutor,
 };
+use aptos_vm_types::view::StateView;
 use std::sync::Arc;
 
 fn create_test_executor() -> BlockExecutor<FakeVM> {

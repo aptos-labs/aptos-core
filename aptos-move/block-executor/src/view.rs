@@ -23,6 +23,7 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use aptos_vm_types::view::{StorageView, TModuleView, TResourceView};
 use std::{cell::RefCell, fmt::Debug, hash::Hash, sync::Arc};
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
@@ -174,13 +175,24 @@ enum ViewMapKind<'a, T: Transaction, X: Executable> {
     Unsync(&'a UnsyncMap<T::Key, T::Value, X>),
 }
 
-pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
+pub(crate) struct LatestView<
+    'a,
+    T: Transaction,
+    S: TResourceView<Key = T::Key> + TModuleView<Key = T::Key> + StorageView,
+    X: Executable,
+> {
     base_view: &'a S,
     latest_view: ViewMapKind<'a, T, X>,
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
+impl<
+        'a,
+        T: Transaction,
+        S: TResourceView<Key = T::Key> + TModuleView<Key = T::Key> + StorageView,
+        X: Executable,
+    > LatestView<'a, T, S, X>
+{
     pub(crate) fn new_mv_view(
         base_view: &'a S,
         map: &'a MVHashMapView<'a, T::Key, T::Value, X>,
@@ -206,12 +218,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 
     fn get_base_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
-        let ret = self.base_view.get_state_value(state_key);
+        let ret = self.base_view.get_resource_state_value_from_view(state_key);
 
         if ret.is_err() {
             // Even speculatively, reading from base view should not return an error.
             // Thus, this critical error log and count does not need to be buffered.
-            let log_context = AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize);
+            let log_context =
+                AdapterLogSchema::new(self.base_view.view_id(), self.txn_idx as usize);
             alert!(
                 log_context,
                 "[VM, StateView] Error getting data from storage for {:?}",
@@ -222,8 +235,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
-    for LatestView<'a, T, S, X>
+impl<
+        'a,
+        T: Transaction,
+        S: TResourceView<Key = T::Key> + TModuleView<Key = T::Key> + StorageView,
+        X: Executable,
+    > TStateView for LatestView<'a, T, S, X>
 {
     type Key = T::Key;
 
@@ -242,15 +259,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
                             // because parallel execution will fall back to sequential anyway.
                             Ok(None)
                         },
-                        Err(NotFound) => self.base_view.get_state_value(state_key),
+                        Err(NotFound) => self.base_view.get_module_state_value_from_view(state_key),
                     }
                 },
                 None => {
                     let mut mv_value = map.fetch_data(state_key, self.txn_idx);
 
                     if matches!(mv_value, ReadResult::Unresolved) {
-                        let from_storage =
-                            self.base_view.get_state_value_bytes(state_key)?.map_or(
+                        let from_storage = self
+                            .base_view
+                            .get_resource_bytes_from_view(state_key)?
+                            .map_or(
                                 Err(VMStatus::error(StatusCode::STORAGE_ERROR, None)),
                                 |bytes| Ok(deserialize(&bytes)),
                             )?;
@@ -289,10 +308,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
     }
 
     fn id(&self) -> StateViewId {
-        self.base_view.id()
+        self.base_view.view_id()
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
-        self.base_view.get_usage()
+        self.base_view.get_storage_usage()
     }
 }

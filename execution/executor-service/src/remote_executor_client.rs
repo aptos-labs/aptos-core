@@ -4,7 +4,7 @@
 use crate::{ExecuteBlockCommand, RemoteExecutionRequest, RemoteExecutionResult};
 use aptos_logger::trace;
 use aptos_secure_net::network_controller::{Message, NetworkController};
-use aptos_state_view::StateView;
+use aptos_state_view::RawStateView;
 use aptos_types::{
     block_executor::partitioner::PartitionedTransactions, transaction::TransactionOutput,
     vm_status::VMStatus,
@@ -18,7 +18,7 @@ use std::{
 };
 
 #[allow(dead_code)]
-pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
+pub struct RemoteExecutorClient<S: RawStateView + Sync + Send + 'static> {
     // Channels to send execute block commands to the executor shards.
     command_txs: Arc<Vec<Mutex<Sender<Message>>>>,
     // Channels to receive execution results from the executor shards.
@@ -30,7 +30,7 @@ pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
 }
 
 #[allow(dead_code)]
-impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
+impl<S: RawStateView + Sync + Send + 'static> RemoteExecutorClient<S> {
     pub fn new(
         remote_shard_addresses: Vec<SocketAddr>,
         controller: &mut NetworkController,
@@ -75,7 +75,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
     }
 }
 
-impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorClient<S> {
+impl<S: RawStateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorClient<S> {
     fn num_shards(&self) -> usize {
         self.command_txs.len()
     }
