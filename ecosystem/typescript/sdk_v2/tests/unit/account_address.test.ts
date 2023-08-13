@@ -43,6 +43,16 @@ const ADDRESS_F: Addresses = {
   ]),
 };
 
+const ADDRESS_F_PADDED_SHORT_FORM: Addresses = {
+  shortWith0x: "0x0f",
+  shortWithout0x: "0f",
+  longWith0x: "0x000000000000000000000000000000000000000000000000000000000000000f",
+  longWithout0x: "000000000000000000000000000000000000000000000000000000000000000f",
+  bytes: new Uint8Array([
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15,
+  ]),
+};
+
 // Non-special addresses.
 
 const ADDRESS_TEN: Addresses = {
@@ -108,6 +118,15 @@ describe("AccountAddress fromStringRelaxed", () => {
     );
   });
 
+  it("parses special address with padded short form: 0x0f", async () => {
+    expect(AccountAddress.fromStringRelaxed({ input: ADDRESS_F_PADDED_SHORT_FORM.shortWith0x }).toString()).toBe(
+      ADDRESS_F.shortWith0x,
+    );
+    expect(AccountAddress.fromStringRelaxed({ input: ADDRESS_F_PADDED_SHORT_FORM.shortWithout0x }).toString()).toBe(
+      ADDRESS_F.shortWith0x,
+    );
+  });
+
   it("parses non-special address: 0x10", async () => {
     expect(AccountAddress.fromStringRelaxed({ input: ADDRESS_TEN.longWith0x }).toString()).toBe(ADDRESS_TEN.longWith0x);
     expect(AccountAddress.fromStringRelaxed({ input: ADDRESS_TEN.longWithout0x }).toString()).toBe(
@@ -153,6 +172,11 @@ describe("AccountAddress fromString", () => {
     expect(() => AccountAddress.fromString({ input: ADDRESS_F.longWithout0x })).toThrow();
     expect(AccountAddress.fromString({ input: ADDRESS_F.shortWith0x }).toString()).toBe(ADDRESS_F.shortWith0x);
     expect(() => AccountAddress.fromString({ input: ADDRESS_F.shortWithout0x })).toThrow();
+  });
+
+  it("throws when parsing special address with padded short form: 0x0f", async () => {
+    expect(() => AccountAddress.fromString({ input: ADDRESS_F_PADDED_SHORT_FORM.shortWith0x })).toThrow();
+    expect(() => AccountAddress.fromString({ input: ADDRESS_F_PADDED_SHORT_FORM.shortWithout0x })).toThrow();
   });
 
   it("parses non-special address: 0x10", async () => {
