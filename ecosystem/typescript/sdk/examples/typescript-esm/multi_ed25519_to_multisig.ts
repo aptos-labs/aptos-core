@@ -168,6 +168,14 @@ const main = async () => {
 //////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
+// For clarification, the process of creating a MultiEd25519 account is:
+//  1. Create or specify N accounts. We will use their public keys to generate the MultiEd25519 account.
+//  2. Create a MultiEd25519 public key with the N public keys and a signature threshold K. K must be <= N.
+//      NOTE: A public key is different from an account's address. It can be always derived from an account's authentication key or private key, not necessarily its address.
+//  3. Create a MultiEd25519 authentication key with the MultiEd25519 public key.
+//      You can then derive the address from the authentication key.
+//  4. Fund the derived MultiEd25519 account at the derived address.
+//
 // Funds and thus creates the derived MultiEd25519 account and prints out the derived address, authentication key, and public key.
 const initializeMultiEd25519 = async (
   faucetClient: FaucetClient,
