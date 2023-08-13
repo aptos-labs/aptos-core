@@ -65,32 +65,14 @@ pub trait WeightedUndirectedGraphStream: Sized {
     }
 }
 
-impl<S> BatchedStream for S
-where
-    S: WeightedUndirectedGraphStream,
-{
-    type StreamItem = (NodeIndex, <Self as WeightedUndirectedGraphStream>::NodeWeight, <Self as WeightedUndirectedGraphStream>::NeighboursIter);
-    type BatchIter<'a> where Self: 'a = ();
+/// A trait for a generic graph streamer.
+pub trait GraphStreamer<G: WeightedUndirectedGraph> {
+    type Stream<'graph>: WeightedUndirectedGraphStream<NodeWeight = G::NodeWeight, EdgeWeight = G::EdgeWeight>
+    where
+        Self: 'graph,
+        G: 'graph;
 
-    fn process_batch<'a, F, R>(&'a mut self, f: F) -> R where F: FnOnce(Option<Self::BatchIter<'a>>) -> R {
-        todo!()
-    }
-
-    fn opt_len(&self) -> Option<usize> {
-        todo!()
-    }
-
-    fn opt_batch_count(&self) -> Option<usize> {
-        todo!()
-    }
-
-    fn into_batch_iter(self) -> BatchIterator<Self> {
-        todo!()
-    }
-
-    fn into_items_iter(self) -> ItemsIterator<Self> {
-        todo!()
-    }
+    fn stream<'graph>(&self, graph: &'graph G) -> Self::Stream<'graph>;
 }
 
 /// Streams graphs in batches of fixed size, in order from `0` to `node_count() - 1`.
