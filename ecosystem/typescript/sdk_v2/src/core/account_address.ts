@@ -182,7 +182,7 @@ export class AccountAddress {
    *
    * Where:
    * - LONG is defined as 0x + 64 hex characters.
-   * - SHORT for special addresses is 0x0 to 0xf inclusive, no padding zeroes.
+   * - SHORT for special addresses is 0x0 to 0xf inclusive without padding zeroes.
    *
    * This means the following are not accepted:
    * - SHORT for non-special addresses.
@@ -215,7 +215,7 @@ export class AccountAddress {
         // 0x + one hex char is the only valid SHORT form for special addresses.
         if (args.input.length != 3) {
           throw new ParsingError(
-            "The given hex string is a special address not in LONG form, it must be 0x0 to 0xf with no padding zeroes.",
+            "The given hex string is a special address not in LONG form, it must be 0x0 to 0xf without padding zeroes.",
             AddressInvalidReason.INVALID_PADDING_ZEROES,
           );
         }
