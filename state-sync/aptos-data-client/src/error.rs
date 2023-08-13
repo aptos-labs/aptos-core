@@ -9,7 +9,7 @@ pub type Result<T, E = Error> = ::std::result::Result<T, E>;
 /// An error returned by the Aptos Data Client for failed API calls.
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
-    #[error("The requested data is unavailable and cannot be found! Error: {0}")]
+    #[error("The requested data is unavailable and cannot be found!! Error: {0}")]
     DataIsUnavailable(String),
     #[error("The requested data is too large: {0}")]
     DataIsTooLarge(String),
