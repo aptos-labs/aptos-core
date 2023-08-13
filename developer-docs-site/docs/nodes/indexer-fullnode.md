@@ -83,7 +83,7 @@ For an Aptos indexer fullnode, install these packages:
 :::tip Bootstap the fullnode
 Instead of syncing your indexer fullnode from genesis, which may take a long period of time, you can choose to bootstrap your fullnode using backup data before starting it. To do so, follow the instructions to [restore from a backup](../nodes/full-node/aptos-db-restore.md).
 
-Note: indexers cannot be bootstrapped using [a snapshot](../nodes/full-node/bootstrap-fullnode.md) or [fast sync](../guides/state-sync.md#fast-syncing), as these are currently unsupported.
+Note: indexers cannot be bootstrapped using [a snapshot](../nodes/full-node/bootstrap-fullnode.md) or [fast sync](../guides/state-sync.md#fast-syncing).
 :::
 
 1. Run the indexer fullnode with either `cargo run` or `docker run` depending upon your setup. Remember to supply the arguments you need for your specific node:
