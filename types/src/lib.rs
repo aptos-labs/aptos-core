@@ -56,5 +56,6 @@ pub mod batched_stream;
 pub mod block_executor;
 pub mod const_option;
 pub mod state_store;
+pub mod with;
 #[cfg(test)]
 mod unit_tests;

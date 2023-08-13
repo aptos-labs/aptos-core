@@ -50,7 +50,7 @@ pub trait BatchedStream: Sized {
 impl<I> BatchedStream for I
 where
     I: Iterator,
-    I::Item: ExactSizeIterator,
+    I::Item: Iterator,
 {
     type StreamItem = <I::Item as Iterator>::Item;
 

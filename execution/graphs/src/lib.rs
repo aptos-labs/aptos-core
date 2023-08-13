@@ -3,3 +3,4 @@
 pub mod graph;
 pub mod graph_stream;
 pub mod partitioning;
+pub mod with;

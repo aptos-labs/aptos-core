@@ -7,7 +7,9 @@ pub type NodeIndex = u32;
 /// A simple trait for an undirected graph.
 pub trait UndirectedGraph {
     /// An iterator over the neighbours of a node in the graph.
-    type NeighboursIter: Iterator<Item = NodeIndex>;
+    type NeighboursIter<'a>: Iterator<Item = NodeIndex>
+    where
+        Self: 'a;
 
     /// Returns the number of nodes in the graph.
     fn node_count(&self) -> usize;
@@ -19,7 +21,7 @@ pub trait UndirectedGraph {
     fn degree(&self, node: NodeIndex) -> usize;
 
     /// Returns an iterator over the neighbors of a node.
-    fn edges(&self, node: NodeIndex) -> Self::NeighboursIter;
+    fn edges(&self, node: NodeIndex) -> Self::NeighboursIter<'_>;
 
     /// A convenience function that returns the range of node indices.
     /// Must be equivalent to 0..self.node_count().
@@ -34,7 +36,9 @@ pub trait WeightedNodes: UndirectedGraph {
     type NodeWeight;
 
     /// An iterator over the nodes of the graph with their weights.
-    type WeightedNodesIter: Iterator<Item = (NodeIndex, Self::NodeWeight)>;
+    type WeightedNodesIter<'a>: Iterator<Item = (NodeIndex, Self::NodeWeight)>
+    where
+        Self: 'a;
 
     /// Returns the weight of a node.
     fn node_weight(&self, node: NodeIndex) -> Self::NodeWeight;
@@ -44,7 +48,7 @@ pub trait WeightedNodes: UndirectedGraph {
     fn total_node_weight(&self) -> Self::NodeWeight;
 
     /// Returns an iterator over the nodes of the graph with their weights.
-    fn weighted_nodes(&self) -> Self::WeightedNodesIter;
+    fn weighted_nodes(&self) -> Self::WeightedNodesIter<'_>;
 }
 
 // A trait for an undirected graph with weighted edges.
@@ -53,11 +57,13 @@ pub trait WeightedEdges: UndirectedGraph {
     type EdgeWeight;
 
     /// An iterator over the neighbors of a node with their edge weights.
-    type WeightedNeighboursIter: Iterator<Item = (NodeIndex, Self::EdgeWeight)>;
+    type WeightedNeighboursIter<'a>: Iterator<Item = (NodeIndex, Self::EdgeWeight)>
+    where
+        Self: 'a;
 
     fn total_edge_weight(&self) -> Self::EdgeWeight;
 
-    fn weighted_edges(&self, node: NodeIndex) -> Self::WeightedNeighboursIter;
+    fn weighted_edges(&self, node: NodeIndex) -> Self::WeightedNeighboursIter<'_>;
 }
 
 /// A trait for an undirected graph with weighted nodes and edges.
@@ -81,7 +87,9 @@ impl<G> UndirectedGraph for TriviallyWeightedGraph<G>
 where
     G: UndirectedGraph,
 {
-    type NeighboursIter = G::NeighboursIter;
+    type NeighboursIter<'a> = G::NeighboursIter<'a>
+    where
+        G: 'a;
 
     fn node_count(&self) -> usize {
         self.graph.node_count()
@@ -95,7 +103,7 @@ where
         self.graph.degree(node)
     }
 
-    fn edges(&self, node: NodeIndex) -> Self::NeighboursIter {
+    fn edges(&self, node: NodeIndex) -> Self::NeighboursIter<'_> {
         self.graph.edges(node)
     }
 }
@@ -105,8 +113,11 @@ where
     G: UndirectedGraph,
 {
     type NodeWeight = NodeIndex;
-    type WeightedNodesIter =
-        std::iter::Map<std::ops::Range<NodeIndex>, fn(NodeIndex) -> (NodeIndex, Self::NodeWeight)>;
+
+    type WeightedNodesIter<'a> =
+        std::iter::Map<std::ops::Range<NodeIndex>, fn(NodeIndex) -> (NodeIndex, Self::NodeWeight)>
+    where
+        Self: 'a;
 
     fn node_weight(&self, _node: NodeIndex) -> Self::NodeWeight {
         1
@@ -116,7 +127,7 @@ where
         self.node_count() as Self::NodeWeight
     }
 
-    fn weighted_nodes(&self) -> Self::WeightedNodesIter {
+    fn weighted_nodes(&self) -> Self::WeightedNodesIter<'_> {
         self.graph.nodes().map(|node| (node, 1 as Self::NodeWeight))
     }
 }
@@ -126,14 +137,16 @@ where
     G: UndirectedGraph,
 {
     type EdgeWeight = usize;
-    type WeightedNeighboursIter =
-        std::iter::Map<G::NeighboursIter, fn(NodeIndex) -> (NodeIndex, usize)>;
+    type WeightedNeighboursIter<'a> =
+        std::iter::Map<G::NeighboursIter<'a>, fn(NodeIndex) -> (NodeIndex, usize)>
+        where
+            G: 'a;
 
     fn total_edge_weight(&self) -> Self::EdgeWeight {
         self.edge_count()
     }
 
-    fn weighted_edges(&self, node: NodeIndex) -> Self::WeightedNeighboursIter {
+    fn weighted_edges(&self, node: NodeIndex) -> Self::WeightedNeighboursIter<'_> {
         self.graph.edges(node).map(|neighbour| (neighbour, 1))
     }
 }

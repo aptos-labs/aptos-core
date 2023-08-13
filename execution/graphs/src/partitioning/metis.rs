@@ -175,8 +175,6 @@ where
     G::NodeWeight: Into<metis::Idx>,
     G::EdgeWeight: Into<metis::Idx>,
 {
-    type Error = anyhow::Error;
-
     /// Partitions the graph using the Metis graph partitioner.
     ///
     /// The partitioning may return an error if it fails to satisfy the balancing constraint
