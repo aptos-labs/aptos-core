@@ -49,12 +49,8 @@ impl FromStr for Address {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self, anyhow::Error> {
-        let mut ret = AccountAddress::from_hex_literal(s);
-        if ret.is_err() {
-            ret = AccountAddress::from_hex(s)
-        }
-        Ok(Self(ret.map_err(|_| {
-            anyhow::format_err!("invalid account address {:?}", s)
+        Ok(Self(AccountAddress::from_str(s).map_err(|e| {
+            anyhow::format_err!("Invalid account address: {:#}", e)
         })?))
     }
 }

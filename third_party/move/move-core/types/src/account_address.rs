@@ -119,6 +119,8 @@ impl AccountAddress {
         self.0
     }
 
+    /// NOTE: Where possible use from_str instead, it handles the widest range of
+    /// inputs and conforms to AIP-40.
     pub fn from_hex_literal(literal: &str) -> Result<Self, AccountAddressParseError> {
         if !literal.starts_with("0x") {
             return Err(AccountAddressParseError);
@@ -145,6 +147,8 @@ impl AccountAddress {
         format!("0x{}", self.short_str_lossless())
     }
 
+    /// NOTE: Where possible use from_str instead, it handles the widest range of
+    /// inputs and conforms to AIP-40.
     pub fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, AccountAddressParseError> {
         <[u8; Self::LENGTH]>::from_hex(hex)
             .map_err(|_| AccountAddressParseError)
@@ -161,6 +165,53 @@ impl AccountAddress {
         <[u8; Self::LENGTH]>::try_from(bytes.as_ref())
             .map_err(|_| AccountAddressParseError)
             .map(Self)
+    }
+
+    /// NOTE: This function has strict parsing behavior. For relaxed behavior, please use
+    /// the `from_str` function. Where possible, prefer to use `from_str_strict`.
+    ///
+    /// Create an instance of AccountAddress by parsing a hex string representation.
+    ///
+    /// This function allows only the strictest formats defined by AIP-40. In short this
+    /// means only the following formats are accepted:
+    ///
+    /// - LONG
+    /// - SHORT for special addresses
+    ///
+    /// Where:
+    ///
+    /// - LONG is defined as 0x + 64 hex characters.
+    /// - SHORT for special addresses is 0x0 to 0xf inclusive.
+    ///
+    /// This means the following are not accepted:
+    ///
+    /// - SHORT for non-special addresses.
+    /// - Any address without a leading 0x.
+    ///
+    /// Learn more about the different address formats by reading AIP-40:
+    /// https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md.
+    pub fn from_str_strict(s: &str) -> Result<Self, AccountAddressParseError> {
+        // Assert the string starts with 0x.
+        if !s.starts_with("0x") {
+            return Err(AccountAddressParseError);
+        }
+
+        let address = AccountAddress::from_str(s)?;
+
+        // Check if the address is in LONG form. If it is not, this is only allowed for
+        // special addresses, in which case we check it is in proper SHORT form.
+        if s.len() != (AccountAddress::LENGTH * 2) + 2 {
+            if !address.is_special() {
+                return Err(AccountAddressParseError);
+            } else {
+                // 0x + one hex char is the only valid SHORT form for special addresses.
+                if s.len() != 3 {
+                    return Err(AccountAddressParseError);
+                }
+            }
+        }
+
+        Ok(address)
     }
 }
 
@@ -276,19 +327,43 @@ impl TryFrom<String> for AccountAddress {
     type Error = AccountAddressParseError;
 
     fn try_from(s: String) -> Result<AccountAddress, AccountAddressParseError> {
-        Self::from_hex(s)
+        Self::from_str(&s)
     }
 }
 
 impl FromStr for AccountAddress {
     type Err = AccountAddressParseError;
 
+    /// NOTE: This function has relaxed parsing behavior. For strict behavior, please use
+    /// the `from_str_strict` function. Where possible use `from_str_strict` rather than
+    /// this function.
+    ///
+    /// Create an instance of AccountAddress by parsing a hex string representation.
+    ///
+    /// This function allows all formats defined by AIP-40. In short this means the
+    /// following formats are accepted:
+    ///
+    /// - LONG, with or without leading 0x
+    /// - SHORT, with or without leading 0x
+    ///
+    /// Where:
+    ///
+    /// - LONG is 64 hex characters.
+    /// - SHORT is 1 to 63 hex characters inclusive.
+    ///
+    /// Learn more about the different address formats by reading AIP-40:
+    /// https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md.
     fn from_str(s: &str) -> Result<Self, AccountAddressParseError> {
-        // Accept 0xADDRESS or ADDRESS
-        if let Ok(address) = AccountAddress::from_hex_literal(s) {
-            Ok(address)
+        if !s.starts_with("0x") {
+            if s.is_empty() {
+                return Err(AccountAddressParseError);
+            }
+            AccountAddress::from_hex_literal(&format!("0x{}", s))
         } else {
-            Self::from_hex(s)
+            if s.len() == 2 {
+                return Err(AccountAddressParseError);
+            }
+            AccountAddress::from_hex_literal(s)
         }
     }
 }
@@ -336,8 +411,7 @@ impl fmt::Display for AccountAddressParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Unable to parse AccountAddress (must be hex string of length {})",
-            AccountAddress::LENGTH
+            "Unable to parse AccountAddress (must be hex string that conforms to AIP-40)",
         )
     }
 }
@@ -576,6 +650,143 @@ mod tests {
     }
 
     #[test]
+    fn test_account_address_from_str() {
+        assert_eq!(
+            &AccountAddress::from_str("0x0")
+                .unwrap()
+                .to_standard_string(),
+            "0x0"
+        );
+        assert_eq!(
+            &AccountAddress::from_str("0x1")
+                .unwrap()
+                .to_standard_string(),
+            "0x1"
+        );
+        assert_eq!(
+            &AccountAddress::from_str("0xf")
+                .unwrap()
+                .to_standard_string(),
+            "0xf"
+        );
+        assert_eq!(
+            &AccountAddress::from_str("0x0f")
+                .unwrap()
+                .to_standard_string(),
+            "0xf"
+        );
+        assert_eq!(
+            &AccountAddress::from_str("0x010")
+                .unwrap()
+                .to_standard_string(),
+            "0x0000000000000000000000000000000000000000000000000000000000000010"
+        );
+        assert_eq!(
+            &AccountAddress::from_str("0xfdfdf")
+                .unwrap()
+                .to_standard_string(),
+            "0x00000000000000000000000000000000000000000000000000000000000fdfdf"
+        );
+        assert_eq!(
+            &AccountAddress::from_str(
+                "0x0500000000000000000000000000000000000000000000000000000000aadfdf"
+            )
+            .unwrap()
+            .to_standard_string(),
+            "0x0500000000000000000000000000000000000000000000000000000000aadfdf"
+        );
+
+        // As above but without the 0x prefix.
+        assert_eq!(
+            &AccountAddress::from_str("0").unwrap().to_standard_string(),
+            "0x0"
+        );
+        assert_eq!(
+            &AccountAddress::from_str("1").unwrap().to_standard_string(),
+            "0x1"
+        );
+        assert_eq!(
+            &AccountAddress::from_str("f").unwrap().to_standard_string(),
+            "0xf"
+        );
+        assert_eq!(
+            &AccountAddress::from_str("0f").unwrap().to_standard_string(),
+            "0xf"
+        );
+        assert_eq!(
+            &AccountAddress::from_str("010")
+                .unwrap()
+                .to_standard_string(),
+            "0x0000000000000000000000000000000000000000000000000000000000000010"
+        );
+        assert_eq!(
+            &AccountAddress::from_str("fdfdf")
+                .unwrap()
+                .to_standard_string(),
+            "0x00000000000000000000000000000000000000000000000000000000000fdfdf"
+        );
+        assert_eq!(
+            &AccountAddress::from_str(
+                "0500000000000000000000000000000000000000000000000000000000aadfdf"
+            )
+            .unwrap()
+            .to_standard_string(),
+            "0x0500000000000000000000000000000000000000000000000000000000aadfdf"
+        );
+    }
+
+    #[test]
+    fn test_account_address_from_str_strict() {
+        // See that only special addresses are accepted in SHORT form and all other
+        // addresses must use LONG form.
+        assert_eq!(
+            &AccountAddress::from_str_strict("0x0")
+                .unwrap()
+                .to_standard_string(),
+            "0x0"
+        );
+        assert_eq!(
+            &AccountAddress::from_str_strict("0x1")
+                .unwrap()
+                .to_standard_string(),
+            "0x1"
+        );
+        assert_eq!(
+            &AccountAddress::from_str_strict("0xf")
+                .unwrap()
+                .to_standard_string(),
+            "0xf"
+        );
+
+        assert!(&AccountAddress::from_str_strict("0x010").is_err());
+        assert!(&AccountAddress::from_str_strict("0xfdfdf").is_err());
+        assert_eq!(
+            &AccountAddress::from_str_strict(
+                "0x0500000000000000000000000000000000000000000000000000000000aadfdf"
+            )
+            .unwrap()
+            .to_standard_string(),
+            "0x0500000000000000000000000000000000000000000000000000000000aadfdf"
+        );
+
+        // Assert that special addresses must be in either SHORT or LONG form, meaning
+        // either 0x0 to 0xf inclusive (no leading zeros) or 0x0{63}[0-f].
+        assert!(&AccountAddress::from_str_strict("0x0f").is_err());
+
+        // As above but without the 0x prefix. See that they are all errors.
+        assert!(&AccountAddress::from_str_strict("0").is_err());
+        assert!(&AccountAddress::from_str_strict("1").is_err());
+        assert!(&AccountAddress::from_str_strict("f").is_err());
+        assert!(&AccountAddress::from_str_strict("010").is_err());
+        assert!(&AccountAddress::from_str_strict("fdfdf").is_err());
+        assert!(&AccountAddress::from_str_strict(
+            "0500000000000000000000000000000000000000000000000000000000aadfdf"
+        )
+        .is_err());
+        assert!(&AccountAddress::from_str_strict("0f").is_err());
+    }
+
+    #[test]
     fn test_ref() {
         let address = AccountAddress::new([1u8; AccountAddress::LENGTH]);
         let _: &[u8] = address.as_ref();
@@ -614,6 +825,9 @@ mod tests {
     fn test_address_from_empty_string() {
         assert!(AccountAddress::try_from("".to_string()).is_err());
         assert!(AccountAddress::from_str("").is_err());
+        assert!(AccountAddress::from_str("0x").is_err());
+        assert!(AccountAddress::from_str_strict("").is_err());
+        assert!(AccountAddress::from_str_strict("0x").is_err());
     }
 
     proptest! {
