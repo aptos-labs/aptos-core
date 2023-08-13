@@ -9,7 +9,7 @@ use crate::{
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     counters::*,
-    data_cache::StorageAdapter,
+    data_cache::{AsMoveResolver, StorageAdapter},
     errors::expect_only_successful_execution,
     move_vm_ext::{MoveResolverExt, RespawnedSession, SessionExt, SessionId},
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
@@ -119,16 +119,17 @@ macro_rules! unwrap_or_discard {
 }
 
 impl AptosVM {
-    pub fn new(state: &impl StateView) -> Self {
-        Self(AptosVMImpl::new(state))
+    pub fn new(state_view: &impl StateView) -> Self {
+        let config_storage = state_view.as_move_resolver();
+        Self(AptosVMImpl::new(&config_storage))
     }
 
-    pub fn new_for_validation(state: &impl StateView) -> Self {
+    pub fn new_for_validation(state_view: &impl StateView) -> Self {
         info!(
-            AdapterLogSchema::new(state.id(), 0),
+            AdapterLogSchema::new(state_view.id(), 0),
             "Adapter created for Validation"
         );
-        Self::new(state)
+        Self::new(state_view)
     }
 
     /// Sets execution concurrency level when invoked the first time.
