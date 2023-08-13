@@ -5,7 +5,7 @@ import { TypeTag, TypeTagVector } from "../aptos_types";
 import { Deserializer } from "./deserializer";
 import { Serializer } from "./serializer";
 import { AnyNumber, Bytes, Seq, Uint16, Uint32, Uint8 } from "./types";
-import { serializeVector as smartSerializeVectorWithDepth } from "../transaction_builder/builder_utils";
+import { serializeVector as serializeVectorHelper } from "../transaction_builder/builder_utils";
 
 interface Serializable {
   serialize(serializer: Serializer): void;
@@ -14,11 +14,10 @@ interface Serializable {
 /**
  * Serializes a vector of any depth with the corresponding serialization function for the specified TypeTag.
  */
-export function smartSerializeVector(argVal: any, typeTag: TypeTag): Bytes {
-  // The depth is not used in the function below, so we can just pass 0.
+export function serializeVectorWithDepth(argVal: any, typeTag: TypeTag): Bytes {
   const serializer = new Serializer();
   const typeTagVector = new TypeTagVector(typeTag);
-  smartSerializeVectorWithDepth(argVal, typeTagVector, serializer, 0);
+  serializeVectorHelper(argVal, typeTagVector, serializer, 0);
   return serializer.getBytes();
 }
 
