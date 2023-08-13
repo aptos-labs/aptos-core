@@ -512,7 +512,16 @@ impl<'a> FunctionGenerator<'a> {
     ) {
         let fun_ctx = ctx.fun_ctx;
         self.abstract_push_args(ctx, source);
-        if inst.is_empty() {
+        if let Some(opcode) = ctx.fun_ctx.module.get_well_known_function_code(
+            &ctx.fun_ctx.loc,
+            id,
+            Some(
+                self.gen
+                    .signature(&ctx.fun_ctx.module, &ctx.fun_ctx.loc, inst.to_vec()),
+            ),
+        ) {
+            self.emit(opcode)
+        } else if inst.is_empty() {
             let idx = self.gen.function_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,

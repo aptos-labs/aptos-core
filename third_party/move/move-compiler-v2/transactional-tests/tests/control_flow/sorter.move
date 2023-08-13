@@ -1,4 +1,4 @@
-//# publish
+//# publish --print-bytecode
 module 0x42::heap {
     use std::vector;
 
@@ -64,7 +64,7 @@ module 0x42::heap {
     }
 }
 
-//# run
+//# run --print-bytecode
 script {
 use 0x42::heap::main;
 fun mymain() {
