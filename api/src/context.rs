@@ -45,7 +45,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     data_cache::{AsMoveResolver, StorageAdapter},
-    move_vm_ext::MoveResolverExt,
+    move_vm_ext::AptosMoveResolver,
 };
 use futures::{channel::oneshot, SinkExt};
 use move_core_types::language_storage::{ModuleId, StructTag};

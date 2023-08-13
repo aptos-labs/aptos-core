@@ -4,7 +4,6 @@
 
 use crate::{
     access_path_cache::AccessPathCache,
-    data_cache::StorageAdapter,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
     system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
@@ -17,14 +16,13 @@ use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_state_view::StateView;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     chain_id::ChainId,
     fee_statement::FeeStatement,
     on_chain_config::{
-        ApprovedExecutionHashes, ConfigurationResource, FeatureFlag, Features, GasSchedule,
-        GasScheduleV2, OnChainConfig, TimedFeatures, Version,
+        ApprovedExecutionHashes, ConfigStorage, ConfigurationResource, FeatureFlag, Features,
+        GasSchedule, GasScheduleV2, OnChainConfig, TimedFeatures, Version,
     },
     transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
@@ -57,8 +55,10 @@ pub struct AptosVMImpl {
     features: Features,
 }
 
-pub fn gas_config(storage: &impl MoveResolverExt) -> (Result<AptosGasParameters, String>, u64) {
-    match GasScheduleV2::fetch_config(storage) {
+pub fn gas_config(
+    config_storage: &impl ConfigStorage,
+) -> (Result<AptosGasParameters, String>, u64) {
+    match GasScheduleV2::fetch_config(config_storage) {
         Some(gas_schedule) => {
             let feature_version = gas_schedule.feature_version;
             let map = gas_schedule.to_btree_map();
@@ -67,7 +67,7 @@ pub fn gas_config(storage: &impl MoveResolverExt) -> (Result<AptosGasParameters,
                 feature_version,
             )
         },
-        None => match GasSchedule::fetch_config(storage) {
+        None => match GasSchedule::fetch_config(config_storage) {
             Some(gas_schedule) => {
                 let map = gas_schedule.to_btree_map();
                 (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
@@ -79,16 +79,14 @@ pub fn gas_config(storage: &impl MoveResolverExt) -> (Result<AptosGasParameters,
 
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
-    pub fn new(state: &impl StateView) -> Self {
-        let storage = StorageAdapter::new(state);
-
+    pub fn new(config_storage: &impl ConfigStorage) -> Self {
         // Get the gas parameters
-        let (mut gas_params, gas_feature_version) = gas_config(&storage);
+        let (mut gas_params, gas_feature_version) = gas_config(config_storage);
 
         let storage_gas_params = match &mut gas_params {
             Ok(gas_params) => {
                 let storage_gas_params =
-                    StorageGasParameters::new(gas_feature_version, gas_params, &storage);
+                    StorageGasParameters::new(gas_feature_version, gas_params, config_storage);
 
                 // Overwrite table io gas parameters with global io pricing.
                 let g = &mut gas_params.natives.table;
@@ -131,12 +129,12 @@ impl AptosVMImpl {
             Err(_) => (NativeGasParameters::zeros(), MiscGasParameters::zeros()),
         };
 
-        let features = Features::fetch_config(&storage).unwrap_or_default();
+        let features = Features::fetch_config(config_storage).unwrap_or_default();
 
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
-        let chain_id = ChainId::fetch_config(&storage).unwrap_or_else(ChainId::test);
+        let chain_id = ChainId::fetch_config(config_storage).unwrap_or_else(ChainId::test);
 
-        let timestamp = ConfigurationResource::fetch_config(&storage)
+        let timestamp = ConfigurationResource::fetch_config(config_storage)
             .map(|config| config.last_reconfiguration_time())
             .unwrap_or(0);
 
@@ -155,7 +153,7 @@ impl AptosVMImpl {
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
-        let version = Version::fetch_config(&storage);
+        let version = Version::fetch_config(config_storage);
 
         Self {
             move_vm,

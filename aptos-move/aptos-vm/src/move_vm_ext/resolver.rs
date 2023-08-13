@@ -13,13 +13,8 @@ use move_core_types::{
 };
 use std::collections::BTreeMap;
 
-pub trait MoveResolverExt:
-    MoveResolver
-    + TableResolver
-    + AggregatorResolver
-    + StateStorageUsageResolver
-    + ConfigStorage
-    + StateView
+pub trait AptosMoveResolver:
+    MoveResolver + TableResolver + AggregatorResolver + StateStorageUsageResolver + ConfigStorage
 {
     fn get_resource_group_data(
         &self,
@@ -51,3 +46,7 @@ pub trait MoveResolverExt:
         .is_some()
     }
 }
+
+pub trait MoveResolverExt: AptosMoveResolver + StateView {}
+
+impl<T: AptosMoveResolver + StateView> MoveResolverExt for T {}
