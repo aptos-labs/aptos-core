@@ -59,11 +59,18 @@ async fn test_flows(runtime: &Runtime, network_name: NetworkName) -> Result<()> 
         TestName::PublishModule.run(network_name, &test_time).await;
     });
 
+    // Flow 5: View function
+    let test_time = run_id.clone();
+    let handle_viewfunction = runtime.spawn(async move {
+        TestName::ViewFunction.run(network_name, &test_time).await;
+    });
+
     join_all(vec![
         handle_newaccount,
         handle_cointransfer,
         handle_nfttransfer,
         handle_publishmodule,
+        handle_viewfunction,
     ])
     .await;
     Ok(())
