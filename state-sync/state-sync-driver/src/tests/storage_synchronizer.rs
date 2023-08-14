@@ -28,7 +28,7 @@ use aptos_event_notifications::EventSubscriptionService;
 use aptos_executor_types::ChunkCommitNotification;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_storage_interface::DbReaderWriter;
+use aptos_storage_interface::{AptosDbError, DbReaderWriter};
 use aptos_storage_service_notifications::StorageServiceNotificationListener;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -548,7 +548,11 @@ async fn test_initialize_state_synchronizer_receiver_error() {
     let mut db_writer = create_mock_db_writer();
     db_writer
         .expect_get_state_snapshot_receiver()
-        .returning(|_, _| Err(format_err!("Failed to get snapshot receiver!")));
+        .returning(|_, _| {
+            Err(AptosDbError::Other(
+                "Failed to get snapshot receiver!".to_string(),
+            ))
+        });
 
     // Create the storage synchronizer
     let (_, _, _, _, _, mut storage_synchronizer, _, _, _) = create_storage_synchronizer(
@@ -710,7 +714,7 @@ async fn test_save_states_invalid_chunk() {
     snapshot_receiver
         .expect_add_chunk()
         .with(always(), always())
-        .returning(|_, _| Err(format_err!("Invalid chunk!")));
+        .returning(|_, _| Err(AptosDbError::Other("Invalid chunk!".to_string())));
 
     // Setup the mock db writer
     let mut db_writer = create_mock_db_writer();

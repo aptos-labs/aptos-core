@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::AptosDB;
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use aptos_config::config::{NodeConfig, StorageDirPaths};
 use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter,
+    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter, Result,
     StateSnapshotReceiver,
 };
 use aptos_types::{

@@ -486,7 +486,7 @@ impl DbReader for AptosDB {
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
             self.error_if_ledger_pruned("NewBlockEvent", version)?;
-            ensure!(version <= self.get_latest_version()?);
+            ensure!(version <= self.get_latest_version()?, "version older than latest version");
 
             match self.event_store.get_block_metadata(version) {
                 Ok((_first_version, new_block_event)) => Ok(new_block_event.proposed_time()),
@@ -734,7 +734,7 @@ impl DbReader for AptosDB {
     ) -> Result<TransactionAccumulatorSummary> {
         let num_txns = ledger_version + 1;
         let frozen_subtrees = self.ledger_store.get_frozen_subtree_hashes(num_txns)?;
-        TransactionAccumulatorSummary::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?)
+        TransactionAccumulatorSummary::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?).map_err(Into::into)
     }
 
     fn get_state_leaf_count(&self, version: Version) -> Result<usize> {
@@ -792,7 +792,7 @@ impl DbReader for AptosDB {
     fn get_table_info(&self, handle: TableHandle) -> Result<TableInfo> {
         gauged_api("get_table_info", || {
             self.get_table_info_option(handle)?
-                .ok_or_else(|| AptosDbError::NotFound(format!("TableInfo for {:?}", handle)).into())
+                .ok_or_else(|| AptosDbError::NotFound(format!("TableInfo for {:?}", handle)))
         })
     }
 

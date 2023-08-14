@@ -18,10 +18,10 @@ use crate::{
         truncate_state_merkle_db,
     },
 };
-use anyhow::{ensure, Result};
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_schemadb::{ReadOptions, DB};
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::transaction::Version;
 use claims::assert_le;
 use clap::Parser;

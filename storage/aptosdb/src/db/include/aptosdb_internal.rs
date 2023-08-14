@@ -246,7 +246,7 @@ impl Debug for AptosDB {
 
 fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<()> {
     if num_requested > max_allowed {
-        Err(AptosDbError::TooManyRequested(num_requested, max_allowed).into())
+        Err(AptosDbError::TooManyRequested(num_requested, max_allowed))
     } else {
         Ok(())
     }

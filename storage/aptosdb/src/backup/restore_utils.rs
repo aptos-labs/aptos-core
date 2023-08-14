@@ -15,9 +15,9 @@ use crate::{
     transaction_store::TransactionStore,
     utils::{new_sharded_kv_schema_batch, ShardedStateKvSchemaBatch},
 };
-use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_schemadb::{SchemaBatch, DB};
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,

@@ -5,8 +5,8 @@ use crate::{
     db_debugger::common::DbDir, ledger_store::LedgerStore,
     schema::transaction_accumulator::TransactionAccumulatorSchema,
 };
-use anyhow::{ensure, Result};
 use aptos_crypto::hash::CryptoHash;
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{proof::position::Position, transaction::Version};
 use clap::Parser;
 use std::sync::Arc;
