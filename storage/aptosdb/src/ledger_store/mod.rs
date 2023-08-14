@@ -6,7 +6,6 @@
 //! root(LedgerInfo) to leaf(TransactionInfo).
 
 use crate::{
-    errors::AptosDbError,
     ledger_db::LedgerDb,
     schema::{
         db_metadata::DbMetadataKey, epoch_by_version::EpochByVersionSchema,
@@ -25,6 +24,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_schemadb::{ReadOptions, SchemaBatch};
+use aptos_storage_interface::errors::AptosDbError;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,

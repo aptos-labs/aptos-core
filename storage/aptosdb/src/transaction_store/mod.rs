@@ -5,7 +5,6 @@
 //! This file defines transaction store APIs that are related to committed signed transactions.
 
 use crate::{
-    errors::AptosDbError,
     ledger_db::LedgerDb,
     schema::{
         transaction::TransactionSchema, transaction_by_account::TransactionByAccountSchema,
@@ -18,6 +17,7 @@ use crate::{
 use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_schemadb::{ReadOptions, SchemaBatch};
+use aptos_storage_interface::errors::AptosDbError;
 use aptos_types::{
     account_address::AccountAddress,
     proof::position::Position,

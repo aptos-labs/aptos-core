@@ -17,7 +17,6 @@ pub mod fake_aptosdb;
 pub mod test_helper;
 
 pub mod backup;
-pub mod errors;
 pub mod metrics;
 pub mod schema;
 pub mod state_restore;
@@ -45,7 +44,6 @@ use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     db_options::{ledger_db_column_families, state_merkle_db_column_families},
-    errors::AptosDbError,
     event_store::EventStore,
     ledger_db::{LedgerDb, LedgerDbSchemaBatches},
     ledger_store::LedgerStore,
@@ -76,8 +74,9 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, state_delta::StateDelta, state_view::DbStateView,
-    DbReader, DbWriter, ExecutedTrees, Order, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
+    cached_state_view::ShardedStateCache, errors::AptosDbError, state_delta::StateDelta,
+    state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order, StateSnapshotReceiver,
+    MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,

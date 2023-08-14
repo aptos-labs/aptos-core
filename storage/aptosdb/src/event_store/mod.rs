@@ -8,7 +8,6 @@
 
 use super::AptosDB;
 use crate::{
-    errors::AptosDbError,
     schema::{
         event::EventSchema, event_accumulator::EventAccumulatorSchema,
         event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
@@ -22,6 +21,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_schemadb::{iterator::SchemaIterator, schema::ValueCodec, ReadOptions, SchemaBatch, DB};
+use aptos_storage_interface::errors::AptosDbError;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},

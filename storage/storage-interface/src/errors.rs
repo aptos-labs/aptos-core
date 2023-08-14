@@ -15,4 +15,7 @@ pub enum AptosDbError {
     /// Requested too many items.
     #[error("Too many items requested: at least {0} requested, max is {1}")]
     TooManyRequested(u64, u64),
+    /// Other non-classified error.
+    #[error("Other: {0}")]
+    Other(String),
 }

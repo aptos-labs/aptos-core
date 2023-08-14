@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::cached_state_view::ShardedStateCache;
-use anyhow::{anyhow, format_err, Result};
+use anyhow::{anyhow, format_err};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     access_path::AccessPath,
@@ -41,6 +41,7 @@ use thiserror::Error;
 
 pub mod async_proof_fetcher;
 pub mod cached_state_view;
+pub mod errors;
 mod executed_trees;
 mod metrics;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -50,7 +51,9 @@ pub mod state_view;
 
 use crate::state_delta::StateDelta;
 pub use executed_trees::ExecutedTrees;
+use crate::errors::AptosDbError;
 
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 // This is last line of defense against large queries slipping through external facing interfaces,
 // like the API and State Sync, etc.
 pub const MAX_REQUEST_LIMIT: u64 = 10000;
@@ -302,7 +305,7 @@ pub trait DbReader: Send + Sync {
     /// Returns the latest ledger info.
     fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
         self.get_latest_ledger_info_option()
-            .and_then(|opt| opt.ok_or_else(|| format_err!("Latest LedgerInfo not found.")))
+            .and_then(|opt| opt.ok_or_else(|| AptosDbError::Other("Latest LedgerInfo not found.".to_string())))
     }
 
     /// Returns the latest committed version, error on on non-bootstrapped/empty DB.
@@ -544,7 +547,7 @@ impl MoveStorage for &dyn DbReader {
             self.get_state_value_by_version(&StateKey::access_path(access_path), version)?;
 
         state_value
-            .ok_or_else(|| format_err!("no value found in DB"))
+            .ok_or_else(|| AptosDbError::NotFound("no value found in DB".to_string()))
             .map(|value| value.into_bytes())
     }
 
@@ -558,7 +561,7 @@ impl MoveStorage for &dyn DbReader {
         )?;
         config_value_option
             .map(|x| x.into_bytes())
-            .ok_or_else(|| anyhow!("no config {} found in aptos root account state", config_id))
+            .ok_or_else(|| AptosDbError::NotFound(format!("no config {} found in aptos root account state", config_id)))
     }
 
     fn fetch_synced_version(&self) -> Result<u64> {
@@ -567,7 +570,7 @@ impl MoveStorage for &dyn DbReader {
 
     fn fetch_latest_state_checkpoint_version(&self) -> Result<Version> {
         self.get_latest_state_checkpoint_version()?
-            .ok_or_else(|| format_err!("[MoveStorage] Latest state checkpoint not found."))
+            .ok_or_else(|| AptosDbError::NotFound("[MoveStorage] Latest state checkpoint not found.".to_string()))
     }
 }
 
