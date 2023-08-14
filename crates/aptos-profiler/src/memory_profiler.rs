@@ -112,7 +112,7 @@ impl Profiler for MemProfiler {
             .arg(binary_path)
             .output()
             .expect("Failed to execute command");
-            
+
         Ok(())
     }
 
