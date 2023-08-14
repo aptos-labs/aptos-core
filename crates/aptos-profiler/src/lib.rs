@@ -58,9 +58,9 @@ impl MemProfilerConfig {
 pub trait Profiler {
     // Perform profiling for duration_secs
     fn profile_for(&self, duration_secs: u64, binary_path: &str) -> Result<()>;
-    // Start profiling	
+    // Start profiling
     fn start_profiling(&mut self) -> Result<()>;
-    // End profiling	
+    // End profiling
     fn end_profiling(&mut self, binary_path: &str) -> Result<()>;
     // Expose the results as a JSON string for visualization
     fn expose_text_results(&self) -> Result<String>;
