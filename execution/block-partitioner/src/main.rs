@@ -44,7 +44,7 @@ fn main() {
         .num_threads(8)
         .avoid_pct(10)
         .dashmap_num_shards(64)
-        .merge_discarded(true)
+        .partition_last_round(false)
         .build();
     let mut rng = thread_rng();
     for _ in 0..args.num_blocks {

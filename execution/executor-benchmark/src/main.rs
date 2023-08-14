@@ -141,7 +141,7 @@ impl PipelineOpt {
                 num_rounds_limit: self.max_partitioning_rounds,
                 avoid_pct: ((1.0 - self.partitioner_cross_shard_dep_avoid_threshold) * 100.0) as u64,
                 dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
-                merge_discarded: self.use_global_executor,
+                partition_last_round: self.use_global_executor,
             }),
             _ => panic!("Unknown partitioner version: {}", self.partitioner_version)
         }

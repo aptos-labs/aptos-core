@@ -8,7 +8,7 @@ pub struct PartitionerV2Config {
     pub num_rounds_limit: usize,
     pub avoid_pct: u64,
     pub dashmap_num_shards: usize,
-    pub merge_discarded: bool,
+    pub partition_last_round: bool,
 }
 
 impl PartitionerV2Config {
@@ -18,7 +18,7 @@ impl PartitionerV2Config {
             self.num_rounds_limit,
             self.avoid_pct,
             self.dashmap_num_shards,
-            self.merge_discarded,
+            self.partition_last_round,
         ))
     }
 
@@ -42,8 +42,8 @@ impl PartitionerV2Config {
         self
     }
 
-    pub fn merge_discarded(mut self, val: bool) -> Self {
-        self.merge_discarded = val;
+    pub fn partition_last_round(mut self, val: bool) -> Self {
+        self.partition_last_round = val;
         self
     }
 }
@@ -55,7 +55,7 @@ impl Default for PartitionerV2Config {
             num_rounds_limit: 4,
             avoid_pct: 10,
             dashmap_num_shards: 64,
-            merge_discarded: true,
+            partition_last_round: false,
         }
     }
 }

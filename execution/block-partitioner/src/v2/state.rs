@@ -38,7 +38,7 @@ pub struct PartitionState {
     pub(crate) num_executor_shards: ShardId,
     pub(crate) num_rounds_limit: usize,
     pub(crate) avoid_pct: u64,
-    pub(crate) merge_discarded: bool,
+    pub(crate) partition_last_round: bool,
     pub(crate) thread_pool: Arc<ThreadPool>,
 
     // Holding all the txns.
@@ -115,7 +115,7 @@ impl PartitionState {
         });
         let start_txn_idxs_by_shard = start_txn_idxs(&pre_partitioned);
         Self {
-            merge_discarded,
+            partition_last_round: merge_discarded,
             thread_pool,
             num_executor_shards,
             pre_partitioned,
@@ -279,7 +279,7 @@ impl PartitionState {
     }
 
     pub(crate) fn final_sub_block_idx(&self, sub_blk_idx: SubBlockIdx) -> SubBlockIdx {
-        if self.merge_discarded {
+        if !self.partition_last_round {
             if sub_blk_idx.round_id == self.num_rounds() - 1 {
                 SubBlockIdx::global()
             } else {

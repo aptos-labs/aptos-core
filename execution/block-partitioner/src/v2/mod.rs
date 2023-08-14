@@ -62,10 +62,10 @@ pub mod types;
 pub struct PartitionerV2 {
     pre_partitioner: Box<dyn PrePartitioner>,
     thread_pool: Arc<ThreadPool>,
-    num_rounds_limit: usize,
+    max_partitioning_rounds: RoundId,
     avoid_pct: u64,
     dashmap_num_shards: usize,
-    merge_discarded: bool,
+    partition_last_round: bool,
 }
 
 impl PartitionerV2 {
@@ -74,7 +74,7 @@ impl PartitionerV2 {
         num_rounds_limit: usize,
         avoid_pct: u64,
         dashmap_num_shards: usize,
-        merge_discarded: bool,
+        partition_last_round: bool,
     ) -> Self {
         let thread_pool = Arc::new(
             ThreadPoolBuilder::new()
@@ -85,10 +85,10 @@ impl PartitionerV2 {
         Self {
             pre_partitioner: Box::new(UniformPartitioner {}), //TODO: parameterize it.
             thread_pool,
-            num_rounds_limit,
+            max_partitioning_rounds: num_rounds_limit,
             avoid_pct,
             dashmap_num_shards,
-            merge_discarded,
+            partition_last_round,
         }
     }
 
@@ -122,9 +122,9 @@ impl BlockPartitioner for PartitionerV2 {
             txns,
             num_executor_shards,
             pre_partitioned,
-            self.num_rounds_limit,
+            self.max_partitioning_rounds,
             self.avoid_pct,
-            self.merge_discarded,
+            self.partition_last_round,
         );
         Self::init(&mut state);
         Self::partition_to_matrix(&mut state);

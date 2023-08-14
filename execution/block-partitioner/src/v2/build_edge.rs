@@ -53,7 +53,7 @@ impl PartitionerV2 {
         });
 
         let global_txns: Vec<TransactionWithDependencies<AnalyzedTransaction>> =
-            if state.merge_discarded {
+            if !state.partition_last_round {
                 state
                     .sub_block_matrix
                     .pop()

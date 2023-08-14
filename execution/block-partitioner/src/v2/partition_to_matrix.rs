@@ -40,7 +40,7 @@ impl PartitionerV2 {
             .with_label_values(&["last_round"])
             .start_timer();
 
-        if state.merge_discarded {
+        if !state.partition_last_round {
             trace!("Merging txns after discarding stopped.");
             let last_round_txns: Vec<PreParedTxnIdx> =
                 remaining_txns.into_iter().flatten().collect();
