@@ -22,6 +22,9 @@ pub struct DKGStore {
     // store the aggregated node containing the final aggregated transcript
     // will be proposed as payload by proposal generator once the OnceCell is set
     agg_node: OnceCell<DKGAggNode>,
+    // buffer the nodes received before the DKG locally starts
+    buffered_nodes: Mutex<Vec<DKGNode>>,
+    buffered_agg_nodes: Mutex<Vec<DKGAggNode>>,
 }
 
 impl DKGStore {
@@ -31,6 +34,8 @@ impl DKGStore {
             nodes: DashMap::new(),
             agg_trx: Mutex::new(None),
             agg_node: OnceCell::new(),
+            buffered_nodes: Mutex::new(vec![]),
+            buffered_agg_nodes: Mutex::new(vec![]),
         }
     }
 
@@ -55,17 +60,19 @@ impl DKGStore {
 
         self.nodes.insert(*node.author(), node.clone());
 
-        // Aggregate the transcripts
-        let mut agg_trx = self.agg_trx.lock();
-        if agg_trx.is_none() {
-            *agg_trx = Some(node.transcript().clone());
-        } else {
-            agg_trx
-                .as_mut()
-                .unwrap()
-                .aggregate_with(dkg_pvss_config, node.transcript());
+        {
+            // Aggregate the transcripts
+            let mut agg_trx = self.agg_trx.lock();
+            if agg_trx.is_none() {
+                *agg_trx = Some(node.transcript().clone());
+            } else {
+                agg_trx
+                    .as_mut()
+                    .unwrap()
+                    .aggregate_with(dkg_pvss_config, node.transcript());
+            }
+            debug!("[DKG] Aggregating DKG trx from author {:?}", author);
         }
-        debug!("[DKG] Aggregating DKG trx from author {:?}", author);
 
         let authors: Vec<Author> = self.nodes.iter().map(|entry| *entry.key()).collect();
 
@@ -113,5 +120,21 @@ impl DKGStore {
             debug!("[DKG] Taking DKG Aggregated Node for epoch {:?}", agg_node.epoch());
         }
         self.agg_node.take()
+    }
+
+    pub fn buffer_nodes(&mut self, node: DKGNode) {
+        self.buffered_nodes.lock().push(node);
+    }
+
+    pub fn buffer_agg_nodes(&mut self, agg_node: DKGAggNode) {
+        self.buffered_agg_nodes.lock().push(agg_node);
+    }
+
+    pub fn take_buffered_nodes(&mut self) -> Vec<DKGNode> {
+        std::mem::take(&mut self.buffered_nodes.lock())
+    }
+
+    pub fn take_buffered_agg_nodes(&mut self) -> Vec<DKGAggNode> {
+        std::mem::take(&mut self.buffered_agg_nodes.lock())
     }
 }

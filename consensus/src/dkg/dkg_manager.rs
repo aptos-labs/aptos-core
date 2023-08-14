@@ -198,8 +198,14 @@ impl DKGManager {
 
     pub fn add_node(&self, node: DKGNode) -> anyhow::Result<()> {
         if self.dkg_pvss_config.lock().is_none() {
-            // dkg todo: think more about what to do in this case
+            self.dkg_store.lock().buffer_nodes(node);
             anyhow::bail!("[DKG] DKG PVSS config is not ready!");
+        } else {
+            // dkg todo: need to periodically check if there is any buffered node
+            let buffered_nodes = self.dkg_store.lock().take_buffered_nodes();
+            for node in buffered_nodes {
+                self.add_node(node)?;
+            }
         }
         if node
             .verify(self.dkg_pvss_config.lock().as_ref().unwrap())
@@ -227,7 +233,14 @@ impl DKGManager {
 
     pub fn add_agg_node(&self, agg_node: DKGAggNode) -> anyhow::Result<()> {
         if self.dkg_pvss_config.lock().is_none() {
+            self.dkg_store.lock().buffer_agg_nodes(agg_node);
             anyhow::bail!("[DKG] DKG PVSS config is not ready!");
+        } else {
+            // dkg todo: need to periodically check if there is any buffered node
+            let buffered_agg_nodes = self.dkg_store.lock().take_buffered_agg_nodes();
+            for agg_node in buffered_agg_nodes {
+                self.add_agg_node(agg_node)?;
+            }
         }
         if agg_node
             .verify(self.dkg_pvss_config.lock().as_ref().unwrap())
