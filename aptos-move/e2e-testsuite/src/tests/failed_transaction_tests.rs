@@ -38,11 +38,12 @@ fn failed_transaction_cleanup_test() {
     };
 
     let gas_params = AptosGasParameters::zeros();
-    let storage_gas_params = StorageGasParameters::free_and_unlimited();
+    let storage_gas_params =
+        StorageGasParameters::unlimited(gas_params.vm.txn.free_write_bytes_quota);
 
     let change_set_configs = storage_gas_params.change_set_configs.clone();
 
-    let mut gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
+    let gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
         LATEST_GAS_FEATURE_VERSION,
         gas_params.vm,
         storage_gas_params,
@@ -52,7 +53,7 @@ fn failed_transaction_cleanup_test() {
     // TYPE_MISMATCH should be kept and charged.
     let out1 = aptos_vm.failed_transaction_cleanup(
         VMStatus::error(StatusCode::TYPE_MISMATCH, None),
-        &mut gas_meter,
+        &gas_meter,
         &txn_data,
         &data_cache,
         &log_context,
@@ -72,7 +73,7 @@ fn failed_transaction_cleanup_test() {
     // Invariant violations should be charged.
     let out2 = aptos_vm.failed_transaction_cleanup(
         VMStatus::error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None),
-        &mut gas_meter,
+        &gas_meter,
         &txn_data,
         &data_cache,
         &log_context,
