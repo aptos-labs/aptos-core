@@ -216,7 +216,7 @@ impl<'a, S: StateView> ConfigStorage for StorageAdapter<'a, S> {
 
 impl<'a, S: StateView> StateStorageUsageResolver for StorageAdapter<'a, S> {
     fn get_state_storage_usage(&self) -> Result<StateStorageUsage, Error> {
-        self.get_usage()
+        self.state_store.get_usage()
     }
 }
 
@@ -230,6 +230,12 @@ impl<S: StateView> AsMoveResolver<S> for S {
     }
 }
 
+// We need to implement StateView for adapter because:
+//   1. When processing write set payload, storage is accessed
+//      directly.
+//   2. In VM session to access state value metadata.
+//   3. When stacking Storage adapters on top of each other, e.g.
+//      in epilogue.
 impl<'a, S: StateView> TStateView for StorageAdapter<'a, S> {
     type Key = StateKey;
 
