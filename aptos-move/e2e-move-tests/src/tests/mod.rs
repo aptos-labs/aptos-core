@@ -35,6 +35,7 @@ mod simple_defi;
 mod smart_data_structures;
 mod stake;
 mod state_metadata;
+mod storage_refund;
 mod string_args;
 mod token_event_store;
 mod token_objects;

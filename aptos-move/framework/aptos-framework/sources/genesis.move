@@ -153,6 +153,8 @@ module aptos_framework::genesis {
         stake::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
         // Give transaction_fee module BurnCapability<AptosCoin> so it can burn gas.
         transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
+        // Give transaction_fee module MintCapability<AptosCoin> so it can mint refunds.
+        transaction_fee::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
 
         let core_resources = account::create_account(@core_resources);
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);

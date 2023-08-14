@@ -6,7 +6,7 @@ use crate::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
     ledger_info::LedgerInfo,
     proof::{
         accumulator::InMemoryAccumulator, TransactionInfoListWithProof, TransactionInfoWithProof,
@@ -43,6 +43,7 @@ mod multisig;
 mod script;
 mod transaction_argument;
 
+use crate::fee_statement::FeeStatement;
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 use move_core_types::vm_status::AbortLocation;
@@ -1137,6 +1138,16 @@ impl TransactionOutput {
         );
 
         Ok(())
+    }
+
+    pub fn try_extract_fee_statement(&self) -> Result<Option<FeeStatement>> {
+        // Look backwards since the fee statement is expected to be the last event.
+        for event in self.events.iter().rev() {
+            if let Some(fee_statement) = event.try_v2_typed(&FEE_STATEMENT_EVENT_TYPE)? {
+                return Ok(Some(fee_statement));
+            }
+        }
+        Ok(None)
     }
 }
 
