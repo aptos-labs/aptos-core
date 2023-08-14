@@ -27,7 +27,7 @@ use crate::{
     StaleNodeIndexSchema, StateKvPrunerManager, StateMerklePrunerManager, TransactionStore,
     NUM_STATE_SHARDS, OTHER_TIMERS_SECONDS,
 };
-use anyhow::{ensure, format_err, Context, Result};
+use anyhow::{ensure, format_err, Context};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -79,6 +79,7 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * 2;
 
 const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 100000;
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()

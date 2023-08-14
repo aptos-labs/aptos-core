@@ -297,6 +297,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     self.storage
                         .aptos_db()
                         .get_epoch_ending_ledger_infos(first_epoch_to_consider - 1, epoch_state.epoch)
+                        .map_err(anyhow::Error::from)
                         .and_then(|proof| {
                             ensure!(proof.ledger_info_with_sigs.len() as u64 == (epoch_state.epoch - (first_epoch_to_consider - 1)));
                             extract_epoch_to_proposers(proof, epoch_state.epoch, &proposers, (window_size + seek_len) as u64)

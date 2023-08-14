@@ -10,7 +10,7 @@ use crate::{
         ForbiddenError, InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
     },
 };
-use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
+use anyhow::{bail, ensure, format_err, Context as AnyhowContext};
 use aptos_api_types::{
     AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, ResourceGroup,
     TransactionOnChainData,
@@ -22,6 +22,7 @@ use aptos_logger::error;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::TStateView;
 use aptos_storage_interface::{
+    errors::AptosDbError,
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
     DbReader, Order, MAX_REQUEST_LIMIT,
 };
@@ -56,6 +57,7 @@ use std::{
     time::Instant,
 };
 
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 // Context holds application scope context
 #[derive(Clone)]
 pub struct Context {
@@ -748,7 +750,9 @@ impl Context {
             .await
             .map_err(anyhow::Error::from)?;
 
-        callback.await.map_err(anyhow::Error::from)
+        callback
+            .await
+            .map_err(|e| AptosDbError::Other(e.to_string()))
     }
 
     pub fn get_transaction_by_version(

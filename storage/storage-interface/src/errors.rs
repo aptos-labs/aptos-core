@@ -19,3 +19,9 @@ pub enum AptosDbError {
     #[error("Other: {0}")]
     Other(String),
 }
+
+impl From<anyhow::Error> for AptosDbError {
+    fn from(error: anyhow::Error) -> Self {
+        Self::Other(format!("{}", error))
+    }
+}

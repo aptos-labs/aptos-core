@@ -21,7 +21,7 @@ use aptos_network::{
         wire::handshake::v1::ProtocolId,
     },
 };
-use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
+use aptos_storage_interface::{errors::AptosDbError, DbReader, ExecutedTrees, Order};
 use aptos_storage_service_notifications::StorageServiceNotifier;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServiceResponse, StorageServiceError,
@@ -231,7 +231,7 @@ mock! {
             &self,
             start_epoch: u64,
             end_epoch: u64,
-        ) -> Result<EpochChangeProof>;
+        ) -> Result<EpochChangeProof, AptosDbError>;
 
         fn get_transactions(
             &self,
@@ -239,32 +239,32 @@ mock! {
             batch_size: u64,
             ledger_version: Version,
             fetch_events: bool,
-        ) -> Result<TransactionListWithProof>;
+        ) -> Result<TransactionListWithProof, AptosDbError>;
 
         fn get_transaction_by_hash(
             &self,
             hash: HashValue,
             ledger_version: Version,
             fetch_events: bool,
-        ) -> Result<Option<TransactionWithProof>>;
+        ) -> Result<Option<TransactionWithProof>, AptosDbError>;
 
         fn get_transaction_by_version(
             &self,
             version: Version,
             ledger_version: Version,
             fetch_events: bool,
-        ) -> Result<TransactionWithProof>;
+        ) -> Result<TransactionWithProof, AptosDbError>;
 
-        fn get_first_txn_version(&self) -> Result<Option<Version>>;
+        fn get_first_txn_version(&self) -> Result<Option<Version>, AptosDbError>;
 
-        fn get_first_write_set_version(&self) -> Result<Option<Version>>;
+        fn get_first_write_set_version(&self) -> Result<Option<Version>, AptosDbError>;
 
         fn get_transaction_outputs(
             &self,
             start_version: Version,
             limit: u64,
             ledger_version: Version,
-        ) -> Result<TransactionOutputListWithProof>;
+        ) -> Result<TransactionOutputListWithProof, AptosDbError>;
 
         fn get_events(
             &self,
@@ -273,23 +273,23 @@ mock! {
             order: Order,
             limit: u64,
             ledger_version: Version,
-        ) -> Result<Vec<EventWithVersion>>;
+        ) -> Result<Vec<EventWithVersion>, AptosDbError>;
 
-        fn get_block_timestamp(&self, version: u64) -> Result<u64>;
+        fn get_block_timestamp(&self, version: u64) -> Result<u64, AptosDbError>;
 
         fn get_last_version_before_timestamp(
             &self,
             _timestamp: u64,
             _ledger_version: Version,
-        ) -> Result<Version>;
+        ) -> Result<Version, AptosDbError>;
 
-        fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
+        fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>, AptosDbError>;
 
-        fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;
+        fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures, AptosDbError>;
 
-        fn get_latest_version(&self) -> Result<Version>;
+        fn get_latest_version(&self) -> Result<Version, AptosDbError>;
 
-        fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
+        fn get_latest_commit_metadata(&self) -> Result<(Version, u64), AptosDbError>;
 
         fn get_account_transaction(
             &self,
@@ -297,7 +297,7 @@ mock! {
             seq_num: u64,
             include_events: bool,
             ledger_version: Version,
-        ) -> Result<Option<TransactionWithProof>>;
+        ) -> Result<Option<TransactionWithProof>, AptosDbError>;
 
         fn get_account_transactions(
             &self,
@@ -306,51 +306,51 @@ mock! {
             limit: u64,
             include_events: bool,
             ledger_version: Version,
-        ) -> Result<AccountTransactionsWithProof>;
+        ) -> Result<AccountTransactionsWithProof, AptosDbError>;
 
         fn get_state_proof_with_ledger_info(
             &self,
             known_version: u64,
             ledger_info: LedgerInfoWithSignatures,
-        ) -> Result<StateProof>;
+        ) -> Result<StateProof, AptosDbError>;
 
-        fn get_state_proof(&self, known_version: u64) -> Result<StateProof>;
+        fn get_state_proof(&self, known_version: u64) -> Result<StateProof, AptosDbError>;
 
         fn get_state_value_with_proof_by_version(
             &self,
             state_key: &StateKey,
             version: Version,
-        ) -> Result<(Option<StateValue>, SparseMerkleProof)>;
+        ) -> Result<(Option<StateValue>, SparseMerkleProof), AptosDbError>;
 
-        fn get_latest_executed_trees(&self) -> Result<ExecutedTrees>;
+        fn get_latest_executed_trees(&self) -> Result<ExecutedTrees, AptosDbError>;
 
-        fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures>;
+        fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures, AptosDbError>;
 
-        fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue>;
+        fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue, AptosDbError>;
 
         fn get_accumulator_consistency_proof(
             &self,
             _client_known_version: Option<Version>,
             _ledger_version: Version,
-        ) -> Result<AccumulatorConsistencyProof>;
+        ) -> Result<AccumulatorConsistencyProof, AptosDbError>;
 
         fn get_accumulator_summary(
             &self,
             ledger_version: Version,
-        ) -> Result<TransactionAccumulatorSummary>;
+        ) -> Result<TransactionAccumulatorSummary, AptosDbError>;
 
-        fn get_state_leaf_count(&self, version: Version) -> Result<usize>;
+        fn get_state_leaf_count(&self, version: Version) -> Result<usize, AptosDbError>;
 
         fn get_state_value_chunk_with_proof(
             &self,
             version: Version,
             start_idx: usize,
             chunk_size: usize,
-        ) -> Result<StateValueChunkWithProof>;
+        ) -> Result<StateValueChunkWithProof, AptosDbError>;
 
-        fn get_epoch_snapshot_prune_window(&self) -> Result<usize>;
+        fn get_epoch_snapshot_prune_window(&self) -> Result<usize, AptosDbError>;
 
-        fn is_state_merkle_pruner_enabled(&self) -> Result<bool>;
+        fn is_state_merkle_pruner_enabled(&self) -> Result<bool, AptosDbError>;
     }
 }
 
