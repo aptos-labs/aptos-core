@@ -37,7 +37,7 @@ impl<'a> CpuProfiler<'a> {
 
 impl Profiler for CpuProfiler<'_> {
     /// Perform CPU profiling for the given duration
-    fn profile_for(&self, duration_secs: u64) -> Result<()> {
+    fn profile_for(&self, duration_secs: u64, _binary_path: &str) -> Result<()> {
         let guard = pprof::ProfilerGuard::new(self.frequency).unwrap();
         thread::sleep(time::Duration::from_secs(duration_secs));
 
@@ -57,17 +57,14 @@ impl Profiler for CpuProfiler<'_> {
     }
 
     /// End profiling
-    fn end_profiling(&mut self) -> Result<()> {
-        //TODO: pprof-rs crate may not have a direct way of stopping the profiling from another function.
-        //Potential approach: return guard object to original scope and pass it here to stop and report results
-        if let Some(guard) = &self.guard {
+    fn end_profiling(&mut self, _binary_path: &str) -> Result<()> {
+        if let Some(guard) = self.guard.take() {
             if let Ok(report) = guard.report().build() {
                 let file = create_file_with_parents(self.svg_result_path.as_path())?;
                 let _result = report.flamegraph(file);
-            };
+            }
             self.destory_guard()?;
         }
-
         Ok(())
     }
 
