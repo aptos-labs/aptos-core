@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashMap;
 use super::{types::DKGAggNode, DKGNode};
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
@@ -16,31 +17,31 @@ pub struct DKGStore {
     author: Author,
     // dkg todo: persist the dkg nodes
     // store the mapping from authors to dkg nodes
-    nodes: DashMap<Author, DKGNode>,
+    nodes: HashMap<Author, DKGNode>,
     // store the partially aggregated transcripts
-    agg_trx: Mutex<Option<DKGTranscriptWrapper>>,
+    agg_trx: Option<DKGTranscriptWrapper>,
     // store the aggregated node containing the final aggregated transcript
     // will be proposed as payload by proposal generator once the OnceCell is set
     agg_node: OnceCell<DKGAggNode>,
     // buffer the nodes received before the DKG locally starts
-    buffered_nodes: Mutex<Vec<DKGNode>>,
-    buffered_agg_nodes: Mutex<Vec<DKGAggNode>>,
+    buffered_nodes: Vec<DKGNode>,
+    buffered_agg_nodes: Vec<DKGAggNode>,
 }
 
 impl DKGStore {
     pub fn new(author: Author) -> Self {
         Self {
             author,
-            nodes: DashMap::new(),
-            agg_trx: Mutex::new(None),
+            nodes: HashMap::new(),
+            agg_trx: None,
             agg_node: OnceCell::new(),
-            buffered_nodes: Mutex::new(vec![]),
-            buffered_agg_nodes: Mutex::new(vec![]),
+            buffered_nodes: vec![],
+            buffered_agg_nodes: vec![],
         }
     }
 
     pub fn add_node(
-        &self,
+        &mut self,
         node: DKGNode,
         validator_verifier: &ValidatorVerifier,
         dkg_pvss_config: &DKGPvssConfig,
@@ -62,11 +63,10 @@ impl DKGStore {
 
         {
             // Aggregate the transcripts
-            let mut agg_trx = self.agg_trx.lock();
-            if agg_trx.is_none() {
-                *agg_trx = Some(node.transcript().clone());
+            if self.agg_trx.is_none() {
+                self.agg_trx = Some(node.transcript().clone());
             } else {
-                agg_trx
+                self.agg_trx
                     .as_mut()
                     .unwrap()
                     .aggregate_with(dkg_pvss_config, node.transcript());
@@ -74,7 +74,7 @@ impl DKGStore {
             debug!("[DKG] Aggregating DKG trx from author {:?}", author);
         }
 
-        let authors: Vec<Author> = self.nodes.iter().map(|entry| *entry.key()).collect();
+        let authors: Vec<Author> = self.nodes.iter().map(|(k,v)| *k).collect();
 
         let mut aggregated_voting_power = 0;
         for account_address in authors.clone() {
@@ -93,7 +93,7 @@ impl DKGStore {
             let agg_node = DKGAggNode::new(
                 node.epoch(),
                 self.author,
-                self.agg_trx.lock().take().unwrap(),
+                self.agg_trx.take().unwrap(),
             );
             debug!(
                 "[DKG] Aggregated transcript is ready for epoch {:?}",
@@ -104,7 +104,7 @@ impl DKGStore {
         Ok(None)
     }
 
-    pub fn add_agg_node(&self, agg_node: DKGAggNode) -> anyhow::Result<Option<DKGAggNode>> {
+    pub fn add_agg_node(&mut self, agg_node: DKGAggNode) -> anyhow::Result<Option<DKGAggNode>> {
         if self.agg_node.get().is_some() {
             return Ok(None);
         }
@@ -123,18 +123,18 @@ impl DKGStore {
     }
 
     pub fn buffer_nodes(&mut self, node: DKGNode) {
-        self.buffered_nodes.lock().push(node);
+        self.buffered_nodes.push(node);
     }
 
     pub fn buffer_agg_nodes(&mut self, agg_node: DKGAggNode) {
-        self.buffered_agg_nodes.lock().push(agg_node);
+        self.buffered_agg_nodes.push(agg_node);
     }
 
     pub fn take_buffered_nodes(&mut self) -> Vec<DKGNode> {
-        std::mem::take(&mut self.buffered_nodes.lock())
+        std::mem::take(&mut self.buffered_nodes)
     }
 
     pub fn take_buffered_agg_nodes(&mut self) -> Vec<DKGAggNode> {
-        std::mem::take(&mut self.buffered_agg_nodes.lock())
+        std::mem::take(&mut self.buffered_agg_nodes)
     }
 }

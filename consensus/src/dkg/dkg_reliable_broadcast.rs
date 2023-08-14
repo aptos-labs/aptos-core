@@ -4,6 +4,8 @@
 // use aptos_logger::error;
 // use thiserror::Error as ThisError;
 
+use std::sync::Arc;
+use aptos_infallible::Mutex;
 use super::{
     dkg_manager::DKGManager,
     dkg_network::DKGRpcHandler,
@@ -19,11 +21,11 @@ use aptos_logger::{error, debug};
 // }
 
 pub struct DKGNodeHandler {
-    dkg_manager: DKGManager,
+    dkg_manager: Arc<Mutex<DKGManager>>,
 }
 
 impl DKGNodeHandler {
-    pub fn new(dkg_manager: DKGManager) -> Self {
+    pub fn new(dkg_manager: Arc<Mutex<DKGManager>>) -> Self {
         Self { dkg_manager }
     }
 }
@@ -36,7 +38,7 @@ impl DKGRpcHandler for DKGNodeHandler {
         let epoch = node.epoch();
         debug!("[DKG] Process DKG Node from {:?}", node.author());
         // dkg todo: persist the dkg nodes
-        match self.dkg_manager.add_node(node) {
+        match self.dkg_manager.lock().add_node(node) {
             Ok(_) => Ok(DKGNodeAck::new(epoch)),
             Err(e) => {
                 error!("[DKG] Error when adding DKG node: {:?}", e);
@@ -53,11 +55,11 @@ impl DKGRpcHandler for DKGNodeHandler {
 // }
 
 pub struct DKGAggNodeHandler {
-    dkg_manager: DKGManager,
+    dkg_manager: Arc<Mutex<DKGManager>>,
 }
 
 impl DKGAggNodeHandler {
-    pub fn new(dkg_manager: DKGManager) -> Self {
+    pub fn new(dkg_manager: Arc<Mutex<DKGManager>>) -> Self {
         Self { dkg_manager }
     }
 }
@@ -70,7 +72,7 @@ impl DKGRpcHandler for DKGAggNodeHandler {
         let epoch = agg_node.epoch();
         debug!("[DKG] Process DKG Aggregated Node: {:?}", agg_node);
         // dkg todo: persist the dkg nodes
-        match self.dkg_manager.add_agg_node(agg_node) {
+        match self.dkg_manager.lock().add_agg_node(agg_node) {
             Ok(_) => Ok(DKGAggNodeAck::new(epoch)),
             Err(e) => {
                 error!("[DKG] Error when adding DKG aggregated node: {:?}", e);

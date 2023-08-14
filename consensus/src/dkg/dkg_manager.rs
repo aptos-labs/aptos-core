@@ -13,7 +13,7 @@ use aptos_dkg::{
     pvss::{das, test_utils, traits::Transcript, WeightedTranscript},
     utils::random::random_scalar,
 };
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{error, debug};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
@@ -37,7 +37,7 @@ type WT = WeightedTranscript<das::Transcript>;
 pub enum DKGManagerWrapper {
     #[allow(dead_code)]
     NoDKG,
-    WithDKG(DKGManager),
+    WithDKG(Arc<Mutex<DKGManager>>),
 }
 
 impl DKGManagerWrapper {
@@ -52,7 +52,9 @@ impl DKGManagerWrapper {
                 error!("[DKG] No DKG manager!");
             },
             DKGManagerWrapper::WithDKG(dkg_manager) => {
-                dkg_manager.start_dkg(dkg_events).await;
+                let dkg_manager_clone = dkg_manager.clone();
+                let mut guard = dkg_manager_clone.lock();
+                guard.start_dkg(dkg_events);
             },
         }
     }
@@ -60,40 +62,39 @@ impl DKGManagerWrapper {
     pub fn take_agg_node(&self) -> Option<DKGAggNode> {
         match self {
             DKGManagerWrapper::NoDKG => None,
-            DKGManagerWrapper::WithDKG(dkg_manager) => dkg_manager.take_agg_node(),
+            DKGManagerWrapper::WithDKG(dkg_manager) => dkg_manager.lock().take_agg_node(),
         }
     }
 }
 
-#[derive(Clone)]
 pub struct DKGManager {
     author: Author,
-    epoch_state: Arc<EpochState>,
+    epoch_state: EpochState,
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
-    rb_abort_handle: Arc<Mutex<Option<AbortHandle>>>,
-    dkg_store: Arc<Mutex<DKGStore>>,
-    dkg_rounding: Arc<Mutex<Option<DKGRounding>>>,
-    dkg_pvss_config: Arc<Mutex<Option<DKGPvssConfig>>>,
+    rb_abort_handle: Option<AbortHandle>,
+    dkg_store: DKGStore,
+    dkg_rounding: Option<DKGRounding>,
+    dkg_pvss_config: Option<DKGPvssConfig>,
 }
 
 impl DKGManager {
     pub fn new(
         author: Author,
-        epoch_state: Arc<EpochState>,
+        epoch_state: EpochState,
         reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
     ) -> Self {
         Self {
             author,
             epoch_state,
             reliable_broadcast,
-            rb_abort_handle: Arc::new(Mutex::new(None)),
-            dkg_store: Arc::new(Mutex::new(DKGStore::new(author))),
-            dkg_rounding: Arc::new(Mutex::new(None)),
-            dkg_pvss_config: Arc::new(Mutex::new(None)),
+            rb_abort_handle: None,
+            dkg_store: DKGStore::new(author),
+            dkg_rounding: None,
+            dkg_pvss_config: None,
         }
     }
 
-    pub async fn start_dkg(&self, dkg_events: Vec<ContractEvent>) {
+    pub fn start_dkg(&mut self, dkg_events: Vec<ContractEvent>) {
         // thread::sleep(Duration::from_millis(TRANSCRIPT_COMPUTE_TIME_MS));
         let dkg_rounding: DKGRounding = dkg_events
             .first()
@@ -117,7 +118,7 @@ impl DKGManager {
 
         let wc_1 = dkg_rounding.weighted_config_1().clone();
         let wc_2 = dkg_rounding.weighted_config_2().clone();
-        self.dkg_rounding.lock().replace(dkg_rounding);
+        self.dkg_rounding.replace(dkg_rounding);
 
         let mut rng = thread_rng();
         let seed = random_scalar(&mut rng);
@@ -157,8 +158,9 @@ impl DKGManager {
         // assert_eq!(trx_2, deserialized);
 
         let dkg_pvss_config = DKGPvssConfig::new(wc_1.clone(), wc_2.clone(), pp, consensus_keys, &DST_PVSS_TESTING_APP[..]);
-        self.dkg_pvss_config.lock().replace(dkg_pvss_config);
-
+        {
+            self.dkg_pvss_config.replace(dkg_pvss_config);
+        }
         let dkg_trx_wrapper = DKGTranscriptWrapper {
             trx_one_third: trx_1,
             trx_two_third: trx_2,
@@ -169,8 +171,8 @@ impl DKGManager {
         self.broadcast_node(dkg_node);
     }
 
-    fn broadcast_node(&self, node: DKGNode) {
-        if self.rb_abort_handle.lock().is_some() {
+    fn broadcast_node(&mut self, node: DKGNode) {
+        if self.rb_abort_handle.is_some() {
             // do not rebroadcast if there is an ongoing broadcast
             return;
         }
@@ -178,43 +180,43 @@ impl DKGManager {
         let ack_set = DKGNodeAckState::new(self.epoch_state.verifier.len());
         let task = self.reliable_broadcast.broadcast(node.clone(), ack_set);
         tokio::spawn(Abortable::new(task, abort_registration));
-        self.rb_abort_handle.lock().replace(abort_handle);
+        self.rb_abort_handle.replace(abort_handle);
         debug!("[DKG] Node {:?} broadcast DKG Node of epoch {:?}", self.author, node.epoch());
     }
 
-    pub(crate) fn broadcast_agg_node(&self, agg_node: DKGAggNode) {
+    pub(crate) fn broadcast_agg_node(&mut self, agg_node: DKGAggNode) {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let ack_set = DKGAggNodeAckState::new(self.epoch_state.verifier.len());
         let task = self.reliable_broadcast.broadcast(agg_node.clone(), ack_set);
         tokio::spawn(Abortable::new(task, abort_registration));
         // abort the current node broadcast
         // no concurrent agg_node broadcast guaranteed by OnceCell
-        if let Some(prev_handle) = self.rb_abort_handle.lock().replace(abort_handle) {
+        if let Some(prev_handle) = self.rb_abort_handle.replace(abort_handle) {
             prev_handle.abort();
         }
         debug!("[DKG] Node {:?} broadcast DKG Aggregated Node of epoch {:?}", self.author, agg_node.epoch());
         // dkg todo: abort the broadcast when DKG is done
     }
 
-    pub fn add_node(&self, node: DKGNode) -> anyhow::Result<()> {
-        if self.dkg_pvss_config.lock().is_none() {
-            self.dkg_store.lock().buffer_nodes(node);
+    pub fn add_node(&mut self, node: DKGNode) -> anyhow::Result<()> {
+        if self.dkg_pvss_config.is_none() {
+            self.dkg_store.buffer_nodes(node);
             anyhow::bail!("[DKG] DKG PVSS config is not ready!");
         } else {
             // dkg todo: need to periodically check if there is any buffered node
-            let buffered_nodes = self.dkg_store.lock().take_buffered_nodes();
+            let buffered_nodes = self.dkg_store.take_buffered_nodes();
             for node in buffered_nodes {
                 self.add_node(node)?;
             }
         }
         if node
-            .verify(self.dkg_pvss_config.lock().as_ref().unwrap())
+            .verify(self.dkg_pvss_config.as_ref().unwrap())
             .is_ok()
         {
-            match self.dkg_store.lock().add_node(
+            match self.dkg_store.add_node(
                 node,
                 &self.epoch_state.verifier,
-                self.dkg_pvss_config.lock().as_ref().unwrap(),
+                self.dkg_pvss_config.as_ref().unwrap(),
             ) {
                 Ok(agg_node) => {
                     if let Some(agg_node) = agg_node {
@@ -231,22 +233,22 @@ impl DKGManager {
         }
     }
 
-    pub fn add_agg_node(&self, agg_node: DKGAggNode) -> anyhow::Result<()> {
-        if self.dkg_pvss_config.lock().is_none() {
-            self.dkg_store.lock().buffer_agg_nodes(agg_node);
+    pub fn add_agg_node(&mut self, agg_node: DKGAggNode) -> anyhow::Result<()> {
+        if self.dkg_pvss_config.is_none() {
+            self.dkg_store.buffer_agg_nodes(agg_node);
             anyhow::bail!("[DKG] DKG PVSS config is not ready!");
         } else {
             // dkg todo: need to periodically check if there is any buffered node
-            let buffered_agg_nodes = self.dkg_store.lock().take_buffered_agg_nodes();
+            let buffered_agg_nodes = self.dkg_store.take_buffered_agg_nodes();
             for agg_node in buffered_agg_nodes {
                 self.add_agg_node(agg_node)?;
             }
         }
         if agg_node
-            .verify(self.dkg_pvss_config.lock().as_ref().unwrap())
+            .verify(self.dkg_pvss_config.as_ref().unwrap())
             .is_ok()
         {
-            match self.dkg_store.lock().add_agg_node(agg_node) {
+            match self.dkg_store.add_agg_node(agg_node) {
                 Ok(agg_node) => {
                     if let Some(agg_node) = agg_node {
                         // Broadcast only the first aggregated dkg node
@@ -264,7 +266,7 @@ impl DKGManager {
     }
 
     // Will be called by the proposal generator
-    pub fn take_agg_node(&self) -> Option<DKGAggNode> {
-        self.dkg_store.lock().take_agg_node()
+    pub fn take_agg_node(&mut self) -> Option<DKGAggNode> {
+        self.dkg_store.take_agg_node()
     }
 }
