@@ -162,4 +162,16 @@ export class Hex {
       };
     }
   }
+
+  /**
+   * Return whether Hex instances are equal. Hex instances are considered equal if
+   * their underlying byte data is identical.
+   *
+   * @param other The Hex instance to compare to.
+   * @returns true if the Hex instances are equal, false if not.
+   */
+  equals(other: Hex): boolean {
+    if (this.data.length !== other.data.length) return false;
+    return this.data.every((value, index) => value === other.data[index]);
+  }
 }
