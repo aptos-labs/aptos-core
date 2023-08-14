@@ -233,6 +233,8 @@ pub struct PublishCommand {
     pub gas_budget: Option<u64>,
     #[clap(long = "syntax")]
     pub syntax: Option<SyntaxChoice>,
+    #[clap(long = "print-bytecode")]
+    pub print_bytecode: bool,
 }
 
 #[derive(Debug, Parser)]
@@ -261,6 +263,8 @@ pub struct RunCommand<ExtraValueArgs: ParsableValue> {
     pub syntax: Option<SyntaxChoice>,
     #[clap(name = "NAME", value_parser = parse_qualified_module_access)]
     pub name: Option<(ParsedAddress, Identifier, Identifier)>,
+    #[clap(long = "print-bytecode")]
+    pub print_bytecode: bool,
 }
 
 #[derive(Debug, Parser)]

@@ -752,6 +752,27 @@ class RestClient:
             collection_name,
         )
 
+    async def transfer_object(
+        self, owner: Account, object: AccountAddress, to: AccountAddress
+    ) -> str:
+        transaction_arguments = [
+            TransactionArgument(object, Serializer.struct),
+            TransactionArgument(to, Serializer.struct),
+        ]
+
+        payload = EntryFunction.natural(
+            "0x1::object",
+            "transfer_call",
+            [],
+            transaction_arguments,
+        )
+
+        signed_transaction = await self.create_bcs_signed_transaction(
+            owner,
+            TransactionPayload(payload),
+        )
+        return await self.submit_bcs_transaction(signed_transaction)
+
 
 class FaucetClient:
     """Faucet creates and funds accounts. This is a thin wrapper around that."""

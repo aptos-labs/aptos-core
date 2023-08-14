@@ -17,13 +17,17 @@ use std::collections::BTreeMap;
 /// Automated Gas Calibration to calibrate Move bytecode and Native Functions
 #[derive(Parser, Debug)]
 struct Args {
-    /// Specific tests to run that match a pattern
+    /// Specific Calibration Function tests to run that match a given pattern
     #[clap(short, long, default_value = "")]
     pattern: String,
 
     /// Number of iterations to run each Calibration Function
     #[clap(short, long, default_value_t = 20)]
     iterations: u64,
+
+    /// Maximum execution time in milliseconds
+    #[clap(short, long, default_value_t = 300)]
+    max_execution_time: u64,
 }
 
 fn main() {
@@ -31,6 +35,7 @@ fn main() {
     let args = Args::parse();
     let pattern = &args.pattern;
     let iterations = args.iterations;
+    let max_execution_time = args.max_execution_time;
 
     println!(
         "Running each Calibration Function for {} iterations\n",
@@ -76,5 +81,6 @@ fn main() {
         &mut coeff_matrix,
         &mut const_matrix,
         measurements.equation_names,
+        max_execution_time,
     );
 }

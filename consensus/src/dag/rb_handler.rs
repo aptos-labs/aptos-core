@@ -1,11 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{
-    storage::DAGStorage,
-    types::{CertifiedAck, CertifiedNode},
-    NodeId,
-};
+use super::{storage::DAGStorage, NodeId};
 use crate::dag::{
     dag_network::RpcHandler,
     dag_store::Dag,
@@ -29,7 +25,7 @@ pub enum NodeBroadcastHandleError {
     NotEnoughParents,
 }
 
-pub struct NodeBroadcastHandler {
+pub(crate) struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,
     votes_by_round_peer: BTreeMap<Round, BTreeMap<Author, Vote>>,
     signer: ValidatorSigner,
@@ -159,48 +155,5 @@ impl RpcHandler for NodeBroadcastHandler {
             },
             Some(ack) => Ok(ack.clone()),
         }
-    }
-}
-
-#[derive(Debug, ThisError)]
-pub enum CertifiedNodeHandleError {
-    #[error("node already exists")]
-    NodeExists,
-    #[error("missing parents")]
-    MissingParents,
-}
-
-pub struct CertifiedNodeHandler {
-    dag: Arc<RwLock<Dag>>,
-}
-
-impl CertifiedNodeHandler {
-    pub fn new(dag: Arc<RwLock<Dag>>) -> Self {
-        Self { dag }
-    }
-}
-
-impl RpcHandler for CertifiedNodeHandler {
-    type Request = CertifiedNode;
-    type Response = CertifiedAck;
-
-    fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
-        let epoch = node.metadata().epoch();
-        {
-            let dag_reader = self.dag.read();
-            if dag_reader.exists(node.metadata()) {
-                return Ok(CertifiedAck::new(node.metadata().epoch()));
-            }
-
-            if !dag_reader.all_exists(node.parents_metadata()) {
-                // TODO(ibalajiarun): implement fetching logic.
-                bail!(CertifiedNodeHandleError::MissingParents);
-            }
-        }
-
-        let mut dag_writer = self.dag.write();
-        dag_writer.add_node(node)?;
-
-        Ok(CertifiedAck::new(epoch))
     }
 }
