@@ -888,6 +888,45 @@ module std::vector_tests {
         vector::insert(&mut v,6, 6);
     }
 
+    #[test]
+    fun test_push_unique() {
+        let v:vector<u64> = vector[1, 2, 3, 4, 5];
+
+        let pushed = vector::push_unique(&mut v, 1);
+        assert!(&v == &vector[1, 2, 3, 4, 5], 1);
+        assert!(!pushed, 1);
+
+        let pushed = vector::push_unique(&mut v, 8);
+        assert!(&v == &vector[1, 2, 3, 4, 5, 8], 1);
+        assert!(pushed, 1);
+    }
+
+    #[test]
+    fun test_find_remove() {
+        let v: vector<u64> = vector[2, 3, 7, 4, 7, 5];
+
+        let out = vector::find_remove(&mut v, &7);
+        assert!(out == vector[7], 1);
+        assert!(v == vector[2, 3, 5, 4, 7], 1);
+
+        let out = vector::find_remove(&mut v, &9);
+        assert!(out == vector[], 1);
+        assert!(v == vector[2, 3, 5, 4, 7], 1);
+    }
+
+    #[test]
+    fun test_find_remove_by() {
+        let v: vector<u64> = vector[2, 3, 7, 4, 7, 5];
+
+        let out = vector::find_remove_by(&mut v, |x| *x > 6);
+        assert!(out == vector[7], 1);
+        assert!(&v == &vector[2, 3, 5, 4, 7], 1);
+
+        let out = vector::find_remove_by(&mut v, |x| *x < 1);
+        assert!(out == vector[], 1);
+        assert!(&v == &vector[2, 3, 5, 4, 7], 1);
+    }
+
     #[test_only]
     struct MoveOnly {}
 

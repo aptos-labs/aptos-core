@@ -211,6 +211,18 @@ module std::vector {
         pragma intrinsic = true;
     }
 
+    /// Push a new element to the back of the vector if it is not already in the vector.
+    /// This is O(n) in the worst case and preserves ordering of elements in the vector.
+    /// Return `true` if `key` did not already exist in the vector and `false` otherwise.
+    public fun push_unique<Element: drop>(v: &mut vector<Element>, e: Element): bool {
+        if (contains(v, &e)) {
+            false
+        } else {
+            push_back(v, e);
+            true
+        }
+    }
+
     /// Remove the `i`th element of the vector `v`, shifting all subsequent elements.
     /// This is O(n) and preserves ordering of elements in the vector.
     /// Aborts if `i` is out of bounds.
@@ -258,6 +270,36 @@ module std::vector {
     }
     spec swap_remove {
         pragma intrinsic = true;
+    }
+
+    /// Remove the first occurrence of a given value in the vector `v` and return it in
+    /// a vector, swapping the last element in the vector with the removed item.
+    /// This is O(n) + O(1) and does NOT preserve ordering of elements in the vector.
+    /// This returns an empty vector if the value isn't present in the vector.
+    /// Note that this cannot return an option as option uses vector and there'd be a
+    /// circular dependency between option and vector.
+    public inline fun find_remove<Element>(v: &mut vector<Element>, val: &Element): vector<Element> {
+        let (found, index) = index_of(v, val);
+        if (found) {
+            vector[swap_remove(v, index)]
+        } else {
+           vector[]
+        }
+    }
+
+    /// Remove the first value that matches the predicate f in the vector `v` and return
+    /// it in a vector, swapping the last element in the vector with the removed item.
+    /// This is O(n) + O(1) and does NOT preserve ordering of elements in the vector.
+    /// This returns an empty vector if the value isn't present in the vector.
+    /// Note that this cannot return an option as option uses vector and there'd be a
+    /// circular dependency between option and vector.
+    public inline fun find_remove_by<Element>(v: &mut vector<Element>, f: |&Element|bool): vector<Element> {
+        let (found, index) = find(v, |x| f(x));
+        if (found) {
+            vector[swap_remove(v, index)]
+        } else {
+           vector[]
+        }
     }
 
     /// Apply the function to each element in the vector, consuming it.
