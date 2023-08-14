@@ -17,7 +17,7 @@ use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     chain_id::ChainId,
@@ -642,11 +642,9 @@ impl<'a> AptosVMInternals<'a> {
     }
 
     /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
-    pub fn gas_params(
-        self,
-        log_context: &AdapterLogSchema,
-    ) -> Result<&'a AptosGasParameters, VMStatus> {
-        self.0.get_gas_parameters(log_context)
+    pub fn gas_params(self) -> Result<&'a AptosGasParameters, VMStatus> {
+        let log_context = AdapterLogSchema::new(StateViewId::Miscellaneous, 0);
+        self.0.get_gas_parameters(&log_context)
     }
 
     /// Returns the version of Move Runtime.
