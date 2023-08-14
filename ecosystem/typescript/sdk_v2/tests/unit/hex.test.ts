@@ -90,3 +90,9 @@ test("isValid returns false when parsing hex of invalid length", () => {
   expect(result.invalidReason).toBe(HexInvalidReason.INVALID_LENGTH);
   expect(result.invalidReasonMessage).toBe("Hex string must be an even number of hex characters.");
 });
+
+test("compares equality with equals as expected", () => {
+  const hexOne = Hex.fromString({ str: "0x11" });
+  const hexTwo = Hex.fromString({ str: "0x11" });
+  expect(hexOne.equals(hexTwo)).toBeTruthy();
+});
