@@ -8,6 +8,7 @@ use aptos_config::config::{
 use aptos_executor::block_executor::TransactionBlockExecutor;
 use aptos_executor_benchmark::{native_executor::NativeExecutor, pipeline::PipelineConfig};
 use aptos_metrics_core::{register_int_gauge, IntGauge};
+use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::args::TransactionTypeArg;
 use aptos_vm::AptosVM;
@@ -17,11 +18,6 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
-use aptos_profiler::{
-    ProfilerConfig,
-    ProfilerHandler,
-};
-
 
 #[cfg(unix)]
 #[global_allocator]
