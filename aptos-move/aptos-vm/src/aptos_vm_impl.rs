@@ -16,6 +16,7 @@ use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
+use aptos_state_view::StateViewId;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     chain_id::ChainId,
