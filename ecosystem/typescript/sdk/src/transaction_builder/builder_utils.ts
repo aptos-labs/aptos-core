@@ -135,7 +135,7 @@ export function serializeVector(argVal: any, argType: TypeTagVector, serializer:
     throw new Error("Invalid vector args.");
   }
   serializer.serializeU32AsUleb128(argVal.length);
-  if (argVal[0] instanceof Array) {
+  if (Array.isArray(argVal[0])) {
     // If we are serializing a vector of vectors, we merely serialize the length of the outer vectors and then continue traversing deeper
     argVal.forEach((arg) => serializeVector(arg, argType, serializer, depth + 1));
   } else {
