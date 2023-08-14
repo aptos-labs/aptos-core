@@ -511,7 +511,6 @@ impl TransactionGenerator {
             })
             .collect();
         if shuffle_indices {
-            println!("Shuffling conflicting txns*******************************");
             transfer_indices.shuffle(rng);
         }
         transfer_indices
