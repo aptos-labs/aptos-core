@@ -35,7 +35,7 @@ use aptos_peer_monitoring_service_types::{
     },
     PeerMonitoringMetadata, PeerMonitoringServiceError, PeerMonitoringServiceMessage,
 };
-use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
+use aptos_storage_interface::{errors::AptosDbError, DbReader, ExecutedTrees, Order};
 use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{
     account_address::AccountAddress,
@@ -647,13 +647,15 @@ pub fn create_mock_db_reader() -> MockDatabaseReader {
 // TODO(joshlind): if we frequently use these mocks, we should define a single
 // mock test crate to be shared across the codebase.
 mock! {
+    type Result<T, E = AptosDbError> = std::result::Result<T, E>;
+
     pub DatabaseReader {}
     impl DbReader for DatabaseReader {
         fn get_epoch_ending_ledger_infos(
             &self,
             start_epoch: u64,
             end_epoch: u64,
-        ) -> anyhow::Result<EpochChangeProof>;
+        ) -> Result<EpochChangeProof>;
 
         fn get_transactions(
             &self,
@@ -661,32 +663,32 @@ mock! {
             batch_size: u64,
             ledger_version: Version,
             fetch_events: bool,
-        ) -> anyhow::Result<TransactionListWithProof>;
+        ) -> Result<TransactionListWithProof>;
 
         fn get_transaction_by_hash(
             &self,
             hash: HashValue,
             ledger_version: Version,
             fetch_events: bool,
-        ) -> anyhow::Result<Option<TransactionWithProof>>;
+        ) -> Result<Option<TransactionWithProof>>;
 
         fn get_transaction_by_version(
             &self,
             version: Version,
             ledger_version: Version,
             fetch_events: bool,
-        ) -> anyhow::Result<TransactionWithProof>;
+        ) -> Result<TransactionWithProof>;
 
-        fn get_first_txn_version(&self) -> anyhow::Result<Option<Version>>;
+        fn get_first_txn_version(&self) -> Result<Option<Version>>;
 
-        fn get_first_write_set_version(&self) -> anyhow::Result<Option<Version>>;
+        fn get_first_write_set_version(&self) -> Result<Option<Version>>;
 
         fn get_transaction_outputs(
             &self,
             start_version: Version,
             limit: u64,
             ledger_version: Version,
-        ) -> anyhow::Result<TransactionOutputListWithProof>;
+        ) -> Result<TransactionOutputListWithProof>;
 
         fn get_events(
             &self,
@@ -695,23 +697,23 @@ mock! {
             order: Order,
             limit: u64,
             ledger_version: Version,
-        ) -> anyhow::Result<Vec<EventWithVersion>>;
+        ) -> Result<Vec<EventWithVersion>>;
 
-        fn get_block_timestamp(&self, version: u64) -> anyhow::Result<u64>;
+        fn get_block_timestamp(&self, version: u64) -> Result<u64>;
 
         fn get_last_version_before_timestamp(
             &self,
             _timestamp: u64,
             _ledger_version: Version,
-        ) -> anyhow::Result<Version>;
+        ) -> Result<Version>;
 
-        fn get_latest_ledger_info_option(&self) -> anyhow::Result<Option<LedgerInfoWithSignatures>>;
+        fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
 
-        fn get_latest_ledger_info(&self) -> anyhow::Result<LedgerInfoWithSignatures>;
+        fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;
 
-        fn get_latest_version(&self) -> anyhow::Result<Version>;
+        fn get_latest_version(&self) -> Result<Version>;
 
-        fn get_latest_commit_metadata(&self) -> anyhow::Result<(Version, u64)>;
+        fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
 
         fn get_account_transaction(
             &self,
@@ -719,7 +721,7 @@ mock! {
             seq_num: u64,
             include_events: bool,
             ledger_version: Version,
-        ) -> anyhow::Result<Option<TransactionWithProof>>;
+        ) -> Result<Option<TransactionWithProof>>;
 
         fn get_account_transactions(
             &self,
@@ -728,48 +730,48 @@ mock! {
             limit: u64,
             include_events: bool,
             ledger_version: Version,
-        ) -> anyhow::Result<AccountTransactionsWithProof>;
+        ) -> Result<AccountTransactionsWithProof>;
 
         fn get_state_proof_with_ledger_info(
             &self,
             known_version: u64,
             ledger_info: LedgerInfoWithSignatures,
-        ) -> anyhow::Result<StateProof>;
+        ) -> Result<StateProof>;
 
-        fn get_state_proof(&self, known_version: u64) -> anyhow::Result<StateProof>;
+        fn get_state_proof(&self, known_version: u64) -> Result<StateProof>;
 
         fn get_state_value_with_proof_by_version(
             &self,
             state_key: &StateKey,
             version: Version,
-        ) -> anyhow::Result<(Option<StateValue>, SparseMerkleProof)>;
+        ) -> Result<(Option<StateValue>, SparseMerkleProof)>;
 
-        fn get_latest_executed_trees(&self) -> anyhow::Result<ExecutedTrees>;
+        fn get_latest_executed_trees(&self) -> Result<ExecutedTrees>;
 
-        fn get_epoch_ending_ledger_info(&self, known_version: u64) -> anyhow::Result<LedgerInfoWithSignatures>;
+        fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures>;
 
-        fn get_accumulator_root_hash(&self, _version: Version) -> anyhow::Result<HashValue>;
+        fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue>;
 
         fn get_accumulator_consistency_proof(
             &self,
             _client_known_version: Option<Version>,
             _ledger_version: Version,
-        ) -> anyhow::Result<AccumulatorConsistencyProof>;
+        ) -> Result<AccumulatorConsistencyProof>;
 
         fn get_accumulator_summary(
             &self,
             ledger_version: Version,
-        ) -> anyhow::Result<TransactionAccumulatorSummary>;
+        ) -> Result<TransactionAccumulatorSummary>;
 
-        fn get_state_leaf_count(&self, version: Version) -> anyhow::Result<usize>;
+        fn get_state_leaf_count(&self, version: Version) -> Result<usize>;
 
         fn get_state_value_chunk_with_proof(
             &self,
             version: Version,
             start_idx: usize,
             chunk_size: usize,
-        ) -> anyhow::Result<StateValueChunkWithProof>;
+        ) -> Result<StateValueChunkWithProof>;
 
-        fn get_epoch_snapshot_prune_window(&self) -> anyhow::Result<usize>;
+        fn get_epoch_snapshot_prune_window(&self) -> Result<usize>;
     }
 }

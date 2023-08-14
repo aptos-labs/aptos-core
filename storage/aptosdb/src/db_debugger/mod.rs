@@ -8,7 +8,7 @@ pub mod ledger;
 pub mod state_tree;
 pub mod truncate;
 
-use anyhow::Result;
+use crate::Result;
 use clap::Parser;
 
 #[derive(Parser, Clone)]

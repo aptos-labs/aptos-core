@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::HashValue;
+use aptos_storage_interface::errors::AptosDbError;
 use aptos_types::transaction::Version;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -44,6 +45,14 @@ pub enum ExecutorError {
 
 impl From<anyhow::Error> for ExecutorError {
     fn from(error: anyhow::Error) -> Self {
+        Self::InternalError {
+            error: format!("{}", error),
+        }
+    }
+}
+
+impl From<AptosDbError> for Error {
+    fn from(error: AptosDbError) -> Self {
         Self::InternalError {
             error: format!("{}", error),
         }

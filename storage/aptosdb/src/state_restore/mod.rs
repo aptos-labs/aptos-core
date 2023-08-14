@@ -29,6 +29,7 @@ pub static IO_POOL: Lazy<ThreadPool> = Lazy::new(|| {
 
 /// Key-Value batch that will be written into db atomically with other batches.
 pub type StateValueBatch<K, V> = HashMap<(K, Version), V>;
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
@@ -76,15 +77,12 @@ impl Default for StateSnapshotRestoreMode {
 impl FromStr for StateSnapshotRestoreMode {
     type Err = anyhow::Error;
 
-    fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> Result<Self, anyhow::Error> {
         match s {
             "default" => Ok(Self::Default),
             "kv_only" => Ok(Self::KvOnly),
             "tree_only" => Ok(Self::TreeOnly),
-            _ => Err(anyhow::anyhow!(
-                "Invalid state snapshot restore mode: {}",
-                s
-            )),
+            _ => Err(anyhow!("Invalid state snapshot restore mode: {}", s)),
         }
     }
 }
@@ -233,6 +231,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
             .as_mut()
             .unwrap()
             .wait_for_async_commit()
+            .map_err(Into::into)
     }
 }
 

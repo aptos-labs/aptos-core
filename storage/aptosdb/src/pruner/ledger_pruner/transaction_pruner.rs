@@ -9,9 +9,9 @@ use crate::{
     },
     transaction_store::TransactionStore,
 };
-use anyhow::{ensure, Result};
 use aptos_logger::info;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_storage_interface::{db_ensure as ensure, errors::AptosDbError};
 use aptos_types::transaction::{Transaction, Version};
 use std::sync::Arc;
 
@@ -79,7 +79,7 @@ impl TransactionPruner {
         start: Version,
         end: Version,
     ) -> Result<Vec<Transaction>> {
-        ensure!(end >= start);
+        ensure!(end >= start, "{} must be >= {}", end, start);
 
         let mut iter = self
             .transaction_db

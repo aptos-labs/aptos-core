@@ -28,6 +28,7 @@ use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
 #[cfg(test)]
 use aptos_scratchpad::get_state_shard_id;
+use aptos_storage_interface::{db_ensure as ensure, errors::AptosDbError};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProofExt, SparseMerkleRangeProof},
@@ -50,6 +51,7 @@ pub const STATE_MERKLE_METADATA_DB_NAME: &str = "state_merkle_metadata_db";
 pub(crate) type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
 pub(crate) type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
 type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 #[derive(Debug)]
 pub struct StateMerkleDb {
@@ -247,7 +249,9 @@ impl StateMerkleDb {
         Option<(HashValue, (StateKey, Version))>,
         SparseMerkleProofExt,
     )> {
-        JellyfishMerkleTree::new(self).get_with_proof_ext(state_key.hash(), version)
+        JellyfishMerkleTree::new(self)
+            .get_with_proof_ext(state_key.hash(), version)
+            .map_err(Into::into)
     }
 
     pub fn get_range_proof(
@@ -255,15 +259,21 @@ impl StateMerkleDb {
         rightmost_key: HashValue,
         version: Version,
     ) -> Result<SparseMerkleRangeProof> {
-        JellyfishMerkleTree::new(self).get_range_proof(rightmost_key, version)
+        JellyfishMerkleTree::new(self)
+            .get_range_proof(rightmost_key, version)
+            .map_err(Into::into)
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
-        JellyfishMerkleTree::new(self).get_root_hash(version)
+        JellyfishMerkleTree::new(self)
+            .get_root_hash(version)
+            .map_err(Into::into)
     }
 
     pub fn get_leaf_count(&self, version: Version) -> Result<usize> {
-        JellyfishMerkleTree::new(self).get_leaf_count(version)
+        JellyfishMerkleTree::new(self)
+            .get_leaf_count(version)
+            .map_err(Into::into)
     }
 
     pub fn batch_put_value_set_for_shard(
@@ -274,13 +284,15 @@ impl StateMerkleDb {
         persisted_version: Option<Version>,
         version: Version,
     ) -> Result<(Node, TreeUpdateBatch<StateKey>)> {
-        JellyfishMerkleTree::new(self).batch_put_value_set_for_shard(
-            shard_id,
-            value_set,
-            node_hashes,
-            persisted_version,
-            version,
-        )
+        JellyfishMerkleTree::new(self)
+            .batch_put_value_set_for_shard(
+                shard_id,
+                value_set,
+                node_hashes,
+                persisted_version,
+                version,
+            )
+            .map_err(Into::into)
     }
 
     pub fn get_state_snapshot_version_before(
@@ -334,7 +346,7 @@ impl StateMerkleDb {
             .par_iter()
             .with_min_len(optimal_min_len(num_nodes, 128))
             .try_for_each(|(node_key, node)| {
-                ensure!(node_key.get_shard_id() == shard_id);
+                ensure!(node_key.get_shard_id() == shard_id, "shard_id mismatch");
                 batch.put::<JellyfishMerkleNodeSchema>(node_key, node)
             })?;
 
@@ -348,7 +360,7 @@ impl StateMerkleDb {
             .par_iter()
             .with_min_len(optimal_min_len(num_stale_nodes, 128))
             .try_for_each(|row| {
-                ensure!(row.node_key.get_shard_id() == shard_id);
+                ensure!(row.node_key.get_shard_id() == shard_id, "shard_id mismatch");
                 if previous_epoch_ending_version.is_some()
                     && row.node_key.version() <= previous_epoch_ending_version.unwrap()
                 {
@@ -502,7 +514,9 @@ impl StateMerkleDb {
         &self,
         root_persisted_version: Option<Version>,
     ) -> Result<[Option<Version>; NUM_STATE_SHARDS]> {
-        JellyfishMerkleTree::new(self).get_shard_persisted_versions(root_persisted_version)
+        JellyfishMerkleTree::new(self)
+            .get_shard_persisted_versions(root_persisted_version)
+            .map_err(Into::into)
     }
 
     pub(crate) fn sharding_enabled(&self) -> bool {

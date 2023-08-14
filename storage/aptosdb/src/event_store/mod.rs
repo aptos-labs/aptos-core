@@ -8,20 +8,21 @@
 
 use super::AptosDB;
 use crate::{
-    errors::AptosDbError,
     schema::{
         event::EventSchema, event_accumulator::EventAccumulatorSchema,
         event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
     },
     utils::iterators::EventsByVersionIter,
+    Result,
 };
-use anyhow::{bail, ensure, format_err, Result};
+use anyhow::anyhow;
 use aptos_accumulator::{HashReader, MerkleAccumulator};
 use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher},
     HashValue,
 };
 use aptos_schemadb::{iterator::SchemaIterator, schema::ValueCodec, ReadOptions, SchemaBatch, DB};
+use aptos_storage_interface::{db_ensure as ensure, db_other_bail, errors::AptosDbError};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -79,7 +80,7 @@ impl EventStore {
             start_version,
             start_version
                 .checked_add(num_versions as u64)
-                .ok_or_else(|| format_err!("Too many versions requested."))?,
+                .ok_or({ AptosDbError::TooManyRequested(start_version, num_versions as u64) })?,
         ))
     }
 
@@ -90,16 +91,16 @@ impl EventStore {
     ) -> Result<ContractEvent> {
         self.event_db
             .get::<EventSchema>(&(version, index))?
-            .ok_or_else(|| {
-                AptosDbError::NotFound(format!("Event {} of Txn {}", index, version)).into()
-            })
+            .ok_or_else(|| AptosDbError::NotFound(format!("Event {} of Txn {}", index, version)))
     }
 
     pub fn get_txn_ver_by_seq_num(&self, event_key: &EventKey, seq_num: u64) -> Result<u64> {
         let (ver, _) = self
             .event_db
             .get::<EventByKeySchema>(&(*event_key, seq_num))?
-            .ok_or_else(|| format_err!("Index entry should exist for seq_num {}", seq_num))?;
+            .ok_or_else(|| {
+                AptosDbError::NotFound(format!("Index entry should exist for seq_num {}", seq_num))
+            })?;
         Ok(ver)
     }
 
@@ -143,7 +144,7 @@ impl EventStore {
         self.get_latest_sequence_number(ledger_version, event_key)?
             .map_or(Ok(0), |seq| {
                 seq.checked_add(1)
-                    .ok_or_else(|| format_err!("Seq num overflowed."))
+                    .ok_or_else(|| AptosDbError::Other("Seq num overflowed.".to_string()))
             })
     }
 
@@ -181,7 +182,7 @@ impl EventStore {
                 } else {
                     "DB corruption: Sequence number not continuous."
                 };
-                bail!("{} expected: {}, actual: {}", msg, cur_seq, seq);
+                db_other_bail!("{} expected: {}, actual: {}", msg, cur_seq, seq);
             }
             result.push((seq, ver, idx));
             cur_seq += 1;
@@ -201,8 +202,7 @@ impl EventStore {
             return Err(AptosDbError::NotFound(format!(
                 "Event {} of seq num {}.",
                 event_key, seq_num
-            ))
-            .into());
+            )));
         }
         let (_seq, version, index) = indices[0];
 
@@ -359,7 +359,7 @@ impl EventStore {
         event_vecs.iter().enumerate().try_for_each(|(idx, events)| {
             let version = first_version
                 .checked_add(idx as Version)
-                .ok_or_else(|| format_err!("version overflow"))?;
+                .ok_or_else(|| AptosDbError::Other("version overflow".to_string()))?;
             self.put_events(version, events, /*skip_index=*/ false, batch)
         })
     }
@@ -377,9 +377,9 @@ impl EventStore {
     {
         let mut begin = 0u64;
         let mut end = match self.get_latest_sequence_number(ledger_version, event_key)? {
-            Some(s) => s
-                .checked_add(1)
-                .ok_or_else(|| format_err!("event sequence number overflew."))?,
+            Some(s) => s.checked_add(1).ok_or_else(|| {
+                AptosDbError::Other("event sequence number overflew.".to_string())
+            })?,
             None => return Ok(None),
         };
 
@@ -423,10 +423,10 @@ impl EventStore {
                 Ok(new_block_event.proposed_time() < timestamp)
             },
             ledger_version,
-        )?.ok_or_else(|| format_err!(
-            "No new block found beyond timestamp {}, so can't determine the last version before it.",
+        )?.ok_or_else(|| AptosDbError::NotFound(
+            format!("No new block found beyond timestamp {}, so can't determine the last version before it.",
             timestamp,
-        ))?;
+        )))?;
 
         ensure!(
             seq_at_or_after_ts > 0,
@@ -437,9 +437,9 @@ impl EventStore {
         let (version, _idx) =
             self.lookup_event_by_key(&event_key, seq_at_or_after_ts, ledger_version)?;
 
-        version
-            .checked_sub(1)
-            .ok_or_else(|| format_err!("A block with non-zero seq num started at version 0."))
+        version.checked_sub(1).ok_or_else(|| {
+            AptosDbError::Other("A block with non-zero seq num started at version 0.".to_string())
+        })
     }
 
     /// Prunes events by accumulator store for a range of version in [begin, end)
@@ -511,11 +511,11 @@ impl<'a> EventHashReader<'a> {
 }
 
 impl<'a> HashReader for EventHashReader<'a> {
-    fn get(&self, position: Position) -> Result<HashValue> {
+    fn get(&self, position: Position) -> Result<HashValue, anyhow::Error> {
         self.store
             .event_db
             .get::<EventAccumulatorSchema>(&(self.version, position))?
-            .ok_or_else(|| format_err!("Hash at position {:?} not found.", position))
+            .ok_or_else(|| anyhow!(format!("Hash at position {:?} not found.", position)))
     }
 }
 
@@ -523,7 +523,7 @@ struct EmptyReader;
 
 // Asserts `get()` is never called.
 impl HashReader for EmptyReader {
-    fn get(&self, _position: Position) -> Result<HashValue> {
+    fn get(&self, _position: Position) -> Result<HashValue, anyhow::Error> {
         unreachable!()
     }
 }

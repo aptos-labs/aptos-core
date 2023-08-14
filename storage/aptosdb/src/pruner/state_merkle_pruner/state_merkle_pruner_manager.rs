@@ -13,8 +13,8 @@ use crate::{
         state_merkle_pruner::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
     },
     state_merkle_db::StateMerkleDb,
+    Result,
 };
-use anyhow::Result;
 use aptos_config::config::StateMerklePrunerConfig;
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_schemadb::schema::KeyCodec;

@@ -11,9 +11,10 @@ use crate::{
     },
     state_store::StateStore,
     transaction_store::TransactionStore,
+    Result,
 };
-use anyhow::{anyhow, ensure, Context, Result};
 use aptos_crypto::hash::HashValue;
+use aptos_storage_interface::{db_ensure as ensure, errors::AptosDbError};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -74,18 +75,24 @@ impl BackupHandler {
             let version = start_version + idx as u64; // overflow is impossible since it's check upon txn_iter construction.
 
             let txn = txn_res?;
-            let txn_info = txn_info_iter
-                .next()
-                .ok_or_else(|| anyhow!("TransactionInfo not found when Transaction exists."))
-                .context(version)??;
-            let event_vec = event_vec_iter
-                .next()
-                .ok_or_else(|| anyhow!("Events not found when Transaction exists."))
-                .context(version)??;
-            let write_set = write_set_iter
-                .next()
-                .ok_or_else(|| anyhow!("WriteSet not found when Transaction exists."))
-                .context(version)??;
+            let txn_info = txn_info_iter.next().ok_or_else(|| {
+                AptosDbError::NotFound(format!(
+                    "TransactionInfo not found when Transaction exists, version {}",
+                    version
+                ))
+            })??;
+            let event_vec = event_vec_iter.next().ok_or_else(|| {
+                AptosDbError::NotFound(format!(
+                    "Events not found when Transaction exists., version {}",
+                    version
+                ))
+            })??;
+            let write_set = write_set_iter.next().ok_or_else(|| {
+                AptosDbError::NotFound(format!(
+                    "WriteSet not found when Transaction exists, version {}",
+                    version
+                ))
+            })??;
             BACKUP_TXN_VERSION.set(version as i64);
             Ok((txn, txn_info, event_vec, write_set))
         });

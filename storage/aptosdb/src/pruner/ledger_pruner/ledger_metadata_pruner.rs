@@ -1,12 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::schema::{
-    db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    version_data::VersionDataSchema,
+use crate::{
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        version_data::VersionDataSchema,
+    },
+    Result,
 };
-use anyhow::{anyhow, Result};
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_storage_interface::errors::AptosDbError;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
 
@@ -59,6 +62,6 @@ impl LedgerMetadataPruner {
         self.ledger_metadata_db
             .get::<DbMetadataSchema>(&DbMetadataKey::LedgerPrunerProgress)?
             .map(|v| v.expect_version())
-            .ok_or_else(|| anyhow!("LedgerPrunerProgress cannot be None."))
+            .ok_or_else(|| AptosDbError::Other("LedgerPrunerProgress cannot be None.".to_string()))
     }
 }

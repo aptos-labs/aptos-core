@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
+use crate::Result;
 use aptos_types::transaction::Version;
 use std::cmp::min;
 

@@ -2,12 +2,12 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
 use aptos_db::backup::backup_handler::BackupHandler;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec,
 };
+use aptos_storage_interface::errors::AptosDbError;
 use bytes::Bytes;
 use hyper::Body;
 use once_cell::sync::Lazy;
@@ -33,6 +33,7 @@ pub(super) static THROUGHPUT_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 pub(super) fn reply_with_bcs_bytes<R: Serialize>(
     endpoint: &str,
     record: &R,

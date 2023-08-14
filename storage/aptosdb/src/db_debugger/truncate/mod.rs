@@ -3,7 +3,8 @@
 
 use crate::{
     db::AptosDB,
-    db_debugger::ShardingConfig,
+    db_ensure as ensure,
+    jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         epoch_by_version::EpochByVersionSchema,

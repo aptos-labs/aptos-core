@@ -3,10 +3,10 @@
 
 use crate::{
     db_debugger::common::{parse_nibble_path, DbDir},
-    schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    state_merkle_db::StateMerkleDb,
+    db_ensure as ensure,
+    jellyfish_merkle_node::JellyfishMerkleNodeSchema,
+    AptosDbError, Result,
 };
-use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_jellyfish_merkle::{
     node_type::{Child, Node, NodeKey, NodeType},
@@ -34,7 +34,7 @@ pub struct Cmd {
 
 impl Cmd {
     pub fn run(self) -> Result<()> {
-        ensure!(self.before_version > 0);
+        ensure!(self.before_version > 0, "version must be greater than 0.");
         println!(
             "{}",
             format!(

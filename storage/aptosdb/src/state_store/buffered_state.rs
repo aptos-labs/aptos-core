@@ -7,7 +7,6 @@ use crate::{
     metrics::LATEST_CHECKPOINT_VERSION,
     state_store::{state_snapshot_committer::StateSnapshotCommitter, StateDb},
 };
-use anyhow::{ensure, Result};
 use aptos_logger::info;
 use aptos_scratchpad::SmtAncestors;
 use aptos_storage_interface::state_delta::StateDelta;
@@ -23,6 +22,8 @@ use std::{
     },
     thread::JoinHandle,
 };
+
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 pub(crate) const ASYNC_COMMIT_CHANNEL_BUFFER_SIZE: u64 = 1;
 pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 100_000;
@@ -163,7 +164,8 @@ impl BufferedState {
             .current
             .is_family(&self.state_after_checkpoint.current));
         ensure!(
-            new_state_after_checkpoint.base_version >= self.state_after_checkpoint.base_version
+            new_state_after_checkpoint.base_version >= self.state_after_checkpoint.base_version,
+            "new state base version smaller than state after checkpoint base version",
         );
         if let Some(updates_until_next_checkpoint_since_current) =
             updates_until_next_checkpoint_since_current_option

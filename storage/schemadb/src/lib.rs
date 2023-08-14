@@ -29,9 +29,10 @@ use crate::{
     },
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
 };
-use anyhow::{format_err, Result};
+use anyhow::format_err;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_storage_interface::errors::AptosDbError;
 use iterator::{ScanDirection, SchemaIterator};
 use rand::Rng;
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
@@ -42,6 +43,7 @@ pub use rocksdb::{
 use std::{collections::HashMap, iter::Iterator, path::Path};
 
 pub type ColumnFamilyName = &'static str;
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 #[derive(Debug)]
 enum WriteOp {
@@ -194,6 +196,7 @@ impl DB {
         result
             .map(|raw_value| <S::Value as ValueCodec<S>>::decode_value(&raw_value))
             .transpose()
+            .map_err(Into::into)
     }
 
     /// Writes single record.
@@ -286,12 +289,15 @@ impl DB {
     }
 
     fn get_cf_handle(&self, cf_name: &str) -> Result<&rocksdb::ColumnFamily> {
-        self.inner.cf_handle(cf_name).ok_or_else(|| {
-            format_err!(
-                "DB::cf_handle not found for column family name: {}",
-                cf_name
-            )
-        })
+        self.inner
+            .cf_handle(cf_name)
+            .ok_or_else(|| {
+                format_err!(
+                    "DB::cf_handle not found for column family name: {}",
+                    cf_name
+                )
+            })
+            .map_err(Into::into)
     }
 
     /// Flushes memtable data. This is only used for testing `get_approximate_sizes_cf` in unit
@@ -304,10 +310,12 @@ impl DB {
         self.inner
             .property_int_value_cf(self.get_cf_handle(cf_name)?, property_name)?
             .ok_or_else(|| {
-                format_err!(
-                    "Unable to get property \"{}\" of  column family \"{}\".",
-                    property_name,
-                    cf_name,
+                AptosDbError::Other(
+                    format!(
+                        "Unable to get property \"{}\" of  column family \"{}\".",
+                        property_name, cf_name,
+                    )
+                    .to_string(),
                 )
             })
     }

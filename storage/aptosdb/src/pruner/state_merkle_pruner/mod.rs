@@ -25,6 +25,7 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_schemadb::{schema::KeyCodec, ReadOptions, DB};
+use aptos_storage_interface::errors::AptosDbError;
 use aptos_types::transaction::{AtomicVersion, Version};
 use rayon::prelude::*;
 use std::{
@@ -32,6 +33,19 @@ use std::{
     sync::{atomic::Ordering, Arc},
 };
 
+<<<<<<< HEAD
+=======
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
+
+static TREE_PRUNER_WORKER_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(16)
+        .thread_name(|index| format!("tree_pruner_worker_{}", index))
+        .build()
+        .unwrap()
+});
+
+>>>>>>> 2193a0def9 (move the error file and fix the lib interface)
 /// Responsible for pruning the state tree.
 pub struct StateMerklePruner<S> {
     /// Keeps track of the target version that the pruner needs to achieve.

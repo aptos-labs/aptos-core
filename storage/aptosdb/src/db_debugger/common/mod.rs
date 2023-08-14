@@ -54,6 +54,10 @@ impl AsRef<Path> for DbDir {
 
 pub fn parse_nibble_path(src: &str) -> Result<NibblePath> {
     src.chars()
-        .map(|c| Ok(Nibble::from(u8::from_str_radix(&c.to_string(), 16)?)))
+        .map(|c| {
+            Ok(Nibble::from(
+                u8::from_str_radix(&c.to_string(), 16).map_err(Into::<ParseIntError>::into)?,
+            ))
+        })
         .collect()
 }

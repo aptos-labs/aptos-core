@@ -28,7 +28,6 @@ use crate::{
     transaction_store::TransactionStore,
     utils::get_progress,
 };
-use anyhow::Result;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_schemadb::{

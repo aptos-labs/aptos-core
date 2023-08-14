@@ -29,6 +29,8 @@ use std::{
     thread::JoinHandle,
 };
 
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
+
 pub(crate) struct StateSnapshotCommitter {
     state_db: Arc<StateDb>,
     state_snapshot_commit_receiver: Receiver<CommitMessage<Arc<StateDelta>>>,

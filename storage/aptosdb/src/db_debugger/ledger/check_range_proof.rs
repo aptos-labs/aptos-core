@@ -1,8 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{db_debugger::common::DbDir, ledger_store::LedgerStore};
-use anyhow::{ensure, Result};
+use crate::{
+    db_debugger::common::DbDir, db_ensure as ensure, ledger_store::LedgerStore, AptosDbError,
+    Result,
+};
 use aptos_crypto::hash::CryptoHash;
 use aptos_types::transaction::Version;
 use clap::Parser;

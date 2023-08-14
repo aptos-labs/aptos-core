@@ -5,7 +5,6 @@
 //! This file defines transaction store APIs that are related to committed signed transactions.
 
 use crate::{
-    errors::AptosDbError,
     ledger_db::LedgerDb,
     schema::{
         transaction::TransactionSchema, transaction_accumulator::TransactionAccumulatorSchema,
@@ -15,9 +14,9 @@ use crate::{
     },
     utils::iterators::{AccountTransactionVersionIter, ExpectContinuousVersions},
 };
-use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_schemadb::{ReadOptions, SchemaBatch};
+use aptos_storage_interface::{db_ensure as ensure, errors::AptosDbError};
 use aptos_types::{
     account_address::AccountAddress,
     proof::position::Position,
@@ -26,6 +25,7 @@ use aptos_types::{
 };
 use std::sync::Arc;
 
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 #[cfg(test)]
 mod test;
 
@@ -100,7 +100,7 @@ impl TransactionStore {
             address,
             min_seq_num
                 .checked_add(num_versions)
-                .ok_or_else(|| format_err!("too many transactions requested"))?,
+                .ok_or(AptosDbError::TooManyRequested(min_seq_num, num_versions))?,
             ledger_version,
         ))
     }
@@ -110,7 +110,7 @@ impl TransactionStore {
         self.ledger_db
             .transaction_db()
             .get::<TransactionSchema>(&version)?
-            .ok_or_else(|| AptosDbError::NotFound(format!("Txn {}", version)).into())
+            .ok_or(AptosDbError::NotFound(format!("Txn {}", version)))
     }
 
     /// Gets an iterator that yields at most `num_transactions` transactions starting from `start_version`.
@@ -168,9 +168,10 @@ impl TransactionStore {
         self.ledger_db
             .write_set_db()
             .get::<WriteSetSchema>(&version)?
-            .ok_or_else(|| {
-                AptosDbError::NotFound(format!("WriteSet at version {}", version)).into()
-            })
+            .ok_or(AptosDbError::NotFound(format!(
+                "WriteSet at version {}",
+                version
+            )))
     }
 
     /// Get write sets in `[begin_version, end_version)` half-open range.
@@ -199,10 +200,9 @@ impl TransactionStore {
 
         let mut ret = Vec::with_capacity((end_version - begin_version) as usize);
         for current_version in begin_version..end_version {
-            let (version, write_set) = iter
-                .next()
-                .transpose()?
-                .ok_or_else(|| format_err!("Write set missing for version {}", current_version))?;
+            let (version, write_set) = iter.next().transpose()?.ok_or_else(|| {
+                AptosDbError::NotFound(format!("Write set missing for version {}", current_version))
+            })?;
             ensure!(
                 version == current_version,
                 "Write set missing for version {}, got version {}",

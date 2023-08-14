@@ -19,12 +19,15 @@ use crate::{
 use anyhow::{anyhow, Result};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
+use aptos_storage_interface::errors::AptosDbError;
 use aptos_types::transaction::{AtomicVersion, Version};
 use rayon::prelude::*;
 use std::{
     cmp::min,
     sync::{atomic::Ordering, Arc},
 };
+
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 pub const STATE_KV_PRUNER_NAME: &str = "state_kv_pruner";
 

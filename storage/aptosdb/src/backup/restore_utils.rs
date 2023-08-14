@@ -16,9 +16,9 @@ use crate::{
     transaction_store::TransactionStore,
     utils::{new_sharded_kv_schema_batch, ShardedStateKvSchemaBatch},
 };
-use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_schemadb::{SchemaBatch, DB};
+use aptos_storage_interface::{db_ensure as ensure, errors::AptosDbError};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -39,7 +39,7 @@ pub fn save_ledger_infos(
     ledger_infos: &[LedgerInfoWithSignatures],
     existing_batch: Option<&mut SchemaBatch>,
 ) -> Result<()> {
-    ensure!(!ledger_infos.is_empty(), "No LedgerInfos to save.");
+    ensure!(ledger_infos.is_empty(), "No LedgerInfos to save.");
 
     if let Some(existing_batch) = existing_batch {
         save_ledger_infos_impl(ledger_store, ledger_infos, existing_batch)?;

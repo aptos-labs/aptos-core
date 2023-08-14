@@ -9,11 +9,13 @@ use crate::{
         state_value::StateValueSchema,
     },
 };
-use anyhow::Result;
 use aptos_logger::info;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_storage_interface::errors::AptosDbError;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
+
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 pub(in crate::pruner) struct StateKvShardPruner {
     shard_id: u8,

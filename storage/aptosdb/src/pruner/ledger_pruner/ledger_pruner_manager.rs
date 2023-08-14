@@ -8,8 +8,8 @@ use crate::{
         ledger_pruner::LedgerPruner, pruner_manager::PrunerManager, pruner_utils,
         pruner_worker::PrunerWorker,
     },
+    Result,
 };
-use anyhow::Result;
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_infallible::Mutex;
 use aptos_types::transaction::{AtomicVersion, Version};

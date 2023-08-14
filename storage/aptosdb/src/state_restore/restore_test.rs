@@ -1,11 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_restore::{
-    StateSnapshotProgress, StateSnapshotRestore, StateSnapshotRestoreMode, StateValueBatch,
-    StateValueWriter,
+use crate::{
+    state_restore::{
+        StateSnapshotProgress, StateSnapshotRestore, StateSnapshotRestoreMode, StateValueBatch,
+        StateValueWriter,
+    },
+    Result,
 };
-use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::RwLock;
 use aptos_jellyfish_merkle::{

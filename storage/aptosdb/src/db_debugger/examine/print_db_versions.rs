@@ -18,7 +18,7 @@ use crate::{
         get_overall_commit_progress, get_state_kv_commit_progress,
         get_state_merkle_commit_progress,
     },
-    AptosDB,
+    AptosDB, Result,
 };
 use anyhow::Result;
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};

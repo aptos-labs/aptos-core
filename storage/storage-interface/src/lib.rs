@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::cached_state_view::ShardedStateCache;
-use anyhow::{anyhow, format_err, Result};
+use anyhow::anyhow;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     access_path::AccessPath,
@@ -42,6 +42,7 @@ use thiserror::Error;
 pub mod async_proof_fetcher;
 pub mod block_info;
 pub mod cached_state_view;
+pub mod errors;
 mod executed_trees;
 mod metrics;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -53,6 +54,7 @@ use crate::state_delta::StateDelta;
 use aptos_scratchpad::SparseMerkleTree;
 pub use executed_trees::ExecutedTrees;
 
+pub type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 // This is last line of defense against large queries slipping through external facing interfaces,
 // like the API and State Sync, etc.
 pub const MAX_REQUEST_LIMIT: u64 = 10000;
@@ -463,8 +465,9 @@ pub trait DbReader: Send + Sync {
 
     /// Returns the latest ledger info.
     fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
-        self.get_latest_ledger_info_option()
-            .and_then(|opt| opt.ok_or_else(|| format_err!("Latest LedgerInfo not found.")))
+        self.get_latest_ledger_info_option().and_then(|opt| {
+            opt.ok_or_else(|| AptosDbError::Other("Latest LedgerInfo not found.".to_string()))
+        })
     }
 
     /// Returns the latest version and committed block timestamp
@@ -489,16 +492,20 @@ impl MoveStorage for &dyn DbReader {
         &self,
         access_path: AccessPath,
         version: Version,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Vec<u8>, anyhow::Error> {
         let state_value =
             self.get_state_value_by_version(&StateKey::access_path(access_path), version)?;
 
         state_value
-            .ok_or_else(|| format_err!("no value found in DB"))
+            .ok_or_else(|| anyhow!("no value found in DB".to_string()))
             .map(|value| value.bytes().to_vec())
     }
 
-    fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
+    fn fetch_config_by_version(
+        &self,
+        config_id: ConfigID,
+        version: Version,
+    ) -> Result<Vec<u8>, anyhow::Error> {
         let config_value_option = self.get_state_value_by_version(
             &StateKey::access_path(AccessPath::new(
                 CORE_CODE_ADDRESS,
@@ -506,18 +513,27 @@ impl MoveStorage for &dyn DbReader {
             )),
             version,
         )?;
+<<<<<<< HEAD
         config_value_option
             .map(|x| x.bytes().to_vec())
             .ok_or_else(|| anyhow!("no config {} found in aptos root account state", config_id))
+=======
+        config_value_option.map(|x| x.into_bytes()).ok_or_else(|| {
+            anyhow!(format!(
+                "no config {} found in aptos root account state",
+                config_id
+            ))
+        })
+>>>>>>> 2193a0def9 (move the error file and fix the lib interface)
     }
 
-    fn fetch_synced_version(&self) -> Result<u64> {
-        self.get_latest_version()
+    fn fetch_synced_version(&self) -> Result<u64, anyhow::Error> {
+        self.get_latest_version().map_err(Into::into)
     }
 
-    fn fetch_latest_state_checkpoint_version(&self) -> Result<Version> {
+    fn fetch_latest_state_checkpoint_version(&self) -> Result<Version, anyhow::Error> {
         self.get_latest_state_checkpoint_version()?
-            .ok_or_else(|| format_err!("[MoveStorage] Latest state checkpoint not found."))
+            .ok_or_else(|| anyhow!("[MoveStorage] Latest state checkpoint not found.".to_string()))
     }
 }
 
@@ -679,4 +695,27 @@ pub fn jmt_update_refs<K>(
     jmt_updates: &[(HashValue, Option<(HashValue, K)>)],
 ) -> Vec<(HashValue, Option<&(HashValue, K)>)> {
     jmt_updates.iter().map(|(x, y)| (*x, y.as_ref())).collect()
+}
+
+#[macro_export]
+macro_rules! db_not_found_bail {
+    ($($arg:tt)*) => {
+        return Err(AptosDbError::NotFound(format!($($arg)*)))
+    };
+}
+
+#[macro_export]
+macro_rules! db_other_bail {
+    ($($arg:tt)*) => {
+        return Err(AptosDbError::NotFound(format!($($arg)*)))
+    };
+}
+
+#[macro_export]
+macro_rules! db_ensure {
+    ($cond:expr, $($arg:tt)*) => {
+        if !$cond {
+            return Err(AptosDbError::Other(format!($($arg)*)));
+        }
+    };
 }

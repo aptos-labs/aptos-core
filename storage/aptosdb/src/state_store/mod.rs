@@ -35,7 +35,7 @@ use crate::{
         ShardedStateKvSchemaBatch,
     },
 };
-use anyhow::{ensure, format_err, Context, Result};
+use anyhow::Context;
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -50,6 +50,7 @@ use aptos_scratchpad::{SmtAncestors, SparseMerkleTree};
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher,
     cached_state_view::{CachedStateView, ShardedStateCache},
+    db_ensure as ensure,
     state_delta::StateDelta,
     DbReader, StateSnapshotReceiver,
 };
@@ -69,6 +70,8 @@ use aptos_types::{
 use claims::{assert_ge, assert_le};
 use rayon::prelude::*;
 use std::{collections::HashSet, ops::Deref, sync::Arc};
+
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 pub(crate) mod buffered_state;
 mod state_merkle_batch_committer;
@@ -228,7 +231,7 @@ impl StateDb {
             .iter::<EpochByVersionSchema>(ReadOptions::default())?;
         // Search for the end of the previous epoch.
         iter.seek_for_prev(&prev_version)?;
-        iter.next().transpose()
+        iter.next().transpose().map_err(Into::into)
     }
 }
 
@@ -297,10 +300,12 @@ impl StateDb {
         self.get_state_value_by_version(state_key, version)
             .and_then(|opt| {
                 opt.ok_or_else(|| {
-                    format_err!(
-                        "State Value is missing for key {:?} by version {}",
-                        state_key,
-                        version
+                    AptosDbError::NotFound(
+                        format!(
+                            "State Value is missing for key {:?} by version {}",
+                            state_key, version
+                        )
+                        .to_string(),
                     )
                 })
             })
@@ -1015,6 +1020,7 @@ impl StateStore {
             version,
             start_hashed_key,
         )?
+        .map(|it| it.map_err(Into::into))
         .map(move |res| match res {
             Ok((_hashed_key, (key, version))) => {
                 Ok((key.clone(), store.expect_value_by_version(&key, version)?))
@@ -1034,7 +1040,8 @@ impl StateStore {
             version,
             first_index,
         )?
-        .take(chunk_size);
+        .take(chunk_size)
+        .map(|it| it.map_err(Into::into));
         let state_key_values: Vec<(StateKey, StateValue)> = result_iter
             .into_iter()
             .map(|res| {
@@ -1045,7 +1052,8 @@ impl StateStore {
             .collect::<Result<Vec<_>>>()?;
         ensure!(
             !state_key_values.is_empty(),
-            AptosDbError::NotFound(format!("State chunk starting at {}", first_index)),
+            "State chunk starting at {}",
+            first_index,
         );
         let last_index = (state_key_values.len() - 1 + first_index) as u64;
         let first_key = state_key_values.first().expect("checked to exist").0.hash();
@@ -1088,6 +1096,7 @@ impl StateStore {
     ) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
         aptos_jellyfish_merkle::JellyfishMerkleTree::new(self.state_merkle_db.as_ref())
             .get_all_nodes_referenced(version)
+            .map_err(Into::into)
     }
 
     #[cfg(test)]

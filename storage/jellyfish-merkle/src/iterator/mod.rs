@@ -14,13 +14,15 @@ use crate::{
     node_type::{Child, InternalNode, Node, NodeKey},
     TreeReader,
 };
-use anyhow::{bail, ensure, Result};
 use aptos_crypto::HashValue;
+use aptos_storage_interface::{db_ensure as ensure, db_other_bail, errors::AptosDbError};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     transaction::Version,
 };
 use std::{marker::PhantomData, sync::Arc};
+
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 /// `NodeVisitInfo` keeps track of the status of an internal node during the iteration process. It
 /// indicates which ones of its children have been visited.
@@ -252,7 +254,7 @@ where
             current_node = reader.get_node(&current_node_key)?;
         }
 
-        bail!("Bug: potential infinite loop.");
+        db_other_bail!("Bug: potential infinite loop.");
     }
 
     fn skip_leaves<'a>(
@@ -270,7 +272,7 @@ where
             }
         }
 
-        bail!("Bug: Internal node has less leaves than expected.");
+        db_other_bail!("Bug: Internal node has less leaves than expected.");
     }
 }
 

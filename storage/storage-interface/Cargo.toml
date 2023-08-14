@@ -34,6 +34,7 @@ parking_lot = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rayon = { workspace = true }
+rocksdb = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 threadpool = { workspace = true }
