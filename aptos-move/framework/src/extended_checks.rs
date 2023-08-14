@@ -45,17 +45,18 @@ pub fn get_all_attribute_names() -> &'static BTreeSet<String> {
         VIEW_FUN_ATTRIBUTE,
     ];
 
-    fn add_attribute_names(table: &mut BTreeSet<String>) {
-        for str in ALL_ATTRIBUTE_NAMES {
-            table.insert(str.to_string());
-        }
+    fn extended_attribute_names() -> BTreeSet<String> {
+        ALL_ATTRIBUTE_NAMES
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect::<BTreeSet<String>>()
     }
+
     static KNOWN_ATTRIBUTES_SET: Lazy<BTreeSet<String>> = Lazy::new(|| {
         use known_attributes::AttributeKind;
-        let mut known_attributes = BTreeSet::new();
-        known_attributes::KnownAttribute::add_attribute_names(&mut known_attributes);
-        add_attribute_names(&mut known_attributes);
-        known_attributes
+        let mut attributes = extended_attribute_names();
+        known_attributes::KnownAttribute::add_attribute_names(&mut attributes);
+        attributes
     });
     &KNOWN_ATTRIBUTES_SET
 }

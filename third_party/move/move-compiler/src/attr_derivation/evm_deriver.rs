@@ -43,35 +43,38 @@ const RECEIVE_ATTR: &str = "receive";
 const VIEW_ATTR: &str = "view";
 const PURE_ATTR: &str = "pure";
 
-pub(crate) fn add_attributes_for_evm(known_attributes: &mut BTreeSet<String>) {
-    known_attributes.insert(CALLABLE_ATTR.to_string());
-    known_attributes.insert(CONTRACT_ATTR.to_string());
-    known_attributes.insert(EXTERNAL_ATTR.to_string());
-
-    known_attributes.insert(ABI_STRUCT_ATTR.to_string());
-    known_attributes.insert(ACTOR_ATTR.to_string());
-    known_attributes.insert(CREATE_ATTR.to_string());
-    known_attributes.insert(DECODE_ATTR.to_string());
-    known_attributes.insert(DELETE_ATTR.to_string());
-    known_attributes.insert(ENCODE_ATTR.to_string());
-    known_attributes.insert(ENCODE_PACKED_ATTR.to_string());
-    known_attributes.insert(EVENT_ATTR.to_string());
-    known_attributes.insert(EVM_ARITH_ATTR.to_string());
-    known_attributes.insert(EVM_TEST_ATTR.to_string());
-    known_attributes.insert(FALLBACK_ATTR.to_string());
-    known_attributes.insert(INIT_ATTR.to_string());
-    known_attributes.insert(INTERFACE_ATTR.to_string());
-    known_attributes.insert(INTERFACE_ID_ATTR.to_string());
-    known_attributes.insert(MESSAGE_ATTR.to_string());
-    known_attributes.insert(SELECTOR_ATTR.to_string());
-    known_attributes.insert(STATE_ATTR.to_string());
-    known_attributes.insert(STORAGE_ATTR.to_string());
-
-    known_attributes.insert(EVM_CONTRACT_ATTR.to_string());
-    known_attributes.insert(PAYABLE_ATTR.to_string());
-    known_attributes.insert(RECEIVE_ATTR.to_string());
-    known_attributes.insert(VIEW_ATTR.to_string());
-    known_attributes.insert(PURE_ATTR.to_string());
+pub(crate) fn add_attributes_for_evm(attributes: &mut BTreeSet<String>) {
+    const ALL_ATTRIBUTE_NAMES: [&str; 26] = [
+        CALLABLE_ATTR,
+        CONTRACT_ATTR,
+        EXTERNAL_ATTR,
+        ABI_STRUCT_ATTR,
+        ACTOR_ATTR,
+        CREATE_ATTR,
+        DECODE_ATTR,
+        DELETE_ATTR,
+        ENCODE_ATTR,
+        ENCODE_PACKED_ATTR,
+        EVENT_ATTR,
+        EVM_ARITH_ATTR,
+        EVM_TEST_ATTR,
+        FALLBACK_ATTR,
+        INIT_ATTR,
+        INTERFACE_ATTR,
+        INTERFACE_ID_ATTR,
+        MESSAGE_ATTR,
+        SELECTOR_ATTR,
+        STATE_ATTR,
+        STORAGE_ATTR,
+        EVM_CONTRACT_ATTR,
+        PAYABLE_ATTR,
+        RECEIVE_ATTR,
+        VIEW_ATTR,
+        PURE_ATTR,
+    ];
+    ALL_ATTRIBUTE_NAMES.into_iter().for_each(|elt| {
+        attributes.insert(elt.to_string());
+    });
 }
 
 pub(crate) fn derive_for_evm(

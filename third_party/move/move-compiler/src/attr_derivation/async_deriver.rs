@@ -35,17 +35,22 @@ const GENERATED_SEND_ATTR: &str = "_generated_send";
 
 const MAX_SEND_PARAM_COUNT: usize = 8;
 
-pub(crate) fn add_attributes_for_async(known_attributes: &mut BTreeSet<String>) {
-    known_attributes.insert(ACTOR_ATTR.to_string());
-    known_attributes.insert(CONT_ATTR.to_string());
-    known_attributes.insert(EVENT_ATTR.to_string());
-    known_attributes.insert(INIT_ATTR.to_string());
-    known_attributes.insert(MESSAGE_ATTR.to_string());
-    known_attributes.insert(RPC_ATTR.to_string());
-    known_attributes.insert(STATE_ATTR.to_string());
-    known_attributes.insert(GENERATED_CONT_ATTR.to_string());
-    known_attributes.insert(GENERATED_RPC_ATTR.to_string());
-    known_attributes.insert(GENERATED_SEND_ATTR.to_string());
+pub(crate) fn add_attributes_for_async(attributes: &mut BTreeSet<String>) {
+    const ALL_ATTRIBUTE_NAMES: [&str; 10] = [
+        ACTOR_ATTR,
+        CONT_ATTR,
+        EVENT_ATTR,
+        INIT_ATTR,
+        MESSAGE_ATTR,
+        RPC_ATTR,
+        STATE_ATTR,
+        GENERATED_CONT_ATTR,
+        GENERATED_RPC_ATTR,
+        GENERATED_SEND_ATTR,
+    ];
+    ALL_ATTRIBUTE_NAMES.into_iter().for_each(|elt| {
+        attributes.insert(elt.to_string());
+    });
 }
 
 pub(crate) fn derive_for_async(
