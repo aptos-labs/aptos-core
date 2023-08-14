@@ -11,7 +11,7 @@ use move_core_types::{
 };
 use std::collections::BTreeMap;
 
-pub trait MoveResolverExt:
+pub trait AptosMoveResolver:
     MoveResolver + TableResolver + StateStorageUsageResolver + ConfigStorage
 {
     fn get_resource_group_data(

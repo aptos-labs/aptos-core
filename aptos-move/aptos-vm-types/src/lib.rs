@@ -5,7 +5,6 @@ pub mod change_set;
 pub mod check_change_set;
 pub mod output;
 pub mod storage;
-pub mod view;
 
 #[cfg(test)]
 mod tests;
