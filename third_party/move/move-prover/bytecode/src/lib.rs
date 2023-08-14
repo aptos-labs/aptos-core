@@ -4,7 +4,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::function_target_pipeline::FunctionTargetsHolder;
+use crate::{function_target::FunctionTarget, function_target_pipeline::FunctionTargetsHolder};
 use move_model::model::GlobalEnv;
 use std::fmt::Write;
 
@@ -55,6 +55,18 @@ pub fn print_targets_for_test(
     header: &str,
     targets: &FunctionTargetsHolder,
 ) -> String {
+    print_targets_with_annotations_for_test(env, header, targets, |target| {
+        target.register_annotation_formatters_for_test()
+    })
+}
+
+/// Print function targets for testing and debugging.
+pub fn print_targets_with_annotations_for_test(
+    env: &GlobalEnv,
+    header: &str,
+    targets: &FunctionTargetsHolder,
+    register_annotations: impl Fn(&FunctionTarget),
+) -> String {
     let mut text = String::new();
     writeln!(&mut text, "============ {} ================", header).unwrap();
     for module_env in env.get_modules() {
@@ -64,7 +76,7 @@ pub fn print_targets_for_test(
             }
             for (variant, target) in targets.get_targets(&func_env) {
                 if !target.data.code.is_empty() || target.func_env.is_native_or_intrinsic() {
-                    target.register_annotation_formatters_for_test();
+                    register_annotations(&target);
                     writeln!(&mut text, "\n[variant {}]\n{}", variant, target).unwrap();
                 }
             }

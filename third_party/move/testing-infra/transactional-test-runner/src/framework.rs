@@ -44,7 +44,9 @@ use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::session::SerializedReturnValues;
+use once_cell::sync::Lazy;
 use rayon::iter::Either;
+use regex::Regex;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt::{Debug, Write as FmtWrite},
@@ -215,18 +217,21 @@ pub trait MoveTestAdapter<'a>: Sized {
                         Either::Right(compile_ir_module(state.dep_modules(), data_path)?)
                     },
                 };
-                let source_mapping = SourceMapping::new_from_view(
-                    match &compiled {
-                        Either::Left(script) => BinaryIndexedView::Script(script),
-                        Either::Right(module) => BinaryIndexedView::Module(module),
-                    },
-                    Spanned::unsafe_no_loc(()).loc,
-                )
-                .expect("Unable to build dummy source mapping");
-                let disassembler = Disassembler::new(source_mapping, DisassemblerOptions::new());
+                let view = match &compiled {
+                    Either::Left(script) => BinaryIndexedView::Script(script),
+                    Either::Right(module) => BinaryIndexedView::Module(module),
+                };
+                let disassembler = disassembler_for_view(view);
                 Ok(Some(disassembler.disassemble()?))
             },
-            TaskCommand::Publish(PublishCommand { gas_budget, syntax }, extra_args) => {
+            TaskCommand::Publish(
+                PublishCommand {
+                    gas_budget,
+                    syntax,
+                    print_bytecode,
+                },
+                extra_args,
+            ) => {
                 let syntax = syntax.unwrap_or_else(|| self.default_syntax());
                 let data = match data {
                     Some(f) => f,
@@ -242,6 +247,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     // Run the V2 compiler if requested
                     SyntaxChoice::Source if run_config == TestRunConfig::CompilerV2 => {
                         let ((module, _), warning_opt) = compile_source_unit_v2(
+                            state.pre_compiled_deps,
                             state.named_address_mapping.clone(),
                             &state.source_files().cloned().collect::<Vec<_>>(),
                             data_path.to_owned(),
@@ -281,12 +287,24 @@ pub trait MoveTestAdapter<'a>: Sized {
                         (None, module, None)
                     },
                 };
-                let (output, module) = self.publish_module(
+                let printed = if print_bytecode {
+                    let disassembler = disassembler_for_view(BinaryIndexedView::Module(&module));
+                    Some(format!(
+                        "\n== BEGIN Bytecode ==\n{}\n== END Bytecode ==",
+                        disassembler.disassemble()?
+                    ))
+                } else {
+                    None
+                };
+                let (mut output, module) = self.publish_module(
                     module,
                     named_addr_opt.map(|s| Identifier::new(s.as_str()).unwrap()),
                     gas_budget,
                     extra_args,
                 )?;
+                if print_bytecode {
+                    output = merge_output(output, printed);
+                }
                 match syntax {
                     SyntaxChoice::Source => self.compiled_state().add_with_source_file(
                         named_addr_opt,
@@ -308,6 +326,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     gas_budget,
                     syntax,
                     name: None,
+                    print_bytecode,
                 },
                 extra_args,
             ) => {
@@ -326,6 +345,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     // Run the V2 compiler if requested.
                     SyntaxChoice::Source if run_config == TestRunConfig::CompilerV2 => {
                         let ((_, script), warning_opt) = compile_source_unit_v2(
+                            state.pre_compiled_deps,
                             state.named_address_mapping.clone(),
                             &state.source_files().cloned().collect::<Vec<_>>(),
                             data_path.to_owned(),
@@ -354,15 +374,25 @@ pub trait MoveTestAdapter<'a>: Sized {
                     },
                     SyntaxChoice::IR => (compile_ir_script(state.dep_modules(), data_path)?, None),
                 };
+                let printed = if print_bytecode {
+                    let disassembler = disassembler_for_view(BinaryIndexedView::Script(&script));
+                    Some(format!(
+                        "\n== BEGIN Bytecode ==\n{}\n== END Bytecode ==",
+                        disassembler.disassemble()?
+                    ))
+                } else {
+                    None
+                };
                 let args = self.compiled_state().resolve_args(args)?;
                 let type_args = self.compiled_state().resolve_type_args(type_args)?;
-                let (output, return_values) =
+                let (mut output, return_values) =
                     self.execute_script(script, type_args, signers, args, gas_budget, extra_args)?;
                 let rendered_return_value = display_return_values(return_values);
-                Ok(merge_output(
-                    warning_opt,
-                    merge_output(output, rendered_return_value),
-                ))
+                output = merge_output(output, rendered_return_value);
+                if print_bytecode {
+                    output = merge_output(output, printed);
+                }
+                Ok(merge_output(warning_opt, output))
             },
             TaskCommand::Run(
                 RunCommand {
@@ -372,6 +402,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     gas_budget,
                     syntax,
                     name: Some((raw_addr, module_name, name)),
+                    print_bytecode: _,
                 },
                 extra_args,
             ) => {
@@ -425,6 +456,12 @@ pub trait MoveTestAdapter<'a>: Sized {
             }),
         }
     }
+}
+
+fn disassembler_for_view(view: BinaryIndexedView) -> Disassembler {
+    let source_mapping =
+        SourceMapping::new_from_view(view, Spanned::unsafe_no_loc(()).loc).expect("source mapping");
+    Disassembler::new(source_mapping, DisassemblerOptions::new())
 }
 
 fn display_return_values(return_values: SerializedReturnValues) -> Option<String> {
@@ -603,6 +640,7 @@ impl<'a> CompiledState<'a> {
 }
 
 fn compile_source_unit_v2(
+    pre_compiled_deps: Option<&FullyCompiledProgram>,
     named_address_mapping: BTreeMap<String, NumericalAddress>,
     deps: &[String],
     path: String,
@@ -610,9 +648,26 @@ fn compile_source_unit_v2(
     (Option<CompiledModule>, Option<CompiledScript>),
     Option<String>,
 )> {
+    let deps = if let Some(p) = pre_compiled_deps {
+        // The v2 compiler does not (and perhaps never) supports precompiled programs, so
+        // compile from the sources again, computing the directories where they are found.
+        let mut dirs: BTreeSet<_> = p
+            .files
+            .iter()
+            .filter_map(|(_, (file_name, _))| {
+                Path::new(file_name.as_str())
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+            })
+            .collect();
+        dirs.extend(deps.iter().cloned());
+        dirs.into_iter().collect()
+    } else {
+        deps.to_vec()
+    };
     let options = move_compiler_v2::Options {
         sources: vec![path],
-        dependencies: deps.to_vec(),
+        dependencies: deps,
         named_address_mapping: named_address_mapping
             .into_iter()
             .map(|(alias, addr)| format!("{}={}", alias, addr))
@@ -745,6 +800,7 @@ where
         (vec![config], false) // either V1 or V2
     };
     let mut last_output = String::new();
+    let mut bytecode_print_output = BTreeMap::<TestRunConfig, String>::new();
     for run_config in runs {
         let mut output = String::new();
         let mut tasks = taskify::<
@@ -791,6 +847,17 @@ where
         for task in tasks {
             handle_known_task(&mut output, &mut adapter, task);
         }
+        // Extract any bytecode outputs, they should not be part of the diff.
+        static BYTECODE_REX: Lazy<Regex> = Lazy::new(|| {
+            Regex::new("(?m)== BEGIN Bytecode ==(.|\n|\r)*== END Bytecode ==").unwrap()
+        });
+        while let Some(m) = BYTECODE_REX.find(&output) {
+            bytecode_print_output
+                .entry(run_config)
+                .or_default()
+                .push_str(&output.drain(m.range()).collect::<String>());
+        }
+
         // If there is a previous output, compare to that one
         if !last_output.is_empty() && last_output != output {
             let diff = format_diff_no_color(&last_output, &output);
@@ -803,6 +870,18 @@ where
     if config == TestRunConfig::ComparisonV1V2 {
         // Indicate in output that we passed comparison test
         last_output += "\n==> Compiler v2 delivered same results!\n"
+    }
+    // Dump printed bytecode at last
+    for (config, out) in bytecode_print_output {
+        last_output += &format!(
+            "\n>>> {} {{\n{}\n}}\n",
+            match config {
+                TestRunConfig::CompilerV1 => "V1 Compiler",
+                TestRunConfig::CompilerV2 => "V2 Compiler",
+                _ => panic!("unexpected test config"),
+            },
+            out
+        );
     }
     handle_expected_output(path, last_output)?;
     Ok(())
