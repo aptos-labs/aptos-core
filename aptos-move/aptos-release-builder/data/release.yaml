@@ -1,6 +1,6 @@
 ---
 remote_endpoint: ~
-name: "v1.6"
+name: "step_1_upgrade_framework"
 proposals:
   - name: upgrade_framework
     metadata:
@@ -12,7 +12,7 @@ proposals:
       - Framework:
           bytecode_version: 6
           git_hash: ~
-  - name: enable_fee_payer
+  - name: step_2_enable_fee_payer
     metadata:
       title: "Enable fee payer"
       description: "AIP-39: Support secondary fee payer to pay gas cost on behalf of the sender."
@@ -23,7 +23,7 @@ proposals:
     - FeatureFlag:
         enabled:
           - gas_payer_enabled
-  - name: enable_aptos_unique_identifiers
+  - name: step_3_enable_aptos_unique_identifiers
     metadata:
       title: "Enable Aptos Unique Identifiers"
       description: "AIP-36: Support for aptos unique identifiers (generated using native function generate_unique_address)"
@@ -33,7 +33,7 @@ proposals:
     - FeatureFlag:
         enabled:
           - aptos_unique_identifiers
-  - name: enable_partial_voting
+  - name: step_4_enable_partial_voting
     metadata:
       title: "Enable partial voting"
       description: "AIP-28:  Partial voting for on chain governance."
