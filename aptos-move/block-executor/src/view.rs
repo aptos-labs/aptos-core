@@ -37,6 +37,7 @@ use aptos_types::{
     aggregator::PanicError,
     executable::{Executable, ModulePath},
     state_store::{
+        errors::StateviewError,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
@@ -1013,7 +1014,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             self.mark_incorrect_use();
         }
 
-        ret
+        ret.map_err(Into::into)
     }
 
     fn patch_base_value(
@@ -1594,7 +1595,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorag
         self.base_view.id()
     }
 
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
         self.base_view.get_usage()
     }
 }
@@ -1942,7 +1943,8 @@ mod test {
         aggregator::DelayedFieldID,
         executable::Executable,
         state_store::{
-            state_storage_usage::StateStorageUsage, state_value::StateValue, TStateView,
+            errors::StateviewError, state_storage_usage::StateStorageUsage,
+            state_value::StateValue, TStateView,
         },
         transaction::BlockExecutableTransaction,
         write_set::TransactionWrite,
@@ -2561,11 +2563,14 @@ mod test {
     impl TStateView for MockStateView {
         type Key = KeyType<u32>;
 
-        fn get_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        fn get_state_value(
+            &self,
+            state_key: &Self::Key,
+        ) -> Result<Option<StateValue>, StateviewError> {
             Ok(self.data.get(state_key).cloned())
         }
 
-        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
             unimplemented!();
         }
     }

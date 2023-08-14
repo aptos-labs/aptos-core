@@ -19,7 +19,6 @@ pub mod fake_aptosdb;
 pub mod backup;
 pub mod common;
 pub mod db;
-pub mod errors;
 pub mod get_restore_handler;
 pub mod metrics;
 pub(crate) mod rocksdb_property_reporter;

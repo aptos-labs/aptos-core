@@ -12,9 +12,8 @@ use crate::{
     transaction_store::TransactionStore,
     AptosDB,
 };
-use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_storage_interface::DbReader;
+use aptos_storage_interface::{DbReader, Result};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -147,7 +146,9 @@ impl RestoreHandler {
         &self,
         version: Version,
     ) -> Result<Option<(Version, HashValue)>> {
-        self.aptosdb.get_state_snapshot_before(version)
+        self.aptosdb
+            .get_state_snapshot_before(version)
+            .map_err(Into::into)
     }
 
     pub fn get_in_progress_state_kv_snapshot_version(&self) -> Result<Option<Version>> {

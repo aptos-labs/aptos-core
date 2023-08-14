@@ -12,13 +12,13 @@ use crate::{
     },
     utils::iterators::EventsByVersionIter,
 };
-use anyhow::{format_err, Result};
 use aptos_accumulator::MerkleAccumulator;
 use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher},
     HashValue,
 };
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{contract_event::ContractEvent, transaction::Version};
 use std::{path::Path, sync::Arc};
 
@@ -87,9 +87,9 @@ impl EventDb {
         Ok(EventsByVersionIter::new(
             iter,
             start_version,
-            start_version
-                .checked_add(num_versions as u64)
-                .ok_or_else(|| format_err!("Too many versions requested."))?,
+            start_version.checked_add(num_versions as u64).ok_or({
+                AptosDbError::TooManyRequested(num_versions as u64, Version::max_value())
+            })?,
         ))
     }
 
@@ -115,7 +115,7 @@ impl EventDb {
         event_vecs.iter().enumerate().try_for_each(|(idx, events)| {
             let version = first_version
                 .checked_add(idx as Version)
-                .ok_or_else(|| format_err!("version overflow"))?;
+                .ok_or_else(|| AptosDbError::Other("version overflow".to_string()))?;
             self.put_events(version, events, /*skip_index=*/ false, batch)
         })
     }

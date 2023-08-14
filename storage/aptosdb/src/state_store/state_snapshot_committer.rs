@@ -12,11 +12,10 @@ use crate::{
     },
     versioned_node_cache::VersionedNodeCache,
 };
-use anyhow::Result;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::trace;
 use aptos_scratchpad::SmtAncestors;
-use aptos_storage_interface::{jmt_update_refs, jmt_updates, state_delta::StateDelta};
+use aptos_storage_interface::{jmt_update_refs, jmt_updates, state_delta::StateDelta, Result};
 use aptos_types::state_store::state_value::StateValue;
 use rayon::prelude::*;
 use static_assertions::const_assert;

@@ -138,7 +138,7 @@ where
         &self,
         state_key: &Self::Identifier,
     ) -> anyhow::Result<Option<StateValue>> {
-        self.get_state_value(state_key)
+        self.get_state_value(state_key).map_err(Into::into)
     }
 }
 

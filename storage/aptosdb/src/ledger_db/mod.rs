@@ -16,11 +16,11 @@ use crate::{
     ledger_db::{event_db::EventDb, transaction_db::TransactionDb},
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
 };
-use anyhow::Result;
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{ColumnFamilyDescriptor, ColumnFamilyName, SchemaBatch, DB};
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::{
     path::{Path, PathBuf},
