@@ -189,25 +189,29 @@ impl TransactionGasParameters {
         }
     }
 
-    /// New formula to charge storage fee for a write, measured in APT.
-    pub fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee {
+    pub fn storage_fee_for_slot(&self, op: &WriteOp) -> Fee {
         use WriteOp::*;
 
-        let excess_fee = |key: &StateKey, data: &[u8]| -> Fee {
-            let size = NumBytes::new(key.size() as u64) + NumBytes::new(data.len() as u64);
-            match size.checked_sub(self.free_write_bytes_quota) {
-                Some(excess) => excess * self.storage_fee_per_excess_state_byte,
-                None => 0.into(),
-            }
-        };
-
         match op {
-            Creation(data) | CreationWithMetadata { data, .. } => {
-                self.storage_fee_per_state_slot_create * NumSlots::new(1) + excess_fee(key, data)
+            Creation(..) | CreationWithMetadata { .. } => {
+                self.storage_fee_per_state_slot_create * NumSlots::new(1)
             },
-            Modification(data) | ModificationWithMetadata { data, .. } => excess_fee(key, data),
-            Deletion | DeletionWithMetadata { .. } => 0.into(),
+            Modification(..)
+            | ModificationWithMetadata { .. }
+            | Deletion
+            | DeletionWithMetadata { .. } => 0.into(),
         }
+    }
+
+    pub fn storage_fee_for_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee {
+        if let Some(data) = op.bytes() {
+            let size = NumBytes::new(key.size() as u64) + NumBytes::new(data.len() as u64);
+            if let Some(excess) = size.checked_sub(self.free_write_bytes_quota) {
+                return excess * self.storage_fee_per_excess_state_byte;
+            }
+        }
+
+        0.into()
     }
 
     /// New formula to charge storage fee for an event, measured in APT.

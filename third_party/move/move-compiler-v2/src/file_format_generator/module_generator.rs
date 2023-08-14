@@ -16,6 +16,7 @@ use move_binary_format::{
 };
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_model::{
+    ast::Address,
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
         StructEnv, StructId, TypeParameter, TypeParameterKind,
@@ -621,6 +622,43 @@ impl<'env> ModuleContext<'env> {
             0
         } else {
             value as FF::TableIndex
+        }
+    }
+
+    /// Get the file format opcode for a well-known function. This applies currently to a set
+    /// vector functions which have builtin opcodes. Gets passed an optional type instantiation
+    /// in form of a signature.
+    pub fn get_well_known_function_code(
+        &self,
+        loc: &Loc,
+        qid: QualifiedId<FunId>,
+        inst_sign: Option<FF::SignatureIndex>,
+    ) -> Option<FF::Bytecode> {
+        let fun = self.env.get_function(qid);
+        let mod_name = fun.module_env.get_name();
+        if mod_name.addr() != &Address::Numerical(AccountAddress::ONE) {
+            return None;
+        }
+        let pool = self.env.symbol_pool();
+        if pool.string(mod_name.name()).as_str() == "vector" {
+            if let Some(inst) = inst_sign {
+                match pool.string(fun.get_name()).as_str() {
+                    "empty" => Some(FF::Bytecode::VecPack(inst, 0)),
+                    "length" => Some(FF::Bytecode::VecLen(inst)),
+                    "borrow" => Some(FF::Bytecode::VecImmBorrow(inst)),
+                    "borrow_mut" => Some(FF::Bytecode::VecMutBorrow(inst)),
+                    "push_back" => Some(FF::Bytecode::VecPushBack(inst)),
+                    "pop_back" => Some(FF::Bytecode::VecPopBack(inst)),
+                    "destroy_empty" => Some(FF::Bytecode::VecUnpack(inst, 0)),
+                    "swap" => Some(FF::Bytecode::VecSwap(inst)),
+                    _ => None,
+                }
+            } else {
+                self.internal_error(loc, "expected type instantiation for vector operation");
+                None
+            }
+        } else {
+            None
         }
     }
 }

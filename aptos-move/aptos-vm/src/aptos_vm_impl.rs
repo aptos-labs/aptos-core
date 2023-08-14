@@ -640,11 +640,9 @@ impl<'a> AptosVMInternals<'a> {
     }
 
     /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
-    pub fn gas_params(
-        self,
-        log_context: &AdapterLogSchema,
-    ) -> Result<&'a AptosGasParameters, VMStatus> {
-        self.0.get_gas_parameters(log_context)
+    pub fn gas_params(self) -> Result<&'a AptosGasParameters, VMStatus> {
+        let log_context = AdapterLogSchema::new(StateViewId::Miscellaneous, 0);
+        self.0.get_gas_parameters(&log_context)
     }
 
     /// Returns the version of Move Runtime.
