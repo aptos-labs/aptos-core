@@ -10,6 +10,7 @@ use crate::{
         EMIT_FEE_STATEMENT, MULTISIG_ACCOUNT_MODULE, TRANSACTION_FEE_MODULE,
         VALIDATE_MULTISIG_TRANSACTION,
     },
+    testing::{maybe_raise_injected_error, InjectedError},
     transaction_metadata::TransactionMetadata,
     transaction_validation::APTOS_TRANSACTION_VALIDATION,
 };
@@ -552,6 +553,8 @@ impl AptosVMImpl {
         if self.features.is_emit_fee_statement_enabled() {
             self.emit_fee_statement(session, fee_statement)?;
         }
+
+        maybe_raise_injected_error(InjectedError::EndOfRunEpilogue)?;
 
         Ok(())
     }

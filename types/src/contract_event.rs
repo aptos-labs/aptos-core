@@ -10,12 +10,25 @@ use crate::{
 use anyhow::{bail, Error, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
-    account_address::AccountAddress, language_storage::TypeTag, move_resource::MoveStructType,
+    account_address::AccountAddress,
+    ident_str,
+    language_storage::{StructTag, TypeTag, CORE_CODE_ADDRESS},
+    move_resource::MoveStructType,
 };
+use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::convert::TryFrom;
+
+pub static FEE_STATEMENT_EVENT_TYPE: Lazy<TypeTag> = Lazy::new(|| {
+    TypeTag::Struct(Box::new(StructTag {
+        address: CORE_CODE_ADDRESS,
+        module: ident_str!("transaction_fee").to_owned(),
+        name: ident_str!("FeeStatement").to_owned(),
+        type_params: vec![],
+    }))
+});
 
 /// This trait is used by block executor to abstractly represent an event.
 /// Block executor uses `get_event_data` to get the event data.
@@ -128,6 +141,23 @@ impl ContractEvent {
             ContractEvent::V1(_event) => bail!("This is a instance event"),
             ContractEvent::V2(event) => event,
         })
+    }
+
+    pub fn try_v2(&self) -> Option<&ContractEventV2> {
+        match self {
+            ContractEvent::V1(_event) => None,
+            ContractEvent::V2(event) => Some(event),
+        }
+    }
+
+    pub fn try_v2_typed<T: DeserializeOwned>(&self, event_type: &TypeTag) -> Result<Option<T>> {
+        if let Some(v2) = self.try_v2() {
+            if &v2.type_tag == event_type {
+                return Ok(Some(bcs::from_bytes(&v2.event_data)?));
+            }
+        }
+
+        Ok(None)
     }
 }
 
