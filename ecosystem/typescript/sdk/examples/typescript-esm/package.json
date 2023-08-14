@@ -6,7 +6,10 @@
   "type": "module",
   "scripts": {
     "build": "rm -rf dist/* && tsc -p .",
-    "test": "pnpm build && node ./dist/index.js"
+    "test": "pnpm build && node ./dist/index.js",
+    "offer_capabilities": "ts-node --esm offer_capabilities.ts",
+    "rotate_key": "ts-node --esm rotate_key.ts",
+    "multi_ed25519_to_multisig": "ts-node --esm multi_ed25519_to_multisig.ts"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +18,8 @@
     "aptos": "latest"
   },
   "devDependencies": {
+    "@types/node": "18.6.2",
+    "ts-node": "10.9.1",
     "typescript": "4.8.2"
   }
 }

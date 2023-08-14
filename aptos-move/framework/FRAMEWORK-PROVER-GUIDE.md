@@ -2,7 +2,7 @@ This guide gives some hints to troubleshoot issues when using the prover for spe
 
 ## Installation
 
-Please refer to the [doc](https://aptos.dev/tools/install-cli/install-move-prover/).
+Please refer to the [doc](https://aptos.dev/tools/aptos-cli/install-cli/install-move-prover/).
 
 ## Timeout
 

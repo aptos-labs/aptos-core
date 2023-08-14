@@ -122,12 +122,12 @@ pub struct StateSyncDriverConfig {
 impl Default for StateSyncDriverConfig {
     fn default() -> Self {
         Self {
-            bootstrapping_mode: BootstrappingMode::ApplyTransactionOutputsFromGenesis,
+            bootstrapping_mode: BootstrappingMode::ExecuteOrApplyFromGenesis,
             commit_notification_timeout_ms: 5000,
-            continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
+            continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs,
             enable_auto_bootstrapping: false,
             fallback_to_output_syncing_secs: 180, // 3 minutes
-            progress_check_interval_ms: 100,
+            progress_check_interval_ms: 50,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
             max_num_stream_timeouts: 12,
@@ -155,7 +155,7 @@ pub struct StorageServiceConfig {
     /// Maximum number of bytes to send per network message
     pub max_network_chunk_bytes: u64,
     /// Maximum period (ms) of pending optimistic fetch requests
-    pub max_optimistic_fetch_period: u64,
+    pub max_optimistic_fetch_period_ms: u64,
     /// Maximum number of state keys and values per chunk
     pub max_state_chunk_size: u64,
     /// Maximum number of transactions per chunk
@@ -179,13 +179,13 @@ impl Default for StorageServiceConfig {
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
-            max_optimistic_fetch_period: 5000, // 5 seconds
+            max_optimistic_fetch_period_ms: 5000, // 5 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             min_time_to_ignore_peers_secs: 300, // 5 minutes
             request_moderator_refresh_interval_ms: 1000, // 1 second
-            storage_summary_refresh_interval_ms: 500,
+            storage_summary_refresh_interval_ms: 100, // Optimal for <= 10 blocks per second
         }
     }
 }
@@ -228,7 +228,7 @@ impl Default for DataStreamingServiceConfig {
             max_data_stream_channel_sizes: 300,
             max_request_retry: 5,
             max_notification_id_mappings: 300,
-            progress_check_interval_ms: 100,
+            progress_check_interval_ms: 50,
         }
     }
 }
@@ -246,6 +246,8 @@ pub struct AptosDataClientConfig {
     pub max_num_in_flight_regular_polls: u64,
     /// Maximum number of output reductions before transactions are returned
     pub max_num_output_reductions: u64,
+    /// Maximum version lag we'll tolerate when sending optimistic fetch requests
+    pub max_optimistic_fetch_version_lag: u64,
     /// Maximum timeout (in ms) when waiting for a response (after exponential increases)
     pub max_response_timeout_ms: u64,
     /// Maximum number of state keys and values per chunk
@@ -254,10 +256,10 @@ pub struct AptosDataClientConfig {
     pub max_transaction_chunk_size: u64,
     /// Maximum number of transaction outputs per chunk
     pub max_transaction_output_chunk_size: u64,
+    /// Timeout (in ms) when waiting for an optimistic fetch response
+    pub optimistic_fetch_timeout_ms: u64,
     /// First timeout (in ms) when waiting for a response
     pub response_timeout_ms: u64,
-    /// Timeout (in ms) when waiting for a subscription response
-    pub subscription_timeout_ms: u64,
     /// Interval (in ms) between data summary poll loop executions
     pub summary_poll_loop_interval_ms: u64,
     /// Whether or not to request compression for incoming data
@@ -272,12 +274,13 @@ impl Default for AptosDataClientConfig {
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
             max_num_output_reductions: 0,
-            max_response_timeout_ms: 60000, // 60 seconds
+            max_optimistic_fetch_version_lag: 50_000, // Assumes 5K TPS for 10 seconds, which should be plenty
+            max_response_timeout_ms: 60_000,          // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
-            response_timeout_ms: 10000,    // 10 seconds
-            subscription_timeout_ms: 5000, // 5 seconds
+            optimistic_fetch_timeout_ms: 5000, // 5 seconds
+            response_timeout_ms: 10_000,       // 10 seconds
             summary_poll_loop_interval_ms: 200,
             use_compression: true,
         }

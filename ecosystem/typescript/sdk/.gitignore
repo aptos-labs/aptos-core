@@ -15,3 +15,8 @@ build/
 
 # Doc generation output
 docs/
+
+# Other build systems that are not used
+yarn.lock
+yarn-error.log
+package-lock.json

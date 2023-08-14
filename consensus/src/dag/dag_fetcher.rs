@@ -1,27 +1,90 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{types::NodeMetadata, RpcHandler};
-use crate::{
-    dag::{
-        dag_network::DAGNetworkSender,
-        dag_store::Dag,
-        types::{CertifiedNode, DAGMessage, FetchResponse, Node, RemoteFetchRequest},
-    },
-    network::TConsensusMsg,
+use super::{dag_network::RpcWithFallback, types::NodeMetadata, RpcHandler};
+use crate::dag::{
+    dag_network::DAGNetworkSender,
+    dag_store::Dag,
+    types::{CertifiedNode, FetchResponse, Node, RemoteFetchRequest},
 };
 use anyhow::ensure;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_logger::error;
+use aptos_time_service::TimeService;
 use aptos_types::epoch_state::EpochState;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use futures::{stream::FuturesUnordered, Stream, StreamExt};
+use std::{
+    collections::HashMap,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+    time::Duration,
+};
 use thiserror::Error as ThisError;
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
 
+pub struct FetchWaiter<T> {
+    rx: Receiver<oneshot::Receiver<T>>,
+    futures: Pin<Box<FuturesUnordered<oneshot::Receiver<T>>>>,
+}
+
+impl<T> FetchWaiter<T> {
+    fn new(rx: Receiver<oneshot::Receiver<T>>) -> Self {
+        Self {
+            rx,
+            futures: Box::pin(FuturesUnordered::new()),
+        }
+    }
+}
+
+impl<T> Stream for FetchWaiter<T> {
+    type Item = Result<T, oneshot::error::RecvError>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if let Poll::Ready(Some(rx)) = self.rx.poll_recv(cx) {
+            self.futures.push(rx);
+        }
+
+        self.futures.as_mut().poll_next(cx)
+    }
+}
+
+pub struct FetchRequester {
+    request_tx: Sender<LocalFetchRequest>,
+    node_waiter_tx: Sender<oneshot::Receiver<Node>>,
+    certified_node_waiter_tx: Sender<oneshot::Receiver<CertifiedNode>>,
+}
+
+impl FetchRequester {
+    pub fn request_for_node(&self, node: Node) -> anyhow::Result<()> {
+        let (res_tx, res_rx) = oneshot::channel();
+        let fetch_req = LocalFetchRequest::Node(node, res_tx);
+        self.request_tx
+            .try_send(fetch_req)
+            .map_err(|e| anyhow::anyhow!("unable to send node fetch request to channel: {}", e))?;
+        self.node_waiter_tx.try_send(res_rx)?;
+        Ok(())
+    }
+
+    pub fn request_for_certified_node(&self, node: CertifiedNode) -> anyhow::Result<()> {
+        let (res_tx, res_rx) = oneshot::channel();
+        let fetch_req = LocalFetchRequest::CertifiedNode(node, res_tx);
+        self.request_tx.try_send(fetch_req).map_err(|e| {
+            anyhow::anyhow!(
+                "unable to send certified node fetch request to channel: {}",
+                e
+            )
+        })?;
+        self.certified_node_waiter_tx.try_send(res_rx)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
 pub enum LocalFetchRequest {
     Node(Node, oneshot::Sender<Node>),
     CertifiedNode(CertifiedNode, oneshot::Sender<CertifiedNode>),
@@ -56,11 +119,12 @@ impl LocalFetchRequest {
     }
 }
 
-struct DagFetcher {
+pub struct DagFetcher {
     epoch_state: Arc<EpochState>,
     network: Arc<dyn DAGNetworkSender>,
     dag: Arc<RwLock<Dag>>,
     request_rx: Receiver<LocalFetchRequest>,
+    time_service: TimeService,
 }
 
 impl DagFetcher {
@@ -68,16 +132,31 @@ impl DagFetcher {
         epoch_state: Arc<EpochState>,
         network: Arc<dyn DAGNetworkSender>,
         dag: Arc<RwLock<Dag>>,
-    ) -> (Self, Sender<LocalFetchRequest>) {
+        time_service: TimeService,
+    ) -> (
+        Self,
+        FetchRequester,
+        FetchWaiter<Node>,
+        FetchWaiter<CertifiedNode>,
+    ) {
         let (request_tx, request_rx) = tokio::sync::mpsc::channel(16);
+        let (node_tx, node_rx) = tokio::sync::mpsc::channel(100);
+        let (certified_node_tx, certified_node_rx) = tokio::sync::mpsc::channel(100);
         (
             Self {
                 epoch_state,
                 network,
                 dag,
                 request_rx,
+                time_service,
             },
-            request_tx,
+            FetchRequester {
+                request_tx,
+                node_waiter_tx: node_tx,
+                certified_node_waiter_tx: certified_node_tx,
+            },
+            FetchWaiter::new(node_rx),
+            FetchWaiter::new(certified_node_rx),
         )
     }
 
@@ -105,36 +184,45 @@ impl DagFetcher {
                     dag_reader.bitmask(local_request.node().round()),
                 )
             };
-            let network_request = DAGMessage::from(remote_request.clone()).into_network_message();
-            if let Ok(response) = self
-                .network
-                .send_rpc_with_fallbacks(responders, network_request, Duration::from_secs(1))
-                .await
-                .and_then(DAGMessage::try_from)
-                .and_then(FetchResponse::try_from)
-                .and_then(|response| response.verify(&remote_request, &self.epoch_state.verifier))
-            {
-                let ceritified_nodes = response.certified_nodes();
-                // TODO: support chunk response or fallback to state sync
+
+            let mut rpc = RpcWithFallback::new(
+                responders,
+                remote_request.clone().into(),
+                Duration::from_millis(500),
+                Duration::from_secs(1),
+                self.network.clone(),
+                self.time_service.clone(),
+            );
+            while let Some(response) = rpc.next().await {
+                if let Ok(response) =
+                    response
+                        .and_then(FetchResponse::try_from)
+                        .and_then(|response| {
+                            response.verify(&remote_request, &self.epoch_state.verifier)
+                        })
                 {
-                    let mut dag_writer = self.dag.write();
-                    for node in ceritified_nodes {
-                        if let Err(e) = dag_writer.add_node(node) {
-                            error!("Failed to add node {}", e);
+                    let certified_nodes = response.certified_nodes();
+                    // TODO: support chunk response or fallback to state sync
+                    {
+                        let mut dag_writer = self.dag.write();
+                        for node in certified_nodes {
+                            if let Err(e) = dag_writer.add_node(node) {
+                                error!("Failed to add node {}", e);
+                            }
                         }
                     }
-                }
 
-                if self
-                    .dag
-                    .read()
-                    .all_exists(local_request.node().parents_metadata())
-                {
-                    local_request.notify();
-                } else {
-                    // TODO: implement retry logic
+                    if self
+                        .dag
+                        .read()
+                        .all_exists(local_request.node().parents_metadata())
+                    {
+                        local_request.notify();
+                        break;
+                    }
                 }
             }
+            // TODO retry
         }
     }
 }

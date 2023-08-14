@@ -6,11 +6,17 @@ members = [
     "api/openapi-spec-generator",
     "api/test-context",
     "api/types",
+    "aptos-move/aptos-abstract-gas-usage",
     "aptos-move/aptos-aggregator",
     "aptos-move/aptos-debugger",
-    "aptos-move/aptos-gas",
+    "aptos-move/aptos-gas-algebra",
+    "aptos-move/aptos-gas-calibration",
+    "aptos-move/aptos-gas-meter",
     "aptos-move/aptos-gas-profiling",
+    "aptos-move/aptos-gas-schedule",
+    "aptos-move/aptos-gas-schedule-updator",
     "aptos-move/aptos-memory-usage-tracker",
+    "aptos-move/aptos-native-interface",
     "aptos-move/aptos-release-builder",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
@@ -28,7 +34,7 @@ members = [
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
-    "aptos-move/gas-algebra-ext",
+    "aptos-move/framework/table-natives",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
@@ -65,6 +71,7 @@ members = [
     "crates/aptos-network-checker",
     "crates/aptos-node-identity",
     "crates/aptos-openapi",
+    "crates/aptos-profiler",
     "crates/aptos-proptest-helpers",
     "crates/aptos-push-metrics",
     "crates/aptos-rate-limiter",
@@ -88,6 +95,7 @@ members = [
     "crates/node-resource-metrics",
     "crates/num-variants",
     "crates/proxy",
+    "crates/reliable-broadcast",
     "crates/short-hex-str",
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
@@ -101,6 +109,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-post-processor",
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
+    "ecosystem/nft-metadata-crawler-parser",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
@@ -175,6 +184,7 @@ members = [
     "third_party/move/move-command-line-common",
     "third_party/move/move-compiler",
     "third_party/move/move-compiler-v2",
+    "third_party/move/move-compiler-v2/transactional-tests",
     "third_party/move/move-compiler/transactional-tests",
     "third_party/move/move-core/types",
     "third_party/move/move-ir-compiler",
@@ -187,6 +197,7 @@ members = [
     "third_party/move/move-prover",
     "third_party/move/move-prover/boogie-backend",
     "third_party/move/move-prover/bytecode",
+    "third_party/move/move-prover/lab",
     "third_party/move/move-prover/move-abigen",
     "third_party/move/move-prover/move-docgen",
     "third_party/move/move-prover/move-errmapgen",
@@ -245,7 +256,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.70"
+rust-version = "1.71.1"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -296,9 +307,13 @@ aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
 aptos-fuzzer = { path = "testsuite/aptos-fuzzer" }
 fuzzer = { path = "testsuite/fuzzer" }
-aptos-gas = { path = "aptos-move/aptos-gas" }
-aptos-gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
+aptos-abstract-gas-usage = { path = "aptos-move/aptos-abstract-gas-usage" }
+aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }
+aptos-gas-algebra = { path = "aptos-move/aptos-gas-algebra" }
+aptos-gas-calibration = { path = "aptos-move/aptos-gas-calibration" }
 aptos-gas-profiling = { path = "aptos-move/aptos-gas-profiling" }
+aptos-gas-schedule = { path = "aptos-move/aptos-gas-schedule" }
+aptos-gas-schedule-updator = { path = "aptos-move/aptos-gas-schedule-updator" }
 aptos-genesis = { path = "crates/aptos-genesis" }
 aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
@@ -328,11 +343,13 @@ aptos-metrics-core = { path = "crates/aptos-metrics-core" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
 aptos-moving-average = { path = "crates/moving-average" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
+aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
 aptos-network = { path = "network" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
+aptos-nft-metadata-crawler-parser = { path = "ecosystem/nft-metadata-crawler-parser" }
 aptos-node = { path = "aptos-node" }
 aptos-node-checker = { path = "ecosystem/node-checker" }
 aptos-node-identity = { path = "crates/aptos-node-identity" }
@@ -342,6 +359,7 @@ aptos-openapi = { path = "crates/aptos-openapi" }
 aptos-package-builder = { path = "aptos-move/package-builder" }
 aptos-peer-monitoring-service-client = { path = "network/peer-monitoring-service/client" }
 aptos-peer-monitoring-service-server = { path = "network/peer-monitoring-service/server" }
+aptos-profiler = { path = "crates/aptos-profiler" }
 aptos-peer-monitoring-service-types = { path = "network/peer-monitoring-service/types" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "crates/aptos-protos" }
@@ -349,6 +367,7 @@ aptos-proxy = { path = "crates/proxy" }
 aptos-push-metrics = { path = "crates/aptos-push-metrics" }
 aptos-rate-limiter = { path = "crates/aptos-rate-limiter" }
 aptos-release-builder = { path = "aptos-move/aptos-release-builder" }
+aptos-reliable-broadcast = { path = "crates/reliable-broadcast" }
 aptos-resource-viewer = { path = "aptos-move/aptos-resource-viewer" }
 aptos-rest-client = { path = "crates/aptos-rest-client" }
 aptos-retrier = { path = "crates/aptos-retrier" }
@@ -395,11 +414,13 @@ aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" 
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
+nalgebra = "0.32"
+float-cmp = "0.9.0"
 again = "0.1.2"
-anyhow = "1.0.62"
+anyhow = "1.0.71"
 anstyle = "1.0.1"
-arc-swap = "1.5.0"
-arr_macro = "0.1.3"
+arc-swap = "1.6.0"
+arr_macro = "0.2.1"
 ark-bls12-381 = "0.4.0"
 ark-ec = "0.4.0"
 ark-ff = "0.4.0"
@@ -427,7 +448,7 @@ chrono = { version = "0.4.19", features = ["clock", "serde"] }
 cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 claims = "0.7"
-clap = { version = "4.3.5", features = ["derive", "unstable-styles"] }
+clap = { version = "4.3.9", features = ["derive", "unstable-styles"] }
 clap_complete = "4.3.1"
 cloud-storage = { version = "0.11.1", features = ["global-client"] }
 codespan-reporting = "0.11.1"
@@ -474,6 +495,8 @@ get_if_addrs = "0.5.3"
 git2 = "0.16.1"
 glob = "0.3.0"
 goldenfile = "1.1.0"
+google-cloud-pubsub = "0.18.0"
+google-cloud-storage = "0.13.0"
 handlebars = "4.2.2"
 heck = "0.3.2"
 hex = "0.4.3"
@@ -482,6 +505,7 @@ hostname = "0.3.1"
 httpmock = "0.6"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-tls = "0.5.0"
+image = "0.24.5"
 include_dir = { version = "0.7.2", features = ["glob"] }
 indicatif = "0.15.0"
 indoc = "1.0.6"
@@ -530,13 +554,14 @@ prometheus-parse = "0.2.4"
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 prost = "0.11.3"
+prost-types = "0.11.3"
 quanta = "0.10.1"
 quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
 random_word = "0.3.0"
 rayon = "1.5.2"
-redis = { version = "0.22.3", features = ["tokio-comp", "script"] }
+redis = { version = "0.22.3", features = ["tokio-comp", "script", "connection-manager"] }
 redis-test = { version = "0.1.1", features = ["aio"] }
 regex = "1.5.5"
 reqwest = { version = "0.11.11", features = [
@@ -579,6 +604,7 @@ tempfile = "3.3.0"
 termcolor = "1.1.2"
 textwrap = "0.15.0"
 thiserror = "1.0.37"
+time = { version = "0.3.24", features = ["serde"] }
 tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tracing = "0.1.34"
@@ -634,6 +660,7 @@ move-prover = { path = "third_party/move/move-prover" }
 move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backend" }
 move-stackless-bytecode = { path = "third_party/move/move-prover/bytecode" }
 aptos-move-stdlib = { path = "aptos-move/framework/move-stdlib" }
+aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 move-prover-test-utils = { path = "third_party/move/move-prover/test-utils" }
 move-resource-viewer = { path = "third_party/move/tools/move-resource-viewer" }
 move-symbol-pool = { path = "third_party/move/move-symbol-pool" }
@@ -680,3 +707,4 @@ debug = true
 [patch.crates-io]
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
+x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }

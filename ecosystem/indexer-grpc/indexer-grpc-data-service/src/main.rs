@@ -48,6 +48,8 @@ pub struct IndexerGrpcDataServiceConfig {
     // The address for TLS and non-TLS gRPC server to listen on.
     pub data_service_grpc_tls_config: Option<TlsConfig>,
     pub data_service_grpc_non_tls_config: Option<NonTlsConfig>,
+    // The size of the response channel that response can be buffered.
+    pub data_service_response_channel_size: Option<usize>,
     // A list of auth tokens that are allowed to access the service.
     pub whitelisted_auth_tokens: Vec<String>,
     // File store config.
@@ -91,6 +93,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
         let server = RawDataServerWrapper::new(
             self.redis_read_replica_address.clone(),
             self.file_store_config.clone(),
+            self.data_service_response_channel_size,
         );
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Gzip)
@@ -109,6 +112,10 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                 .map_err(|e| anyhow::anyhow!(e))?
                 .next()
                 .ok_or_else(|| anyhow::anyhow!("Failed to parse grpc address"))?;
+            tracing::info!(
+                grpc_address = grpc_address.to_string().as_str(),
+                "[Data Service] Starting gRPC server with non-TLS."
+            );
             tasks.push(tokio::spawn(async move {
                 Server::builder()
                     .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
@@ -132,6 +139,10 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             let cert = tokio::fs::read(config.cert_path.clone()).await?;
             let key = tokio::fs::read(config.key_path.clone()).await?;
             let identity = tonic::transport::Identity::from_pem(cert, key);
+            tracing::info!(
+                grpc_address = grpc_address.to_string().as_str(),
+                "[Data Service] Starting gRPC server with TLS."
+            );
             tasks.push(tokio::spawn(async move {
                 Server::builder()
                     .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
