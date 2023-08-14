@@ -512,16 +512,7 @@ impl<'a> FunctionGenerator<'a> {
     ) {
         let fun_ctx = ctx.fun_ctx;
         self.abstract_push_args(ctx, source);
-        if let Some(opcode) = ctx.fun_ctx.module.get_well_known_function_code(
-            &ctx.fun_ctx.loc,
-            id,
-            Some(
-                self.gen
-                    .signature(&ctx.fun_ctx.module, &ctx.fun_ctx.loc, inst.to_vec()),
-            ),
-        ) {
-            self.emit(opcode)
-        } else if inst.is_empty() {
+        if inst.is_empty() {
             let idx = self.gen.function_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
@@ -532,7 +523,7 @@ impl<'a> FunctionGenerator<'a> {
             let idx = self.gen.function_instantiation_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
-                &fun_ctx.module.env.get_function(id),
+                fun_ctx.fun.func_env,
                 inst.to_vec(),
             );
             self.emit(FF::Bytecode::CallGeneric(idx))
