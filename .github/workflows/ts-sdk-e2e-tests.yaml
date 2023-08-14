@@ -34,6 +34,7 @@ jobs:
 
   # This job determines which files were changed
   file_change_determinator:
+    needs: [permission-check]
     runs-on: ubuntu-latest
     outputs:
       only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
