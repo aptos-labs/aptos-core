@@ -30,12 +30,14 @@ aptos-metrics-core = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-mvhashmap = { workspace = true }
 aptos-native-interface = { workspace = true }
+aptos-runtimes = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 aptos-utils = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
+async-trait = { workspace = true }
 bcs = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
@@ -57,6 +59,8 @@ rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 smallvec = { workspace = true }
+tokio = { workspace = true }
+tokio-scoped = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

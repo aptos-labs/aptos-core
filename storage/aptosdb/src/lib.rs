@@ -74,6 +74,7 @@ use aptos_crypto::HashValue;
 use aptos_db_indexer::Indexer;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
     cached_state_view::ShardedStateCache, state_delta::StateDelta, state_view::DbStateView,
@@ -891,19 +892,27 @@ impl AptosDB {
         sharded_state_cache: Option<&ShardedStateCache>,
         skip_index_and_usage: bool,
     ) -> Result<HashValue> {
-        let new_root_hash = thread::scope(|s| {
+        let mut new_root_hash = HashValue::zero();
+        // TODO(grao): Consider propagating the error instead of panic, if necessary.
+        THREAD_MANAGER.get_non_exe_cpu_pool().scope(|s| {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["save_transactions__work"])
                 .start_timer();
             // TODO(grao): Write progress for each of the following databases, and handle the
             // inconsistency at the startup time.
-            let t0 =
-                s.spawn(|| self.commit_events(txns_to_commit, first_version, skip_index_and_usage));
-            let t1 = s.spawn(|| self.commit_write_sets(txns_to_commit, first_version));
-            let t2 = s.spawn(|| {
-                self.commit_transactions(txns_to_commit, first_version, skip_index_and_usage)
+            s.spawn(|_| {
+                self.commit_events(txns_to_commit, first_version, skip_index_and_usage)
+                    .unwrap();
             });
-            let t3 = s.spawn(|| {
+            s.spawn(|_| {
+                self.commit_write_sets(txns_to_commit, first_version)
+                    .unwrap();
+            });
+            s.spawn(|_| {
+                self.commit_transactions(txns_to_commit, first_version, skip_index_and_usage)
+                    .unwrap();
+            });
+            s.spawn(|_| {
                 self.commit_state_kv_and_ledger_metadata(
                     txns_to_commit,
                     first_version,
@@ -911,17 +920,18 @@ impl AptosDB {
                     sharded_state_cache,
                     skip_index_and_usage,
                 )
+                .unwrap();
             });
-            let t4 = s.spawn(|| self.commit_transaction_infos(txns_to_commit, first_version));
-            let t5 = s.spawn(|| self.commit_transaction_accumulator(txns_to_commit, first_version));
-            // TODO(grao): Consider propagating the error instead of panic, if necessary.
-            t0.join().unwrap()?;
-            t1.join().unwrap()?;
-            t2.join().unwrap()?;
-            t3.join().unwrap()?;
-            t4.join().unwrap()?;
-            t5.join().unwrap()
-        })?;
+            s.spawn(|_| {
+                self.commit_transaction_infos(txns_to_commit, first_version)
+                    .unwrap();
+            });
+            s.spawn(|_| {
+                new_root_hash = self
+                    .commit_transaction_accumulator(txns_to_commit, first_version)
+                    .unwrap();
+            });
+        });
 
         Ok(new_root_hash)
     }

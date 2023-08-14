@@ -38,6 +38,7 @@ pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static, C: Executo
     phantom: PhantomData<S>,
 }
 
+#[derive(Debug)]
 pub enum ExecutorShardCommand<S> {
     ExecuteSubBlocks(
         Arc<S>,
@@ -66,8 +67,8 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
 
     /// Execute a block of transactions in parallel by splitting the block into num_remote_executors partitions and
     /// dispatching each partition to a remote executor shard.
-    pub fn execute_block(
-        &self,
+    pub async fn execute_block(
+        &mut self,
         state_view: Arc<S>,
         transactions: PartitionedTransactions,
         concurrency_level_per_shard: usize,
@@ -89,7 +90,8 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
                 transactions,
                 concurrency_level_per_shard,
                 maybe_block_gas_limit,
-            )?
+            )
+            .await?
             .into_inner();
         // wait for all remote executors to send the result back and append them in order by shard id
         trace!("ShardedBlockExecutor Received all results");

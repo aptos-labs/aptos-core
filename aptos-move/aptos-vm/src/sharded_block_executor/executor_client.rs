@@ -5,6 +5,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::PartitionedTransactions, transaction::TransactionOutput,
 };
+use async_trait::async_trait;
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
 
@@ -30,13 +31,14 @@ impl ShardedExecutionOutput {
 }
 
 // Interface to communicate from the block executor coordinator to the executor shards.
+#[async_trait]
 pub trait ExecutorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
     fn num_shards(&self) -> usize;
 
     // A blocking call that executes the transactions in the block. It returns the execution results from each shard
     // and in the round order and also the global output.
-    fn execute_block(
-        &self,
+    async fn execute_block(
+        &mut self,
         state_view: Arc<S>,
         transactions: PartitionedTransactions,
         concurrency_level_per_shard: usize,

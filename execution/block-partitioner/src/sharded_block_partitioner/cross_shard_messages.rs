@@ -6,7 +6,8 @@ use crate::sharded_block_partitioner::{
     dependency_analysis::{RWSet, WriteSetWithTxnIndex},
 };
 use aptos_types::block_executor::partitioner::{CrossShardEdges, ShardId, TxnIndex};
-use std::sync::mpsc::{Receiver, Sender};
+use async_trait::async_trait;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 #[derive(Clone, Debug)]
 pub enum CrossShardMsg {
@@ -33,30 +34,34 @@ impl CrossShardDependentEdges {
 }
 
 // Define the interface for CrossShardClient
+#[async_trait]
 pub trait CrossShardClientInterface {
-    fn broadcast_and_collect_rw_set(&self, rw_set: RWSet) -> Vec<RWSet>;
-    fn broadcast_and_collect_write_set_with_index(
-        &self,
+    async fn broadcast_and_collect_rw_set(&mut self, rw_set: RWSet) -> Vec<RWSet>;
+    async fn broadcast_and_collect_write_set_with_index(
+        &mut self,
         rw_set_with_index: WriteSetWithTxnIndex,
     ) -> Vec<WriteSetWithTxnIndex>;
-    fn broadcast_and_collect_num_accepted_txns(&self, num_accepted_txns: usize) -> Vec<usize>;
-    fn broadcast_and_collect_dependent_edges(
-        &self,
+    async fn broadcast_and_collect_num_accepted_txns(
+        &mut self,
+        num_accepted_txns: usize,
+    ) -> Vec<usize>;
+    async fn broadcast_and_collect_dependent_edges(
+        &mut self,
         dependent_edges: Vec<Vec<CrossShardDependentEdges>>,
     ) -> Vec<Vec<CrossShardDependentEdges>>;
 }
 
 pub struct CrossShardClient {
     shard_id: ShardId,
-    message_rxs: Vec<Receiver<CrossShardMsg>>,
-    message_txs: Vec<Sender<CrossShardMsg>>,
+    message_rxs: Vec<UnboundedReceiver<CrossShardMsg>>,
+    message_txs: Vec<UnboundedSender<CrossShardMsg>>,
 }
 
 impl CrossShardClient {
     pub fn new(
         shard_id: ShardId,
-        message_rxs: Vec<Receiver<CrossShardMsg>>,
-        message_txs: Vec<Sender<CrossShardMsg>>,
+        message_rxs: Vec<UnboundedReceiver<CrossShardMsg>>,
+        message_txs: Vec<UnboundedSender<CrossShardMsg>>,
     ) -> Self {
         Self {
             shard_id,
@@ -65,7 +70,7 @@ impl CrossShardClient {
         }
     }
 
-    fn broadcast_and_collect<T, F, G>(&self, f: F, g: G) -> Vec<T>
+    async fn broadcast_and_collect<T, F, G>(&mut self, f: F, g: G) -> Vec<T>
     where
         F: Fn() -> CrossShardMsg,
         G: Fn(CrossShardMsg) -> Option<T>,
@@ -80,19 +85,20 @@ impl CrossShardClient {
             }
         }
 
-        for (i, msg_rx) in self.message_rxs.iter().enumerate() {
+        for (i, msg_rx) in self.message_rxs.iter_mut().enumerate() {
             if i == self.shard_id {
                 continue;
             }
-            let msg = msg_rx.recv().unwrap();
+            let msg = msg_rx.recv().await.unwrap();
             vec[i] = g(msg).expect("Unexpected message");
         }
         vec
     }
 }
 
+#[async_trait]
 impl CrossShardClientInterface for CrossShardClient {
-    fn broadcast_and_collect_rw_set(&self, rw_set: RWSet) -> Vec<RWSet> {
+    async fn broadcast_and_collect_rw_set(&mut self, rw_set: RWSet) -> Vec<RWSet> {
         self.broadcast_and_collect(
             || CrossShardMsg::RWSetMsg(rw_set.clone()),
             |msg| match msg {
@@ -100,10 +106,11 @@ impl CrossShardClientInterface for CrossShardClient {
                 _ => None,
             },
         )
+        .await
     }
 
-    fn broadcast_and_collect_write_set_with_index(
-        &self,
+    async fn broadcast_and_collect_write_set_with_index(
+        &mut self,
         rw_set_with_index: WriteSetWithTxnIndex,
     ) -> Vec<WriteSetWithTxnIndex> {
         self.broadcast_and_collect(
@@ -115,9 +122,13 @@ impl CrossShardClientInterface for CrossShardClient {
                 _ => None,
             },
         )
+        .await
     }
 
-    fn broadcast_and_collect_num_accepted_txns(&self, num_accepted_txns: usize) -> Vec<usize> {
+    async fn broadcast_and_collect_num_accepted_txns(
+        &mut self,
+        num_accepted_txns: usize,
+    ) -> Vec<usize> {
         self.broadcast_and_collect(
             || CrossShardMsg::AcceptedTxnsMsg(num_accepted_txns),
             |msg| match msg {
@@ -125,10 +136,11 @@ impl CrossShardClientInterface for CrossShardClient {
                 _ => None,
             },
         )
+        .await
     }
 
-    fn broadcast_and_collect_dependent_edges(
-        &self,
+    async fn broadcast_and_collect_dependent_edges(
+        &mut self,
         dependent_edges: Vec<Vec<CrossShardDependentEdges>>,
     ) -> Vec<Vec<CrossShardDependentEdges>> {
         let num_shards = self.message_txs.len();
@@ -141,8 +153,8 @@ impl CrossShardClientInterface for CrossShardClient {
 
         let mut cross_shard_dependent_edges = vec![vec![]; num_shards];
 
-        for (i, msg_rx) in self.message_rxs.iter().enumerate() {
-            let msg = msg_rx.recv().unwrap();
+        for (i, msg_rx) in self.message_rxs.iter_mut().enumerate() {
+            let msg = msg_rx.recv().await.unwrap();
             match msg {
                 CrossShardDependentEdgesMsg(dependent_edges) => {
                     cross_shard_dependent_edges[i] = dependent_edges;

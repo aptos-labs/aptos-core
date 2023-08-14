@@ -12,11 +12,11 @@ use aptos_types::{
     transaction::analyzed_transaction::AnalyzedTransaction,
 };
 use itertools::Itertools;
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
-pub struct DependentEdgeCreator {
+pub struct DependentEdgeCreator<'a> {
     shard_id: ShardId,
-    cross_shard_client: Arc<dyn CrossShardClientInterface>,
+    cross_shard_client: &'a mut (dyn CrossShardClientInterface + Send),
     froze_sub_blocks: SubBlocksForShard<AnalyzedTransaction>,
     num_shards: usize,
     round_id: usize,
@@ -30,10 +30,10 @@ pub struct DependentEdgeCreator {
 /// 3. It groups the dependent edge list by source txn index.
 /// 4. It adds the dependent edge list to the sub blocks in the current round.
 ///
-impl DependentEdgeCreator {
+impl<'a> DependentEdgeCreator<'a> {
     pub fn new(
         shard_id: ShardId,
-        cross_shard_client: Arc<dyn CrossShardClientInterface>,
+        cross_shard_client: &'a mut (dyn CrossShardClientInterface + Send),
         froze_sub_blocks: SubBlocksForShard<AnalyzedTransaction>,
         num_shards: usize,
         round_id: usize,
@@ -47,7 +47,7 @@ impl DependentEdgeCreator {
         }
     }
 
-    pub fn create_dependent_edges(
+    pub async fn create_dependent_edges(
         &mut self,
         curr_cross_shard_deps: &[CrossShardDependencies],
         index_offset: usize,
@@ -67,7 +67,7 @@ impl DependentEdgeCreator {
                 &mut dependent_edges,
             );
         }
-        let dep_edges_vec = self.send_and_collect_dependent_edges(dependent_edges);
+        let dep_edges_vec = self.send_and_collect_dependent_edges(dependent_edges).await;
         let dep_edges = self.group_dependent_edges_by_source_idx(dep_edges_vec);
         self.add_dependent_edges_to_sub_blocks(dep_edges);
     }
@@ -90,8 +90,8 @@ impl DependentEdgeCreator {
         }
     }
 
-    fn send_and_collect_dependent_edges(
-        &self,
+    async fn send_and_collect_dependent_edges(
+        &mut self,
         dependent_edges: Vec<HashMap<TxnIndex, CrossShardEdges>>,
     ) -> Vec<Vec<CrossShardDependentEdges>> {
         let mut back_edges_vec = Vec::new();
@@ -107,6 +107,7 @@ impl DependentEdgeCreator {
         }
         self.cross_shard_client
             .broadcast_and_collect_dependent_edges(back_edges_vec)
+            .await
     }
 
     fn group_dependent_edges_by_source_idx(

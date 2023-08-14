@@ -17,6 +17,7 @@ use aptos_types::{
     transaction::analyzed_transaction::AnalyzedTransaction,
     write_set::TransactionWrite,
 };
+use async_trait::async_trait;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -25,13 +26,15 @@ use std::{
 pub struct CrossShardCommitReceiver {}
 
 impl CrossShardCommitReceiver {
-    pub fn start<S: StateView + Sync + Send>(
-        cross_shard_state_view: Arc<CrossShardStateView<S>>,
-        cross_shard_client: Arc<dyn CrossShardClient>,
+    pub async fn start<'a, S: StateView + Sync + Send>(
+        cross_shard_state_view: Arc<CrossShardStateView<'a, S>>,
+        cross_shard_receiver_client: &mut dyn CrossShardReceiverClient,
         round: RoundId,
     ) {
         loop {
-            let msg = cross_shard_client.receive_cross_shard_msg(round);
+            let msg = cross_shard_receiver_client
+                .receive_cross_shard_msg(round)
+                .await;
             match msg {
                 RemoteTxnWriteMsg(txn_commit_msg) => {
                     let (state_key, write_op) = txn_commit_msg.take();
@@ -47,9 +50,9 @@ impl CrossShardCommitReceiver {
     }
 }
 
-pub struct CrossShardCommitSender {
+pub struct CrossShardCommitSender<'a> {
     shard_id: ShardId,
-    cross_shard_client: Arc<dyn CrossShardClient>,
+    cross_shard_sender_client: &'a dyn CrossShardSenderClient,
     // The hashmap of source txn index to hashmap of conflicting storage location to the
     // list shard id and round id. Please note that the transaction indices stored here is
     // global indices, so we need to convert the local index received from the parallel execution to
@@ -60,10 +63,10 @@ pub struct CrossShardCommitSender {
     index_offset: TxnIndex,
 }
 
-impl CrossShardCommitSender {
+impl<'a> CrossShardCommitSender<'a> {
     pub fn new(
         shard_id: ShardId,
-        cross_shard_client: Arc<dyn CrossShardClient>,
+        cross_shard_sender_client: &'a dyn CrossShardSenderClient,
         sub_block: &SubBlock<AnalyzedTransaction>,
     ) -> Self {
         let mut dependent_edges = HashMap::new();
@@ -96,7 +99,7 @@ impl CrossShardCommitSender {
 
         Self {
             shard_id,
-            cross_shard_client,
+            cross_shard_sender_client,
             dependent_edges,
             index_offset: sub_block.start_index as TxnIndex,
         }
@@ -120,9 +123,9 @@ impl CrossShardCommitSender {
                         Some(write_op.clone()),
                     ));
                     if *round_id == GLOBAL_ROUND_ID {
-                        self.cross_shard_client.send_global_msg(message);
+                        self.cross_shard_sender_client.send_global_msg(message);
                     } else {
-                        self.cross_shard_client.send_cross_shard_msg(
+                        self.cross_shard_sender_client.send_cross_shard_msg(
                             *dependent_shard_id,
                             *round_id,
                             message,
@@ -134,7 +137,7 @@ impl CrossShardCommitSender {
     }
 }
 
-impl TransactionCommitHook for CrossShardCommitSender {
+impl TransactionCommitHook for CrossShardCommitSender<'_> {
     type Output = AptosTransactionOutput;
 
     fn on_transaction_committed(&self, txn_idx: TxnIndex, txn_output: &Self::Output) {
@@ -151,10 +154,13 @@ impl TransactionCommitHook for CrossShardCommitSender {
 
 // CrossShardClient is a trait that defines the interface for sending and receiving messages across
 // shards.
-pub trait CrossShardClient: Send + Sync {
+pub trait CrossShardSenderClient: Send + Sync {
     fn send_global_msg(&self, msg: CrossShardMsg);
 
     fn send_cross_shard_msg(&self, shard_id: ShardId, round: RoundId, msg: CrossShardMsg);
+}
 
-    fn receive_cross_shard_msg(&self, current_round: RoundId) -> CrossShardMsg;
+#[async_trait]
+pub trait CrossShardReceiverClient: Send + Sync {
+    async fn receive_cross_shard_msg(&mut self, current_round: RoundId) -> CrossShardMsg;
 }

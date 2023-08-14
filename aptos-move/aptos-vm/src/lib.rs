@@ -156,7 +156,7 @@ pub trait VMExecutor: Send + Sync {
 
     /// Executes a block of transactions using a sharded block executor and returns the results.
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
-        sharded_block_executor: &ShardedBlockExecutor<S, E>,
+        sharded_block_executor: &mut ShardedBlockExecutor<S, E>,
         transactions: PartitionedTransactions,
         state_view: Arc<S>,
         maybe_block_gas_limit: Option<u64>,

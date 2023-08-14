@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-runtimes = { workspace = true }
 aptos-types = { workspace = true }
 bitvec = { workspace = true }
 criterion = { workspace = true, optional = true }

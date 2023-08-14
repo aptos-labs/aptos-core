@@ -111,7 +111,8 @@ where
                 .name("block_partitioning".to_string())
                 .spawn(move || {
                     while let Ok(txns) = raw_block_receiver.recv() {
-                        let exe_block_msg = partitioning_stage.process(txns);
+                        let exe_block_msg =
+                            async_std::task::block_on(partitioning_stage.process(txns));
                         executable_block_sender.send(exe_block_msg).unwrap();
                     }
                 })
@@ -178,7 +179,7 @@ where
                             current_block_start_time,
                             partition_time,
                             block,
-                        } = partitioning_stage.process(raw_block);
+                        } = async_std::task::block_on(partitioning_stage.process(raw_block));
                         let block_size = block.transactions.num_transactions();
                         executed += block_size;
                         exe.execute_block(current_block_start_time, partition_time, block);

@@ -13,6 +13,7 @@ use crate::sharded_block_partitioner::{
     partitioning_shard::PartitioningShard,
 };
 use aptos_logger::{error, info};
+use aptos_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_types::{
     block_executor::partitioner::{
         PartitionedTransactions, RoundId, ShardId, SubBlocksForShard, TxnIndex, GLOBAL_ROUND_ID,
@@ -22,13 +23,10 @@ use aptos_types::{
 };
 use counters::BLOCK_PARTITIONING_SECONDS;
 use itertools::Itertools;
-use std::{
-    collections::HashMap,
-    sync::{
-        mpsc::{Receiver, Sender},
-        Arc,
-    },
-    thread,
+use std::{collections::HashMap, sync::Arc};
+use tokio::{
+    sync::mpsc::{UnboundedReceiver, UnboundedSender},
+    task::JoinHandle,
 };
 
 mod conflict_detector;
@@ -118,9 +116,9 @@ pub struct ShardedBlockPartitioner {
     cross_shard_dep_avoid_threshold: f32,
     /// If true, the last round is partitioned and executed in a sharded manner. Otherwise, the last round is executed in global executor.
     partition_last_round: bool,
-    control_txs: Vec<Sender<ControlMsg>>,
-    result_rxs: Vec<Receiver<PartitioningResp>>,
-    shard_threads: Vec<thread::JoinHandle<()>>,
+    control_txs: Vec<UnboundedSender<ControlMsg>>,
+    result_rxs: Vec<UnboundedReceiver<PartitioningResp>>,
+    shard_threads: Vec<JoinHandle<()>>,
 }
 
 impl ShardedBlockPartitioner {
@@ -144,7 +142,7 @@ impl ShardedBlockPartitioner {
             messages_txs.push(vec![]);
             messages_rxs.push(vec![]);
             for _ in 0..num_shards {
-                let (messages_tx, messages_rx) = std::sync::mpsc::channel();
+                let (messages_tx, messages_rx) = tokio::sync::mpsc::unbounded_channel();
                 messages_txs.last_mut().unwrap().push(messages_tx);
                 messages_rxs.last_mut().unwrap().push(messages_rx);
             }
@@ -153,8 +151,8 @@ impl ShardedBlockPartitioner {
         let mut result_rxs = vec![];
         let mut shard_join_handles = vec![];
         for (i, message_rxs) in messages_rxs.into_iter().enumerate() {
-            let (control_tx, control_rx) = std::sync::mpsc::channel();
-            let (result_tx, result_rx) = std::sync::mpsc::channel();
+            let (control_tx, control_rx) = tokio::sync::mpsc::unbounded_channel();
+            let (result_tx, result_rx) = tokio::sync::mpsc::unbounded_channel();
             control_txs.push(control_tx);
             result_rxs.push(result_rx);
             shard_join_handles.push(spawn_partitioning_shard(
@@ -224,8 +222,8 @@ impl ShardedBlockPartitioner {
         }
     }
 
-    fn collect_partition_block_response(
-        &self,
+    async fn collect_partition_block_response(
+        &mut self,
     ) -> (
         Vec<SubBlocksForShard<AnalyzedTransaction>>,
         Vec<WriteSetWithTxnIndex>,
@@ -234,12 +232,12 @@ impl ShardedBlockPartitioner {
         let mut frozen_sub_blocks = Vec::new();
         let mut frozen_write_set_with_index = Vec::new();
         let mut rejected_txns_vec = Vec::new();
-        for rx in &self.result_rxs {
+        for rx in &mut self.result_rxs {
             let PartitioningResp {
                 frozen_sub_blocks: frozen_chunk,
                 write_set_with_index,
                 discarded_txns: rejected_txns,
-            } = rx.recv().unwrap();
+            } = rx.recv().await.unwrap();
             frozen_sub_blocks.push(frozen_chunk);
             frozen_write_set_with_index.push(write_set_with_index);
             rejected_txns_vec.push(rejected_txns);
@@ -251,8 +249,8 @@ impl ShardedBlockPartitioner {
         )
     }
 
-    fn discard_txns_with_cross_shard_dependencies(
-        &self,
+    async fn discard_txns_with_cross_shard_dependencies(
+        &mut self,
         txns_to_partition: Vec<Vec<AnalyzedTransaction>>,
         current_round_start_index: TxnIndex,
         frozen_sub_blocks: Vec<SubBlocksForShard<AnalyzedTransaction>>,
@@ -277,11 +275,11 @@ impl ShardedBlockPartitioner {
             })
             .collect();
         self.send_partition_msgs(partition_block_msgs);
-        self.collect_partition_block_response()
+        self.collect_partition_block_response().await
     }
 
-    fn add_cross_shard_dependencies(
-        &self,
+    async fn add_cross_shard_dependencies(
+        &mut self,
         index_offset: usize,
         remaining_txns_vec: Vec<Vec<AnalyzedTransaction>>,
         frozen_sub_blocks_by_shard: Vec<SubBlocksForShard<AnalyzedTransaction>>,
@@ -310,7 +308,7 @@ impl ShardedBlockPartitioner {
             })
             .collect::<Vec<ControlMsg>>();
         self.send_partition_msgs(partition_block_msgs);
-        self.collect_partition_block_response()
+        self.collect_partition_block_response().await
     }
 
     /// We repeatedly partition chunks, discarding a bunch of transactions with cross-shard dependencies. The set of discarded
@@ -319,7 +317,10 @@ impl ShardedBlockPartitioner {
     /// `max_partitioning_rounds` is the maximum number of partitioning rounds we allow.
     /// `cross_shard_dep_avoid_threshold` is the maximum fraction of transactions we try to avoid cross shard dependencies. Once we reach
     /// this fraction, we terminate early and add cross-shard dependencies to the remaining transactions.
-    pub fn partition(&self, transactions: Vec<AnalyzedTransaction>) -> PartitionedTransactions {
+    pub async fn partition(
+        &mut self,
+        transactions: Vec<AnalyzedTransaction>,
+    ) -> PartitionedTransactions {
         let _timer = BLOCK_PARTITIONING_SECONDS.start_timer();
         let total_txns = transactions.len();
         assert!(
@@ -360,13 +361,15 @@ impl ShardedBlockPartitioner {
                 updated_frozen_sub_blocks,
                 current_frozen_rw_set_with_index_vec,
                 discarded_txns_to_partition,
-            ) = self.discard_txns_with_cross_shard_dependencies(
-                txns_to_partition,
-                current_round_start_index,
-                frozen_sub_blocks,
-                frozen_write_set_with_index.clone(),
-                current_round,
-            );
+            ) = self
+                .discard_txns_with_cross_shard_dependencies(
+                    txns_to_partition,
+                    current_round_start_index,
+                    frozen_sub_blocks,
+                    frozen_write_set_with_index.clone(),
+                    current_round,
+                )
+                .await;
             // Current round start index is the sum of the number of transactions in the frozen sub-blocks
             current_round_start_index = updated_frozen_sub_blocks
                 .iter()
@@ -398,16 +401,19 @@ impl ShardedBlockPartitioner {
         let _timer = BLOCK_PARTITIONING_MISC_TIMERS_SECONDS
             .with_label_values(&["last_round"])
             .start_timer();
+
         // Assert rejected transactions are empty
         if self.partition_last_round {
             // We just add cross shard dependencies for remaining transactions.
-            let (frozen_sub_blocks, _, rejected_txns) = self.add_cross_shard_dependencies(
-                current_round_start_index,
-                txns_to_partition,
-                frozen_sub_blocks,
-                frozen_write_set_with_index,
-                current_round,
-            );
+            let (frozen_sub_blocks, _, rejected_txns) = self
+                .add_cross_shard_dependencies(
+                    current_round_start_index,
+                    txns_to_partition,
+                    frozen_sub_blocks,
+                    frozen_write_set_with_index,
+                    current_round,
+                )
+                .await;
             assert!(rejected_txns.iter().all(|txns| txns.is_empty()));
             PartitionedTransactions::new(frozen_sub_blocks, vec![])
         } else {
@@ -420,13 +426,15 @@ impl ShardedBlockPartitioner {
             for _ in 1..self.num_shards {
                 txns_to_partition.push(vec![]);
             }
-            let (mut frozen_sub_blocks, _, rejected_txns) = self.add_cross_shard_dependencies(
-                current_round_start_index,
-                txns_to_partition,
-                frozen_sub_blocks,
-                frozen_write_set_with_index,
-                GLOBAL_ROUND_ID,
-            );
+            let (mut frozen_sub_blocks, _, rejected_txns) = self
+                .add_cross_shard_dependencies(
+                    current_round_start_index,
+                    txns_to_partition,
+                    frozen_sub_blocks,
+                    frozen_write_set_with_index,
+                    GLOBAL_ROUND_ID,
+                )
+                .await;
 
             assert!(rejected_txns.iter().all(|txns| txns.is_empty()));
             let global_txns = frozen_sub_blocks[0]
@@ -455,31 +463,28 @@ impl Drop for ShardedBlockPartitioner {
             }
         }
 
+        /*
         // wait for all executor shards to stop
         for shard_thread in self.shard_threads.drain(..) {
-            shard_thread.join().unwrap_or_else(|e| {
+            shard_thread.await.unwrap_or_else(|e| {
                 error!("Failed to join executor shard thread: {:?}", e);
             });
-        }
+        }*/
     }
 }
 
 fn spawn_partitioning_shard(
     shard_id: ShardId,
-    control_rx: Receiver<ControlMsg>,
-    result_tx: Sender<PartitioningResp>,
-    message_rxs: Vec<Receiver<CrossShardMsg>>,
-    messages_txs: Vec<Sender<CrossShardMsg>>,
-) -> thread::JoinHandle<()> {
-    // create and start a new executor shard in a separate thread
-    thread::Builder::new()
-        .name(format!("partitioning-shard-{}", shard_id))
-        .spawn(move || {
-            let partitioning_shard =
-                PartitioningShard::new(shard_id, control_rx, result_tx, message_rxs, messages_txs);
-            partitioning_shard.start();
-        })
-        .unwrap()
+    control_rx: UnboundedReceiver<ControlMsg>,
+    result_tx: UnboundedSender<PartitioningResp>,
+    message_rxs: Vec<UnboundedReceiver<CrossShardMsg>>,
+    messages_txs: Vec<UnboundedSender<CrossShardMsg>>,
+) -> JoinHandle<()> {
+    THREAD_MANAGER.get_exe_runtime().spawn(async move {
+        let mut partitioning_shard =
+            PartitioningShard::new(shard_id, control_rx, result_tx, message_rxs, messages_txs);
+        partitioning_shard.start().await
+    })
 }
 
 #[cfg(test)]

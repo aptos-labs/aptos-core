@@ -26,6 +26,7 @@ use aptos_gas_meter::{AptosGasMeter, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::VMGasParameters;
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
+use aptos_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
@@ -1521,7 +1522,7 @@ impl VMExecutor for AptosVM {
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>>(
-        sharded_block_executor: &ShardedBlockExecutor<S, C>,
+        sharded_block_executor: &mut ShardedBlockExecutor<S, C>,
         transactions: PartitionedTransactions,
         state_view: Arc<S>,
         maybe_block_gas_limit: Option<u64>,
@@ -1534,12 +1535,14 @@ impl VMExecutor for AptosVM {
         );
 
         let count = transactions.num_txns();
-        let ret = sharded_block_executor.execute_block(
-            state_view,
-            transactions,
-            AptosVM::get_concurrency_level(),
-            maybe_block_gas_limit,
-        );
+        let ret = THREAD_MANAGER
+            .get_exe_runtime()
+            .block_on(sharded_block_executor.execute_block(
+                state_view,
+                transactions,
+                AptosVM::get_concurrency_level(),
+                maybe_block_gas_limit,
+            ));
         if ret.is_ok() {
             // Record the histogram count for transactions per block.
             BLOCK_TRANSACTION_COUNT.observe(count as f64);

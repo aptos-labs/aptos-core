@@ -20,6 +20,7 @@ use aptos_executor_types::{
     ParsedTransactionOutput, TransactionData,
 };
 use aptos_logger::error;
+use aptos_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -46,75 +47,77 @@ impl ApplyChunkOutput {
         base_view: &ExecutedTrees,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedBlock, Vec<Transaction>, Vec<Transaction>)> {
-        let ChunkOutput {
-            state_cache,
-            transactions,
-            transaction_outputs,
-        } = chunk_output;
-        let (new_epoch, status, to_keep, to_discard, to_retry) = {
-            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                .with_label_values(&["sort_transactions"])
-                .start_timer();
-            // Separate transactions with different VM statuses, i.e., Keep, Discard and Retry.
-            // Will return transactions with Retry txns sorted after Keep/Discard txns.
-            // If the transactions contain no reconfiguration txn, will insert the StateCheckpoint txn
-            // at the boundary of Keep/Discard txns and Retry txns.
-            Self::sort_transactions_with_state_checkpoint(
+        THREAD_MANAGER.get_exe_cpu_pool().install(|| {
+            let ChunkOutput {
+                state_cache,
                 transactions,
                 transaction_outputs,
-                append_state_checkpoint_to_block,
-            )?
-        };
+            } = chunk_output;
+            let (new_epoch, status, to_keep, to_discard, to_retry) = {
+                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                    .with_label_values(&["sort_transactions"])
+                    .start_timer();
+                // Separate transactions with different VM statuses, i.e., Keep, Discard and Retry.
+                // Will return transactions with Retry txns sorted after Keep/Discard txns.
+                // If the transactions contain no reconfiguration txn, will insert the StateCheckpoint txn
+                // at the boundary of Keep/Discard txns and Retry txns.
+                Self::sort_transactions_with_state_checkpoint(
+                    transactions,
+                    transaction_outputs,
+                    append_state_checkpoint_to_block,
+                )?
+            };
 
-        // Apply the write set, get the latest state.
-        let (
-            state_updates_vec,
-            state_checkpoint_hashes,
-            result_state,
-            next_epoch_state,
-            block_state_updates,
-            sharded_state_cache,
-        ) = {
-            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                .with_label_values(&["calculate_for_transaction_block"])
-                .start_timer();
-            InMemoryStateCalculatorV2::calculate_for_transaction_block(
-                base_view.state(),
-                state_cache,
-                &to_keep,
-                new_epoch,
-            )?
-        };
-
-        // Calculate TransactionData and TransactionInfo, i.e. the ledger history diff.
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-            .with_label_values(&["assemble_ledger_diff_for_block"])
-            .start_timer();
-        let (to_commit, transaction_info_hashes, reconfig_events) =
-            Self::assemble_ledger_diff_for_block(
-                to_keep,
+            // Apply the write set, get the latest state.
+            let (
                 state_updates_vec,
                 state_checkpoint_hashes,
-            );
-        let result_view = ExecutedTrees::new(
-            result_state,
-            Arc::new(base_view.txn_accumulator().append(&transaction_info_hashes)),
-        );
-
-        Ok((
-            ExecutedBlock {
-                status,
-                to_commit,
-                result_view,
+                result_state,
                 next_epoch_state,
-                reconfig_events,
-                transaction_info_hashes,
                 block_state_updates,
                 sharded_state_cache,
-            },
-            to_discard,
-            to_retry,
-        ))
+            ) = {
+                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                    .with_label_values(&["calculate_for_transaction_block"])
+                    .start_timer();
+                InMemoryStateCalculatorV2::calculate_for_transaction_block(
+                    base_view.state(),
+                    state_cache,
+                    &to_keep,
+                    new_epoch,
+                )?
+            };
+
+            // Calculate TransactionData and TransactionInfo, i.e. the ledger history diff.
+            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                .with_label_values(&["assemble_ledger_diff_for_block"])
+                .start_timer();
+            let (to_commit, transaction_info_hashes, reconfig_events) =
+                Self::assemble_ledger_diff_for_block(
+                    to_keep,
+                    state_updates_vec,
+                    state_checkpoint_hashes,
+                );
+            let result_view = ExecutedTrees::new(
+                result_state,
+                Arc::new(base_view.txn_accumulator().append(&transaction_info_hashes)),
+            );
+
+            Ok((
+                ExecutedBlock {
+                    status,
+                    to_commit,
+                    result_view,
+                    next_epoch_state,
+                    reconfig_events,
+                    transaction_info_hashes,
+                    block_state_updates,
+                    sharded_state_cache,
+                },
+                to_discard,
+                to_retry,
+            ))
+        })
     }
 
     pub fn apply_chunk(

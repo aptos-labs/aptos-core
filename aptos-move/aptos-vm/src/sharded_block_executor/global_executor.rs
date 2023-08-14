@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sharded_block_executor::{
-    local_executor_shard::GlobalCrossShardClient, sharded_executor_service::ShardedExecutorService,
+    local_executor_shard::{GlobalCrossShardReceiverClient, GlobalCrossShardSenderClient},
+    sharded_executor_service::ShardedExecutorService,
 };
 use aptos_logger::trace;
 use aptos_state_view::StateView;
@@ -14,13 +15,18 @@ use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
 
 pub struct GlobalExecutor<S: StateView + Sync + Send + 'static> {
-    global_cross_shard_client: Arc<GlobalCrossShardClient>,
+    global_cross_shard_sender_client: GlobalCrossShardSenderClient,
+    global_cross_shard_receiver_client: GlobalCrossShardReceiverClient,
     executor_thread_pool: Arc<rayon::ThreadPool>,
     phantom: std::marker::PhantomData<S>,
 }
 
 impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
-    pub fn new(cross_shard_client: Arc<GlobalCrossShardClient>, num_threads: usize) -> Self {
+    pub fn new(
+        global_cross_shard_sender_client: GlobalCrossShardSenderClient,
+        global_cross_shard_receiver_client: GlobalCrossShardReceiverClient,
+        num_threads: usize,
+    ) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 // We need two extra threads for the cross-shard commit receiver and the thread
@@ -30,14 +36,15 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
                 .unwrap(),
         );
         Self {
-            global_cross_shard_client: cross_shard_client,
+            global_cross_shard_sender_client,
+            global_cross_shard_receiver_client,
             executor_thread_pool,
             phantom: std::marker::PhantomData,
         }
     }
 
     pub fn execute_global_txns(
-        &self,
+        &mut self,
         transactions: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
         state_view: &S,
         concurrency_level: usize,
@@ -51,7 +58,8 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
             None,
             self.executor_thread_pool.clone(),
             transactions,
-            self.global_cross_shard_client.clone(),
+            &self.global_cross_shard_sender_client,
+            &mut self.global_cross_shard_receiver_client,
             None,
             GLOBAL_ROUND_ID,
             state_view,

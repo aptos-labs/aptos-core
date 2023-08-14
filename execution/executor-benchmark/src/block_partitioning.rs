@@ -38,7 +38,7 @@ impl BlockPartitioningStage {
         }
     }
 
-    pub fn process(&mut self, mut txns: Vec<Transaction>) -> ExecuteBlockMessage {
+    pub async fn process(&mut self, mut txns: Vec<Transaction>) -> ExecuteBlockMessage {
         let current_block_start_time = Instant::now();
         info!(
             "In iteration {}, received {:?} transactions.",
@@ -46,12 +46,12 @@ impl BlockPartitioningStage {
             txns.len()
         );
         let block_id = HashValue::random();
-        let block: ExecutableBlock = match &self.maybe_partitioner {
+        let block: ExecutableBlock = match &mut self.maybe_partitioner {
             None => (block_id, txns).into(),
             Some(partitioner) => {
                 let last_txn = txns.pop().unwrap();
                 let analyzed_transactions = txns.into_iter().map(|t| t.into()).collect();
-                let mut partitioned_txns = partitioner.partition(analyzed_transactions);
+                let mut partitioned_txns = partitioner.partition(analyzed_transactions).await;
                 partitioned_txns.add_checkpoint_txn(last_txn);
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(partitioned_txns))
             },

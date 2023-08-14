@@ -7,6 +7,7 @@ use aptos_types::{
 };
 use std::sync::Arc;
 
+#[derive(Debug)]
 pub struct DiscardCrossShardDep {
     pub transactions: Vec<AnalyzedTransaction>,
     // The frozen dependencies in previous chunks.
@@ -36,6 +37,7 @@ impl DiscardCrossShardDep {
     }
 }
 
+#[derive(Debug)]
 pub struct AddWithCrossShardDep {
     pub transactions: Vec<AnalyzedTransaction>,
     pub index_offset: TxnIndex,
@@ -63,6 +65,7 @@ impl AddWithCrossShardDep {
     }
 }
 
+#[derive(Debug)]
 pub struct PartitioningResp {
     pub frozen_sub_blocks: SubBlocksForShard<AnalyzedTransaction>,
     pub write_set_with_index: WriteSetWithTxnIndex,
@@ -83,6 +86,7 @@ impl PartitioningResp {
     }
 }
 
+#[derive(Debug)]
 pub enum ControlMsg {
     DiscardCrossShardDepReq(DiscardCrossShardDep),
     AddCrossShardDepReq(AddWithCrossShardDep),
