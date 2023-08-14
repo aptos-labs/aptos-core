@@ -2,7 +2,6 @@ import subprocess
 import sys
 
 def execute_command(command):
-    print("this is error")
     try:
         output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
         return output.decode('utf-8').strip()
