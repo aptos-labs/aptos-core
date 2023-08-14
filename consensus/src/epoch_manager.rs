@@ -718,11 +718,11 @@ impl EpochManager {
             ExponentialBackoff::from_millis(5),
             aptos_time_service::TimeService::real(),
         ));
-        let dkg_manager = DKGManager::new(
+        let dkg_manager = Arc::new(Mutex::new(DKGManager::new(
             self.author,
-            Arc::new(epoch_state.clone()),
+            epoch_state.clone(),
             dkg_reliable_broadcast,
-        );
+        )));
         let dkg_manager_wrapper = Arc::new(DKGManagerWrapper::WithDKG(dkg_manager.clone()));
         let dkg_handler: DKGNetworkHandler = DKGNetworkHandler::new(
             self.author,

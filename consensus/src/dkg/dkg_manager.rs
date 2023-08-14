@@ -37,7 +37,7 @@ type WT = WeightedTranscript<das::Transcript>;
 pub enum DKGManagerWrapper {
     #[allow(dead_code)]
     NoDKG,
-    WithDKG(DKGManager),
+    WithDKG(Arc<Mutex<DKGManager>>),
 }
 
 impl DKGManagerWrapper {
@@ -52,7 +52,9 @@ impl DKGManagerWrapper {
                 error!("[DKG] No DKG manager!");
             },
             DKGManagerWrapper::WithDKG(dkg_manager) => {
-                dkg_manager.start_dkg(dkg_events).await;
+                let dkg_manager_clone = dkg_manager.clone();
+                let mut guard = dkg_manager_clone.lock();
+                guard.start_dkg(dkg_events);
             },
         }
     }
@@ -60,25 +62,24 @@ impl DKGManagerWrapper {
     pub fn take_agg_node(&self) -> Option<DKGAggNode> {
         match self {
             DKGManagerWrapper::NoDKG => None,
-            DKGManagerWrapper::WithDKG(dkg_manager) => dkg_manager.take_agg_node(),
+            DKGManagerWrapper::WithDKG(dkg_manager) => dkg_manager.lock().take_agg_node(),
         }
     }
 }
 
-#[derive(Clone)]
 pub struct DKGManager {
     author: Author,
-    epoch_state: Arc<EpochState>,
+    epoch_state: EpochState,
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
-    rb_abort_handle: Arc<Mutex<Option<AbortHandle>>>,
-    dkg_store: Arc<DKGStore>,
-    dkg_rounding: Arc<Mutex<Option<DKGRounding>>>,
+    rb_abort_handle: Option<AbortHandle>,
+    dkg_store: DKGStore,
+    dkg_rounding: Option<DKGRounding>,
 }
 
 impl DKGManager {
     pub fn new(
         author: Author,
-        epoch_state: Arc<EpochState>,
+        epoch_state: EpochState,
         reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
     ) -> Self {
         let verifier = epoch_state.verifier.clone();
@@ -86,13 +87,13 @@ impl DKGManager {
             author,
             epoch_state,
             reliable_broadcast,
-            rb_abort_handle: Arc::new(Mutex::new(None)),
-            dkg_store: Arc::new(DKGStore::new(author, verifier)),
-            dkg_rounding: Arc::new(Mutex::new(None)),
+            rb_abort_handle: None,
+            dkg_store: DKGStore::new(author, verifier),
+            dkg_rounding: None,
         }
     }
 
-    pub async fn start_dkg(&self, dkg_events: Vec<ContractEvent>) {
+    pub fn start_dkg(&mut self, dkg_events: Vec<ContractEvent>) {
         // thread::sleep(Duration::from_millis(TRANSCRIPT_COMPUTE_TIME_MS));
         let dkg_rounding: DKGRounding = dkg_events
             .first()
@@ -116,7 +117,7 @@ impl DKGManager {
 
         let wc_1 = dkg_rounding.weighted_config_1().clone();
         let wc_2 = dkg_rounding.weighted_config_2().clone();
-        self.dkg_rounding.lock().replace(dkg_rounding);
+        self.dkg_rounding.replace(dkg_rounding);
 
         let mut rng = thread_rng();
         let seed = random_scalar(&mut rng);
@@ -168,8 +169,8 @@ impl DKGManager {
         self.broadcast_node(dkg_node);
     }
 
-    fn broadcast_node(&self, node: DKGNode) {
-        if self.rb_abort_handle.lock().is_some() {
+    fn broadcast_node(&mut self, node: DKGNode) {
+        if self.rb_abort_handle.is_some() {
             // do not rebroadcast if there is an ongoing broadcast
             return;
         }
@@ -177,31 +178,28 @@ impl DKGManager {
         let ack_set = DKGNodeAckState::new(self.epoch_state.verifier.len());
         let task = self.reliable_broadcast.broadcast(node.clone(), ack_set);
         tokio::spawn(Abortable::new(task, abort_registration));
-        self.rb_abort_handle.lock().replace(abort_handle);
+        self.rb_abort_handle.replace(abort_handle);
         debug!("[DKG] Node {:?} broadcast DKG Node of epoch {:?}", self.author, node.epoch());
     }
 
-    pub(crate) fn broadcast_agg_node(&self, agg_node: DKGAggNode) {
+    pub(crate) fn broadcast_agg_node(&mut self, agg_node: DKGAggNode) {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let ack_set = DKGAggNodeAckState::new(self.epoch_state.verifier.len());
         let task = self.reliable_broadcast.broadcast(agg_node.clone(), ack_set);
-        debug!("[DKG] adding agg node 6");
 
         tokio::spawn(Abortable::new(task, abort_registration));
         // abort the current node broadcast
         // no concurrent agg_node broadcast guaranteed by OnceCell
-        if let Some(prev_handle) = self.rb_abort_handle.lock().replace(abort_handle) {
+        if let Some(prev_handle) = self.rb_abort_handle.replace(abort_handle) {
             prev_handle.abort();
         }
         debug!("[DKG] Node {:?} broadcast DKG Aggregated Node of epoch {:?}", self.author, agg_node.epoch());
         // dkg todo: abort the broadcast when DKG is done
     }
 
-    pub fn add_node(&self, node: DKGNode) -> anyhow::Result<()> {
+    pub fn add_node(&mut self, node: DKGNode) -> anyhow::Result<()> {
         match self.dkg_store.add_node(node) {
             Ok(agg_node) => {
-                debug!("[DKG] adding agg node -1");
-
                 if let Some(agg_node) = agg_node {
                     self.add_agg_node(agg_node)?;
                 }
@@ -213,16 +211,10 @@ impl DKGManager {
         }
     }
 
-    pub fn add_agg_node(&self, agg_node: DKGAggNode) -> anyhow::Result<()> {
-        debug!("[DKG] adding agg node 0");
-
+    pub fn add_agg_node(&mut self, agg_node: DKGAggNode) -> anyhow::Result<()> {
         match self.dkg_store.add_agg_node(agg_node) {
             Ok(agg_node) => {
-                debug!("[DKG] adding agg node 4");
-
                 if let Some(agg_node) = agg_node {
-                    debug!("[DKG] adding agg node 5");
-
                     // Broadcast only the first aggregated dkg node
                     self.broadcast_agg_node(agg_node);
                 }
@@ -235,7 +227,7 @@ impl DKGManager {
     }
 
     // Will be called by the proposal generator
-    pub fn take_agg_node(&self) -> Option<DKGAggNode> {
+    pub fn take_agg_node(&mut self) -> Option<DKGAggNode> {
         self.dkg_store.take_agg_node()
     }
 }

@@ -16,6 +16,7 @@ use aptos_types::epoch_state::EpochState;
 use bytes::Bytes;
 use futures::StreamExt;
 use std::sync::Arc;
+use aptos_infallible::Mutex;
 
 pub struct DKGNetworkHandler {
     author: Author,
@@ -30,7 +31,7 @@ impl DKGNetworkHandler {
         author: Author,
         dkg_rpc_rx: aptos_channel::Receiver<Author, IncomingDKGRequest>,
         epoch_state: Arc<EpochState>,
-        dkg_manager: DKGManager,
+        dkg_manager: Arc<Mutex<DKGManager>>,
     ) -> Self {
         Self {
             author,
