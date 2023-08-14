@@ -366,13 +366,13 @@ fn main() {
     let cpu_profiling = opt.profiler_opt.cpu_profiling;
     let memory_profiling = opt.profiler_opt.memory_profiling;
 
+    let mut cpu_profiler = handler.get_cpu_profiler();
+    let mut memory_profiler = handler.get_mem_profiler();
+
     if cpu_profiling {
-        let mut cpu_profiler = handler.get_cpu_profiler();
         let _cpu_start = cpu_profiler.start_profiling();
     }
-
     if memory_profiling {
-        let mut memory_profiler = handler.get_mem_profiler();
         let _mem_start = memory_profiler.start_profiling();
     }
 
