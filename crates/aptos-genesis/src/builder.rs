@@ -600,7 +600,7 @@ impl Builder {
 
         let mut genesis_config = GenesisConfiguration {
             allow_new_validators: false,
-            epoch_duration_secs: 10, // dkg todo
+            epoch_duration_secs: 30, // dkg todo
             is_test: true,
             min_stake: 0,
             min_voting_threshold: 0,

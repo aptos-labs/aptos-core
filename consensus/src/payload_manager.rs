@@ -130,10 +130,8 @@ impl PayloadManager {
                 Payload::DirectMempool(_) => {
                     unreachable!()
                 },
-                Payload::DKG(_) => {
-                    // dkg todo
-                    todo!()
-                },
+                // DKG payload contains DKG aggregated node
+                Payload::DKG(_) => {},
             },
         }
     }

@@ -4,7 +4,7 @@
 use super::{
     dkg_rounding::DKGRounding,
     dkg_store::DKGStore,
-    types::{DKGAggNode, DKGAggNodeAckState, DKGMessage, DKGNodeAckState, TDKGMessage},
+    types::{DKGAggNode, DKGAggNodeAckState, DKGMessage, DKGNodeAckState},
 };
 use crate::dkg::types::DKGNode;
 use aptos_consensus_types::common::Author;
@@ -71,9 +71,8 @@ pub struct DKGManager {
     epoch_state: Arc<EpochState>,
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
     rb_abort_handle: Arc<Mutex<Option<AbortHandle>>>,
-    dkg_store: Arc<Mutex<DKGStore>>,
+    dkg_store: Arc<DKGStore>,
     dkg_rounding: Arc<Mutex<Option<DKGRounding>>>,
-    dkg_pvss_config: Arc<Mutex<Option<DKGPvssConfig>>>,
 }
 
 impl DKGManager {
@@ -82,14 +81,14 @@ impl DKGManager {
         epoch_state: Arc<EpochState>,
         reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
     ) -> Self {
+        let verifier = epoch_state.verifier.clone();
         Self {
             author,
             epoch_state,
             reliable_broadcast,
             rb_abort_handle: Arc::new(Mutex::new(None)),
-            dkg_store: Arc::new(Mutex::new(DKGStore::new(author))),
+            dkg_store: Arc::new(DKGStore::new(author, verifier)),
             dkg_rounding: Arc::new(Mutex::new(None)),
-            dkg_pvss_config: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -157,7 +156,7 @@ impl DKGManager {
         // assert_eq!(trx_2, deserialized);
 
         let dkg_pvss_config = DKGPvssConfig::new(wc_1.clone(), wc_2.clone(), pp, consensus_keys, &DST_PVSS_TESTING_APP[..]);
-        self.dkg_pvss_config.lock().replace(dkg_pvss_config);
+        self.dkg_store.add_pvss_config(dkg_pvss_config);
 
         let dkg_trx_wrapper = DKGTranscriptWrapper {
             trx_one_third: trx_1,
@@ -186,6 +185,8 @@ impl DKGManager {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let ack_set = DKGAggNodeAckState::new(self.epoch_state.verifier.len());
         let task = self.reliable_broadcast.broadcast(agg_node.clone(), ack_set);
+        debug!("[DKG] adding agg node 6");
+
         tokio::spawn(Abortable::new(task, abort_registration));
         // abort the current node broadcast
         // no concurrent agg_node broadcast guaranteed by OnceCell
@@ -197,74 +198,44 @@ impl DKGManager {
     }
 
     pub fn add_node(&self, node: DKGNode) -> anyhow::Result<()> {
-        if self.dkg_pvss_config.lock().is_none() {
-            self.dkg_store.lock().buffer_nodes(node);
-            anyhow::bail!("[DKG] DKG PVSS config is not ready!");
-        } else {
-            // dkg todo: need to periodically check if there is any buffered node
-            let buffered_nodes = self.dkg_store.lock().take_buffered_nodes();
-            for node in buffered_nodes {
-                self.add_node(node)?;
-            }
-        }
-        if node
-            .verify(self.dkg_pvss_config.lock().as_ref().unwrap())
-            .is_ok()
-        {
-            match self.dkg_store.lock().add_node(
-                node,
-                &self.epoch_state.verifier,
-                self.dkg_pvss_config.lock().as_ref().unwrap(),
-            ) {
-                Ok(agg_node) => {
-                    if let Some(agg_node) = agg_node {
-                        self.add_agg_node(agg_node)?;
-                    }
-                    Ok(())
-                },
-                Err(e) => {
-                    anyhow::bail!("[DKG] Failed to add DKG node: {:?}", e);
-                },
-            }
-        } else {
-            anyhow::bail!("[DKG] Failed to verify DKG node: {:?}", node);
+        match self.dkg_store.add_node(node) {
+            Ok(agg_node) => {
+                debug!("[DKG] adding agg node -1");
+
+                if let Some(agg_node) = agg_node {
+                    self.add_agg_node(agg_node)?;
+                }
+                Ok(())
+            },
+            Err(e) => {
+                anyhow::bail!("[DKG] Failed to add DKG node: {:?}", e);
+            },
         }
     }
 
     pub fn add_agg_node(&self, agg_node: DKGAggNode) -> anyhow::Result<()> {
-        if self.dkg_pvss_config.lock().is_none() {
-            self.dkg_store.lock().buffer_agg_nodes(agg_node);
-            anyhow::bail!("[DKG] DKG PVSS config is not ready!");
-        } else {
-            // dkg todo: need to periodically check if there is any buffered node
-            let buffered_agg_nodes = self.dkg_store.lock().take_buffered_agg_nodes();
-            for agg_node in buffered_agg_nodes {
-                self.add_agg_node(agg_node)?;
-            }
-        }
-        if agg_node
-            .verify(self.dkg_pvss_config.lock().as_ref().unwrap())
-            .is_ok()
-        {
-            match self.dkg_store.lock().add_agg_node(agg_node) {
-                Ok(agg_node) => {
-                    if let Some(agg_node) = agg_node {
-                        // Broadcast only the first aggregated dkg node
-                        self.broadcast_agg_node(agg_node);
-                    }
-                    Ok(())
-                },
-                Err(e) => {
-                    anyhow::bail!("[DKG] Failed to add DKG aggregated node: {:?}", e);
-                },
-            }
-        } else {
-            anyhow::bail!("[DKG] Failed to verify DKG aggregated node: {:?}", agg_node);
+        debug!("[DKG] adding agg node 0");
+
+        match self.dkg_store.add_agg_node(agg_node) {
+            Ok(agg_node) => {
+                debug!("[DKG] adding agg node 4");
+
+                if let Some(agg_node) = agg_node {
+                    debug!("[DKG] adding agg node 5");
+
+                    // Broadcast only the first aggregated dkg node
+                    self.broadcast_agg_node(agg_node);
+                }
+                Ok(())
+            },
+            Err(e) => {
+                anyhow::bail!("[DKG] Failed to add DKG aggregated node: {:?}", e);
+            },
         }
     }
 
     // Will be called by the proposal generator
     pub fn take_agg_node(&self) -> Option<DKGAggNode> {
-        self.dkg_store.lock().take_agg_node()
+        self.dkg_store.take_agg_node()
     }
 }
