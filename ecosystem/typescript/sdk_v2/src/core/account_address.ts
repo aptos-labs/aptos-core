@@ -15,6 +15,7 @@ export enum AddressInvalidReason {
   TOO_LONG = "too_long",
   LEADING_ZERO_X_REQUIRED = "leading_zero_x_required",
   LONG_FORM_REQUIRED_UNLESS_SPECIAL = "long_form_required_unless_special",
+  INVALID_PADDING_ZEROES = "INVALID_PADDING_ZEROES",
 }
 
 /**
@@ -181,7 +182,7 @@ export class AccountAddress {
    *
    * Where:
    * - LONG is defined as 0x + 64 hex characters.
-   * - SHORT for special addresses is 0x0 to 0xf inclusive.
+   * - SHORT for special addresses is 0x0 to 0xf inclusive without padding zeroes.
    *
    * This means the following are not accepted:
    * - SHORT for non-special addresses.
@@ -202,10 +203,29 @@ export class AccountAddress {
 
     const address = AccountAddress.fromStringRelaxed(args);
 
+    // Check if the address is in LONG form. If it is not, this is only allowed for
+    // special addresses, in which case we check it is in proper SHORT form.
+    if (args.input.length != AccountAddress.LONG_STRING_LENGTH + 2) {
+      if (!address.isSpecial()) {
+        throw new ParsingError(
+          "The given hex string is not a special address, it must be represented as 0x + 64 chars.",
+          AddressInvalidReason.LONG_FORM_REQUIRED_UNLESS_SPECIAL,
+        );
+      } else {
+        // 0x + one hex char is the only valid SHORT form for special addresses.
+        if (args.input.length != 3) {
+          throw new ParsingError(
+            "The given hex string is a special address not in LONG form, it must be 0x0 to 0xf without padding zeroes.",
+            AddressInvalidReason.INVALID_PADDING_ZEROES,
+          );
+        }
+      }
+    }
+
     // Assert that only special addresses can use short form.
     if (args.input.slice(2).length !== this.LONG_STRING_LENGTH && !address.isSpecial()) {
       throw new ParsingError(
-        "Hex string is not a special address, it must be represented as 0x + 64 chars.",
+        "Padding zeroes are not allowed, the address must be represented as 0x0 to 0xf for special addresses or 0x + 64 chars for all other addresses.",
         AddressInvalidReason.LONG_FORM_REQUIRED_UNLESS_SPECIAL,
       );
     }
@@ -229,6 +249,7 @@ export class AccountAddress {
    * Where:
    * - LONG is 64 hex characters.
    * - SHORT is 1 to 63 hex characters inclusive.
+   * - Padding zeroes are allowed, e.g. 0x0123 is valid.
    *
    * Learn more about the different address formats by reading AIP-40:
    * https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md.
