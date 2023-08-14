@@ -8,7 +8,7 @@ use image::ImageFormat;
 use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
-use tracing::{error, info};
+use tracing::{info, warn};
 
 pub struct JSONParser;
 
@@ -69,7 +69,7 @@ impl JSONParser {
         match retry(backoff, op).await {
             Ok(result) => Ok(result),
             Err(e) => {
-                error!(
+                warn!(
                     uri = uri,
                     error = ?e,
                     "[NFT Metadata Parser] Exponential backoff timed out, skipping JSON"

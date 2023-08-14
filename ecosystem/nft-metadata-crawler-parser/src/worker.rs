@@ -108,6 +108,7 @@ async fn consume_pubsub_entries_to_channel_loop(
                 error = ?e,
                 "[NFT Metadata Crawler] Failed to send PubSub entry to channel"
             );
+            panic!();
         });
     }
 
