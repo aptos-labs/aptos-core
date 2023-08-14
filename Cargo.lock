@@ -1168,6 +1168,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-node-resource-metrics",
+ "aptos-profiler",
  "aptos-push-metrics",
  "aptos-sdk",
  "aptos-state-view",
