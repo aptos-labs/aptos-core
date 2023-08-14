@@ -358,4 +358,16 @@ export class AccountAddress {
       };
     }
   }
+
+  /**
+   * Return whether AccountAddresses are equal. AccountAddresses are considered equal
+   * if their underlying byte data is identical.
+   *
+   * @param other The AccountAddress to compare to.
+   * @returns true if the AccountAddresses are equal, false if not.
+   */
+  equals(other: AccountAddress): boolean {
+    if (this.data.length !== other.data.length) return false;
+    return this.data.every((value, index) => value === other.data[index]);
+  }
 }
