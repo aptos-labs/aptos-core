@@ -362,16 +362,18 @@ fn main() {
 
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
-    let mut cpu_profiler = handler.get_cpu_profiler();
-    let mut memory_profiler = handler.get_mem_profiler();
-    let memory_profiling = opt.profiler_opt.memory_profiling;
+
     let cpu_profiling = opt.profiler_opt.cpu_profiling;
+    let memory_profiling = opt.profiler_opt.memory_profiling;
 
     if cpu_profiling {
-        let _cpu_prof = cpu_profiler.start_profiling();
+        let mut cpu_profiler = handler.get_cpu_profiler();
+        let _cpu_start = cpu_profiler.start_profiling();
     }
+
     if memory_profiling {
-        let _mem_prof = memory_profiler.start_profiling();
+        let mut memory_profiler = handler.get_mem_profiler();
+        let _mem_start = memory_profiler.start_profiling();
     }
 
     if opt.use_native_executor {
