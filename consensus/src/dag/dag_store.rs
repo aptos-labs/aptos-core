@@ -10,7 +10,9 @@ use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
 use aptos_logger::error;
-use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
+use aptos_types::{
+    epoch_state::EpochState, ledger_info::LedgerInfo, validator_verifier::ValidatorVerifier,
+};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
@@ -48,13 +50,22 @@ pub struct Dag {
 }
 
 impl Dag {
-    pub fn new(epoch_state: Arc<EpochState>, storage: Arc<dyn DAGStorage>) -> Self {
+    pub fn new(
+        epoch_state: Arc<EpochState>,
+        storage: Arc<dyn DAGStorage>,
+        latest_ledger_info: LedgerInfo,
+    ) -> Self {
         let epoch = epoch_state.epoch;
         let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
         let num_validators = author_to_index.len();
         let all_nodes = storage.get_certified_nodes().unwrap_or_default();
         let mut expired = vec![];
         let mut nodes_by_round = BTreeMap::new();
+        let _storage_block_id = if latest_ledger_info.ends_epoch() {
+            None
+        } else {
+            Some(latest_ledger_info.consensus_block_id())
+        };
         for (digest, certified_node) in all_nodes {
             if certified_node.metadata().epoch() == epoch {
                 let arc_node = Arc::new(certified_node);

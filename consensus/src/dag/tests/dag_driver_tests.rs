@@ -72,7 +72,11 @@ fn test_certified_node_handler() {
         verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
-    let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage.clone())));
+    let dag = Arc::new(RwLock::new(Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        LedgerInfo::mock_genesis(Some((&epoch_state.verifier).into())),
+    )));
 
     let zeroth_round_node = new_certified_node(0, signers[0].author(), vec![]);
 

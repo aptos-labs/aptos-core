@@ -9,7 +9,9 @@ use crate::dag::{
     RpcHandler,
 };
 use aptos_infallible::RwLock;
-use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
+use aptos_types::{
+    epoch_state::EpochState, ledger_info::LedgerInfo, validator_verifier::random_validator_verifier,
+};
 use claims::assert_ok_eq;
 use std::sync::Arc;
 
@@ -21,7 +23,11 @@ fn test_dag_fetcher_receiver() {
         verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
-    let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage)));
+    let dag = Arc::new(RwLock::new(Dag::new(
+        epoch_state.clone(),
+        storage,
+        LedgerInfo::mock_genesis(Some((&epoch_state.verifier).into())),
+    )));
 
     let mut fetcher = FetchRequestHandler::new(dag.clone(), epoch_state);
 

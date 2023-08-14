@@ -11,7 +11,7 @@ use crate::dag::{
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_types::{
-    epoch_state::EpochState, validator_signer::ValidatorSigner,
+    epoch_state::EpochState, ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
     validator_verifier::random_validator_verifier,
 };
 use std::{collections::HashMap, sync::Arc};
@@ -82,11 +82,15 @@ impl DAGStorage for MockStorage {
         Ok(())
     }
 
-    fn save_ordered_anchor_id(&self, _node_id: &NodeId) -> anyhow::Result<()> {
+    fn save_ordered_anchor_id(
+        &self,
+        _node_id: &NodeId,
+        _block_id: &HashValue,
+    ) -> anyhow::Result<()> {
         todo!()
     }
 
-    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>> {
+    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, HashValue)>> {
         todo!()
     }
 
@@ -102,7 +106,11 @@ fn setup() -> (Vec<ValidatorSigner>, Arc<EpochState>, Dag, Arc<MockStorage>) {
         verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
-    let dag = Dag::new(epoch_state.clone(), storage.clone());
+    let dag = Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        LedgerInfo::mock_genesis(Some((&epoch_state.verifier).into())),
+    );
     (signers, epoch_state, dag, storage)
 }
 
@@ -190,7 +198,11 @@ fn test_dag_recover_from_storage() {
             assert!(dag.add_node(node).is_ok());
         }
     }
-    let new_dag = Dag::new(epoch_state.clone(), storage.clone());
+    let new_dag = Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        LedgerInfo::mock_genesis(Some((&epoch_state.verifier).into())),
+    );
 
     for metadata in &metadatas {
         assert!(new_dag.exists(metadata));
@@ -201,7 +213,11 @@ fn test_dag_recover_from_storage() {
         verifier: epoch_state.verifier.clone(),
     });
 
-    let _new_epoch_dag = Dag::new(new_epoch_state, storage.clone());
+    let _new_epoch_dag = Dag::new(
+        new_epoch_state.clone(),
+        storage.clone(),
+        LedgerInfo::mock_genesis(Some((&new_epoch_state.verifier).into())),
+    );
     assert!(storage.certified_node_data.lock().is_empty());
 }
 

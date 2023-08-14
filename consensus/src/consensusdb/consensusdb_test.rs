@@ -109,7 +109,7 @@ fn test_dag() {
     let anchor_id = node.id();
     test_dag_type::<OrderedAnchorIdSchema, <OrderedAnchorIdSchema as Schema>::Key>(
         anchor_id,
-        (),
+        node.digest(),
         &db,
     );
 }

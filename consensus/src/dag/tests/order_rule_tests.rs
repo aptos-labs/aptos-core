@@ -15,7 +15,7 @@ use crate::{
 use aptos_consensus_types::common::Author;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
-    aggregate_signature::AggregateSignature, epoch_state::EpochState,
+    aggregate_signature::AggregateSignature, epoch_state::EpochState, ledger_info::LedgerInfo,
     validator_verifier::random_validator_verifier,
 };
 use futures_channel::mpsc::{unbounded, UnboundedReceiver};
@@ -153,7 +153,7 @@ proptest! {
             epoch: 1,
             verifier: validator_verifier,
         });
-        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()));
+        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), LedgerInfo::mock_genesis(Some((&epoch_state.verifier).into())));
         for round_nodes in &nodes {
             for node in round_nodes.iter().flatten() {
                 dag.add_node(node.clone()).unwrap();
@@ -231,7 +231,11 @@ fn test_order_rule_basic() {
         epoch: 1,
         verifier: validator_verifier,
     });
-    let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()));
+    let mut dag = Dag::new(
+        epoch_state.clone(),
+        Arc::new(MockStorage::new()),
+        LedgerInfo::mock_genesis(Some((&epoch_state.verifier).into())),
+    );
     for round_nodes in &nodes {
         for node in round_nodes.iter().flatten() {
             dag.add_node(node.clone()).unwrap();

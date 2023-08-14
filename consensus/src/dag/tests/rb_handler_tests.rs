@@ -11,7 +11,7 @@ use crate::dag::{
 };
 use aptos_infallible::RwLock;
 use aptos_types::{
-    aggregate_signature::PartialSignatures, epoch_state::EpochState,
+    aggregate_signature::PartialSignatures, epoch_state::EpochState, ledger_info::LedgerInfo,
     validator_verifier::random_validator_verifier,
 };
 use claims::{assert_ok, assert_ok_eq};
@@ -25,7 +25,11 @@ async fn test_node_broadcast_receiver_succeed() {
         verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
-    let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage.clone())));
+    let dag = Arc::new(RwLock::new(Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        LedgerInfo::mock_genesis(Some((&epoch_state.verifier).into())),
+    )));
 
     let wellformed_node = new_node(0, 10, signers[0].author(), vec![]);
     let equivocating_node = new_node(0, 20, signers[0].author(), vec![]);
@@ -56,7 +60,11 @@ async fn test_node_broadcast_receiver_failure() {
         .iter()
         .map(|signer| {
             let storage = Arc::new(MockStorage::new());
-            let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage.clone())));
+            let dag = Arc::new(RwLock::new(Dag::new(
+                epoch_state.clone(),
+                storage.clone(),
+                LedgerInfo::mock_genesis(Some((&epoch_state.verifier).into())),
+            )));
 
             NodeBroadcastHandler::new(dag, signer.clone(), epoch_state.clone(), storage)
         })
@@ -121,7 +129,11 @@ fn test_node_broadcast_receiver_storage() {
         verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
-    let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage.clone())));
+    let dag = Arc::new(RwLock::new(Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        LedgerInfo::mock_genesis(Some((&epoch_state.verifier).into())),
+    )));
 
     let node = new_node(1, 10, signers[0].author(), vec![]);
 

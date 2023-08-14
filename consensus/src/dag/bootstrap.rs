@@ -56,7 +56,11 @@ pub fn bootstrap_dag(
         time_service.clone(),
     ));
 
-    let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage.clone())));
+    let dag = Arc::new(RwLock::new(Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        latest_ledger_info.clone(),
+    )));
 
     let anchor_election = Box::new(RoundRobinAnchorElection::new(validators));
     let order_rule = OrderRule::new(

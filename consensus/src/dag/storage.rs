@@ -27,9 +27,9 @@ pub trait DAGStorage: Send + Sync {
 
     fn delete_certified_nodes(&self, digests: Vec<HashValue>) -> anyhow::Result<()>;
 
-    fn save_ordered_anchor_id(&self, node_id: &NodeId) -> anyhow::Result<()>;
+    fn save_ordered_anchor_id(&self, node_id: &NodeId, block_id: &HashValue) -> anyhow::Result<()>;
 
-    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>>;
+    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, HashValue)>>;
 
     fn delete_ordered_anchor_ids(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()>;
 }
@@ -67,11 +67,11 @@ impl DAGStorage for ConsensusDB {
         Ok(self.delete_data::<CertifiedNodeSchema>(digests)?)
     }
 
-    fn save_ordered_anchor_id(&self, node_id: &NodeId) -> anyhow::Result<()> {
-        Ok(self.save_data::<OrderedAnchorIdSchema>(node_id, &())?)
+    fn save_ordered_anchor_id(&self, node_id: &NodeId, block_id: &HashValue) -> anyhow::Result<()> {
+        Ok(self.save_data::<OrderedAnchorIdSchema>(node_id, &block_id)?)
     }
 
-    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>> {
+    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, HashValue)>> {
         Ok(self.get_all_data::<OrderedAnchorIdSchema>()?)
     }
 
