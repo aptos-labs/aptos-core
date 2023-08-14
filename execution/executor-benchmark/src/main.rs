@@ -17,6 +17,11 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+use aptos_profiler::{
+    ProfilerConfig,
+    ProfilerHandler,
+};
+
 
 #[cfg(unix)]
 #[global_allocator]
@@ -116,6 +121,15 @@ impl PipelineOpt {
 }
 
 #[derive(Parser, Debug)]
+struct ProfilerOpt {
+    #[clap(long)]
+    cpu_profiling: bool,
+
+    #[clap(long)]
+    memory_profiling: bool,
+}
+
+#[derive(Parser, Debug)]
 struct Opt {
     #[clap(long, default_value_t = 10000)]
     block_size: usize,
@@ -155,6 +169,9 @@ struct Opt {
 
     #[clap(long)]
     use_native_executor: bool,
+
+    #[clap(flatten)]
+    profiler_opt: ProfilerOpt,
 }
 
 impl Opt {
@@ -343,10 +360,31 @@ fn main() {
     AptosVM::set_num_shards_once(opt.pipeline_opt.num_executor_shards);
     NativeExecutor::set_concurrency_level_once(opt.concurrency_level());
 
+    let config = ProfilerConfig::new_with_defaults();
+    let handler = ProfilerHandler::new(config);
+    let mut cpu_profiler = handler.get_cpu_profiler();
+    let mut memory_profiler = handler.get_mem_profiler();
+    let memory_profiling = opt.profiler_opt.memory_profiling;
+    let cpu_profiling = opt.profiler_opt.cpu_profiling;
+
+    if cpu_profiling {
+        let _cpu_prof = cpu_profiler.start_profiling();
+    }
+    if memory_profiling {
+        let _mem_prof = memory_profiler.start_profiling();
+    }
+
     if opt.use_native_executor {
         run::<NativeExecutor>(opt);
     } else {
         run::<AptosVM>(opt);
+    }
+
+    if cpu_profiling {
+        let _cpu_end = cpu_profiler.end_profiling("");
+    }
+    if memory_profiling {
+        let _mem_end = memory_profiler.end_profiling("./target/release/aptos-executor-benchmark");
     }
 }
 
