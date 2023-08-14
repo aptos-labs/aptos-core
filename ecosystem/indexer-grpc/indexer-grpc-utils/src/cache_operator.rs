@@ -180,6 +180,7 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
     pub(crate) async fn check_cache_coverage_status(
         &mut self,
         requested_version: u64,
+        size_hint: Option<usize>,
     ) -> anyhow::Result<CacheCoverageStatus> {
         let latest_version: u64 = match self
             .conn
@@ -199,7 +200,7 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
         } else {
             Ok(CacheCoverageStatus::CacheHit(std::cmp::min(
                 latest_version - requested_version,
-                BLOB_STORAGE_SIZE as u64,
+                size_hint.unwrap_or(BLOB_STORAGE_SIZE as usize) as u64,
             )))
         }
     }
@@ -268,8 +269,9 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
     pub async fn batch_get_encoded_proto_data(
         &mut self,
         start_version: u64,
+        size_hint: Option<usize>,
     ) -> anyhow::Result<CacheBatchGetStatus> {
-        let cache_coverage_status = self.check_cache_coverage_status(start_version).await;
+        let cache_coverage_status = self.check_cache_coverage_status(start_version, size_hint).await;
         match cache_coverage_status {
             Ok(CacheCoverageStatus::CacheHit(v)) => {
                 let versions = (start_version..start_version + v)
@@ -339,7 +341,7 @@ mod tests {
 
         assert_eq!(
             cache_operator
-                .check_cache_coverage_status(123)
+                .check_cache_coverage_status(123, None)
                 .await
                 .unwrap(),
             CacheCoverageStatus::DataNotReady
@@ -357,7 +359,7 @@ mod tests {
             CacheOperator::new(mock_connection);
 
         assert_eq!(
-            cache_operator.check_cache_coverage_status(1).await.unwrap(),
+            cache_operator.check_cache_coverage_status(1, None).await.unwrap(),
             CacheCoverageStatus::CacheEvicted
         );
     }
@@ -375,7 +377,7 @@ mod tests {
         // Transactions are 100..123, thus 23 transactions are cached.
         assert_eq!(
             cache_operator
-                .check_cache_coverage_status(100)
+                .check_cache_coverage_status(100, None)
                 .await
                 .unwrap(),
             CacheCoverageStatus::CacheHit(23)
@@ -394,7 +396,7 @@ mod tests {
 
         assert_eq!(
             cache_operator
-                .check_cache_coverage_status(1000)
+                .check_cache_coverage_status(1000, None)
                 .await
                 .unwrap(),
             CacheCoverageStatus::CacheHit(1000)
@@ -422,7 +424,7 @@ mod tests {
 
         assert_eq!(
             cache_operator
-                .batch_get_encoded_proto_data(0)
+                .batch_get_encoded_proto_data(0, None)
                 .await
                 .unwrap(),
             CacheBatchGetStatus::Ok(vec!["t0".to_string(), "t1".to_string(), "t2".to_string()])
@@ -447,7 +449,7 @@ mod tests {
 
         assert_eq!(
             cache_operator
-                .batch_get_encoded_proto_data(1)
+                .batch_get_encoded_proto_data(1, None)
                 .await
                 .unwrap(),
             CacheBatchGetStatus::Ok((1..1001).map(|e| format!("t{}", e)).collect())
@@ -466,7 +468,7 @@ mod tests {
 
         assert_eq!(
             cache_operator
-                .batch_get_encoded_proto_data(1)
+                .batch_get_encoded_proto_data(1, None)
                 .await
                 .unwrap(),
             CacheBatchGetStatus::EvictedFromCache
@@ -485,7 +487,7 @@ mod tests {
 
         assert_eq!(
             cache_operator
-                .batch_get_encoded_proto_data(100_000_000)
+                .batch_get_encoded_proto_data(100_000_000, None)
                 .await
                 .unwrap(),
             CacheBatchGetStatus::NotReady

@@ -224,6 +224,7 @@ impl RawData for RawDataServerWrapper {
                         current_version,
                         &mut cache_operator,
                         file_store_operator.as_ref(),
+                        Some(10_000),
                     )
                     .await
                     {
@@ -378,9 +379,10 @@ async fn data_fetch(
     starting_version: u64,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: &dyn FileStoreOperator,
+    size_hint: Option<usize>,
 ) -> anyhow::Result<TransactionsDataStatus> {
     let batch_get_result = cache_operator
-        .batch_get_encoded_proto_data(starting_version)
+        .batch_get_encoded_proto_data(starting_version, size_hint)
         .await;
 
     match batch_get_result {
