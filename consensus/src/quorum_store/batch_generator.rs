@@ -224,7 +224,7 @@ impl BatchGenerator {
             .flatten()
             .cloned()
             .collect();
-        counters::IN_PROGRESS_TXNS_NUM.observe(exclude_txns.len() as f64);
+        counters::BATCH_PULL_EXCLUDED_TXNS.observe(exclude_txns.len() as f64);
         trace!("QS: excluding txs len: {:?}", exclude_txns.len());
 
         let mut pulled_txns = self
@@ -252,7 +252,7 @@ impl BatchGenerator {
             counters::PULLED_TXNS_COUNT.inc();
             counters::PULLED_TXNS_NUM.observe(pulled_txns.len() as f64);
             if pulled_txns.len() as u64 == max_count {
-                counters::PULLED_FULL_TXNS_FULL.inc();
+                counters::BATCH_PULL_FULL_TXNS.observe(max_count as f64)
             }
         }
         counters::BATCH_CREATION_DURATION.observe_duration(self.last_end_batch_time.elapsed());
