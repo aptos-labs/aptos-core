@@ -340,6 +340,7 @@ impl Worker {
 
         // Deduplicate raw_image_uri
         // Proceed with image optimization of force or if raw_image_uri has not been parsed
+        // Since we default to token_uri, this check works if raw_image_uri is null because deduplication for token_uri has already taken place
         if self.force
             || self.model.get_raw_image_uri().map_or(true, |uri_option| {
                 NFTMetadataCrawlerURIsQuery::get_by_raw_image_uri(
