@@ -178,15 +178,6 @@ impl PartitionState {
         tracker.has_write_in_range(range_start, range_end)
     }
 
-    pub(crate) fn write_hints(&self, txn_idx: PreParedTxnIdx) -> Vec<StorageKeyIdx> {
-        self.write_sets[txn_idx]
-            .read()
-            .unwrap()
-            .iter()
-            .copied()
-            .collect()
-    }
-
     pub(crate) fn update_trackers_on_accepting(
         &self,
         ori_txn_idx: PreParedTxnIdx,
@@ -293,7 +284,7 @@ impl PartitionState {
         }
 
         // Build dependent edges.
-        for key_idx in self.write_hints(ori_txn_idx) {
+        for &key_idx in self.write_sets[ori_txn_idx].read().unwrap().iter() {
             if Some(ori_txn_idx) == self.last_writer(key_idx, SubBlockIdx { round_id, shard_id }) {
                 let start_of_next_sub_block = ShardedTxnIndexV2::new(round_id, shard_id + 1, 0);
                 let next_writer = self.first_writer(key_idx, start_of_next_sub_block);
