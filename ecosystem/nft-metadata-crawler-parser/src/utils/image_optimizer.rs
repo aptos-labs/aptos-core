@@ -24,12 +24,10 @@ impl ImageOptimizer {
     ) -> anyhow::Result<(Vec<u8>, ImageFormat)> {
         let (_, size) = get_uri_metadata(uri.clone()).await?;
         if size > max_file_size_bytes {
-            let error_msg = format!(
+            return Err(anyhow::anyhow!(format!(
                 "Image optimizer received file too large: {} bytes, skipping",
                 size
-            );
-            error!(uri = uri, "[NFT Metadata Crawler] {}", error_msg);
-            return Err(anyhow::anyhow!(error_msg));
+            )));
         }
 
         let op = || {
@@ -59,7 +57,7 @@ impl ImageOptimizer {
                         let img = image::load_from_memory(&img_bytes)
                             .context(format!("Failed to load image from memory: {} bytes", size))?;
                         let resized_image = resize(&img.to_rgb8(), 400, 400, FilterType::Gaussian);
-                        Ok((Self::to_json_bytes(resized_image, image_quality)?, format))
+                        Ok((Self::to_jpeg_bytes(resized_image, image_quality)?, format))
                     },
                 }
             }
@@ -76,6 +74,7 @@ impl ImageOptimizer {
             Err(e) => {
                 error!(
                     uri = uri,
+                    error = ?e,
                     "[NFT Metadata Crawler] Exponential backoff timed out, skipping image"
                 );
                 Err(e)
@@ -84,7 +83,7 @@ impl ImageOptimizer {
     }
 
     /// Converts image to JPEG bytes vector
-    fn to_json_bytes(
+    fn to_jpeg_bytes(
         image_buffer: ImageBuffer<image::Rgb<u8>, Vec<u8>>,
         image_quality: u8,
     ) -> anyhow::Result<Vec<u8>> {
@@ -93,7 +92,7 @@ impl ImageOptimizer {
         match dynamic_image.write_to(&mut byte_store, ImageOutputFormat::Jpeg(image_quality)) {
             Ok(_) => Ok(byte_store.into_inner()),
             Err(e) => {
-                error!(error = ?e, "[NFT Metadata Crawler] Error converting image to bytes:: {} bytes", dynamic_image.as_bytes().len());
+                error!(error = ?e, "[NFT Metadata Crawler] Error converting image to bytes: {} bytes", dynamic_image.as_bytes().len());
                 Err(anyhow::anyhow!(e))
             },
         }
