@@ -7,7 +7,7 @@ use aptos_crypto::Uniform;
 use rand::prelude::ThreadRng;
 use rand::thread_rng;
 
-/// Helper function that returns an (sc, pp, dks, eks, s) tuple. Useful in tests and benchmarks when
+/// Helper function that returns an `(pp, dks, eks, s, sk)` tuple. Useful in tests and benchmarks when
 /// wanting to quickly deal & verify a transcript.
 pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng>(
     sc: &T::SecretSharingConfig,

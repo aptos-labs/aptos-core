@@ -225,11 +225,14 @@ impl traits::Transcript for Transcript {
         debug_assert_eq!(self.V.len(), sc.n + 1);
 
         self.hat_w += other.hat_w;
+        self.C_0 += other.C_0;
 
         for i in 0..sc.n {
             self.C[i] += other.C[i];
             self.V[i] += other.V[i];
         }
+        self.V[sc.n] += other.V[sc.n];
+
 
         debug_assert_eq!(self.C.len(), other.C.len());
         debug_assert_eq!(self.V.len(), other.V.len());

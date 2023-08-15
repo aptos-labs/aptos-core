@@ -206,6 +206,7 @@ impl traits::Transcript for Transcript {
             self.A[i] += other.A[i];
             self.Y_hat[i] += other.Y_hat[i];
         }
+        self.A[sc.n] += other.A[sc.n];
 
         debug_assert_eq!(self.A.len(), other.A.len());
         debug_assert_eq!(self.Y_hat.len(), other.Y_hat.len());
