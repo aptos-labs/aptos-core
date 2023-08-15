@@ -194,6 +194,10 @@ impl Payload {
                 }
                 Ok(())
             },
+            (_, Payload::DKG(_)) => {
+                // dkg todo: do we verify here?
+                Ok(())
+            }
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
                 quorum_store_enabled,

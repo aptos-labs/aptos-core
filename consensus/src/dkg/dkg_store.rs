@@ -60,26 +60,23 @@ impl DKGStore {
                 self.add_node(node)?;
             }
         }
-        if node
-            .verify(self.dkg_pvss_config.as_ref().unwrap())
-            .is_ok()
-        {
-            if self.agg_node.get().is_some() {
-                debug!("[DKG] Adding DKG Node failed due to agg node already available");
-                return Ok(None);
-            }
-            let author = node.author();
-            if self.nodes.contains_key(node.author()) {
-                return Err(anyhow::anyhow!(
-                    "[DKG] Author {:?} sends multiple DKG nodes!",
-                    author
-                ));
-            }
-            debug!("[DKG] Adding DKG Node from author {:?}", author);
+        match node.verify(self.dkg_pvss_config.as_ref().unwrap()) {
+            Ok(_) => {
+                if self.agg_node.get().is_some() {
+                    debug!("[DKG] Adding DKG Node failed due to agg node already available");
+                    return Ok(None);
+                }
+                let author = node.author();
+                if self.nodes.contains_key(node.author()) {
+                    return Err(anyhow::anyhow!(
+                        "[DKG] Author {:?} sends multiple DKG nodes!",
+                        author
+                    ));
+                }
+                debug!("[DKG] Adding DKG Node from author {:?}", author);
 
-            self.nodes.insert(*node.author(), node.clone());
+                self.nodes.insert(*node.author(), node.clone());
 
-            {
                 // Aggregate the transcripts
                 if self.agg_trx.is_none() {
                     self.agg_trx = Some(node.transcript().clone());
@@ -87,38 +84,39 @@ impl DKGStore {
                     self.agg_trx.as_mut().unwrap().aggregate_with(self.dkg_pvss_config.as_ref().unwrap(), node.transcript());
                 }
                 debug!("[DKG] Aggregating DKG trx from author {:?}", author);
-            }
 
-        let authors: Vec<Author> = self.nodes.iter().map(|(k,_)| *k).collect();
+                let authors: Vec<Author> = self.nodes.iter().map(|(k,_)| *k).collect();
 
-            let mut aggregated_voting_power = 0;
-            for account_address in authors.clone() {
-                match self.validator_verifier.get_voting_power(&account_address) {
-                    Some(voting_power) => aggregated_voting_power += voting_power as u128,
-                    None => (),
+                let mut aggregated_voting_power = 0;
+                for account_address in authors.clone() {
+                    match self.validator_verifier.get_voting_power(&account_address) {
+                        Some(voting_power) => aggregated_voting_power += voting_power as u128,
+                        None => (),
+                    }
                 }
-            }
-            debug!("[DKG] Node {:?} has aggregated stake {:?}, threshold stake {:?}", self.author, aggregated_voting_power, self.validator_verifier.total_voting_power() - self.validator_verifier.quorum_voting_power());
+                debug!("[DKG] Node {:?} has aggregated stake {:?}, threshold stake {:?}", self.author, aggregated_voting_power, self.validator_verifier.total_voting_power() - self.validator_verifier.quorum_voting_power());
 
-            // dkg todo: f+1 transcripts are sufficient to reconstruct the aggregated node
-            if self.validator_verifier
-                .check_voting_power(authors.iter(), false)
-                .is_ok()
-            {
-                let agg_node = DKGAggNode::new(
-                    node.epoch(),
-                    self.author,
-                    self.agg_trx.take().unwrap(),
-                );
-                debug!(
-                    "[DKG] Aggregated transcript is ready for epoch {:?}",
-                    node.epoch()
-                );
-                return Ok(Some(agg_node));
+                // dkg todo: f+1 transcripts are sufficient to reconstruct the aggregated node
+                if self.validator_verifier
+                    .check_voting_power(authors.iter(), false)
+                    .is_ok()
+                {
+                    let agg_node = DKGAggNode::new(
+                        node.epoch(),
+                        self.author,
+                        self.agg_trx.take().unwrap(),
+                    );
+                    debug!(
+                        "[DKG] Aggregated transcript is ready for epoch {:?}",
+                        node.epoch()
+                    );
+                    return Ok(Some(agg_node));
+                }
+                return Ok(None);
             }
-            return Ok(None);
-        } else {
-            anyhow::bail!("[DKG] Failed to verify DKG node: {:?}", node);
+            Err(e) => {
+                anyhow::bail!("[DKG] Failed to verify DKG node: {:?}, error = {:?}", node.metadata(), e);
+            }
         }
     }
 
@@ -137,17 +135,18 @@ impl DKGStore {
                 self.add_agg_node(agg_node)?;
             }
         }
-        if agg_node
-            .verify(self.dkg_pvss_config.as_ref().unwrap())
-            .is_ok()
+        match agg_node.verify(self.dkg_pvss_config.as_ref().unwrap())
         {
-            if self.agg_node.set(agg_node.clone()).is_ok() {
-                debug!("[DKG] Adding DKG Aggregated Node for epoch {:?}", agg_node.epoch());
-                return Ok(Some(agg_node));
+            Ok(_) => {
+                if self.agg_node.set(agg_node.clone()).is_ok() {
+                    debug!("[DKG] Adding DKG Aggregated Node for epoch {:?}", agg_node.epoch());
+                    return Ok(Some(agg_node));
+                }
+                return Ok(None);
             }
-            return Ok(None);
-        } else {
-            anyhow::bail!("[DKG] Failed to verify DKG aggregated node: {:?}", agg_node);
+            Err(e) => {
+                anyhow::bail!("[DKG] Failed to verify DKG aggregated node: {:?}, error = {:?}", agg_node.metadata(), e);
+            }
         }
     }
 

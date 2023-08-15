@@ -70,7 +70,7 @@ impl DKGRpcHandler for DKGAggNodeHandler {
 
     fn process(&mut self, agg_node: Self::DKGRequest) -> anyhow::Result<Self::DKGResponse> {
         let epoch = agg_node.epoch();
-        debug!("[DKG] Process DKG Aggregated Node: {:?}", agg_node);
+        debug!("[DKG] Process DKG Aggregated Node: {:?}", agg_node.metadata());
         // dkg todo: persist the dkg nodes
         match self.dkg_manager.lock().add_agg_node(agg_node) {
             Ok(_) => Ok(DKGAggNodeAck::new(epoch)),
