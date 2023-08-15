@@ -262,13 +262,6 @@ pub trait AptosGasMeter: MoveGasMeter {
             .to_unit_round_up_with_params(&self.vm_gas_params().txn)
     }
 
-    /// Return the total gas used for storage.
-    fn storage_fee_used_in_gas_units(&self) -> Gas {
-        self.algebra()
-            .storage_fee_used_in_gas_units()
-            .to_unit_round_up_with_params(&self.vm_gas_params().txn)
-    }
-
     /// Return the total fee used for storage.
     fn storage_fee_used(&self) -> Fee {
         self.algebra().storage_fee_used()

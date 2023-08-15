@@ -83,7 +83,7 @@ pub(crate) fn build_vm_output(
             aggregator_write_set,
             aggregator_delta_set,
         ),
-        FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
+        FeeStatement::new(GAS_USED, GAS_USED, 0, 0),
         STATUS,
     )
 }

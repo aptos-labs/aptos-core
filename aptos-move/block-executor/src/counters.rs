@@ -15,7 +15,6 @@ impl GasType {
     pub const IO_GAS: &'static str = "io_gas";
     pub const NON_STORAGE_GAS: &'static str = "non_storage_gas";
     pub const STORAGE_FEE: &'static str = "storage_in_octas";
-    pub const STORAGE_GAS: &'static str = "storage_in_gas";
     pub const TOTAL_GAS: &'static str = "total_gas";
 }
 
@@ -207,10 +206,6 @@ pub(crate) fn update_parallel_block_gas_counters(
     );
     observe_parallel_execution_block_gas(accumulated_fee_statement.io_gas_used(), GasType::IO_GAS);
     observe_parallel_execution_block_gas(
-        accumulated_fee_statement.storage_gas_used(),
-        GasType::STORAGE_GAS,
-    );
-    observe_parallel_execution_block_gas(
         accumulated_fee_statement.execution_gas_used() + accumulated_fee_statement.io_gas_used(),
         GasType::NON_STORAGE_GAS,
     );
@@ -231,7 +226,6 @@ pub(crate) fn update_parallel_txn_gas_counters(txn_fee_statements: &Vec<FeeState
             GasType::EXECUTION_GAS,
         );
         observe_parallel_execution_txn_gas(fee_statement.io_gas_used(), GasType::IO_GAS);
-        observe_parallel_execution_txn_gas(fee_statement.storage_gas_used(), GasType::STORAGE_GAS);
         observe_parallel_execution_txn_gas(
             fee_statement.execution_gas_used() + fee_statement.io_gas_used(),
             GasType::NON_STORAGE_GAS,
@@ -257,10 +251,6 @@ pub(crate) fn update_sequential_block_gas_counters(
         GasType::IO_GAS,
     );
     observe_sequential_execution_block_gas(
-        accumulated_fee_statement.storage_gas_used(),
-        GasType::STORAGE_GAS,
-    );
-    observe_sequential_execution_block_gas(
         accumulated_fee_statement.execution_gas_used() + accumulated_fee_statement.io_gas_used(),
         GasType::NON_STORAGE_GAS,
     );
@@ -280,7 +270,6 @@ pub(crate) fn update_sequential_txn_gas_counters(fee_statement: &FeeStatement) {
         GasType::EXECUTION_GAS,
     );
     observe_sequential_execution_txn_gas(fee_statement.io_gas_used(), GasType::IO_GAS);
-    observe_sequential_execution_txn_gas(fee_statement.storage_gas_used(), GasType::STORAGE_GAS);
     observe_sequential_execution_txn_gas(
         fee_statement.execution_gas_used() + fee_statement.io_gas_used(),
         GasType::NON_STORAGE_GAS,
