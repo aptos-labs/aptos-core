@@ -222,14 +222,6 @@ export class AccountAddress {
       }
     }
 
-    // Assert that only special addresses can use short form.
-    if (args.input.slice(2).length !== this.LONG_STRING_LENGTH && !address.isSpecial()) {
-      throw new ParsingError(
-        "Padding zeroes are not allowed, the address must be represented as 0x0 to 0xf for special addresses or 0x + 64 chars for all other addresses.",
-        AddressInvalidReason.LONG_FORM_REQUIRED_UNLESS_SPECIAL,
-      );
-    }
-
     return address;
   }
 
