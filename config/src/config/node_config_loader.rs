@@ -126,6 +126,18 @@ fn optimize_and_sanitize_node_config(
     NodeConfig::sanitize(node_config, node_type, chain_id)
 }
 
+pub fn sanitize_node_config(node_config: &mut NodeConfig) -> Result<(), Error> {
+    let node_type = NodeType::extract_from_config(node_config);
+    let chain_id = match get_chain_id(node_config) {
+        Ok(chain_id) => chain_id,
+        Err(error) => {
+            println!("Failed to get the chain ID from the genesis blob! Skipping config sanitization. Error: {:?}", error);
+            return Ok(());
+        },
+    };
+    NodeConfig::sanitize(node_config, node_type, chain_id)
+}
+
 /// Get the chain ID for the node
 fn get_chain_id(node_config: &NodeConfig) -> Result<ChainId, Error> {
     // TODO: can we make this less hacky?
