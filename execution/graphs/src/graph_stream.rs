@@ -1,13 +1,12 @@
 // Copyright © Aptos Foundation
 
-use aptos_types::with::{MapWithOp, MapWithRef};
-use crate::graph::{NodeIndex, WeightedUndirectedGraph};
+use namable_closures::{Closure, closure};
+use crate::graph::{NodeIndex, WeightedGraph};
 use rand::seq::SliceRandom;
-use aptos_types::batched_stream::{BatchedStream};
-
+use aptos_types::closuretools::{ClosureTools, MapClosure};
 
 /// A trait for batched streams for undirected graphs with weighted nodes and edges.
-pub trait WeightedUndirectedGraphStream: Sized {
+pub trait GraphStream: Sized {
     /// The weight of a node.
     type NodeWeight;
 
@@ -15,17 +14,19 @@ pub trait WeightedUndirectedGraphStream: Sized {
     type EdgeWeight;
 
     /// An iterator over the neighbours of a node in the graph.
-    type NeighboursIter: Iterator<Item = (NodeIndex, Self::EdgeWeight)>;
-
-    /// An iterator over the nodes in a batch.
-    type Batch: Iterator<Item = (NodeIndex, Self::NodeWeight, Self::NeighboursIter<'a>)>
+    type NeighboursIter<'a>: Iterator<Item = (NodeIndex, Self::EdgeWeight)>
     where
         Self: 'a;
 
-    /// Applies a function to the next batch of items in the stream.
-    fn process_batch<'a, F, R>(&'a mut self, f: F) -> R
-        where
-            F: FnOnce(Option<Self::BatchIter<'a>>) -> R;
+    /// An iterator over the nodes in a batch.
+    type Batch<'a>: IntoIterator<Item = (NodeIndex, Self::NodeWeight, Self::NeighboursIter<'a>)>
+    where
+        Self: 'a;
+
+    /// Advances the stream and returns the next value.
+    ///
+    /// Returns [`None`] when stream is finished.
+    fn next_batch(&mut self) -> Option<Self::Batch<'_>>;
 
     /// Returns the total number of batches remaining in the stream, if available.
     fn opt_remaining_batch_count(&self) -> Option<usize> {
@@ -63,9 +64,68 @@ pub trait WeightedUndirectedGraphStream: Sized {
     }
 }
 
+/// A trait for graph streams with known exact node count.
+pub trait ExactNodeCountGraphStream: GraphStream {
+    fn remaining_node_count(&self) -> usize {
+        self.opt_remaining_node_count().unwrap()
+    }
+
+    fn total_node_count(&self) -> usize {
+        self.opt_total_node_count().unwrap()
+    }
+}
+
+// A mutable reference to a `GraphStream` is a `GraphStream` itself.
+impl<'a, S> GraphStream for &'a mut S
+where
+    S: GraphStream,
+{
+    type NodeWeight = S::NodeWeight;
+    type EdgeWeight = S::EdgeWeight;
+
+    type NeighboursIter<'b> = S::NeighboursIter<'b>
+    where
+        Self: 'b;
+
+    type Batch<'b> = S::Batch<'b>
+    where
+        Self: 'b;
+
+    fn next_batch(&mut self) -> Option<Self::Batch<'_>> {
+        (**self).next_batch()
+    }
+
+    fn opt_remaining_batch_count(&self) -> Option<usize> {
+        (**self).opt_remaining_batch_count()
+    }
+
+    fn opt_remaining_node_count(&self) -> Option<usize> {
+        (**self).opt_remaining_node_count()
+    }
+
+    fn opt_total_node_count(&self) -> Option<usize> {
+        (**self).opt_total_node_count()
+    }
+
+    fn opt_total_edge_count(&self) -> Option<usize> {
+        (**self).opt_total_edge_count()
+    }
+
+    fn opt_total_node_weight(&self) -> Option<Self::NodeWeight> {
+        (**self).opt_total_node_weight()
+    }
+
+    fn opt_total_edge_weight(&self) -> Option<Self::EdgeWeight> {
+        (**self).opt_total_edge_weight()
+    }
+}
+
 /// A trait for a generic graph streamer.
-pub trait GraphStreamer<G: WeightedUndirectedGraph> {
-    type Stream<'graph>: WeightedUndirectedGraphStream<NodeWeight = G::NodeWeight, EdgeWeight = G::EdgeWeight>
+pub trait GraphStreamer<G: WeightedGraph> {
+    type Stream<'graph>: GraphStream<
+        NodeWeight = G::NodeWeight,
+        EdgeWeight = G::EdgeWeight,
+    >
     where
         Self: 'graph,
         G: 'graph;
@@ -84,7 +144,7 @@ impl InputOrderGraphStreamer {
     }
 }
 
-impl<G: WeightedUndirectedGraph> GraphStreamer<G> for InputOrderGraphStreamer {
+impl<G: WeightedGraph> GraphStreamer<G> for InputOrderGraphStreamer {
     type Stream<'graph> = InputOrderGraphStream<'graph, G>
     where
         G: 'graph;
@@ -107,7 +167,7 @@ impl RandomOrderGraphStreamer {
     }
 }
 
-impl<G: WeightedUndirectedGraph> GraphStreamer<G> for RandomOrderGraphStreamer {
+impl<G: WeightedGraph> GraphStreamer<G> for RandomOrderGraphStreamer {
     type Stream<'graph> = RandomOrderGraphStream<'graph, G>
     where
         Self: 'graph,
@@ -125,7 +185,7 @@ pub struct InputOrderGraphStream<'graph, G> {
     current_node: NodeIndex,
 }
 
-impl<'graph, G: WeightedUndirectedGraph> InputOrderGraphStream<'graph, G> {
+impl<'graph, G: WeightedGraph> InputOrderGraphStream<'graph, G> {
     pub fn new(graph: &'graph G, batch_size: usize) -> Self {
         Self {
             graph,
@@ -135,43 +195,39 @@ impl<'graph, G: WeightedUndirectedGraph> InputOrderGraphStream<'graph, G> {
     }
 }
 
-impl<'graph, G> WeightedUndirectedGraphStream for InputOrderGraphStream<'graph, G>
+impl<'graph, G> GraphStream for InputOrderGraphStream<'graph, G>
 where
-    G: WeightedUndirectedGraph,
+    G: WeightedGraph,
 {
     type NodeWeight = G::NodeWeight;
     type EdgeWeight = G::EdgeWeight;
 
     type NeighboursIter<'a> = G::WeightedNeighboursIter<'a>
+        where
+            Self: 'a;
+
+    type Batch<'a> = MapClosure<
+        std::ops::Range<NodeIndex>,
+        Closure<'a, Self, (NodeIndex,), (NodeIndex, Self::NodeWeight, Self::NeighboursIter<'a>)>,
+    >
     where
         Self: 'a;
 
-    type BatchIter<'a> = MapWithRef<
-        'a,
-        std::ops::Range<NodeIndex>,
-        Self,
-        fn(&Self, NodeIndex) -> (NodeIndex, Self::NodeWeight, Self::NeighboursIter<'a>)
-    >
-    where
-        Self: 'a,
-        G: 'a;
-
-    fn process_batch<'a, F, R>(&'a mut self, f: F) -> R where F: FnOnce(Option<Self::BatchIter<'a>>) -> R {
+    fn next_batch(&mut self) -> Option<Self::Batch<'_>> {
         if self.current_node == self.graph.node_count() as NodeIndex {
-            return f(None);
+            return None;
         }
 
         let batch_start = self.current_node;
         self.current_node = (self.current_node + self.batch_size as NodeIndex)
             .min(self.graph.node_count() as NodeIndex);
 
-        f(Some(
-            (batch_start..self.current_node)
-                .map_with_ref(self, |self_, node| {
-                    let node_weight = self_.graph.node_weight(node);
-                    let neighbours = self_.graph.weighted_edges(node);
-                    (node, node_weight, neighbours)
-                }))
+        Some(
+            (batch_start..self.current_node).map_closure(closure!(self_ = self => |node| {
+                let node_weight = self_.graph.node_weight(node);
+                let neighbours = self_.graph.weighted_edges(node);
+                (node, node_weight, neighbours)
+            }))
         )
     }
 
@@ -209,7 +265,7 @@ pub struct RandomOrderGraphStream<'graph, G> {
     current_node: NodeIndex,
 }
 
-impl<'graph, G: WeightedUndirectedGraph> RandomOrderGraphStream<'graph, G> {
+impl<'graph, G: WeightedGraph> RandomOrderGraphStream<'graph, G> {
     pub fn new(graph: &'graph G, batch_size: usize) -> Self {
         let mut order: Vec<_> = graph.nodes().collect();
         let mut rng = rand::thread_rng();
@@ -224,9 +280,9 @@ impl<'graph, G: WeightedUndirectedGraph> RandomOrderGraphStream<'graph, G> {
     }
 }
 
-impl<'graph, G> WeightedUndirectedGraphStream for RandomOrderGraphStream<'graph, G>
+impl<'graph, G> GraphStream for RandomOrderGraphStream<'graph, G>
 where
-    G: WeightedUndirectedGraph,
+    G: WeightedGraph,
 {
     type NodeWeight = G::NodeWeight;
     type EdgeWeight = G::EdgeWeight;
@@ -235,34 +291,32 @@ where
     where
         Self: 'a;
 
-    type BatchIter<'a> = MapWithRef<
-        'a,
+    type Batch<'a> = MapClosure<
         std::iter::Copied<std::slice::Iter<'a, NodeIndex>>,
-        Self,
-        fn(&Self, NodeIndex) -> (NodeIndex, Self::NodeWeight, Self::NeighboursIter<'a>)
+        Closure<'a, Self, (NodeIndex,), (NodeIndex, Self::NodeWeight, Self::NeighboursIter<'a>)>
     >
     where
         Self: 'a;
 
-    fn process_batch<'a, F, R>(&'a mut self, f: F) -> R where F: FnOnce(Option<Self::BatchIter<'a>>) -> R {
+    fn next_batch(&mut self) -> Option<Self::Batch<'_>> {
         if self.current_node == self.order.len() as NodeIndex {
-            return f(None);
+            return None;
         }
 
         let batch_start = self.current_node;
         self.current_node =
             (self.current_node + self.batch_size as NodeIndex).min(self.order.len() as NodeIndex);
 
-        f(Some(
+        Some(
             (&self.order[batch_start as usize..self.current_node as usize])
                 .into_iter()
                 .copied()
-                .map_with_ref(self, |self_, node| {
+                .map_closure(closure!(self_ = self => |node| {
                     let node_weight = self_.graph.node_weight(node);
                     let neighbours = self_.graph.weighted_edges(node);
                     (node, node_weight, neighbours)
-                })
-        ))
+                })),
+        )
     }
 
     fn opt_remaining_batch_count(&self) -> Option<usize> {

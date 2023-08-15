@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::graph::{UndirectedGraph, WeightedUndirectedGraph};
+use crate::graph::{Graph, WeightedGraph};
 use crate::partitioning::{GraphPartitioner, PartitionId};
 
 /// A weighted undirected graph in the format expected by the Metis library.
@@ -74,7 +74,7 @@ impl Default for MetisGraphPartitioner {
 }
 
 impl MetisGraph {
-    fn unweighted<G: UndirectedGraph>(graph: &G) -> Self {
+    fn unweighted<G: Graph>(graph: &G) -> Self {
         // adjncy is the concatenation of the adjacency lists of all vertices.
         let adjncy: Vec<_> = graph
             .nodes()
@@ -104,7 +104,7 @@ impl MetisGraph {
         }
     }
 
-    fn weighted<G: WeightedUndirectedGraph>(graph: &G) -> Self
+    fn weighted<G: WeightedGraph>(graph: &G) -> Self
     where
         G::NodeWeight: Into<metis::Idx>,
         G::EdgeWeight: Into<metis::Idx>,
@@ -170,11 +170,13 @@ impl MetisGraphPartitioner {
     }
 }
 
-impl<G: WeightedUndirectedGraph> GraphPartitioner<G> for MetisGraphPartitioner
+impl<G: WeightedGraph> GraphPartitioner<G> for MetisGraphPartitioner
 where
     G::NodeWeight: Into<metis::Idx>,
     G::EdgeWeight: Into<metis::Idx>,
 {
+    type Error = anyhow::Error;
+
     /// Partitions the graph using the Metis graph partitioner.
     ///
     /// The partitioning may return an error if it fails to satisfy the balancing constraint

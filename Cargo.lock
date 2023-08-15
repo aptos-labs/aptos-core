@@ -1818,9 +1818,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-types",
+ "itertools",
  "metis",
+ "namable_closures",
  "nonmax",
  "rand 0.7.3",
+ "thiserror",
 ]
 
 [[package]]
@@ -3763,6 +3766,7 @@ dependencies = [
  "itertools",
  "move-core-types",
  "move-table-extension",
+ "namable_closures",
  "num-derive",
  "num-traits 0.2.15",
  "once_cell",
@@ -9899,6 +9903,12 @@ dependencies = [
  "quote 1.0.29",
  "syn 1.0.105",
 ]
+
+[[package]]
+name = "namable_closures"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3692f03a721113e0b493831f0ca52d589f694b1b6225ebef34a0edfa8561956f"
 
 [[package]]
 name = "named-lock"

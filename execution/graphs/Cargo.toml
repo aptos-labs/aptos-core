@@ -14,7 +14,10 @@ rust-version.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 aptos-types = { workspace = true }
+itertools = { workspace = true }
 metis = { workspace = true }
+namable_closures = { workspace = true }
 nonmax = { workspace = true }
 rand = { workspace = true }
+thiserror = { workspace = true }
 

@@ -25,6 +25,7 @@ hex = { workspace = true }
 itertools = { workspace = true }
 move-core-types = { workspace = true }
 move-table-extension = { workspace = true }
+namable_closures = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }

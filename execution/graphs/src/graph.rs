@@ -5,7 +5,7 @@
 pub type NodeIndex = u32;
 
 /// A simple trait for an undirected graph.
-pub trait UndirectedGraph {
+pub trait Graph {
     /// An iterator over the neighbours of a node in the graph.
     type NeighboursIter<'a>: Iterator<Item = NodeIndex>
     where
@@ -31,7 +31,7 @@ pub trait UndirectedGraph {
 }
 
 // A trait for an undirected graph with weighted nodes.
-pub trait WeightedNodes: UndirectedGraph {
+pub trait WeightedNodes: Graph {
     /// The weight of a node.
     type NodeWeight;
 
@@ -52,7 +52,7 @@ pub trait WeightedNodes: UndirectedGraph {
 }
 
 // A trait for an undirected graph with weighted edges.
-pub trait WeightedEdges: UndirectedGraph {
+pub trait WeightedEdges: Graph {
     /// The weight of an edge.
     type EdgeWeight;
 
@@ -67,9 +67,9 @@ pub trait WeightedEdges: UndirectedGraph {
 }
 
 /// A trait for an undirected graph with weighted nodes and edges.
-pub trait WeightedUndirectedGraph: WeightedNodes + WeightedEdges {}
+pub trait WeightedGraph: WeightedNodes + WeightedEdges {}
 
-impl<G> WeightedUndirectedGraph for G where G: WeightedNodes + WeightedEdges {}
+impl<G> WeightedGraph for G where G: WeightedNodes + WeightedEdges {}
 
 /// Simple wrapper that makes a weighted undirected graph out of any graph
 /// by assigning weight "1" to all nodes and edges.
@@ -83,9 +83,9 @@ impl<G> TriviallyWeightedGraph<G> {
     }
 }
 
-impl<G> UndirectedGraph for TriviallyWeightedGraph<G>
+impl<G> Graph for TriviallyWeightedGraph<G>
 where
-    G: UndirectedGraph,
+    G: Graph,
 {
     type NeighboursIter<'a> = G::NeighboursIter<'a>
     where
@@ -110,7 +110,7 @@ where
 
 impl<G> WeightedNodes for TriviallyWeightedGraph<G>
 where
-    G: UndirectedGraph,
+    G: Graph,
 {
     type NodeWeight = NodeIndex;
 
@@ -134,7 +134,7 @@ where
 
 impl<G> WeightedEdges for TriviallyWeightedGraph<G>
 where
-    G: UndirectedGraph,
+    G: Graph,
 {
     type EdgeWeight = usize;
     type WeightedNeighboursIter<'a> =

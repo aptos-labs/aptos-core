@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 
 pub mod metis;
+pub mod fennel;
 
-use crate::graph::{NodeIndex, WeightedUndirectedGraph};
-use crate::graph_stream::{GraphStreamer, WeightedUndirectedGraphStream};
+use crate::graph::{NodeIndex, WeightedGraph};
+use crate::graph_stream::{GraphStreamer, GraphStream};
 use aptos_types::batched_stream::BatchedStream;
 
 // In stable Rust, there are no good ways to implement "number" traits.
@@ -12,42 +13,47 @@ pub type PartitionId = NodeIndex;
 
 /// A trait for graph partitioners.
 pub trait GraphPartitioner<G> {
+    type Error;
+
     /// Assigns each node in the graph to a partition.
     /// Outputs the mapping from node indices to partitions as a vector.
     /// Node i is assigned to partition output[i].
-    fn partition(&self, graph: &G, n_partitions: usize) -> anyhow::Result<Vec<PartitionId>>;
+    fn partition(&self, graph: &G, n_partitions: usize) -> Result<Vec<PartitionId>, Self::Error>;
 }
 
 /// A trait for streaming graph partitioners.
 pub trait StreamingGraphPartitioner<NW, EW> {
-    type ResultStream<'a, S>: BatchedStream<StreamItem = anyhow::Result<(NodeIndex, PartitionId)>>
+    type Error;
+
+    type ResultStream<S>: BatchedStream<StreamItem = (NodeIndex, PartitionId), Error = Self::Error>
     where
-        Self: 'a,
-        S: 'a;
+        S: GraphStream<NodeWeight = NW, EdgeWeight = EW>;
 
     /// Assigns each node in the graph to a partition.
     /// Outputs a batched stream of node indices with their assigned partitions.
-    fn partition_stream<'s, S>(
+    fn partition_stream<S>(
         &self,
-        graph_stream: &'s mut S,
+        graph_stream: S,
         n_partitions: usize,
-    ) -> Self::ResultStream<'s, S>
+    ) -> Self::ResultStream<S>
     where
-        S: WeightedUndirectedGraphStream<NodeWeight = NW, EdgeWeight = EW>;
+        S: GraphStream<NodeWeight = NW, EdgeWeight = EW>;
 }
 
-pub struct OrderedGraphPartitioner<P, O> {
+pub struct OrderedGraphPartitioner<P, S> {
     streaming_graph_partitioner: P,
-    graph_streamer: O,
+    graph_streamer: S,
 }
 
-impl<G, P, O> GraphPartitioner<G> for OrderedGraphPartitioner<P, O>
+impl<G, P, S> GraphPartitioner<G> for OrderedGraphPartitioner<P, S>
 where
-    G: WeightedUndirectedGraph,
-    O: GraphStreamer<G>,
+    G: WeightedGraph,
+    S: GraphStreamer<G>,
     P: StreamingGraphPartitioner<G::NodeWeight, G::EdgeWeight>,
 {
-    fn partition(&self, graph: &G, n_partitions: usize) -> anyhow::Result<Vec<PartitionId>> {
+    type Error = P::Error;
+
+    fn partition(&self, graph: &G, n_partitions: usize) -> Result<Vec<PartitionId>, Self::Error> {
         let mut graph_stream = self.graph_streamer.stream(graph);
         let partition_stream = self
             .streaming_graph_partitioner
@@ -55,7 +61,7 @@ where
 
         let mut partitioning = vec![0; graph.node_count()];
 
-        for res in partition_stream.as_items_iter() {
+        for res in partition_stream.into_items_iter() {
             match res {
                 Ok((node, partition)) => {
                     partitioning[node as usize] = partition;
