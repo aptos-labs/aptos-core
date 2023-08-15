@@ -9,11 +9,11 @@ use anyhow::Result;
 use aptos_executor::{
     block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput,
 };
-use aptos_executor_types::ExecutableTransactions;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{deposit::DepositEvent, withdraw::WithdrawEvent},
+    block_executor::partitioner::ExecutableTransactions,
     contract_event::ContractEvent,
     event::EventKey,
     state_store::state_key::StateKey,

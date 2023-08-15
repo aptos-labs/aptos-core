@@ -28,7 +28,7 @@ module aptos_framework::staking_config {
     const EINVALID_LAST_REWARDS_RATE_PERIOD_START: u64 = 7;
     /// Specified rewards rate decrease rate is invalid, which must be not greater than BPS_DENOMINATOR.
     const EINVALID_REWARDS_RATE_DECREASE_RATE: u64 = 8;
-    /// Specified rewards rate period is invalid, which must be 1 year at the moment.
+    /// Specified rewards rate period is invalid. It must be larger than 0 and cannot be changed if configured.
     const EINVALID_REWARDS_RATE_PERIOD: u64 = 9;
     /// The function has been deprecated.
     const EDEPRECATED_FUNCTION: u64 = 10;
@@ -188,7 +188,7 @@ module aptos_framework::staking_config {
 
     /// Return the reward rate of this epoch.
     public fun get_reward_rate(config: &StakingConfig): (u64, u64) acquires StakingRewardsConfig {
-        let (rewards_rate, rewards_rate_denominator) = if (features::periodical_reward_rate_decrease_enabled()) {
+        if (features::periodical_reward_rate_decrease_enabled()) {
             let epoch_rewards_rate = borrow_global<StakingRewardsConfig>(@aptos_framework).rewards_rate;
             if (fixed_point64::is_zero(epoch_rewards_rate)) {
                 (0u64, 1u64)
@@ -204,8 +204,7 @@ module aptos_framework::staking_config {
             }
         } else {
             (config.rewards_rate, config.rewards_rate_denominator)
-        };
-        (rewards_rate, rewards_rate_denominator)
+        }
     }
 
     /// Return the joining limit %.
@@ -325,6 +324,12 @@ module aptos_framework::staking_config {
         );
 
         let staking_rewards_config = borrow_global_mut<StakingRewardsConfig>(@aptos_framework);
+        // Currently rewards_rate_period_in_secs is not allowed to be changed because this could bring complicated
+        // logics. At the moment the argument is just a placeholder for future use.
+        assert!(
+            rewards_rate_period_in_secs == staking_rewards_config.rewards_rate_period_in_secs,
+            error::invalid_argument(EINVALID_REWARDS_RATE_PERIOD),
+        );
         staking_rewards_config.rewards_rate = rewards_rate;
         staking_rewards_config.min_rewards_rate = min_rewards_rate;
         staking_rewards_config.rewards_rate_period_in_secs = rewards_rate_period_in_secs;
@@ -371,11 +376,10 @@ module aptos_framework::staking_config {
             fixed_point64::ceil(rewards_rate_decrease_rate) <= 1,
             error::invalid_argument(EINVALID_REWARDS_RATE_DECREASE_RATE)
         );
-        // This field, rewards_rate_period_in_secs is added as a placeholder. In case we want to change
-        // the reward period, we don't have to add a new struct.
-        // To avoid complex logic, now rewards rate decrease interval must be 1 year.
+        // This field, rewards_rate_period_in_secs must be greater than 0.
+        // TODO: rewards_rate_period_in_secs should be longer than the epoch duration but reading epoch duration causes a circular dependency.
         assert!(
-            rewards_rate_period_in_secs == ONE_YEAR_IN_SECS,
+            rewards_rate_period_in_secs > 0,
             error::invalid_argument(EINVALID_REWARDS_RATE_PERIOD),
         );
     }
@@ -579,6 +583,27 @@ module aptos_framework::staking_config {
             create_from_rational(1, 100),
             ONE_YEAR_IN_SECS,
             create_from_rational(101, 100),
+        );
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    #[expected_failure(abort_code = 0x10009, location = Self)]
+    public entry fun test_update_rewards_config_cannot_change_rewards_rate_period(aptos_framework: signer) acquires StakingRewardsConfig {
+        let start_time_in_secs: u64 = 100001000000;
+        initialize_rewards_for_test(
+            &aptos_framework,
+            create_from_rational(15981, 1000000000),
+            create_from_rational(7991, 1000000000),
+            ONE_YEAR_IN_SECS,
+            start_time_in_secs,
+            create_from_rational(15, 1000),
+        );
+        update_rewards_config(
+            &aptos_framework,
+            create_from_rational(15981, 1000000000),
+            create_from_rational(7991, 1000000000),
+            ONE_YEAR_IN_SECS - 1,
+            create_from_rational(15, 1000),
         );
     }
 

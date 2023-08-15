@@ -114,6 +114,7 @@ pub enum Tok {
     LSquare,
     RSquare,
     PeriodPeriod,
+    Nop,
 }
 
 impl Tok {
@@ -403,7 +404,7 @@ impl<'input> Lexer<'input> {
 fn get_name_len(text: &str) -> usize {
     // If the first character is 0..=9 or EOF, then return a length of 0.
     let first_char = text.chars().next().unwrap_or('0');
-    if ('0'..='9').contains(&first_char) {
+    if first_char.is_ascii_digit() {
         return 0;
     }
     text.chars()
@@ -492,6 +493,7 @@ fn get_name_token(name: &str) -> Tok {
         "succeeds_if" => Tok::SucceedsIf,
         "synthetic" => Tok::Synthetic,
         "true" => Tok::True,
+        "nop" => Tok::Nop,
         _ => Tok::NameValue,
     }
 }

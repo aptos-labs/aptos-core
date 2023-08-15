@@ -1,35 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{Context, Result};
-use aptos_logger::info;
+use anyhow::Result;
 use aptos_types::transaction::Version;
 use std::cmp::min;
 
 /// Defines the trait for pruner for different DB
 pub trait DBPruner: Send + Sync {
-    /// Find out the first undeleted item in the stale node index.
-    fn initialize(&self) {
-        let min_readable_version = self
-            .initialize_min_readable_version()
-            .context(self.name())
-            .expect("Pruner failed to initialize.");
-        info!(
-            min_readable_version = min_readable_version,
-            "{} initialized.",
-            self.name()
-        );
-        self.record_progress(min_readable_version);
-    }
-
     fn name(&self) -> &'static str;
 
     /// Performs the actual pruning, a target version is passed, which is the target the pruner
     /// tries to prune.
     fn prune(&self, batch_size: usize) -> Result<Version>;
-
-    /// Initializes the least readable version stored in underlying DB storage
-    fn initialize_min_readable_version(&self) -> Result<Version>;
 
     /// Returns the progress of the pruner.
     fn progress(&self) -> Version;

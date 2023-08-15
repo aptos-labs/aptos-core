@@ -12,6 +12,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.52"
 arbitrary = { version = "1.1.7", optional = true, features = ["derive"] }
+backtrace = { workspace = true }
 indexmap = "1.9.3"
 move-core-types = { path = "../move-core/types" }
 once_cell = "1.7.2"

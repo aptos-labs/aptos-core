@@ -15,9 +15,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_executor_types::{
-    BlockExecutorTrait, Error, ExecutableBlock, ExecutableTransactions, StateComputeResult,
-};
+use aptos_executor_types::{BlockExecutorTrait, Error, StateComputeResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_scratchpad::SparseMerkleTree;
@@ -25,7 +23,11 @@ use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
 };
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, state_store::state_value::StateValue};
+use aptos_types::{
+    block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
+    ledger_info::LedgerInfoWithSignatures,
+    state_store::state_value::StateValue,
+};
 use aptos_vm::AptosVM;
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};

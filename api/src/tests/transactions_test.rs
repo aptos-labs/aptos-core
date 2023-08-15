@@ -5,7 +5,7 @@
 use super::new_test_context;
 use crate::tests::new_test_context_with_config;
 use aptos_api_test_context::{assert_json, current_function_name, pretty, TestContext};
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{GasEstimationStaticOverride, NodeConfig};
 use aptos_crypto::{
     ed25519::Ed25519PrivateKey,
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
@@ -245,6 +245,74 @@ async fn test_multi_agent_signed_transaction() {
     );
 
     // ensure multi agent txns can be submitted into mempool by JSON format
+    context
+        .expect_status_code(202)
+        .post("/transactions", resp)
+        .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_fee_payer_signed_transaction() {
+    let mut context = new_test_context(current_function_name!());
+    let account = context.gen_account();
+    let secondary = context.gen_account();
+    let factory = context.transaction_factory();
+    let mut root_account = context.root_account().await;
+
+    // Create secondary signer account
+    context
+        .commit_block(&[context.create_user_account_by(&mut root_account, &secondary)])
+        .await;
+
+    // Create a new account with a multi-agent signer
+    let txn = root_account.sign_fee_payer_with_transaction_builder(
+        vec![],
+        &secondary,
+        factory.create_user_account(account.public_key()),
+    );
+
+    let body = bcs::to_bytes(&txn).unwrap();
+    let resp = context
+        .expect_status_code(202)
+        .post_bcs_txn("/transactions", body)
+        .await;
+
+    let (sender, _, fee_payer_signer) = match txn.authenticator() {
+        TransactionAuthenticator::FeePayer {
+            sender,
+            secondary_signer_addresses: _,
+            secondary_signers,
+            fee_payer_address: _,
+            fee_payer_signer,
+        } => (sender, secondary_signers, fee_payer_signer),
+        _ => panic!(
+            "expecting TransactionAuthenticator::MultiAgent, but got: {:?}",
+            txn.authenticator()
+        ),
+    };
+    assert_json(
+        resp["signature"].clone(),
+        json!({
+            "type": "fee_payer_signature",
+            "sender": {
+                "type": "ed25519_signature",
+                "public_key": format!("0x{}", hex::encode(sender.public_key_bytes())),
+                "signature": format!("0x{}", hex::encode(sender.signature_bytes())),
+            },
+            "secondary_signer_addresses": [
+            ],
+            "secondary_signers": [
+            ],
+            "fee_payer_address": secondary.address().to_hex_literal(),
+            "fee_payer_signer": {
+                "type": "ed25519_signature",
+                "public_key": format!("0x{}",hex::encode(fee_payer_signer.public_key_bytes())),
+                "signature": format!("0x{}", hex::encode(fee_payer_signer.signature_bytes())),
+            },
+        }),
+    );
+
+    // ensure fee payer txns can be submitted into mempool by JSON format
     context
         .expect_status_code(202)
         .post("/transactions", resp)
@@ -1168,6 +1236,39 @@ async fn test_gas_estimation_cache() {
 async fn test_gas_estimation_disabled() {
     let mut node_config = NodeConfig::default();
     node_config.api.gas_estimation.enabled = false;
+    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+
+    let ctx = &mut context;
+    let creator = &mut ctx.gen_account();
+    let mint_txn = ctx.mint_user_account(creator).await;
+
+    // Include the mint txn in the first block
+    let mut block = vec![mint_txn];
+    // First block is ignored in gas estimate, so make 11
+    for _i in 0..11 {
+        fill_block(&mut block, ctx, creator).await;
+        ctx.commit_block(&block).await;
+        block.clear();
+    }
+
+    // It's disabled, so we always expect the default, despite the blocks being filled above
+    let resp = context.get("/estimate_gas_price").await;
+    for _i in 0..2 {
+        let cached = context.get("/estimate_gas_price").await;
+        assert_eq!(resp, cached);
+    }
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_gas_estimation_static_override() {
+    let mut node_config = NodeConfig::default();
+    node_config.api.gas_estimation.enabled = true;
+    node_config.api.gas_estimation.static_override = Some(GasEstimationStaticOverride {
+        low: 100,
+        market: 200,
+        aggressive: 300,
+    });
     let mut context = new_test_context_with_config(current_function_name!(), node_config);
 
     let ctx = &mut context;

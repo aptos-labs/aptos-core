@@ -62,6 +62,10 @@ pub enum DbMetadataKey {
     TransactionInfoPrunerProgress,
     TransactionPrunerProgress,
     WriteSetPrunerProgress,
+    StateMerkleShardPrunerProgress(ShardId),
+    EpochEndingStateMerkleShardPrunerProgress(ShardId),
+    StateKvShardPrunerProgress(ShardId),
+    StateMerkleShardRestoreProgress(ShardId, Version),
 }
 
 define_schema!(

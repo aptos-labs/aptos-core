@@ -353,6 +353,17 @@ impl Flags {
         }
     }
 
+    pub fn model_compilation() -> Self {
+        Self {
+            test: false,
+            verify: true,
+            shadow: true, // allows overlapping between sources and deps
+            flavor: "".to_string(),
+            bytecode_version: None,
+            keep_testing_functions: true,
+        }
+    }
+
     pub fn set_flavor(self, flavor: impl ToString) -> Self {
         Self {
             flavor: flavor.to_string(),

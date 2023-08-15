@@ -16,7 +16,7 @@ impl Test for PartialNodesDown {
 }
 
 impl NetworkTest for PartialNodesDown {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let runtime = Runtime::new()?;
         let duration = Duration::from_secs(120);
         let all_validators = ctx

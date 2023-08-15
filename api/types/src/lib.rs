@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::match_result_ok)] // Required to overcome the limitations of deriving Union
+
 mod account;
 mod address;
 mod block;
@@ -45,14 +47,14 @@ pub use table::{RawTableItemRequest, TableItemRequest};
 pub use transaction::{
     AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem,
     DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest, EntryFunctionPayload, Event,
-    GasEstimation, GasEstimationBcs, GenesisPayload, GenesisTransaction, ModuleBundlePayload,
-    MultiAgentSignature, MultiEd25519Signature, MultisigPayload, MultisigTransactionPayload,
-    PendingTransaction, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
-    TransactionData, TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
-    TransactionSignature, TransactionSigningMessage, TransactionsBatchSingleSubmissionFailure,
-    TransactionsBatchSubmissionResult, UserCreateSigningMessageRequest, UserTransaction,
-    UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
-    WriteSetPayload, WriteTableItem,
+    FeePayerSignature, GasEstimation, GasEstimationBcs, GenesisPayload, GenesisTransaction,
+    ModuleBundlePayload, MultiAgentSignature, MultiEd25519Signature, MultisigPayload,
+    MultisigTransactionPayload, PendingTransaction, ScriptPayload, ScriptWriteSet,
+    SubmitTransactionRequest, Transaction, TransactionData, TransactionId, TransactionInfo,
+    TransactionOnChainData, TransactionPayload, TransactionSignature, TransactionSigningMessage,
+    TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult,
+    UserCreateSigningMessageRequest, UserTransaction, UserTransactionRequest, VersionedEvent,
+    WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload, WriteTableItem,
 };
 pub use view::ViewRequest;
 pub use wrappers::{EventGuid, IdentifierWrapper, StateKeyWrapper};

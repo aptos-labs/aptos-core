@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: field `f` of struct `X::S` is private to its module
+   ┌─ tests/checking/typing/mutate_field_internal.move:13:16
+   │
+13 │         X::s().f = 0;
+   │                ^
+
+error: field `f` of struct `X::S` is private to its module
+   ┌─ tests/checking/typing/mutate_field_internal.move:15:11
+   │
+15 │         s.f = 0;
+   │           ^

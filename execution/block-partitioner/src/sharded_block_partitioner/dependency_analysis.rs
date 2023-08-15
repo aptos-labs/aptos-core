@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::types::TxnIndex;
-use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation};
+use aptos_types::{
+    block_executor::partitioner::TxnIndex,
+    transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
+};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,

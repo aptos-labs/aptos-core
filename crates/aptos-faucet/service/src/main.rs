@@ -30,3 +30,9 @@ async fn main() -> Result<()> {
 
     root_args.run_command().await
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
+}

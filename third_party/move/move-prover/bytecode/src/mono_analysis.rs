@@ -215,8 +215,7 @@ impl<'a> Analyzer<'a> {
 
         // Next do todo-list for regular functions, while self.inst_opt contains the
         // specific instantiation.
-        while !self.todo_funs.is_empty() {
-            let (fun, variant, inst) = self.todo_funs.pop().unwrap();
+        while let Some((fun, variant, inst)) = self.todo_funs.pop() {
             self.inst_opt = Some(inst);
             self.analyze_fun(
                 self.targets
@@ -243,8 +242,7 @@ impl<'a> Analyzer<'a> {
         }
 
         // Finally do spec functions, after all regular functions and axioms are done.
-        while !self.todo_spec_funs.is_empty() {
-            let (fun, inst) = self.todo_spec_funs.pop().unwrap();
+        while let Some((fun, inst)) = self.todo_spec_funs.pop() {
             self.inst_opt = Some(inst);
             self.analyze_spec_fun(fun);
             let inst = std::mem::take(&mut self.inst_opt).unwrap();
@@ -328,7 +326,7 @@ impl<'a> Analyzer<'a> {
 
                     // make sure these two types unify before trying to instantiate them
                     let adapter = TypeUnificationAdapter::new_pair(&lhs_ty, &rhs_ty, true, true);
-                    if adapter.unify(Variance::Allow, false).is_none() {
+                    if adapter.unify(Variance::SpecVariance, false).is_none() {
                         continue;
                     }
 
@@ -468,7 +466,7 @@ impl<'a> Analyzer<'a> {
             for ref ty in self.env.get_node_instantiation(node_id) {
                 self.add_type_root(ty);
             }
-            if let ExpData::Call(node_id, ast::Operation::Function(mid, fid, _), _) = e {
+            if let ExpData::Call(node_id, ast::Operation::SpecFunction(mid, fid, _), _) = e {
                 let actuals = self.instantiate_vec(&self.env.get_node_instantiation(*node_id));
                 let module = self.env.get_module(*mid);
                 let spec_fun = module.get_spec_fun(*fid);

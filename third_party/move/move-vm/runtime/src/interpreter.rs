@@ -1110,7 +1110,8 @@ fn check_ability(has_ability: bool) -> PartialVMResult<()> {
     } else {
         Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Paranoid Mode: Expected ability mismatch".to_string()),
+                .with_message("Paranoid Mode: Expected ability mismatch".to_string())
+                .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
         )
     }
 }
@@ -1936,7 +1937,7 @@ impl Frame {
                     Bytecode::ImmBorrowFieldGeneric(fi_idx)
                     | Bytecode::MutBorrowFieldGeneric(fi_idx) => {
                         let instr = match instruction {
-                            Bytecode::MutBorrowField(_) => S::MutBorrowFieldGeneric,
+                            Bytecode::MutBorrowFieldGeneric(_) => S::MutBorrowFieldGeneric,
                             _ => S::ImmBorrowFieldGeneric,
                         };
                         gas_meter.charge_simple_instr(instr)?;
@@ -2021,7 +2022,7 @@ impl Frame {
                             .push(Value::u16(integer_value.cast_u16()?))?;
                     },
                     Bytecode::CastU32 => {
-                        gas_meter.charge_simple_instr(S::CastU16)?;
+                        gas_meter.charge_simple_instr(S::CastU32)?;
                         let integer_value = interpreter.operand_stack.pop_as::<IntegerValue>()?;
                         interpreter
                             .operand_stack
@@ -2042,7 +2043,7 @@ impl Frame {
                             .push(Value::u128(integer_value.cast_u128()?))?;
                     },
                     Bytecode::CastU256 => {
-                        gas_meter.charge_simple_instr(S::CastU16)?;
+                        gas_meter.charge_simple_instr(S::CastU256)?;
                         let integer_value = interpreter.operand_stack.pop_as::<IntegerValue>()?;
                         interpreter
                             .operand_stack

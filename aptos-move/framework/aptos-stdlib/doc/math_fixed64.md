@@ -299,7 +299,8 @@ For functions that approximate a value it's useful to test a value is close
 to the most correct value up to last digit
 
 
-<pre><code><b>fun</b> <a href="math_fixed64.md#0x1_math_fixed64_assert_approx_the_same">assert_approx_the_same</a>(x: u256, y: u256, precission: u128)
+<pre><code>#[testonly]
+<b>fun</b> <a href="math_fixed64.md#0x1_math_fixed64_assert_approx_the_same">assert_approx_the_same</a>(x: u256, y: u256, precission: u128)
 </code></pre>
 
 
@@ -324,4 +325,4 @@ to the most correct value up to last digit
 </details>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

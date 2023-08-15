@@ -10,7 +10,7 @@
 /// The rank is stored in the property map, thus displayed in a wallet as a trait of the token.
 /// The token uri is the concatenation of the base uri and the rank, where the base uri is given
 /// as an argument of the minting function. So, the token uri changes when the rank changes.
-module token_objects::ambassador {
+module ambassador::ambassador {
     use std::error;
     use std::option;
     use std::string::{Self, String};
@@ -47,6 +47,7 @@ module token_objects::ambassador {
     const RANK_SILVER: vector<u8> = b"Silver";
     const RANK_BRONZE: vector<u8> = b"Bronze";
 
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The ambassador token
     struct AmbassadorToken has key {
         /// Used to mutate the token uri
@@ -61,6 +62,7 @@ module token_objects::ambassador {
         base_uri: String,
     }
 
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The ambassador level
     struct AmbassadorLevel has key {
         ambassador_level: u64,

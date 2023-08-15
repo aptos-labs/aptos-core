@@ -81,6 +81,12 @@ export function bcsSerializeU128(value: AnyNumber): Bytes {
   return serializer.getBytes();
 }
 
+export function bcsSerializeU256(value: AnyNumber): Bytes {
+  const serializer = new Serializer();
+  serializer.serializeU256(value);
+  return serializer.getBytes();
+}
+
 export function bcsSerializeBool(value: boolean): Bytes {
   const serializer = new Serializer();
   serializer.serializeBool(value);

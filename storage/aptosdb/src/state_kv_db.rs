@@ -27,6 +27,7 @@ pub const STATE_KV_METADATA_DB_NAME: &str = "state_kv_metadata_db";
 pub struct StateKvDb {
     state_kv_metadata_db: Arc<DB>,
     state_kv_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
+    enabled_sharding: bool,
 }
 
 impl StateKvDb {
@@ -38,11 +39,12 @@ impl StateKvDb {
         readonly: bool,
         ledger_db: Arc<DB>,
     ) -> Result<Self> {
-        if !rocksdb_configs.use_state_kv_db {
+        if !rocksdb_configs.split_ledger_db {
             info!("State K/V DB is not enabled!");
             return Ok(Self {
                 state_kv_metadata_db: Arc::clone(&ledger_db),
                 state_kv_db_shards: arr![Arc::clone(&ledger_db); 16],
+                enabled_sharding: false,
             });
         }
 
@@ -68,24 +70,19 @@ impl StateKvDb {
             "Opened state kv metadata db!"
         );
 
-        // TODO(grao): Support sharding here.
-        let sharding = false;
         let state_kv_db_shards = {
-            if sharding {
-                let mut shard_id: usize = 0;
-                arr![{
-                    let db = Self::open_shard(db_root_path.as_ref(), shard_id as u8, &state_kv_db_config, readonly)?;
-                    shard_id += 1;
-                    Arc::new(db)
-                }; 16]
-            } else {
-                arr![Arc::clone(&state_kv_metadata_db); 16]
-            }
+            let mut shard_id: usize = 0;
+            arr![{
+                let db = Self::open_shard(db_root_path.as_ref(), shard_id as u8, &state_kv_db_config, readonly)?;
+                shard_id += 1;
+                Arc::new(db)
+            }; 16]
         };
 
         let state_kv_db = Self {
             state_kv_metadata_db,
             state_kv_db_shards,
+            enabled_sharding: true,
         };
 
         if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
@@ -98,12 +95,15 @@ impl StateKvDb {
     pub(crate) fn commit(
         &self,
         version: Version,
+        state_kv_metadata_batch: SchemaBatch,
         sharded_state_kv_batches: [SchemaBatch; NUM_STATE_SHARDS],
     ) -> Result<()> {
         COMMIT_POOL.scope(|s| {
             let mut batches = sharded_state_kv_batches.into_iter();
             for shard_id in 0..NUM_STATE_SHARDS {
-                let state_kv_batch = batches.next().unwrap();
+                let state_kv_batch = batches
+                    .next()
+                    .expect("Not sufficient number of sharded state kv batches");
                 s.spawn(move |_| {
                     // TODO(grao): Consider propagating the error instead of panic, if necessary.
                     self.commit_single_shard(version, shard_id as u8, state_kv_batch)
@@ -112,12 +112,10 @@ impl StateKvDb {
             }
         });
 
-        self.write_progress(version)
-    }
+        self.state_kv_metadata_db
+            .write_schemas(state_kv_metadata_batch)?;
 
-    pub(crate) fn commit_raw_batch(&self, state_kv_batch: SchemaBatch) -> Result<()> {
-        // TODO(grao): Support sharding here.
-        self.state_kv_metadata_db.write_schemas(state_kv_batch)
+        self.write_progress(version)
     }
 
     pub(crate) fn write_progress(&self, version: Version) -> Result<()> {
@@ -150,16 +148,10 @@ impl StateKvDb {
             .metadata_db()
             .create_checkpoint(Self::metadata_db_path(cp_root_path.as_ref()))?;
 
-        let sharding = false;
-        if sharding {
-            for shard_id in 0..NUM_STATE_SHARDS {
-                state_kv_db
-                    .db_shard(shard_id as u8)
-                    .create_checkpoint(Self::db_shard_path(
-                        cp_root_path.as_ref(),
-                        shard_id as u8,
-                    ))?;
-            }
+        for shard_id in 0..NUM_STATE_SHARDS {
+            state_kv_db
+                .db_shard(shard_id as u8)
+                .create_checkpoint(Self::db_shard_path(cp_root_path.as_ref(), shard_id as u8))?;
         }
 
         Ok(())
@@ -171,6 +163,18 @@ impl StateKvDb {
 
     pub(crate) fn db_shard(&self, shard_id: u8) -> &DB {
         &self.state_kv_db_shards[shard_id as usize]
+    }
+
+    pub(crate) fn db_shard_arc(&self, shard_id: u8) -> Arc<DB> {
+        Arc::clone(&self.state_kv_db_shards[shard_id as usize])
+    }
+
+    pub(crate) fn enabled_sharding(&self) -> bool {
+        self.enabled_sharding
+    }
+
+    pub(crate) fn num_shards(&self) -> u8 {
+        NUM_STATE_SHARDS as u8
     }
 
     pub(crate) fn commit_single_shard(

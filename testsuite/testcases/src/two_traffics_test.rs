@@ -70,6 +70,7 @@ impl NetworkLoadTest for TwoTrafficsTest {
             &self.inner_success_criteria,
             report,
             &rate,
+            None,
             Some("inner traffic".to_string()),
         )?;
         Ok(())
@@ -77,7 +78,7 @@ impl NetworkLoadTest for TwoTrafficsTest {
 }
 
 impl NetworkTest for TwoTrafficsTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

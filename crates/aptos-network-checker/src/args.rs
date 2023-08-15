@@ -21,7 +21,7 @@ pub struct NodeAddressArgs {
 #[derive(Clone, Debug, Deserialize, Parser, Serialize)]
 pub struct HandshakeArgs {
     /// `NetworkId` of remote server interface
-    #[clap(long, default_value = "public")]
+    #[clap(long, default_value_t = NetworkId::Public)]
     #[serde(default)]
     pub network_id: NetworkId,
     /// Optional number of seconds to timeout attempting to connect to endpoint

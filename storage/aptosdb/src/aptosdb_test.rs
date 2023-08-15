@@ -3,10 +3,7 @@
 
 use crate::{
     get_first_seq_num_and_limit,
-    pruner::{
-        ledger_pruner_manager::LedgerPrunerManager,
-        state_merkle_pruner_manager::StateMerklePrunerManager,
-    },
+    pruner::{LedgerPrunerManager, StateMerklePrunerManager},
     test_helper,
     test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
     AptosDB, PrunerManager, StaleNodeIndexSchema,
@@ -288,6 +285,7 @@ proptest! {
 
     #[test]
     fn test_state_merkle_pruning(input in arb_blocks_to_commit()) {
+        aptos_logger::Logger::new().init();
         test_state_merkle_pruning_impl(input);
     }
 }

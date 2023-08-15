@@ -43,8 +43,10 @@ use aptos_network::{
 };
 use aptos_storage_interface::mock::MockDbReaderWriter;
 use aptos_types::{
-    account_address::AccountAddress, mempool_status::MempoolStatusCode,
-    on_chain_config::OnChainConfigPayload, transaction::SignedTransaction,
+    account_address::AccountAddress,
+    mempool_status::MempoolStatusCode,
+    on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
+    transaction::SignedTransaction,
 };
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use futures::{channel::oneshot, SinkExt};
@@ -453,7 +455,12 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
             peers_and_metadata,
         ) = setup_node_networks(&network_ids);
         let (mempool_client_sender, consensus_to_mempool_sender, mempool_notifications, mempool) =
-            setup_mempool(config, network_client, network_service_events);
+            setup_mempool(
+                config,
+                network_client,
+                network_service_events,
+                peers_and_metadata.clone(),
+            );
 
         MempoolNode {
             node_id,
@@ -539,7 +546,8 @@ fn setup_network(
         PeerManagerRequestSender::new(reqs_outbound_sender),
         ConnectionRequestSender::new(connection_outbound_sender),
     );
-    let network_events = NetworkEvents::new(reqs_inbound_receiver, connection_inbound_receiver);
+    let network_events =
+        NetworkEvents::new(reqs_inbound_receiver, connection_inbound_receiver, None);
 
     (
         network_sender,
@@ -565,6 +573,7 @@ fn setup_mempool(
     config: NodeConfig,
     network_client: NetworkClient<MempoolSyncMsg>,
     network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (
     MempoolClientSender,
     futures::channel::mpsc::Sender<QuorumStoreRequest>,
@@ -588,7 +597,10 @@ fn setup_mempool(
     reconfig_sender
         .push((), ReconfigNotification {
             version: 1,
-            on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
+            on_chain_configs: OnChainConfigPayload::new(
+                1,
+                InMemoryOnChainConfig::new(HashMap::new()),
+            ),
         })
         .unwrap();
 
@@ -605,6 +617,7 @@ fn setup_mempool(
         db_ro,
         vm_validator,
         vec![sender],
+        peers_and_metadata,
     );
 
     (

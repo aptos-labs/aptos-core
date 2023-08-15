@@ -48,6 +48,10 @@ impl LedgerInfo {
         self.ledger_version.into()
     }
 
+    pub fn oldest_version(&self) -> u64 {
+        self.oldest_ledger_version.into()
+    }
+
     pub fn timestamp(&self) -> u64 {
         self.ledger_timestamp.into()
     }

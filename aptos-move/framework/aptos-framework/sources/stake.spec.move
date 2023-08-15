@@ -27,6 +27,13 @@ spec aptos_framework::stake {
     // Function specifications
     // -----------------------
 
+    spec initialize_validator_fees(aptos_framework: &signer) {
+        let aptos_addr = signer::address_of(aptos_framework);
+        aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
+        aborts_if exists<ValidatorFees>(aptos_addr);
+        ensures exists<ValidatorFees>(aptos_addr);
+    }
+
     // `Validator` is initialized once.
     spec initialize(aptos_framework: &signer) {
         let aptos_addr = signer::address_of(aptos_framework);

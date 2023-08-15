@@ -1,0 +1,85 @@
+
+Diagnostics:
+error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:19:16
+   │
+19 │         _f2: S<&u64>,
+   │                ^^^^
+
+error: invalid type instantiation `(u64, u64)`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:21:16
+   │
+21 │         _f4: S<(u64, u64)>,
+   │                ^^^^^^^^^^
+
+error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:24:11
+   │
+24 │         S<&u64>,
+   │           ^^^^
+
+error: invalid type instantiation `(u64, u64)`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:26:11
+   │
+26 │         S<(u64, u64)>,
+   │           ^^^^^^^^^^
+
+error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:12:15
+   │
+12 │         f2: S<&u64>,
+   │               ^^^^
+
+error: invalid type instantiation `(u64, u64)`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:14:15
+   │
+14 │         f4: S<(u64, u64)>,
+   │               ^^^^^^^^^^
+
+error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:28:9
+   │
+28 │         abort 0
+   │         ^^^^^^^
+
+error: invalid type instantiation `(u64, u64)`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:28:9
+   │
+28 │         abort 0
+   │         ^^^^^^^
+
+error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:33:19
+   │
+33 │         let f2: S<&u64> = abort 0;
+   │                   ^^^^
+
+error: invalid type instantiation `(u64, u64)`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:35:19
+   │
+35 │         let f4: S<(u64, u64)> = abort 0;
+   │                   ^^^^^^^^^^
+
+error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:38:14
+   │
+38 │         id<S<&u64>>(abort 0);
+   │              ^^^^
+
+error: invalid type instantiation `(u64, u64)`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:40:14
+   │
+40 │         id<S<(u64, u64)>>(abort 0);
+   │              ^^^^^^^^^^
+
+error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:43:13
+   │
+43 │         S<S<&u64>> { f: abort 0 };
+   │             ^^^^
+
+error: invalid type instantiation `(u64, u64)`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:45:13
+   │
+45 │         S<S<(u64, u64)>> { f: abort 0 };
+   │             ^^^^^^^^^^

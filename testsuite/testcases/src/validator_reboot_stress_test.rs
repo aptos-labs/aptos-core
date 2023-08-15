@@ -61,7 +61,7 @@ impl NetworkLoadTest for ValidatorRebootStressTest {
 }
 
 impl NetworkTest for ValidatorRebootStressTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

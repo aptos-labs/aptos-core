@@ -11,6 +11,8 @@ spec aptos_framework::account {
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
         aborts_if exists<OriginatingAddress>(aptos_addr);
         ensures exists<OriginatingAddress>(aptos_addr);
+        // TODO: an compiler error is occur when using table::new()
+        //ensures global<OriginatingAddress>(aptos_addr).address_map == table::new();
     }
 
     /// Check if the bytes of the new address is 32.
@@ -20,6 +22,7 @@ spec aptos_framework::account {
         include CreateAccountAbortsIf {addr: new_address};
         aborts_if new_address == @vm_reserved || new_address == @aptos_framework || new_address == @aptos_token;
         ensures signer::address_of(result) == new_address;
+        ensures exists<Account>(new_address);
     }
 
     /// Check if the bytes of the new address is 32.
@@ -27,6 +30,11 @@ spec aptos_framework::account {
     spec create_account_unchecked(new_address: address): signer {
         include CreateAccountAbortsIf {addr: new_address};
         ensures signer::address_of(result) == new_address;
+        ensures exists<Account>(new_address);
+    }
+
+    spec exists_at {
+        aborts_if false;
     }
 
     spec schema CreateAccountAbortsIf {
@@ -34,6 +42,7 @@ spec aptos_framework::account {
         let authentication_key = bcs::to_bytes(addr);
         aborts_if len(authentication_key) != 32;
         aborts_if exists<Account>(addr);
+        ensures len(authentication_key) == 32;
     }
 
     spec get_guid_next_creation_num(addr: address): u64 {
@@ -102,6 +111,7 @@ spec aptos_framework::account {
             challenge
         );
         aborts_if scheme != ED25519_SCHEME && scheme != MULTI_ED25519_SCHEME;
+        ensures scheme == ED25519_SCHEME || scheme == MULTI_ED25519_SCHEME;
     }
 
     /// The Account existed under the signer
@@ -152,21 +162,25 @@ spec aptos_framework::account {
             scheme: to_scheme,
             public_key_bytes: to_public_key_bytes,
             signature: cap_update_table,
-            challenge: challenge,
+            challenge,
         };
 
-        // let new_auth_key = spec_assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, challenge);
+        // Verify all properties in update_auth_key_and_originating_address_table
+        let originating_addr = addr;
+        let new_auth_key_vector = spec_assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, challenge);
 
-        // TODO: boogie error: Error: invalid type for argument 0 in application of $1_from_bcs_deserializable'address': int (expected: Vec int).
-        // include UpdateAuthKeyAndOriginatingAddressTableAbortsIf{
-        //     originating_addr: addr,
-        //     account_resource: account_resource,
-        //     new_auth_key_vector: new_auth_key
-        // };
-        pragma aborts_if_is_partial;
+        let address_map = global<OriginatingAddress>(@aptos_framework).address_map;
+        let new_auth_key = from_bcs::deserialize<address>(new_auth_key_vector);
 
-        modifies global<Account>(addr);
-        modifies global<OriginatingAddress>(@aptos_framework);
+        aborts_if !exists<OriginatingAddress>(@aptos_framework);
+        aborts_if !from_bcs::deserializable<address>(account_resource.authentication_key);
+        aborts_if table::spec_contains(address_map, curr_auth_key) &&
+            table::spec_get(address_map, curr_auth_key) != originating_addr;
+
+        aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
+
+        aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
+
     }
 
     spec rotate_authentication_key_with_rotation_capability(
@@ -195,10 +209,20 @@ spec aptos_framework::account {
             signature: cap_update_table,
             challenge: challenge,
         };
-        // let new_auth_key = spec_assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, challenge);
-        // TODO: Need to investigate the issue of including UpdateAuthKeyAndOriginatingAddressTableAbortsIf here.
-        // TODO: boogie error: Error: invalid type for argument 0 in application of $1_from_bcs_deserializable'address': int (expected: Vec int).
-        pragma aborts_if_is_partial;
+
+        let new_auth_key_vector = spec_assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, challenge);
+        let address_map = global<OriginatingAddress>(@aptos_framework).address_map;
+
+        // Verify all properties in update_auth_key_and_originating_address_table
+        aborts_if !exists<OriginatingAddress>(@aptos_framework);
+        aborts_if !from_bcs::deserializable<address>(offerer_account_resource.authentication_key);
+        aborts_if table::spec_contains(address_map, curr_auth_key) &&
+            table::spec_get(address_map, curr_auth_key) != rotation_cap_offerer_address;
+
+        aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
+        let new_auth_key = from_bcs::deserialize<address>(new_auth_key_vector);
+
+        aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
     }
 
     spec offer_rotation_capability(
@@ -309,6 +333,16 @@ spec aptos_framework::account {
         aborts_if len(account_resource.signer_capability_offer.for.vec) == 0;
     }
 
+    spec is_rotation_capability_offered(account_addr: address): bool {
+        aborts_if !exists<Account>(account_addr);
+    }
+
+    spec get_rotation_capability_offer_for(account_addr: address): address {
+        aborts_if !exists<Account>(account_addr);
+        let account_resource = global<Account>(account_addr);
+        aborts_if len(account_resource.rotation_capability_offer.for.vec) == 0;
+    }
+
     /// The Account existed under the signer.
     /// The value of signer_capability_offer.for of Account resource under the signer is to_be_revoked_address.
     spec revoke_signer_capability(account: &signer, to_be_revoked_address: address) {
@@ -385,6 +419,8 @@ spec aptos_framework::account {
         aborts_if len(ZERO_AUTH_KEY) != 32;
         include exists_at(resource_addr) ==> CreateResourceAccountAbortsIf;
         include !exists_at(resource_addr) ==> CreateAccountAbortsIf {addr: resource_addr};
+
+        ensures signer::address_of(result_1) == resource_addr;
     }
 
     /// Check if the bytes of the new address is 32.
@@ -418,6 +454,7 @@ spec aptos_framework::account {
             account: account_signer,
         };
         modifies global<Account>(addr);
+        ensures global<Account>(addr).guid_creation_num == old(global<Account>(addr).guid_creation_num) + 1;
     }
 
     /// The Account existed under the signer.
@@ -473,6 +510,8 @@ spec aptos_framework::account {
             table::spec_get(address_map, curr_auth_key) != originating_addr;
         aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
         aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
+
+        ensures table::spec_contains(global<OriginatingAddress>(@aptos_framework).address_map, from_bcs::deserialize<address>(new_auth_key_vector));
     }
 
     spec verify_signed_message<T: drop>(
@@ -482,7 +521,40 @@ spec aptos_framework::account {
         signed_message_bytes: vector<u8>,
         message: T,
     ) {
-        pragma verify = false;
+        pragma aborts_if_is_partial;
+
         modifies global<Account>(account);
+        let account_resource = global<Account>(account);
+        aborts_if !exists<Account>(account);
+
+        include account_scheme == ED25519_SCHEME ==> ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key };
+        aborts_if account_scheme == ED25519_SCHEME && ({
+            let expected_auth_key = ed25519::spec_public_key_bytes_to_authentication_key(account_public_key);
+            account_resource.authentication_key != expected_auth_key
+        });
+
+        include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key };
+        aborts_if account_scheme == MULTI_ED25519_SCHEME && ({
+            let expected_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key);
+            account_resource.authentication_key != expected_auth_key
+        });
+
+        include account_scheme == ED25519_SCHEME ==> ed25519::NewSignatureFromBytesAbortsIf { bytes: signed_message_bytes };
+        // TODO: compiler error with message T
+        // aborts_if account_scheme == ED25519_SCHEME && !ed25519::spec_signature_verify_strict_t(
+        //     ed25519::Signature { bytes: signed_message_bytes },
+        //     ed25519::UnvalidatedPublicKey { bytes: account_public_key },
+        //     message
+        // );
+
+        include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewSignatureFromBytesAbortsIf { bytes: signed_message_bytes };
+        // TODO: compiler error with message T
+        // aborts_if account_scheme == MULTI_ED25519_SCHEME && !multi_ed25519::spec_signature_verify_strict_t(
+        //     multi_ed25519::Signature { bytes: signed_message_bytes },
+        //     multi_ed25519::UnvalidatedPublicKey { bytes: account_public_key },
+        //     message
+        // );
+
+        aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
     }
 }

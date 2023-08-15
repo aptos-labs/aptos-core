@@ -69,6 +69,12 @@ load_test:
     txn_expiration_time_secs: 30
     # -- Whether to submit transactions through validator REST API
     use_validators: false
+    # -- If true, run $numFullnodeGroups parallel load tests
+    use_pfns: true
+    # -- Default 20k * $duration
+    expected_max_txns: 6000000
+    max_transactions_per_account: 5
+    transaction_type: coin-transfer
 
 serviceAccount:
   # -- Specifies whether a service account should be created

@@ -21,7 +21,7 @@ import {
   Uint16,
   Uint256,
 } from "../bcs";
-import { TransactionAuthenticator } from "./authenticator";
+import { AccountAuthenticator, TransactionAuthenticator, TransactionAuthenticatorMultiAgent } from "./authenticator";
 import { Identifier } from "./identifier";
 import { TypeTag } from "./type_tag";
 import { AccountAddress } from "./account_address";
@@ -294,8 +294,7 @@ export class ModuleId {
 
   /**
    * Converts a string literal to a ModuleId
-   * @param moduleId String literal in format "AccountAddress::module_name",
-   *   e.g. "0x1::coin"
+   * @param moduleId String literal in format "AccountAddress::module_name", e.g. "0x1::coin"
    * @returns
    */
   static fromStr(moduleId: string): ModuleId {
@@ -372,6 +371,8 @@ export abstract class RawTransactionWithData {
     switch (index) {
       case 0:
         return MultiAgentRawTransaction.load(deserializer);
+      case 1:
+        return FeePayerRawTransaction.load(deserializer);
       default:
         throw new Error(`Unknown variant index for RawTransactionWithData: ${index}`);
     }
@@ -398,6 +399,32 @@ export class MultiAgentRawTransaction extends RawTransactionWithData {
     const secondarySignerAddresses = deserializeVector(deserializer, AccountAddress);
 
     return new MultiAgentRawTransaction(rawTxn, secondarySignerAddresses);
+  }
+}
+
+export class FeePayerRawTransaction extends RawTransactionWithData {
+  constructor(
+    public readonly raw_txn: RawTransaction,
+    public readonly secondary_signer_addresses: Seq<AccountAddress>,
+    public readonly fee_payer_address: AccountAddress,
+  ) {
+    super();
+  }
+
+  serialize(serializer: Serializer): void {
+    // enum variant index
+    serializer.serializeU32AsUleb128(1);
+    this.raw_txn.serialize(serializer);
+    serializeVector<TransactionArgument>(this.secondary_signer_addresses, serializer);
+    this.fee_payer_address.serialize(serializer);
+  }
+
+  static load(deserializer: Deserializer): FeePayerRawTransaction {
+    const rawTxn = RawTransaction.deserialize(deserializer);
+    const secondarySignerAddresses = deserializeVector(deserializer, AccountAddress);
+    const feePayerAddress = AccountAddress.deserialize(deserializer);
+
+    return new FeePayerRawTransaction(rawTxn, secondarySignerAddresses, feePayerAddress);
   }
 }
 

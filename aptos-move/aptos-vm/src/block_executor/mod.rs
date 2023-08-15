@@ -21,11 +21,14 @@ use aptos_block_executor::{
         Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
     },
+    txn_commit_hook::TransactionCommitHook,
 };
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
+    contract_event::ContractEvent,
     executable::ExecutableTestType,
+    fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
     write_set::WriteOp,
@@ -38,13 +41,14 @@ use rayon::{prelude::*, ThreadPool};
 use std::sync::Arc;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
+    type Event = ContractEvent;
     type Key = StateKey;
     type Value = WriteOp;
 }
 
 // Wrapper to avoid orphan rule
 #[derive(Debug)]
-pub(crate) struct AptosTransactionOutput {
+pub struct AptosTransactionOutput {
     vm_output: Mutex<Option<VMOutput>>,
     committed_output: OnceCell<TransactionOutput>,
 }
@@ -57,6 +61,10 @@ impl AptosTransactionOutput {
         }
     }
 
+    pub(crate) fn committed_output(&self) -> &TransactionOutput {
+        self.committed_output.get().unwrap()
+    }
+
     fn take_output(mut self) -> TransactionOutput {
         match self.committed_output.take() {
             Some(output) => output,
@@ -65,7 +73,7 @@ impl AptosTransactionOutput {
                 .lock()
                 .take()
                 .expect("Output must be set")
-                .output_with_delta_writes(vec![]),
+                .into_transaction_output_with_materialized_deltas(vec![]),
         }
     }
 }
@@ -85,8 +93,8 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output to be set to get writes")
-            .write_set()
-            .iter()
+            .change_set()
+            .write_set_iter()
             .map(|(key, op)| (key.clone(), op.clone()))
             .collect()
     }
@@ -98,10 +106,23 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output to be set to get deltas")
-            .delta_change_set()
+            .change_set()
+            .aggregator_delta_set()
             .iter()
             .map(|(key, op)| (key.clone(), *op))
             .collect()
+    }
+
+    /// Should never be called after incorporate_delta_writes, as it
+    /// will consume vm_output to prepare an output with deltas.
+    fn get_events(&self) -> Vec<ContractEvent> {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get events")
+            .change_set()
+            .events()
+            .to_vec()
     }
 
     /// Can be called (at most) once after transaction is committed to internally
@@ -114,30 +135,46 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                         .lock()
                         .take()
                         .expect("Output must be set to combine with deltas")
-                        .output_with_delta_writes(delta_writes),
+                        .into_transaction_output_with_materialized_deltas(delta_writes),
                 )
                 .is_ok(),
             "Could not combine VMOutput with deltas"
         );
     }
 
-    /// Return the amount of gas consumed by the transaction.
-    fn gas_used(&self) -> u64 {
-        self.committed_output
-            .get()
-            .map_or(0, |output| output.gas_used())
+    /// Return the fee statement of the transaction.
+    /// Should never be called after vm_output is consumed.
+    fn fee_statement(&self) -> FeeStatement {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get fee statement")
+            .fee_statement()
+            .clone()
     }
 }
 
 pub struct BlockAptosVM();
 
 impl BlockAptosVM {
-    pub fn execute_block<S: StateView + Sync>(
+    fn verify_transactions(transactions: Vec<Transaction>) -> Vec<PreprocessedTransaction> {
+        transactions
+            .into_par_iter()
+            .with_min_len(25)
+            .map(preprocess_transaction::<AptosVM>)
+            .collect()
+    }
+
+    pub fn execute_block<
+        S: StateView + Sync,
+        L: TransactionCommitHook<Output = AptosTransactionOutput>,
+    >(
         executor_thread_pool: Arc<ThreadPool>,
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
+        transaction_commit_listener: Option<L>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         // Verify the signatures of all the transactions in parallel.
@@ -146,14 +183,8 @@ impl BlockAptosVM {
         // TODO: state sync runs this code but doesn't need to verify signatures
         let signature_verification_timer =
             BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
-        let signature_verified_block: Vec<PreprocessedTransaction> =
-            executor_thread_pool.install(|| {
-                transactions
-                    .into_par_iter()
-                    .with_min_len(25)
-                    .map(preprocess_transaction::<AptosVM>)
-                    .collect()
-            });
+        let signature_verified_block =
+            executor_thread_pool.install(|| Self::verify_transactions(transactions));
         drop(signature_verification_timer);
 
         let num_txns = signature_verified_block.len();
@@ -168,11 +199,13 @@ impl BlockAptosVM {
             PreprocessedTransaction,
             AptosExecutorTask<S>,
             S,
+            L,
             ExecutableTestType,
         >::new(
             concurrency_level,
             executor_thread_pool,
             maybe_block_gas_limit,
+            transaction_commit_listener,
         );
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);

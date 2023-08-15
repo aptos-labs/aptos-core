@@ -64,7 +64,8 @@ A Map for typed key to value mapping, the contract using it
 should keep track of what keys are what types, and parse them accordingly.
 
 
-<pre><code><b>struct</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> <b>has</b> drop, key
+<pre><code>#[resource_group_member(#[group = <a href="../../aptos-framework/doc/object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<b>struct</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> <b>has</b> drop, key
 </code></pre>
 
 
@@ -1211,4 +1212,4 @@ Removes a property from the map, ensuring that it does in fact exist
 </details>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

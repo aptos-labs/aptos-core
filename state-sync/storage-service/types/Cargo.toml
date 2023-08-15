@@ -25,3 +25,4 @@ thiserror = { workspace = true }
 [dev-dependencies]
 claims = { workspace = true }
 proptest = { workspace = true }
+rand = { workspace = true }

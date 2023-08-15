@@ -1,6 +1,6 @@
 import * as Types from './types';
 
-export type CurrentTokenOwnershipFieldsFragment = { __typename?: 'current_token_ownerships_v2', token_standard: string, is_fungible_v2?: boolean | null, is_soulbound_v2?: boolean | null, property_version_v1: any, table_type_v1?: string | null, token_properties_mutated_v1?: any | null, amount: any, last_transaction_timestamp: any, last_transaction_version: any, storage_id: string, owner_address: string, current_token_data?: { __typename?: 'current_token_datas_v2', token_name: string, token_data_id: string, token_uri: string, token_properties: any, supply: any, maximum?: any | null, last_transaction_version: any, last_transaction_timestamp: any, largest_property_version_v1?: any | null, current_collection?: { __typename?: 'current_collections_v2', collection_name: string, creator_address: string, description: string, uri: string, collection_id: string, last_transaction_version: any, current_supply: any, mutable_description?: boolean | null, total_minted_v2?: any | null, table_handle_v1?: string | null, mutable_uri?: boolean | null } | null } | null };
+export type CurrentTokenOwnershipFieldsFragment = { __typename?: 'current_token_ownerships_v2', token_standard: string, token_properties_mutated_v1?: any | null, token_data_id: string, table_type_v1?: string | null, storage_id: string, property_version_v1: any, owner_address: string, last_transaction_version: any, last_transaction_timestamp: any, is_soulbound_v2?: boolean | null, is_fungible_v2?: boolean | null, amount: any, current_token_data?: { __typename?: 'current_token_datas_v2', collection_id: string, description: string, is_fungible_v2?: boolean | null, largest_property_version_v1?: any | null, last_transaction_timestamp: any, last_transaction_version: any, maximum?: any | null, supply: any, token_data_id: string, token_name: string, token_properties: any, token_standard: string, token_uri: string, current_collection?: { __typename?: 'current_collections_v2', collection_id: string, collection_name: string, creator_address: string, current_supply: any, description: string, last_transaction_timestamp: any, last_transaction_version: any, max_supply?: any | null, mutable_description?: boolean | null, mutable_uri?: boolean | null, table_handle_v1?: string | null, token_standard: string, total_minted_v2?: any | null, uri: string } | null } | null };
 
 export type GetAccountCoinsDataQueryVariables = Types.Exact<{
   owner_address?: Types.InputMaybe<Types.Scalars['String']>;
@@ -9,7 +9,7 @@ export type GetAccountCoinsDataQueryVariables = Types.Exact<{
 }>;
 
 
-export type GetAccountCoinsDataQuery = { __typename?: 'query_root', current_coin_balances: Array<{ __typename?: 'current_coin_balances', amount: any, coin_type: string, coin_info?: { __typename?: 'coin_infos', name: string, decimals: number, symbol: string } | null }> };
+export type GetAccountCoinsDataQuery = { __typename?: 'query_root', current_coin_balances: Array<{ __typename?: 'current_coin_balances', amount: any, coin_type: string, coin_type_hash: string, last_transaction_timestamp: any, last_transaction_version: any, owner_address: string, coin_info?: { __typename?: 'coin_infos', coin_type: string, coin_type_hash: string, creator_address: string, decimals: number, name: string, supply_aggregator_table_handle?: string | null, supply_aggregator_table_key?: string | null, symbol: string, transaction_created_timestamp: any, transaction_version_created: any } | null }> };
 
 export type GetAccountCurrentTokensQueryVariables = Types.Exact<{
   address: Types.Scalars['String'];
@@ -25,45 +25,50 @@ export type TokenDataFieldsFragment = { __typename?: 'current_token_datas', crea
 export type CollectionDataFieldsFragment = { __typename?: 'current_collection_datas', metadata_uri: string, supply: any, description: string, collection_name: string, collection_data_id_hash: string, table_handle: string, creator_address: string };
 
 export type GetAccountTokensCountQueryVariables = Types.Exact<{
-  owner_address?: Types.InputMaybe<Types.Scalars['String']>;
+  where_condition?: Types.InputMaybe<Types.Current_Token_Ownerships_V2_Bool_Exp>;
+  offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
 }>;
 
 
-export type GetAccountTokensCountQuery = { __typename?: 'query_root', current_token_ownerships_aggregate: { __typename?: 'current_token_ownerships_aggregate', aggregate?: { __typename?: 'current_token_ownerships_aggregate_fields', count: number } | null } };
+export type GetAccountTokensCountQuery = { __typename?: 'query_root', current_token_ownerships_v2_aggregate: { __typename?: 'current_token_ownerships_v2_aggregate', aggregate?: { __typename?: 'current_token_ownerships_v2_aggregate_fields', count: number } | null } };
 
 export type GetAccountTransactionsCountQueryVariables = Types.Exact<{
   address?: Types.InputMaybe<Types.Scalars['String']>;
 }>;
 
 
-export type GetAccountTransactionsCountQuery = { __typename?: 'query_root', move_resources_aggregate: { __typename?: 'move_resources_aggregate', aggregate?: { __typename?: 'move_resources_aggregate_fields', count: number } | null } };
+export type GetAccountTransactionsCountQuery = { __typename?: 'query_root', account_transactions_aggregate: { __typename?: 'account_transactions_aggregate', aggregate?: { __typename?: 'account_transactions_aggregate_fields', count: number } | null } };
 
 export type GetAccountTransactionsDataQueryVariables = Types.Exact<{
-  address?: Types.InputMaybe<Types.Scalars['String']>;
-  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  where_condition: Types.Account_Transactions_Bool_Exp;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.Account_Transactions_Order_By> | Types.Account_Transactions_Order_By>;
 }>;
 
 
-export type GetAccountTransactionsDataQuery = { __typename?: 'query_root', move_resources: Array<{ __typename?: 'move_resources', transaction_version: any }> };
+export type GetAccountTransactionsDataQuery = { __typename?: 'query_root', account_transactions: Array<{ __typename?: 'account_transactions', transaction_version: any, account_address: string, token_activities_v2: Array<{ __typename?: 'token_activities_v2', after_value?: string | null, before_value?: string | null, entry_function_id_str?: string | null, event_account_address: string, event_index: any, from_address?: string | null, is_fungible_v2?: boolean | null, property_version_v1: any, to_address?: string | null, token_amount: any, token_data_id: string, token_standard: string, transaction_timestamp: any, transaction_version: any, type: string }> }> };
 
 export type GetCollectionDataQueryVariables = Types.Exact<{
   where_condition: Types.Current_Collections_V2_Bool_Exp;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
   limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.Current_Collections_V2_Order_By> | Types.Current_Collections_V2_Order_By>;
 }>;
 
 
-export type GetCollectionDataQuery = { __typename?: 'query_root', current_collections_v2: Array<{ __typename?: 'current_collections_v2', collection_id: string, token_standard: string, collection_name: string, creator_address: string, current_supply: any, description: string, uri: string }> };
+export type GetCollectionDataQuery = { __typename?: 'query_root', current_collections_v2: Array<{ __typename?: 'current_collections_v2', collection_id: string, collection_name: string, creator_address: string, current_supply: any, description: string, last_transaction_timestamp: any, last_transaction_version: any, max_supply?: any | null, mutable_description?: boolean | null, mutable_uri?: boolean | null, table_handle_v1?: string | null, token_standard: string, total_minted_v2?: any | null, uri: string }> };
 
 export type GetCollectionsWithOwnedTokensQueryVariables = Types.Exact<{
   where_condition: Types.Current_Collection_Ownership_V2_View_Bool_Exp;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
   limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.Current_Collection_Ownership_V2_View_Order_By> | Types.Current_Collection_Ownership_V2_View_Order_By>;
 }>;
 
 
-export type GetCollectionsWithOwnedTokensQuery = { __typename?: 'query_root', current_collection_ownership_v2_view: Array<{ __typename?: 'current_collection_ownership_v2_view', distinct_tokens?: any | null, last_transaction_version?: any | null, current_collection?: { __typename?: 'current_collections_v2', creator_address: string, collection_name: string, token_standard: string, collection_id: string, description: string, table_handle_v1?: string | null, uri: string, total_minted_v2?: any | null, max_supply?: any | null } | null }> };
+export type GetCollectionsWithOwnedTokensQuery = { __typename?: 'query_root', current_collection_ownership_v2_view: Array<{ __typename?: 'current_collection_ownership_v2_view', collection_id?: string | null, collection_name?: string | null, collection_uri?: string | null, creator_address?: string | null, distinct_tokens?: any | null, last_transaction_version?: any | null, owner_address?: string | null, single_token_uri?: string | null, current_collection?: { __typename?: 'current_collections_v2', collection_id: string, collection_name: string, creator_address: string, current_supply: any, description: string, last_transaction_timestamp: any, last_transaction_version: any, mutable_description?: boolean | null, max_supply?: any | null, mutable_uri?: boolean | null, table_handle_v1?: string | null, token_standard: string, total_minted_v2?: any | null, uri: string } | null }> };
 
 export type GetDelegatedStakingActivitiesQueryVariables = Types.Exact<{
   delegatorAddress?: Types.InputMaybe<Types.Scalars['String']>;
@@ -83,56 +88,84 @@ export type GetNumberOfDelegatorsQueryVariables = Types.Exact<{
 }>;
 
 
-export type GetNumberOfDelegatorsQuery = { __typename?: 'query_root', num_active_delegator_per_pool: Array<{ __typename?: 'num_active_delegator_per_pool', num_active_delegator?: any | null }> };
+export type GetNumberOfDelegatorsQuery = { __typename?: 'query_root', num_active_delegator_per_pool: Array<{ __typename?: 'num_active_delegator_per_pool', num_active_delegator?: any | null, pool_address?: string | null }> };
 
 export type GetOwnedTokensQueryVariables = Types.Exact<{
   where_condition: Types.Current_Token_Ownerships_V2_Bool_Exp;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
   limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.Current_Token_Ownerships_V2_Order_By> | Types.Current_Token_Ownerships_V2_Order_By>;
 }>;
 
 
-export type GetOwnedTokensQuery = { __typename?: 'query_root', current_token_ownerships_v2: Array<{ __typename?: 'current_token_ownerships_v2', token_standard: string, is_fungible_v2?: boolean | null, is_soulbound_v2?: boolean | null, property_version_v1: any, table_type_v1?: string | null, token_properties_mutated_v1?: any | null, amount: any, last_transaction_timestamp: any, last_transaction_version: any, storage_id: string, owner_address: string, current_token_data?: { __typename?: 'current_token_datas_v2', token_name: string, token_data_id: string, token_uri: string, token_properties: any, supply: any, maximum?: any | null, last_transaction_version: any, last_transaction_timestamp: any, largest_property_version_v1?: any | null, current_collection?: { __typename?: 'current_collections_v2', collection_name: string, creator_address: string, description: string, uri: string, collection_id: string, last_transaction_version: any, current_supply: any, mutable_description?: boolean | null, total_minted_v2?: any | null, table_handle_v1?: string | null, mutable_uri?: boolean | null } | null } | null }> };
+export type GetOwnedTokensQuery = { __typename?: 'query_root', current_token_ownerships_v2: Array<{ __typename?: 'current_token_ownerships_v2', token_standard: string, token_properties_mutated_v1?: any | null, token_data_id: string, table_type_v1?: string | null, storage_id: string, property_version_v1: any, owner_address: string, last_transaction_version: any, last_transaction_timestamp: any, is_soulbound_v2?: boolean | null, is_fungible_v2?: boolean | null, amount: any, current_token_data?: { __typename?: 'current_token_datas_v2', collection_id: string, description: string, is_fungible_v2?: boolean | null, largest_property_version_v1?: any | null, last_transaction_timestamp: any, last_transaction_version: any, maximum?: any | null, supply: any, token_data_id: string, token_name: string, token_properties: any, token_standard: string, token_uri: string, current_collection?: { __typename?: 'current_collections_v2', collection_id: string, collection_name: string, creator_address: string, current_supply: any, description: string, last_transaction_timestamp: any, last_transaction_version: any, max_supply?: any | null, mutable_description?: boolean | null, mutable_uri?: boolean | null, table_handle_v1?: string | null, token_standard: string, total_minted_v2?: any | null, uri: string } | null } | null }> };
 
-export type GetTokenActivitiesQueryVariables = Types.Exact<{
-  idHash: Types.Scalars['String'];
+export type GetOwnedTokensByTokenDataQueryVariables = Types.Exact<{
+  where_condition: Types.Current_Token_Ownerships_V2_Bool_Exp;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
   limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.Current_Token_Ownerships_V2_Order_By> | Types.Current_Token_Ownerships_V2_Order_By>;
 }>;
 
 
-export type GetTokenActivitiesQuery = { __typename?: 'query_root', token_activities: Array<{ __typename?: 'token_activities', creator_address: string, collection_name: string, name: string, token_data_id_hash: string, collection_data_id_hash: string, from_address?: string | null, to_address?: string | null, transaction_version: any, transaction_timestamp: any, property_version: any, transfer_type: string, event_sequence_number: any, token_amount: any }> };
+export type GetOwnedTokensByTokenDataQuery = { __typename?: 'query_root', current_token_ownerships_v2: Array<{ __typename?: 'current_token_ownerships_v2', token_standard: string, token_properties_mutated_v1?: any | null, token_data_id: string, table_type_v1?: string | null, storage_id: string, property_version_v1: any, owner_address: string, last_transaction_version: any, last_transaction_timestamp: any, is_soulbound_v2?: boolean | null, is_fungible_v2?: boolean | null, amount: any, current_token_data?: { __typename?: 'current_token_datas_v2', collection_id: string, description: string, is_fungible_v2?: boolean | null, largest_property_version_v1?: any | null, last_transaction_timestamp: any, last_transaction_version: any, maximum?: any | null, supply: any, token_data_id: string, token_name: string, token_properties: any, token_standard: string, token_uri: string, current_collection?: { __typename?: 'current_collections_v2', collection_id: string, collection_name: string, creator_address: string, current_supply: any, description: string, last_transaction_timestamp: any, last_transaction_version: any, max_supply?: any | null, mutable_description?: boolean | null, mutable_uri?: boolean | null, table_handle_v1?: string | null, token_standard: string, total_minted_v2?: any | null, uri: string } | null } | null }> };
+
+export type GetTokenActivitiesQueryVariables = Types.Exact<{
+  where_condition: Types.Token_Activities_V2_Bool_Exp;
+  offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.Token_Activities_V2_Order_By> | Types.Token_Activities_V2_Order_By>;
+}>;
+
+
+export type GetTokenActivitiesQuery = { __typename?: 'query_root', token_activities_v2: Array<{ __typename?: 'token_activities_v2', after_value?: string | null, before_value?: string | null, entry_function_id_str?: string | null, event_account_address: string, event_index: any, from_address?: string | null, is_fungible_v2?: boolean | null, property_version_v1: any, to_address?: string | null, token_amount: any, token_data_id: string, token_standard: string, transaction_timestamp: any, transaction_version: any, type: string }> };
 
 export type GetTokenActivitiesCountQueryVariables = Types.Exact<{
   token_id?: Types.InputMaybe<Types.Scalars['String']>;
 }>;
 
 
-export type GetTokenActivitiesCountQuery = { __typename?: 'query_root', token_activities_aggregate: { __typename?: 'token_activities_aggregate', aggregate?: { __typename?: 'token_activities_aggregate_fields', count: number } | null } };
+export type GetTokenActivitiesCountQuery = { __typename?: 'query_root', token_activities_v2_aggregate: { __typename?: 'token_activities_v2_aggregate', aggregate?: { __typename?: 'token_activities_v2_aggregate_fields', count: number } | null } };
 
-export type GetTokenDataQueryVariables = Types.Exact<{
-  token_id?: Types.InputMaybe<Types.Scalars['String']>;
+export type GetTokenCurrentOwnerDataQueryVariables = Types.Exact<{
+  where_condition: Types.Current_Token_Ownerships_V2_Bool_Exp;
+  offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.Current_Token_Ownerships_V2_Order_By> | Types.Current_Token_Ownerships_V2_Order_By>;
 }>;
 
 
-export type GetTokenDataQuery = { __typename?: 'query_root', current_token_datas: Array<{ __typename?: 'current_token_datas', token_data_id_hash: string, name: string, collection_name: string, creator_address: string, default_properties: any, largest_property_version: any, maximum: any, metadata_uri: string, payee_address: string, royalty_points_denominator: any, royalty_points_numerator: any, supply: any }> };
+export type GetTokenCurrentOwnerDataQuery = { __typename?: 'query_root', current_token_ownerships_v2: Array<{ __typename?: 'current_token_ownerships_v2', token_standard: string, token_properties_mutated_v1?: any | null, token_data_id: string, table_type_v1?: string | null, storage_id: string, property_version_v1: any, owner_address: string, last_transaction_version: any, last_transaction_timestamp: any, is_soulbound_v2?: boolean | null, is_fungible_v2?: boolean | null, amount: any, current_token_data?: { __typename?: 'current_token_datas_v2', collection_id: string, description: string, is_fungible_v2?: boolean | null, largest_property_version_v1?: any | null, last_transaction_timestamp: any, last_transaction_version: any, maximum?: any | null, supply: any, token_data_id: string, token_name: string, token_properties: any, token_standard: string, token_uri: string, current_collection?: { __typename?: 'current_collections_v2', collection_id: string, collection_name: string, creator_address: string, current_supply: any, description: string, last_transaction_timestamp: any, last_transaction_version: any, max_supply?: any | null, mutable_description?: boolean | null, mutable_uri?: boolean | null, table_handle_v1?: string | null, token_standard: string, total_minted_v2?: any | null, uri: string } | null } | null }> };
+
+export type GetTokenDataQueryVariables = Types.Exact<{
+  where_condition?: Types.InputMaybe<Types.Current_Token_Datas_V2_Bool_Exp>;
+  offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.Current_Token_Datas_V2_Order_By> | Types.Current_Token_Datas_V2_Order_By>;
+}>;
+
+
+export type GetTokenDataQuery = { __typename?: 'query_root', current_token_datas_v2: Array<{ __typename?: 'current_token_datas_v2', collection_id: string, description: string, is_fungible_v2?: boolean | null, largest_property_version_v1?: any | null, last_transaction_timestamp: any, last_transaction_version: any, maximum?: any | null, supply: any, token_data_id: string, token_name: string, token_properties: any, token_standard: string, token_uri: string, current_collection?: { __typename?: 'current_collections_v2', collection_id: string, collection_name: string, creator_address: string, current_supply: any, description: string, last_transaction_timestamp: any, last_transaction_version: any, max_supply?: any | null, mutable_description?: boolean | null, mutable_uri?: boolean | null, table_handle_v1?: string | null, token_standard: string, total_minted_v2?: any | null, uri: string } | null }> };
 
 export type GetTokenOwnedFromCollectionQueryVariables = Types.Exact<{
   where_condition: Types.Current_Token_Ownerships_V2_Bool_Exp;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
   limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.Current_Token_Ownerships_V2_Order_By> | Types.Current_Token_Ownerships_V2_Order_By>;
 }>;
 
 
-export type GetTokenOwnedFromCollectionQuery = { __typename?: 'query_root', current_token_ownerships_v2: Array<{ __typename?: 'current_token_ownerships_v2', token_standard: string, is_fungible_v2?: boolean | null, is_soulbound_v2?: boolean | null, property_version_v1: any, table_type_v1?: string | null, token_properties_mutated_v1?: any | null, amount: any, last_transaction_timestamp: any, last_transaction_version: any, storage_id: string, owner_address: string, current_token_data?: { __typename?: 'current_token_datas_v2', token_name: string, token_data_id: string, token_uri: string, token_properties: any, supply: any, maximum?: any | null, last_transaction_version: any, last_transaction_timestamp: any, largest_property_version_v1?: any | null, current_collection?: { __typename?: 'current_collections_v2', collection_name: string, creator_address: string, description: string, uri: string, collection_id: string, last_transaction_version: any, current_supply: any, mutable_description?: boolean | null, total_minted_v2?: any | null, table_handle_v1?: string | null, mutable_uri?: boolean | null } | null } | null }> };
+export type GetTokenOwnedFromCollectionQuery = { __typename?: 'query_root', current_token_ownerships_v2: Array<{ __typename?: 'current_token_ownerships_v2', token_standard: string, token_properties_mutated_v1?: any | null, token_data_id: string, table_type_v1?: string | null, storage_id: string, property_version_v1: any, owner_address: string, last_transaction_version: any, last_transaction_timestamp: any, is_soulbound_v2?: boolean | null, is_fungible_v2?: boolean | null, amount: any, current_token_data?: { __typename?: 'current_token_datas_v2', collection_id: string, description: string, is_fungible_v2?: boolean | null, largest_property_version_v1?: any | null, last_transaction_timestamp: any, last_transaction_version: any, maximum?: any | null, supply: any, token_data_id: string, token_name: string, token_properties: any, token_standard: string, token_uri: string, current_collection?: { __typename?: 'current_collections_v2', collection_id: string, collection_name: string, creator_address: string, current_supply: any, description: string, last_transaction_timestamp: any, last_transaction_version: any, max_supply?: any | null, mutable_description?: boolean | null, mutable_uri?: boolean | null, table_handle_v1?: string | null, token_standard: string, total_minted_v2?: any | null, uri: string } | null } | null }> };
 
 export type GetTokenOwnersDataQueryVariables = Types.Exact<{
-  token_id?: Types.InputMaybe<Types.Scalars['String']>;
-  property_version?: Types.InputMaybe<Types.Scalars['numeric']>;
+  where_condition: Types.Current_Token_Ownerships_V2_Bool_Exp;
+  offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.Current_Token_Ownerships_V2_Order_By> | Types.Current_Token_Ownerships_V2_Order_By>;
 }>;
 
 
-export type GetTokenOwnersDataQuery = { __typename?: 'query_root', current_token_ownerships: Array<{ __typename?: 'current_token_ownerships', owner_address: string }> };
+export type GetTokenOwnersDataQuery = { __typename?: 'query_root', current_token_ownerships_v2: Array<{ __typename?: 'current_token_ownerships_v2', token_standard: string, token_properties_mutated_v1?: any | null, token_data_id: string, table_type_v1?: string | null, storage_id: string, property_version_v1: any, owner_address: string, last_transaction_version: any, last_transaction_timestamp: any, is_soulbound_v2?: boolean | null, is_fungible_v2?: boolean | null, amount: any, current_token_data?: { __typename?: 'current_token_datas_v2', collection_id: string, description: string, is_fungible_v2?: boolean | null, largest_property_version_v1?: any | null, last_transaction_timestamp: any, last_transaction_version: any, maximum?: any | null, supply: any, token_data_id: string, token_name: string, token_properties: any, token_standard: string, token_uri: string, current_collection?: { __typename?: 'current_collections_v2', collection_id: string, collection_name: string, creator_address: string, current_supply: any, description: string, last_transaction_timestamp: any, last_transaction_version: any, max_supply?: any | null, mutable_description?: boolean | null, mutable_uri?: boolean | null, table_handle_v1?: string | null, token_standard: string, total_minted_v2?: any | null, uri: string } | null } | null }> };
 
 export type GetTopUserTransactionsQueryVariables = Types.Exact<{
   limit?: Types.InputMaybe<Types.Scalars['Int']>;
@@ -142,10 +175,13 @@ export type GetTopUserTransactionsQueryVariables = Types.Exact<{
 export type GetTopUserTransactionsQuery = { __typename?: 'query_root', user_transactions: Array<{ __typename?: 'user_transactions', version: any }> };
 
 export type GetUserTransactionsQueryVariables = Types.Exact<{
-  limit?: Types.InputMaybe<Types.Scalars['Int']>;
-  start_version?: Types.InputMaybe<Types.Scalars['bigint']>;
+  where_condition: Types.User_Transactions_Bool_Exp;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.User_Transactions_Order_By> | Types.User_Transactions_Order_By>;
 }>;
 
 
 export type GetUserTransactionsQuery = { __typename?: 'query_root', user_transactions: Array<{ __typename?: 'user_transactions', version: any }> };
+
+export type TokenActivitiesFieldsFragment = { __typename?: 'token_activities_v2', after_value?: string | null, before_value?: string | null, entry_function_id_str?: string | null, event_account_address: string, event_index: any, from_address?: string | null, is_fungible_v2?: boolean | null, property_version_v1: any, to_address?: string | null, token_amount: any, token_data_id: string, token_standard: string, transaction_timestamp: any, transaction_version: any, type: string };

@@ -17,7 +17,7 @@ For development environment setup and first build, see [Building Aptos From Sour
 
 ### Code Style, Hints, and Testing
 
-Refer to our Coding Guidelines for the [Move](./developer-docs-site/docs/guides/move-guides/book/coding-conventions.md) and [Rust](./developer-docs-site/docs/contribute/rust-coding-guidelines.md) programming languages for detailed guidance about how to contribute to the project.
+Refer to our Coding Guidelines for the [Move](./developer-docs-site/docs/move/book/coding-conventions.md) and [Rust](./developer-docs-site/docs/contribute/rust-coding-guidelines.md) programming languages for detailed guidance about how to contribute to the project.
 
 ### Documentation
 

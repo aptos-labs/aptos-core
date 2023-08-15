@@ -461,7 +461,7 @@ async fn test_continuous_stream_epoch_change_retry() {
 }
 
 #[tokio::test]
-async fn test_continuous_stream_subscription_retry() {
+async fn test_continuous_stream_optimistic_fetch_retry() {
     // Create a test streaming service config
     let max_request_retry = 3;
     let max_concurrent_requests = 3;
@@ -529,25 +529,25 @@ async fn test_continuous_stream_subscription_retry() {
         };
         assert_eq!(client_request, expected_request);
 
-        // Set a timeout response for the subscription request and process it
+        // Set a timeout response for the optimistic fetch request and process it
         set_timeout_response_in_queue(&mut data_stream, 0);
         process_data_responses(&mut data_stream, &global_data_summary).await;
         assert_none!(stream_listener.select_next_some().now_or_never());
 
         // Handle multiple timeouts and retries because no new data is known
-        // about, so the best we can do is send subscriptions
+        // about, so the best we can do is send optimistic fetches
         for _ in 0..max_request_retry * 3 {
             // Set a timeout response for the request and process it
             set_timeout_response_in_queue(&mut data_stream, 0);
             process_data_responses(&mut data_stream, &global_data_summary).await;
 
-            // Verify the same subscription request was resent to the network
+            // Verify the same optimistic fetch request was resent to the network
             let new_client_request = get_pending_client_request(&mut data_stream, 0);
             assert_eq!(new_client_request, client_request);
         }
 
-        // Set a subscription response in the queue and process it
-        set_subscription_response_in_queue(
+        // Set an optimistic fetch response in the queue and process it
+        set_optimistic_fetch_response_in_queue(
             &mut data_stream,
             0,
             MAX_ADVERTISED_TRANSACTION + 1,
@@ -555,7 +555,7 @@ async fn test_continuous_stream_subscription_retry() {
         );
         process_data_responses(&mut data_stream, &global_data_summary).await;
 
-        // Verify another subscription request is now sent (for data beyond the previous target)
+        // Verify another optimistic fetch request is now sent (for data beyond the previous target)
         let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
         assert_eq!(sent_requests.as_ref().unwrap().len(), 1);
         let client_request = get_pending_client_request(&mut data_stream, 0);
@@ -583,12 +583,12 @@ async fn test_continuous_stream_subscription_retry() {
         };
         assert_eq!(client_request, expected_request);
 
-        // Set a timeout response for the subscription request and process it.
+        // Set a timeout response for the optimistic fetch request and process it.
         // This will cause the same request to be re-sent.
         set_timeout_response_in_queue(&mut data_stream, 0);
         process_data_responses(&mut data_stream, &global_data_summary).await;
 
-        // Set a timeout response for the subscription request and process it,
+        // Set a timeout response for the optimistic fetch request and process it,
         // but this time the node knows about new data to fetch.
         set_timeout_response_in_queue(&mut data_stream, 0);
         let mut new_global_data_summary = global_data_summary.clone();
@@ -635,11 +635,11 @@ async fn test_continuous_stream_subscription_retry() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_continuous_stream_subscription_timeout() {
+async fn test_continuous_stream_optimistic_fetch_timeout() {
     // Create a test data client config
-    let subscription_timeout_ms = 2022;
+    let optimistic_fetch_timeout_ms = 2022;
     let data_client_config = AptosDataClientConfig {
-        subscription_timeout_ms,
+        optimistic_fetch_timeout_ms,
         ..Default::default()
     };
 
@@ -688,7 +688,7 @@ async fn test_continuous_stream_subscription_timeout() {
         .await;
 
         // Handle multiple timeouts and retries because no new data is known
-        // about, so the best we can do is send subscriptions
+        // about, so the best we can do is send optimistic fetch requests.
         for _ in 0..3 {
             set_timeout_response_in_queue(&mut data_stream, 0);
             process_data_responses(&mut data_stream, &global_data_summary).await;
@@ -1138,9 +1138,9 @@ fn set_state_value_response_in_queue(
     pending_response.lock().client_response = client_response;
 }
 
-/// Sets the client response at the index in the pending queue to contain a
-/// subscription data response.
-fn set_subscription_response_in_queue(
+/// Sets the client response at the index in the pending queue to contain
+/// an optimistic fetch response.
+fn set_optimistic_fetch_response_in_queue(
     data_stream: &mut DataStream<MockAptosDataClient>,
     index: usize,
     single_data_version: u64,
@@ -1291,7 +1291,7 @@ fn get_pending_client_request(
     client_request
 }
 
-/// Waits for a subscription notification along the given
+/// Waits for an optimistic fetch notification along the given
 /// listener and continues to drive progress until one is received.
 /// Verifies the notification when it is received.
 async fn wait_for_notification_and_verify(
@@ -1299,15 +1299,15 @@ async fn wait_for_notification_and_verify(
     stream_listener: &mut DataStreamListener,
     transaction_syncing: bool,
     allow_transactions_or_outputs: bool,
-    subscription_notification: bool,
+    optimistic_fetch_notification: bool,
     global_data_summary: &GlobalDataSummary,
 ) {
     loop {
         if let Ok(data_notification) =
             timeout(Duration::from_secs(1), stream_listener.select_next_some()).await
         {
-            if subscription_notification {
-                // Verify we got the correct subscription data
+            if optimistic_fetch_notification {
+                // Verify we got the correct optimistic fetch data
                 match data_notification.data_payload {
                     DataPayload::ContinuousTransactionsWithProof(..) => {
                         assert!(allow_transactions_or_outputs || transaction_syncing);

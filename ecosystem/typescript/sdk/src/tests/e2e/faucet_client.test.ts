@@ -33,15 +33,11 @@ test(
     expect((accountResource!.data as { coin: { value: string } }).coin.value).toBe("10000000");
 
     const account2 = new AptosAccount();
-    await faucetClient.fundAccount(account2.address(), 0);
-    resources = await client.getAccountResources(account2.address());
-    accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as { coin: { value: string } }).coin.value).toBe("0");
 
     const payload: Gen.TransactionPayload_EntryFunctionPayload = {
       type: "entry_function_payload",
-      function: "0x1::coin::transfer",
-      type_arguments: ["0x1::aptos_coin::AptosCoin"],
+      function: "0x1::aptos_account::transfer",
+      type_arguments: [],
       arguments: [account2.address().hex(), 717],
     };
 

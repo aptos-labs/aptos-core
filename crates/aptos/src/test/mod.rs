@@ -22,8 +22,8 @@ use crate::{
         utils::write_to_file,
     },
     governance::{
-        CompileScriptFunction, ProposalSubmissionSummary, SubmitProposal, SubmitVote,
-        VerifyProposal, VerifyProposalResponse,
+        CompileScriptFunction, ProposalSubmissionSummary, SubmitProposal, SubmitProposalArgs,
+        SubmitVote, SubmitVoteArgs, VerifyProposal, VerifyProposalResponse,
     },
     move_tool::{
         ArgWithType, CompilePackage, DownloadPackage, FrameworkPackageArgs, IncludedArtifacts,
@@ -224,7 +224,7 @@ impl CliTestFramework {
     pub async fn fund_account(&self, index: usize, amount: Option<u64>) -> CliTypedResult<String> {
         FundWithFaucet {
             profile_options: Default::default(),
-            account: self.account_id(index),
+            account: Some(self.account_id(index)),
             faucet_options: self.faucet_options(),
             amount: amount.unwrap_or(DEFAULT_FUNDED_COINS),
             rest_options: self.rest_options(),
@@ -1036,6 +1036,7 @@ impl CliTestFramework {
 
     pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageDir {
         MovePackageDir {
+            dev: true,
             package_dir: Some(self.move_dir()),
             output_dir: None,
             named_addresses: Self::named_addresses(account_strs),
@@ -1130,21 +1131,23 @@ impl CliTestFramework {
         is_multi_step: bool,
     ) -> CliTypedResult<ProposalSubmissionSummary> {
         SubmitProposal {
-            #[cfg(feature = "no-upload-proposal")]
-            metadata_path: None,
-            metadata_url: Url::parse(metadata_url).unwrap(),
             pool_address_args: PoolAddressArgs { pool_address },
-            txn_options: self.transaction_options(index, None),
-            is_multi_step,
-            compile_proposal_args: CompileScriptFunction {
-                script_path: Some(script_path),
-                compiled_script_path: None,
-                framework_package_args: FrameworkPackageArgs {
-                    framework_git_rev: None,
-                    framework_local_dir: Some(Self::aptos_framework_dir()),
-                    skip_fetch_latest_git_deps: false,
+            args: SubmitProposalArgs {
+                #[cfg(feature = "no-upload-proposal")]
+                metadata_path: None,
+                metadata_url: Url::parse(metadata_url).unwrap(),
+                txn_options: self.transaction_options(index, None),
+                is_multi_step,
+                compile_proposal_args: CompileScriptFunction {
+                    script_path: Some(script_path),
+                    compiled_script_path: None,
+                    framework_package_args: FrameworkPackageArgs {
+                        framework_git_rev: None,
+                        framework_local_dir: Some(Self::aptos_framework_dir()),
+                        skip_fetch_latest_git_deps: false,
+                    },
+                    bytecode_version: None,
                 },
-                bytecode_version: None,
             },
         }
         .execute()
@@ -1160,11 +1163,14 @@ impl CliTestFramework {
         pool_addresses: Vec<AccountAddress>,
     ) {
         SubmitVote {
-            proposal_id,
-            yes,
-            no,
             pool_addresses,
-            txn_options: self.transaction_options(index, None),
+            args: SubmitVoteArgs {
+                proposal_id,
+                yes,
+                no,
+                voting_power: None,
+                txn_options: self.transaction_options(index, None),
+            },
         }
         .execute()
         .await

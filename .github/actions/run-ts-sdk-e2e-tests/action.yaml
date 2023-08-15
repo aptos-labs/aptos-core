@@ -1,0 +1,68 @@
+name: "Run SDK E2E tests"
+description: |
+  Run the SDK E2E tests against a local testnet built from a particular release branch
+inputs:
+  BRANCH:
+    description: "The branch to use for running the local testnet"
+    required: true
+  GCP_DOCKER_ARTIFACT_REPO:
+    description: "The GCP Docker artifact repository"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Install node and pnpm.
+    - uses: actions/setup-node@969bd2663942d722d85b6a8626225850c2f7be4b # pin@v3
+      with:
+        node-version-file: .node-version
+        registry-url: "https://registry.npmjs.org"
+    - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
+
+    # Find a docker image to use for the testnet.
+    - uses: ./.github/actions/get-latest-docker-image-tag
+      id: get-docker-image-tag
+      with:
+        branch: ${{ inputs.BRANCH }}
+
+    # Set up the necessary env vars for the test suite.
+    - run: echo "DOCKER_IMAGE=${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}" >>.env
+      shell: bash
+      working-directory: ./ecosystem/typescript/sdk
+    - run: echo "APTOS_NODE_URL=http://127.0.0.1:8080/v1" >> .env
+      shell: bash
+      working-directory: ./ecosystem/typescript/sdk
+    - run: echo "APTOS_FAUCET_URL=http://127.0.0.1:8081" >> .env
+      shell: bash
+      working-directory: ./ecosystem/typescript/sdk
+    - run: echo "ANS_TEST_ACCOUNT_PRIVATE_KEY=0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a17e13ba163e20221" >> .env
+      shell: bash
+      working-directory: ./ecosystem/typescript/sdk
+    - run: echo "ANS_TEST_ACCOUNT_ADDRESS=585fc9f0f0c54183b039ffc770ca282ebd87307916c215a3e692f2f8e4305e82" >> .env
+      shell: bash
+      working-directory: ./ecosystem/typescript/sdk
+
+    # Run package install. If install fails, it probably means the updated lockfile was
+    # not included in the commit.
+    - run: pnpm install --frozen-lockfile
+      shell: bash
+      working-directory: ./ecosystem/typescript/sdk
+
+    # Run a local testnet.
+    - uses: ./.github/actions/run-local-testnet
+      with:
+        IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
+        GCP_DOCKER_ARTIFACT_REPO: ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+
+    # Run the TS SDK tests.
+    - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+      name: sdk-pnpm-test
+      env:
+        # This is important, it ensures that the tempdir we create for cloning the ANS
+        # repo and mounting it into the CLI container is created in a location that
+        # actually supports mounting. Learn more here: https://stackoverflow.com/a/76523941/3846032.
+        TMPDIR: ${{ runner.temp }}
+      with:
+        max_attempts: 3
+        timeout_minutes: 25
+        command: cd ./ecosystem/typescript/sdk && pnpm run test:ci

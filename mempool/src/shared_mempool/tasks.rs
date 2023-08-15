@@ -26,7 +26,7 @@ use aptos_network::application::interface::NetworkClientInterface;
 use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
 use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
-    on_chain_config::{OnChainConfigPayload, OnChainConsensusConfig},
+    on_chain_config::{OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig},
     transaction::SignedTransaction,
     vm_status::{DiscardedVMStatus, StatusCode},
 };
@@ -70,7 +70,7 @@ pub(crate) async fn execute_broadcast<NetworkClient, TransactionValidator>(
                 .peer(&peer)
                 .error(&error)),
                 _ => {
-                    trace!("{:?}", err)
+                    debug!("{:?}", err)
                 },
             }
         }
@@ -545,13 +545,19 @@ pub(crate) fn process_committed_transactions(
     block_timestamp_usecs: u64,
 ) {
     let mut pool = mempool.lock();
+    let block_timestamp = Duration::from_micros(block_timestamp_usecs);
 
     for transaction in transactions {
+        pool.log_commit_transaction(
+            &transaction.sender,
+            transaction.sequence_number,
+            block_timestamp,
+        );
         pool.commit_transaction(&transaction.sender, transaction.sequence_number);
     }
 
     if block_timestamp_usecs > 0 {
-        pool.gc_by_expiration_time(Duration::from_micros(block_timestamp_usecs));
+        pool.gc_by_expiration_time(block_timestamp);
     }
 }
 
@@ -572,19 +578,20 @@ pub(crate) fn process_rejected_transactions(
 }
 
 /// Processes on-chain reconfiguration notifications.  Restarts validator with the new info.
-pub(crate) async fn process_config_update<V>(
-    config_update: OnChainConfigPayload,
+pub(crate) async fn process_config_update<V, P>(
+    config_update: OnChainConfigPayload<P>,
     validator: Arc<RwLock<V>>,
     broadcast_within_validator_network: Arc<RwLock<bool>>,
 ) where
     V: TransactionValidation,
+    P: OnChainConfigProvider,
 {
-    info!(
-        LogSchema::event_log(LogEntry::ReconfigUpdate, LogEvent::Process)
-            .reconfig_update(config_update.clone())
-    );
+    info!(LogSchema::event_log(
+        LogEntry::ReconfigUpdate,
+        LogEvent::Process
+    ));
 
-    if let Err(e) = validator.write().restart(config_update.clone()) {
+    if let Err(e) = validator.write().restart() {
         counters::VM_RECONFIG_UPDATE_FAIL_COUNT.inc();
         error!(LogSchema::event_log(LogEntry::ReconfigUpdate, LogEvent::VMUpdateFail).error(&e));
     }

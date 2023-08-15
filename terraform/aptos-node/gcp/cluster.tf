@@ -53,8 +53,7 @@ resource "google_container_cluster" "aptos" {
   }
 
   network_policy {
-    enabled  = true
-    provider = "CALICO"
+    enabled = false
   }
 
   cluster_autoscaling {

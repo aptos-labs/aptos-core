@@ -51,7 +51,6 @@ use bcs::Result;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
 use futures::FutureExt;
-use hex::FromHex;
 use rand::{rngs::StdRng, SeedableRng};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -121,7 +120,7 @@ pub struct OperatorConfigFileArgs {
     /// Operator Configuration file
     ///
     /// Config file created from the `genesis set-validator-configuration` command
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) operator_config_file: Option<PathBuf>,
 }
 
@@ -142,13 +141,13 @@ pub struct ValidatorConsensusKeyArgs {
     /// Hex encoded Consensus public key
     ///
     /// The key should be a BLS12-381 public key
-    #[clap(long, parse(try_from_str = bls12381::PublicKey::from_encoded_string))]
+    #[clap(long, value_parser = bls12381::PublicKey::from_encoded_string)]
     pub(crate) consensus_public_key: Option<bls12381::PublicKey>,
 
     /// Hex encoded Consensus proof of possession
     ///
     /// The key should be a BLS12-381 proof of possession
-    #[clap(long, parse(try_from_str = bls12381::ProofOfPossession::from_encoded_string))]
+    #[clap(long, value_parser = bls12381::ProofOfPossession::from_encoded_string)]
     pub(crate) proof_of_possession: Option<bls12381::ProofOfPossession>,
 }
 
@@ -196,7 +195,7 @@ pub struct ValidatorNetworkAddressesArgs {
     pub(crate) validator_host: Option<HostAndPort>,
 
     /// Validator x25519 public network key
-    #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
+    #[clap(long, value_parser = x25519::PublicKey::from_encoded_string)]
     pub(crate) validator_network_public_key: Option<x25519::PublicKey>,
 
     /// Host and port pair for the fullnode
@@ -206,7 +205,7 @@ pub struct ValidatorNetworkAddressesArgs {
     pub(crate) full_node_host: Option<HostAndPort>,
 
     /// Full node x25519 public network key
-    #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
+    #[clap(long, value_parser = x25519::PublicKey::from_encoded_string)]
     pub(crate) full_node_network_public_key: Option<x25519::PublicKey>,
 }
 
@@ -308,7 +307,7 @@ pub struct StakePoolResult {
 #[derive(Parser)]
 pub struct GetStakePool {
     /// The owner address of the stake pool
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) owner_address: AccountAddress,
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
@@ -854,27 +853,36 @@ pub struct ValidatorSetSummary {
     pub total_joining_power: u128,
 }
 
+impl ValidatorSetSummary {
+    fn convert_to_summary_vec(
+        validator_info: Vec<ValidatorInfo>,
+    ) -> Result<Vec<ValidatorInfoSummary>, bcs::Error> {
+        let mut validators: Vec<ValidatorInfoSummary> = vec![];
+        for validator in validator_info.iter() {
+            match validator.try_into() {
+                Ok(validator) => validators.push(validator),
+                Err(err) => return Err(err),
+            }
+        }
+        Ok(validators)
+    }
+}
+
 impl TryFrom<&ValidatorSet> for ValidatorSetSummary {
     type Error = bcs::Error;
 
     fn try_from(set: &ValidatorSet) -> Result<Self, Self::Error> {
+        let active_validators: Vec<ValidatorInfoSummary> =
+            Self::convert_to_summary_vec(set.active_validators.clone())?;
+        let pending_inactive: Vec<ValidatorInfoSummary> =
+            Self::convert_to_summary_vec(set.pending_inactive.clone())?;
+        let pending_active: Vec<ValidatorInfoSummary> =
+            Self::convert_to_summary_vec(set.pending_active.clone())?;
         Ok(ValidatorSetSummary {
             scheme: set.scheme,
-            active_validators: set
-                .active_validators
-                .iter()
-                .filter_map(|validator| validator.try_into().ok())
-                .collect(),
-            pending_inactive: set
-                .pending_inactive
-                .iter()
-                .filter_map(|validator| validator.try_into().ok())
-                .collect(),
-            pending_active: set
-                .pending_active
-                .iter()
-                .filter_map(|validator| validator.try_into().ok())
-                .collect(),
+            active_validators,
+            pending_inactive,
+            pending_active,
             total_voting_power: set.total_voting_power,
             total_joining_power: set.total_joining_power,
         })
@@ -977,11 +985,17 @@ impl ValidatorConfig {
     }
 
     pub fn fullnode_network_addresses(&self) -> Result<Vec<NetworkAddress>, bcs::Error> {
-        bcs::from_bytes(&self.fullnode_network_addresses)
+        match &self.validator_network_addresses.is_empty() {
+            true => Ok(vec![]),
+            false => bcs::from_bytes(&self.fullnode_network_addresses),
+        }
     }
 
     pub fn validator_network_addresses(&self) -> Result<Vec<NetworkAddress>, bcs::Error> {
-        bcs::from_bytes(&self.validator_network_addresses)
+        match &self.validator_network_addresses.is_empty() {
+            true => Ok(vec![]),
+            false => bcs::from_bytes(&self.validator_network_addresses),
+        }
     }
 }
 
@@ -1009,7 +1023,6 @@ impl TryFrom<&ValidatorConfig> for ValidatorConfigSummary {
         };
         Ok(ValidatorConfigSummary {
             consensus_public_key,
-            // TODO: We should handle if some of these are not parsable
             validator_network_addresses: config.validator_network_addresses()?,
             fullnode_network_addresses: config.fullnode_network_addresses()?,
             validator_index: config.validator_index,
@@ -1048,26 +1061,26 @@ pub struct RunLocalTestnet {
     ///
     /// If provided, the config will be used, and any needed configuration for the local testnet
     /// will override the config's values
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     config_path: Option<PathBuf>,
 
     /// The directory to save all files for the node
     ///
     /// Defaults to .aptos/testnet
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     test_dir: Option<PathBuf>,
 
     /// Path to node configuration file override for local test mode.
     ///
     /// If provided, the default node config will be overridden by the config in the given file.
     /// Cannot be used with --config-path
-    #[clap(long, parse(from_os_str), conflicts_with("config-path"))]
+    #[clap(long, value_parser, conflicts_with("config_path"))]
     test_config_override: Option<PathBuf>,
 
     /// Random seed for key generation in test mode
     ///
     /// This allows you to have deterministic keys for testing
-    #[clap(long, parse(try_from_str = FromHex::from_hex))]
+    #[clap(long, value_parser = aptos_node::load_seed)]
     seed: Option<[u8; 32]>,
 
     /// Clean the state and start with a new chain at genesis
@@ -1352,7 +1365,7 @@ pub struct AnalyzeValidatorPerformance {
     /// First epoch to analyze
     ///
     /// Defaults to the first epoch
-    #[clap(long, default_value = "-2")]
+    #[clap(long, default_value_t = -2)]
     pub start_epoch: i64,
 
     /// Last epoch to analyze
@@ -1362,13 +1375,13 @@ pub struct AnalyzeValidatorPerformance {
     pub end_epoch: Option<i64>,
 
     /// Analyze mode for the validator: [All, DetailedEpochTable, ValidatorHealthOverTime, NetworkHealthOverTime]
-    #[clap(arg_enum, long)]
+    #[clap(value_enum, ignore_case = true, long)]
     pub(crate) analyze_mode: AnalyzeMode,
 
     /// Filter of stake pool addresses to analyze
     ///
     /// Defaults to all stake pool addresses
-    #[clap(long, multiple_values = true, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, num_args = 0.., value_parser = crate::common::types::load_account_arg)]
     pub pool_addresses: Vec<AccountAddress>,
 
     #[clap(flatten)]
@@ -1377,7 +1390,7 @@ pub struct AnalyzeValidatorPerformance {
     pub(crate) profile_options: ProfileOptions,
 }
 
-#[derive(PartialEq, Eq, clap::ArgEnum, Clone)]
+#[derive(PartialEq, Eq, clap::ValueEnum, Clone)]
 pub enum AnalyzeMode {
     /// Print all other modes simultaneously
     All,
@@ -1658,14 +1671,10 @@ mod tests {
 
     // TODO: there have to be cleaner ways to test things. Maybe a CLI test framework?
 
+    // FIXME: Remove this test, it's very fragile and move to E2E CLI test framework
     #[tokio::test]
     // Verifies basic properties about the network connectivity checker
     async fn test_check_network_connectivity() {
-        // Verify the help function works
-        let args = &["aptos", "node", "check-network-connectivity", "--help"];
-        let help_message = run_tool_with_args(args).await.unwrap_err();
-        assert_contains(help_message, "USAGE:"); // We expect the command to return USAGE info
-
         // Verify that an invalid address will return an error
         let args = &[
             "aptos",
@@ -1682,7 +1691,7 @@ mod tests {
         // Verify that an invalid chain-id will return an error
         let args = &["aptos", "node", "check-network-connectivity", "--address", "/ip4/34.70.116.169/tcp/6182/noise-ik/0x249f3301db104705652e0a0c471b46d13172b2baf14e31f007413f3baee46b0c/handshake/0", "--chain-id", "invalid-chain"];
         let error_message = run_tool_with_args(args).await.unwrap_err();
-        assert_contains(error_message, "Invalid value");
+        assert_contains(error_message, "invalid value");
 
         // Verify that a failure to connect will return a timeout
         let args = &["aptos", "node", "check-network-connectivity", "--address", "/ip4/31.71.116.169/tcp/0001/noise-ik/0x249f3301db104705652e0a0c471b46d13172b2baf14e31f007413f3baee46b0c/handshake/0", "--chain-id", "testnet"];

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use self::framework::FrameworkReleaseConfig;
-use crate::components::feature_flags::Features;
-use anyhow::{anyhow, bail, Result};
+use crate::{aptos_core_path, aptos_framework_path, components::feature_flags::Features};
+use anyhow::{anyhow, bail, Context, Result};
 use aptos::governance::GenerateExecutionHash;
 use aptos_rest_client::Client;
 use aptos_temppath::TempPath;
@@ -122,7 +122,7 @@ impl ReleaseEntry {
                 }
             },
             ReleaseEntry::DefaultGas => {
-                let gas_schedule = aptos_gas::gen::current_gas_schedule();
+                let gas_schedule = aptos_gas_schedule_updator::current_gas_schedule();
                 if !fetch_and_equals::<GasScheduleV2>(client, &gas_schedule)? {
                     result.append(&mut gas::generate_gas_upgrade_proposal(
                         &gas_schedule,
@@ -205,8 +205,7 @@ impl ReleaseEntry {
                 }
             },
             ReleaseEntry::RawScript(script_path) => {
-                let base_path =
-                    PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join(script_path.as_path());
+                let base_path = aptos_core_path().join(script_path.as_path());
                 let file_name = base_path
                     .file_name()
                     .and_then(|name| name.to_str())
@@ -214,7 +213,8 @@ impl ReleaseEntry {
                         anyhow!("Unable to obtain file name for proposal: {:?}", script_path)
                     })?
                     .to_string();
-                let file_content = std::fs::read_to_string(base_path)?;
+                let file_content = std::fs::read_to_string(base_path)
+                    .with_context(|| format!("Unable to read file: {}", script_path.display()))?;
 
                 if let ExecutionMode::MultiStep = execution_mode {
                     // Render the hash for multi step proposal.
@@ -260,7 +260,10 @@ impl ReleaseEntry {
                 }
             },
             ReleaseEntry::DefaultGas => {
-                if !fetch_and_equals(client_opt, &aptos_gas::gen::current_gas_schedule())? {
+                if !fetch_and_equals(
+                    client_opt,
+                    &aptos_gas_schedule_updator::current_gas_schedule(),
+                )? {
                     bail!("Gas schedule config mismatch: Expected Default");
                 }
             },
@@ -308,28 +311,32 @@ fn fetch_and_equals<T: OnChainConfig + PartialEq>(
 ) -> Result<bool> {
     match client {
         Some(client) => {
-            let config = T::deserialize_into_config(
-                block_on(async {
-                    client
-                        .get_account_resource_bytes(
-                            CORE_CODE_ADDRESS,
-                            format!(
-                                "{}::{}::{}",
-                                T::ADDRESS,
-                                T::MODULE_IDENTIFIER,
-                                T::TYPE_IDENTIFIER
-                            )
-                            .as_str(),
-                        )
-                        .await
-                })?
-                .inner(),
-            )?;
+            let config = fetch_config::<T>(client)?;
 
             Ok(&config == expected)
         },
         None => Ok(false),
     }
+}
+
+pub fn fetch_config<T: OnChainConfig>(client: &Client) -> Result<T> {
+    T::deserialize_into_config(
+        block_on(async {
+            client
+                .get_account_resource_bytes(
+                    CORE_CODE_ADDRESS,
+                    format!(
+                        "{}::{}::{}",
+                        T::ADDRESS,
+                        T::MODULE_IDENTIFIER,
+                        T::TYPE_IDENTIFIER
+                    )
+                    .as_str(),
+                )
+                .await
+        })?
+        .inner(),
+    )
 }
 
 impl ReleaseConfig {
@@ -341,6 +348,19 @@ impl ReleaseConfig {
 
         // Create directories for source and metadata.
         let mut source_dir = base_path.to_path_buf();
+
+        // If source dir doesnt exist create it, if it does exist error
+        if !source_dir.exists() {
+            println!("Creating source directory: {:?}", source_dir);
+            std::fs::create_dir(source_dir.as_path()).map_err(|err| {
+                anyhow!(
+                    "Fail to create folder for source: {} {:?}",
+                    source_dir.display(),
+                    err
+                )
+            })?;
+        }
+
         source_dir.push("sources");
 
         std::fs::create_dir(source_dir.as_path())
@@ -507,7 +527,8 @@ impl Default for ReleaseConfig {
                         }),
                         ReleaseEntry::Consensus(OnChainConsensusConfig::default()),
                         ReleaseEntry::Execution(OnChainExecutionConfig::V1(ExecutionConfigV1 {
-                            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+                            transaction_shuffler_type:
+                                TransactionShufflerType::DeprecatedSenderAwareV1(32),
                         })),
                         ReleaseEntry::RawScript(PathBuf::from(
                             "data/proposals/empty_multi_step.move",
@@ -538,6 +559,7 @@ pub fn get_execution_hash(result: &Vec<(String, String)>) -> Vec<u8> {
 
         let (_, hash) = GenerateExecutionHash {
             script_path: Option::from(move_script_path),
+            framework_local_dir: Some(aptos_framework_path()),
         }
         .generate_hash()
         .unwrap();
@@ -562,6 +584,7 @@ fn append_script_hash(raw_script: String) -> String {
 
     let (_, hash) = GenerateExecutionHash {
         script_path: Option::from(move_script_path),
+        framework_local_dir: Some(aptos_framework_path()),
     }
     .generate_hash()
     .unwrap();

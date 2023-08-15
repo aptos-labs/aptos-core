@@ -31,7 +31,7 @@ fn test_genesis() {
     let path = aptos_temppath::TempPath::new();
     path.create_as_dir().unwrap();
     let genesis = aptos_vm_genesis::test_genesis_transaction();
-    let (_, db, _executor, waypoint) = create_db_and_executor(path.path(), &genesis);
+    let (_, db, _executor, waypoint) = create_db_and_executor(path.path(), &genesis, false);
 
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
     let state_proof = db.reader.get_state_proof(trusted_state.version()).unwrap();
@@ -48,12 +48,15 @@ fn test_genesis() {
         .reader
         .get_state_value_with_proof_by_version(&account_resource_path, 0)
         .unwrap();
-    let (txn_info_version, txn_info) = db
+    let latest_version = db.reader.get_latest_version().unwrap();
+    assert_eq!(latest_version, 0);
+    let txn_info = db
         .reader
-        .get_latest_transaction_info_option()
+        .get_transaction_info_iterator(0, 1)
+        .unwrap()
+        .next()
         .unwrap()
         .unwrap();
-    assert_eq!(txn_info_version, 0);
     state_proof
         .verify(
             txn_info.state_checkpoint_hash().unwrap(),
@@ -74,7 +77,7 @@ fn test_reconfiguration() {
     let (genesis, validators) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_key = &aptos_vm_genesis::GENESIS_KEYPAIR.0;
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-    let (_, db, executor, _waypoint) = create_db_and_executor(path.path(), &genesis_txn);
+    let (_, db, executor, _waypoint) = create_db_and_executor(path.path(), &genesis_txn, false);
     let parent_block_id = executor.committed_block_id();
     let signer = ValidatorSigner::new(
         validators[0].data.owner_address,

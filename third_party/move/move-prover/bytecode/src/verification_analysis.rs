@@ -368,7 +368,7 @@ impl VerificationAnalysisProcessor {
         targets: &mut FunctionTargetsHolder,
     ) {
         // TODO(mengxu): re-check the treatment of fixedpoint here
-        let mut info = data
+        let info = data
             .annotations
             .get_or_default_mut::<VerificationInfo>(true);
         if !info.verified {
@@ -584,7 +584,7 @@ impl VerificationAnalysisProcessor {
                     }
                     let adapter =
                         TypeUnificationAdapter::new_vec(&fun_mem.inst, &inv_mem.inst, true, true);
-                    let rel = adapter.unify(Variance::Allow, /* shallow_subst */ false);
+                    let rel = adapter.unify(Variance::SpecVariance, /* shallow_subst */ false);
                     if rel.is_some() {
                         inv_accessed.insert(inv.id);
 

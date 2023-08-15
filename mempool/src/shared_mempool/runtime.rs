@@ -12,12 +12,16 @@ use crate::{
     QuorumStoreRequest,
 };
 use aptos_config::config::NodeConfig;
-use aptos_event_notifications::ReconfigNotificationListener;
+use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::Level;
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
+use aptos_network::application::{
+    interface::{NetworkClient, NetworkServiceEvents},
+    storage::PeersAndMetadata,
+};
 use aptos_storage_interface::DbReader;
+use aptos_types::on_chain_config::OnChainConfigProvider;
 use aptos_vm_validator::vm_validator::{TransactionValidation, VMValidator};
 use futures::channel::mpsc::{Receiver, UnboundedSender};
 use std::sync::Arc;
@@ -28,7 +32,7 @@ use tokio::runtime::{Handle, Runtime};
 ///   - outbound_sync_task (task that periodically broadcasts transactions to peers).
 ///   - inbound_network_task (task that handles inbound mempool messages and network events).
 ///   - gc_task (task that performs GC of all expired transactions by SystemTTL).
-pub(crate) fn start_shared_mempool<TransactionValidator>(
+pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
     executor: &Handle,
     config: &NodeConfig,
     mempool: Arc<Mutex<CoreMempool>>,
@@ -37,12 +41,14 @@ pub(crate) fn start_shared_mempool<TransactionValidator>(
     client_events: MempoolEventsReceiver,
     quorum_store_requests: Receiver<QuorumStoreRequest>,
     mempool_listener: MempoolNotificationListener,
-    mempool_reconfig_events: ReconfigNotificationListener,
+    mempool_reconfig_events: ReconfigNotificationListener<ConfigProvider>,
     db: Arc<dyn DbReader>,
     validator: Arc<RwLock<TransactionValidator>>,
     subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 ) where
     TransactionValidator: TransactionValidation + 'static,
+    ConfigProvider: OnChainConfigProvider,
 {
     let smp: SharedMempool<NetworkClient<MempoolSyncMsg>, TransactionValidator> =
         SharedMempool::new(
@@ -63,6 +69,8 @@ pub(crate) fn start_shared_mempool<TransactionValidator>(
         quorum_store_requests,
         mempool_listener,
         mempool_reconfig_events,
+        config.mempool.shared_mempool_peer_update_interval_ms,
+        peers_and_metadata,
     ));
 
     executor.spawn(gc_coordinator(
@@ -86,7 +94,8 @@ pub fn bootstrap(
     client_events: MempoolEventsReceiver,
     quorum_store_requests: Receiver<QuorumStoreRequest>,
     mempool_listener: MempoolNotificationListener,
-    mempool_reconfig_events: ReconfigNotificationListener,
+    mempool_reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
     let mempool = Arc::new(Mutex::new(CoreMempool::new(config)));
@@ -104,6 +113,7 @@ pub fn bootstrap(
         db,
         vm_validator,
         vec![],
+        peers_and_metadata,
     );
     runtime
 }

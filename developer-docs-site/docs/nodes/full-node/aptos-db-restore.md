@@ -34,7 +34,7 @@ Each type of data in the backup storage is organized as follows:
 
 ## Restore a DB using the public backup files
 
-The [Aptos CLI](../../tools/aptos-cli-tool/use-aptos-cli.md) supports two kinds of restore operations by reading from the public backup files:
+The [Aptos CLI](../../tools/aptos-cli/use-cli/use-aptos-cli.md) supports two kinds of restore operations by reading from the public backup files:
 1. Recreating a database with minimal transaction history at a user-specified transaction version (or the latest version the backup has)
 2. Restoring the database over a specific period. In addition to the above, this option ensures that the recreated database carries the ledger history of the user-designated version range.
 
@@ -54,7 +54,7 @@ Example command:
 ```bash
 aptos node bootstrap-db \ 
     --target-version 500000000 \
-    --command-adapter-config /path/to/s3-public.yaml \
+    --command-adapter-config /path/to/gcs.yaml \
     --target-db-dir /path/to/local/db
 ```
 
@@ -74,6 +74,45 @@ Example command:
 aptos node bootstrap-db \ 
     --ledger-history-start-version 150000000 \
     --target-version 155000000 
-    --command-adapter-config /path/to/s3-public.yaml \
+    --command-adapter-config /path/to/gcs.yaml \
     --target-db-dir /path/to/local/db
+```
+
+### Restore a fullnode with full history from genesis
+**Resource Requirements**
+
+* Open File Limit: Set the open file limit to 10K.
+* Testnet:
+  * Disk: 1.5TB
+  * RAM: 32GB
+  * Duration: Approximately 10 hours to finish.
+* Mainnet:
+  * Disk: 1TB
+  * RAM: 32GB
+  * Duration: Approximately 5 hours to finish.
+
+
+To restore a fullnode with full history from genesis, set `ledger-history-start-version` to 0 and disable the pruner by [disabling the ledger pruner](../../guides/data-pruning.md).
+
+Example command: 
+
+```bash
+aptos node bootstrap-db \
+--ledger-history-start-version 0 \
+--target-version use_the_largest_version_in_backup \
+--command-adapter-config /path/to/gcs.yaml \
+--target-db-dir /path/to/local/db
+```
+
+:::tip
+If you don't specify the target_version (via `--target-version`), the tool will use the latest version in the backup as the target version.
+:::
+
+Disable the pruner in the node config to prevent the early history from being pruned when you start the node.
+```Yaml
+storage:
+ storage_pruner_config:
+  ledger_pruner_config:
+   enable: false
+
 ```
