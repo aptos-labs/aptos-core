@@ -574,6 +574,8 @@ async fn handle_ready_subscriptions<T: StorageReaderInterface>(
     time_service: TimeService,
     peers_with_ready_subscriptions: Vec<(PeerNetworkId, LedgerInfoWithSignatures)>,
 ) {
+    // Go through all peers with ready subscriptions
+    let mut active_tasks = vec![];
     for (peer_network_id, target_ledger_info) in peers_with_ready_subscriptions {
         // Remove the subscription from the active subscription stream
         let subscription_request_and_known_version =
@@ -600,7 +602,7 @@ async fn handle_ready_subscriptions<T: StorageReaderInterface>(
             let time_service = time_service.clone();
 
             // Spawn a blocking task to handle the subscription
-            bounded_executor
+            let active_task = bounded_executor
                 .spawn_blocking(move || {
                     // Get the subscription start time and request
                     let subscription_start_time = subscription_request.request_start_time;
@@ -669,8 +671,14 @@ async fn handle_ready_subscriptions<T: StorageReaderInterface>(
                     }
                 })
                 .await;
+
+            // Add the task to the list of active tasks
+            active_tasks.push(active_task);
         }
     }
+
+    // Wait for all the active tasks to complete
+    join_all(active_tasks).await;
 }
 
 /// Identifies the subscriptions that can be handled now.
@@ -891,6 +899,8 @@ async fn identify_ready_and_invalid_subscriptions<T: StorageReaderInterface>(
                 }
             })
             .await;
+
+        // Add the task to the list of active tasks
         active_tasks.push(active_task);
     }
 

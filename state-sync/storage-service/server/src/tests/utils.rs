@@ -63,20 +63,6 @@ pub async fn advance_storage_refresh_time(mock_time: &MockTimeService) {
     mock_time.advance_ms_async(cache_update_freq_ms).await;
 }
 
-/// Advances the storage refresh time and
-/// waits for the storage summary to refresh.
-pub async fn advance_time_and_wait_for_refresh(
-    mock_client: &mut MockClient,
-    mock_time: &MockTimeService,
-    old_storage_server_summary: StorageServerSummary,
-) {
-    // Advance the storage refresh time
-    advance_storage_refresh_time(mock_time).await;
-
-    // Wait for the storage server to refresh the cached summary
-    wait_for_cached_summary_update(mock_client, mock_time, old_storage_server_summary, true).await;
-}
-
 /// Creates and returns a list of data chunks that respect an epoch change
 /// version (i.e., no single chunk crosses the epoch boundary). Each chunk
 /// is of the form (start_version, end_version), inclusive. The list contains
@@ -402,25 +388,32 @@ async fn force_cache_update_notification(
     mock_client: &mut MockClient,
     mock_time: &MockTimeService,
     storage_service_notifier: &StorageServiceNotifier,
+    wait_for_storage_cache_update: bool,
 ) {
     // Generate a random number and if the number is even, send
-    // a state sync notification. Otherwise, wait for the storage
-    // summary to refresh manually (by advancing time).
+    // a state sync notification. Otherwise, advance enough time
+    // to refresh the storage cache manually.
     let random_number: u8 = OsRng.gen();
     if random_number % 2 == 0 {
-        // Send a state sync notification and wait for storage to update
-        send_notification_and_wait_for_refresh(
+        // Send a state sync notification with the highest synced version
+        storage_service_notifier
+            .notify_new_commit(random_number as u64)
+            .await
+            .unwrap();
+    } else {
+        // Advance the storage refresh time manually
+        advance_storage_refresh_time(mock_time).await;
+    }
+
+    // Wait for the storage server to refresh the cached summary
+    if wait_for_storage_cache_update {
+        wait_for_cached_summary_update(
             mock_client,
             mock_time,
-            storage_service_notifier,
-            random_number as u64,
             StorageServerSummary::default(),
+            true,
         )
         .await;
-    } else {
-        // Advance the time manually and wait for storage to update
-        advance_time_and_wait_for_refresh(mock_client, mock_time, StorageServerSummary::default())
-            .await;
     }
 }
 
@@ -430,7 +423,7 @@ pub async fn force_optimistic_fetch_handler_to_run(
     mock_time: &MockTimeService,
     storage_service_notifier: &StorageServiceNotifier,
 ) {
-    force_cache_update_notification(mock_client, mock_time, storage_service_notifier).await;
+    force_cache_update_notification(mock_client, mock_time, storage_service_notifier, true).await;
 }
 
 /// This function forces the subscription handler to work
@@ -439,7 +432,11 @@ pub async fn force_subscription_handler_to_run(
     mock_time: &MockTimeService,
     storage_service_notifier: &StorageServiceNotifier,
 ) {
-    force_cache_update_notification(mock_client, mock_time, storage_service_notifier).await;
+    for _ in 0..10 {
+        // Force a cache update multiple times (to emulate real execution)
+        force_cache_update_notification(mock_client, mock_time, storage_service_notifier, true)
+            .await;
+    }
 }
 
 /// Sends a number of states request and processes the response
@@ -497,25 +494,6 @@ pub fn initialize_logger() {
         .is_async(false)
         .level(Level::Debug)
         .build();
-}
-
-/// Sends a state sync notification to the storage server
-/// and waits for the storage summary to refresh.
-pub async fn send_notification_and_wait_for_refresh(
-    mock_client: &mut MockClient,
-    mock_time: &MockTimeService,
-    storage_service_notifier: &StorageServiceNotifier,
-    highest_synced_version: u64,
-    old_storage_server_summary: StorageServerSummary,
-) {
-    // Send a state sync notification with the highest synced version
-    storage_service_notifier
-        .notify_new_commit(highest_synced_version)
-        .await
-        .unwrap();
-
-    // Wait for the storage server to refresh the cached summary
-    wait_for_cached_summary_update(mock_client, mock_time, old_storage_server_summary, false).await;
 }
 
 /// Sends a batch of transaction output requests and
@@ -897,7 +875,6 @@ pub fn verify_no_subscription_responses(
 /// Verifies that a response is received for a given stream request index
 /// and that the response contains the correct data.
 pub async fn verify_output_subscription_response(
-    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     expected_output_lists_with_proofs: Vec<TransactionOutputListWithProof>,
     expected_target_ledger_info: LedgerInfoWithSignatures,
     mock_client: &mut MockClient,
@@ -918,9 +895,6 @@ pub async fn verify_output_subscription_response(
         expected_target_ledger_info,
     )
     .await;
-
-    // Manually reset the cached storage server summary
-    cached_storage_server_summary.store(Arc::new(StorageServerSummary::default()));
 }
 
 /// Verifies the state of an active subscription stream entry.
