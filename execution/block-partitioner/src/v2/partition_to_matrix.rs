@@ -31,7 +31,9 @@ impl PartitionerV2 {
             remaining_txns = discarded;
             num_remaining_txns = remaining_txns.iter().map(|ts| ts.len()).sum();
 
-            if num_remaining_txns < state.avoid_pct as usize * state.num_txns() / 100 {
+            if num_remaining_txns
+                < ((1.0 - state.cross_shard_dep_avoid_threshold) * state.num_txns() as f32) as usize
+            {
                 break;
             }
         }

@@ -20,7 +20,7 @@ fn bench_group(c: &mut Criterion) {
 
     let num_threads = 8;
     let num_rounds_limit = 4;
-    let avoid_pct = 10;
+    let avoid_pct = 0.9;
     let dashmap_num_shards = 64;
     let merge_discards = true;
 

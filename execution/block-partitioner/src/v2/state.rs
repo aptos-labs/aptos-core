@@ -37,7 +37,7 @@ pub struct PartitionState {
     // Params/utils from partitioner.
     pub(crate) num_executor_shards: ShardId,
     pub(crate) num_rounds_limit: usize,
-    pub(crate) avoid_pct: u64,
+    pub(crate) cross_shard_dep_avoid_threshold: f32,
     pub(crate) partition_last_round: bool,
     pub(crate) thread_pool: Arc<ThreadPool>,
 
@@ -85,7 +85,7 @@ impl PartitionState {
         num_executor_shards: ShardId,
         pre_partitioned: Vec<Vec<PreParedTxnIdx>>,
         num_rounds_limit: usize,
-        avoid_pct: u64,
+        cross_shard_dep_avoid_threshold: f32,
         merge_discarded: bool,
     ) -> Self {
         let _timer = MISC_TIMERS_SECONDS
@@ -129,7 +129,7 @@ impl PartitionState {
             key_idx_table,
             trackers,
             min_discards_by_sender: DashMap::new(),
-            avoid_pct,
+            cross_shard_dep_avoid_threshold,
             num_rounds_limit,
             finalized_txn_matrix: Vec::with_capacity(num_rounds_limit),
             new_txn_idxs: vec![],

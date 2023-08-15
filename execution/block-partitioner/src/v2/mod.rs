@@ -63,7 +63,7 @@ pub struct PartitionerV2 {
     pre_partitioner: Box<dyn PrePartitioner>,
     thread_pool: Arc<ThreadPool>,
     max_partitioning_rounds: RoundId,
-    avoid_pct: u64,
+    cross_shard_dep_avoid_threshold: f32,
     dashmap_num_shards: usize,
     partition_last_round: bool,
 }
@@ -72,7 +72,7 @@ impl PartitionerV2 {
     pub fn new(
         num_threads: usize,
         num_rounds_limit: usize,
-        avoid_pct: u64,
+        cross_shard_dep_avoid_threshold: f32,
         dashmap_num_shards: usize,
         partition_last_round: bool,
     ) -> Self {
@@ -86,7 +86,7 @@ impl PartitionerV2 {
             pre_partitioner: Box::new(UniformPartitioner {}), //TODO: parameterize it.
             thread_pool,
             max_partitioning_rounds: num_rounds_limit,
-            avoid_pct,
+            cross_shard_dep_avoid_threshold,
             dashmap_num_shards,
             partition_last_round,
         }
@@ -123,7 +123,7 @@ impl BlockPartitioner for PartitionerV2 {
             num_executor_shards,
             pre_partitioned,
             self.max_partitioning_rounds,
-            self.avoid_pct,
+            self.cross_shard_dep_avoid_threshold,
             self.partition_last_round,
         );
         Self::init(&mut state);
@@ -142,7 +142,7 @@ impl BlockPartitioner for PartitionerV2 {
 fn test_partitioner_v2_correctness() {
     for merge_discarded in [false, true] {
         let block_generator = P2PBlockGenerator::new(100);
-        let partitioner = PartitionerV2::new(8, 4, 10, 64, merge_discarded);
+        let partitioner = PartitionerV2::new(8, 4, 0.9, 64, merge_discarded);
         let mut rng = thread_rng();
         for _run_id in 0..20 {
             let block_size = 10_u64.pow(rng.gen_range(0, 4)) as usize;
@@ -158,7 +158,7 @@ fn test_partitioner_v2_correctness() {
 #[test]
 fn test_partitioner_v2_determinism() {
     for merge_discarded in [false, true] {
-        let partitioner = Arc::new(PartitionerV2::new(4, 4, 10, 64, merge_discarded));
+        let partitioner = Arc::new(PartitionerV2::new(4, 4, 0.9, 64, merge_discarded));
         assert_deterministic_result(partitioner);
     }
 }

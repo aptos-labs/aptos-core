@@ -138,8 +138,8 @@ impl PipelineOpt {
             }),
             2 => PartitionerConfig::V2(PartitionerV2Config {
                 num_threads: self.partitioner_v2_num_threads,
-                num_rounds_limit: self.max_partitioning_rounds,
-                avoid_pct: ((1.0 - self.partitioner_cross_shard_dep_avoid_threshold) * 100.0) as u64,
+                max_partitioning_rounds: self.max_partitioning_rounds,
+                cross_shard_dep_avoid_threshold: ((1.0 - self.partitioner_cross_shard_dep_avoid_threshold) * 100.0) as u64,
                 dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
                 partition_last_round: self.use_global_executor,
             }),

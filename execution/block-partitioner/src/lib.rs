@@ -17,8 +17,8 @@ use aptos_crypto::{
 use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::{
-        GLOBAL_ROUND_ID, GLOBAL_SHARD_ID, PartitionedTransactions, RoundId, ShardId,
-        SubBlocksForShard, TransactionWithDependencies,
+        PartitionedTransactions, RoundId, ShardId, SubBlocksForShard, TransactionWithDependencies,
+        GLOBAL_ROUND_ID, GLOBAL_SHARD_ID,
     },
     state_store::state_key::StateKey,
     transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
@@ -27,6 +27,7 @@ use move_core_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
 #[cfg(test)]
 use rand::thread_rng;
+use sharded_block_partitioner::config::PartitionerV1Config;
 #[cfg(test)]
 use std::sync::Arc;
 use std::{
@@ -34,7 +35,6 @@ use std::{
     hash::{Hash, Hasher},
     sync::RwLock,
 };
-use sharded_block_partitioner::config::PartitionerV1Config;
 use v2::config::PartitionerV2Config;
 mod pre_partition;
 

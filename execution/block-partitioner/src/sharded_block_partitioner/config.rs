@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 
+use crate::{sharded_block_partitioner::ShardedBlockPartitioner, BlockPartitioner};
 use aptos_types::block_executor::partitioner::RoundId;
-use crate::BlockPartitioner;
-use crate::sharded_block_partitioner::ShardedBlockPartitioner;
 
 #[derive(Clone, Copy, Debug)]
 pub struct PartitionerV1Config {
