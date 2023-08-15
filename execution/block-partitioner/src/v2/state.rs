@@ -39,6 +39,7 @@ pub struct PartitionState {
     // Params/utils from partitioner.
     pub(crate) num_executor_shards: ShardId,
     pub(crate) num_rounds_limit: usize,
+    pub(crate) dashmap_num_shards: usize,
     pub(crate) cross_shard_dep_avoid_threshold: f32,
     pub(crate) partition_last_round: bool,
     pub(crate) thread_pool: Arc<ThreadPool>,
@@ -68,9 +69,6 @@ pub struct PartitionState {
 
     // A `ConflictingTxnTracker` for each key that helps resolve conflicts and speed-up edge creation.
     pub(crate) trackers: DashMap<StorageKeyIdx, RwLock<ConflictingTxnTracker>>,
-
-    // Used in `remove_cross_shard_dependencies()` to preserve relative txns order for the same sender.
-    pub(crate) min_discards_by_sender: DashMap<SenderIdx, AtomicUsize>,
 
     // Results of `remove_cross_shard_dependencies()`.
     pub(crate) finalized_txn_matrix: Vec<Vec<Vec<PreParedTxnIdx>>>,
@@ -120,6 +118,7 @@ impl PartitionState {
         });
         let start_txn_idxs_by_shard = start_txn_idxs(&pre_partitioned);
         Self {
+            dashmap_num_shards,
             partition_last_round: merge_discarded,
             thread_pool,
             num_executor_shards,
@@ -133,7 +132,6 @@ impl PartitionState {
             sender_idx_table,
             key_idx_table,
             trackers,
-            min_discards_by_sender: DashMap::new(),
             cross_shard_dep_avoid_threshold,
             num_rounds_limit,
             finalized_txn_matrix: Vec::with_capacity(num_rounds_limit),
@@ -153,13 +151,6 @@ impl PartitionState {
             .key_idx_table
             .entry(key.clone())
             .or_insert_with(|| self.storage_key_counter.fetch_add(1, Ordering::SeqCst))
-    }
-
-    pub(crate) fn reset_min_discard_table(&mut self) {
-        let table = mem::take(&mut self.min_discards_by_sender);
-        self.thread_pool.spawn(move || {
-            drop(table);
-        });
     }
 
     pub(crate) fn storage_location(&self, key_idx: StorageKeyIdx) -> StorageLocation {
@@ -201,21 +192,6 @@ impl PartitionState {
             .iter()
             .copied()
             .collect()
-    }
-
-    pub(crate) fn min_discard(&self, sender: SenderIdx) -> Option<PreParedTxnIdx> {
-        self.min_discards_by_sender
-            .get(&sender)
-            .as_ref()
-            .map(|r| r.value().load(Ordering::SeqCst))
-    }
-
-    pub(crate) fn update_min_discarded_txn_idx(&self, sender: SenderIdx, txn_idx: PreParedTxnIdx) {
-        self.min_discards_by_sender
-            .entry(sender)
-            .or_insert_with(|| AtomicUsize::new(usize::MAX))
-            .value()
-            .fetch_min(txn_idx, Ordering::SeqCst);
     }
 
     pub(crate) fn update_trackers_on_accepting(
