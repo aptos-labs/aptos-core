@@ -681,8 +681,8 @@ impl AptosVM {
         cleanup_args: Vec<Vec<u8>>,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
-        // Charge gas for writeset before we do cleanup. This ensures we don't charge gas for
-        // cleanup writeset changes, which is consistent with outer-level success cleanup
+        // Charge gas for write set before we do cleanup. This ensures we don't charge gas for
+        // cleanup write set changes, which is consistent with outer-level success cleanup
         // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
         let mut respawned_session = self.charge_change_set_and_respawn_session(
             session,
@@ -1190,10 +1190,10 @@ impl AptosVM {
         Ok((status, output, gas_meter))
     }
 
-    fn execute_writeset(
+    fn execute_write_set(
         &self,
-        resolver: &impl MoveResolverExt,
-        writeset_payload: &WriteSetPayload,
+        resolver: &impl AptosMoveResolver,
+        write_set_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
     ) -> Result<VMChangeSet, VMStatus> {
@@ -1201,7 +1201,7 @@ impl AptosVM {
         let change_set_configs =
             ChangeSetConfigs::unlimited_at_gas_feature_version(self.0.get_gas_feature_version());
 
-        match writeset_payload {
+        match write_set_payload {
             WriteSetPayload::Direct(change_set) => {
                 VMChangeSet::try_from_storage_change_set(change_set.clone(), &change_set_configs)
             },
@@ -1282,7 +1282,7 @@ impl AptosVM {
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         // TODO: user specified genesis id to distinguish different genesis write sets
         let genesis_id = HashValue::zero();
-        let change_set = self.execute_writeset(
+        let change_set = self.execute_write_set(
             resolver,
             &writeset_payload,
             Some(aptos_types::account_config::reserved_vm_address()),
@@ -1603,7 +1603,7 @@ impl VMValidator for AptosVM {
 impl VMAdapter for AptosVM {
     fn new_session<'r>(
         &self,
-        resolver: &'r impl MoveResolverExt,
+        resolver: &'r impl AptosMoveResolver,
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
         self.0.new_session(resolver, session_id)
@@ -1777,7 +1777,7 @@ impl AptosSimulationVM {
     fn validate_simulated_transaction(
         &self,
         session: &mut SessionExt,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         transaction: &SignedTransaction,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
