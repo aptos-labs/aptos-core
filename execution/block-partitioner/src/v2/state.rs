@@ -170,6 +170,7 @@ impl PartitionState {
             .or_insert_with(|| self.sender_counter.fetch_add(1, Ordering::SeqCst))
     }
 
+    /// For a key, check if there is any write between the anchor shard and a given shard.
     pub(crate) fn key_owned_by_another_shard(&self, shard_id: ShardId, key: StorageKeyIdx) -> bool {
         let tracker_ref = self.trackers.get(&key).unwrap();
         let tracker = tracker_ref.read().unwrap();
