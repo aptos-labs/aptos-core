@@ -83,10 +83,15 @@ impl PartitionerV2 {
             .start_timer();
 
         let num_shards = remaining_txns.len();
+
+        // Overview of the logic:
+        // 1. Key conflicts are analyzed and a txn from `remaining_txns` either goes to `discarded` or `tentatively_accepted`.
+        // 2. Relative orders of txns from the same sender are analyzed and a txn from `tentatively_accepted` either goes to `finally_accepted` or `discarded`.
         let mut discarded: Vec<RwLock<Vec<PreParedTxnIdx>>> = Vec::with_capacity(num_shards);
         let mut tentatively_accepted: Vec<RwLock<Vec<PreParedTxnIdx>>> =
             Vec::with_capacity(num_shards);
         let mut finally_accepted: Vec<RwLock<Vec<PreParedTxnIdx>>> = Vec::with_capacity(num_shards);
+
         for txns in remaining_txns.iter() {
             tentatively_accepted.push(RwLock::new(Vec::with_capacity(txns.len())));
             finally_accepted.push(RwLock::new(Vec::with_capacity(txns.len())));
