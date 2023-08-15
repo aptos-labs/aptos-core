@@ -242,12 +242,8 @@ impl PartitionState {
     }
 
     pub(crate) fn final_sub_block_idx(&self, sub_blk_idx: SubBlockIdx) -> SubBlockIdx {
-        if !self.partition_last_round {
-            if sub_blk_idx.round_id == self.num_rounds() - 1 {
-                SubBlockIdx::global()
-            } else {
-                sub_blk_idx
-            }
+        if !self.partition_last_round && sub_blk_idx.round_id == self.num_rounds() - 1 {
+            SubBlockIdx::global()
         } else {
             sub_blk_idx
         }
