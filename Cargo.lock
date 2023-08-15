@@ -3602,6 +3602,7 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-node-resource-metrics",
  "aptos-push-metrics",
  "aptos-types",
  "aptos-vm",

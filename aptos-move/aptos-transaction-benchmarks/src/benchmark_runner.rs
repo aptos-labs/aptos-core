@@ -2,7 +2,7 @@
 
 use crate::transaction_bench_state::TransactionBenchState;
 use aptos_language_e2e_tests::account_universe::{AUTransactionGen, AccountPickStyle};
-use aptos_types::transaction::Transaction;
+use aptos_types::{block_executor::partitioner::PartitionedTransactions, transaction::Transaction};
 use proptest::strategy::Strategy;
 use std::net::SocketAddr;
 
@@ -69,8 +69,10 @@ where
             self.account_pick_style.clone(),
         );
         let transactions = state.gen_transaction();
+        let partitioned_txns = state.partition_txns_if_needed(&transactions);
         state.execute_blockstm_benchmark(
             transactions,
+            partitioned_txns,
             run_par,
             run_seq,
             concurrency_level_per_shard,
@@ -83,6 +85,7 @@ pub struct PreGeneratedTxnsBenchmarkRunner<'a, S> {
     states: Vec<TransactionBenchState<&'a S>>,
     // pre-generated transactions
     transactions: Vec<Vec<Transaction>>,
+    partitioned_txns: Vec<Option<PartitionedTransactions>>,
 }
 
 impl<'a, S> PreGeneratedTxnsBenchmarkRunner<'a, S>
@@ -112,14 +115,19 @@ where
                 )
             })
             .collect();
-        let transactions = states
+        let (transactions, partitioned_txns) = states
             .iter_mut()
-            .map(|state| state.gen_transaction())
-            .collect();
+            .map(|state| {
+                let txns = state.gen_transaction();
+                let partitioned_txns = state.partition_txns_if_needed(&txns);
+                (txns, partitioned_txns)
+            })
+            .unzip();
         println!("Done generating transactions for {} runs", num_runs);
         Self {
             states,
             transactions,
+            partitioned_txns,
         }
     }
 }
@@ -138,8 +146,10 @@ where
     ) -> (usize, usize) {
         let mut state = self.states.pop().unwrap();
         let transactions = self.transactions.pop().unwrap();
+        let partitioned_txns = self.partitioned_txns.pop().unwrap();
         state.execute_blockstm_benchmark(
             transactions,
+            partitioned_txns,
             run_par,
             run_seq,
             concurrency_level_per_shard,

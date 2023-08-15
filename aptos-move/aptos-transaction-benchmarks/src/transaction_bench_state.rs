@@ -13,6 +13,7 @@ use aptos_language_e2e_tests::{
     executor::FakeExecutor,
 };
 use aptos_types::{
+    block_executor::partitioner::PartitionedTransactions,
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},
     transaction::{
@@ -36,7 +37,7 @@ pub struct TransactionBenchState<S> {
     num_transactions: usize,
     strategy: S,
     account_universe: AccountUniverse,
-    parallel_block_executor:
+    sharded_block_executor:
         Option<Arc<ShardedBlockExecutor<FakeDataStore, LocalExecutorClient<FakeDataStore>>>>,
     block_partitioner: Option<Box<dyn BlockPartitioner>>,
     validator_set: ValidatorSet,
@@ -119,7 +120,7 @@ where
             num_transactions,
             strategy,
             account_universe: universe,
-            parallel_block_executor,
+            sharded_block_executor: parallel_block_executor,
             block_partitioner,
             validator_set,
             state_view,
@@ -159,6 +160,25 @@ where
         transactions
     }
 
+    pub fn partition_txns_if_needed(
+        &mut self,
+        txns: &[Transaction],
+    ) -> Option<PartitionedTransactions> {
+        if self.is_shareded() {
+            Some(
+                self.block_partitioner.as_ref().unwrap().partition(
+                    txns.iter()
+                        .skip(1)
+                        .map(|txn| txn.clone().into())
+                        .collect::<Vec<AnalyzedTransaction>>(),
+                    self.sharded_block_executor.as_ref().unwrap().num_shards()
+                ),
+            )
+        } else {
+            None
+        }
+    }
+
     /// Executes this state in a single block.
     pub(crate) fn execute_sequential(mut self) {
         // The output is ignored here since we're just testing transaction performance, not trying
@@ -173,6 +193,10 @@ where
         // to assert correctness.
         let txns = self.gen_transaction();
         self.execute_benchmark_parallel(txns, num_cpus::get(), None);
+    }
+
+    fn is_shareded(&self) -> bool {
+        self.sharded_block_executor.is_some()
     }
 
     fn execute_benchmark_sequential(
@@ -199,6 +223,30 @@ where
         (output, block_size * 1000 / exec_time as usize)
     }
 
+    fn execute_benchmark_sharded(
+        &self,
+        transactions: PartitionedTransactions,
+        concurrency_level_per_shard: usize,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> (Vec<TransactionOutput>, usize) {
+        let block_size = transactions.num_txns();
+        let timer = Instant::now();
+        let output = self
+            .sharded_block_executor
+            .as_ref()
+            .unwrap()
+            .execute_block(
+                self.state_view.clone(),
+                transactions,
+                concurrency_level_per_shard,
+                maybe_block_gas_limit,
+            )
+            .expect("VM should not fail to start");
+        let exec_time = timer.elapsed().as_millis();
+
+        (output, block_size * 1000 / exec_time as usize)
+    }
+
     fn execute_benchmark_parallel(
         &self,
         transactions: Vec<Transaction>,
@@ -207,38 +255,18 @@ where
     ) -> (Vec<TransactionOutput>, usize) {
         let block_size = transactions.len();
         let timer = Instant::now();
-        let output = if let Some(parallel_block_executor) = self.parallel_block_executor.as_ref() {
-            // TODO(skedia) partition in a pipelined way and evaluate how expensive it is to
-            // parse the txns in a single thread.
-            let partitioned_block = self.block_partitioner.as_ref().unwrap().partition(
-                transactions
-                    .into_iter()
-                    .map(|txn| txn.into())
-                    .collect::<Vec<AnalyzedTransaction>>(),
-                self.parallel_block_executor.as_ref().unwrap().num_shards(),
-            );
-            parallel_block_executor
-                .execute_block(
-                    self.state_view.clone(),
-                    partitioned_block,
-                    concurrency_level_per_shard,
-                    maybe_block_gas_limit,
-                )
-                .expect("VM should not fail to start")
-        } else {
-            BlockAptosVM::execute_block::<
-                _,
-                NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-            >(
-                Arc::clone(&RAYON_EXEC_POOL),
-                transactions,
-                self.state_view.as_ref(),
-                concurrency_level_per_shard,
-                maybe_block_gas_limit,
-                None,
-            )
-            .expect("VM should not fail to start")
-        };
+        let output = BlockAptosVM::execute_block::<
+            _,
+            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+        >(
+            Arc::clone(&RAYON_EXEC_POOL),
+            transactions,
+            self.state_view.as_ref(),
+            concurrency_level_per_shard,
+            maybe_block_gas_limit,
+            None,
+        )
+        .expect("VM should not fail to start");
         let exec_time = timer.elapsed().as_millis();
 
         (output, block_size * 1000 / exec_time as usize)
@@ -247,6 +275,7 @@ where
     pub(crate) fn execute_blockstm_benchmark(
         &mut self,
         transactions: Vec<Transaction>,
+        partitioned_txns: Option<PartitionedTransactions>,
         run_par: bool,
         run_seq: bool,
         conurrency_level_per_shard: usize,
@@ -254,11 +283,19 @@ where
     ) -> (usize, usize) {
         let (output, par_tps) = if run_par {
             println!("Parallel execution starts...");
-            let (output, tps) = self.execute_benchmark_parallel(
-                transactions.clone(),
-                conurrency_level_per_shard,
-                maybe_block_gas_limit,
-            );
+            let (output, tps) = if self.is_shareded() {
+                self.execute_benchmark_sharded(
+                    partitioned_txns.unwrap(),
+                    conurrency_level_per_shard,
+                    maybe_block_gas_limit,
+                )
+            } else {
+                self.execute_benchmark_parallel(
+                    transactions.clone(),
+                    conurrency_level_per_shard,
+                    maybe_block_gas_limit,
+                )
+            };
             println!("Parallel execution finishes, TPS = {}", tps);
             (output, tps)
         } else {
