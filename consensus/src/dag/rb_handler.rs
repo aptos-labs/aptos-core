@@ -128,7 +128,7 @@ fn read_votes_from_storage(
             votes_by_round_peer
                 .entry(node_id.round())
                 .or_insert_with(BTreeMap::new)
-                .insert(node_id.author(), vote);
+                .insert(*node_id.author(), vote);
         } else {
             to_delete.push(node_id);
         }

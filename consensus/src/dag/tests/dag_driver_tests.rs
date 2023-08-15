@@ -8,7 +8,9 @@ use crate::{
         dag_network::{RpcWithFallback, TDAGNetworkSender},
         dag_store::Dag,
         order_rule::OrderRule,
-        tests::{dag_test::MockStorage, helpers::new_certified_node},
+        tests::{
+            dag_test::MockStorage, helpers::new_certified_node, order_rule_tests::TestNotifier,
+        },
         types::{CertifiedAck, DAGMessage},
         RpcHandler,
     },
@@ -23,6 +25,7 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use claims::{assert_ok, assert_ok_eq};
+use futures_channel::mpsc::unbounded;
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -86,14 +89,15 @@ fn test_certified_node_handler() {
         aptos_time_service::TimeService::mock(),
     ));
     let time_service = TimeService::mock();
-    let (ordered_nodes_sender, _) = futures_channel::mpsc::unbounded();
     let validators = signers.iter().map(|vs| vs.author()).collect();
+    let (tx, _) = unbounded();
     let order_rule = OrderRule::new(
         epoch_state.clone(),
         LedgerInfo::mock_genesis(None),
         dag.clone(),
         Box::new(RoundRobinAnchorElection::new(validators)),
-        ordered_nodes_sender,
+        Box::new(TestNotifier { tx }),
+        storage.clone(),
     );
 
     let (_, fetch_requester, _, _) = DagFetcher::new(
