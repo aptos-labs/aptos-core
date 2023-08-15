@@ -9661,8 +9661,8 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91761aed67d03ad966ef783ae962ef9bbaca728d2dd7ceb7939ec110fffad998"
 dependencies = [
- "proc-macro2 1.0.66",
- "quote 1.0.32",
+ "proc-macro2 1.0.64",
+ "quote 1.0.29",
  "syn 1.0.105",
 ]
 
@@ -10727,8 +10727,8 @@ version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "597c3287a549da151aca6ada2795ecde089c7527bd5093114e8e0e1c3f0e52b1"
 dependencies = [
- "proc-macro2 1.0.66",
- "quote 1.0.32",
+ "proc-macro2 1.0.64",
+ "quote 1.0.29",
  "syn 1.0.105",
 ]
 
@@ -13006,15 +13006,9 @@ version = "1.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d7b1fadccbbc7e19ea64708629f9d8dccd007c260d66485f20a6d41bc1cf4b3"
 dependencies = [
-<<<<<<< HEAD
- "proc-macro2 1.0.66",
- "quote 1.0.32",
- "syn 2.0.28",
-=======
  "proc-macro2 1.0.64",
  "quote 1.0.29",
- "syn 1.0.105",
->>>>>>> 90db0cbc6f ([Storage Service] Add tests for subscription streams.)
+ "syn 2.0.25",
 ]
 
 [[package]]

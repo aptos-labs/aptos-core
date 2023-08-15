@@ -35,7 +35,7 @@ async fn test_get_new_transactions() {
             );
 
             // Create the mock db reader
-            let mut db_reader = mock::create_mock_db_for_optimistic_fetch(
+            let mut db_reader = mock::create_mock_db_with_summary_updates(
                 highest_ledger_info.clone(),
                 lowest_version,
             );
@@ -118,7 +118,7 @@ async fn test_get_new_transactions_different_networks() {
             );
 
             // Create the mock db reader
-            let mut db_reader = mock::create_mock_db_for_optimistic_fetch(
+            let mut db_reader = mock::create_mock_db_with_summary_updates(
                 highest_ledger_info.clone(),
                 lowest_version,
             );
@@ -228,7 +228,7 @@ async fn test_get_new_transactions_epoch_change() {
         );
 
         // Create the mock db reader
-        let mut db_reader = mock::create_mock_db_for_optimistic_fetch(
+        let mut db_reader = mock::create_mock_db_with_summary_updates(
             utils::create_test_ledger_info_with_sigs(highest_epoch, highest_version),
             lowest_version,
         );
@@ -312,7 +312,7 @@ async fn test_get_new_transactions_max_chunk() {
 
         // Create the mock db reader
         let mut db_reader =
-            mock::create_mock_db_for_optimistic_fetch(highest_ledger_info.clone(), lowest_version);
+            mock::create_mock_db_with_summary_updates(highest_ledger_info.clone(), lowest_version);
         utils::expect_get_transactions(
             &mut db_reader,
             peer_version + 1,
