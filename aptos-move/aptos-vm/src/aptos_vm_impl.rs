@@ -5,7 +5,7 @@
 use crate::{
     access_path_cache::AccessPathCache,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
-    move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
+    move_vm_ext::{AptosMoveResolver, MoveResolverExt, MoveVmExt, SessionExt, SessionId},
     system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
     transaction_metadata::TransactionMetadata,
     transaction_validation::APTOS_TRANSACTION_VALIDATION,
@@ -214,7 +214,7 @@ impl AptosVMImpl {
 
     pub fn check_gas(
         &self,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {

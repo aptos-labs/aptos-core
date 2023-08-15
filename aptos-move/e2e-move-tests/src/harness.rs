@@ -605,7 +605,7 @@ impl MoveHarness {
     }
 
     pub fn new_vm(&self) -> AptosVM {
-        AptosVM::new(self.executor.data_store())
+        AptosVM::new_from_state_view(self.executor.data_store())
     }
 
     pub fn set_default_gas_unit_price(&mut self, gas_unit_price: u64) {

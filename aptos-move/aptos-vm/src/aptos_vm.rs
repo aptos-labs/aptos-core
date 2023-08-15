@@ -9,9 +9,9 @@ use crate::{
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     counters::*,
-    data_cache::{AsMoveResolver, StorageAdapter},
+    data_cache::StorageAdapter,
     errors::expect_only_successful_execution,
-    move_vm_ext::{MoveResolverExt, RespawnedSession, SessionExt, SessionId},
+    move_vm_ext::{AptosMoveResolver, MoveResolverExt, RespawnedSession, SessionExt, SessionId},
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
@@ -33,7 +33,7 @@ use aptos_types::{
     block_executor::partitioner::PartitionedTransactions,
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
-    on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
+    on_chain_config::{new_epoch_event_key, ConfigStorage, FeatureFlag, TimedFeatureOverride},
     state_store::state_key::StateKey,
     transaction::{
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
@@ -119,8 +119,12 @@ macro_rules! unwrap_or_discard {
 }
 
 impl AptosVM {
-    pub fn new(state_view: &impl StateView) -> Self {
-        let config_storage = state_view.as_move_resolver();
+    pub fn new(config_storage: &impl ConfigStorage) -> Self {
+        Self(AptosVMImpl::new(config_storage))
+    }
+
+    pub fn new_from_state_view(state_view: &impl StateView) -> Self {
+        let config_storage = StorageAdapter::new(state_view);
         Self(AptosVMImpl::new(&config_storage))
     }
 
@@ -129,7 +133,7 @@ impl AptosVM {
             AdapterLogSchema::new(state_view.id(), 0),
             "Adapter created for Validation"
         );
-        Self::new(state_view)
+        Self::new_from_state_view(state_view)
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -252,7 +256,7 @@ impl AptosVM {
         .1
     }
 
-    pub fn as_move_resolver<'a, S: StateView>(&self, state_view: &'a S) -> StorageAdapter<'a, S> {
+    pub fn as_move_resolver<'a, S>(&self, state_view: &'a S) -> StorageAdapter<'a, S> {
         StorageAdapter::new_with_cached_config(
             state_view,
             self.0.get_gas_feature_version(),
@@ -1164,7 +1168,7 @@ impl AptosVM {
         F: FnOnce(u64, VMGasParameters, StorageGasParameters, Gas) -> Result<G, VMStatus>,
     {
         // TODO(Gas): revisit this.
-        let vm = AptosVM::new(state_view);
+        let vm = AptosVM::new_from_state_view(state_view);
 
         // TODO(Gas): avoid creating txn metadata twice.
         let balance = TransactionMetadata::new(txn).max_gas_amount();
@@ -1354,7 +1358,7 @@ impl AptosVM {
         txn: &SignedTransaction,
         state_view: &impl StateView,
     ) -> (VMStatus, TransactionOutput) {
-        let vm = AptosVM::new(state_view);
+        let vm = AptosVM::new_from_state_view(state_view);
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
@@ -1379,7 +1383,7 @@ impl AptosVM {
         arguments: Vec<Vec<u8>>,
         gas_budget: u64,
     ) -> Result<Vec<Vec<u8>>> {
-        let vm = AptosVM::new(state_view);
+        let vm = AptosVM::new_from_state_view(state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         let mut gas_meter =
             MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
@@ -1421,7 +1425,7 @@ impl AptosVM {
     fn run_prologue_with_payload(
         &self,
         session: &mut SessionExt,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         payload: &TransactionPayload,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -1623,7 +1627,7 @@ impl VMAdapter for AptosVM {
     fn run_prologue(
         &self,
         session: &mut SessionExt,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         transaction: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {

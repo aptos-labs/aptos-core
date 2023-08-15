@@ -50,7 +50,7 @@ pub struct StorageAdapter<'a, S> {
         RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
 }
 
-impl<'a, S: StateView> StorageAdapter<'a, S> {
+impl<'a, S> StorageAdapter<'a, S> {
     pub fn new_with_cached_config(
         state_store: &'a S,
         gas_feature_version: u64,
@@ -68,7 +68,9 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         s.max_binary_format_version = get_max_binary_format_version(features, gas_feature_version);
         s
     }
+}
 
+impl<'a, S: StateView> StorageAdapter<'a, S> {
     pub fn new(state_store: &'a S) -> Self {
         let mut s = Self {
             state_store,
