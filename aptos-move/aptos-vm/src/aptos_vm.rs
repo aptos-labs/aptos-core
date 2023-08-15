@@ -74,7 +74,6 @@ use once_cell::sync::{Lazy, OnceCell};
 use std::{
     cmp::{max, min},
     collections::{BTreeMap, BTreeSet},
-    convert::{AsMut, AsRef},
     marker::Sync,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -1758,18 +1757,6 @@ impl VMAdapter for AptosVM {
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
         })
-    }
-}
-
-impl AsRef<AptosVMImpl> for AptosVM {
-    fn as_ref(&self) -> &AptosVMImpl {
-        &self.0
-    }
-}
-
-impl AsMut<AptosVMImpl> for AptosVM {
-    fn as_mut(&mut self) -> &mut AptosVMImpl {
-        &mut self.0
     }
 }
 
