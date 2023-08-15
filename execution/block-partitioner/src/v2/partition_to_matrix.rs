@@ -6,7 +6,6 @@ use crate::v2::{
 };
 use aptos_logger::trace;
 use aptos_types::block_executor::partitioner::{RoundId, TxnIndex};
-use dashmap::DashMap;
 use rayon::{
     iter::ParallelIterator,
     prelude::{IntoParallelIterator, IntoParallelRefIterator},
@@ -24,7 +23,7 @@ impl PartitionerV2 {
         let mut remaining_txns = mem::take(&mut state.pre_partitioned);
         assert_eq!(state.num_executor_shards, remaining_txns.len());
 
-        let mut num_remaining_txns = usize::MAX;
+        let mut num_remaining_txns: usize;
         for round_id in 0..(state.num_rounds_limit - 1) {
             let (accepted, discarded) = Self::discarding_round(state, round_id, remaining_txns);
             state.finalized_txn_matrix.push(accepted);

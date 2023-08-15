@@ -5,6 +5,7 @@ use crate::{
     block_partitioning::BlockPartitioningStage, GasMesurement, TransactionCommitter,
     TransactionExecutor,
 };
+use aptos_block_partitioner::PartitionerConfig;
 use aptos_crypto::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
@@ -22,7 +23,6 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
-use aptos_block_partitioner::PartitionerConfig;
 
 #[derive(Clone, Copy, Debug)]
 pub struct PipelineConfig {

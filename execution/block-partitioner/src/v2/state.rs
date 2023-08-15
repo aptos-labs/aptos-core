@@ -1,5 +1,7 @@
 // Copyright © Aptos Foundation
 
+#![allow(unused_variables)]
+
 use crate::{
     pre_partition::start_txn_idxs,
     v2::{
@@ -148,10 +150,6 @@ impl PartitionState {
             .key_idx_table
             .entry(key.clone())
             .or_insert_with(|| self.key_counter.fetch_add(1, Ordering::SeqCst))
-    }
-
-    pub(crate) fn num_keys(&self) -> usize {
-        self.key_counter.load(Ordering::SeqCst)
     }
 
     pub(crate) fn reset_min_discard_table(&mut self) {

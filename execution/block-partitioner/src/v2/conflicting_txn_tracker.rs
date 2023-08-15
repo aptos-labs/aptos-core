@@ -8,7 +8,7 @@ use aptos_types::{
     transaction::analyzed_transaction::StorageLocation,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{btree_set::BTreeSet, HashSet};
+use std::collections::btree_set::BTreeSet;
 
 /// This structure is only used in `V2Partitioner`.
 /// For txns that claimed to access the same storage location,

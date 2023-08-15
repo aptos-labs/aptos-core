@@ -7,9 +7,8 @@
 extern crate criterion;
 
 use aptos_block_partitioner::{test_utils::P2PBlockGenerator, v2::PartitionerV2, BlockPartitioner};
-use criterion::{BenchmarkId, Criterion};
+use criterion::Criterion;
 use rand::thread_rng;
-use std::{thread::sleep, time::Duration};
 
 fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("v2");

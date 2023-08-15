@@ -107,7 +107,7 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
         .cross_shard_dep_avoid_threshold(0.9)
         .partition_last_round(true)
         .build();
-    let partitioned_txns = partitioner.partition(transactions.clone());
+    let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),

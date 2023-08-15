@@ -1,19 +1,10 @@
 // Copyright © Aptos Foundation
 
-use aptos_block_partitioner::{
-    sharded_block_partitioner::config::PartitionerV1Config,
-    test_utils::{
-        create_signed_p2p_transaction, generate_test_account, P2PBlockGenerator, TestAccount,
-    },
-    v2::{config::PartitionerV2Config, PartitionerV2},
-    BlockPartitioner,
-};
+use aptos_block_partitioner::{test_utils::P2PBlockGenerator, v2::config::PartitionerV2Config};
 use aptos_logger::info;
-use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use clap::Parser;
-use rand::{rngs::OsRng, thread_rng};
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::{sync::Mutex, time::Instant};
+use rand::thread_rng;
+use std::time::Instant;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -51,7 +42,7 @@ fn main() {
         let transactions = block_gen.rand_block(&mut rng, args.block_size);
         info!("Starting to partition");
         let now = Instant::now();
-        let partitioned = partitioner.partition(transactions.clone(), args.num_shards);
+        let _partitioned = partitioner.partition(transactions.clone(), args.num_shards);
         let elapsed = now.elapsed();
         info!("Time taken to partition: {:?}", elapsed);
     }

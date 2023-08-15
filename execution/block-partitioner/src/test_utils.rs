@@ -1,20 +1,31 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(test)]
 use crate::{BlockPartitioner, Sender};
-use aptos_crypto::{
-    ed25519::ed25519_keys::Ed25519PrivateKey,
-    hash::{CryptoHash, TestOnlyHash},
-    HashValue, PrivateKey, SigningKey, Uniform,
-};
-use aptos_logger::info;
+#[cfg(test)]
+use aptos_crypto::hash::CryptoHash;
+#[cfg(test)]
+use aptos_crypto::hash::TestOnlyHash;
+#[cfg(test)]
+use aptos_crypto::HashValue;
+use aptos_crypto::{ed25519::ed25519_keys::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+#[cfg(test)]
+use aptos_types::block_executor::partitioner::PartitionedTransactions;
+#[cfg(test)]
+use aptos_types::block_executor::partitioner::RoundId;
+#[cfg(test)]
+use aptos_types::block_executor::partitioner::ShardId;
+#[cfg(test)]
+use aptos_types::block_executor::partitioner::TransactionWithDependencies;
+#[cfg(test)]
+use aptos_types::block_executor::partitioner::GLOBAL_ROUND_ID;
+#[cfg(test)]
+use aptos_types::block_executor::partitioner::GLOBAL_SHARD_ID;
+#[cfg(test)]
+use aptos_types::state_store::state_key::StateKey;
 use aptos_types::{
-    block_executor::partitioner::{
-        PartitionedTransactions, RoundId, ShardId, TransactionWithDependencies, GLOBAL_ROUND_ID,
-        GLOBAL_SHARD_ID,
-    },
     chain_id::ChainId,
-    state_store::state_key::StateKey,
     transaction::{
         analyzed_transaction::AnalyzedTransaction, EntryFunction, RawTransaction,
         SignedTransaction, Transaction, TransactionPayload,
@@ -24,12 +35,15 @@ use aptos_types::{
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
 };
-use rand::{thread_rng, Rng};
+#[cfg(test)]
+use rand::thread_rng;
+use rand::Rng;
 use rayon::{iter::ParallelIterator, prelude::IntoParallelIterator};
-use std::{
-    collections::{HashMap, HashSet},
-    sync::{Arc, Mutex},
-};
+#[cfg(test)]
+use std::collections::HashMap;
+#[cfg(test)]
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
 pub struct TestAccount {
@@ -201,7 +215,6 @@ pub fn verify_partitioner_output(
             {
                 for loc in locs.iter() {
                     let key = loc.clone().into_state_key();
-                    let key_str = CryptoHash::hash(&key).to_hex();
                     if round_id != num_rounds - 1 {
                         assert_ne!(src_txn_idx.round_id, round_id);
                     }
@@ -228,7 +241,6 @@ pub fn verify_partitioner_output(
             {
                 for loc in locs.iter() {
                     let key = loc.clone().into_state_key();
-                    let key_str = CryptoHash::hash(&key).to_hex();
                     if round_id != num_rounds - 1 {
                         assert_ne!(dst_tid.round_id, round_id);
                     }

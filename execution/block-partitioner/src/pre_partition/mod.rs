@@ -1,9 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::v2::types::PreParedTxnIdx;
-use aptos_types::{
-    block_executor::partitioner::ShardId, transaction::analyzed_transaction::AnalyzedTransaction,
-};
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 
 pub trait PrePartitioner: Send {
     fn pre_partition(

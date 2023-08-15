@@ -7,33 +7,15 @@ pub mod v2;
 
 pub mod test_utils;
 
-#[cfg(test)]
-use crate::test_utils::P2PBlockGenerator;
-use crate::{sharded_block_partitioner::ShardedBlockPartitioner, v2::PartitionerV2};
-use aptos_crypto::{
-    hash::{CryptoHash, TestOnlyHash},
-    HashValue,
-};
-use aptos_logger::info;
 use aptos_types::{
-    block_executor::partitioner::{
-        PartitionedTransactions, RoundId, ShardId, SubBlocksForShard, TransactionWithDependencies,
-        GLOBAL_ROUND_ID, GLOBAL_SHARD_ID,
-    },
-    state_store::state_key::StateKey,
+    block_executor::partitioner::{PartitionedTransactions, ShardId},
     transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
 };
 use move_core_types::account_address::AccountAddress;
-use once_cell::sync::Lazy;
-#[cfg(test)]
-use rand::thread_rng;
 use sharded_block_partitioner::config::PartitionerV1Config;
-#[cfg(test)]
-use std::sync::Arc;
 use std::{
-    collections::{hash_map::DefaultHasher, HashMap, HashSet},
+    collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
-    sync::RwLock,
 };
 use v2::config::PartitionerV2Config;
 mod pre_partition;

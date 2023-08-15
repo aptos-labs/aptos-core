@@ -2,12 +2,16 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_block_partitioner::{
+    sharded_block_partitioner::config::PartitionerV1Config, v2::config::PartitionerV2Config,
+    PartitionerConfig,
+};
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
 use aptos_executor::block_executor::TransactionBlockExecutor;
 use aptos_executor_benchmark::{native_executor::NativeExecutor, pipeline::PipelineConfig};
-use aptos_metrics_core::{IntGauge, register_int_gauge};
+use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::args::TransactionTypeArg;
 use aptos_vm::AptosVM;
@@ -17,9 +21,6 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
-use aptos_block_partitioner::PartitionerConfig;
-use aptos_block_partitioner::sharded_block_partitioner::config::PartitionerV1Config;
-use aptos_block_partitioner::v2::config::PartitionerV2Config;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -139,11 +140,11 @@ impl PipelineOpt {
             2 => PartitionerConfig::V2(PartitionerV2Config {
                 num_threads: self.partitioner_v2_num_threads,
                 max_partitioning_rounds: self.max_partitioning_rounds,
-                cross_shard_dep_avoid_threshold: ((1.0 - self.partitioner_cross_shard_dep_avoid_threshold) * 100.0) as u64,
+                cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
                 dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
                 partition_last_round: self.use_global_executor,
             }),
-            _ => panic!("Unknown partitioner version: {}", self.partitioner_version)
+            _ => panic!("Unknown partitioner version: {}", self.partitioner_version),
         }
     }
 }

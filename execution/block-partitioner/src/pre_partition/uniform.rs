@@ -1,12 +1,10 @@
 // Copyright © Aptos Foundation
 
-use crate::{
-    pre_partition::PrePartitioner, test_utils::P2PBlockGenerator, v2::types::PreParedTxnIdx,
-};
-use aptos_types::{
-    block_executor::partitioner::ShardId, transaction::analyzed_transaction::AnalyzedTransaction,
-};
-use itertools::Itertools;
+#[cfg(test)]
+use crate::test_utils::P2PBlockGenerator;
+use crate::{pre_partition::PrePartitioner, v2::types::PreParedTxnIdx};
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
+#[cfg(test)]
 use rand::thread_rng;
 
 /// Evenly divide txns. Example: processing txns 0..11 results in [[0,1,2,3],[4,5,6,7],[8,9,10]].

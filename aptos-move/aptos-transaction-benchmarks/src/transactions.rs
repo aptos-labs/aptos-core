@@ -4,10 +4,12 @@
 
 use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
-use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
+use aptos_block_partitioner::{
+    sharded_block_partitioner::config::PartitionerV1Config, BlockPartitioner,
+};
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
-    account_universe::{AccountPickStyle, AccountUniverse, AccountUniverseGen, AUTransactionGen},
+    account_universe::{AUTransactionGen, AccountPickStyle, AccountUniverse, AccountUniverseGen},
     data_store::FakeDataStore,
     executor::FakeExecutor,
     gas_costs::TXN_RESERVED,
@@ -29,7 +31,7 @@ use aptos_vm::{
         ShardedBlockExecutor,
     },
 };
-use criterion::{BatchSize, Bencher, measurement::Measurement};
+use criterion::{measurement::Measurement, BatchSize, Bencher};
 use once_cell::sync::Lazy;
 use proptest::{
     collection::vec,
@@ -37,7 +39,6 @@ use proptest::{
     test_runner::TestRunner,
 };
 use std::{net::SocketAddr, sync::Arc, time::Instant};
-use aptos_block_partitioner::sharded_block_partitioner::config::PartitionerV1Config;
 
 pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
@@ -198,7 +199,7 @@ struct TransactionBenchState<S> {
     account_universe: AccountUniverse,
     parallel_block_executor:
         Option<Arc<ShardedBlockExecutor<FakeDataStore, LocalExecutorClient<FakeDataStore>>>>,
-    block_partitioner: Option<ShardedBlockPartitioner>,
+    block_partitioner: Option<Box<dyn BlockPartitioner>>,
     validator_set: ValidatorSet,
     state_view: Arc<FakeDataStore>,
 }
@@ -380,6 +381,7 @@ where
                     .into_iter()
                     .map(|txn| txn.into())
                     .collect::<Vec<AnalyzedTransaction>>(),
+                self.parallel_block_executor.as_ref().unwrap().num_shards(),
             );
             parallel_block_executor
                 .execute_block(

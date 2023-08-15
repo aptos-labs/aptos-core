@@ -19,6 +19,7 @@ use crate::{
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
 use aptos_block_executor::counters as block_executor_counters;
+use aptos_block_partitioner::PartitionerConfig;
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
 use aptos_executor::{
@@ -49,7 +50,6 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::Runtime;
-use aptos_block_partitioner::PartitionerConfig;
 
 pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
@@ -178,7 +178,7 @@ pub fn run_benchmark<V>(
     let version = db.reader.get_latest_version().unwrap();
 
     let (pipeline, block_sender) =
-        Pipeline::new(executor, version, pipeline_config.clone(), Some(num_blocks));
+        Pipeline::new(executor, version, pipeline_config, Some(num_blocks));
 
     let mut num_accounts_to_load = num_main_signer_accounts;
     if let Some(mix) = &transaction_mix {
@@ -575,6 +575,7 @@ mod tests {
                 num_executor_shards: 1,
                 async_partitioning: false,
                 use_global_executor: false,
+                partitioner_config: Default::default(),
             },
         );
 
@@ -603,6 +604,7 @@ mod tests {
                 num_executor_shards: 1,
                 async_partitioning: false,
                 use_global_executor: false,
+                partitioner_config: Default::default(),
             },
         );
     }

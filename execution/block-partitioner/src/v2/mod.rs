@@ -5,47 +5,22 @@ use crate::test_utils::assert_deterministic_result;
 #[cfg(test)]
 use crate::test_utils::P2PBlockGenerator;
 use crate::{
-    get_anchor_shard_id,
-    pre_partition::{start_txn_idxs, uniform, uniform::UniformPartitioner, PrePartitioner},
-    v2::{conflicting_txn_tracker::ConflictingTxnTracker, counters::MISC_TIMERS_SECONDS},
-    BlockPartitioner, Sender,
+    pre_partition::{uniform::UniformPartitioner, PrePartitioner},
+    v2::counters::MISC_TIMERS_SECONDS,
+    BlockPartitioner,
 };
-use aptos_crypto::hash::CryptoHash;
-use aptos_logger::{debug, info, trace};
 use aptos_types::{
-    block_executor::partitioner::{
-        CrossShardDependencies, PartitionedTransactions, RoundId, ShardId, ShardedTxnIndex,
-        SubBlock, SubBlocksForShard, TransactionWithDependencies, TxnIndex, GLOBAL_ROUND_ID,
-        GLOBAL_SHARD_ID,
-    },
-    state_store::state_key::StateKey,
-    transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
+    block_executor::partitioner::{PartitionedTransactions, RoundId},
+    transaction::analyzed_transaction::AnalyzedTransaction,
 };
-use dashmap::DashMap;
 #[cfg(test)]
 use rand::thread_rng;
 #[cfg(test)]
 use rand::Rng;
-use rayon::{
-    iter::ParallelIterator,
-    prelude::{IntoParallelIterator, IntoParallelRefIterator},
-    ThreadPool, ThreadPoolBuilder,
-};
-use serde::{Deserialize, Serialize};
+use rayon::{ThreadPool, ThreadPoolBuilder};
 use state::PartitionState;
-use std::{
-    cmp,
-    collections::{btree_set::Range, HashSet},
-    iter::Chain,
-    mem,
-    mem::swap,
-    slice::Iter,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, Mutex, RwLock,
-    },
-};
-use types::{PreParedTxnIdx, SenderIdx, ShardedTxnIndexV2, StorageKeyIdx, SubBlockIdx};
+use std::sync::{Arc, RwLock};
+use types::PreParedTxnIdx;
 
 mod build_edge;
 pub mod config;
