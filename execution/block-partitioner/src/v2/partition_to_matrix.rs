@@ -1,19 +1,26 @@
 // Copyright © Aptos Foundation
 
 use crate::v2::{
-    counters::MISC_TIMERS_SECONDS, extract_and_sort, state::PartitionState, types::PreParedTxnIdx,
+    counters::MISC_TIMERS_SECONDS,
+    extract_and_sort,
+    state::PartitionState,
+    types::{PreParedTxnIdx, SenderIdx},
     PartitionerV2,
 };
 use aptos_logger::trace;
 use aptos_types::block_executor::partitioner::{RoundId, TxnIndex};
+use dashmap::DashMap;
 use rayon::{
     iter::ParallelIterator,
     prelude::{IntoParallelIterator, IntoParallelRefIterator},
 };
-use std::{mem, sync::RwLock};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use dashmap::DashMap;
-use crate::v2::types::SenderIdx;
+use std::{
+    mem,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        RwLock,
+    },
+};
 
 impl PartitionerV2 {
     /// Populate `state.finalized_txn_matrix` with txns flattened into a matrix (num_rounds by num_shards),
@@ -98,7 +105,8 @@ impl PartitionerV2 {
             discarded.push(RwLock::new(Vec::with_capacity(txns.len())));
         }
 
-        let min_discard_table: DashMap<SenderIdx, AtomicUsize> = DashMap::with_shard_amount(state.dashmap_num_shards);
+        let min_discard_table: DashMap<SenderIdx, AtomicUsize> =
+            DashMap::with_shard_amount(state.dashmap_num_shards);
 
         state.thread_pool.install(|| {
             // Move some txns to the next round (stored in `discarded`).
@@ -123,7 +131,10 @@ impl PartitionerV2 {
 
                         if in_round_conflict_detected {
                             let sender = state.sender_idx(txn_idx);
-                            min_discard_table.entry(sender).or_insert_with(||AtomicUsize::new(usize::MAX)).fetch_min(txn_idx, Ordering::SeqCst);
+                            min_discard_table
+                                .entry(sender)
+                                .or_insert_with(|| AtomicUsize::new(usize::MAX))
+                                .fetch_min(txn_idx, Ordering::SeqCst);
                             discarded[shard_id].write().unwrap().push(txn_idx);
                         } else {
                             tentatively_accepted[shard_id]
@@ -144,7 +155,10 @@ impl PartitionerV2 {
                     let txn_idxs = mem::take(&mut *txn_idxs.write().unwrap());
                     txn_idxs.into_par_iter().for_each(|ori_txn_idx| {
                         let sender_idx = state.sender_idx(ori_txn_idx);
-                        let min_discarded = min_discard_table.get(&sender_idx).map(|kv|kv.load(Ordering::SeqCst)).unwrap_or(usize::MAX);
+                        let min_discarded = min_discard_table
+                            .get(&sender_idx)
+                            .map(|kv| kv.load(Ordering::SeqCst))
+                            .unwrap_or(usize::MAX);
                         if ori_txn_idx < min_discarded {
                             state.update_trackers_on_accepting(ori_txn_idx, round_id, shard_id);
                             finally_accepted[shard_id]

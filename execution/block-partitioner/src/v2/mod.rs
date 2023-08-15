@@ -1,9 +1,5 @@
 // Copyright © Aptos Foundation
 
-#[cfg(test)]
-use crate::test_utils::assert_deterministic_result;
-#[cfg(test)]
-use crate::test_utils::P2PBlockGenerator;
 use crate::{
     pre_partition::{uniform_partitioner::UniformPartitioner, PrePartitioner},
     v2::counters::MISC_TIMERS_SECONDS,
@@ -13,10 +9,6 @@ use aptos_types::{
     block_executor::partitioner::{PartitionedTransactions, RoundId},
     transaction::analyzed_transaction::AnalyzedTransaction,
 };
-#[cfg(test)]
-use rand::thread_rng;
-#[cfg(test)]
-use rand::Rng;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use state::PartitionState;
 use std::sync::{Arc, RwLock};
@@ -126,11 +118,13 @@ impl BlockPartitioner for PartitionerV2 {
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        test_utils::{assert_deterministic_result, P2PBlockGenerator},
+        v2::PartitionerV2,
+        BlockPartitioner,
+    };
+    use rand::{thread_rng, Rng};
     use std::sync::Arc;
-    use rand::{Rng, thread_rng};
-    use crate::test_utils::{assert_deterministic_result, P2PBlockGenerator};
-    use crate::v2::PartitionerV2;
-    use crate::BlockPartitioner;
 
     #[test]
     fn test_partitioner_v2_correctness() {

@@ -26,7 +26,6 @@ use rayon::{
 };
 use std::{
     collections::HashSet,
-    mem,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc, Mutex, RwLock,
