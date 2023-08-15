@@ -13,7 +13,7 @@ use crate::{
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
-    view::LatestView,
+    view::{LatestView, ParallelState, SequentialState, ViewState},
 };
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_logger::{debug, info};
@@ -28,6 +28,7 @@ use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
+    collections::HashMap,
     marker::PhantomData,
     sync::{
         atomic::AtomicU32,
@@ -110,39 +111,53 @@ where
     }
 
     fn execute(
-        &self,
         version: Version,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
         executor: &E,
-        sync_view: &mut LatestView<T, S, X>,
+        base_view: &S,
+        latest_view: ParallelState<T, X>,
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let (idx_to_execute, incarnation) = version;
         let txn = &signature_verified_block[idx_to_execute as usize];
 
         // VM execution.
-        sync_view.update_txn_idx(idx_to_execute);
+        let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), idx_to_execute);
         let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute, false);
-        let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
+
+        let mut prev_modified_keys = last_input_output
+            .modified_keys(idx_to_execute)
+            .map_or(HashMap::new(), |keys| keys.collect());
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
         let mut updates_outside = false;
         let mut apply_updates = |output: &E::Output| {
             // First, apply writes.
             let write_version = (idx_to_execute, incarnation);
-            for (k, v) in output.get_writes().into_iter() {
-                if !prev_modified_keys.remove(&k) {
+            for (k, v) in output
+                .resource_write_set()
+                .into_iter()
+                .chain(output.aggregator_v1_write_set().into_iter())
+            {
+                if prev_modified_keys.remove(&k).is_none() {
                     updates_outside = true;
                 }
-                versioned_cache.write(k, write_version, v);
+                versioned_cache.data().write(k, write_version, v);
+            }
+
+            for (k, v) in output.module_write_set().into_iter() {
+                if prev_modified_keys.remove(&k).is_none() {
+                    updates_outside = true;
+                }
+                versioned_cache.modules().write(k, idx_to_execute, v);
             }
 
             // Then, apply deltas.
-            for (k, d) in output.get_deltas().into_iter() {
-                if !prev_modified_keys.remove(&k) {
+            for (k, d) in output.aggregator_v1_delta_set().into_iter() {
+                if prev_modified_keys.remove(&k).is_none() {
                     updates_outside = true;
                 }
                 versioned_cache.add_delta(k, idx_to_execute, d);
@@ -171,8 +186,12 @@ where
         };
 
         // Remove entries from previous write/delta set that were not overwritten.
-        for k in prev_modified_keys {
-            versioned_cache.delete(&k, idx_to_execute);
+        for (k, is_module) in prev_modified_keys {
+            if is_module {
+                versioned_cache.modules().delete(&k, idx_to_execute);
+            } else {
+                versioned_cache.data().delete(&k, idx_to_execute);
+            }
         }
 
         if last_input_output
@@ -188,7 +207,6 @@ where
     }
 
     fn validate(
-        &self,
         version_to_validate: Version,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
@@ -232,8 +250,14 @@ where
             clear_speculative_txn_logs(idx_to_validate as usize);
 
             // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
-            for k in last_input_output.modified_keys(idx_to_validate) {
-                versioned_cache.mark_estimate(&k, idx_to_validate);
+            if let Some(keys) = last_input_output.modified_keys(idx_to_validate) {
+                for (k, is_module_path) in keys {
+                    if is_module_path {
+                        versioned_cache.modules().mark_estimate(&k, idx_to_validate);
+                    } else {
+                        versioned_cache.data().mark_estimate(&k, idx_to_validate);
+                    }
+                }
             }
 
             scheduler.finish_abort(idx_to_validate, incarnation)
@@ -342,10 +366,10 @@ where
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         base_view: &S,
     ) {
-        let (num_deltas, delta_keys) = last_input_output.delta_keys(txn_idx);
+        let delta_keys = last_input_output.delta_keys(txn_idx);
         let _events = last_input_output.events(txn_idx);
-        let mut delta_writes = Vec::with_capacity(num_deltas);
-        for k in delta_keys {
+        let mut delta_writes = Vec::with_capacity(delta_keys.len());
+        for k in delta_keys.into_iter() {
             // Note that delta materialization happens concurrently, but under concurrent
             // commit_hooks (which may be dispatched by the coordinator), threads may end up
             // contending on delta materialization of the same aggregator. However, the
@@ -372,10 +396,7 @@ where
                 });
 
             // Must contain committed value as we set the base value above.
-            delta_writes.push((
-                k.clone(),
-                WriteOp::Modification(serialize(&committed_delta)),
-            ));
+            delta_writes.push((k, WriteOp::Modification(serialize(&committed_delta))));
         }
         last_input_output.record_delta_writes(txn_idx, delta_writes);
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
@@ -402,7 +423,7 @@ where
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
         base_view: &S,
-        sync_view: &mut LatestView<T, S, X>,
+        shared_counter: &AtomicU32,
         role: CommitRole,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
@@ -446,7 +467,7 @@ where
             }
 
             scheduler_task = match scheduler_task {
-                SchedulerTask::ValidationTask(version_to_validate, wave) => self.validate(
+                SchedulerTask::ValidationTask(version_to_validate, wave) => Self::validate(
                     version_to_validate,
                     wave,
                     last_input_output,
@@ -454,14 +475,15 @@ where
                     scheduler,
                 ),
                 SchedulerTask::ExecutionTask(version_to_execute, ExecutionTaskType::Execution) => {
-                    self.execute(
+                    Self::execute(
                         version_to_execute,
                         block,
                         last_input_output,
                         versioned_cache,
                         scheduler,
                         &executor,
-                        sync_view,
+                        base_view,
+                        ParallelState::new(versioned_cache, scheduler, shared_counter),
                     )
                 },
                 SchedulerTask::ExecutionTask(_, ExecutionTaskType::Wakeup(condvar)) => {
@@ -536,13 +558,6 @@ where
             for _ in 0..self.concurrency_level {
                 let role = roles.pop().expect("Role must be set for all threads");
                 s.spawn(|_| {
-                    let mut sync_view = LatestView::<T, S, X>::new_sync_view(
-                        base_view,
-                        &versioned_cache,
-                        &scheduler,
-                        &shared_counter,
-                    );
-
                     self.work_task_with_scope(
                         &executor_initial_arguments,
                         signature_verified_block,
@@ -550,7 +565,7 @@ where
                         &versioned_cache,
                         &scheduler,
                         base_view,
-                        &mut sync_view,
+                        &shared_counter,
                         role,
                     );
                 });
@@ -612,27 +627,38 @@ where
         drop(init_timer);
 
         let data_map = UnsyncMap::new();
-        let mut unsync_view = LatestView::<T, S, X>::new_unsync_view(base_view, &data_map);
 
         let mut ret = Vec::with_capacity(num_txns);
 
         let mut accumulated_fee_statement = FeeStatement::zero();
 
         for (idx, txn) in signature_verified_block.iter().enumerate() {
-            unsync_view.update_txn_idx(idx as TxnIndex);
+            let unsync_view = LatestView::<T, S, X>::new(
+                base_view,
+                ViewState::Unsync(SequentialState {
+                    unsync_map: &data_map,
+                    _counter: &0,
+                }),
+                idx as TxnIndex,
+            );
             let res = executor.execute_transaction(&unsync_view, txn, idx as TxnIndex, true);
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                     assert_eq!(
-                        output.get_deltas().len(),
+                        output.aggregator_v1_delta_set().len(),
                         0,
                         "Sequential execution must materialize deltas"
                     );
                     // Apply the writes.
-                    for (ap, write_op) in output.get_writes().into_iter() {
-                        data_map.write(ap, write_op);
+                    for (key, write_op) in output
+                        .resource_write_set()
+                        .into_iter()
+                        .chain(output.aggregator_v1_write_set().into_iter())
+                        .chain(output.module_write_set().into_iter())
+                    {
+                        data_map.write(key, write_op);
                     }
                     // Calculating the accumulated gas costs of the committed txns.
                     let fee_statement = output.fee_statement();

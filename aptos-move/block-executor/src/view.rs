@@ -45,10 +45,10 @@ pub(crate) enum ReadResult<V> {
     None,
 }
 
-struct ParallelState<'a, T: Transaction, X: Executable> {
+pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
     versioned_map: &'a MVHashMap<T::Key, T::Value, X>,
     scheduler: &'a Scheduler,
-    counter: &'a AtomicU32,
+    _counter: &'a AtomicU32,
     captured_reads: RefCell<Vec<ReadDescriptor<T::Key>>>,
 }
 
@@ -61,7 +61,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         Self {
             versioned_map: shared_map,
             scheduler: shared_scheduler,
-            counter: shared_counter,
+            _counter: shared_counter,
             captured_reads: RefCell::new(Vec::new()),
         }
     }
@@ -72,11 +72,10 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         key: &T::Key,
         txn_idx: TxnIndex,
     ) -> anyhow::Result<MVModulesOutput<T::Value, X>, MVModulesError> {
-        // Add a fake read from storage to register in reads for now in order
-        // for the read / write path intersection fallback for modules to still work.
+        // Register a fake read for the read / write path intersection fallback for modules.
         self.captured_reads
             .borrow_mut()
-            .push(ReadDescriptor::from_storage(key.clone()));
+            .push(ReadDescriptor::from_module(key.clone()));
 
         self.versioned_map.fetch_module(key, txn_idx)
     }
@@ -161,12 +160,12 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     }
 }
 
-struct SequentialState<'a, T: Transaction, X: Executable> {
-    unsync_map: &'a UnsyncMap<T::Key, T::Value, X>,
-    counter: u32,
+pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
+    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Value, X>,
+    pub(crate) _counter: &'a u32,
 }
 
-enum ViewState<'a, T: Transaction, X: Executable> {
+pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
     Sync(ParallelState<'a, T, X>),
     Unsync(SequentialState<'a, T, X>),
 }
@@ -179,53 +178,20 @@ enum ViewState<'a, T: Transaction, X: Executable> {
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
     base_view: &'a S,
     latest_view: ViewState<'a, T, X>,
-    latest_txn_idx: Option<TxnIndex>,
+    txn_idx: TxnIndex,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
-    pub(crate) fn new_sync_view(
+    pub(crate) fn new(
         base_view: &'a S,
-        shared_map: &'a MVHashMap<T::Key, T::Value, X>,
-        shared_scheduler: &'a Scheduler,
-        shared_counter: &'a AtomicU32,
-    ) -> LatestView<'a, T, S, X> {
-        LatestView {
+        latest_view: ViewState<'a, T, X>,
+        txn_idx: TxnIndex,
+    ) -> Self {
+        Self {
             base_view,
-            latest_view: ViewState::Sync(ParallelState::new(
-                shared_map,
-                shared_scheduler,
-                shared_counter,
-            )),
-            latest_txn_idx: None,
+            latest_view,
+            txn_idx,
         }
-    }
-
-    pub(crate) fn new_unsync_view(
-        base_view: &'a S,
-        map: &'a UnsyncMap<T::Key, T::Value, X>,
-    ) -> LatestView<'a, T, S, X> {
-        LatestView {
-            base_view,
-            latest_view: ViewState::Unsync(SequentialState {
-                unsync_map: map,
-                counter: 0,
-            }),
-            latest_txn_idx: None,
-        }
-    }
-
-    /// Records the index of the transaction that the worker is executing next. In parallel (Sync)
-    /// setting, clears captured reads to prepare for the next VM execution.
-    pub(crate) fn update_txn_idx(&mut self, txn_idx: TxnIndex) {
-        if let ViewState::Sync(state) = &self.latest_view {
-            state.captured_reads.borrow_mut().clear();
-        }
-        self.latest_txn_idx = Some(txn_idx);
-    }
-
-    fn expect_latest_txn_idx(&self) -> TxnIndex {
-        self.latest_txn_idx
-            .expect("Latest transaction index must be set")
     }
 
     /// Drains the captured reads.
@@ -244,8 +210,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         if ret.is_err() {
             // Even speculatively, reading from base view should not return an error.
             // Thus, this critical error log and count does not need to be buffered.
-            let log_context =
-                AdapterLogSchema::new(self.base_view.id(), self.expect_latest_txn_idx() as usize);
+            let log_context = AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize);
             alert!(
                 log_context,
                 "[VM, StateView] Error getting data from storage for {:?}",
@@ -268,7 +233,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
                     use MVModulesError::*;
                     use MVModulesOutput::*;
 
-                    match state.fetch_module(state_key, self.expect_latest_txn_idx()) {
+                    match state.fetch_module(state_key, self.txn_idx) {
                         Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
                         Ok(Module((v, _))) => Ok(v.as_state_value()),
                         Err(Dependency(_)) => {
@@ -280,7 +245,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
                     }
                 },
                 None => {
-                    let mut mv_value = state.fetch_data(state_key, self.expect_latest_txn_idx());
+                    let mut mv_value = state.fetch_data(state_key, self.txn_idx);
 
                     if matches!(mv_value, ReadResult::Unresolved) {
                         let from_storage = self
@@ -292,7 +257,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
                         // reads can be resolved to U128 directly without storage calls.
                         state.set_aggregator_base_value(state_key, from_storage);
 
-                        mv_value = state.fetch_data(state_key, self.expect_latest_txn_idx());
+                        mv_value = state.fetch_data(state_key, self.txn_idx);
                     }
 
                     match mv_value {
