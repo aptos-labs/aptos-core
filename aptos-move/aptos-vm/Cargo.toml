@@ -40,8 +40,13 @@ bcs = { workspace = true }
 claims = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.0-aurora", default-features = false }
+evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.0-aurora", default-features = false, features = ["std"] }
+evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.0-aurora", default-features = false, features = ["std", "tracing"] }
+evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.0-aurora", default-features = false, features = ["std", "tracing"] }
 fail = { workspace = true }
 futures = { workspace = true }
+hex = "0.4"
 move-binary-format = { workspace = true }
 move-bytecode-utils = { workspace = true }
 move-bytecode-verifier = { workspace = true }
@@ -53,6 +58,7 @@ move-vm-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 ouroboros = { workspace = true }
+primitive-types = { version = "0.12", default-features = false, features = ["rlp", "serde_no_std"] }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }

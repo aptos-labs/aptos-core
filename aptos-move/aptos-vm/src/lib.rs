@@ -119,6 +119,7 @@ pub mod testing;
 pub mod transaction_metadata;
 mod transaction_validation;
 mod verifier;
+mod evm;
 
 pub use crate::aptos_vm::AptosVM;
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};

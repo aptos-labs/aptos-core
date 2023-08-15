@@ -43,6 +43,10 @@ codespan-reporting = { workspace = true }
 # we work with version 3. Instead, we use `zkcrypto/bulleproofs` which relies on `zkcrypto/curve25519-dalek-ng`.
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 either = { workspace = true }
+evm = {workspace = true }
+evm-core = { workspace = true }
+evm-gasometer = { workspace = true }
+evm-runtime = { workspace = true }
 flate2 = { workspace = true }
 hex = { workspace = true }
 include_dir = { workspace = true }
