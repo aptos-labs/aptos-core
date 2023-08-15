@@ -735,3 +735,19 @@ pub fn jmt_update_refs<K>(
 ) -> Vec<(HashValue, Option<&(HashValue, K)>)> {
     jmt_updates.iter().map(|(x, y)| (*x, y.as_ref())).collect()
 }
+
+#[macro_export]
+macro_rules! db_not_found_bail {
+    ($($arg:tt)*) => {
+        return Err(AptosDbError::NotFound(format!($($arg)*)))
+    };
+}
+
+#[macro_export]
+macro_rules! db_ensure {
+    ($cond:expr, $($arg:tt)*) => {
+        if !$cond {
+            return Err(AptosDbError::Other(format!($($arg)*)));
+        }
+    };
+}

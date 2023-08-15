@@ -25,3 +25,9 @@ impl From<anyhow::Error> for AptosDbError {
         Self::Other(format!("{}", error))
     }
 }
+
+impl From<bcs::Error> for AptosDbError {
+    fn from(error: bcs::Error) -> Self {
+        Self::Other(format!("{}", error))
+    }
+}

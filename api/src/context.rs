@@ -22,6 +22,7 @@ use aptos_logger::error;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::TStateView;
 use aptos_storage_interface::{
+    db_ensure,
     errors::AptosDbError,
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
     DbReader, Order, MAX_REQUEST_LIMIT,
@@ -626,7 +627,7 @@ impl Context {
         start_version: u64,
         limit: u16,
         ledger_version: u64,
-    ) -> Result<Vec<TransactionOnChainData>> {
+    ) -> Result<Vec<TransactionOnChainData>, AptosDbError> {
         let data = self
             .db
             .get_transaction_outputs(start_version, limit as u64, ledger_version)?;
@@ -634,7 +635,7 @@ impl Context {
         let txn_start_version = data
             .first_transaction_output_version
             .ok_or_else(|| format_err!("no start version from database"))?;
-        ensure!(
+        db_ensure!(
             txn_start_version == start_version,
             "invalid start version from database: {} != {}",
             txn_start_version,
@@ -644,7 +645,7 @@ impl Context {
         let infos = data.proof.transaction_infos;
         let transactions_and_outputs = data.transactions_and_outputs;
 
-        ensure!(
+        db_ensure!(
             transactions_and_outputs.len() == infos.len(),
             "invalid data size from database: {}, {}",
             transactions_and_outputs.len(),
@@ -731,7 +732,7 @@ impl Context {
         &self,
         hash: HashValue,
         ledger_version: u64,
-    ) -> Result<Option<TransactionOnChainData>> {
+    ) -> Result<Option<TransactionOnChainData>, AptosDbError> {
         self.db
             .get_transaction_by_hash(hash, ledger_version, true)?
             .map(|t| self.convert_into_transaction_on_chain_data(t))
@@ -767,14 +768,14 @@ impl Context {
         )?)
     }
 
-    pub fn get_accumulator_root_hash(&self, version: u64) -> Result<HashValue> {
+    pub fn get_accumulator_root_hash(&self, version: u64) -> Result<HashValue, AptosDbError> {
         self.db.get_accumulator_root_hash(version)
     }
 
     fn convert_into_transaction_on_chain_data(
         &self,
         txn: TransactionWithProof,
-    ) -> Result<TransactionOnChainData> {
+    ) -> Result<TransactionOnChainData, AptosDbError> {
         // the type is Vec<(Transaction, TransactionOutput)> - given we have one transaction here, there should only ever be one value in this array
         let (_, txn_output) = &self
             .db
@@ -790,7 +791,7 @@ impl Context {
         start: Option<u64>,
         limit: u16,
         ledger_version: u64,
-    ) -> Result<Vec<EventWithVersion>> {
+    ) -> Result<Vec<EventWithVersion>, AptosDbError> {
         if let Some(start) = start {
             self.db.get_events(
                 event_key,
