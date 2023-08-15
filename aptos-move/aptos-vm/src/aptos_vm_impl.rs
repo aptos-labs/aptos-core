@@ -17,7 +17,7 @@ use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     chain_id::ChainId,
@@ -506,9 +506,11 @@ impl AptosVMImpl {
         gas_remaining: Gas,
         txn_data: &TransactionMetadata,
     ) -> VMResult<()> {
-        let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price();
         let txn_max_gas_units = txn_data.max_gas_amount();
+        // TODO(aldenhu): repurpose this to be the amount of the storage fee refund.
+        let unused = 0;
+
         // We can unconditionally do this as this condition can only be true if the prologue
         // accepted it, in which case the gas payer feature is enabled.
         if let Some(fee_payer) = txn_data.fee_payer() {
@@ -519,7 +521,7 @@ impl AptosVMImpl {
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::Address(fee_payer),
-                    MoveValue::U64(txn_sequence_number),
+                    MoveValue::U64(unused),
                     MoveValue::U64(txn_gas_price.into()),
                     MoveValue::U64(txn_max_gas_units.into()),
                     MoveValue::U64(gas_remaining.into()),
@@ -534,7 +536,7 @@ impl AptosVMImpl {
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
-                    MoveValue::U64(txn_sequence_number),
+                    MoveValue::U64(unused),
                     MoveValue::U64(txn_gas_price.into()),
                     MoveValue::U64(txn_max_gas_units.into()),
                     MoveValue::U64(gas_remaining.into()),
@@ -640,11 +642,9 @@ impl<'a> AptosVMInternals<'a> {
     }
 
     /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
-    pub fn gas_params(
-        self,
-        log_context: &AdapterLogSchema,
-    ) -> Result<&'a AptosGasParameters, VMStatus> {
-        self.0.get_gas_parameters(log_context)
+    pub fn gas_params(self) -> Result<&'a AptosGasParameters, VMStatus> {
+        let log_context = AdapterLogSchema::new(StateViewId::Miscellaneous, 0);
+        self.0.get_gas_parameters(&log_context)
     }
 
     /// Returns the version of Move Runtime.
