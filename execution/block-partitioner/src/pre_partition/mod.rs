@@ -13,7 +13,7 @@ pub trait PrePartitioner: Send {
     ) -> Vec<Vec<PreParedTxnIdx>>;
 }
 
-pub mod uniform;
+pub mod uniform_partitioner;
 
 pub fn start_txn_idxs(pre_partitioned: &Vec<Vec<PreParedTxnIdx>>) -> Vec<PreParedTxnIdx> {
     let num_shards = pre_partitioned.len();

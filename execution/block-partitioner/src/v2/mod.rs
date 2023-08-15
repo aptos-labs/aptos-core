@@ -5,7 +5,7 @@ use crate::test_utils::assert_deterministic_result;
 #[cfg(test)]
 use crate::test_utils::P2PBlockGenerator;
 use crate::{
-    pre_partition::{uniform::UniformPartitioner, PrePartitioner},
+    pre_partition::{uniform_partitioner::UniformPartitioner, PrePartitioner},
     v2::counters::MISC_TIMERS_SECONDS,
     BlockPartitioner,
 };
