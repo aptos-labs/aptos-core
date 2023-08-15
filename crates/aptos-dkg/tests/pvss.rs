@@ -28,10 +28,10 @@ fn all_unweighted_pvss_bvt() {
         let seed = random_scalar(&mut rng);
 
         // SCRAPE
-        pvss_deal_verify_and_reconstruct::<pvss::scrape::Transcript>(&tc, seed.to_bytes_le());
+        pvss_deal_verify_aggr_and_reconstruct::<pvss::scrape::Transcript>(&tc, seed.to_bytes_le());
 
         // Das
-        pvss_deal_verify_and_reconstruct::<pvss::das::Transcript>(&tc, seed.to_bytes_le());
+        pvss_deal_verify_aggr_and_reconstruct::<pvss::das::Transcript>(&tc, seed.to_bytes_le());
     }
 }
 
@@ -47,13 +47,13 @@ fn all_weighted_pvss_bvt() {
 
         // SCRAPE
         let seed = random_scalar(&mut rng);
-        pvss_deal_verify_and_reconstruct::<WeightedTranscript<pvss::scrape::Transcript>>(
+        pvss_deal_verify_aggr_and_reconstruct::<WeightedTranscript<pvss::scrape::Transcript>>(
             &wc,
             seed.to_bytes_le(),
         );
 
         // Das
-        pvss_deal_verify_and_reconstruct::<WeightedTranscript<pvss::das::Transcript>>(
+        pvss_deal_verify_aggr_and_reconstruct::<WeightedTranscript<pvss::das::Transcript>>(
             &wc,
             seed.to_bytes_le(),
         );
@@ -82,7 +82,7 @@ fn weighted_fail_due_to_blst_bug() {
         attempt += 1;
 
         let seed = random_scalar(&mut rng);
-        pvss_deal_verify_and_reconstruct::<WeightedTranscript<pvss::scrape::Transcript>>(
+        pvss_deal_verify_aggr_and_reconstruct::<WeightedTranscript<pvss::scrape::Transcript>>(
             &wc,
             seed.to_bytes_le(),
         );
@@ -124,7 +124,7 @@ fn print_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(t
 ///  1. Deals a secret, creating a transcript
 ///  2. Verifies the transcript.
 ///  3. Ensures the a sufficiently-large random subset of the players can recover the dealt secret
-fn pvss_deal_verify_and_reconstruct<T: Transcript>(
+fn pvss_deal_verify_aggr_and_reconstruct<T: Transcript>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
@@ -132,25 +132,27 @@ fn pvss_deal_verify_and_reconstruct<T: Transcript>(
     // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
     let mut rng = StdRng::from_seed(seed_bytes);
 
+    // TODO: Change this to return multiple InputSecrets, and their sum as the DealtSK. Then, test the secret reconstruction from the aggregated transcript shares.
     let (pp, dks, eks, s, sk) = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
 
-    let trx = T::deal(&sc, &pp, &eks, &s, &DST_PVSS_TESTING_APP[..], &mut rng);
-    trx.verify(&sc, &pp, &eks, &DST_PVSS_TESTING_APP[..])
+    let mut trx1 = T::deal(&sc, &pp, &eks, &s, &DST_PVSS_TESTING_APP[..], &mut rng);
+    let trx2 = T::deal(&sc, &pp, &eks, &s, &DST_PVSS_TESTING_APP[..], &mut rng);
+    trx1.verify(&sc, &pp, &eks, &DST_PVSS_TESTING_APP[..])
         .expect("PVSS transcript failed verification");
 
     // Test transcript (de)serialization
-    let serialized = trx.to_bytes();
+    let serialized = trx1.to_bytes();
     let deserialized = T::try_from(serialized.as_slice())
         .expect("serialized transcript should deserialize correctly");
 
-    assert_eq!(trx, deserialized);
+    assert_eq!(trx1, deserialized);
 
     // Test reconstruction from t random shares
     let players_and_shares = sc
         .get_random_subset_of_capable_players(&mut rng)
         .into_iter()
         .map(|p| {
-            let (sk, _) = trx.decrypt_own_share(&sc, &p, &dks[p.get_id()]);
+            let (sk, _) = trx1.decrypt_own_share(&sc, &p, &dks[p.get_id()]);
 
             (p, sk)
         })
@@ -161,6 +163,10 @@ fn pvss_deal_verify_and_reconstruct<T: Transcript>(
     // println!();
     assert_eq!(sk, sk_reconstruct);
     // println!("Reconstructed {:?}", sk_reconstruct);
+
+    // Test aggregation
+    trx1.aggregate_with(sc, &trx2);
+    trx1.verify(sc, &pp, &eks, &DST_PVSS_TESTING_APP[..]).expect("aggregated PVSS transcript failed verification");
 }
 
 fn actual_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(
