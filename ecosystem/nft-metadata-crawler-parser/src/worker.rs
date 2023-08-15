@@ -263,11 +263,14 @@ impl Worker {
         // Deduplicate token_uri
         // Proceed if force or if token_uri has not been parsed
         if self.force
-            || NFTMetadataCrawlerURIsQuery::get_by_token_uri(
-                self.token_uri.clone(),
-                &mut self.conn,
-            )?
-            .is_none()
+            || NFTMetadataCrawlerURIsQuery::get_by_token_uri(self.token_uri.clone(), &mut self.conn)
+                .map_or(true, |uri| match uri {
+                    Some(uris) => {
+                        self.model.set_cdn_json_uri(uris.cdn_json_uri);
+                        false
+                    },
+                    None => true,
+                })
         {
             // Parse token_uri
             self.model.set_token_uri(self.token_uri.clone());
@@ -315,23 +318,33 @@ impl Worker {
                     .ok();
                 self.model.set_cdn_json_uri(cdn_json_uri);
             }
+        }
 
-            // Commit model to Postgres
-            if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
-                error!(
-                    last_transaction_version = self.last_transaction_version,
-                    error = ?e,
-                    "[NFT Metadata Crawler] Commit to Postgres failed"
-                );
-            }
+        // Commit model to Postgres
+        if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
+            error!(
+                last_transaction_version = self.last_transaction_version,
+                error = ?e,
+                "[NFT Metadata Crawler] Commit to Postgres failed"
+            );
         }
 
         // Deduplicate raw_image_uri
         // Proceed with image optimization of force or if raw_image_uri has not been parsed
         if self.force
             || self.model.get_raw_image_uri().map_or(true, |uri_option| {
-                NFTMetadataCrawlerURIsQuery::get_by_raw_image_uri(uri_option, &mut self.conn)
-                    .map_or(true, |uri| uri.is_none())
+                NFTMetadataCrawlerURIsQuery::get_by_raw_image_uri(
+                    self.token_uri.clone(),
+                    uri_option,
+                    &mut self.conn,
+                )
+                .map_or(true, |uri| match uri {
+                    Some(uris) => {
+                        self.model.set_cdn_image_uri(uris.cdn_image_uri);
+                        false
+                    },
+                    None => true,
+                })
             })
         {
             // Parse raw_image_uri, use token_uri if parsing fails
@@ -402,9 +415,18 @@ impl Worker {
         let mut raw_animation_uri_option = self.model.get_raw_animation_uri();
         if !self.force
             && raw_animation_uri_option.clone().map_or(true, |uri| {
-                NFTMetadataCrawlerURIsQuery::get_by_raw_animation_uri(uri, &mut self.conn)
-                    .unwrap_or(None)
-                    .is_some()
+                NFTMetadataCrawlerURIsQuery::get_by_raw_animation_uri(
+                    self.token_uri.clone(),
+                    uri,
+                    &mut self.conn,
+                )
+                .map_or(true, |uri| match uri {
+                    Some(uris) => {
+                        self.model.set_cdn_animation_uri(uris.cdn_animation_uri);
+                        true
+                    },
+                    None => true,
+                })
             })
         {
             raw_animation_uri_option = None;

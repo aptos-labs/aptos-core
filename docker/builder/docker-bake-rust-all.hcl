@@ -58,6 +58,7 @@ group "all" {
     "telemetry-service",
     "indexer-grpc",
     "validator-testing",
+    "nft-metadata-crawler",
   ])
 }
 
@@ -211,6 +212,15 @@ target "indexer-grpc" {
   target     = "indexer-grpc"
   cache-to   = generate_cache_to("indexer-grpc")
   tags       = generate_tags("indexer-grpc")
+}
+
+target "nft-metadata-crawler" {
+  inherits   = ["_common"]
+  target     = "nft-metadata-crawler"
+  dockerfile = "docker/builder/nft-metadata-crawler.Dockerfile"
+  tags       = generate_tags("nft-metadata-crawler")
+  cache-from = generate_cache_from("nft-metadata-crawler")
+  cache-to   = generate_cache_to("nft-metadata-crawler")
 }
 
 function "generate_cache_from" {

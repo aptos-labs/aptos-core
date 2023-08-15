@@ -56,12 +56,14 @@ impl NFTMetadataCrawlerURIsQuery {
     }
 
     pub fn get_by_raw_image_uri(
+        token_uri: String,
         raw_image_uri: String,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> anyhow::Result<Option<Self>> {
         let mut op = || {
             parsed_token_uris::table
                 .filter(parsed_token_uris::raw_image_uri.eq(raw_image_uri.clone()))
+                .filter(parsed_token_uris::token_uri.ne(token_uri.clone()))
                 .first::<NFTMetadataCrawlerURIsQuery>(conn)
                 .optional()
                 .map_err(Into::into)
@@ -85,12 +87,14 @@ impl NFTMetadataCrawlerURIsQuery {
     }
 
     pub fn get_by_raw_animation_uri(
+        token_uri: String,
         raw_animation_uri: String,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> anyhow::Result<Option<Self>> {
         let mut op = || {
             parsed_token_uris::table
                 .filter(parsed_token_uris::raw_animation_uri.eq(raw_animation_uri.clone()))
+                .filter(parsed_token_uris::token_uri.ne(token_uri.clone()))
                 .first::<NFTMetadataCrawlerURIsQuery>(conn)
                 .optional()
                 .map_err(Into::into)
