@@ -44,7 +44,8 @@ pub struct PartitionState {
     pub(crate) partition_last_round: bool,
     pub(crate) thread_pool: Arc<ThreadPool>,
 
-    // Holding all the txns.
+    /// Holding all the txns.
+    /// Wrapped in `RwLock` to allow being taking in parallel in `add_edges` phase and parallel reads in other phases.
     pub(crate) txns: Vec<RwLock<Option<AnalyzedTransaction>>>,
 
     // Pre-partitioning results.
