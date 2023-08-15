@@ -55,7 +55,7 @@ where
 
         let mut partitioning = vec![0; graph.node_count()];
 
-        for res in partition_stream.into_items_iter() {
+        for res in partition_stream.as_items_iter() {
             match res {
                 Ok((node, partition)) => {
                     partitioning[node as usize] = partition;

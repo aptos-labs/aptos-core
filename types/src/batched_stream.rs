@@ -1,23 +1,33 @@
 // Copyright © Aptos Foundation
 
-/// A simple trait for batched streams.
+/// A simple trait for batched streams of data.
+///
+/// Any type implementing `impl Iterator<Item = impl IntoIterator>` is a batched stream.
+/// Vice versa, any batched stream can be converted to `impl Iterator<Item = impl IntoIterator>`
+/// via method `into_batch_iter`.
+///
+/// Additionally, this trait provides utility methods for optional stream length information
+/// (`opt_items_count` and `opt_batch_count`) and for materializing batches (`materialize`)
+/// to obtain a stream with `Vec<T>` batch type.
 pub trait BatchedStream: Sized {
     /// The type of items the stream.
     type StreamItem;
 
     /// An iterator over the items in a batch.
-    type BatchIter<'a>: Iterator<Item = Self::StreamItem>
-    where
-        Self: 'a;
+    type Batch: IntoIterator<Item = Self::StreamItem>;
 
-    /// Applies a function to the next batch of items in the stream.
-    fn process_batch<'a, F, R>(&'a mut self, f: F) -> R
-    where
-        F: FnOnce(Option<Self::BatchIter<'a>>) -> R;
+    /// Returns the next batch in the stream, if available.
+    fn next_batch(&mut self) -> Option<Self::Batch>;
+
+    /// Returns a batched stream with batches collected into `Vec`.
+    /// This method is usually zero-cost if the stream already has `Vec` batch type.
+    fn materialize(self) -> Materialize<Self> {
+        Materialize::new(self)
+    }
 
     /// Returns the total number of items in all remaining batches of the stream combined,
     /// if available.
-    fn opt_len(&self) -> Option<usize> {
+    fn opt_items_count(&self) -> Option<usize> {
         None
     }
 
@@ -27,50 +37,21 @@ pub trait BatchedStream: Sized {
     }
 
     /// Returns an iterator over the batches in the stream.
-    ///
-    /// NB: due to Rust borrow checking rules, each batch must be collected into a `Vec`
-    /// before it is returned from the `BatchIterator`.
-    /// See the comments in the `BatchIterator` implementation for more details on why
-    /// this is necessary.
     fn into_batch_iter(self) -> BatchIterator<Self> {
         BatchIterator::new(self)
     }
 
     /// Returns an iterator over the items in the stream.
-    ///
-    /// NB: due to Rust borrow checking rules, each batch is collected into a `Vec`
-    /// before the items can be returned from the `ItemsIterator`.
-    /// See the comments in the `ItemsIterator` implementation for more details on why
-    /// this is necessary.
     fn into_items_iter(self) -> ItemsIterator<Self> {
         ItemsIterator::new(self)
     }
 }
 
-impl<I> BatchedStream for I
-where
-    I: Iterator,
-    I::Item: Iterator,
-{
-    type StreamItem = <I::Item as Iterator>::Item;
-
-    type BatchIter<'a> = I::Item
-    where
-        Self: 'a;
-
-    fn process_batch<'a, F, R>(&'a mut self, f: F) -> R
-    where
-        F: FnOnce(Option<Self::BatchIter<'a>>) -> R,
-    {
-        f(self.next())
-    }
-}
-
 /// A trait for batched streams with known exact size.
-pub trait ExactSizeBatchedStream: BatchedStream {
+pub trait ExactItemsCountBatchedStream: BatchedStream {
     /// Returns the total number of items in all remaining batches of the stream combined.
-    fn len(&self) -> usize {
-        self.opt_len().unwrap()
+    fn items_count(&self) -> usize {
+        self.opt_items_count().unwrap()
     }
 }
 
@@ -82,26 +63,99 @@ pub trait ExactBatchCountBatchedStream: BatchedStream {
     }
 }
 
+/// A trait for batched streams with `Vec<T>` batch type.
+pub trait MaterializedBatchedStream<T>: BatchedStream<StreamItem = T, Batch = Vec<T>> {}
+
+impl<T, S> MaterializedBatchedStream<T> for S where S: BatchedStream<StreamItem = T, Batch = Vec<T>> {}
+
+/// Implementation of `BatchedStream` for any iterator over iterators.
+impl<I> BatchedStream for I
+where
+    I: Iterator,
+    I::Item: IntoIterator,
+{
+    type StreamItem = <I::Item as IntoIterator>::Item;
+    type Batch = I::Item;
+
+    fn next_batch(&mut self) -> Option<Self::Batch> {
+        self.next()
+    }
+
+    fn opt_batch_count(&self) -> Option<usize> {
+        let (min, max) = self.size_hint();
+        if min == max? {
+            Some(min)
+        } else {
+            None
+        }
+    }
+}
+
+/// Adds a method `batched` to all iterators that creates a `MaterializedBatchedStream` by
+/// grouping the elements into batches of size `batch_size`. Each batch is collected into a
+/// `Vec` before being returned.
+pub trait Batched: Iterator + Sized {
+    fn batched(self, batch_size: usize) -> BatchedIter<Self> {
+        BatchedIter::new(self, batch_size)
+    }
+}
+
+impl<I: Iterator> Batched for I {}
+
+/// An adapter for a batched stream that materializes batches before returning them.
+/// Usually zero-cost if the underlying stream already has `Vec` batch type.
+pub struct Materialize<S> {
+    inner: S,
+}
+
+impl<S> Materialize<S> {
+    /// Creates a new `MaterializedStream` from a batched stream.
+    pub fn new(inner: S) -> Self {
+        Self { inner }
+    }
+}
+
+impl<S: BatchedStream> BatchedStream for Materialize<S> {
+    type StreamItem = S::StreamItem;
+    type Batch = Vec<S::StreamItem>;
+
+    fn next_batch(&mut self) -> Option<Self::Batch> {
+        // NB: due to the use of specialization in the standard library,
+        // `vec.into_iter().collect::<Vec<_>>()` is usually a no-op and does
+        // not allocate a new `Vec`.
+        // At the moment of writing this comment, the only exception is when the original
+        // `Vec` has capacity more than twice its size.
+        // (See: https://doc.rust-lang.org/src/alloc/vec/spec_from_iter.rs.html)
+        self.inner
+            .next_batch()
+            .map(|batch| batch.into_iter().collect())
+    }
+
+    fn opt_items_count(&self) -> Option<usize> {
+        self.inner.opt_items_count()
+    }
+
+    fn opt_batch_count(&self) -> Option<usize> {
+        self.inner.opt_batch_count()
+    }
+}
+
 /// An iterator over batches of a batched stream.
 pub struct BatchIterator<S> {
     inner: S,
 }
 
 impl<S> BatchIterator<S> {
-    fn new(stream: S) -> Self {
+    pub fn new(stream: S) -> Self {
         Self { inner: stream }
     }
 }
 
-impl<S: BatchedStream> Iterator for BatchIterator<S> {
-    type Item = Vec<S::StreamItem>;
+impl<'s, S: BatchedStream> Iterator for BatchIterator<S> {
+    type Item = S::Batch;
 
-    fn next(&mut self) -> Option<Vec<S::StreamItem>> {
-        // NB: as the returned item's lifetime is not ties to `self`, we cannot return
-        // anything that may contain a reference to `self` or `inner`, including `BatchIter`.
-        // Hence, we have to collect the batch into a `Vec` before returning it.
-        self.inner
-            .process_batch(|batch| batch.map(Iterator::collect))
+    fn next(&mut self) -> Option<S::Batch> {
+        self.inner.next_batch()
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -121,15 +175,18 @@ impl<S: ExactBatchCountBatchedStream> ExactSizeIterator for BatchIterator<S> {
 
 /// An iterator over items of a batched stream.
 pub struct ItemsIterator<S: BatchedStream> {
-    batch_iter: BatchIterator<S>,
-    current_batch_iter: std::vec::IntoIter<S::StreamItem>,
+    stream: S,
+    /// Iterator over the current batch.
+    /// None indicates that the stream is empty.
+    current_batch_iter: Option<<S::Batch as IntoIterator>::IntoIter>,
 }
 
 impl<S: BatchedStream> ItemsIterator<S> {
-    fn new(stream: S) -> Self {
+    fn new(mut stream: S) -> Self {
+        let current_batch_iter = stream.next_batch().map(|batch| batch.into_iter());
         Self {
-            batch_iter: stream.into_batch_iter(),
-            current_batch_iter: vec![].into_iter(),
+            stream,
+            current_batch_iter,
         }
     }
 }
@@ -138,55 +195,75 @@ impl<S: BatchedStream> Iterator for ItemsIterator<S> {
     type Item = S::StreamItem;
 
     fn next(&mut self) -> Option<S::StreamItem> {
-        // while skips empty batches.
-        while self.current_batch_iter.len() == 0 {
-            match self.batch_iter.next().map(|vec| vec.into_iter()) {
-                Some(iter) => self.current_batch_iter = iter,
-                None => return None,
+        // This loop will skip over empty batches.
+        loop {
+            // If `current_batch_iter` is `None`, then the stream is empty.
+            let current_batch_iter = self.current_batch_iter.as_mut()?;
+
+            if let Some(item) = current_batch_iter.next() {
+                return Some(item);
+            } else {
+                self.current_batch_iter = self.stream.next_batch().map(|batch| batch.into_iter());
             }
         }
-
-        self.current_batch_iter.next()
     }
 }
 
 impl<S> ExactSizeIterator for ItemsIterator<S>
 where
-    S: ExactSizeBatchedStream,
+    S: ExactItemsCountBatchedStream,
+    <S::Batch as IntoIterator>::IntoIter: ExactSizeIterator,
 {
     fn len(&self) -> usize {
-        self.batch_iter.inner.len() + self.current_batch_iter.len()
+        match &self.current_batch_iter {
+            Some(iter) => iter.len() + self.stream.items_count(),
+            None => 0,
+        }
     }
 }
 
-pub struct Batched<I> {
-    items: I,
+/// A wrapper around an iterator that groups its elements into batches of size `batch_size`.
+pub struct BatchedIter<I> {
+    iter: I,
     batch_size: usize,
 }
 
-impl<I> BatchedStream for Batched<I>
+impl<I> BatchedIter<I> {
+    pub fn new(iter: I, batch_size: usize) -> Self {
+        Self { iter, batch_size }
+    }
+}
+
+impl<'a, I> BatchedStream for &'a mut BatchedIter<I>
 where
     I: Iterator,
 {
     type StreamItem = I::Item;
+    type Batch = Vec<I::Item>;
 
-    type BatchIter<'a> = std::iter::Peekable<std::iter::Take<&'a mut I>>
-    where
-        Self: 'a;
-
-    fn process_batch<'a, F, R>(&'a mut self, f: F) -> R
-    where
-        F: FnOnce(Option<Self::BatchIter<'a>>) -> R,
-    {
-        let mut batch = self.items.by_ref().take(self.batch_size).peekable();
-        f(if batch.peek().is_some() { Some(batch) } else { None })
+    fn next_batch(&mut self) -> Option<Self::Batch> {
+        let mut batch = self.iter.by_ref().take(self.batch_size).peekable();
+        // Unfortunately, due to Rust borrow checking rules, the lifetime of the
+        // returned batch cannot depend on the lifetime of `self`. Hence, we need
+        // to collect the batch into a `Vec` before returning it.
+        if batch.peek().is_some() {
+            Some(batch.collect())
+        } else {
+            None
+        }
     }
 
-    fn opt_len(&self) -> Option<usize> {
-        self.items.size_hint().1
+    fn opt_items_count(&self) -> Option<usize> {
+        let (min, max) = self.iter.size_hint();
+        if min == max? {
+            Some(min)
+        } else {
+            None
+        }
     }
 
     fn opt_batch_count(&self) -> Option<usize> {
-        self.opt_len().map(|len| (len + self.batch_size - 1) / self.batch_size)
+        self.opt_items_count()
+            .map(|len| (len + self.batch_size - 1) / self.batch_size)
     }
 }

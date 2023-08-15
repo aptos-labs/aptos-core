@@ -4,6 +4,9 @@
 
 #![forbid(unsafe_code)]
 
+pub use account_address::AccountAddress as PeerId;
+pub use utility_coin::*;
+
 pub mod access_path;
 pub mod account_address;
 pub mod account_config;
@@ -47,15 +50,12 @@ pub mod vm_status;
 pub mod waypoint;
 pub mod write_set;
 
-pub use account_address::AccountAddress as PeerId;
-pub use utility_coin::*;
-
 pub mod account_view;
 pub mod aggregate_signature;
 pub mod batched_stream;
 pub mod block_executor;
 pub mod const_option;
 pub mod state_store;
-pub mod with;
 #[cfg(test)]
 mod unit_tests;
+pub mod with;

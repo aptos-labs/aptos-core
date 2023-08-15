@@ -3,7 +3,7 @@
 use aptos_types::with::{MapWithOp, MapWithRef};
 use crate::graph::{NodeIndex, WeightedUndirectedGraph};
 use rand::seq::SliceRandom;
-use aptos_types::batched_stream::{BatchedStream, BatchIterator, ItemsIterator};
+use aptos_types::batched_stream::{BatchedStream};
 
 
 /// A trait for batched streams for undirected graphs with weighted nodes and edges.
@@ -15,12 +15,10 @@ pub trait WeightedUndirectedGraphStream: Sized {
     type EdgeWeight;
 
     /// An iterator over the neighbours of a node in the graph.
-    type NeighboursIter<'a>: Iterator<Item = (NodeIndex, Self::EdgeWeight)>
-    where
-        Self: 'a;
+    type NeighboursIter: Iterator<Item = (NodeIndex, Self::EdgeWeight)>;
 
     /// An iterator over the nodes in a batch.
-    type BatchIter<'a>: Iterator<Item = (NodeIndex, Self::NodeWeight, Self::NeighboursIter<'a>)>
+    type Batch: Iterator<Item = (NodeIndex, Self::NodeWeight, Self::NeighboursIter<'a>)>
     where
         Self: 'a;
 
