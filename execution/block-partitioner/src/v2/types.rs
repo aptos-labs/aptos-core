@@ -36,7 +36,7 @@ impl SubBlockIdx {
     }
 }
 
-/// The position of a txn in the block after `pre_partition` and before `flatten_to_rounds`.
+/// The position of a txn in the block after `pre_partition` and before `partition_to_matrix`.
 pub type PreParedTxnIdx = usize;
 
 /// Represent a specific storage location in a partitioning session.
