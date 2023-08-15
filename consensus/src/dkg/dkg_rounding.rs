@@ -96,8 +96,8 @@ pub fn rounding_scheme(
         .collect::<Vec<usize>>();
     let total_weight = validator_weights.iter().sum::<usize>();
     // dkg todo: calculate the actual weights of one third stake and two third stake
-    let weights_of_one_third_stake = total_weight / 3;
-    let weights_of_two_third_stake = total_weight * 2 / 3;
+    let weights_of_one_third_stake = (total_weight - 1) / 3 + 1;
+    let weights_of_two_third_stake = (total_weight - 1) / 3 * 2 + 1;
     (
         validator_weights,
         weights_of_one_third_stake,

@@ -785,7 +785,7 @@ impl EpochManager {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
-            dkg_manager_wrapper,
+            dkg_manager_wrapper.clone(),
         );
 
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
@@ -824,6 +824,7 @@ impl EpochManager {
             onchain_consensus_config,
             round_manager_tx,
             self.config.clone(),
+            dkg_manager_wrapper,
         );
 
         round_manager.init(last_vote).await;

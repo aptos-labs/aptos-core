@@ -958,7 +958,7 @@ impl Arbitrary for BlockMetadata {
                         previous_block_votes,
                         failed_proposer_indices,
                         timestamp,
-                        vec![],
+                        None,
                         None,
                     )
                 },

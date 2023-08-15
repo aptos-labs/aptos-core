@@ -23,6 +23,7 @@ impl MoveStructType for StartDKGEvent {
 
 type WT = WeightedTranscript<das::Transcript>;
 
+#[derive(Clone)]
 pub struct DKGPvssConfig {
     pub wc_1: <WT as Transcript>::SecretSharingConfig,
     pub wc_2: <WT as Transcript>::SecretSharingConfig,

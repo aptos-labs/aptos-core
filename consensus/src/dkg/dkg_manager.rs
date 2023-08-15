@@ -65,6 +65,13 @@ impl DKGManagerWrapper {
             DKGManagerWrapper::WithDKG(dkg_manager) => dkg_manager.lock().take_agg_node(),
         }
     }
+
+    pub fn get_pvss_config(&self) -> Option<DKGPvssConfig> {
+        match self {
+            DKGManagerWrapper::NoDKG => None,
+            DKGManagerWrapper::WithDKG(dkg_manager) => dkg_manager.lock().dkg_store.get_pvss_config(),
+        }
+    }
 }
 
 pub struct DKGManager {
@@ -104,14 +111,19 @@ impl DKGManager {
             })
             .expect("[DKG]: Convertion from DKG events to DKG Rounding failed!");
 
-        debug!("[DKG] Starting DKG with the following parameters: \n
-        number of validators: {:?} \n
-        validator stakes: \n {:?} \n
-        validator weights: \n {:?} \n ",
-        dkg_rounding.validator_stakes().len(),
-        dkg_rounding.validator_stakes(),
-        dkg_rounding.validator_weights());
-
+        debug!(
+            "[DKG] Starting DKG with the following parameters: \n
+            number of validators: {:?} \n
+            validator stakes: \n {:?} \n
+            validator weights: \n {:?} \n
+            validator 1/3 weights: \n {:?} \n
+            validator 2/3 weights: \n {:?} \n",
+            dkg_rounding.validator_stakes().len(),
+            dkg_rounding.validator_stakes(),
+            dkg_rounding.validator_weights(),
+            dkg_rounding.weighted_config_1().get_threshold_weight(),
+            dkg_rounding.weighted_config_2().get_threshold_weight(),
+        );
 
         let consensus_keys: Vec<<das::Transcript as Transcript>::EncryptPubKey> = dkg_rounding.validator_consensus_keys().iter().map(|k| k.to_bytes().as_slice().try_into().unwrap()).collect::<Vec<_>>();
 
@@ -124,7 +136,7 @@ impl DKGManager {
         let mut rng = StdRng::from_seed(seed.to_bytes_le());
 
         // dkg todo: generate these parameters
-        // dkg todo: use real encryption keys of the new validators
+        // dkg todo: decide whether to use consensus key as encryption key
         let (pp, _dks, _eks, s, _sk) = test_utils::setup_dealing::<WT, StdRng>(&wc_1, &mut rng);
 
         let trx_1 = WT::deal(
@@ -166,6 +178,12 @@ impl DKGManager {
         let dkg_node = DKGNode::new(self.epoch_state.epoch, self.author, dkg_trx_wrapper);
 
         debug!("[DKG] Node {:?} finish computing DKG Node of epoch {:?}", self.author, dkg_node.epoch());
+        match self.add_node(dkg_node.clone()) {
+            Ok(_) => {},
+            Err(e) => {
+                error!("[DKG] Error when adding DKG node: {:?}", e);
+            },
+        }
         self.broadcast_node(dkg_node);
     }
 

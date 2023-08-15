@@ -128,13 +128,20 @@ impl StateComputer for ExecutionProxy {
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
         let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
-        let (txns, dkg_agg_nodes) = payload_manager.get_transactions(block).await?;
+        let (txns, maybe_dkg_agg_node) = payload_manager.get_transactions(block).await?;
 
-        // dkg todo: support multiple transcripts
-        let dkg_transcripts = dkg_agg_nodes
-            .into_iter()
-            .map(|node| node.agg_trx().clone())
-            .collect();
+        let dkg_transcript = maybe_dkg_agg_node.map_or_else(|| None, |node| {
+            // verify the DKG aggregated transcript
+            match node.agg_trx().verify(self.dkg_manager_wrapper.lock().as_ref().unwrap().get_pvss_config().as_ref().unwrap()) {
+                Ok(_) => {
+                    Some(node.agg_trx().clone())
+                },
+                Err(e) => {
+                    debug!("[DKG] Aggregated transcript verification failed for epoch {:?}, error = {:?}", node.epoch(), e);
+                    None
+                }
+            }
+        });
 
         let deduped_txns = txn_deduper.dedup(txns);
         let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
@@ -148,7 +155,7 @@ impl StateComputer for ExecutionProxy {
             &self.validators.lock(),
             shuffled_txns.clone(),
             block_gas_limit,
-            dkg_transcripts,
+            dkg_transcript,
             maybe_randomness,
         );
 
@@ -213,23 +220,30 @@ impl StateComputer for ExecutionProxy {
                 payloads.push(payload.clone());
             }
 
-            let (signed_txns, dkg_agg_nodes) =
+            let (signed_txns, maybe_dkg_agg_node) =
                 payload_manager.get_transactions(block.block()).await?;
             let deduped_txns = txn_deduper.dedup(signed_txns);
             let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
-            // dkg todo: support multiple transcripts
-            let dkg_transcripts = dkg_agg_nodes
-                .into_iter()
-                .map(|node| node.agg_trx().clone())
-                .collect();
+            let dkg_transcript = maybe_dkg_agg_node.map_or_else(|| None, |node| {
+                // verify the DKG aggregated transcript
+                match node.agg_trx().verify(self.dkg_manager_wrapper.lock().as_ref().unwrap().get_pvss_config().as_ref().unwrap()) {
+                    Ok(_) => {
+                        Some(node.agg_trx().clone())
+                    },
+                    Err(e) => {
+                        debug!("[DKG] Aggregated transcript verification failed for epoch {:?}, error = {:?}", node.epoch(), e);
+                        None
+                    }
+                }
+            });
             let maybe_randomness = block.maybe_randomness();
 
             txns.extend(block.transactions_to_commit(
                 &self.validators.lock(),
                 shuffled_txns,
                 block_gas_limit,
-                dkg_transcripts,
+                dkg_transcript,
                 maybe_randomness,
             ));
             reconfig_events.extend(block.reconfig_event());

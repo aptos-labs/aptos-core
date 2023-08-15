@@ -29,7 +29,7 @@ pub struct BlockMetadata {
     failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,
     // dkg todo
-    dkg_transcripts: Vec<DKGTranscriptWrapper>,
+    maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
     maybe_randomness: Option<Randomness>,
 }
 
@@ -46,7 +46,7 @@ impl BlockMetadata {
         previous_block_votes_bitvec: Vec<u8>,
         failed_proposer_indices: Vec<u32>,
         timestamp_usecs: u64,
-        dkg_transcripts: Vec<DKGTranscriptWrapper>,
+        maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
         maybe_randomness: Option<Randomness>,
     ) -> Self {
         Self {
@@ -57,7 +57,7 @@ impl BlockMetadata {
             previous_block_votes_bitvec,
             failed_proposer_indices,
             timestamp_usecs,
-            dkg_transcripts,
+            maybe_dkg_transcript,
             maybe_randomness,
         }
     }
@@ -90,12 +90,10 @@ impl BlockMetadata {
         ];
 
         //dkg todo: currently assuming the first transcript is valid.
-        ret.push(MoveValue::Bool(!self.dkg_transcripts.is_empty()));
+        ret.push(MoveValue::Bool(!self.maybe_dkg_transcript.is_some()));
         ret.push(MoveValue::Vector(
-            self.dkg_transcripts
-                .first()
-                .map(serialize_transcript)
-                .unwrap_or(vec![])
+            self.maybe_dkg_transcript
+                .map_or_else(|| vec![], |trx| serialize_transcript(&trx))
                 .into_iter()
                 .map(MoveValue::U8)
                 .collect(),
@@ -128,8 +126,8 @@ impl BlockMetadata {
         self.round
     }
 
-    pub fn dkg_transcripts(&self) -> &Vec<DKGTranscriptWrapper> {
-        &self.dkg_transcripts
+    pub fn maybe_dkg_transcript(&self) -> &Option<DKGTranscriptWrapper> {
+        &self.maybe_dkg_transcript
     }
 
     pub fn maybe_randomness(&self) -> &Option<Randomness> {

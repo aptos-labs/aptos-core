@@ -3,7 +3,7 @@
 
 use crate::common::Author;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::dkg::DKGTranscriptWrapper;
+use aptos_types::dkg::{DKGTranscriptWrapper, DKGPvssConfig};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
@@ -67,5 +67,9 @@ impl DKGAggNode {
     pub fn num_bytes(&self) -> usize {
         // dkg todo: compute size
         0
+    }
+
+    pub fn verify(&self, pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
+        self.agg_trx.verify(pvss_config)
     }
 }

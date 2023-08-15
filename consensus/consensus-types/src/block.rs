@@ -350,7 +350,7 @@ impl Block {
         validators: &[AccountAddress],
         txns: Vec<SignedTransaction>,
         block_gas_limit: Option<u64>,
-        dkg_transcripts: Vec<DKGTranscriptWrapper>,
+        maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
         maybe_randomness: Option<Randomness>,
     ) -> Vec<Transaction> {
         if block_gas_limit.is_some() {
@@ -358,7 +358,7 @@ impl Block {
             // is inserted after block execution
             once(Transaction::BlockMetadata(self.new_block_metadata(
                 validators,
-                dkg_transcripts,
+                maybe_dkg_transcript,
                 maybe_randomness,
             )))
             .chain(txns.into_iter().map(Transaction::UserTransaction))
@@ -368,7 +368,7 @@ impl Block {
             // is inserted here for compatibility.
             once(Transaction::BlockMetadata(self.new_block_metadata(
                 validators,
-                dkg_transcripts,
+                maybe_dkg_transcript,
                 maybe_randomness,
             )))
             .chain(txns.into_iter().map(Transaction::UserTransaction))
@@ -380,7 +380,7 @@ impl Block {
     fn new_block_metadata(
         &self,
         validators: &[AccountAddress],
-        dkg_transcripts: Vec<DKGTranscriptWrapper>,
+        maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
         maybe_randomness: Option<Randomness>,
     ) -> BlockMetadata {
         BlockMetadata::new(
@@ -401,7 +401,7 @@ impl Block {
                     Self::failed_authors_to_indices(validators, failed_authors)
                 }),
             self.timestamp_usecs(),
-            dkg_transcripts,
+            maybe_dkg_transcript,
             maybe_randomness,
         )
     }

@@ -121,7 +121,7 @@ impl ExecutedBlock {
         validators: &[AccountAddress],
         txns: Vec<SignedTransaction>,
         block_gas_limit: Option<u64>,
-        dkg_transcripts: Vec<DKGTranscriptWrapper>,
+        maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
         maybe_randomness: Option<Randomness>,
     ) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
@@ -134,7 +134,7 @@ impl ExecutedBlock {
             validators,
             txns,
             block_gas_limit,
-            dkg_transcripts,
+            maybe_dkg_transcript,
             maybe_randomness,
         );
         if block_gas_limit.is_some() && !self.state_compute_result.has_reconfiguration() {

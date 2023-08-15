@@ -46,6 +46,10 @@ impl DKGStore {
         self.dkg_pvss_config = Some(dkg_pvss_config);
     }
 
+    pub fn get_pvss_config(&self) -> Option<DKGPvssConfig> {
+        self.dkg_pvss_config.clone()
+    }
+
     pub fn add_node(
         &mut self,
         node: DKGNode,
@@ -63,7 +67,7 @@ impl DKGStore {
         match node.verify(self.dkg_pvss_config.as_ref().unwrap()) {
             Ok(_) => {
                 if self.agg_node.get().is_some() {
-                    debug!("[DKG] Adding DKG Node failed due to agg node already available");
+                    debug!("[DKG] Node {:?} adds DKG Node failed due to agg node already available", self.author);
                     return Ok(None);
                 }
                 let author = node.author();
@@ -73,7 +77,7 @@ impl DKGStore {
                         author
                     ));
                 }
-                debug!("[DKG] Adding DKG Node from author {:?}", author);
+                debug!("[DKG] Node {:?} adds DKG Node: {:?}", self.author, node.metadata());
 
                 self.nodes.insert(*node.author(), node.clone());
 
@@ -83,7 +87,7 @@ impl DKGStore {
                 } else {
                     self.agg_trx.as_mut().unwrap().aggregate_with(self.dkg_pvss_config.as_ref().unwrap(), node.transcript());
                 }
-                debug!("[DKG] Aggregating DKG trx from author {:?}", author);
+                debug!("[DKG] Node {:?} aggregates DKG trx: {:?}", self.author, node.metadata());
 
                 let authors: Vec<Author> = self.nodes.iter().map(|(k,_)| *k).collect();
 
@@ -106,8 +110,11 @@ impl DKGStore {
                         self.author,
                         self.agg_trx.take().unwrap(),
                     );
+                    if let Err(e) = agg_node.agg_trx().verify(self.dkg_pvss_config.as_ref().unwrap()) {
+                        debug!("[DKG] agg trx verify failed: {:?}", e);
+                    }
                     debug!(
-                        "[DKG] Aggregated transcript is ready for epoch {:?}",
+                        "[DKG] Node {:?} aggregated transcript is ready for epoch {:?}", self.author,
                         node.epoch()
                     );
                     return Ok(Some(agg_node));

@@ -79,7 +79,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         vec![0],
         vec![],
         1,
-        vec![],
+        None,
         None,
     ));
     let tx1 = core_resources_account
@@ -140,7 +140,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         vec![0],
         vec![],
         2,
-        vec![],
+        None,
         None,
     ));
     let reconfig2 = core_resources_account
@@ -156,7 +156,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         vec![0],
         vec![],
         3,
-        vec![],
+        None,
         None,
     ));
     let mut block3 = vec![block3_meta];

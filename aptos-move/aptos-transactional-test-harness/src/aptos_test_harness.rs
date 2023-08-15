@@ -887,7 +887,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     vec![],
                     vec![],
                     block_cmd.time,
-                    vec![],
+                    None,
                     None,
                 );
 

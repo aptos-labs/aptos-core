@@ -11,7 +11,7 @@ use aptos_executor_types::Error;
 use aptos_infallible::Mutex;
 use aptos_types::{
     account_address::AccountAddress, transaction::SignedTransaction,
-    validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus,
+    validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus, dkg::DKGPvssConfig,
 };
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -119,6 +119,10 @@ impl DKGPayload {
 
     pub fn len(&self) -> usize {
         1
+    }
+
+    pub fn verify(&self, pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
+        self.dkg_agg_node.verify(pvss_config)
     }
 }
 

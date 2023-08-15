@@ -22,14 +22,14 @@ use crate::{
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
-    quorum_store::types::BatchMsg,
+    quorum_store::types::BatchMsg, dkg::dkg_manager::DKGManagerWrapper,
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
     block::Block,
-    common::{Author, Round},
+    common::{Author, Round, Payload},
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
@@ -207,6 +207,8 @@ pub struct RoundManager {
     round_manager_tx:
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     local_config: ConsensusConfig,
+    // Round manager will fetch the DKG PVSS config from the DKG manager
+    dkg_manager_wrapper: Arc<DKGManagerWrapper>,
 }
 
 impl RoundManager {
@@ -225,6 +227,7 @@ impl RoundManager {
             (Author, VerifiedEvent),
         >,
         local_config: ConsensusConfig,
+        dkg_manager_wrapper: Arc<DKGManagerWrapper>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -246,6 +249,7 @@ impl RoundManager {
             onchain_config,
             round_manager_tx,
             local_config,
+            dkg_manager_wrapper,
         }
     }
 
@@ -694,6 +698,19 @@ impl RoundManager {
             block_time_since_epoch,
             self.round_state.current_round_deadline(),
         );
+
+        // If the proposal contains DKG payload, should verify its validity
+        match proposal.payload() {
+            Some(Payload::DKG(dkg_payload)) => {
+                if let Some(pvss_config) = self.dkg_manager_wrapper.get_pvss_config() {
+                    ensure!(dkg_payload.verify(&pvss_config).is_ok(), "[RoundManager] Invalid DKG payload: {:?}!", dkg_payload.dkg_agg_node().metadata());
+                } else {
+                    // dkg todo: Need to buffer DKG payload when locally has no pvss_config yet
+                }
+            }
+            _ => {}
+        }
+
 
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
         if self.decoupled_execution() && self.block_store.vote_back_pressure() {

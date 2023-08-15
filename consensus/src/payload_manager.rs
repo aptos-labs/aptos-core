@@ -141,15 +141,15 @@ impl PayloadManager {
     pub async fn get_transactions(
         &self,
         block: &Block,
-    ) -> Result<(Vec<SignedTransaction>, Vec<DKGAggNode>), Error> {
+    ) -> Result<(Vec<SignedTransaction>, Option<DKGAggNode>), Error> {
         let payload = match block.payload() {
             Some(p) => p,
-            None => return Ok((Vec::new(), vec![])),
+            None => return Ok((Vec::new(), None)),
         };
 
         match (self, payload) {
             (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => {
-                Ok((txns.clone(), vec![]))
+                Ok((txns.clone(), None))
             },
             (
                 PayloadManager::InQuorumStore(batch_store, _),
@@ -163,7 +163,7 @@ impl PayloadManager {
                             .status
                             .lock()
                             .replace(DataStatus::Cached(data.clone()));
-                        Ok((data, vec![]))
+                        Ok((data, None))
                     },
                     DataStatus::Requested(receivers) => {
                         let _timer = counters::BATCH_WAIT_DURATION.start_timer();
@@ -218,14 +218,13 @@ impl PayloadManager {
                             .status
                             .lock()
                             .replace(DataStatus::Cached(ret.clone()));
-                        Ok((ret, vec![]))
+                        Ok((ret, None))
                     },
                 }
             },
             (PayloadManager::InQuorumStore(_batch_store, _), Payload::DKG(dkg_payload)) => {
-                // extract dkg transactions
-                // dkg todo: support multiple dkg agg nodes
-                Ok((vec![], vec![dkg_payload.dkg_agg_node().clone()]))
+                // extract dkg transaction
+                Ok((vec![], Some(dkg_payload.dkg_agg_node().clone())))
             },
             (_, _) => unreachable!(
                 "Wrong payload {} epoch {}, round {}, id {}",
