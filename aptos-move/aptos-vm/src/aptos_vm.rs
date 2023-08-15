@@ -273,7 +273,6 @@ impl AptosVM {
             gas_used.into(),
             u64::from(gas_meter.execution_gas_used()),
             u64::from(gas_meter.io_gas_used()),
-            u64::from(gas_meter.storage_fee_used_in_gas_units()),
             u64::from(gas_meter.storage_fee_used()),
         )
     }

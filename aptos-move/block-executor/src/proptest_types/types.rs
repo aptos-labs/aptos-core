@@ -626,7 +626,6 @@ where
             self.total_gas / 2,
             (self.total_gas + 1) / 2,
             0,
-            0,
         )
     }
 }
