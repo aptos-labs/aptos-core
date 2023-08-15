@@ -20,7 +20,7 @@ use crate::no_error::NoError;
 ///
 /// NOTE: the lifetime of a `Batch` cannot depend on the lifetime of `self`.
 /// Changing it would require using Generic Associated Types (GATs).
-/// However, Rust's support for GAT is quite limited at the moment.
+/// However, Rust's support for GATs is quite limited at the moment.
 pub trait BatchedStream: Sized {
     /// The type of items the stream.
     type StreamItem;
@@ -452,8 +452,6 @@ where
         // Unfortunately, due to Rust borrow checking rules, the lifetime of the
         // returned batch cannot depend on the lifetime of `self`. Hence, we need
         // to collect the batch into a `Vec` before returning it.
-        // An alternative could be to use lending iterators:
-        // (See: https://crates.io/crates/lending-iterator).
         if batch.peek().is_some() {
             Some(Ok(batch.collect()))
         } else {
