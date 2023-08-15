@@ -63,7 +63,7 @@ pub struct PartitionState {
     pub(crate) sender_idx_table: DashMap<Sender, SenderIdx>,
 
     // Used in `init()` to discretize storage locations.
-    pub(crate) key_counter: AtomicUsize,
+    pub(crate) storage_key_counter: AtomicUsize,
     pub(crate) key_idx_table: DashMap<StateKey, StorageKeyIdx>,
 
     // A `ConflictingTxnTracker` for each key that helps resolve conflicts and speed-up edge creation.
@@ -126,7 +126,7 @@ impl PartitionState {
             pre_partitioned,
             start_txn_idxs_by_shard,
             sender_counter,
-            key_counter,
+            storage_key_counter: key_counter,
             sender_idxs: senders,
             write_sets: wsets,
             read_sets: rsets,
@@ -152,7 +152,7 @@ impl PartitionState {
         *self
             .key_idx_table
             .entry(key.clone())
-            .or_insert_with(|| self.key_counter.fetch_add(1, Ordering::SeqCst))
+            .or_insert_with(|| self.storage_key_counter.fetch_add(1, Ordering::SeqCst))
     }
 
     pub(crate) fn reset_min_discard_table(&mut self) {
