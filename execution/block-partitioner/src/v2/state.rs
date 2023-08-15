@@ -51,8 +51,11 @@ pub struct PartitionState {
     pub(crate) start_txn_idxs_by_shard: Vec<PreParedTxnIdx>,
 
     // The discretized txn info, populated in `init()`.
+    /// Sender index by `PreParedTxnIdx`.
     pub(crate) sender_idxs: Vec<RwLock<Option<SenderIdx>>>,
+    /// Write key indices by `PreParedTxnIdx`.
     pub(crate) write_sets: Vec<RwLock<HashSet<StorageKeyIdx>>>,
+    /// Read key indices by `PreParedTxnIdx`.
     pub(crate) read_sets: Vec<RwLock<HashSet<StorageKeyIdx>>>,
 
     // Used in `init()` to discretize senders.
@@ -66,10 +69,10 @@ pub struct PartitionState {
     // A `ConflictingTxnTracker` for each key that helps resolve conflicts and speed-up edge creation.
     pub(crate) trackers: DashMap<StorageKeyIdx, RwLock<ConflictingTxnTracker>>,
 
-    // Used in `flatten_to_rounds()` to preserve relative txns order for the same sender.
+    // Used in `remove_cross_shard_dependencies()` to preserve relative txns order for the same sender.
     pub(crate) min_discards_by_sender: DashMap<SenderIdx, AtomicUsize>,
 
-    // Results of `flatten_to_rounds()`.
+    // Results of `remove_cross_shard_dependencies()`.
     pub(crate) finalized_txn_matrix: Vec<Vec<Vec<PreParedTxnIdx>>>,
     pub(crate) start_index_matrix: Vec<Vec<PreParedTxnIdx>>,
     pub(crate) new_txn_idxs: Vec<RwLock<TxnIndex>>,
