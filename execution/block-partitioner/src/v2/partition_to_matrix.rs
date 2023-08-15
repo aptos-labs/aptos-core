@@ -107,7 +107,9 @@ impl PartitionerV2 {
                 .for_each(|(shard_id, txn_idxs)| {
                     txn_idxs.into_par_iter().for_each(|txn_idx| {
                         let mut in_round_conflict_detected = false;
-                        for key_idx in state.all_hints(txn_idx) {
+                        let write_set = state.write_sets[txn_idx].read().unwrap();
+                        let read_set = state.read_sets[txn_idx].read().unwrap();
+                        for &key_idx in write_set.iter().chain(read_set.iter()) {
                             if state.key_owned_by_another_shard(shard_id, key_idx) {
                                 in_round_conflict_detected = true;
                                 break;

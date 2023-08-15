@@ -178,13 +178,6 @@ impl PartitionState {
         tracker.has_write_in_range(range_start, range_end)
     }
 
-    pub(crate) fn all_hints(&self, txn_idx: PreParedTxnIdx) -> Vec<StorageKeyIdx> {
-        let wset = self.write_sets[txn_idx].read().unwrap();
-        let rset = self.read_sets[txn_idx].read().unwrap();
-        let all: Vec<StorageKeyIdx> = wset.iter().chain(rset.iter()).copied().collect();
-        all
-    }
-
     pub(crate) fn write_hints(&self, txn_idx: PreParedTxnIdx) -> Vec<StorageKeyIdx> {
         self.write_sets[txn_idx]
             .read()
@@ -200,7 +193,9 @@ impl PartitionState {
         round_id: RoundId,
         shard_id: ShardId,
     ) {
-        for key_idx in self.all_hints(ori_txn_idx) {
+        let write_set = self.write_sets[ori_txn_idx].read().unwrap();
+        let read_set = self.read_sets[ori_txn_idx].read().unwrap();
+        for &key_idx in write_set.iter().chain(read_set.iter()) {
             self.trackers
                 .get(&key_idx)
                 .unwrap()
@@ -278,7 +273,9 @@ impl PartitionState {
         let mut deps = CrossShardDependencies::default();
 
         // Build required edges.
-        for key_idx in self.all_hints(ori_txn_idx) {
+        let write_set = self.write_sets[ori_txn_idx].read().unwrap();
+        let read_set = self.read_sets[ori_txn_idx].read().unwrap();
+        for &key_idx in write_set.iter().chain(read_set.iter()) {
             let tracker_ref = self.trackers.get(&key_idx).unwrap();
             let tracker = tracker_ref.read().unwrap();
             if let Some(txn_idx) = tracker
