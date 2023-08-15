@@ -6,16 +6,16 @@ use crate::{
     },
     counters::{test_error, test_fail, test_latency, test_step_latency, test_success},
     strings::{ERROR_NO_BALANCE, FAIL_WRONG_BALANCE},
-    tests::{coin_transfer, new_account, publish_module, tokenv1_transfer},
+    tests::{coin_transfer, new_account, publish_module, tokenv1_transfer, view_function},
     time_fn,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Error, Result};
 use aptos_api_types::U64;
 use aptos_logger::{error, info};
 use aptos_rest_client::{error::RestError, Client, FaucetClient};
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
-use std::env;
+use std::{env, num::ParseIntError, str::FromStr};
 
 // Test failure
 
@@ -27,15 +27,21 @@ pub enum TestFailure {
     Error(anyhow::Error),
 }
 
+impl From<anyhow::Error> for TestFailure {
+    fn from(e: anyhow::Error) -> TestFailure {
+        TestFailure::Error(e)
+    }
+}
+
 impl From<RestError> for TestFailure {
     fn from(e: RestError) -> TestFailure {
         TestFailure::Error(e.into())
     }
 }
 
-impl From<anyhow::Error> for TestFailure {
-    fn from(e: anyhow::Error) -> TestFailure {
-        TestFailure::Error(e)
+impl From<ParseIntError> for TestFailure {
+    fn from(e: ParseIntError) -> TestFailure {
+        TestFailure::Error(e.into())
     }
 }
 
@@ -47,17 +53,7 @@ pub enum TestName {
     CoinTransfer,
     TokenV1Transfer,
     PublishModule,
-}
-
-impl ToString for TestName {
-    fn to_string(&self) -> String {
-        match &self {
-            TestName::NewAccount => "new_account".to_string(),
-            TestName::CoinTransfer => "coin_transfer".to_string(),
-            TestName::TokenV1Transfer => "tokenv1_transfer".to_string(),
-            TestName::PublishModule => "publish_module".to_string(),
-        }
-    }
+    ViewFunction,
 }
 
 impl TestName {
@@ -67,9 +63,22 @@ impl TestName {
             TestName::CoinTransfer => time_fn!(coin_transfer::test, network_name, run_id),
             TestName::TokenV1Transfer => time_fn!(tokenv1_transfer::test, network_name, run_id),
             TestName::PublishModule => time_fn!(publish_module::test, network_name, run_id),
+            TestName::ViewFunction => time_fn!(view_function::test, network_name, run_id),
         };
 
         emit_test_metrics(output, *self, network_name, run_id);
+    }
+}
+
+impl ToString for TestName {
+    fn to_string(&self) -> String {
+        match &self {
+            TestName::NewAccount => "new_account".to_string(),
+            TestName::CoinTransfer => "coin_transfer".to_string(),
+            TestName::TokenV1Transfer => "tokenv1_transfer".to_string(),
+            TestName::PublishModule => "publish_module".to_string(),
+            TestName::ViewFunction => "view_function".to_string(),
+        }
     }
 }
 
@@ -86,6 +95,18 @@ impl ToString for NetworkName {
         match &self {
             NetworkName::Testnet => "testnet".to_string(),
             NetworkName::Devnet => "devnet".to_string(),
+        }
+    }
+}
+
+impl FromStr for NetworkName {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "testnet" => Ok(NetworkName::Testnet),
+            "devnet" => Ok(NetworkName::Devnet),
+            _ => Err(anyhow!("invalid network name")),
         }
     }
 }

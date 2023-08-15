@@ -32,7 +32,7 @@ use move_core_types::{ident_str, language_storage::ModuleId};
 use std::{collections::BTreeMap, path::PathBuf};
 
 static MODULE_NAME: &str = "message";
-static MESSAGE: &str = "test message";
+static TEST_MESSAGE: &str = "test message";
 
 /// Tests module publishing and interaction. Checks that:
 ///   - can publish module
@@ -293,7 +293,7 @@ async fn check_module_data(
 
 async fn set_message(client: &Client, account: &mut LocalAccount) -> Result<(), TestFailure> {
     // set up message
-    let message = match bcs::to_bytes(MESSAGE) {
+    let message = match bcs::to_bytes(TEST_MESSAGE) {
         Ok(data) => data,
         Err(e) => {
             error!(
@@ -341,7 +341,7 @@ async fn set_message(client: &Client, account: &mut LocalAccount) -> Result<(), 
 
 async fn check_message(client: &Client, address: AccountAddress) -> Result<(), TestFailure> {
     // expected
-    let expected = MESSAGE.to_string();
+    let expected = TEST_MESSAGE.to_string();
 
     // actual
     let actual = match get_message(client, address).await {

@@ -13,6 +13,7 @@ pub const FAIL_WRONG_TOKEN_DATA: &str = "wrong token data";
 
 // Error messages
 
+pub const ERROR_BAD_BALANCE_STRING: &str = "bad balance string";
 pub const ERROR_COULD_NOT_BUILD_PACKAGE: &str = "failed to build package";
 pub const ERROR_COULD_NOT_CHECK: &str = "persistency check never started";
 pub const ERROR_COULD_NOT_CREATE_ACCOUNT: &str = "failed to create account";
@@ -21,8 +22,10 @@ pub const ERROR_COULD_NOT_CREATE_AND_SUBMIT_TRANSACTION: &str =
 pub const ERROR_COULD_NOT_FINISH_TRANSACTION: &str = "failed to finish transaction";
 pub const ERROR_COULD_NOT_FUND_ACCOUNT: &str = "failed to fund account";
 pub const ERROR_COULD_NOT_SERIALIZE: &str = "failed to serialize";
+pub const ERROR_COULD_NOT_VIEW: &str = "view function failed";
 pub const ERROR_NO_ACCOUNT_DATA: &str = "can't find account data";
 pub const ERROR_NO_BALANCE: &str = "can't find account balance";
+pub const ERROR_NO_BALANCE_STRING: &str = "the API did not return a balance string";
 pub const ERROR_NO_BYTECODE: &str = "can't find bytecode";
 pub const ERROR_NO_COLLECTION_DATA: &str = "can't find collection data";
 pub const ERROR_NO_MESSAGE: &str = "can't find message";
@@ -53,3 +56,4 @@ pub const PUBLISH_MODULE: &str = "publish_module";
 pub const CHECK_MODULE_DATA: &str = "check_module_data";
 pub const SET_MESSAGE: &str = "set_message";
 pub const CHECK_MESSAGE: &str = "check_message";
+pub const CHECK_VIEW_ACCOUNT_BALANCE: &str = "check_view_account_balance";

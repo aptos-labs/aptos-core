@@ -1,10 +1,19 @@
 // Copyright © Aptos Foundation
 
+use crate::utils::NetworkName;
 use once_cell::sync::Lazy;
 use std::{env, time::Duration};
 use url::Url;
 
 // Node and faucet constants
+
+// TODO: consider making this a CLI argument
+pub static NETWORK_NAME: Lazy<NetworkName> = Lazy::new(|| {
+    env::var("NETWORK_NAME")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(NetworkName::Devnet)
+});
 
 pub static DEVNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.devnet.aptoslabs.com").unwrap());
