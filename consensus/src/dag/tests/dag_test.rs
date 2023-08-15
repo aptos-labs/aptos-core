@@ -83,15 +83,15 @@ impl DAGStorage for MockStorage {
     }
 
     fn save_ordered_anchor_id(&self, _node_id: &NodeId) -> anyhow::Result<()> {
-        todo!()
+        Ok(())
     }
 
     fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>> {
-        todo!()
+        Ok(vec![])
     }
 
     fn delete_ordered_anchor_ids(&self, _node_ids: Vec<NodeId>) -> anyhow::Result<()> {
-        todo!()
+        Ok(())
     }
 }
 

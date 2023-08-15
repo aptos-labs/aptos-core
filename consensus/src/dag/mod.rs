@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(dead_code)]
 
+mod adapter;
 mod anchor_election;
 mod bootstrap;
 mod dag_driver;
