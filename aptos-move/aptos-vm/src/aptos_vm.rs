@@ -229,7 +229,7 @@ impl AptosVM {
     pub fn load_module(
         &self,
         module_id: &ModuleId,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
     ) -> VMResult<Arc<CompiledModule>> {
         self.0.load_module(module_id, resolver)
     }
@@ -1236,7 +1236,7 @@ impl AptosVM {
         }
     }
 
-    fn read_writeset<'a>(
+    fn read_write_set<'a>(
         &self,
         state_view: &impl StateView,
         write_set: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
@@ -1290,7 +1290,7 @@ impl AptosVM {
         )?;
 
         Self::validate_waypoint_change_set(&change_set, log_context)?;
-        self.read_writeset(resolver, change_set.write_set_iter())?;
+        self.read_write_set(resolver, change_set.write_set_iter())?;
         assert!(
             change_set.aggregator_write_set().is_empty(),
             "Waypoint change set should not have any aggregator writes."
@@ -1304,7 +1304,7 @@ impl AptosVM {
 
     pub(crate) fn process_block_prologue(
         &self,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         block_metadata: BlockMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {

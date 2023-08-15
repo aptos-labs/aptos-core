@@ -5,7 +5,7 @@
 use crate::{
     access_path_cache::AccessPathCache,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
-    move_vm_ext::{AptosMoveResolver, MoveResolverExt, MoveVmExt, SessionExt, SessionId},
+    move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionExt, SessionId},
     system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
     transaction_metadata::TransactionMetadata,
     transaction_validation::APTOS_TRANSACTION_VALIDATION,
@@ -499,7 +499,7 @@ impl AptosVMImpl {
             .or_else(|err| convert_prologue_error(err, log_context))
     }
 
-    fn run_epiloque(
+    fn run_epilogue(
         &self,
         session: &mut SessionExt,
         gas_remaining: Gas,
@@ -563,7 +563,7 @@ impl AptosVMImpl {
             ))
         });
 
-        self.run_epiloque(session, gas_remaining, txn_data)
+        self.run_epilogue(session, gas_remaining, txn_data)
             .or_else(|err| convert_epilogue_error(err, log_context))
     }
 
@@ -576,7 +576,7 @@ impl AptosVMImpl {
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        self.run_epiloque(session, gas_remaining, txn_data)
+        self.run_epilogue(session, gas_remaining, txn_data)
             .or_else(|e| {
                 expect_only_successful_execution(
                     e,
@@ -611,7 +611,7 @@ impl AptosVMImpl {
 
     pub fn new_session<'r>(
         &self,
-        resolver: &'r impl MoveResolverExt,
+        resolver: &'r impl AptosMoveResolver,
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
         self.move_vm.new_session(resolver, session_id)
@@ -620,7 +620,7 @@ impl AptosVMImpl {
     pub fn load_module(
         &self,
         module_id: &ModuleId,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
     ) -> VMResult<Arc<CompiledModule>> {
         self.move_vm.load_module(module_id, resolver)
     }

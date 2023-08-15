@@ -5,7 +5,7 @@
 
 use crate::{
     aptos_vm_impl::gas_config,
-    move_vm_ext::{get_max_binary_format_version, AptosMoveResolver},
+    move_vm_ext::{get_max_binary_format_version, AptosMoveResolver, StateValueMetadataResolver},
 };
 #[allow(unused_imports)]
 use anyhow::Error;
@@ -16,7 +16,9 @@ use aptos_types::{
     access_path::AccessPath,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::{StateValue, StateValueMetadata},
     },
 };
 use move_binary_format::{errors::*, CompiledModule};
@@ -232,10 +234,19 @@ impl<S: StateView> AsMoveResolver<S> for S {
     }
 }
 
+impl<'a, S: StateView> StateValueMetadataResolver for StorageAdapter<'a, S> {
+    fn get_state_value_metadata(
+        &self,
+        state_key: &StateKey,
+    ) -> anyhow::Result<Option<Option<StateValueMetadata>>> {
+        let maybe_state_value = self.state_store.get_state_value(state_key)?;
+        Ok(maybe_state_value.map(|state_value| state_value.into_metadata()))
+    }
+}
+
 // We need to implement StateView for adapter because:
 //   1. When processing write set payload, storage is accessed
 //      directly.
-//   2. In VM session to access state value metadata.
 //   3. When stacking Storage adapters on top of each other, e.g.
 //      in epilogue.
 impl<'a, S: StateView> TStateView for StorageAdapter<'a, S> {
