@@ -129,7 +129,7 @@ pub struct AggregatorSnapshotID {
 ///
 /// TODO: while we support tracking of the history, it is not yet fully used on
 /// executor side because we don't know how to throw errors.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Hash, Copy, Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub struct DeltaHistory {
     pub max_achieved_positive_delta: u128,
     pub min_achieved_negative_delta: u128,
@@ -147,8 +147,14 @@ pub struct DeltaHistory {
     pub max_underflow_negative_delta: Option<u128>,
 }
 
+impl Default for DeltaHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DeltaHistory {
-    fn new() -> Self {
+    pub fn new() -> Self {
         DeltaHistory {
             max_achieved_positive_delta: 0,
             min_achieved_negative_delta: 0,
@@ -303,7 +309,7 @@ impl Aggregator {
     fn get_delta(&self) -> Option<DeltaValue> {
         match self.state {
             AggregatorState::Data { .. } => None,
-            AggregatorState::Delta { delta, .. } => Some(delta),
+            AggregatorState::Delta {delta, ..} => Some(delta),
         }
     }
 
@@ -311,16 +317,12 @@ impl Aggregator {
     fn get_history(&self) -> Option<&DeltaHistory> {
         match self.state {
             AggregatorState::Data { .. } => None,
-            AggregatorState::Delta { ref history, .. } => Some(history),
+            AggregatorState::Delta {ref history, ..} => Some(history),
         }
     }
 
     /// Implements logic for adding to an aggregator.
-    pub fn try_add(
-        &mut self,
-        resolver: &dyn AggregatorResolver,
-        input: u128,
-    ) -> PartialVMResult<()> {
+    pub fn try_add(&mut self, resolver: &dyn AggregatorResolver, input: u128) -> PartialVMResult<()> {
         if input > self.max_value {
             // we do not have to record the overflow.
             // We record the delta that result in overflows/underflows so that when we compute the actual value
@@ -421,11 +423,7 @@ impl Aggregator {
     }
 
     /// Implements logic for subtracting from an aggregator.
-    pub fn try_sub(
-        &mut self,
-        resolver: &dyn AggregatorResolver,
-        input: u128,
-    ) -> PartialVMResult<()> {
+    pub fn try_sub(&mut self, resolver: &dyn AggregatorResolver, input: u128) -> PartialVMResult<()> {
         if input > self.max_value {
             // we do not have to record the underflow.
             // We record the delta that result in overflows/underflows so that when we compute the actual value
@@ -555,8 +553,13 @@ impl Aggregator {
                         ))
                     })?;
 
-                // Validate history and apply the delta.
-                self.validate_history(value_from_storage)?;
+                // Assert that the history is empty.
+                assert_eq!(*self.get_history().unwrap(), DeltaHistory {
+                    max_achieved_positive_delta: 0,
+                    min_achieved_negative_delta: 0,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                }, "History must be empty when reading the last committed value");
                 self.state = AggregatorState::Delta {
                     speculative_start_value: value_from_storage,
                     speculative_source: SpeculativeValueSource::LastCommittedValue,
@@ -799,7 +802,10 @@ mod test {
     #[test]
     fn test_read_aggregator_not_in_storage() {
         let mut aggregator_data = AggregatorData::default();
-        assert_err!(aggregator_data.get_aggregator(aggregator_id_for_test(300), 700));
+        assert_err!(aggregator_data.get_aggregator(
+            aggregator_id_for_test(300),
+            700
+        ));
     }
 
     #[test]

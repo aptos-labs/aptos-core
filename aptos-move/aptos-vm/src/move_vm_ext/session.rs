@@ -5,7 +5,7 @@ use crate::{
     access_path_cache::AccessPathCache, data_cache::get_resource_group_from_metadata,
     move_vm_ext::MoveResolverExt, transaction_metadata::TransactionMetadata,
 };
-use aptos_aggregator::{aggregator_extension::AggregatorID, delta_change_set::serialize};
+use aptos_aggregator::{aggregator_extension::AggregatorID, delta_change_set::{serialize, DeltaOp}};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
@@ -336,8 +336,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let mut resource_write_set = BTreeMap::new();
         let mut module_write_set = BTreeMap::new();
-        let mut aggregator_write_set = BTreeMap::new();
-        let mut aggregator_delta_set = BTreeMap::new();
+        let mut aggregator_v1_write_set = BTreeMap::new();
+        let mut aggregator_v1_delta_set = BTreeMap::new();
+        let mut aggregator_v2_change_set = BTreeMap::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
@@ -386,22 +387,29 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     let state_key = StateKey::table_item(TableHandle::from(handle), key_bytes);
 
                     match change {
-                        AggregatorChange::Write(value) => {
-                            let write_op = woc.convert_aggregator_mod(&state_key, value)?;
-                            aggregator_write_set.insert(state_key, write_op);
-                        },
-                        AggregatorChange::Merge(delta_op) => {
-                            aggregator_delta_set.insert(state_key, delta_op);
+                        AggregatorChange::State {
+                            max_value,
+                            state,
+                        } => {
+                            match state {
+                                AggregatorState::Data { value} => {
+                                    let write_op = woc.convert_aggregator_mod(&state_key, value)?;
+                                    aggregator_v1_write_set.insert(state_key, write_op);
+                                },
+                                AggregatorState::Delta { .. } => {
+                                    aggregator_v1_delta_set.insert(state_key, change);
+                                }
+                            }
                         },
                         AggregatorChange::Delete => {
                             let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
-                            aggregator_write_set.insert(state_key, write_op);
+                            aggregator_v1_write_set.insert(state_key, write_op);
                         },
                     }
                 },
                 // Process Aggregator V2.
                 AggregatorID::Ephemeral(_) => {
-                    unreachable!("Ephemeral IDs for aggregators are not used.")
+                    aggregator_v2_change_set.insert(id, change);
                 },
             }
         }
@@ -417,8 +425,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         VMChangeSet::new(
             resource_write_set,
             module_write_set,
-            aggregator_write_set,
-            aggregator_delta_set,
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set,
+            aggregator_v2_change_set,
             events,
             configs,
         )

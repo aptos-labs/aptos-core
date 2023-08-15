@@ -15,7 +15,7 @@ use crate::{
     txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_aggregator::{
-    aggregator_extension::DeltaValue,
+    aggregator_extension::{DeltaValue, DeltaHistory},
     delta_change_set::{delta_add, delta_sub, DeltaOp},
 };
 use aptos_mvhashmap::types::TxnIndex;
@@ -170,10 +170,7 @@ fn delta_chains() {
                             },
                             // below params irrelevant for this test.
                             u128::MAX,
-                            0,
-                            0,
-                            None,
-                            None,
+                            DeltaHistory::new()
                         ),
                     )),
                     false => None,
