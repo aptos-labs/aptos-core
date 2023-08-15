@@ -54,27 +54,17 @@ use dashmap::DashMap;
 use futures::channel::oneshot::Receiver;
 use mockall::predicate::eq;
 use rand::{prelude::SliceRandom, rngs::OsRng, Rng};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, future::Future, sync::Arc, time::Duration};
+use tokio::time::timeout;
+
+// Useful test constants
+const MAX_WAIT_TIME_SECS: u64 = 60;
 
 /// Advances the given timer by the amount of time it takes to refresh storage
 pub async fn advance_storage_refresh_time(mock_time: &MockTimeService) {
     let default_storage_config = StorageServiceConfig::default();
     let cache_update_freq_ms = default_storage_config.storage_summary_refresh_interval_ms;
     mock_time.advance_ms_async(cache_update_freq_ms).await;
-}
-
-/// Advances the storage refresh time and
-/// waits for the storage summary to refresh.
-pub async fn advance_time_and_wait_for_refresh(
-    mock_client: &mut MockClient,
-    mock_time: &MockTimeService,
-    old_storage_server_summary: StorageServerSummary,
-) {
-    // Advance the storage refresh time
-    advance_storage_refresh_time(mock_time).await;
-
-    // Wait for the storage server to refresh the cached summary
-    wait_for_cached_summary_update(mock_client, mock_time, old_storage_server_summary, true).await;
 }
 
 /// Creates and returns a list of data chunks that respect an epoch change
@@ -395,32 +385,41 @@ pub fn extract_peer_and_network_id(
 
 /// This function forces a cache update notification to be sent
 /// to the optimistic fetch and subscription handlers.
+///
 /// This can be done in two ways: (i) a state sync notification
 /// is sent to the storage service, invoking the handlers; or (ii)
 /// enough time elapses that the handlers execute manually.
-async fn force_cache_update_notification(
+pub async fn force_cache_update_notification(
     mock_client: &mut MockClient,
     mock_time: &MockTimeService,
     storage_service_notifier: &StorageServiceNotifier,
+    always_advance_time: bool,
+    wait_for_storage_cache_update: bool,
 ) {
     // Generate a random number and if the number is even, send
-    // a state sync notification. Otherwise, wait for the storage
-    // summary to refresh manually (by advancing time).
+    // a state sync notification. Otherwise, advance enough time
+    // to refresh the storage cache manually.
     let random_number: u8 = OsRng.gen();
-    if random_number % 2 == 0 {
-        // Send a state sync notification and wait for storage to update
-        send_notification_and_wait_for_refresh(
+    if always_advance_time || random_number % 2 != 0 {
+        // Advance the storage refresh time manually
+        advance_storage_refresh_time(mock_time).await;
+    } else {
+        // Send a state sync notification with the highest synced version
+        storage_service_notifier
+            .notify_new_commit(random_number as u64)
+            .await
+            .unwrap();
+    }
+
+    // Wait for the storage server to refresh the cached summary
+    if wait_for_storage_cache_update {
+        wait_for_cached_summary_update(
             mock_client,
             mock_time,
-            storage_service_notifier,
-            random_number as u64,
             StorageServerSummary::default(),
+            true,
         )
         .await;
-    } else {
-        // Advance the time manually and wait for storage to update
-        advance_time_and_wait_for_refresh(mock_client, mock_time, StorageServerSummary::default())
-            .await;
     }
 }
 
@@ -430,7 +429,14 @@ pub async fn force_optimistic_fetch_handler_to_run(
     mock_time: &MockTimeService,
     storage_service_notifier: &StorageServiceNotifier,
 ) {
-    force_cache_update_notification(mock_client, mock_time, storage_service_notifier).await;
+    force_cache_update_notification(
+        mock_client,
+        mock_time,
+        storage_service_notifier,
+        false,
+        true,
+    )
+    .await;
 }
 
 /// This function forces the subscription handler to work
@@ -439,7 +445,14 @@ pub async fn force_subscription_handler_to_run(
     mock_time: &MockTimeService,
     storage_service_notifier: &StorageServiceNotifier,
 ) {
-    force_cache_update_notification(mock_client, mock_time, storage_service_notifier).await;
+    force_cache_update_notification(
+        mock_client,
+        mock_time,
+        storage_service_notifier,
+        false,
+        true,
+    )
+    .await;
 }
 
 /// Sends a number of states request and processes the response
@@ -497,25 +510,6 @@ pub fn initialize_logger() {
         .is_async(false)
         .level(Level::Debug)
         .build();
-}
-
-/// Sends a state sync notification to the storage server
-/// and waits for the storage summary to refresh.
-pub async fn send_notification_and_wait_for_refresh(
-    mock_client: &mut MockClient,
-    mock_time: &MockTimeService,
-    storage_service_notifier: &StorageServiceNotifier,
-    highest_synced_version: u64,
-    old_storage_server_summary: StorageServerSummary,
-) {
-    // Send a state sync notification with the highest synced version
-    storage_service_notifier
-        .notify_new_commit(highest_synced_version)
-        .await
-        .unwrap();
-
-    // Wait for the storage server to refresh the cached summary
-    wait_for_cached_summary_update(mock_client, mock_time, old_storage_server_summary, false).await;
 }
 
 /// Sends a batch of transaction output requests and
@@ -897,19 +891,12 @@ pub fn verify_no_subscription_responses(
 /// Verifies that a response is received for a given stream request index
 /// and that the response contains the correct data.
 pub async fn verify_output_subscription_response(
-    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     expected_output_lists_with_proofs: Vec<TransactionOutputListWithProof>,
     expected_target_ledger_info: LedgerInfoWithSignatures,
     mock_client: &mut MockClient,
-    mock_time: &MockTimeService,
     response_receivers: &mut HashMap<u64, Receiver<Result<Bytes, RpcError>>>,
     stream_request_index: u64,
-    storage_service_notifier: &StorageServiceNotifier,
 ) {
-    // Force the subscription handler to work
-    force_subscription_handler_to_run(mock_client, mock_time, storage_service_notifier).await;
-
-    // Verify a response is received and that it contains the correct data
     let response_receiver = response_receivers.remove(&stream_request_index).unwrap();
     verify_new_transaction_outputs_with_proof(
         mock_client,
@@ -918,9 +905,6 @@ pub async fn verify_output_subscription_response(
         expected_target_ledger_info,
     )
     .await;
-
-    // Manually reset the cached storage server summary
-    cached_storage_server_summary.store(Arc::new(StorageServerSummary::default()));
 }
 
 /// Verifies the state of an active subscription stream entry.
@@ -963,15 +947,29 @@ pub async fn wait_for_active_optimistic_fetches(
     active_optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     expected_num_active_fetches: usize,
 ) {
-    loop {
-        let num_active_fetches = active_optimistic_fetches.len();
-        if num_active_fetches == expected_num_active_fetches {
-            return; // We found the expected number of active fetches
-        }
+    // Wait for the specified number of active fetches
+    let check_active_fetches = async move {
+        loop {
+            // Check if we've found the expected number of active fetches
+            let num_active_fetches = active_optimistic_fetches.len();
+            if num_active_fetches == expected_num_active_fetches {
+                return; // We found the expected number of active fetches
+            }
 
-        // Sleep for a while
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
+            // Otherwise, sleep for a while
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    };
+
+    // Spawn the task with a timeout
+    spawn_with_timeout(
+        check_active_fetches,
+        &format!(
+            "Timed-out while waiting for {} active fetches!",
+            expected_num_active_fetches
+        ),
+    )
+    .await;
 }
 
 /// Waits for the specified number of active stream requests for
@@ -981,22 +979,35 @@ pub async fn wait_for_active_stream_requests(
     peer_network_id: PeerNetworkId,
     expected_num_active_stream_requests: usize,
 ) {
-    loop {
-        // Check the number of active stream requests
-        if let Some(subscription_stream_requests) =
-            active_subscriptions.lock().get_mut(&peer_network_id)
-        {
-            let num_active_stream_requests = subscription_stream_requests
-                .get_pending_subscription_requests()
-                .len();
-            if num_active_stream_requests == expected_num_active_stream_requests {
-                return; // We found the expected number of stream requests
+    // Wait for the specified number of active stream requests
+    let check_active_stream_requests = async move {
+        loop {
+            // Check if the number of active stream requests matches
+            if let Some(subscription_stream_requests) =
+                active_subscriptions.lock().get_mut(&peer_network_id)
+            {
+                let num_active_stream_requests = subscription_stream_requests
+                    .get_pending_subscription_requests()
+                    .len();
+                if num_active_stream_requests == expected_num_active_stream_requests {
+                    return; // We found the expected number of stream requests
+                }
             }
-        }
 
-        // Sleep for a while
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
+            // Otherwise, sleep for a while
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    };
+
+    // Spawn the task with a timeout
+    spawn_with_timeout(
+        check_active_stream_requests,
+        &format!(
+            "Timed-out while waiting for {} active stream requests.",
+            expected_num_active_stream_requests
+        ),
+    )
+    .await;
 }
 
 /// Waits for the specified number of subscriptions to be active
@@ -1004,15 +1015,29 @@ pub async fn wait_for_active_subscriptions(
     active_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
     expected_num_active_subscriptions: usize,
 ) {
-    loop {
-        let num_active_subscriptions = active_subscriptions.lock().len();
-        if num_active_subscriptions == expected_num_active_subscriptions {
-            return; // We found the expected number of active subscriptions
-        }
+    // Wait for the specified number of active subscriptions
+    let check_active_subscriptions = async move {
+        loop {
+            // Check if the number of active subscriptions matches
+            let num_active_subscriptions = active_subscriptions.lock().len();
+            if num_active_subscriptions == expected_num_active_subscriptions {
+                return; // We found the expected number of active subscriptions
+            }
 
-        // Sleep for a while
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
+            // Otherwise, sleep for a while
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    };
+
+    // Spawn the task with a timeout
+    spawn_with_timeout(
+        check_active_subscriptions,
+        &format!(
+            "Timed-out while waiting for {} active subscriptions.",
+            expected_num_active_subscriptions
+        ),
+    )
+    .await;
 }
 
 /// Waits for the cached storage summary to update
@@ -1022,25 +1047,43 @@ async fn wait_for_cached_summary_update(
     old_storage_server_summary: StorageServerSummary,
     continue_advancing_time: bool,
 ) {
+    // Create a storage summary request
     let storage_request = StorageServiceRequest::new(DataRequest::GetStorageServerSummary, true);
 
-    // Loop until the storage summary has updated
-    while mock_client
-        .process_request(storage_request.clone())
-        .await
-        .unwrap()
-        == StorageServiceResponse::new(
-            DataResponse::StorageServerSummary(old_storage_server_summary.clone()),
-            true,
-        )
-        .unwrap()
-    {
-        // Advance the storage refresh time
-        if continue_advancing_time {
-            advance_storage_refresh_time(mock_time).await;
-        }
+    // Wait for the storage summary to update
+    let storage_summary_updated = async move {
+        while mock_client
+            .process_request(storage_request.clone())
+            .await
+            .unwrap()
+            == StorageServiceResponse::new(
+                DataResponse::StorageServerSummary(old_storage_server_summary.clone()),
+                true,
+            )
+            .unwrap()
+        {
+            // Advance the storage refresh time
+            if continue_advancing_time {
+                advance_storage_refresh_time(mock_time).await;
+            }
 
-        // Sleep for a while
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
+            // Sleep for a while
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    };
+
+    // Spawn the task with a timeout
+    spawn_with_timeout(
+        storage_summary_updated,
+        "Timed-out while waiting for the cached storage summary to update!",
+    )
+    .await;
+}
+
+/// Spawns the given task with a timeout
+pub async fn spawn_with_timeout(task: impl Future<Output = ()>, timeout_error_message: &str) {
+    let timeout_duration = Duration::from_secs(MAX_WAIT_TIME_SECS);
+    timeout(timeout_duration, task)
+        .await
+        .expect(timeout_error_message)
 }

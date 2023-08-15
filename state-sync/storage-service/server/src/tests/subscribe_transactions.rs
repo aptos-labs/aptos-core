@@ -7,18 +7,14 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_network::protocols::network::RpcError;
-use aptos_storage_service_notifications::StorageServiceNotifier;
-use aptos_storage_service_types::responses::StorageServerSummary;
-use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{
     epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
     transaction::TransactionListWithProof, PeerId,
 };
-use arc_swap::ArcSwap;
 use bytes::Bytes;
 use claims::assert_none;
 use futures::channel::oneshot::Receiver;
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_subscribe_transactions_different_networks() {
@@ -49,8 +45,10 @@ async fn test_subscribe_transactions_different_networks() {
             );
 
             // Create the mock db reader
-            let mut db_reader =
-                mock::create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
+            let mut db_reader = mock::create_mock_db_with_summary_updates(
+                highest_ledger_info.clone(),
+                lowest_version,
+            );
             utils::expect_get_transactions(
                 &mut db_reader,
                 peer_version_1 + 1,
@@ -162,7 +160,7 @@ async fn test_subscribe_transactions_epoch_change() {
         );
 
         // Create the mock db reader
-        let mut db_reader = mock::create_mock_db_for_subscription(
+        let mut db_reader = mock::create_mock_db_with_summary_updates(
             utils::create_test_ledger_info_with_sigs(highest_epoch, highest_version),
             lowest_version,
         );
@@ -248,7 +246,7 @@ async fn test_subscribe_transactions_max_chunk() {
 
         // Create the mock db reader
         let mut db_reader =
-            mock::create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
+            mock::create_mock_db_with_summary_updates(highest_ledger_info.clone(), lowest_version);
         utils::expect_get_transactions(
             &mut db_reader,
             peer_version + 1,
@@ -298,95 +296,6 @@ async fn test_subscribe_transactions_max_chunk() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_subscribe_transactions_single_request_expired() {
-    // Create a storage service config
-    let storage_service_config = StorageServiceConfig::default();
-    let max_transaction_chunk_size = storage_service_config.max_transaction_chunk_size;
-
-    // Test small and large chunk sizes
-    for chunk_size in [1, 100, max_transaction_chunk_size] {
-        // Test event inclusion
-        for include_events in [true, false] {
-            // Create test data
-            let highest_version = 45576;
-            let highest_epoch = 43;
-            let lowest_version = 4566;
-            let peer_version = highest_version - chunk_size;
-            let highest_ledger_info =
-                utils::create_test_ledger_info_with_sigs(highest_epoch, highest_version);
-            let transaction_list_with_proof = utils::create_transaction_list_with_proof(
-                peer_version + 1,
-                highest_version,
-                highest_version,
-                include_events,
-            );
-
-            // Create the mock db reader
-            let mut db_reader =
-                mock::create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
-            utils::expect_get_transactions(
-                &mut db_reader,
-                peer_version + 1,
-                highest_version - peer_version,
-                highest_version,
-                include_events,
-                transaction_list_with_proof.clone(),
-            );
-
-            // Create the storage client and server
-            let (mut mock_client, service, storage_service_notifier, mock_time, _) =
-                MockClient::new(Some(db_reader), Some(storage_service_config));
-            let active_subscriptions = service.get_subscriptions();
-            tokio::spawn(service.start());
-
-            // Send a request to subscribe to transactions
-            let mut response_receiver = utils::subscribe_to_transactions(
-                &mut mock_client,
-                peer_version,
-                highest_epoch,
-                include_events,
-                utils::get_random_u64(),
-                0,
-            )
-            .await;
-
-            // Wait until the subscription is active
-            utils::wait_for_active_subscriptions(active_subscriptions.clone(), 1).await;
-
-            // Verify no subscription response has been received yet
-            assert_none!(response_receiver.try_recv().unwrap());
-
-            // Force the subscription handler to work
-            utils::force_subscription_handler_to_run(
-                &mut mock_client,
-                &mock_time,
-                &storage_service_notifier,
-            )
-            .await;
-
-            // Verify a response is received and that it contains the correct data
-            utils::verify_new_transactions_with_proof(
-                &mut mock_client,
-                response_receiver,
-                transaction_list_with_proof,
-                highest_ledger_info,
-            )
-            .await;
-
-            // Elapse enough time to expire the now empty stream
-            utils::elapse_time(
-                storage_service_config.max_subscription_period_ms + 1,
-                &TimeService::from_mock(mock_time),
-            )
-            .await;
-
-            // Wait until the subscription is cleared
-            utils::wait_for_active_subscriptions(active_subscriptions.clone(), 0).await;
-        }
-    }
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn test_subscribe_transactions_streaming() {
     // Create a storage service config
     let max_transaction_chunk_size = 100;
@@ -420,7 +329,7 @@ async fn test_subscribe_transactions_streaming() {
 
     // Create the mock db reader
     let mut db_reader =
-        mock::create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
+        mock::create_mock_db_with_summary_updates(highest_ledger_info.clone(), lowest_version);
     for i in 0..num_stream_requests {
         utils::expect_get_transactions(
             &mut db_reader,
@@ -436,7 +345,6 @@ async fn test_subscribe_transactions_streaming() {
     let (mut mock_client, service, storage_service_notifier, mock_time, _) =
         MockClient::new(Some(db_reader), Some(storage_service_config));
     let active_subscriptions = service.get_subscriptions();
-    let cached_storage_server_summary = service.cached_storage_server_summary.clone();
     tokio::spawn(service.start());
 
     // Create a new peer and stream ID
@@ -469,28 +377,25 @@ async fn test_subscribe_transactions_streaming() {
         )
         .await;
 
+        // Force the subscription handler to work
+        utils::force_cache_update_notification(
+            &mut mock_client,
+            &mock_time,
+            &storage_service_notifier,
+            true,
+            true,
+        )
+        .await;
+
         // Continuously run the subscription service until the batch responses are received
         for stream_request_index in first_request_index..=last_request_index {
-            // Verify the state of the subscription stream
-            utils::verify_subscription_stream_entry(
-                active_subscriptions.clone(),
-                peer_network_id,
-                num_requests_per_batch,
-                peer_version,
-                highest_epoch,
-                max_transaction_chunk_size,
-            );
-
             // Verify that the correct response is received
             verify_transaction_subscription_response(
-                cached_storage_server_summary.clone(),
                 transaction_lists_with_proofs.clone(),
                 highest_ledger_info.clone(),
                 &mut mock_client,
-                &mock_time,
                 &mut response_receivers,
                 stream_request_index,
-                &storage_service_notifier,
             )
             .await;
         }
@@ -547,7 +452,7 @@ async fn test_subscribe_transactions_streaming_epoch_change() {
 
     // Create the mock db reader
     let mut db_reader =
-        mock::create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
+        mock::create_mock_db_with_summary_updates(highest_ledger_info.clone(), lowest_version);
     utils::expect_get_epoch_ending_ledger_infos(
         &mut db_reader,
         peer_epoch,
@@ -574,7 +479,6 @@ async fn test_subscribe_transactions_streaming_epoch_change() {
     let (mut mock_client, service, storage_service_notifier, mock_time, _) =
         MockClient::new(Some(db_reader), Some(storage_service_config));
     let active_subscriptions = service.get_subscriptions();
-    let cached_storage_server_summary = service.cached_storage_server_summary.clone();
     tokio::spawn(service.start());
 
     // Create a new peer and stream ID
@@ -601,6 +505,14 @@ async fn test_subscribe_transactions_streaming_epoch_change() {
     )
     .await;
 
+    // Force the subscription handler to work
+    utils::force_subscription_handler_to_run(
+        &mut mock_client,
+        &mock_time,
+        &storage_service_notifier,
+    )
+    .await;
+
     // Continuously run the subscription service until all the responses are received
     for stream_request_index in 0..max_num_active_subscriptions {
         // Determine the target ledger info for the response
@@ -615,14 +527,118 @@ async fn test_subscribe_transactions_streaming_epoch_change() {
 
         // Verify that the correct response is received
         verify_transaction_subscription_response(
-            cached_storage_server_summary.clone(),
             transaction_lists_with_proofs.clone(),
             target_ledger_info.clone(),
             &mut mock_client,
-            &mock_time,
             &mut response_receivers,
             stream_request_index,
-            &storage_service_notifier,
+        )
+        .await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_subscribe_transactions_streaming_loop() {
+    // Create a storage service config
+    let max_transaction_chunk_size = 100;
+    let storage_service_config = StorageServiceConfig {
+        max_transaction_chunk_size,
+        ..Default::default()
+    };
+
+    // Create test data
+    let num_stream_requests = 20;
+    let highest_version = 100_000;
+    let highest_epoch = 10;
+    let lowest_version = 10_000;
+    let peer_version = 50_000;
+    let highest_ledger_info =
+        utils::create_test_ledger_info_with_sigs(highest_epoch, highest_version);
+
+    // Create the transaction lists with proofs
+    let transaction_lists_with_proofs: Vec<_> = (0..num_stream_requests)
+        .map(|i| {
+            let start_version = peer_version + (i * max_transaction_chunk_size) + 1;
+            let end_version = start_version + max_transaction_chunk_size - 1;
+            utils::create_transaction_list_with_proof(
+                start_version,
+                end_version,
+                highest_version,
+                false,
+            )
+        })
+        .collect();
+
+    // Create the mock db reader
+    let mut db_reader =
+        mock::create_mock_db_with_summary_updates(highest_ledger_info.clone(), lowest_version);
+    for i in 0..num_stream_requests {
+        utils::expect_get_transactions(
+            &mut db_reader,
+            peer_version + (i * max_transaction_chunk_size) + 1,
+            max_transaction_chunk_size,
+            highest_version,
+            false,
+            transaction_lists_with_proofs[i as usize].clone(),
+        );
+    }
+
+    // Create the storage client and server
+    let (mut mock_client, service, storage_service_notifier, mock_time, _) =
+        MockClient::new(Some(db_reader), Some(storage_service_config));
+    let active_subscriptions = service.get_subscriptions();
+    tokio::spawn(service.start());
+
+    // Create a new peer and stream ID
+    let peer_network_id = PeerNetworkId::random();
+    let stream_id = utils::get_random_u64();
+
+    // Send the requests to the server and verify the responses
+    let mut response_receivers = send_transaction_subscription_request_batch(
+        &mut mock_client,
+        peer_network_id,
+        0,
+        num_stream_requests - 1,
+        stream_id,
+        peer_version,
+        highest_epoch,
+    )
+    .await;
+
+    // Wait until the stream requests are active
+    utils::wait_for_active_stream_requests(
+        active_subscriptions.clone(),
+        peer_network_id,
+        num_stream_requests as usize,
+    )
+    .await;
+
+    // Verify the state of the subscription stream
+    utils::verify_subscription_stream_entry(
+        active_subscriptions.clone(),
+        peer_network_id,
+        num_stream_requests,
+        peer_version,
+        highest_epoch,
+        max_transaction_chunk_size,
+    );
+
+    // Force the subscription handler to work
+    utils::force_subscription_handler_to_run(
+        &mut mock_client,
+        &mock_time,
+        &storage_service_notifier,
+    )
+    .await;
+
+    // Verify all responses are received
+    for stream_request_index in 0..num_stream_requests {
+        let response_receiver = response_receivers.remove(&stream_request_index).unwrap();
+        utils::verify_new_transactions_with_proof(
+            &mut mock_client,
+            response_receiver,
+            transaction_lists_with_proofs[stream_request_index as usize].clone(),
+            highest_ledger_info.clone(),
         )
         .await;
     }
@@ -668,20 +684,12 @@ async fn send_transaction_subscription_request_batch(
 /// Verifies that a response is received for a given stream request index
 /// and that the response contains the correct data.
 async fn verify_transaction_subscription_response(
-    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     expected_transaction_lists_with_proofs: Vec<TransactionListWithProof>,
     expected_target_ledger_info: LedgerInfoWithSignatures,
     mock_client: &mut MockClient,
-    mock_time: &MockTimeService,
     response_receivers: &mut HashMap<u64, Receiver<Result<Bytes, RpcError>>>,
     stream_request_index: u64,
-    storage_service_notifier: &StorageServiceNotifier,
 ) {
-    // Force the subscription handler to work
-    utils::force_subscription_handler_to_run(mock_client, mock_time, storage_service_notifier)
-        .await;
-
-    // Verify a response is received and that it contains the correct data
     let response_receiver = response_receivers.remove(&stream_request_index).unwrap();
     utils::verify_new_transactions_with_proof(
         mock_client,
@@ -690,7 +698,4 @@ async fn verify_transaction_subscription_response(
         expected_target_ledger_info,
     )
     .await;
-
-    // Manually reset the cached storage server summary
-    cached_storage_server_summary.store(Arc::new(StorageServerSummary::default()));
 }
