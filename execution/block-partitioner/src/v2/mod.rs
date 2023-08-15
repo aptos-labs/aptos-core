@@ -89,6 +89,7 @@ impl BlockPartitioner for PartitionerV2 {
             .with_label_values(&["total"])
             .start_timer();
 
+        // Step 0: pre-partition. Divide a list of transactions into `num_executor_shards` chunks.
         let pre_partitioned = self.pre_partition(txns.as_slice(), num_executor_shards);
 
         let mut state = PartitionState::new(
@@ -101,11 +102,21 @@ impl BlockPartitioner for PartitionerV2 {
             self.cross_shard_dep_avoid_threshold,
             self.partition_last_round,
         );
+        // Step 1: build some necessary indices for txn senders/storage locations.
         Self::init(&mut state);
-        Self::partition_to_matrix(&mut state);
+
+        // Step 2: remove cross-shard dependencies by move some txns into new rounds.
+        // As a result, we get a txn matrix of no more than `self.max_partitioning_rounds` rows and exactly `num_executor_shards` columns.
+        // It's guaranteed that inside every round other than the last round, there's no cross-shard dependency. (But cross-round dependencies are always possible.)
+        Self::remove_cross_shard_dependencies(&mut state);
+
+        // Step 3: build some additional indices of the resulting txn matrix from Step 2.
         Self::build_index_from_txn_matrix(&mut state);
+
+        // Step 4: calculate all the cross-shard dependencies and prepare the input for sharded execution.
         let ret = Self::add_edges(&mut state);
 
+        // Async clean-up.
         self.thread_pool.spawn(move || {
             drop(state);
         });
