@@ -16,7 +16,7 @@ ethnum = "1.0.4"
 hex = "0.4.3"
 num = "0.4.0"
 once_cell = "1.7.2"
-primitive-types = { version = "0.10.1", features = ["impl-serde"] }
+primitive-types = { version = "0.12.1", features = ["impl-serde"] }
 proptest = { version = "1.0.0", default-features = false, optional = true }
 proptest-derive = { version = "0.3.0", default-features = false, optional = true }
 rand = "0.8.3"

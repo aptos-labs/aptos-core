@@ -97,6 +97,16 @@ impl fmt::Display for U256FromStrError {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Copy, PartialOrd, Ord, Default)]
 pub struct U256(PrimitiveU256);
 
+impl U256 {
+    pub fn into_inner(self) -> PrimitiveU256 {
+        self.0
+    }
+
+    pub fn from_inner(inner: PrimitiveU256) -> Self {
+        Self(inner)
+    }
+}
+
 impl fmt::Display for U256 {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         self.0.fmt(f)
