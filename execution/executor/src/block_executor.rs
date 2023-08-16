@@ -185,7 +185,7 @@ where
             block_id,
             transactions,
         } = block;
-        let committed_block = self.block_tree.root_block();
+        let committed_block_id = self.committed_block_id();
         let mut block_vec = self
             .block_tree
             .get_blocks_opt(&[block_id, parent_block_id])?;
@@ -203,7 +203,7 @@ where
             return Ok(b.output.as_state_compute_result(parent_accumulator));
         }
 
-        let output = if parent_block_id != committed_block.id && parent_output.has_reconfiguration()
+        let output = if parent_block_id != committed_block_id && parent_output.has_reconfiguration()
         {
             info!(
                 LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
