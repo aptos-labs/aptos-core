@@ -148,7 +148,9 @@ impl RestoreHandler {
         &self,
         version: Version,
     ) -> Result<Option<(Version, HashValue)>> {
-        self.aptosdb.get_state_snapshot_before(version)
+        self.aptosdb
+            .get_state_snapshot_before(version)
+            .map_err(Into::into)
     }
 
     pub fn get_in_progress_state_kv_snapshot_version(&self) -> Result<Option<Version>> {

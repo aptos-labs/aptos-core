@@ -12,12 +12,13 @@ use crate::{
         column_families, indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema,
     },
 };
-use anyhow::{bail, ensure, Result};
 use aptos_config::config::RocksdbConfig;
 use aptos_logger::warn;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
-use aptos_storage_interface::{state_view::DbStateView, DbReader};
+use aptos_storage_interface::{
+    db_ensure, db_other_bail, errors::AptosDbError, state_view::DbStateView, DbReader,
+};
 use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
@@ -40,6 +41,7 @@ use std::{
     sync::{atomic::Ordering, Arc},
 };
 
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 #[derive(Debug)]
 pub struct Indexer {
     db: DB,
@@ -93,7 +95,7 @@ impl Indexer {
         write_sets: &[&WriteSet],
     ) -> Result<()> {
         let next_version = self.next_version();
-        ensure!(
+        db_ensure!(
             first_version <= next_version,
             "Indexer expects to see continuous transaction versions. Expecting: {}, got: {}",
             next_version,
@@ -128,7 +130,7 @@ impl Indexer {
                     .for_each(|(i, write_set)| {
                         aptos_logger::error!(version = first_version as usize + i, write_set = ?write_set);
                     });
-                bail!(err);
+                db_other_bail!("Failed to parse table info: {:?}", err);
             },
         };
         batch.put::<IndexerMetadataSchema>(
@@ -240,7 +242,7 @@ impl<'a> TableInfoParser<'a> {
                             assert_eq!(name.as_ref(), ident_str!("handle"));
                             TableHandle(*handle)
                         },
-                        _ => bail!("Table struct malformed. {:?}", struct_value),
+                        _ => db_other_bail!("Table struct malformed. {:?}", struct_value),
                     };
                     self.save_table_info(table_handle, table_info)?;
                 } else {
@@ -290,7 +292,7 @@ impl<'a> TableInfoParser<'a> {
     }
 
     fn finish(self, batch: &mut SchemaBatch) -> Result<bool> {
-        ensure!(
+        db_ensure!(
             self.pending_on.is_empty(),
             "There is still pending table items to parse due to unknown table info for table handles: {:?}",
             self.pending_on.keys(),

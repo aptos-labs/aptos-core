@@ -74,7 +74,9 @@ async fn test_get_number_of_states_at_version_invalid() {
         .times(1)
         .with(eq(version))
         .returning(move |_| {
-            AptosDbError::NotFound(format_err!("Version does not exist!").to_string()).into()
+            Err(AptosDbError::NotFound(
+                format_err!("Version does not exist!").to_string(),
+            ))
         });
 
     // Create the storage client and server

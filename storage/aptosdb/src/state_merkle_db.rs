@@ -13,7 +13,6 @@ use crate::{
     versioned_node_cache::VersionedNodeCache,
     NUM_STATE_SHARDS, OTHER_TIMERS_SECONDS,
 };
-use anyhow::{ensure, Result};
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_jellyfish_merkle::{
@@ -40,6 +39,8 @@ use std::{
     sync::Arc,
     time::Instant,
 };
+use aptos_storage_interface::errors::{AptosDbError};
+use aptos_storage_interface::{db_ensure as ensure};
 
 pub const STATE_MERKLE_DB_FOLDER_NAME: &str = "state_merkle_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
@@ -56,6 +57,8 @@ static TREE_COMMIT_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
 pub(crate) type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
 pub(crate) type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
 type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
+
 
 #[derive(Debug)]
 pub struct StateMerkleDb {
@@ -122,7 +125,7 @@ impl StateMerkleDb {
         top_levels_batch: SchemaBatch,
         batches_for_shards: Vec<SchemaBatch>,
     ) -> Result<()> {
-        ensure!(batches_for_shards.len() == NUM_STATE_SHARDS);
+        ensure!(batches_for_shards.len() == NUM_STATE_SHARDS, "batch size {} not equal to {}", batches_for_shards.len(), NUM_STATE_SHARDS);
         TREE_COMMIT_POOL.scope(|s| {
             let mut batches = batches_for_shards.into_iter();
             for shard_id in 0..NUM_STATE_SHARDS {
@@ -144,7 +147,7 @@ impl StateMerkleDb {
         top_level_batch: SchemaBatch,
         batches_for_shards: Vec<SchemaBatch>,
     ) -> Result<()> {
-        ensure!(batches_for_shards.len() == NUM_STATE_SHARDS);
+        ensure!(batches_for_shards.len() == NUM_STATE_SHARDS, "batch size {} not equal to {}", batches_for_shards.len(), NUM_STATE_SHARDS);
         TREE_COMMIT_POOL.scope(|s| {
             let mut state_merkle_batch = batches_for_shards.into_iter();
             for shard_id in 0..NUM_STATE_SHARDS {
@@ -336,7 +339,7 @@ impl StateMerkleDb {
             .par_iter()
             .with_min_len(128)
             .try_for_each(|(node_key, node)| {
-                ensure!(node_key.get_shard_id() == shard_id);
+                ensure!(node_key.get_shard_id() == shard_id, "shard_id mismatch");
                 batch.put::<JellyfishMerkleNodeSchema>(node_key, node)
             })?;
 
@@ -348,7 +351,7 @@ impl StateMerkleDb {
             .par_iter()
             .with_min_len(128)
             .try_for_each(|row| {
-                ensure!(row.node_key.get_shard_id() == shard_id);
+                ensure!(row.node_key.get_shard_id() == shard_id, "shard_id mismatch");
                 if previous_epoch_ending_version.is_some()
                     && row.node_key.version() <= previous_epoch_ending_version.unwrap()
                 {

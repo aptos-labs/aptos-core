@@ -124,6 +124,7 @@ impl BackupHandler {
         let iterator = self
             .state_store
             .get_state_key_and_value_iter(version, HashValue::zero())?
+            .map(|it| it.map_error(Into::into))
             .enumerate()
             .map(move |(idx, res)| {
                 BACKUP_STATE_SNAPSHOT_VERSION.set(version as i64);

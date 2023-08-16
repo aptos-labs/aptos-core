@@ -9,7 +9,7 @@ use crate::{
     },
     state_kv_db::StateKvDb,
 };
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, ensure};
 use aptos_schemadb::{iterator::SchemaIterator, ReadOptions};
 use aptos_types::{
     account_address::AccountAddress,
@@ -19,6 +19,9 @@ use aptos_types::{
     transaction::Version,
 };
 use std::{iter::Peekable, marker::PhantomData};
+use aptos_storage_interface::errors::AptosDbError;
+
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 pub struct ContinuousVersionIter<I, T> {
     inner: I,

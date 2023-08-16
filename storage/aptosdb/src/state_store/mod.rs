@@ -27,7 +27,7 @@ use crate::{
     StaleNodeIndexSchema, StateKvPrunerManager, StateMerklePrunerManager, TransactionStore,
     NUM_STATE_SHARDS, OTHER_TIMERS_SECONDS,
 };
-use anyhow::{ensure, format_err, Context, Result as AnyhowResult, anyhow};
+use anyhow::{Context};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -38,7 +38,7 @@ use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
 use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_state_view::StateViewId;
-use aptos_storage_interface::{
+use aptos_storage_interface::{db_ensure as ensure,
     async_proof_fetcher::AsyncProofFetcher,
     cached_state_view::{CachedStateView, ShardedStateCache},
     state_delta::StateDelta,
@@ -64,6 +64,8 @@ use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::{collections::HashSet, ops::Deref, sync::Arc};
 
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
+
 pub(crate) mod buffered_state;
 mod state_merkle_batch_committer;
 mod state_snapshot_committer;
@@ -79,7 +81,6 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * 2;
 
 const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 100000;
-type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -196,7 +197,7 @@ impl DbReader for StateDb {
         ))
     }
 
-    fn get_state_storage_usage(&self, version: Option<Version>) -> AnyhowResult<StateStorageUsage> {
+    fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         if self.skip_usage {
             return Ok(StateStorageUsage::new_untracked());
         }
@@ -205,7 +206,9 @@ impl DbReader for StateDb {
                 .ledger_db
                 .metadata_db()
                 .get::<VersionDataSchema>(&version)?
-                .ok_or_else(||anyhow!(format!("VersionData at {}", version)))?
+                .ok_or_else(|| {
+                    AptosDbError::NotFound(format!("VersionData at {}", version).to_string())
+                })?
                 .get_state_storage_usage())
         })
     }
@@ -217,7 +220,7 @@ impl StateDb {
     pub fn get_previous_epoch_ending(
         &self,
         version: Version,
-    ) -> AnyhowResult<Option<(u64, Version)>> {
+    ) -> Result<Option<(u64, Version)>> {
         if version == 0 {
             return Ok(None);
         }
@@ -229,7 +232,7 @@ impl StateDb {
             .iter::<EpochByVersionSchema>(ReadOptions::default())?;
         // Search for the end of the previous epoch.
         iter.seek_for_prev(&prev_version)?;
-        iter.next().transpose()
+        iter.next().transpose().map_err(Into::into)
     }
 }
 
@@ -290,14 +293,17 @@ impl StateDb {
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> AnyhowResult<StateValue> {
+    ) -> Result<StateValue> {
         self.get_state_value_by_version(state_key, version)
             .and_then(|opt| {
                 opt.ok_or_else(|| {
-                    anyhow!(format!(
-                        "State Value is missing for key {:?} by version {}",
-                        state_key, version
-                    ))
+                    AptosDbError::NotFound(
+                        format!(
+                            "State Value is missing for key {:?} by version {}",
+                            state_key, version
+                        )
+                        .to_string(),
+                    )
                 })
             })
     }
@@ -436,7 +442,7 @@ impl StateStore {
         ledger_db: Arc<LedgerDb>,
         state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
-    ) -> AnyhowResult<Option<Version>> {
+    ) -> Result<Option<Version>> {
         use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
 
         let state_merkle_pruner = StateMerklePrunerManager::new(
@@ -472,7 +478,7 @@ impl StateStore {
         buffered_state_target_items: usize,
         hack_for_tests: bool,
         check_max_versions_after_snapshot: bool,
-    ) -> AnyhowResult<BufferedState> {
+    ) -> Result<BufferedState> {
         let ledger_store = LedgerStore::new(Arc::clone(&state_db.ledger_db));
         let num_transactions = ledger_store.get_latest_version().map_or(0, |v| v + 1);
 
@@ -545,7 +551,7 @@ impl StateStore {
                 ledger_store.get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
             let last_checkpoint_index = txn_info_iter
                 .into_iter()
-                .collect::<AnyhowResult<Vec<_>>>()?
+                .collect::<Result<Vec<_>>>()?
                 .into_iter()
                 .enumerate()
                 .filter(|(_idx, txn_info)| txn_info.is_state_checkpoint())
@@ -600,7 +606,7 @@ impl StateStore {
         key_prefix: &StateKeyPrefix,
         first_key_opt: Option<&StateKey>,
         desired_version: Version,
-    ) -> AnyhowResult<PrefixedStateValueIterator> {
+    ) -> Result<PrefixedStateValueIterator> {
         PrefixedStateValueIterator::new(
             &self.state_kv_db,
             key_prefix.clone(),
@@ -615,7 +621,7 @@ impl StateStore {
         &self,
         rightmost_key: HashValue,
         version: Version,
-    ) -> AnyhowResult<SparseMerkleRangeProof> {
+    ) -> Result<SparseMerkleRangeProof> {
         self.state_merkle_db.get_range_proof(rightmost_key, version)
     }
 
@@ -628,7 +634,7 @@ impl StateStore {
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
         state_kv_metadata_batch: &SchemaBatch,
         put_state_value_indices: bool,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_writesets"])
             .start_timer();
@@ -681,7 +687,7 @@ impl StateStore {
         state_kv_metadata_batch: &SchemaBatch,
         put_state_value_indices: bool,
         skip_usage: bool,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_value_sets"])
             .start_timer();
@@ -716,7 +722,7 @@ impl StateStore {
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
         state_kv_metadata_batch: &SchemaBatch,
         put_state_value_indices: bool,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         sharded_state_kv_batches
             .par_iter()
             .enumerate()
@@ -731,7 +737,7 @@ impl StateStore {
                             batch.put::<StateValueSchema>(&(k.clone(), version), v)
                         })
                     })
-                    .collect::<AnyhowResult<_>>()
+                    .collect::<Result<_>>()
             })?;
 
         // Eventually this index will move to indexer side. For now we temporarily write this into
@@ -753,7 +759,7 @@ impl StateStore {
         Ok(())
     }
 
-    pub fn get_usage(&self, version: Option<Version>) -> AnyhowResult<StateStorageUsage> {
+    pub fn get_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["get_usage"])
             .start_timer();
@@ -780,7 +786,7 @@ impl StateStore {
         batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
         skip_usage: bool,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_stats_and_indices"])
             .start_timer();
@@ -985,11 +991,11 @@ impl StateStore {
         Ok(root_hash)
     }
 
-    pub fn get_root_hash(&self, version: Version) -> AnyhowResult<HashValue> {
+    pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
         self.state_merkle_db.get_root_hash(version)
     }
 
-    pub fn get_value_count(&self, version: Version) -> AnyhowResult<usize> {
+    pub fn get_value_count(&self, version: Version) -> Result<usize> {
         self.state_merkle_db.get_leaf_count(version)
     }
 
@@ -997,13 +1003,13 @@ impl StateStore {
         self: &Arc<Self>,
         version: Version,
         start_hashed_key: HashValue,
-    ) -> AnyhowResult<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync> {
+    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync> {
         let store = Arc::clone(self);
         Ok(JellyfishMerkleIterator::new(
             Arc::clone(&self.state_merkle_db),
             version,
             start_hashed_key,
-        )?
+        )?.map(|it| it.map_err(Into::into))
         .map(move |res| match res {
             Ok((_hashed_key, (key, version))) => {
                 Ok((key.clone(), store.expect_value_by_version(&key, version)?))
@@ -1017,13 +1023,13 @@ impl StateStore {
         version: Version,
         first_index: usize,
         chunk_size: usize,
-    ) -> AnyhowResult<StateValueChunkWithProof> {
+    ) -> Result<StateValueChunkWithProof> {
         let result_iter = JellyfishMerkleIterator::new_by_index(
             Arc::clone(&self.state_merkle_db),
             version,
             first_index,
         )?
-        .take(chunk_size);
+        .take(chunk_size).map(|it| it.map_err(Into::into));
         let state_key_values: Vec<(StateKey, StateValue)> = result_iter
             .into_iter()
             .map(|res| {
@@ -1031,10 +1037,11 @@ impl StateStore {
                     Ok((key.clone(), self.expect_value_by_version(&key, version)?))
                 })
             })
-            .collect::<AnyhowResult<Vec<_>>>()?;
+            .collect::<Result<Vec<_>>>()?;
         ensure!(
             !state_key_values.is_empty(),
-            AptosDbError::NotFound(format!("State chunk starting at {}", first_index)),
+            "State chunk starting at {}",
+            first_index,
         );
         let last_index = (state_key_values.len() - 1 + first_index) as u64;
         let first_key = state_key_values.first().expect("checked to exist").0.hash();
@@ -1059,7 +1066,7 @@ impl StateStore {
         self: &Arc<Self>,
         version: Version,
         expected_root_hash: HashValue,
-    ) -> AnyhowResult<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
         Ok(Box::new(StateSnapshotRestore::new(
             &self.state_merkle_db,
             self,
@@ -1074,15 +1081,14 @@ impl StateStore {
     pub fn get_all_jmt_nodes_referenced(
         &self,
         version: Version,
-    ) -> AnyhowResult<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
+    ) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
         aptos_jellyfish_merkle::JellyfishMerkleTree::new(self.state_merkle_db.as_ref())
             .get_all_nodes_referenced(version)
+            .map_err(Into::into)
     }
 
     #[cfg(test)]
-    pub fn get_all_jmt_nodes(
-        &self,
-    ) -> AnyhowResult<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
+    pub fn get_all_jmt_nodes(&self) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
         // TODO(grao): Support sharding here.
         let mut iter = self
             .state_db
@@ -1100,7 +1106,7 @@ impl StateStore {
         &self,
         base_version: Version,
         sharded_state_cache: &ShardedStateCache,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         IO_POOL.scope(|s| {
             sharded_state_cache.par_iter().for_each(|shard| {
                 shard.iter_mut().for_each(|mut entry| {
@@ -1140,7 +1146,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         version: Version,
         node_batch: &StateValueBatch,
         progress: StateSnapshotProgress,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["state_value_writer_write_chunk"])
             .start_timer();
@@ -1158,13 +1164,13 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             .commit(version, batch, sharded_schema_batch)
     }
 
-    fn write_usage(&self, version: Version, usage: StateStorageUsage) -> AnyhowResult<()> {
+    fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
         self.ledger_db
             .metadata_db()
             .put::<VersionDataSchema>(&version, &usage.into())
     }
 
-    fn get_progress(&self, version: Version) -> AnyhowResult<Option<StateSnapshotProgress>> {
+    fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {
         Ok(self
             .state_kv_db
             .metadata_db()

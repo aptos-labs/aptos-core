@@ -50,6 +50,7 @@ pub mod state_delta;
 pub mod state_view;
 
 use crate::{errors::AptosDbError, state_delta::StateDelta};
+use anyhow::Result as AnyhowResult;
 pub use executed_trees::ExecutedTrees;
 
 pub type Result<T, E = AptosDbError> = std::result::Result<T, E>;
@@ -58,11 +59,11 @@ pub type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 pub const MAX_REQUEST_LIMIT: u64 = 10000;
 
 pub trait StateSnapshotReceiver<K, V>: Send {
-    fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()>;
+    fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> AnyhowResult<()>;
 
-    fn finish(self) -> Result<()>;
+    fn finish(self) -> AnyhowResult<()>;
 
-    fn finish_box(self: Box<Self>) -> Result<()>;
+    fn finish_box(self: Box<Self>) -> AnyhowResult<()>;
 }
 
 #[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
@@ -738,6 +739,13 @@ pub fn jmt_update_refs<K>(
 
 #[macro_export]
 macro_rules! db_not_found_bail {
+    ($($arg:tt)*) => {
+        return Err(AptosDbError::NotFound(format!($($arg)*)))
+    };
+}
+
+#[macro_export]
+macro_rules! db_other_bail {
     ($($arg:tt)*) => {
         return Err(AptosDbError::NotFound(format!($($arg)*)))
     };

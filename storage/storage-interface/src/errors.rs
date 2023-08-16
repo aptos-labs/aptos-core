@@ -4,6 +4,7 @@
 
 //! This module defines error types used by [`AptosDB`](crate::AptosDB).
 
+use rocksdb;
 use thiserror::Error;
 
 /// This enum defines errors commonly used among [`AptosDB`](crate::AptosDB) APIs.
@@ -31,3 +32,12 @@ impl From<bcs::Error> for AptosDbError {
         Self::Other(format!("{}", error))
     }
 }
+
+impl From<rocksdb::Error> for AptosDbError {
+    fn from(error: rocksdb::Error) -> Self {
+        Self::Other(format!("{}", error))
+    }
+}
+
+
+

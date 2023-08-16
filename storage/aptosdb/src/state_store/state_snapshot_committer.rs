@@ -12,7 +12,6 @@ use crate::{
     versioned_node_cache::VersionedNodeCache,
     OTHER_TIMERS_SECONDS,
 };
-use anyhow::Result;
 use aptos_logger::trace;
 use aptos_storage_interface::{jmt_update_refs, jmt_updates, state_delta::StateDelta};
 use rayon::prelude::*;
@@ -25,6 +24,9 @@ use std::{
     },
     thread::JoinHandle,
 };
+use aptos_storage_interface::errors::AptosDbError;
+
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 pub(crate) struct StateSnapshotCommitter {
     state_db: Arc<StateDb>,

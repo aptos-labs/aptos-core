@@ -61,7 +61,6 @@ use crate::{
     state_store::{buffered_state::BufferedState, StateStore},
     transaction_store::TransactionStore,
 };
-use anyhow::{bail, ensure, Result as AnyhowResult};
 use aptos_config::config::{
     PrunerConfig, RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG,
 };
@@ -74,7 +73,7 @@ use aptos_db_indexer::Indexer;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{SchemaBatch, DB};
-use aptos_storage_interface::{
+use aptos_storage_interface::{db_ensure as ensure, db_other_bail,
     cached_state_view::ShardedStateCache, errors::AptosDbError, state_delta::StateDelta,
     state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order, StateSnapshotReceiver,
     MAX_REQUEST_LIMIT,
@@ -191,7 +190,7 @@ pub(crate) fn new_sharded_kv_schema_batch() -> ShardedStateKvSchemaBatch {
     arr![SchemaBatch::new(); 16]
 }
 
-fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> AnyhowResult<()> {
+fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<()> {
     if num_requested > max_allowed {
         Err(AptosDbError::TooManyRequested(num_requested, max_allowed).into())
     } else {
@@ -202,7 +201,7 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> AnyhowRe
 fn update_rocksdb_properties(
     ledger_rocksdb: &DB,
     state_merkle_db: &StateMerkleDb,
-) -> AnyhowResult<()> {
+) -> Result<()> {
     let _timer = OTHER_TIMERS_SECONDS
         .with_label_values(&["update_rocksdb_properties"])
         .start_timer();
@@ -358,7 +357,7 @@ impl AptosDB {
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         empty_buffered_state_for_restore: bool,
-    ) -> AnyhowResult<Self> {
+    ) -> Result<Self> {
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
             "Do not set prune_window when opening readonly.",
@@ -397,7 +396,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
-    ) -> AnyhowResult<Self> {
+    ) -> Result<Self> {
         Self::open_internal(
             db_root_path,
             readonly,
@@ -418,7 +417,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
-    ) -> AnyhowResult<Self> {
+    ) -> Result<Self> {
         Self::open_internal(
             db_root_path,
             readonly,
@@ -436,7 +435,7 @@ impl AptosDB {
         rocksdb_configs: RocksdbConfigs,
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
-    ) -> AnyhowResult<(LedgerDb, StateMerkleDb, StateKvDb)> {
+    ) -> Result<(LedgerDb, StateMerkleDb, StateKvDb)> {
         let ledger_db = LedgerDb::new(db_root_path.as_ref(), rocksdb_configs, readonly)?;
         let state_kv_db = StateKvDb::new(
             db_root_path.as_ref(),
@@ -458,7 +457,7 @@ impl AptosDB {
         &mut self,
         db_root_path: impl AsRef<Path>,
         rocksdb_config: RocksdbConfig,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         let indexer = Indexer::open(&db_root_path, rocksdb_config)?;
         let ledger_next_version = self.get_latest_version().map_or(0, |v| v + 1);
         info!(
@@ -599,7 +598,7 @@ impl AptosDB {
     }
 
     /// This force the db to update rocksdb properties immediately.
-    pub fn update_rocksdb_properties(&self) -> AnyhowResult<()> {
+    pub fn update_rocksdb_properties(&self) -> Result<()> {
         update_rocksdb_properties(&self.ledger_db.metadata_db_arc(), &self.state_merkle_db)
     }
 
@@ -611,7 +610,7 @@ impl AptosDB {
         &self,
         start_epoch: u64,
         end_epoch: u64,
-    ) -> AnyhowResult<(Vec<LedgerInfoWithSignatures>, bool)> {
+    ) -> Result<(Vec<LedgerInfoWithSignatures>, bool)> {
         self.get_epoch_ending_ledger_infos_impl(
             start_epoch,
             end_epoch,
@@ -624,7 +623,7 @@ impl AptosDB {
         start_epoch: u64,
         end_epoch: u64,
         limit: usize,
-    ) -> AnyhowResult<(Vec<LedgerInfoWithSignatures>, bool)> {
+    ) -> Result<(Vec<LedgerInfoWithSignatures>, bool)> {
         ensure!(
             start_epoch <= end_epoch,
             "Bad epoch range [{}, {})",
@@ -654,7 +653,7 @@ impl AptosDB {
         let lis = self
             .ledger_store
             .get_epoch_ending_ledger_info_iter(start_epoch, paging_epoch)?
-            .collect::<AnyhowResult<Vec<_>>>()?;
+            .collect::<Result<Vec<_>>>()?;
         ensure!(
             lis.len() == (paging_epoch - start_epoch) as usize,
             "DB corruption: missing epoch ending ledger info for epoch {}",
@@ -672,7 +671,7 @@ impl AptosDB {
         version: Version,
         ledger_version: Version,
         fetch_events: bool,
-    ) -> AnyhowResult<TransactionWithProof> {
+    ) -> Result<TransactionWithProof> {
         self.error_if_ledger_pruned("Transaction", version)?;
 
         let proof = self
@@ -713,7 +712,7 @@ impl AptosDB {
         cp_path: impl AsRef<Path>,
         use_split_ledger_db: bool,
         use_sharded_state_merkle_db: bool,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         let start = Instant::now();
 
         info!(
@@ -749,7 +748,7 @@ impl AptosDB {
         order: Order,
         limit: u64,
         ledger_version: Version,
-    ) -> AnyhowResult<Vec<EventWithVersion>> {
+    ) -> Result<Vec<EventWithVersion>> {
         error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
         let get_latest = order == Order::Descending && start_seq_num == u64::max_value();
 
@@ -800,7 +799,7 @@ impl AptosDB {
                 );
                 Ok(EventWithVersion::new(ver, event))
             })
-            .collect::<AnyhowResult<Vec<_>>>()?;
+            .collect::<Result<Vec<_>>>()?;
         if order == Order::Descending {
             events_with_version.reverse();
         }
@@ -808,11 +807,11 @@ impl AptosDB {
         Ok(events_with_version)
     }
 
-    fn get_table_info_option(&self, handle: TableHandle) -> AnyhowResult<Option<TableInfo>> {
+    fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         match &self.indexer {
             Some(indexer) => indexer.get_table_info(handle),
             None => {
-                bail!("Indexer not enabled.");
+                db_other_bail!("Indexer not enabled.");
             },
         }
     }
@@ -824,7 +823,7 @@ impl AptosDB {
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         latest_in_memory_state: &StateDelta,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["save_transactions_validation"])
             .start_timer();
@@ -890,7 +889,7 @@ impl AptosDB {
         expected_state_db_usage: StateStorageUsage,
         sharded_state_cache: Option<&ShardedStateCache>,
         skip_index_and_usage: bool,
-    ) -> AnyhowResult<HashValue> {
+    ) -> Result<HashValue> {
         let new_root_hash = thread::scope(|s| {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["save_transactions__work"])
@@ -933,7 +932,7 @@ impl AptosDB {
         expected_state_db_usage: StateStorageUsage,
         sharded_state_cache: Option<&ShardedStateCache>,
         skip_index_and_usage: bool,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_state_kv_and_ledger_metadata"])
             .start_timer();
@@ -996,7 +995,7 @@ impl AptosDB {
         txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
         first_version: Version,
         skip_index: bool,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_events"])
             .start_timer();
@@ -1026,7 +1025,7 @@ impl AptosDB {
         txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
         first_version: Version,
         skip_index: bool,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_transactions"])
             .start_timer();
@@ -1034,7 +1033,7 @@ impl AptosDB {
         txns_to_commit
             .par_chunks(chunk_size)
             .enumerate()
-            .try_for_each(|(chunk_index, txns_in_chunk)| -> AnyhowResult<()> {
+            .try_for_each(|(chunk_index, txns_in_chunk)| -> Result<()> {
                 let batch = SchemaBatch::new();
                 let chunk_first_version = first_version + (chunk_size * chunk_index) as u64;
                 txns_in_chunk.iter().enumerate().try_for_each(
@@ -1060,7 +1059,7 @@ impl AptosDB {
         &self,
         txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
         first_version: u64,
-    ) -> AnyhowResult<HashValue> {
+    ) -> Result<HashValue> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_transaction_accumulator"])
             .start_timer();
@@ -1084,7 +1083,7 @@ impl AptosDB {
         &self,
         txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
         first_version: u64,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_transaction_infos"])
             .start_timer();
@@ -1114,7 +1113,7 @@ impl AptosDB {
         &self,
         txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
         first_version: Version,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_write_sets"])
             .start_timer();
@@ -1143,7 +1142,7 @@ impl AptosDB {
         last_version: Version,
         new_root_hash: HashValue,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_ledger_info"])
             .start_timer();
@@ -1187,7 +1186,7 @@ impl AptosDB {
         first_version: Version,
         latest_in_memory_state: StateDelta,
         sync_commit: bool,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         let mut end_with_reconfig = false;
         let updates_until_latest_checkpoint_since_current = {
             let _timer = OTHER_TIMERS_SECONDS
@@ -1236,7 +1235,7 @@ impl AptosDB {
         txns_to_commit: &[impl Borrow<TransactionToCommit>],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-    ) -> AnyhowResult<()> {
+    ) -> Result<()> {
         // If commit succeeds and there are at least one transaction written to the storage, we
         // will inform the pruner thread to work.
         let num_txns = txns_to_commit.len() as u64;
@@ -1278,7 +1277,7 @@ impl AptosDB {
         Ok(())
     }
 
-    fn error_if_ledger_pruned(&self, data_type: &str, version: Version) -> AnyhowResult<()> {
+    fn error_if_ledger_pruned(&self, data_type: &str, version: Version) -> Result<()> {
         let min_readable_version = self.ledger_pruner.get_min_readable_version();
         ensure!(
             version >= min_readable_version,
@@ -1290,7 +1289,7 @@ impl AptosDB {
         Ok(())
     }
 
-    fn error_if_state_merkle_pruned(&self, data_type: &str, version: Version) -> AnyhowResult<()> {
+    fn error_if_state_merkle_pruned(&self, data_type: &str, version: Version) -> Result<()> {
         let min_readable_version = self
             .state_store
             .state_db
@@ -1308,17 +1307,18 @@ impl AptosDB {
         if version >= min_readable_epoch_snapshot_version {
             self.ledger_store.ensure_epoch_ending(version)
         } else {
-            bail!(
+            return Err(AptosDbError::Other(format!(
                 "{} at version {} is pruned. snapshots are available at >= {}, epoch snapshots are available at >= {}",
                 data_type,
                 version,
                 min_readable_version,
                 min_readable_epoch_snapshot_version,
             )
+            ));
         }
     }
 
-    fn error_if_state_kv_pruned(&self, data_type: &str, version: Version) -> AnyhowResult<()> {
+    fn error_if_state_kv_pruned(&self, data_type: &str, version: Version) -> Result<()> {
         let min_readable_version = self.state_store.state_kv_pruner.get_min_readable_version();
         ensure!(
             version >= min_readable_version,
@@ -1830,7 +1830,11 @@ impl DbReader for AptosDB {
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
             self.error_if_ledger_pruned("NewBlockEvent", version)?;
-            db_ensure!(version <= self.get_latest_version()?);
+            db_ensure!(
+                version <= self.get_latest_version()?,
+                "version {} is bigger than latest version",
+                version
+            );
 
             let (_first_version, new_block_event) = self.event_store.get_block_metadata(version)?;
             Ok(new_block_event.proposed_time())

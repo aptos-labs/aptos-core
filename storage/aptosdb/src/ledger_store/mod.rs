@@ -14,17 +14,16 @@ use crate::{
     },
     utils::{
         get_progress,
-        iterators::{EpochEndingLedgerInfoIter, ExpectContinuousVersions},
+        iterators::{EpochEndingLedgerInfoIter},
     },
 };
-use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_accumulator::{HashReader, MerkleAccumulator};
 use aptos_crypto::{
     hash::{CryptoHash, TransactionAccumulatorHasher},
     HashValue,
 };
 use aptos_schemadb::{ReadOptions, SchemaBatch};
-use aptos_storage_interface::errors::AptosDbError;
+use aptos_storage_interface::{db_ensure as ensure, errors::AptosDbError};
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
@@ -37,7 +36,9 @@ use aptos_types::{
 use arc_swap::ArcSwap;
 use itertools::Itertools;
 use std::{borrow::Borrow, ops::Deref, sync::Arc};
+use crate::utils::iterators::ExpectContinuousVersions;
 
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 #[derive(Debug)]
 pub struct LedgerStore {
     pub ledger_db: Arc<LedgerDb>,
@@ -120,7 +121,7 @@ impl LedgerStore {
         );
         li.ledger_info()
             .next_epoch_state()
-            .ok_or_else(|| format_err!("Not an epoch change at version {}", version))?;
+            .ok_or_else(|| AptosDbError::NotFound(format!("Not an epoch change at version {}", version)))?;
 
         Ok(li)
     }
@@ -163,13 +164,13 @@ impl LedgerStore {
         let latest_epoch_state = ledger_info_with_sigs
             .ledger_info()
             .next_epoch_state()
-            .ok_or_else(|| format_err!("Last LedgerInfo in epoch must carry next_epoch_state."))?;
+            .ok_or_else(|| AptosDbError::Other("Last LedgerInfo in epoch must carry next_epoch_state.".to_string()))?;
 
         Ok(latest_epoch_state.clone())
     }
 
     pub fn get_frozen_subtree_hashes(&self, num_transactions: LeafCount) -> Result<Vec<HashValue>> {
-        Accumulator::get_frozen_subtree_hashes(self, num_transactions)
+        Accumulator::get_frozen_subtree_hashes(self, num_transactions).map_err(Into::into)
     }
 
     /// Get transaction info given `version`
@@ -177,7 +178,7 @@ impl LedgerStore {
         self.ledger_db
             .transaction_info_db()
             .get::<TransactionInfoSchema>(&version)?
-            .ok_or_else(|| format_err!("No TransactionInfo at version {}", version))
+            .ok_or_else(|| AptosDbError::NotFound(format!("No TransactionInfo at version {}", version)))
     }
 
     pub fn get_latest_version(&self) -> Result<Version> {
@@ -185,7 +186,7 @@ impl LedgerStore {
             self.ledger_db.metadata_db(),
             &DbMetadataKey::OverallCommitProgress,
         )?
-        .ok_or(anyhow!("No progress in db."))
+        .ok_or(AptosDbError::Other("No progress in db.".to_string()))
     }
 
     /// Gets an iterator that yields `num_transaction_infos` transaction infos starting from
@@ -222,7 +223,7 @@ impl LedgerStore {
         self.ledger_db
             .metadata_db()
             .get::<EpochByVersionSchema>(&version)?
-            .ok_or_else(|| format_err!("Version {} is not epoch ending.", version))?;
+            .ok_or_else(|| AptosDbError::NotFound(format!("Version {} is not epoch ending.", version).to_string()))?;
         Ok(())
     }
 
@@ -244,7 +245,7 @@ impl LedgerStore {
         version: Version,
         ledger_version: Version,
     ) -> Result<TransactionAccumulatorProof> {
-        Accumulator::get_proof(self, ledger_version + 1 /* num_leaves */, version)
+        Accumulator::get_proof(self, ledger_version + 1 /* num_leaves */, version).map_err(Into::into)
     }
 
     /// Get proof for `num_txns` consecutive transactions starting from `start_version` towards
@@ -260,7 +261,7 @@ impl LedgerStore {
             ledger_version + 1, /* num_leaves */
             start_version,
             num_txns,
-        )
+        ).map_err(Into::into)
     }
 
     /// Gets proof that shows the ledger at `ledger_version` is consistent with the ledger at
@@ -274,7 +275,7 @@ impl LedgerStore {
             .map(|v| v.saturating_add(1))
             .unwrap_or(0);
         let ledger_num_leaves = ledger_version.saturating_add(1);
-        Accumulator::get_consistency_proof(self, ledger_num_leaves, client_known_num_leaves)
+        Accumulator::get_consistency_proof(self, ledger_num_leaves, client_known_num_leaves).map_err(Into::into)
     }
 
     /// Write `txn_infos` to `batch`. Assigned `first_version` to the version number of the
@@ -356,7 +357,7 @@ impl LedgerStore {
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
-        Accumulator::get_root_hash(self, version + 1)
+        Accumulator::get_root_hash(self, version + 1).map_err(Into::into)
     }
 }
 
@@ -367,7 +368,7 @@ impl HashReader for LedgerStore {
         self.ledger_db
             .transaction_accumulator_db()
             .get::<TransactionAccumulatorSchema>(&position)?
-            .ok_or_else(|| format_err!("{} does not exist.", position))
+            .ok_or_else(|| AptosDbError::NotFound(format!("{} does not exist.", position)))
     }
 }
 

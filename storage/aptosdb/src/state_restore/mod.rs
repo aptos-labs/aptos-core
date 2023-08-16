@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::OTHER_TIMERS_SECONDS;
-use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{
@@ -15,12 +14,14 @@ use aptos_types::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, hash::Hash, str::FromStr, sync::Arc};
+use aptos_storage_interface::errors::AptosDbError;
 
 #[cfg(test)]
 mod restore_test;
 
 /// Key-Value batch that will be written into db atomically with other batches.
 pub type StateValueBatch<K, V> = HashMap<(K, Version), V>;
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
@@ -73,9 +74,10 @@ impl FromStr for StateSnapshotRestoreMode {
             "default" => Ok(Self::Default),
             "kv_only" => Ok(Self::KvOnly),
             "tree_only" => Ok(Self::TreeOnly),
-            _ => Err(anyhow::anyhow!(
-                "Invalid state snapshot restore mode: {}",
+            _ => Err(AptosDbError::Other(
+                format!("Invalid state snapshot restore mode: {}",
                 s
+                )
             )),
         }
     }
@@ -224,7 +226,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
             .lock()
             .as_mut()
             .unwrap()
-            .wait_for_async_commit()
+            .wait_for_async_commit().map_err(Into::into)
     }
 }
 

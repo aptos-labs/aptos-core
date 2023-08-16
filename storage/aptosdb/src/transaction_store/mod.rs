@@ -12,12 +12,11 @@ use crate::{
     },
     transaction_accumulator::TransactionAccumulatorSchema,
     transaction_info::TransactionInfoSchema,
-    utils::iterators::{AccountTransactionVersionIter, ExpectContinuousVersions},
+    utils::iterators::{AccountTransactionVersionIter},
 };
-use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_schemadb::{ReadOptions, SchemaBatch};
-use aptos_storage_interface::errors::AptosDbError;
+use aptos_storage_interface::{db_ensure as ensure, errors::AptosDbError};
 use aptos_types::{
     account_address::AccountAddress,
     proof::position::Position,
@@ -26,6 +25,7 @@ use aptos_types::{
 };
 use std::sync::Arc;
 
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 #[cfg(test)]
 mod test;
 
@@ -100,7 +100,7 @@ impl TransactionStore {
             address,
             min_seq_num
                 .checked_add(num_versions)
-                .ok_or_else(|| format_err!("too many transactions requested"))?,
+                .ok_or_else(|| AptosDbError::TooManyRequested(min_seq_num, num_versions))?,
             ledger_version,
         ))
     }
@@ -202,7 +202,7 @@ impl TransactionStore {
             let (version, write_set) = iter
                 .next()
                 .transpose()?
-                .ok_or_else(|| format_err!("Write set missing for version {}", current_version))?;
+                .ok_or_else(|| AptosDbError::NotFound(format!("Write set missing for version {}", current_version)))?;
             ensure!(
                 version == current_version,
                 "Write set missing for version {}, got version {}",
