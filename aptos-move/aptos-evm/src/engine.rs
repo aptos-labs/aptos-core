@@ -7,12 +7,12 @@ use evm_runtime::Config;
 use primitive_types::{H160, H256, U256};
 use aptos_table_natives::{TableChange, TableChangeSet, TableHandle, TableResolver};
 use crate::eth_address::EthAddress;
-use crate::evm_backend::EVMBackend;
+use crate::evm_backend::{EVMBackend, StorageKey};
 use move_core_types::account_address::AccountAddress;
 use evm::backend::{Apply, Backend, Basic, MemoryAccount};
 #[cfg(test)]
 use crate::in_memory_storage::InMemoryTableResolver;
-use crate::utils::u256_to_arr;
+use crate::utils::{u256_to_arr, u256_to_move_arr};
 use std::str::FromStr;
 use aptos_vm_types::change_set;
 use move_core_types::effects::Op;
@@ -102,11 +102,11 @@ impl<'a> Engine<'a> {
     }
 
     fn modify_nonce(address: &EthAddress, nonce: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
-        (address.as_bytes().to_vec(), Op::Modify(u256_to_arr(nonce).to_vec()))
+        (address.as_bytes().to_vec(), Op::Modify(u256_to_move_arr(nonce).to_vec()))
     }
 
     fn modify_balance(address: &EthAddress, balance: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
-        (address.as_bytes().to_vec(), Op::Modify(u256_to_arr(balance).to_vec()))
+        (address.as_bytes().to_vec(), Op::Modify(u256_to_move_arr(balance).to_vec()))
     }
 
     fn modify_code(address: &EthAddress, code: &Vec<u8>) -> (Vec<u8>, Op<Vec<u8>>) {
@@ -121,11 +121,11 @@ impl<'a> Engine<'a> {
     }
 
     fn add_nonce(address: &EthAddress, nonce: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
-        (address.as_bytes().to_vec(), Op::New(u256_to_arr(nonce).to_vec()))
+        (address.as_bytes().to_vec(), Op::New(u256_to_move_arr(nonce).to_vec()))
     }
 
     fn add_balance(address: &EthAddress, balance: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
-        (address.as_bytes().to_vec(), Op::New(u256_to_arr(balance).to_vec()))
+        (address.as_bytes().to_vec(), Op::New(u256_to_move_arr(balance).to_vec()))
     }
 
     fn add_code(address: &EthAddress, code: &Vec<u8>) -> (Vec<u8>, Op<Vec<u8>>) {
@@ -136,7 +136,8 @@ impl<'a> Engine<'a> {
         let mut buf = [0u8; 52];
         buf[..20].copy_from_slice(&address.as_bytes());
         buf[20..].copy_from_slice(&index.as_bytes());
-        (buf.to_vec(), Op::New(value.as_bytes().to_vec()))
+        let storage_key = StorageKey::new(address.as_bytes().to_vec(), index.as_bytes().to_vec());
+        (bcs::to_bytes(&storage_key).unwrap(), Op::New(value.as_bytes().to_vec()))
     }
 
     fn delete_nonce(address: &EthAddress) -> (Vec<u8>, Op<Vec<u8>>) {
@@ -149,13 +150,6 @@ impl<'a> Engine<'a> {
 
     fn delete_code(address: &EthAddress) -> (Vec<u8>, Op<Vec<u8>>) {
         (address.as_bytes().to_vec(), Op::Delete)
-    }
-
-    fn delete_storage(address: &EthAddress, index: &H256) -> (Vec<u8>, Op<Vec<u8>>) {
-        let mut buf = [0u8; 52];
-        buf[..20].copy_from_slice(&address.as_bytes());
-        buf[20..].copy_from_slice(&index.as_bytes());
-        (buf.to_vec(), Op::Delete)
     }
 
     fn into_change_set<A, I>(&self, values: A, backend: EVMBackend) -> TableChangeSet

@@ -59,6 +59,20 @@ pub enum MoveValue {
     U256(u256::U256),
 }
 
+impl MoveValue {
+    pub fn to_u256(self) -> u256::U256 {
+        match self {
+            MoveValue::U256(val) => {
+                val
+            }
+            _ => {
+                panic!("MoveValue is not a U256");
+            }
+        }
+    }
+
+}
+
 /// A layout associated with a named field
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
