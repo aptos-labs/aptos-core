@@ -20,7 +20,7 @@ impl MemProfiler {
 }
 
 impl Profiler for MemProfiler {
-    fn profile_for(&self, duration_secs: u64) -> Result<()> {
+    fn profile_for(&self, duration_secs: u64, binary_path: &str) -> Result<()> {
         let mut prof_active: bool = true;
 
         let result = unsafe {
@@ -59,6 +59,7 @@ impl Profiler for MemProfiler {
             .arg("./crates/aptos-profiler/src/jeprof.py")
             .arg(self.txt_result_path.to_string_lossy().as_ref())
             .arg(self.svg_result_path.to_string_lossy().as_ref())
+            .arg(binary_path)
             .output()
             .expect("Failed to execute command");
 
@@ -66,7 +67,7 @@ impl Profiler for MemProfiler {
     }
 
     /// Enable memory profiling until it is disabled
-    fn start_profiling(&self) -> Result<()> {
+    fn start_profiling(&mut self) -> Result<()> {
         let mut prof_active: bool = true;
 
         let result = unsafe {
@@ -87,7 +88,7 @@ impl Profiler for MemProfiler {
     }
 
     /// Disable profiling and run jeprof to obtain results
-    fn end_profiling(&self) -> Result<()> {
+    fn end_profiling(&mut self, binary_path: &str) -> Result<()> {
         let mut prof_active: bool = false;
         let result = unsafe {
             jemalloc_sys::mallctl(
@@ -108,8 +109,10 @@ impl Profiler for MemProfiler {
             .arg("./crates/aptos-profiler/src/jeprof.py")
             .arg(self.txt_result_path.to_string_lossy().as_ref())
             .arg(self.svg_result_path.to_string_lossy().as_ref())
+            .arg(binary_path)
             .output()
             .expect("Failed to execute command");
+
         Ok(())
     }
 

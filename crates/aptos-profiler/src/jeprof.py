@@ -10,12 +10,15 @@ def execute_command(command):
 
 text_location = sys.argv[1]
 svg_location = sys.argv[2]
+binary_path = sys.argv[3]
 
 
-command = "jeprof --show_bytes ./target/release/aptos-node ./*.heap --svg  > " + svg_location
+
+command = "mkdir profiling_results"
 result = execute_command(command)
-command = "jeprof --show_bytes ./target/release/aptos-node ./*.heap --text  > " + text_location
+command = "jeprof --show_bytes " + binary_path + " ./*.heap --svg  > " + svg_location
 result = execute_command(command)
-
+command = "jeprof --show_bytes " + binary_path + " ./*.heap --text  > " + text_location
+result = execute_command(command)
 command = "rm ./*.heap"
 result = execute_command(command)
