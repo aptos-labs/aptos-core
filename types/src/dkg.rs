@@ -1,10 +1,13 @@
 // Copyright © Aptos Foundation
 
+use std::io::{Read, Write};
 use crate::validator_info::ValidatorInfo;
 use anyhow::Result;
 use aptos_dkg::pvss::{das, traits::Transcript, WeightedTranscript};
 use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
+use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
+use crate::on_chain_config::{ConfigID, OnChainConfig};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StartDKGEvent {
@@ -56,6 +59,28 @@ pub struct DKGTranscriptWrapper {
     pub trx_two_third: WT,
 }
 
+impl TryFrom<&[u8]> for DKGTranscriptWrapper {
+    type Error = CryptoMaterialError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        //TODO: make it compile
+        // let mut cursor = std::io::Cursor::new(value);
+        // let trx1_len = cursor.read_u64::<ByteOrder>()? as usize;
+        // let mut buf1: Vec<u8> = vec![0; trx1_len];
+        // cursor.read_exact(buf1.as_mut_slice())?;
+        // let trx1: WT = buf1.try_into()?;
+        // let trx2_len = cursor.read_u64()? as usize;
+        // let mut buf2: Vec<u8> = vec![0; trx2_len];
+        // cursor.read_exact(buf2.as_mut_slice())?;
+        // let trx2: WT = buf1.try_into()?;
+        // Ok(Self {
+        //     trx_one_third: trx1,
+        //     trx_two_third: trx2,
+        // })
+        todo!()
+    }
+}
+
 impl DKGTranscriptWrapper {
     pub fn verify(&self, dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
         self.trx_one_third.verify(
@@ -78,5 +103,19 @@ impl DKGTranscriptWrapper {
             .aggregate_with(&dkg_pvss_config.wc_1, &other.trx_one_third);
         self.trx_two_third
             .aggregate_with(&dkg_pvss_config.wc_2, &other.trx_two_third);
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        //TODO: make it compile
+        // let trx1_bytes = self.trx_one_third.to_bytes();
+        // let trx2_bytes = self.trx_two_third.to_bytes();
+        // let mut buffer: Vec<u8> = Vec::with_capacity(16 + trx1_bytes.len() + trx2_bytes.len());
+        // let mut cursor = std::io::Cursor::new(&mut buffer);
+        // cursor.write_u64(trx1_bytes.len() as u64).unwrap();
+        // cursor.write_all(trx1_bytes.as_slice()).unwrap();
+        // cursor.write_u64(trx2_bytes.len() as u64).unwrap();
+        // cursor.write_all(trx2_bytes.as_slice()).unwrap();
+        // buffer
+        todo!()
     }
 }

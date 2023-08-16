@@ -17,6 +17,7 @@ use move_core_types::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt, sync::Arc};
+use crate::dkg::DKGTranscriptWrapper;
 
 mod approved_execution_hashes;
 mod aptos_features;
@@ -28,6 +29,7 @@ mod gas_schedule;
 mod timed_features;
 mod timestamp;
 mod validator_set;
+mod dkg_state;
 
 pub use self::{
     approved_execution_hashes::ApprovedExecutionHashes,
@@ -47,6 +49,7 @@ pub use self::{
     timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures},
     timestamp::CurrentTimeMicroseconds,
     validator_set::{ConsensusScheme, ValidatorSet},
+    dkg_state::DKGState,
 };
 
 /// To register an on-chain config in Rust:
@@ -82,6 +85,7 @@ impl fmt::Display for ConfigID {
 pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
     ApprovedExecutionHashes::CONFIG_ID,
     ValidatorSet::CONFIG_ID,
+    DKGState::CONFIG_ID,
     Version::CONFIG_ID,
     OnChainConsensusConfig::CONFIG_ID,
     ChainId::CONFIG_ID,

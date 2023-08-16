@@ -76,7 +76,7 @@ use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
         LeaderReputationType, OnChainConfigPayload, OnChainConsensusConfig, OnChainExecutionConfig,
-        ProposerElectionType, ValidatorSet,
+        ProposerElectionType, ValidatorSet, DKGState,
     },
     validator_verifier::ValidatorVerifier,
 };
@@ -838,6 +838,7 @@ impl EpochManager {
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
         // dkg todo: the new epoch validators read and decrypt their private keys from DKG
+        let maybe_dkg_state: Option<DKGState> = payload.get().ok();
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");

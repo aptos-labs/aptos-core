@@ -20,7 +20,7 @@ module aptos_framework::dkg {
     }
 
     struct DKGState has key {
-        state_id: u64, // 0: inactive, 1: active
+        state_id: u64, // 0: inactive, 1: active,
         countdown: u64, // For debugging...
         /// DKG Transcript for current epoch.
         serialized_transcript: vector<u8>,
