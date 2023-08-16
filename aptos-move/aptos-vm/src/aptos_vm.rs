@@ -428,6 +428,12 @@ impl AptosVM {
                 TransactionPayload::Script(script) => {
                     let loaded_func =
                         session.load_script(script.code(), script.ty_args().to_vec())?;
+                    // Gerardo: consolidate the extended validation to verifier.
+                    verifier::event_validation::verify_no_event_emission_in_script(
+                        script.code(),
+                        session.get_vm_config().max_binary_format_version,
+                    )?;
+
                     let args =
                         verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
                             &mut session,
