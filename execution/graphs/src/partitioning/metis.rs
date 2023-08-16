@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::graph::{Graph, WeightedGraph};
+use crate::graph::WeightedGraph;
 use crate::partitioning::{GraphPartitioner, PartitionId};
 
 /// A weighted undirected graph in the format expected by the Metis library.
@@ -74,7 +74,7 @@ impl Default for MetisGraphPartitioner {
 }
 
 impl MetisGraph {
-    fn unweighted<G: Graph>(graph: &G) -> Self {
+    fn unweighted<G: WeightedGraph>(graph: &G) -> Self {
         // adjncy is the concatenation of the adjacency lists of all vertices.
         let adjncy: Vec<_> = graph
             .nodes()
@@ -130,7 +130,7 @@ impl MetisGraph {
 }
 
 impl MetisGraphPartitioner {
-    fn partition(
+    fn partition_impl(
         &self,
         metis_graph: &mut MetisGraph,
         n_partitions: usize,
@@ -184,6 +184,42 @@ where
     /// See the description of the `metis` crate for details: https://crates.io/crates/metis
     fn partition(&self, graph: &G, n_partitions: usize) -> anyhow::Result<Vec<PartitionId>> {
         let mut metis_graph = MetisGraph::weighted(graph);
-        self.partition(&mut metis_graph, n_partitions)
+        self.partition_impl(&mut metis_graph, n_partitions)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::partitioning::GraphPartitioner;
+    use crate::partitioning::metis::MetisGraphPartitioner;
+    use crate::test_utils::simple_four_nodes_two_partitions_graph;
+
+    // NOTE: Metis should be installed on the system.
+    // Please see the description of the `metis` crate for details:
+    // https://crates.io/crates/metis
+    #[test]
+    fn simple_four_nodes_two_partitions_test() {
+        let graph = simple_four_nodes_two_partitions_graph();
+
+        let mut partitioner = MetisGraphPartitioner::default();
+        // NB: Setting `balance_constraint` to 0.2 or higher causes Metis to
+        // put everything in one partition, even though it's clearly not a valid solution.
+        partitioner.balance_constraint = 0.1;
+
+        let partitioning = partitioner.partition(&graph, 2).unwrap();
+
+        // The first node may be sent to any partition, depending on the implementation.
+        let first_node_partition = partitioning[0];
+
+        // The second node must be sent to the other partition to satisfy the balancing constraint.
+        assert_eq!(partitioning[1], 1 - first_node_partition);
+
+        // The third node must be sent to the same partition as the first one
+        // due to a heavy edge between them.
+        assert_eq!(partitioning[2], first_node_partition);
+
+        // Finally, the fourth node must be sent to the same partition as the second node
+        // as it has equal weight edges to both partitions, but the second one is less loaded.
+        assert_eq!(partitioning[3], 1 - first_node_partition);
     }
 }

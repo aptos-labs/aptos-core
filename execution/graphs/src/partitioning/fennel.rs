@@ -22,7 +22,7 @@ pub enum AlphaComputationMode {
     Global,
 }
 
-#[derive(Debug, thiserror::Error, Clone, Copy)]
+#[derive(Debug, thiserror::Error, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub enum Error {
     #[error("Failed to satisfy the balancing constraint")]
     BalancingConstraint,
@@ -226,6 +226,11 @@ where
                 // Convert the node weight to f64.
                 let node_weight = node_weight.into();
 
+                // Allocate more space if necessary.
+                if node as usize >= self.partition.len() {
+                    self.partition.resize(self.partition.len() * 2, None);
+                }
+
                 // It is important to update it in the beginning as we may later use it
                 // to compute `max_load` and `alpha`.
                 self.partitioned_node_weight += node_weight;
@@ -264,7 +269,7 @@ where
                 let choose = |apply_balance_constraint| {
                     let filter_predicate = |&(_, load): &(_, f64)| {
                         if apply_balance_constraint {
-                            load < max_load
+                            load + node_weight < max_load
                         } else {
                             true
                         }
@@ -313,7 +318,7 @@ where
         }
 
         // Temporarily take ownership of `graph_stream` to avoid borrowing `self` mutably.
-        let mut graph_stream = self.graph_stream.take()?;
+        let mut graph_stream = self.graph_stream.take().unwrap();
         // Partition the next batch.
         let res = graph_stream.next_batch().map(|batch| self.partition(batch));
         // Return the ownership of `graph_stream` back to `self`.
@@ -325,12 +330,56 @@ where
     fn opt_items_count(&self) -> Option<usize> {
         self.graph_stream
             .as_ref()
-            .and_then(|graph_stream| graph_stream.opt_remaining_node_count())
+            .unwrap()
+            .opt_remaining_node_count()
     }
 
     fn opt_batch_count(&self) -> Option<usize> {
         self.graph_stream
             .as_ref()
-            .and_then(|graph_stream| graph_stream.opt_remaining_batch_count())
+            .unwrap()
+            .opt_remaining_batch_count()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use aptos_types::batched_stream::BatchedStream;
+    use crate::graph_stream::{GraphStreamer, InputOrderGraphStreamer};
+    use crate::partitioning::fennel::FennelGraphPartitioner;
+    use crate::partitioning::StreamingGraphPartitioner;
+    use crate::test_utils::simple_four_nodes_two_partitions_graph;
+
+    #[test]
+    fn simple_four_nodes_two_partitions_test() {
+        let graph = simple_four_nodes_two_partitions_graph();
+
+        let graph_streamer = InputOrderGraphStreamer::new(2);
+
+        let mut partitioner = FennelGraphPartitioner::default();
+        partitioner.balance_constraint = 0.2;
+
+        let partition_stream = partitioner.partition_stream(
+            graph_streamer.stream(&graph),
+            2,
+        );
+
+        let mut partition_iter = partition_stream.into_items_iter();
+
+        // The first node may be sent to any partition, depending on the implementation.
+        let (first_item, first_partition) = partition_iter.next().unwrap().unwrap();
+        assert_eq!(first_item, 0);
+
+        // The second node must be sent to the other partition to satisfy the balancing constraint.
+        assert_eq!(partition_iter.next(), Some(Ok((1, 1 - first_partition))));
+
+        // The third node must be sent to the same partition as the first one
+        // due to a heavy edge between them.
+        assert_eq!(partition_iter.next(), Some(Ok((2, first_partition))));
+
+        // Finally, the fourth node must be sent to the same partition as the second node
+        // as it has equal weight edges to both partitions, but the second one is less loaded.
+        assert_eq!(partition_iter.next(), Some(Ok((3, 1 - first_partition))));
+        assert_eq!(partition_iter.next(), None);
     }
 }

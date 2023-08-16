@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use namable_closures::{Closure, closure};
-use crate::graph::{NodeIndex, WeightedGraph};
+use crate::graph::{Graph, NodeIndex, WeightedGraph};
 use rand::seq::SliceRandom;
 use aptos_types::closuretools::{ClosureTools, MapClosure};
 
@@ -14,12 +14,12 @@ pub trait GraphStream: Sized {
     type EdgeWeight;
 
     /// An iterator over the neighbours of a node in the graph.
-    type NeighboursIter<'a>: Iterator<Item = (NodeIndex, Self::EdgeWeight)>
+    type NodeEdgesIter<'a>: Iterator<Item = (NodeIndex, Self::EdgeWeight)>
     where
         Self: 'a;
 
     /// An iterator over the nodes in a batch.
-    type Batch<'a>: IntoIterator<Item = (NodeIndex, Self::NodeWeight, Self::NeighboursIter<'a>)>
+    type Batch<'a>: IntoIterator<Item = (NodeIndex, Self::NodeWeight, Self::NodeEdgesIter<'a>)>
     where
         Self: 'a;
 
@@ -83,7 +83,7 @@ where
     type NodeWeight = S::NodeWeight;
     type EdgeWeight = S::EdgeWeight;
 
-    type NeighboursIter<'b> = S::NeighboursIter<'b>
+    type NodeEdgesIter<'b> = S::NodeEdgesIter<'b>
     where
         Self: 'b;
 
@@ -185,7 +185,7 @@ pub struct InputOrderGraphStream<'graph, G> {
     current_node: NodeIndex,
 }
 
-impl<'graph, G: WeightedGraph> InputOrderGraphStream<'graph, G> {
+impl<'graph, G: Graph> InputOrderGraphStream<'graph, G> {
     pub fn new(graph: &'graph G, batch_size: usize) -> Self {
         Self {
             graph,
@@ -195,20 +195,17 @@ impl<'graph, G: WeightedGraph> InputOrderGraphStream<'graph, G> {
     }
 }
 
-impl<'graph, G> GraphStream for InputOrderGraphStream<'graph, G>
-where
-    G: WeightedGraph,
-{
+impl<'graph, G: WeightedGraph> GraphStream for InputOrderGraphStream<'graph, G> {
     type NodeWeight = G::NodeWeight;
     type EdgeWeight = G::EdgeWeight;
 
-    type NeighboursIter<'a> = G::WeightedNeighboursIter<'a>
-        where
-            Self: 'a;
+    type NodeEdgesIter<'a> = G::WeightedNodeEdgesIter<'a>
+    where
+        Self: 'a;
 
     type Batch<'a> = MapClosure<
         std::ops::Range<NodeIndex>,
-        Closure<'a, Self, (NodeIndex,), (NodeIndex, Self::NodeWeight, Self::NeighboursIter<'a>)>,
+        Closure<'a, Self, (NodeIndex,), (NodeIndex, Self::NodeWeight, Self::NodeEdgesIter<'a>)>,
     >
     where
         Self: 'a;
@@ -265,7 +262,7 @@ pub struct RandomOrderGraphStream<'graph, G> {
     current_node: NodeIndex,
 }
 
-impl<'graph, G: WeightedGraph> RandomOrderGraphStream<'graph, G> {
+impl<'graph, G: Graph> RandomOrderGraphStream<'graph, G> {
     pub fn new(graph: &'graph G, batch_size: usize) -> Self {
         let mut order: Vec<_> = graph.nodes().collect();
         let mut rng = rand::thread_rng();
@@ -280,20 +277,17 @@ impl<'graph, G: WeightedGraph> RandomOrderGraphStream<'graph, G> {
     }
 }
 
-impl<'graph, G> GraphStream for RandomOrderGraphStream<'graph, G>
-where
-    G: WeightedGraph,
-{
+impl<'graph, G: WeightedGraph> GraphStream for RandomOrderGraphStream<'graph, G> {
     type NodeWeight = G::NodeWeight;
     type EdgeWeight = G::EdgeWeight;
 
-    type NeighboursIter<'a> = G::WeightedNeighboursIter<'a>
+    type NodeEdgesIter<'a> = G::WeightedNodeEdgesIter<'a>
     where
         Self: 'a;
 
     type Batch<'a> = MapClosure<
         std::iter::Copied<std::slice::Iter<'a, NodeIndex>>,
-        Closure<'a, Self, (NodeIndex,), (NodeIndex, Self::NodeWeight, Self::NeighboursIter<'a>)>
+        Closure<'a, Self, (NodeIndex,), (NodeIndex, Self::NodeWeight, Self::NodeEdgesIter<'a>)>
     >
     where
         Self: 'a;
