@@ -111,7 +111,6 @@ pub mod aptos_vm;
 mod aptos_vm_impl;
 pub mod block_executor;
 mod errors;
-mod evm;
 pub mod move_vm_ext;
 pub mod natives;
 pub mod sharded_block_executor;

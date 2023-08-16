@@ -6,13 +6,13 @@ use evm_core::ExitReason;
 use evm_runtime::Config;
 use primitive_types::{H160, H256, U256};
 use aptos_table_natives::{TableChangeSet, TableHandle, TableResolver};
-use crate::evm::eth_address::EthAddress;
-use crate::evm::evm_backend::EVMBackend;
+use crate::eth_address::EthAddress;
+use crate::evm_backend::EVMBackend;
 use move_core_types::account_address::AccountAddress;
 use evm::backend::{Apply, Backend, Basic, MemoryAccount};
 #[cfg(test)]
-use crate::evm::in_memory_storage::InMemoryTableResolver;
-use crate::evm::utils::u256_to_arr;
+use crate::in_memory_storage::InMemoryTableResolver;
+use crate::utils::u256_to_arr;
 use std::str::FromStr;
 use aptos_vm_types::change_set;
 use move_core_types::effects::Op;
@@ -285,11 +285,9 @@ fn test_contract_in_memory_table() {
 
 #[cfg(test)]
 mod tests {
-    use crate::evm::engine::test_contract_in_memory_table;
+    use crate::engine::test_contract_in_memory_table;
     #[test]
     fn test_run_loop_contract_table() {
         test_contract_in_memory_table();
-
     }
-
 }

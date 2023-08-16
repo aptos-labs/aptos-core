@@ -8,10 +8,10 @@ use primitive_types::{H160, H256, U256};
 use std::collections::BTreeMap;
 use evm::executor::stack::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use std::str::FromStr;
-use crate::evm::eth_address::EthAddress;
+use crate::eth_address::EthAddress;
 #[cfg(test)]
-use crate::evm::in_memory_storage::InMemoryTableResolver;
-use crate::evm::utils::{read_h256_from_bytes, read_u256_from_bytes, u256_to_arr};
+use crate::in_memory_storage::InMemoryTableResolver;
+use crate::utils::{read_h256_from_bytes, read_u256_from_bytes, u256_to_arr};
 
 pub struct EVMBackend<'a> {
     pub(crate) resolver: &'a dyn TableResolver,
