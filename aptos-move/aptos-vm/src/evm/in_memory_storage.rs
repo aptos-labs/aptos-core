@@ -8,36 +8,27 @@ use move_core_types::{
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
-struct InMemoryAccountStorage {
-    resources: BTreeMap<StructTag, Vec<u8>>,
-    modules: BTreeMap<Identifier, Vec<u8>>,
-}
-
-impl InMemoryAccountStorage {
-    fn new() -> Self {
-        Self {
-            modules: BTreeMap::new(),
-            resources: BTreeMap::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct InMemoryStorage {
-    accounts: BTreeMap<AccountAddress, InMemoryAccountStorage>,
+pub struct InMemoryTableResolver {
     tables: BTreeMap<TableHandle, BTreeMap<Vec<u8>, Vec<u8>>>,
 }
 
-impl InMemoryStorage {
+impl InMemoryTableResolver {
     pub fn new() -> Self {
         Self {
-            accounts: BTreeMap::new(),
             tables: BTreeMap::new(),
         }
     }
+
+    pub fn add_table(&mut self, handle: TableHandle) {
+        self.tables.insert(handle, BTreeMap::new());
+    }
+
+    pub fn add_table_entry(&mut self, handle: &TableHandle, key: Vec<u8>, value: Vec<u8>) {
+        self.tables.get_mut(handle).unwrap().insert(key, value);
+    }
 }
 
-impl TableResolver for InMemoryStorage {
+impl TableResolver for InMemoryTableResolver {
     fn resolve_table_entry(
         &self,
         handle: &TableHandle,

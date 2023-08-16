@@ -41,6 +41,12 @@ impl AccountAddress {
         Self(addr)
     }
 
+    pub fn get_hex_address_u8(num: u8) -> Self {
+        let mut addr = [0u8; AccountAddress::LENGTH];
+        addr[AccountAddress::LENGTH - 1] = num;
+        Self(addr)
+    }
+
     pub fn random() -> Self {
         let mut rng = OsRng;
         let buf: [u8; Self::LENGTH] = rng.gen();
