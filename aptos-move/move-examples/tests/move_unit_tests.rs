@@ -87,6 +87,11 @@ fn test_veiled_coin() {
 }
 
 #[test]
+fn test_poker() {
+    test_common("poker");
+}
+
+#[test]
 fn test_common_account() {
     test_common("common_account");
 }
