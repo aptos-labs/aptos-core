@@ -32,7 +32,6 @@ use aptos_types::{
     account_config::new_block_event_key,
     block_executor::partitioner::PartitionedTransactions,
     block_metadata::BlockMetadata,
-    contract_event::ContractEvent,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, ConfigStorage, FeatureFlag, TimedFeatureOverride},
     transaction::{
@@ -1259,20 +1258,14 @@ impl AptosVM {
         change_set: &VMChangeSet,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        let has_new_block_event = change_set.events().iter().any(|e| {
-            if let ContractEvent::V1(v1) = e {
-                *v1.key() == new_block_event_key()
-            } else {
-                false
-            }
-        });
-        let has_new_epoch_event = change_set.events().iter().any(|e| {
-            if let ContractEvent::V1(v1) = e {
-                *v1.key() == new_epoch_event_key()
-            } else {
-                false
-            }
-        });
+        let has_new_block_event = change_set
+            .events()
+            .iter()
+            .any(|e| e.event_key() == Some(&new_block_event_key()));
+        let has_new_epoch_event = change_set
+            .events()
+            .iter()
+            .any(|e| e.event_key() == Some(&new_epoch_event_key()));
         if has_new_block_event && has_new_epoch_event {
             Ok(())
         } else {
@@ -1650,13 +1643,11 @@ impl VMAdapter for AptosVM {
 
     fn should_restart_execution(vm_output: &VMOutput) -> bool {
         let new_epoch_event_key = aptos_types::on_chain_config::new_epoch_event_key();
-        vm_output.change_set().events().iter().any(|event| {
-            if let ContractEvent::V1(v1) = event {
-                *v1.key() == new_epoch_event_key
-            } else {
-                false
-            }
-        })
+        vm_output
+            .change_set()
+            .events()
+            .iter()
+            .any(|event| event.event_key() == Some(&new_epoch_event_key))
     }
 
     fn execute_single_transaction(

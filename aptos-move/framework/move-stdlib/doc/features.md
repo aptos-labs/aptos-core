@@ -1586,6 +1586,17 @@ Helper to check whether a feature flag is enabled.
 
 
 
+
+<a name="0x1_features_spec_module_event_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_module_event_enabled">spec_module_event_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_MODULE_EVENT">MODULE_EVENT</a>)
+}
+</code></pre>
+
+
+
 <a name="@Specification_1_set"></a>
 
 ### Function `set`
