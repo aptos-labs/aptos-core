@@ -177,6 +177,9 @@ module veiled_coin::veiled_coin {
     /// The domain separation tag (DST) used for the Bulletproofs prover.
     const VEILED_COIN_BULLETPROOFS_DST: vector<u8> = b"AptosVeiledCoin/BulletproofRangeProof";
 
+    // TODO: Describe what this is
+    const DEVELOPER_ADDRESS: address = @0x42beef
+
     //
     // Structs
     //
@@ -237,7 +240,7 @@ module veiled_coin::veiled_coin {
 
     /// Initializes a so-called "resource" account which will maintain a `coin::CoinStore<T>` resource for all `Coin<T>`'s
     /// that have been converted into a `VeiledCoin<T>`.
-    fun init_module(deployer: &signer) {
+    fun init_module<CoinType>(resource_account: &signer) {
         assert!(
             bulletproofs::get_max_range_bits() >= MAX_BITS_IN_VEILED_COIN_VALUE,
             error::internal(ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE)
@@ -248,15 +251,23 @@ module veiled_coin::veiled_coin {
             error::internal(EU64_COIN_AMOUNT_CLAMPING_IS_INCORRECT)
         );
 
+        let signer_cap = resource_account::retrieve_resource_account_cap(
+            resource_account, DEVELOPER_ADDRESS
+        );
+
+        coin::register<CoinType>(resource_account);
+
+        move_to(resource_account, Credentials { signer_cap } );
+
         // Create the resource account. This will allow this module to later obtain a `signer` for this account and
         // transfer `Coin<T>`'s into its `CoinStore<T>` before minting a `VeiledCoin<T>`.
-        let (_resource, signer_cap) = account::create_resource_account(deployer, vector::empty());
+        //let (_resource, signer_cap) = account::create_resource_account(deployer, vector::empty());
 
-        move_to(deployer,
-            VeiledCoinMinter {
-                signer_cap
-            }
-        )
+        //move_to(deployer,
+          //  VeiledCoinMinter {
+           //     signer_cap
+           // }
+       // )
     }
 
     //
