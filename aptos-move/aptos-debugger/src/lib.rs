@@ -12,7 +12,6 @@ use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    contract_event::ContractEvent,
     on_chain_config::{Features, OnChainConfig, TimedFeatures},
     transaction::{
         SignedTransaction, Transaction, TransactionInfo, TransactionOutput, TransactionPayload,
@@ -250,11 +249,8 @@ impl AptosDebugger {
 
 fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
     let new_epoch_event_key = aptos_types::on_chain_config::new_epoch_event_key();
-    vm_output.events().iter().any(|event| {
-        if let ContractEvent::V1(v1) = event {
-            *v1.key() == new_epoch_event_key
-        } else {
-            false
-        }
-    })
+    vm_output
+        .events()
+        .iter()
+        .any(|event| event.event_key() == Some(&new_epoch_event_key))
 }

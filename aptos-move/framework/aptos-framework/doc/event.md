@@ -20,6 +20,7 @@ events emitted to a handle and emit events to the event store.
 -  [Function `write_to_event_store`](#0x1_event_write_to_event_store)
 -  [Function `destroy_handle`](#0x1_event_destroy_handle)
 -  [Specification](#@Specification_1)
+    -  [Function `emit`](#@Specification_1_emit)
     -  [Function `write_to_module_event_store`](#@Specification_1_write_to_module_event_store)
     -  [Function `emit_event`](#@Specification_1_emit_event)
     -  [Function `guid`](#@Specification_1_guid)
@@ -95,7 +96,7 @@ Module event feature is not supported.
 Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s key and counter.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: drop, store&gt;(msg: &T)
+<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: drop, store&gt;(msg: T)
 </code></pre>
 
 
@@ -104,8 +105,8 @@ Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s k
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: store + drop&gt;(msg: &T) {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_bulletproofs_enabled">features::bulletproofs_enabled</a>(), std::error::invalid_state(<a href="event.md#0x1_event_EMODULE_EVENT_NOT_SUPPORTED">EMODULE_EVENT_NOT_SUPPORTED</a>));
+<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: store + drop&gt;(msg: T) {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_enabled">features::module_event_enabled</a>(), std::error::invalid_state(<a href="event.md#0x1_event_EMODULE_EVENT_NOT_SUPPORTED">EMODULE_EVENT_NOT_SUPPORTED</a>));
     <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T&gt;(msg);
 }
 </code></pre>
@@ -121,7 +122,7 @@ Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s k
 Log <code>msg</code> with the event stream identified by <code>T</code>
 
 
-<pre><code><b>fun</b> <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T: drop, store&gt;(msg: &T)
+<pre><code><b>fun</b> <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T: drop, store&gt;(msg: T)
 </code></pre>
 
 
@@ -130,7 +131,7 @@ Log <code>msg</code> with the event stream identified by <code>T</code>
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T: drop + store&gt;(msg: &T);
+<pre><code><b>native</b> <b>fun</b> <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T: drop + store&gt;(msg: T);
 </code></pre>
 
 
@@ -310,12 +311,29 @@ Destroy a unique handle.
 
 
 
+<a name="@Specification_1_emit"></a>
+
+### Function `emit`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: drop, store&gt;(msg: T)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_module_event_enabled">features::spec_module_event_enabled</a>();
+</code></pre>
+
+
+
 <a name="@Specification_1_write_to_module_event_store"></a>
 
 ### Function `write_to_module_event_store`
 
 
-<pre><code><b>fun</b> <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T: drop, store&gt;(msg: &T)
+<pre><code><b>fun</b> <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T: drop, store&gt;(msg: T)
 </code></pre>
 
 

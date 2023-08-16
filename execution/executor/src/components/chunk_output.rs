@@ -391,21 +391,16 @@ pub fn update_counters_for_processed_chunk(
         }
 
         for event in output.events() {
-            let is_core = match event {
-                ContractEvent::V1(v1) => v1.key().get_creator_address() == CORE_CODE_ADDRESS,
-                ContractEvent::V2(_v2) => {
-                    // TODO(eventv2): support v2 events
-                    false
-                },
-            };
-            let creation_number = if is_core && detailed_counters {
-                if let ContractEvent::V1(v1) = event {
-                    v1.key().get_creation_number().to_string()
-                } else {
-                    "event".to_string()
-                }
-            } else {
-                "event".to_string()
+            let (is_core, creation_number) = match event {
+                ContractEvent::V1(v1) => (
+                    v1.key().get_creator_address() == CORE_CODE_ADDRESS,
+                    if detailed_counters {
+                        v1.key().get_creation_number().to_string()
+                    } else {
+                        "event".to_string()
+                    },
+                ),
+                ContractEvent::V2(_v2) => (false, "event".to_string()),
             };
             metrics::APTOS_PROCESSED_USER_TRANSACTIONS_CORE_EVENTS
                 .with_label_values(&[
