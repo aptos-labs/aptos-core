@@ -8,10 +8,11 @@ use primitive_types::{H160, H256, U256};
 use std::collections::BTreeMap;
 use evm::executor::stack::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use std::str::FromStr;
+use move_core_types::value::{MoveTypeLayout, MoveValue};
 use crate::eth_address::EthAddress;
 #[cfg(test)]
 use crate::in_memory_storage::InMemoryTableResolver;
-use crate::utils::{read_h256_from_bytes, read_u256_from_bytes, u256_to_arr};
+use crate::utils::{read_h256_from_bytes, read_u256_from_bytes, read_u256_from_move_bytes, u256_to_arr};
 
 pub struct EVMBackend<'a> {
     pub(crate) resolver: &'a dyn TableResolver,
@@ -46,7 +47,7 @@ impl<'a> EVMBackend<'a> {
             .resolver
             .resolve_table_entry(&self.nonce_table_handle, &address.as_bytes())
             .unwrap();
-        bytes.map(|bytes| read_u256_from_bytes(&bytes))
+        bytes.map(|bytes| read_u256_from_move_bytes(&bytes))
     }
 
     pub fn get_balance(&self, address: &EthAddress) -> Option<U256> {
@@ -54,7 +55,7 @@ impl<'a> EVMBackend<'a> {
             .resolver
             .resolve_table_entry(&self.balance_table_handle, &address.as_bytes())
             .unwrap();
-        bytes.map(|bytes| read_u256_from_bytes(&bytes))
+        bytes.map(|bytes| read_u256_from_move_bytes(&bytes))
     }
 
     pub fn get_code(&self, address: &EthAddress) -> Vec<u8> {

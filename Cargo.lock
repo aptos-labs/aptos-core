@@ -9179,7 +9179,7 @@ dependencies = [
  "hex",
  "num 0.4.0",
  "once_cell",
- "primitive-types 0.10.1",
+ "primitive-types 0.12.1",
  "proptest",
  "proptest-derive",
  "rand 0.8.5",
@@ -11038,7 +11038,6 @@ dependencies = [
  "fixed-hash 0.7.0",
  "impl-codec 0.5.1",
  "impl-rlp",
- "impl-serde 0.3.2",
  "scale-info 1.0.0",
  "uint",
 ]

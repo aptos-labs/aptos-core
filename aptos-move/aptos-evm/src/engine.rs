@@ -12,7 +12,7 @@ use move_core_types::account_address::AccountAddress;
 use evm::backend::{Apply, Backend, Basic, MemoryAccount};
 #[cfg(test)]
 use crate::in_memory_storage::InMemoryTableResolver;
-use crate::utils::u256_to_arr;
+use crate::utils::{u256_to_arr, u256_to_move_arr};
 use std::str::FromStr;
 use aptos_vm_types::change_set;
 use move_core_types::effects::Op;
@@ -102,11 +102,11 @@ impl<'a> Engine<'a> {
     }
 
     fn modify_nonce(address: &EthAddress, nonce: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
-        (address.as_bytes().to_vec(), Op::Modify(u256_to_arr(nonce).to_vec()))
+        (address.as_bytes().to_vec(), Op::Modify(u256_to_move_arr(nonce).to_vec()))
     }
 
     fn modify_balance(address: &EthAddress, balance: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
-        (address.as_bytes().to_vec(), Op::Modify(u256_to_arr(balance).to_vec()))
+        (address.as_bytes().to_vec(), Op::Modify(u256_to_move_arr(balance).to_vec()))
     }
 
     fn modify_code(address: &EthAddress, code: &Vec<u8>) -> (Vec<u8>, Op<Vec<u8>>) {
@@ -121,11 +121,11 @@ impl<'a> Engine<'a> {
     }
 
     fn add_nonce(address: &EthAddress, nonce: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
-        (address.as_bytes().to_vec(), Op::New(u256_to_arr(nonce).to_vec()))
+        (address.as_bytes().to_vec(), Op::New(u256_to_move_arr(nonce).to_vec()))
     }
 
     fn add_balance(address: &EthAddress, balance: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
-        (address.as_bytes().to_vec(), Op::New(u256_to_arr(balance).to_vec()))
+        (address.as_bytes().to_vec(), Op::New(u256_to_move_arr(balance).to_vec()))
     }
 
     fn add_code(address: &EthAddress, code: &Vec<u8>) -> (Vec<u8>, Op<Vec<u8>>) {
