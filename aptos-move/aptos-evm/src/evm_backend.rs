@@ -3,16 +3,27 @@
 use evm_runtime::Config;
 use aptos_table_natives::{TableHandle, TableResolver};
 use evm::backend::{Backend, Basic, MemoryAccount, MemoryBackend, MemoryVicinity};
-use move_core_types::account_address::AccountAddress;
 use primitive_types::{H160, H256, U256};
 use std::collections::BTreeMap;
 use evm::executor::stack::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use std::str::FromStr;
-use move_core_types::value::{MoveTypeLayout, MoveValue};
+use serde::{Deserialize, Serialize};
 use crate::eth_address::EthAddress;
 #[cfg(test)]
 use crate::in_memory_storage::InMemoryTableResolver;
-use crate::utils::{read_h256_from_bytes, read_u256_from_bytes, read_u256_from_move_bytes, u256_to_arr};
+use crate::utils::{read_h256_from_bytes, read_u256_from_move_bytes};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StorageKey {
+    pub address: Vec<u8>,
+    pub offset: Vec<u8>,
+}
+
+impl StorageKey {
+    pub fn new(address: Vec<u8>, offset: Vec<u8>) -> Self {
+        Self { address, offset }
+    }
+}
 
 pub struct EVMBackend<'a> {
     pub(crate) resolver: &'a dyn TableResolver,
@@ -67,12 +78,10 @@ impl<'a> EVMBackend<'a> {
     }
 
     pub fn get_storage(&self, address: &EthAddress, index: H256) -> Option<H256> {
-        let mut buf = [0u8; 52];
-        buf[..20].copy_from_slice(&address.as_bytes());
-        buf[20..].copy_from_slice(&index.as_bytes());
+        let storage_key = StorageKey::new(address.as_bytes().to_vec(), index.as_bytes().to_vec());
         let bytes = self
             .resolver
-            .resolve_table_entry(&self.storage_table_handle, &buf)
+            .resolve_table_entry(&self.storage_table_handle, bcs::to_bytes(&storage_key).unwrap().as_slice())
             .unwrap();
         bytes.map(|bytes| read_h256_from_bytes(&bytes))
     }

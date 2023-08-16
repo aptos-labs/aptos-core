@@ -7,7 +7,7 @@ use evm_runtime::Config;
 use primitive_types::{H160, H256, U256};
 use aptos_table_natives::{TableChange, TableChangeSet, TableHandle, TableResolver};
 use crate::eth_address::EthAddress;
-use crate::evm_backend::EVMBackend;
+use crate::evm_backend::{EVMBackend, StorageKey};
 use move_core_types::account_address::AccountAddress;
 use evm::backend::{Apply, Backend, Basic, MemoryAccount};
 #[cfg(test)]
@@ -136,7 +136,8 @@ impl<'a> Engine<'a> {
         let mut buf = [0u8; 52];
         buf[..20].copy_from_slice(&address.as_bytes());
         buf[20..].copy_from_slice(&index.as_bytes());
-        (buf.to_vec(), Op::New(value.as_bytes().to_vec()))
+        let storage_key = StorageKey::new(address.as_bytes().to_vec(), index.as_bytes().to_vec());
+        (bcs::to_bytes(&storage_key).unwrap(), Op::New(value.as_bytes().to_vec()))
     }
 
     fn delete_nonce(address: &EthAddress) -> (Vec<u8>, Op<Vec<u8>>) {
@@ -149,13 +150,6 @@ impl<'a> Engine<'a> {
 
     fn delete_code(address: &EthAddress) -> (Vec<u8>, Op<Vec<u8>>) {
         (address.as_bytes().to_vec(), Op::Delete)
-    }
-
-    fn delete_storage(address: &EthAddress, index: &H256) -> (Vec<u8>, Op<Vec<u8>>) {
-        let mut buf = [0u8; 52];
-        buf[..20].copy_from_slice(&address.as_bytes());
-        buf[20..].copy_from_slice(&index.as_bytes());
-        (buf.to_vec(), Op::Delete)
     }
 
     fn into_change_set<A, I>(&self, values: A, backend: EVMBackend) -> TableChangeSet
