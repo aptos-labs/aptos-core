@@ -36,7 +36,7 @@ impl ImageOptimizer {
         let op = || {
             async {
                 let client = Client::builder()
-                    .timeout(Duration::from_secs(MAX_IMAGE_REQUEST_RETRY_SECONDS)) // Allocate three minutes for downloading large images
+                    .timeout(Duration::from_secs(MAX_IMAGE_REQUEST_RETRY_SECONDS))
                     .build()
                     .context("Failed to build reqwest client")?;
 
