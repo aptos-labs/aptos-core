@@ -34,6 +34,9 @@ use std::error;
     /// The given player is not in the game
     const EPLAYER_DOESNT_EXIST: u64 = 8;
 
+    /// The given player has already shuffled the deck
+    const EPLAYER_ALREADY_SHUFFLED: u64 = 9;
+
 struct Player has copy, drop, store {
     pk: elgamal::CompressedPubkey,
     owner: address,
@@ -97,7 +100,15 @@ public entry fun shuffle(sender: &signer, game_addr: address, shuffle_proof: vec
     let n = vector::length(&game.players);
     let i = 0;
     let found_player = false;
-    let player = find_player(&game, user_addr);
+    let player: Player;
+    while (i < n) { 
+        let player = vector::borrow(&game.players, i);
+        if (player.owner == user_addr) {
+            let found_player = true;
+            break;
+        };
+        i = i + 1;
+    };
     assert!(found_player, error::not_found(EPLAYER_DOESNT_EXIST));
     assert!(!player.shuffled, error::invalid_argument(EPLAYER_ALREADY_SHUFFLED));
 
@@ -106,7 +117,7 @@ public entry fun shuffle(sender: &signer, game_addr: address, shuffle_proof: vec
 }
 
 // Searches a Game for a specific Player, and returns it
-fun find_player(game: &Game, addr: address): Player {
+/*fun find_player(game: &Game, addr: address): Player {
     while (i < n) { 
         let player = vector::borrow(&game.players, i);
         if (player.owner == addr) {
@@ -115,7 +126,7 @@ fun find_player(game: &Game, addr: address): Player {
         };
         i = i + 1;
     };
-}
+}*/
 
 // Initializes the deck with the values 1 through 52 encrypted with no randomness
 fun initialize_deck(): Deck {
@@ -125,8 +136,8 @@ fun initialize_deck(): Deck {
     let i = 0;
     while (i < n) {
        let scalar = ristretto255::new_scalar_from_u8(i);
-       let ct = elgamal::new_ciphertext_no_randomness(scalar); 
-       vector::push_back<elgamal::CompressedCiphertext>(&mut vec);
+       let ct = elgamal::new_ciphertext_no_randomness(&scalar); 
+       vector::push_back<elgamal::CompressedCiphertext>(&mut vec, elgamal::compress_ciphertext(&ct));
        i = i + 1;
     };
     res
@@ -134,13 +145,14 @@ fun initialize_deck(): Deck {
 
 // Checks if all players have shuffled the deck. This means a game is ready to begin.
 fun check_deck_shuffled(game: &Game): bool {
-    let n = vector::length(game.players); 
+    let n = vector::length(&game.players); 
     let i = 0;
     while (i < n) {
-        if (game.players[i].shuffled == false) {
+        let player = vector::borrow(&game.players, i);
+        if (player.shuffled == false) {
             return false;
         }
     };
-    return true;
+    true
 }
 }
