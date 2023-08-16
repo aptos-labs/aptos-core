@@ -5,15 +5,17 @@ use evm::executor::stack::{MemoryStackState, PrecompileFn, StackExecutor, StackS
 use evm_core::ExitReason;
 use evm_runtime::Config;
 use primitive_types::{H160, H256, U256};
-use aptos_table_natives::{TableHandle, TableResolver};
+use aptos_table_natives::{TableChangeSet, TableHandle, TableResolver};
 use crate::evm::eth_address::EthAddress;
 use crate::evm::evm_backend::EVMBackend;
 use move_core_types::account_address::AccountAddress;
-use evm::backend::MemoryAccount;
+use evm::backend::{Apply, Backend, Basic, MemoryAccount};
 #[cfg(test)]
 use crate::evm::in_memory_storage::InMemoryTableResolver;
 use crate::evm::utils::u256_to_arr;
 use std::str::FromStr;
+use aptos_vm_types::change_set;
+use move_core_types::effects::Op;
 
 pub struct Engine<'a> {
     resolver: &'a dyn TableResolver,
@@ -64,7 +66,111 @@ impl<'a> Engine<'a> {
         let state = MemoryStackState::new(metadata, &backend);
         let precompiles: BTreeMap<_, PrecompileFn> = BTreeMap::new();
         let mut executor = StackExecutor::new_with_precompiles(state, &config, &precompiles);
-        executor.transact_call(caller, address, value, data, gas_limit, access_list)
+        let ret = executor.transact_call(caller, address, value, data, gas_limit, access_list);
+
+        let (values, logs) = executor.into_state().deconstruct();
+        ret
+    }
+
+    fn modify_nonce(address: &EthAddress, nonce: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
+        (address.as_bytes().to_vec(), Op::Modify(u256_to_arr(nonce).to_vec()))
+    }
+
+    fn modify_balance(address: &EthAddress, balance: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
+        (address.as_bytes().to_vec(), Op::Modify(u256_to_arr(balance).to_vec()))
+    }
+
+    fn modify_code(address: &EthAddress, code: &Vec<u8>) -> (Vec<u8>, Op<Vec<u8>>) {
+        (address.as_bytes().to_vec(), Op::Modify(code.clone()))
+    }
+
+    fn modify_storage(address: &EthAddress, index: &H256, value: &H256) -> (Vec<u8>, Op<Vec<u8>>) {
+        let mut buf = [0u8; 52];
+        buf[..20].copy_from_slice(&address.as_bytes());
+        buf[20..].copy_from_slice(&index.as_bytes());
+        (buf.to_vec(), Op::Modify(value.as_bytes().to_vec()))
+    }
+
+    fn add_nonce(address: &EthAddress, nonce: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
+        (address.as_bytes().to_vec(), Op::New(u256_to_arr(nonce).to_vec()))
+    }
+
+    fn add_balance(address: &EthAddress, balance: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
+        (address.as_bytes().to_vec(), Op::New(u256_to_arr(balance).to_vec()))
+    }
+
+    fn add_code(address: &EthAddress, code: &Vec<u8>) -> (Vec<u8>, Op<Vec<u8>>) {
+        (address.as_bytes().to_vec(), Op::New(code.clone()))
+    }
+
+    fn add_storage(address: &EthAddress, index: &H256, value: &H256) -> (Vec<u8>, Op<Vec<u8>>) {
+        let mut buf = [0u8; 52];
+        buf[..20].copy_from_slice(&address.as_bytes());
+        buf[20..].copy_from_slice(&index.as_bytes());
+        (buf.to_vec(), Op::New(value.as_bytes().to_vec()))
+    }
+
+    fn add_new_account<I>(address: &EthAddress, basic: Basic, code: Option<Vec<u8>>, storage: I ) -> Vec<(Vec<u8>, Op<Vec<u8>>)>
+        where I: IntoIterator<Item = (H256, H256)>
+    {
+        let mut change_set = vec![];
+        change_set.push(Self::add_nonce(address, &basic.nonce));
+        change_set.push(Self::add_balance(address, &basic.balance));
+        if let Some(code) = code {
+            change_set.push(Self::add_code(address, &code));
+        }
+        for (index, value) in storage {
+            change_set.push(Self::add_storage(address, &index, &value));
+        }
+        change_set
+    }
+
+    fn into_change_set<A, I>(values: A, backend: EVMBackend) -> TableChangeSet
+        where
+            A: IntoIterator<Item = Apply<I>>,
+            I: IntoIterator<Item = (H256, H256)>
+    {
+
+        for apply in values {
+            match apply {
+                Apply::Modify {
+                    address,
+                    basic,
+                    code,
+                    storage,
+                    reset_storage,
+                } => {
+                    // if !backend.exists(address.clone()) {
+                    //     change_set.extend(Self::add_new_account(&EthAddress(address), basic, code, storage));
+                    // } else {
+                    //     let current_basic = backend.basic(address);
+                    //     if current_basic.nonce != basic.nonce {
+                    //         change_set.push(Self::modify_nonce(&EthAddress(address), &basic.nonce));
+                    //     }
+                    //     if current_basic.balance != basic.balance {
+                    //         change_set.push(Self::modify_balance(&EthAddress(address), &basic.balance));
+                    //     }
+                    //     if let Some(code) = code {
+                    //         change_set.push(Self::modify_code(&EthAddress(address), &code));
+                    //     }
+                    //     for (index, value) in storage {
+                    //         change_set.push(Self::modify_storage(&EthAddress(address), &index, &value));
+                    //     }
+                    // }
+                    let current_basic = backend.basic(address);
+                    // if current_basic.nonce != basic.nonce {
+                    //     set_nonce(&mut self.io, &address, &basic.nonce);
+                    //     writes_counter += 1;
+                    // }
+
+                    todo!("Modify")
+                }
+                Apply::Delete { address } => {
+                    todo!("Delete")
+                }
+            }
+        }
+        todo!("into_change_set")
     }
 
     pub fn transact_create(
@@ -172,6 +278,8 @@ fn test_contract_in_memory_table() {
         u64::MAX,
         Vec::new(),
     );
+
+    println!("Result: {:?}", _reason);
 }
 
 
