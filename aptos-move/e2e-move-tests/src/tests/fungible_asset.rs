@@ -42,7 +42,7 @@ fn test_basic_fungible_token() {
     let metadata = h
         .execute_view_function(
             str::parse(&format!(
-                "0x{}::managed_fungible_token::get_metadata",
+                "{}::managed_fungible_token::get_metadata",
                 *alice.address()
             ))
             .unwrap(),
@@ -57,7 +57,7 @@ fn test_basic_fungible_token() {
     let result = h.run_entry_function(
         &alice,
         str::parse(&format!(
-            "0x{}::managed_fungible_asset::mint_to_primary_stores",
+            "{}::managed_fungible_asset::mint_to_primary_stores",
             *alice.address()
         ))
         .unwrap(),
@@ -73,7 +73,7 @@ fn test_basic_fungible_token() {
     let result = h.run_entry_function(
         &alice,
         str::parse(&format!(
-            "0x{}::managed_fungible_asset::transfer_between_primary_stores",
+            "{}::managed_fungible_asset::transfer_between_primary_stores",
             *alice.address()
         ))
         .unwrap(),
@@ -90,7 +90,7 @@ fn test_basic_fungible_token() {
     let result = h.run_entry_function(
         &alice,
         str::parse(&format!(
-            "0x{}::managed_fungible_asset::burn_from_primary_stores",
+            "{}::managed_fungible_asset::burn_from_primary_stores",
             *alice.address()
         ))
         .unwrap(),

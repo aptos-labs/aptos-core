@@ -23,7 +23,7 @@ use move_core_types::{
 use move_package::compilation::compiled_package::CompiledPackage;
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::gas_schedule::CostTable;
-use std::{fs, path::Path};
+use std::{fs, path::Path, str::FromStr};
 
 #[allow(clippy::too_many_arguments)]
 pub fn run(
@@ -71,7 +71,7 @@ move run` must be applied to a module inside `storage/`",
 
     let signer_addresses = signers
         .iter()
-        .map(|s| AccountAddress::from_hex_literal(s))
+        .map(|s| AccountAddress::from_str(s))
         .collect::<Result<Vec<AccountAddress>, _>>()?;
     // TODO: parse Value's directly instead of going through the indirection of TransactionArgument?
     let vm_args: Vec<Vec<u8>> = convert_txn_args(txn_args);

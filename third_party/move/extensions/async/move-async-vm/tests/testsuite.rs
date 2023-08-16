@@ -50,7 +50,7 @@ struct Harness {
 }
 
 fn test_account() -> AccountAddress {
-    AccountAddress::from_hex_literal(TEST_ADDR).expect("valid test address")
+    AccountAddress::from_str(TEST_ADDR).expect("valid test address")
 }
 
 fn test_runner(path: &Path) -> datatest_stable::Result<()> {
@@ -271,7 +271,7 @@ impl Harness {
             if parts.len() < 4 {
                 bail!("malformed actor decl `{}`", actor)
             }
-            let address = AccountAddress::from_hex_literal(parts[0])?;
+            let address = AccountAddress::from_str(parts[0])?;
             let module = Identifier::from_str(parts[1])?;
             let struct_ = Identifier::from_str(parts[2])?;
             let initializer = Identifier::from_str(parts[3])?;
@@ -306,9 +306,9 @@ impl Harness {
             if parts.len() != 3 {
                 bail!("malformed instance decl `{}`", inst)
             }
-            let address = AccountAddress::from_hex_literal(parts[0])?;
+            let address = AccountAddress::from_str(parts[0])?;
             let module = Identifier::from_str(parts[1])?;
-            let inst_address = AccountAddress::from_hex_literal(parts[2])?;
+            let inst_address = AccountAddress::from_str(parts[2])?;
             result.push((ModuleId::new(address, module), inst_address))
         }
         Ok(result)

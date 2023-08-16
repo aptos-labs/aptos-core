@@ -526,7 +526,7 @@ pub fn test_open_publishing_invalid_address() {
 
     let module = format!(
         "
-        module 0x{}.M {{
+        module {}.M {{
             public max(a: u64, b: u64): u64 {{
             label b0:
                 jump_if (copy(a) > copy(b)) b2;
@@ -589,7 +589,7 @@ pub fn test_open_publishing() {
 
     let program = format!(
         "
-        module 0x{}.M {{
+        module {}.M {{
             public max(a: u64, b: u64): u64 {{
             label b0:
                 jump_if (copy(a) > copy(b)) b2;
@@ -657,7 +657,7 @@ fn good_module_uses_bad(
 ) -> (CompiledModule, Vec<u8>) {
     let good_module_code = format!(
         "
-    module 0x{}.Test2 {{
+    module {}.Test2 {{
         import 0x1.Test;
         struct S {{ b: bool }}
 
@@ -895,7 +895,7 @@ fn test_module_transitive_dependency_fails_verification() {
 
     let module_code = format!(
         "
-    module 0x{}.Test3 {{
+    module {}.Test3 {{
         import 0x1.Test2;
         public bar() {{
         label b0:

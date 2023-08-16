@@ -69,7 +69,7 @@ fn setup_module() -> ModuleCode {
     // first function takes a mutable ref & writes to it, the other takes immutable ref, so we exercise both paths
     let code = format!(
         r#"
-        module 0x{}::{} {{
+        module {}::{} {{
             fun {}(a: &mut u64) {{ *a = {}; }}
             fun {}(_a: & u64) {{ }}
         }}

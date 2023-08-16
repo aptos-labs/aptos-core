@@ -212,7 +212,7 @@ fn change_after_move() {
 fn add_module_txn(sender: &AccountData, seq_num: u64) -> (CompiledModule, SignedTransaction) {
     let module_code = format!(
         "
-        module 0x{}.M {{
+        module {}.M {{
             import 0x1.signer;
             struct T1 has key {{ v: u64 }}
 
@@ -278,7 +278,7 @@ fn add_resource_txn(
 ) -> SignedTransaction {
     let program = format!(
         "
-            import 0x{}.M;
+            import {}.M;
 
             main(account: signer) {{
             label b0:
@@ -305,7 +305,7 @@ fn remove_resource_txn(
 ) -> SignedTransaction {
     let program = format!(
         "
-            import 0x{}.M;
+            import {}.M;
 
             main(account: signer) {{
             label b0:
@@ -332,7 +332,7 @@ fn borrow_resource_txn(
 ) -> SignedTransaction {
     let program = format!(
         "
-            import 0x{}.M;
+            import {}.M;
 
             main(account: signer) {{
             label b0:
@@ -359,7 +359,7 @@ fn change_resource_txn(
 ) -> SignedTransaction {
     let program = format!(
         "
-            import 0x{}.M;
+            import {}.M;
 
             main(account: signer) {{
             label b0:

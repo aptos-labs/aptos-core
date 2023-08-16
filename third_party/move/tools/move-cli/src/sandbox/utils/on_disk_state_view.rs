@@ -27,6 +27,7 @@ use std::{
     fmt::Debug,
     fs,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 type Event = (Vec<u8>, u64, TypeTag, Vec<u8>);
@@ -102,7 +103,7 @@ impl OnDiskStateView {
 
     fn get_addr_path(&self, addr: &AccountAddress) -> PathBuf {
         let mut path = self.storage_dir.clone();
-        path.push(format!("0x{}", addr));
+        path.push(format!("{}", addr));
         path
     }
 
@@ -142,9 +143,8 @@ impl OnDiskStateView {
         let name = Identifier::new(p.file_stem().unwrap().to_str().unwrap()).unwrap();
         match p.parent().and_then(|parent| parent.parent()) {
             Some(parent) => {
-                let addr =
-                    AccountAddress::from_hex_literal(parent.file_stem().unwrap().to_str().unwrap())
-                        .unwrap();
+                let addr = AccountAddress::from_str(parent.file_stem().unwrap().to_str().unwrap())
+                    .unwrap();
                 Some(ModuleId::new(addr, name))
             },
             None => None,
@@ -468,10 +468,11 @@ impl ToString for TypeID {
 impl ToString for StructID {
     fn to_string(&self) -> String {
         let tag = &self.0;
-        // TODO: TypeTag parser insists on leading 0x for StructTag's, so we insert one here.
-        // Would be nice to expose a StructTag parser and get rid of the 0x here
+        // TODO: TypeTag parser insists on leading 0x for StructTag's (which is
+        // included by the Display impl of AccountAddress). Would be nice to
+        // expose a StructTag parser and not worry about the 0x here.
         format!(
-            "0x{}::{}::{}{}",
+            "{}::{}::{}{}",
             tag.address,
             tag.module,
             tag.name,

@@ -18,7 +18,7 @@ use move_core_types::account_address::AccountAddress;
 use move_ir_types::location::{sp, Loc};
 use move_symbol_pool::Symbol;
 use sha3::{Digest, Sha3_256};
-use std::{collections::BTreeSet, convert::TryInto};
+use std::{collections::BTreeSet, convert::TryInto, str::FromStr};
 
 const ACTOR_ATTR: &str = "actor";
 const STATE_ATTR: &str = "state";
@@ -333,7 +333,7 @@ fn message_hash(
                     Derivation::DeriveFailed,
                     (loc, format!("cannot resolve address alias `{}`", name))
                 ));
-                AccountAddress::from_hex_literal("0x0").unwrap()
+                AccountAddress::from_str("0x0").unwrap()
             }
         },
     };

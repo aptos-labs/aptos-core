@@ -27,7 +27,7 @@ fn bad_module_address() {
 
     let program = format!(
         "
-        module 0x{}.M {{
+        module {}.M {{
         }}
         ",
         account1.address()
@@ -272,7 +272,7 @@ pub fn test_publishing_modules_proper_sender() {
 
     let program = format!(
         "
-        module 0x{}.M {{
+        module {}.M {{
         }}
         ",
         sender.address(),
@@ -336,7 +336,7 @@ pub fn test_publishing_allow_modules() {
 
     let program = format!(
         "
-        module 0x{}.M {{
+        module {}.M {{
         }}
         ",
         sender.address(),

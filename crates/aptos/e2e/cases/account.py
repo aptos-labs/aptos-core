@@ -214,7 +214,7 @@ def test_account_resource_account(run_helper: RunHelper, test_name=None):
         if module.get("0x1::resource_account::Container") != None:
             data = module["0x1::resource_account::Container"]["store"]["data"]
             for resource in data:
-                if resource.get("key") == f"0x{resource_account_address}":
+                if resource.get("key") == resource_account_address:
                     found_resource = True
                     break
 

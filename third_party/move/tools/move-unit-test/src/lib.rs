@@ -115,11 +115,7 @@ pub struct UnitTestingConfig {
 }
 
 fn format_module_id(module_id: &ModuleId) -> String {
-    format!(
-        "0x{}::{}",
-        module_id.address().short_str_lossless(),
-        module_id.name()
-    )
+    format!("{}::{}", module_id.address(), module_id.name())
 }
 
 impl UnitTestingConfig {

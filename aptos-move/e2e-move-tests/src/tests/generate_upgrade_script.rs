@@ -20,7 +20,7 @@ fn generate_upgrade_script() {
         "test",
         &format!(
             "\
-module 0x{}::test {{
+module {}::test {{
     public entry fun hi(_s: &signer){{
     }}
 }}",

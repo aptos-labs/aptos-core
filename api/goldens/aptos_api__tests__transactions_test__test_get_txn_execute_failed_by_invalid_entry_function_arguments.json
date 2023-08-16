@@ -13,6 +13,38 @@
       "address": "0xa550c18",
       "state_key_hash": "",
       "data": {
+        "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+        "data": {
+          "coin": {
+            "value": "18446744073709551415"
+          },
+          "deposit_events": {
+            "counter": "1",
+            "guid": {
+              "id": {
+                "addr": "0xa550c18",
+                "creation_num": "2"
+              }
+            }
+          },
+          "frozen": false,
+          "withdraw_events": {
+            "counter": "0",
+            "guid": {
+              "id": {
+                "addr": "0xa550c18",
+                "creation_num": "3"
+              }
+            }
+          }
+        }
+      },
+      "type": "write_resource"
+    },
+    {
+      "address": "0xa550c18",
+      "state_key_hash": "",
+      "data": {
         "type": "0x1::account::Account",
         "data": {
           "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
@@ -49,12 +81,20 @@
         }
       },
       "type": "write_resource"
+    },
+    {
+      "state_key_hash": "",
+      "handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+      "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+      "value": "0x41ffffffffffffff0000000000000000",
+      "data": null,
+      "type": "write_table_item"
     }
   ],
   "sender": "0xa550c18",
   "sequence_number": "0",
-  "max_gas_amount": "100000000",
-  "gas_unit_price": "0",
+  "max_gas_amount": "2000000",
+  "gas_unit_price": "100",
   "expiration_timestamp_secs": "18446744073709551615",
   "payload": {
     "function": "0x1::Coin::transfer",
@@ -69,7 +109,7 @@
   },
   "signature": {
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0x20e1f74f12aa955275a9d1a63190065d77e1903cc53b0116b704b3ace98fd7a57d303738799840523688cdaaad74ee0c73b6bee53517e4dcd6e7589296711108",
+    "signature": "0x030ee3a101777b25bd2e2e5ce11a984f3914edff419c0f3526a524574cc4a9d332329970fb2a7edc99796205a2096e85253e191c1c9a6443903388aa2d2c3d05",
     "type": "ed25519_signature"
   },
   "events": [],

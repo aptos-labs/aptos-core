@@ -33,7 +33,7 @@ fn mutated_accounts() {
         }
     "#;
 
-    let code = code.replace("{{ADDR}}", &format!("0x{}", TEST_ADDR));
+    let code = code.replace("{{ADDR}}", &format!("{}", TEST_ADDR));
     let mut units = compile_units(&code).unwrap();
     let m = as_module(units.pop().unwrap());
     let mut blob = vec![];

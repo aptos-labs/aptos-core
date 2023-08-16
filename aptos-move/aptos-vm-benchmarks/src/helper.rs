@@ -114,11 +114,7 @@ pub fn get_module_name(
     let MemberId {
         module_id,
         member_id: _function_id,
-    } = str::parse(&format!(
-        "0x{}::{}::{}",
-        address, identifier, func_identifier,
-    ))
-    .unwrap();
+    } = str::parse(&format!("{}::{}::{}", address, identifier, func_identifier,)).unwrap();
 
     module_id
 }

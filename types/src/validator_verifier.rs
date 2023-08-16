@@ -403,12 +403,7 @@ impl fmt::Display for ValidatorVerifier {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         write!(f, "ValidatorSet: [")?;
         for info in &self.validator_infos {
-            write!(
-                f,
-                "{}: {}, ",
-                info.address.short_str_lossless(),
-                info.voting_power
-            )?;
+            write!(f, "{}: {}, ", info.address, info.voting_power)?;
         }
         write!(f, "]")
     }

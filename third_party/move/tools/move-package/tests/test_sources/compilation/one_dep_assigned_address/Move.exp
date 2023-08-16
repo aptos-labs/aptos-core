@@ -1,7 +1,7 @@
 CompiledPackageInfo {
     package_name: "Root",
     address_alias_instantiation: {
-        "A": 0000000000000000000000000000000000000000000000000000000000000002,
+        "A": 0x2,
     },
     source_digest: Some(
         "ELIDED_FOR_TEST",

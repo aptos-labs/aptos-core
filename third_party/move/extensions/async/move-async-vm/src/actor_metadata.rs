@@ -22,7 +22,7 @@ pub struct ActorMetadata {
 /// Compute a hash for a message.
 pub fn message_hash(module_id: &ModuleId, handler_id: &IdentStr) -> u64 {
     let hash_str = format!(
-        "0x{}::{}::{}",
+        "{}::{}::{}",
         module_id.address(),
         module_id.name(),
         handler_id

@@ -27,6 +27,7 @@ use std::{
     fmt::{Debug, Error, Formatter},
     hash::Hash,
     ops::Deref,
+    str::FromStr,
 };
 
 // =================================================================================================
@@ -1281,7 +1282,7 @@ impl Address {
         if s.starts_with("0x") {
             s = &s[2..]
         }
-        let addr = AccountAddress::from_hex_literal(s).map(Address::Numerical)?;
+        let addr = AccountAddress::from_str(s).map(Address::Numerical)?;
         Ok(addr)
     }
 
@@ -1321,12 +1322,10 @@ impl ModuleName {
     }
 
     pub fn from_str(addr: &str, name: Symbol) -> ModuleName {
-        let addr = if !addr.starts_with("0x") {
-            AccountAddress::from_hex_literal(&format!("0x{}", addr))
-        } else {
-            AccountAddress::from_hex_literal(addr)
-        };
-        ModuleName(Address::Numerical(addr.expect("valid address")), name)
+        ModuleName(
+            Address::Numerical(AccountAddress::from_str(addr).expect("valid address")),
+            name,
+        )
     }
 
     pub fn addr(&self) -> &Address {

@@ -46,7 +46,7 @@ ResolutionGraph {
                 subst: Some(
                     {
                         "BA": Assign(
-                            0000000000000000000000000000000000000000000000000000000000000001,
+                            0x1,
                         ),
                     },
                 ),
@@ -144,7 +144,7 @@ ResolutionGraph {
                 ),
             },
             resolution_table: {
-                "AA": 0000000000000000000000000000000000000000000000000000000000000001,
+                "AA": 0x1,
             },
             source_digest: "ELIDED_FOR_TEST",
         },
@@ -191,7 +191,7 @@ ResolutionGraph {
                 ),
             },
             resolution_table: {
-                "BA": 0000000000000000000000000000000000000000000000000000000000000001,
+                "BA": 0x1,
             },
             source_digest: "ELIDED_FOR_TEST",
         },
@@ -222,7 +222,7 @@ ResolutionGraph {
             package_path: "ELIDED_FOR_TEST",
             renaming: {},
             resolution_table: {
-                "A": 0000000000000000000000000000000000000000000000000000000000000001,
+                "A": 0x1,
             },
             source_digest: "ELIDED_FOR_TEST",
         },
@@ -257,7 +257,7 @@ ResolutionGraph {
                         subst: Some(
                             {
                                 "BA": Assign(
-                                    0000000000000000000000000000000000000000000000000000000000000001,
+                                    0x1,
                                 ),
                             },
                         ),
@@ -272,8 +272,8 @@ ResolutionGraph {
             package_path: "ELIDED_FOR_TEST",
             renaming: {},
             resolution_table: {
-                "AA": 0000000000000000000000000000000000000000000000000000000000000001,
-                "BA": 0000000000000000000000000000000000000000000000000000000000000001,
+                "AA": 0x1,
+                "BA": 0x1,
             },
             source_digest: "ELIDED_FOR_TEST",
         },

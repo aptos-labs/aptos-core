@@ -27,7 +27,7 @@ fn run(
 
     let code = format!(
         r#"
-        module 0x{}::M {{
+        module {}::M {{
             {}
 
             fun foo{} {{

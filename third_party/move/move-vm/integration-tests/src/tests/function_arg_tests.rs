@@ -38,7 +38,7 @@ fn run(
 
     let code = format!(
         r#"
-        module 0x{}::M {{
+        module {}::M {{
             struct Foo has copy, drop {{ x: u64 }}
             struct Bar<T> has copy, drop {{ x: T }}
 

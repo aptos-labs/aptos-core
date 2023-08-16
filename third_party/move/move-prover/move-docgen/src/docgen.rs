@@ -31,6 +31,7 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
     rc::Rc,
+    str::FromStr,
 };
 
 /// The maximum number of subheadings that are allowed
@@ -1664,7 +1665,7 @@ impl<'env> Docgen<'env> {
                 // Cannot resolve.
                 return None;
             }
-            let addr = AccountAddress::from_hex_literal(parts[0]).ok()?;
+            let addr = AccountAddress::from_str(parts[0]).ok()?;
             let mname = ModuleName::new(
                 Address::Numerical(addr),
                 self.env.symbol_pool().make(parts[1]),

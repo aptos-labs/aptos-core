@@ -16,6 +16,7 @@ use std::{
     fs::File,
     io::{BufRead, BufReader, Read, Write},
     path::Path,
+    str::FromStr,
 };
 
 pub type FunctionCoverage = BTreeMap<u64, u64>;
@@ -77,8 +78,7 @@ impl CoverageMap {
             if !is_script {
                 let func_name = Identifier::new(context_segs.pop().unwrap()).unwrap();
                 let module_name = Identifier::new(context_segs.pop().unwrap()).unwrap();
-                let module_addr =
-                    AccountAddress::from_hex_literal(context_segs.pop().unwrap()).unwrap();
+                let module_addr = AccountAddress::from_str(context_segs.pop().unwrap()).unwrap();
                 self.insert(exec_id, module_addr, module_name, func_name, pc);
             } else {
                 // Don't count scripts (for now)
@@ -286,8 +286,7 @@ impl TraceMap {
             if !is_script {
                 let func_name = Identifier::new(context_segs.pop().unwrap()).unwrap();
                 let module_name = Identifier::new(context_segs.pop().unwrap()).unwrap();
-                let module_addr =
-                    AccountAddress::from_hex_literal(context_segs.pop().unwrap()).unwrap();
+                let module_addr = AccountAddress::from_str(context_segs.pop().unwrap()).unwrap();
                 self.insert(exec_id, module_addr, module_name, func_name, pc);
             } else {
                 // Don't count scripts (for now)
