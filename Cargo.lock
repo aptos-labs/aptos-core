@@ -1147,6 +1147,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-evm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-framework",
+ "aptos-infallible",
+ "aptos-language-e2e-tests",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-move-stdlib",
+ "aptos-native-interface",
+ "aptos-state-view",
+ "aptos-table-natives",
+ "aptos-types",
+ "aptos-utils",
+ "aptos-vm-types",
+ "bcs 0.1.4",
+ "crossbeam-channel",
+ "dashmap",
+ "evm 0.39.0",
+ "evm-core 0.39.0",
+ "evm-gasometer 0.39.0",
+ "evm-runtime 0.39.0",
+ "fail 0.5.0",
+ "futures",
+ "hex",
+ "move-binary-format",
+ "move-bytecode-utils",
+ "move-bytecode-verifier",
+ "move-core-types",
+ "move-unit-test",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "move-vm-types",
+ "ouroboros 0.15.6",
+ "primitive-types 0.12.1",
+ "proptest",
+ "rand 0.7.3",
+ "serde 1.0.149",
+ "serde_json",
+]
+
+[[package]]
 name = "aptos-executable-store"
 version = "0.1.0"
 dependencies = [
