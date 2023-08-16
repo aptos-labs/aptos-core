@@ -28,7 +28,7 @@ impl Default for QuorumStoreBackPressureConfig {
             // QS will be backpressured if the remaining total txns is more than this number
             backlog_txn_limit_count: u64::MAX,
             // QS will create batches at the max rate until this number is reached
-            backlog_per_validator_batch_limit_count: u64::MAX,
+            backlog_per_validator_batch_limit_count: u64::MAX / 1000, // Big but not too big
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
