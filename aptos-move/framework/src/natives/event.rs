@@ -15,9 +15,7 @@ use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 #[cfg(feature = "testing")]
 use move_binary_format::errors::PartialVMResult;
-#[cfg(feature = "testing")]
-use move_core_types::language_storage::TypeTag;
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
 use move_vm_runtime::native_functions::NativeFunction;
 #[cfg(feature = "testing")]
 use move_vm_types::values::{Reference, Struct, StructRef};
@@ -92,7 +90,6 @@ fn native_write_to_event_store(
         EVENT_WRITE_TO_EVENT_STORE_BASE
             + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg),
     )?;
-
     let ty_tag = context.type_to_type_tag(&ty)?;
     let ty_layout = context.type_to_type_layout(&ty)?;
     let blob = msg.simple_serialize(&ty_layout).ok_or_else(|| {
@@ -210,6 +207,33 @@ fn native_write_module_event_to_store(
 
     let type_tag = context.type_to_type_tag(&ty)?;
 
+    // Runtime check for script/module call.
+    if let (Some(id), _, _) = context
+        .stack_frames(1)
+        .stack_trace()
+        .first()
+        .ok_or_else(|| {
+            SafeNativeError::InvariantViolation(PartialVMError::new(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            ))
+        })?
+    {
+        if let TypeTag::Struct(ref struct_tag) = type_tag {
+            if id != &struct_tag.module_id() {
+                return Err(SafeNativeError::InvariantViolation(PartialVMError::new(
+                    StatusCode::INTERNAL_TYPE_ERROR,
+                )));
+            }
+        } else {
+            return Err(SafeNativeError::InvariantViolation(PartialVMError::new(
+                StatusCode::INTERNAL_TYPE_ERROR,
+            )));
+        }
+    } else {
+        return Err(SafeNativeError::InvariantViolation(PartialVMError::new(
+            StatusCode::INVALID_OPERATION_IN_SCRIPT,
+        )));
+    }
     let layout = context.type_to_type_layout(&ty)?;
     let blob = msg.simple_serialize(&layout).ok_or_else(|| {
         SafeNativeError::InvariantViolation(
