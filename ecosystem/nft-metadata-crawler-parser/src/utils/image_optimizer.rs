@@ -10,7 +10,7 @@ use image::{
 };
 use reqwest::Client;
 use std::{io::Cursor, time::Duration};
-use tracing::error;
+use tracing::warn;
 
 pub struct ImageOptimizer;
 
@@ -72,7 +72,7 @@ impl ImageOptimizer {
         match retry(backoff, op).await {
             Ok(result) => Ok(result),
             Err(e) => {
-                error!(
+                warn!(
                     uri = uri,
                     error = ?e,
                     "[NFT Metadata Crawler] Exponential backoff timed out, skipping image"
@@ -92,7 +92,7 @@ impl ImageOptimizer {
         match dynamic_image.write_to(&mut byte_store, ImageOutputFormat::Jpeg(image_quality)) {
             Ok(_) => Ok(byte_store.into_inner()),
             Err(e) => {
-                error!(error = ?e, "[NFT Metadata Crawler] Error converting image to bytes: {} bytes", dynamic_image.as_bytes().len());
+                warn!(error = ?e, "[NFT Metadata Crawler] Error converting image to bytes: {} bytes", dynamic_image.as_bytes().len());
                 Err(anyhow::anyhow!(e))
             },
         }
