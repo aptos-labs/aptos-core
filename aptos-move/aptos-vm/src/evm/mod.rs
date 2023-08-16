@@ -2,6 +2,7 @@
 
 mod eth_address;
 mod in_memory_storage;
+mod utils;
 
 use crate::evm::eth_address::EthAddress;
 use aptos_table_natives::{TableHandle, TableResolver};
@@ -12,6 +13,10 @@ use evm::{
 };
 use primitive_types::{H160, H256, U256};
 use std::{collections::BTreeMap, str::FromStr};
+use move_core_types::account_address::AccountAddress;
+use crate::evm::in_memory_storage::InMemoryTableResolver;
+use crate::evm::utils::{read_h256_from_bytes, read_u256_from_bytes, u256_to_arr};
+
 struct EVMBackend<'a> {
     pub(crate) resolver: &'a dyn TableResolver,
     pub(crate) nonce_table_handle: TableHandle,
@@ -45,7 +50,7 @@ impl<'a> EVMBackend<'a> {
             .resolver
             .resolve_table_entry(&self.nonce_table_handle, &address.as_bytes())
             .unwrap();
-        bytes.map(|bytes| self.read_u256_from_bytes(&bytes))
+        bytes.map(|bytes| read_u256_from_bytes(&bytes))
     }
 
     pub fn get_balance(&self, address: &EthAddress) -> Option<U256> {
@@ -53,7 +58,7 @@ impl<'a> EVMBackend<'a> {
             .resolver
             .resolve_table_entry(&self.balance_table_handle, &address.as_bytes())
             .unwrap();
-        bytes.map(|bytes| self.read_u256_from_bytes(&bytes))
+        bytes.map(|bytes| read_u256_from_bytes(&bytes))
     }
 
     pub fn get_code(&self, address: &EthAddress) -> Vec<u8> {
@@ -72,25 +77,7 @@ impl<'a> EVMBackend<'a> {
             .resolver
             .resolve_table_entry(&self.storage_table_handle, &buf)
             .unwrap();
-        bytes.map(|bytes| self.read_h256_from_bytes(&bytes))
-    }
-
-    /// Convenience function to read a 256-bit unsigned integer from storage
-    /// (assumes big-endian encoding).
-    fn read_u256_from_bytes(&self, bytes: &[u8]) -> U256 {
-        if bytes.len() != 32 {
-            panic!("InvalidU256 length expected 32, got {}", bytes.len());
-        }
-        U256::from_big_endian(bytes)
-    }
-
-    fn read_h256_from_bytes(&self, bytes: &[u8]) -> H256 {
-        if bytes.len() != 32 {
-            panic!("InvalidU256 length expected 32, got {}", bytes.len());
-        }
-        let mut buf = [0u8; 32];
-        buf.copy_from_slice(&bytes);
-        H256(buf)
+        bytes.map(|bytes| read_h256_from_bytes(&bytes))
     }
 }
 
@@ -211,7 +198,7 @@ impl<'a> Backend for EVMBackend<'a> {
     }
 }
 
-fn run_loop_contract() {
+fn run_loop_contract_in_memory() {
     let config = Config::istanbul();
 
     let vicinity = MemoryVicinity {
@@ -267,11 +254,104 @@ fn run_loop_contract() {
     );
 }
 
+
+fn run_loop_contract_in_memory_table() {
+    let config = Config::istanbul();
+
+    let mut table_resolver = InMemoryTableResolver::new();
+    let nonce_table_handle = TableHandle(AccountAddress::random());
+    table_resolver.add_table(nonce_table_handle.clone());
+    let balance_table_handle = TableHandle(AccountAddress::random());
+    table_resolver.add_table(balance_table_handle.clone());
+    let code_table_handle = TableHandle(AccountAddress::random());
+    table_resolver.add_table(code_table_handle.clone());
+    let storage_table_handle = TableHandle(AccountAddress::random());
+    table_resolver.add_table(storage_table_handle.clone());
+
+    fn add_memory_account(resolver: &mut InMemoryTableResolver,
+                            nonce_table_handle: &TableHandle,
+                            balance_table_handle: &TableHandle,
+                            code_table_handle: &TableHandle,
+                            storage_table_handle: &TableHandle,
+                          address: &EthAddress, account: MemoryAccount) {
+        resolver.add_table_entry(nonce_table_handle, address.as_bytes().to_vec(), u256_to_arr( &account.nonce).to_vec());
+        resolver.add_table_entry(balance_table_handle, address.as_bytes().to_vec(), u256_to_arr( &account.balance).to_vec());
+        resolver.add_table_entry(code_table_handle, address.as_bytes().to_vec(), account.code);
+        for (index, value) in account.storage {
+            let mut buf = [0u8; 52];
+            buf[..20].copy_from_slice(&address.as_bytes());
+            buf[20..].copy_from_slice(&index.as_bytes());
+            resolver.add_table_entry(storage_table_handle, buf.to_vec(), value.as_bytes().to_vec());
+        }
+    }
+
+    let account1 = MemoryAccount {
+        nonce: U256::one(),
+        balance: U256::from(10000000),
+        storage: BTreeMap::new(),
+        code: hex::decode("6080604052348015600f57600080fd5b506004361060285760003560e01c80630f14a40614602d575b600080fd5b605660048036036020811015604157600080fd5b8101908080359060200190929190505050606c565b6040518082815260200191505060405180910390f35b6000806000905060005b83811015608f5760018201915080806001019150506076565b508091505091905056fea26469706673582212202bc9ec597249a9700278fe4ce78da83273cb236e76d4d6797b441454784f901d64736f6c63430007040033").unwrap(),
+    };
+
+    add_memory_account(&mut table_resolver,
+                       &nonce_table_handle,
+                       &balance_table_handle,
+                       &code_table_handle,
+                       &storage_table_handle,
+                       &EthAddress::new(H160::from_str("0x1000000000000000000000000000000000000000").unwrap(),),
+                       account1);
+
+
+   let account2 =  MemoryAccount {
+       nonce: U256::one(),
+       balance: U256::from(10000000),
+       storage: BTreeMap::new(),
+       code: Vec::new(),
+   };
+
+    add_memory_account(&mut table_resolver,
+                       &nonce_table_handle,
+                       &balance_table_handle,
+                       &code_table_handle,
+                       &storage_table_handle,
+                       &EthAddress::new(H160::from_str("0xf000000000000000000000000000000000000000").unwrap()),
+                          account2);
+
+
+    let backend = EVMBackend::new(&table_resolver,
+                                  nonce_table_handle,
+                                  balance_table_handle,
+                                  code_table_handle,
+                                  storage_table_handle,
+            EthAddress::new(H160::default())
+        );
+    let metadata = StackSubstateMetadata::new(u64::MAX, &config);
+    let state = MemoryStackState::new(metadata, &backend);
+    let precompiles = BTreeMap::new();
+    let mut executor = StackExecutor::new_with_precompiles(state, &config, &precompiles);
+
+    let _reason = executor.transact_call(
+        H160::from_str("0xf000000000000000000000000000000000000000").unwrap(),
+        H160::from_str("0x1000000000000000000000000000000000000000").unwrap(),
+        U256::zero(),
+        // hex::decode("0f14a4060000000000000000000000000000000000000000000000000000000000b71b00")
+        // 	.unwrap(),
+        hex::decode("0f14a4060000000000000000000000000000000000000000000000000000000000002ee0")
+            .unwrap(),
+        u64::MAX,
+        Vec::new(),
+    );
+}
+
 #[cfg(test)]
 mod tests {
 
     #[test]
-    fn test_run_loop_contract() {
-        super::run_loop_contract();
+    fn test_run_loop_contract_in_mem() {
+        super::run_loop_contract_in_memory();
+    }
+
+    #[test]
+    fn test_run_loop_contract_table() {
+        super::run_loop_contract_in_memory_table();
     }
 }
