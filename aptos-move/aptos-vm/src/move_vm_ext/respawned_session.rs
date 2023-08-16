@@ -118,10 +118,6 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
         }
     }
 
-    fn is_genesis(&self) -> bool {
-        unreachable!("Unexpected access to is_genesis()")
-    }
-
     fn get_usage(&self) -> Result<StateStorageUsage> {
         bail!("Unexpected access to get_usage()")
     }

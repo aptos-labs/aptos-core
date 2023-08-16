@@ -567,10 +567,6 @@ mod test {
             )))
         }
 
-        fn is_genesis(&self) -> bool {
-            unreachable!()
-        }
-
         fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
             unreachable!()
         }

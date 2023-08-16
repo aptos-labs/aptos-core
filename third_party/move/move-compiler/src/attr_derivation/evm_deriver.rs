@@ -11,10 +11,71 @@ use crate::{
 };
 use move_ir_types::location::sp;
 use move_symbol_pool::Symbol;
+use std::collections::BTreeSet;
 
 const CONTRACT_ATTR: &str = "contract";
 const CALLABLE_ATTR: &str = "callable";
 const EXTERNAL_ATTR: &str = "external";
+
+// The following appear in test code under /evm/.
+const ACTOR_ATTR: &str = "actor";
+const INIT_ATTR: &str = "init";
+const MESSAGE_ATTR: &str = "message";
+const ABI_STRUCT_ATTR: &str = "abi_struct";
+const CREATE_ATTR: &str = "create";
+const DECODE_ATTR: &str = "decode";
+const DELETE_ATTR: &str = "delete";
+const ENCODE_ATTR: &str = "encode";
+const ENCODE_PACKED_ATTR: &str = "encode_packed";
+const EVENT_ATTR: &str = "event";
+const EVM_ARITH_ATTR: &str = "evm_arith";
+const EVM_TEST_ATTR: &str = "evm_test";
+const FALLBACK_ATTR: &str = "fallback";
+const INTERFACE_ATTR: &str = "interface";
+const INTERFACE_ID_ATTR: &str = "interface_id";
+const SELECTOR_ATTR: &str = "selector";
+const STATE_ATTR: &str = "state";
+const STORAGE_ATTR: &str = "storage";
+
+const EVM_CONTRACT_ATTR: &str = "evm_contract";
+const PAYABLE_ATTR: &str = "payable";
+const RECEIVE_ATTR: &str = "receive";
+const VIEW_ATTR: &str = "view";
+const PURE_ATTR: &str = "pure";
+
+pub(crate) fn add_attributes_for_evm(attributes: &mut BTreeSet<String>) {
+    const ALL_ATTRIBUTE_NAMES: [&str; 26] = [
+        CALLABLE_ATTR,
+        CONTRACT_ATTR,
+        EXTERNAL_ATTR,
+        ABI_STRUCT_ATTR,
+        ACTOR_ATTR,
+        CREATE_ATTR,
+        DECODE_ATTR,
+        DELETE_ATTR,
+        ENCODE_ATTR,
+        ENCODE_PACKED_ATTR,
+        EVENT_ATTR,
+        EVM_ARITH_ATTR,
+        EVM_TEST_ATTR,
+        FALLBACK_ATTR,
+        INIT_ATTR,
+        INTERFACE_ATTR,
+        INTERFACE_ID_ATTR,
+        MESSAGE_ATTR,
+        SELECTOR_ATTR,
+        STATE_ATTR,
+        STORAGE_ATTR,
+        EVM_CONTRACT_ATTR,
+        PAYABLE_ATTR,
+        RECEIVE_ATTR,
+        VIEW_ATTR,
+        PURE_ATTR,
+    ];
+    ALL_ATTRIBUTE_NAMES.into_iter().for_each(|elt| {
+        attributes.insert(elt.to_string());
+    });
+}
 
 pub(crate) fn derive_for_evm(
     _env: &mut CompilationEnv,

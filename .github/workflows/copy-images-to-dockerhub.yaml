@@ -59,6 +59,7 @@ jobs:
           FORCE_COLOR: 3 # Force color output as per https://github.com/google/zx#using-github-actions
           GIT_SHA: ${{ inputs.GIT_SHA || github.sha }} # If GIT_SHA is not provided, use the sha of the triggering branch
           GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+          GCP_DOCKER_ARTIFACT_REPO_US: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO_US }}
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ECR_ACCOUNT_NUM }}
           IMAGE_TAG_PREFIX: ${{ inputs.image_tag_prefix }}
         run: ./docker/release-images.mjs --wait-for-image-seconds=3600

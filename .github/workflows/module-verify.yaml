@@ -35,9 +35,9 @@ jobs:
     secrets: inherit
     with:
       GIT_SHA: ${{ inputs.GIT_SHA }}
-      BUCKET: aptos-testnet-backup-2223d95b
+      BUCKET: aptos-testnet-backup-b7b1ad7a
       SUB_DIR: e1
-      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
+      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
       RUNS_ON: high-perf-docker-with-local-ssd
       TIMEOUT_MINUTES: 20
@@ -48,9 +48,9 @@ jobs:
     secrets: inherit
     with:
       GIT_SHA: ${{ inputs.GIT_SHA }}
-      BUCKET: aptos-mainnet-backup-backup-831a69a8
+      BUCKET: aptos-mainnet-backup-backup-e098483d
       SUB_DIR: e1
-      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
+      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
       RUNS_ON: high-perf-docker-with-local-ssd
       TIMEOUT_MINUTES: 20
@@ -61,9 +61,9 @@ jobs:
     secrets: inherit
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha }}
-      BUCKET: aptos-testnet-backup-2223d95b
+      BUCKET: aptos-testnet-backup-b7b1ad7a
       SUB_DIR: e1
-      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
+      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
       RUNS_ON: "high-perf-docker-with-local-ssd"
       TIMEOUT_MINUTES: 20

@@ -161,7 +161,6 @@ impl MoveVmExt {
         extensions.add(AlgebraContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 
-        let sender_opt = session_id.sender();
         let script_hash = match session_id {
             SessionId::Txn {
                 sender: _,
@@ -196,7 +195,6 @@ impl MoveVmExt {
         SessionExt::new(
             self.inner.new_session_with_extensions(remote, extensions),
             remote,
-            sender_opt,
             self.features.clone(),
         )
     }

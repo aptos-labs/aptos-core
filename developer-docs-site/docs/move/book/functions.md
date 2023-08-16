@@ -463,7 +463,7 @@ fun add(x: u64, y: u64): u64 {
 }
 ```
 
-[As mentioned above](#function-body), the function's body is an [expression block](./variables.md). The expression block can sequence various statements, and the final expression in the block will be be the value of that block
+[As mentioned above](#function-body), the function's body is an [expression block](./variables.md). The expression block can sequence various statements, and the final expression in the block will be the value of that block
 
 ```move=
 fun double_and_add(x: u64, y: u64): u64 {
