@@ -73,7 +73,7 @@ impl Display for TableInfo {
 }
 
 /// A table change set.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct TableChangeSet {
     pub new_tables: BTreeMap<TableHandle, TableInfo>,
     pub removed_tables: BTreeSet<TableHandle>,
@@ -81,8 +81,16 @@ pub struct TableChangeSet {
 }
 
 /// A change of a single table.
+
+#[derive(Debug)]
 pub struct TableChange {
     pub entries: BTreeMap<Vec<u8>, Op<Vec<u8>>>,
+}
+
+impl TableChange {
+    pub fn new(entries: BTreeMap<Vec<u8>, Op<Vec<u8>>>) -> Self {
+        Self { entries }
+    }
 }
 
 /// A table resolver which needs to be provided by the environment. This allows to lookup
