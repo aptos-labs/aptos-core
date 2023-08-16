@@ -13,8 +13,6 @@ use aptos_types::contract_event::ContractEvent;
 use aptos_types::event::EventKey;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
-#[cfg(feature = "testing")]
-use move_binary_format::errors::PartialVMResult;
 use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
 use move_vm_runtime::native_functions::NativeFunction;
 #[cfg(feature = "testing")]
@@ -35,11 +33,7 @@ impl NativeEventContext {
     }
 
     #[cfg(feature = "testing")]
-    fn emitted_v1_events(
-        &self,
-        event_key: &EventKey,
-        ty_tag: &TypeTag,
-    ) -> PartialVMResult<Vec<&[u8]>> {
+    fn emitted_v1_events(&self, event_key: &EventKey, ty_tag: &TypeTag) -> Vec<&[u8]> {
         let mut events = vec![];
         for event in self.events.iter() {
             if let ContractEvent::V1(e) = event {
@@ -48,11 +42,11 @@ impl NativeEventContext {
                 }
             }
         }
-        Ok(events)
+        events
     }
 
     #[cfg(feature = "testing")]
-    fn emitted_v2_events(&self, ty_tag: &TypeTag) -> PartialVMResult<Vec<&[u8]>> {
+    fn emitted_v2_events(&self, ty_tag: &TypeTag) -> Vec<&[u8]> {
         let mut events = vec![];
         for event in self.events.iter() {
             if let ContractEvent::V2(e) = event {
@@ -61,7 +55,7 @@ impl NativeEventContext {
                 }
             }
         }
-        Ok(events)
+        events
     }
 }
 
@@ -94,7 +88,7 @@ fn native_write_to_event_store(
     let ty_layout = context.type_to_type_layout(&ty)?;
     let blob = msg.simple_serialize(&ty_layout).ok_or_else(|| {
         SafeNativeError::InvariantViolation(PartialVMError::new(
-            StatusCode::VALUE_DESERIALIZATION_ERROR,
+            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
         ))
     })?;
     let key = bcs::from_bytes(guid.as_slice()).map_err(|_| {
@@ -147,12 +141,12 @@ fn native_emitted_events_by_handle(
     let ty_layout = context.type_to_type_layout(&ty)?;
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
     let events = ctx
-        .emitted_v1_events(&key, &ty_tag)?
+        .emitted_v1_events(&key, &ty_tag)
         .into_iter()
         .map(|blob| {
             Value::simple_deserialize(blob, &ty_layout).ok_or_else(|| {
                 SafeNativeError::InvariantViolation(PartialVMError::new(
-                    StatusCode::VALUE_DESERIALIZATION_ERROR,
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 ))
             })
         })
@@ -175,7 +169,7 @@ fn native_emitted_events(
     let ty_layout = context.type_to_type_layout(&ty)?;
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
     let events = ctx
-        .emitted_v2_events(&ty_tag)?
+        .emitted_v2_events(&ty_tag)
         .into_iter()
         .map(|blob| {
             Value::simple_deserialize(blob, &ty_layout).ok_or_else(|| {
@@ -207,7 +201,7 @@ fn native_write_module_event_to_store(
 
     let type_tag = context.type_to_type_tag(&ty)?;
 
-    // Runtime check for script/module call.
+    // Additional runtime check for module call.
     if let (Some(id), _, _) = context
         .stack_frames(1)
         .stack_trace()
@@ -229,15 +223,11 @@ fn native_write_module_event_to_store(
                 StatusCode::INTERNAL_TYPE_ERROR,
             )));
         }
-    } else {
-        return Err(SafeNativeError::InvariantViolation(PartialVMError::new(
-            StatusCode::INVALID_OPERATION_IN_SCRIPT,
-        )));
     }
     let layout = context.type_to_type_layout(&ty)?;
     let blob = msg.simple_serialize(&layout).ok_or_else(|| {
         SafeNativeError::InvariantViolation(
-            PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("Event serialization failure".to_string()),
         )
     })?;

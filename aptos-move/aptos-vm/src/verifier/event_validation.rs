@@ -4,10 +4,10 @@
 use crate::move_vm_ext::SessionExt;
 use aptos_framework::RuntimeModuleMetadataV1;
 use move_binary_format::{
-    access::ModuleAccess,
+    access::{ModuleAccess, ScriptAccess},
     errors::{Location, PartialVMError, VMError, VMResult},
     file_format::{
-        Bytecode,
+        Bytecode, CompiledScript,
         SignatureToken::{Struct, StructInstantiation},
     },
     CompiledModule,
@@ -25,12 +25,12 @@ fn metadata_validation_err(msg: &str) -> Result<(), VMError> {
 }
 
 fn metadata_validation_error(msg: &str) -> VMError {
-    PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
+    PartialVMError::new(StatusCode::EVENT_METADATA_VALIDATION_ERROR)
         .with_message(format!("metadata and code bundle mismatch: {}", msg))
         .finish(Location::Undefined)
 }
 
-/// Validate resource group metadata on modules one by one:
+/// Validate event metadata on modules one by one:
 /// * Extract the event metadata
 /// * Verify all changes are compatible upgrades (existing event attributes cannot be removed)
 pub(crate) fn validate_module_events(
@@ -77,8 +77,7 @@ pub(crate) fn validate_emit_calls(
                     let module_addr = module.address_identifier_at(module_handle.address);
                     let module_name = module.identifier_at(module_handle.name);
                     let func_name = module.identifier_at(func_handle.name);
-                    if module_addr
-                        != &AccountAddress::from_hex_literal("0x1").expect("valid address")
+                    if module_addr != &AccountAddress::ONE
                         || module_name.as_str() != EVENT_MODULE_NAME
                         || func_name.as_str() != EVENT_EMIT_FUNCTION_NAME
                     {
@@ -146,4 +145,40 @@ pub(crate) fn extract_event_metadata(
         }
     }
     Ok(event_structs)
+}
+
+pub(crate) fn verify_no_event_emission_in_script(
+    script_code: &[u8],
+    max_binary_format_version: u32,
+) -> VMResult<()> {
+    let script = match CompiledScript::deserialize_with_max_version(
+        script_code,
+        max_binary_format_version,
+    ) {
+        Ok(script) => script,
+        Err(err) => {
+            let msg = format!("[VM] deserializer for script returned error: {:?}", err);
+            return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                .with_message(msg)
+                .finish(Location::Script));
+        },
+    };
+    for bc in &script.code().code {
+        if let Bytecode::CallGeneric(index) = bc {
+            let func_instantiation = &script.function_instantiation_at(*index);
+            let func_handle = script.function_handle_at(func_instantiation.handle);
+            let module_handle = script.module_handle_at(func_handle.module);
+            let module_addr = script.address_identifier_at(module_handle.address);
+            let module_name = script.identifier_at(module_handle.name);
+            let func_name = script.identifier_at(func_handle.name);
+            if module_addr == &AccountAddress::ONE
+                && module_name.as_str() == EVENT_MODULE_NAME
+                && func_name.as_str() == EVENT_EMIT_FUNCTION_NAME
+            {
+                return Err(PartialVMError::new(StatusCode::INVALID_OPERATION_IN_SCRIPT)
+                    .finish(Location::Script));
+            }
+        }
+    }
+    Ok(())
 }
