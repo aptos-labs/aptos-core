@@ -9,7 +9,7 @@ class SpyTests(unittest.TestCase):
             [
                 FakeCommand(
                     "git remote get-url origin",
-                    RunResult(0, b"git@github.com:banana-corp/aptos-core.git"),
+                    RunResult(0, b"github@github.com:banana-corp/aptos-core.git"),
                 )
             ]
         )
