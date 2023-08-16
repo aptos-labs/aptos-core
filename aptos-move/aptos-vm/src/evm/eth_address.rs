@@ -2,6 +2,7 @@
 
 use primitive_types::H160;
 
+#[derive(Clone, Debug)]
 pub struct EthAddress(H160);
 
 impl EthAddress {
