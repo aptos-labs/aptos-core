@@ -16,52 +16,66 @@ from verify_core.common import clear_artifacts, query_backup_latest_version
 # This script runs the replay-verify from the root of aptos-core
 # It assumes the aptos-db-tool binary is already built with the release profile
 
-testnet_runner_mapping = {
-    0:[250000000, 255584106],
-    1:[255584107, 271874718],
-    2:[271874719, 305009463],
-    3:[305009464, 324904819],
-    4:[324904820, 347234877],
-    5:[347234878, 366973577],
-    6:[366973578, 399489396],
-    7:[399489397, 430909965],
-    8:[430909966, 449999999],
-    9:[450000000, 462114510],
-    10:[462114511, 477825432],
-    11:[477825433, 485000000],
-    12:[485000001, 516281795],
-    13:[516281796, 551052675],
-    14:[551052676, 582481398],
-    15:[582481399, sys.maxsize]
-}
 
-mainnet_runner_mapping = {
-    0:[0, 14949498],
-    1:[14949499, 30518131],
-    2:[30518132, 49314011],
-    3:[49314012, 69611025],
-    4:[69611026, 90057535],
-    5:[90057536, 109821002],
-    6:[109821003, 125881567],
-    7:[125881568, 134463753],
-    8:[134463754, 153497556],
-    9:[153497557, 171327640],
-    10:[171327641, 188112798],
-    11:[188112799, 202553811],
-    12:[202553812, 208815844],
-    13:[208815845, 214051314],
-    14:[214051315, 220182489],
-    15:[220182490, 225000000],
-}
+# The key is the runner's number and the value is the range of txns that the runner is responsible for
+# This mapping is generated in 3 steps:
+# (1) allocate the txns to runners based on how much time the runners in past takes to finish evenly distributed txns, example script https://gist.github.com/areshand/d00ce302d3bafe0f7b97c311113eba1b
+# (2) rerun the flow with new ranges and check the time each runner takes to finish again
+# (3) manual adjust the range based on times each takes to finish the work to make sure each runner takes similar time to finish
+
+#  Note: this range needs to be updated when the last range's time is over 2 hrs. (we will send a low pri alert once the time is over 2 hrs)
+#  Oncall should
+#  1. seal the last range with the latest txn version and start a new range with the [latest_txn_version + 1, sys.maxsize]
+#  2. meanwhile, the oncall should delete the old ranges that are beyond 300M window that we want to scan
+#
+
+testnet_runner_mapping = [
+    [250000000, 255584106],
+    [255584107, 271874718],
+    [271874719, 300009463],
+    [300009464, 324904819],
+    [324904820, 347234877],
+    [347234878, 366973577],
+    [366973578, 399489396],
+    [399489397, 430909965],
+    [430909966, 449999999],
+    [450000000, 462114510],
+    [462114511, 478825432],
+    [478825433, 483500000],
+    [483500001, 516281795],
+    [516281796, 551052675],
+    [551052676, 582481398],
+    [582481399, sys.maxsize],
+]
+
+mainnet_runner_mapping = [
+    [0, 14949498],
+    [14949499, 30518131],
+    [30518132, 49314011],
+    [49314012, 69611025],
+    [69611026, 90057535],
+    [90057536, 109821002],
+    [109821003, 125881567],
+    [125881568, 134463753],
+    [134463754, 153497556],
+    [153497557, 171327640],
+    [171327641, 188112798],
+    [188112799, 202553811],
+    [202553812, 208815844],
+    [208815845, 214051314],
+    [214051315, 220182489],
+    [220182490, sys.maxsize],
+]
+
 
 def replay_verify_partition(
-        n: int,
-        N: int,
-        history_start: int,
-        per_partition: int,
-        latest_version: int,
-        txns_to_skip: Tuple[int],
-        backup_config_template_path: str,
+    n: int,
+    N: int,
+    history_start: int,
+    per_partition: int,
+    latest_version: int,
+    txns_to_skip: Tuple[int],
+    backup_config_template_path: str,
 ) -> Tuple[int, int]:
     """
     Run replay-verify for a partition of the backup, returning a tuple of the (partition number, return code)
@@ -143,7 +157,7 @@ def main():
         runner_cnt = 1
 
     assert (
-            runner_no >= 0 and runner_no < runner_cnt
+        runner_no >= 0 and runner_no < runner_cnt
     ), "runner_no must be between 0 and runner_cnt"
 
     TXNS_TO_SKIP = [int(txn) for txn in os.environ["TXNS_TO_SKIP"].split(" ")]
@@ -165,7 +179,15 @@ def main():
     LATEST_VERSION = query_backup_latest_version(BACKUP_CONFIG_TEMPLATE_PATH)
 
     # the runner may have small overlap at the boundary to prevent missing any transactions
-    runner_mapping = testnet_runner_mapping if "testnet" in os.environ["BUCKET"] else mainnet_runner_mapping
+    runner_mapping = (
+        testnet_runner_mapping
+        if "testnet" in os.environ["BUCKET"]
+        else mainnet_runner_mapping
+    )
+
+    assert runner_cnt == len(
+        runner_mapping
+    ), "runner_cnt must match the number of runners in the mapping"
     runner_start = runner_mapping[runner_no][0]
     runner_end = runner_mapping[runner_no][1]
     if runner_no == runner_cnt - 1:
