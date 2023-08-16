@@ -1,12 +1,215 @@
-
 // Copyright © Aptos Foundation
 
-use evm::backend::{ApplyBackend, Backend, MemoryAccount, MemoryBackend, MemoryVicinity};
-use evm::{Config};
-use std::collections::BTreeMap;
-use std::str::FromStr;
-use evm::executor::stack::{MemoryStackState, StackExecutor, StackSubstateMetadata};
-use primitive_types::{H160, U256};
+mod eth_address;
+mod in_memory_storage;
+
+use crate::evm::eth_address::EthAddress;
+use aptos_table_natives::{TableHandle, TableResolver};
+use evm::{
+    backend::{ApplyBackend, Backend, Basic, MemoryAccount, MemoryBackend, MemoryVicinity},
+    executor::stack::{MemoryStackState, StackExecutor, StackSubstateMetadata},
+    Config,
+};
+use primitive_types::{H160, H256, U256};
+use std::{collections::BTreeMap, str::FromStr};
+struct EVMBackend<'a> {
+    pub(crate) resolver: &'a dyn TableResolver,
+    pub(crate) nonce_table_handle: TableHandle,
+    pub(crate) balance_table_handle: TableHandle,
+    pub(crate) code_table_handle: TableHandle,
+    pub(crate) storage_table_handle: TableHandle,
+    origin: EthAddress,
+}
+
+impl<'a> EVMBackend<'a> {
+    pub fn new(
+        resolver: &'a dyn TableResolver,
+        nonce_table_handle: TableHandle,
+        balance_table_handle: TableHandle,
+        code_table_handle: TableHandle,
+        storage_table_handle: TableHandle,
+        origin: EthAddress,
+    ) -> Self {
+        Self {
+            resolver,
+            nonce_table_handle,
+            balance_table_handle,
+            code_table_handle,
+            storage_table_handle,
+            origin,
+        }
+    }
+
+    pub fn get_nonce(&self, address: &EthAddress) -> Option<U256> {
+        let bytes = self
+            .resolver
+            .resolve_table_entry(&self.nonce_table_handle, &address.as_bytes())
+            .unwrap();
+        bytes.map(|bytes| self.read_u256_from_bytes(&bytes))
+    }
+
+    pub fn get_balance(&self, address: &EthAddress) -> Option<U256> {
+        let bytes = self
+            .resolver
+            .resolve_table_entry(&self.balance_table_handle, &address.as_bytes())
+            .unwrap();
+        bytes.map(|bytes| self.read_u256_from_bytes(&bytes))
+    }
+
+    pub fn get_code(&self, address: &EthAddress) -> Vec<u8> {
+        let bytes = self
+            .resolver
+            .resolve_table_entry(&self.code_table_handle, &address.as_bytes())
+            .unwrap();
+        bytes.unwrap_or_default()
+    }
+
+    pub fn get_storage(&self, address: &EthAddress, index: H256) -> Option<H256> {
+        let mut buf = [0u8; 52];
+        buf[..20].copy_from_slice(&address.as_bytes());
+        buf[20..].copy_from_slice(&index.as_bytes());
+        let bytes = self
+            .resolver
+            .resolve_table_entry(&self.storage_table_handle, &buf)
+            .unwrap();
+        bytes.map(|bytes| self.read_h256_from_bytes(&bytes))
+    }
+
+    /// Convenience function to read a 256-bit unsigned integer from storage
+    /// (assumes big-endian encoding).
+    fn read_u256_from_bytes(&self, bytes: &[u8]) -> U256 {
+        if bytes.len() != 32 {
+            panic!("InvalidU256 length expected 32, got {}", bytes.len());
+        }
+        U256::from_big_endian(bytes)
+    }
+
+    fn read_h256_from_bytes(&self, bytes: &[u8]) -> H256 {
+        if bytes.len() != 32 {
+            panic!("InvalidU256 length expected 32, got {}", bytes.len());
+        }
+        let mut buf = [0u8; 32];
+        buf.copy_from_slice(&bytes);
+        H256(buf)
+    }
+}
+
+impl<'a> Backend for EVMBackend<'a> {
+    fn gas_price(&self) -> U256 {
+        U256::from(100)
+    }
+
+    fn origin(&self) -> H160 {
+        self.origin.raw()
+    }
+
+    fn block_hash(&self, _number: U256) -> H256 {
+        todo!("block_hash not implemented")
+    }
+
+    /// Returns the current block index number.
+    fn block_number(&self) -> U256 {
+        todo!("block_number not implemented")
+    }
+
+    /// Returns a mocked coinbase which is the EVM address for the Aurora
+    /// account, being 0x4444588443C3a91288c5002483449Aba1054192b.
+    ///
+    /// See: `https://doc.aurora.dev/develop/compat/evm#coinbase`
+    fn block_coinbase(&self) -> H160 {
+        H160([
+            0x44, 0x44, 0x58, 0x84, 0x43, 0xC3, 0xA9, 0x12, 0x88, 0xC5, 0x00, 0x24, 0x83, 0x44,
+            0x9A, 0xBA, 0x10, 0x54, 0x19, 0x2B,
+        ])
+    }
+
+    /// Returns the current block timestamp.
+    fn block_timestamp(&self) -> U256 {
+        todo!("block_timestamp not implemented")
+    }
+
+    /// Returns the current block difficulty.
+    ///
+    /// See: `https://doc.aurora.dev/develop/compat/evm#difficulty`
+    fn block_difficulty(&self) -> U256 {
+        U256::zero()
+    }
+
+    /// Get environmental block randomness.
+    fn block_randomness(&self) -> Option<H256> {
+        todo!("block_randomness not implemented")
+    }
+
+    /// Returns the current block gas limit.
+    ///
+    /// Currently, this returns 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+    /// as there isn't a gas limit alternative right now but this may change in
+    /// the future.
+    ///
+    /// See: `https://doc.aurora.dev/develop/compat/evm#gaslimit`
+    fn block_gas_limit(&self) -> U256 {
+        U256::max_value()
+    }
+
+    /// Returns the current base fee for the current block.
+    ///
+    /// Currently, this returns 0 as there is no concept of a base fee at this
+    /// time but this may change in the future.
+    ///
+    /// TODO: doc.aurora.dev link
+    fn block_base_fee_per_gas(&self) -> U256 {
+        U256::zero()
+    }
+
+    /// Returns the states chain ID.
+    fn chain_id(&self) -> U256 {
+        todo!("chain_id not implemented")
+    }
+
+    /// Checks if an address exists.
+    fn exists(&self, address: H160) -> bool {
+        let address = EthAddress::new(address);
+        let nonce = self.get_nonce(&address);
+        let balance = self.get_balance(&address);
+        if !balance.is_none() || !nonce.is_none() {
+            return true;
+        }
+        let code = self.get_code(&address);
+        !code.is_empty()
+    }
+
+    /// Returns basic account information.
+    fn basic(&self, address: H160) -> Basic {
+        let address = EthAddress::new(address);
+        let nonce = self.get_nonce(&address);
+        let balance = self.get_balance(&address);
+        Basic {
+            nonce: nonce.unwrap_or_default(),
+            balance: balance.unwrap_or_default(),
+        }
+    }
+
+    /// Returns the code of the contract from an address.
+    fn code(&self, address: H160) -> Vec<u8> {
+        let address = EthAddress::new(address);
+        self.get_code(&address)
+    }
+
+    /// Get storage value of address at index.
+    fn storage(&self, address: H160, index: H256) -> H256 {
+        let address = EthAddress::new(address);
+        self.get_storage(&address, index).unwrap_or_default()
+    }
+
+    /// Get original storage value of address at index, if available.
+    ///
+    /// Since `SputnikVM` collects storage changes in memory until the transaction is over,
+    /// the "original storage" will always be the same as the storage because no values
+    /// are written to storage until after the transaction is complete.
+    fn original_storage(&self, address: H160, index: H256) -> Option<H256> {
+        Some(self.storage(address, index))
+    }
+}
 
 fn run_loop_contract() {
     let config = Config::istanbul();
@@ -57,7 +260,8 @@ fn run_loop_contract() {
         U256::zero(),
         // hex::decode("0f14a4060000000000000000000000000000000000000000000000000000000000b71b00")
         // 	.unwrap(),
-        hex::decode("0f14a4060000000000000000000000000000000000000000000000000000000000002ee0").unwrap(),
+        hex::decode("0f14a4060000000000000000000000000000000000000000000000000000000000002ee0")
+            .unwrap(),
         u64::MAX,
         Vec::new(),
     );

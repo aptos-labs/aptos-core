@@ -111,6 +111,7 @@ pub mod aptos_vm;
 mod aptos_vm_impl;
 pub mod block_executor;
 mod errors;
+mod evm;
 pub mod move_vm_ext;
 pub mod natives;
 pub mod sharded_block_executor;
@@ -119,7 +120,6 @@ pub mod testing;
 pub mod transaction_metadata;
 mod transaction_validation;
 mod verifier;
-mod evm;
 
 pub use crate::aptos_vm::AptosVM;
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
