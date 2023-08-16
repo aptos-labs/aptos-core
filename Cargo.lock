@@ -2297,6 +2297,7 @@ dependencies = [
 name = "aptos-move-examples"
 version = "0.1.0"
 dependencies = [
+ "aptos-framework",
  "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm",
@@ -8966,6 +8967,7 @@ dependencies = [
  "itertools",
  "move-binary-format",
  "move-command-line-common",
+ "move-compiler",
  "move-core-types",
  "move-disassembler",
  "move-ir-types",

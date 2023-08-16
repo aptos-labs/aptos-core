@@ -125,6 +125,7 @@ pub trait MoveTestAdapter<'a>: Sized {
 
     fn compiled_state(&mut self) -> &mut CompiledState<'a>;
     fn default_syntax(&self) -> SyntaxChoice;
+    fn known_attributes(&self) -> &BTreeSet<String>;
     fn run_config(&self) -> TestRunConfig {
         TestRunConfig::CompilerV1
     }
@@ -265,6 +266,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                             state.named_address_mapping.clone(),
                             &state.source_files().cloned().collect::<Vec<_>>(),
                             data_path.to_owned(),
+                            self.known_attributes(),
                         )?;
                         let (named_addr_opt, module) = match unit {
                             AnnotatedCompiledUnit::Module(annot_module) => {
@@ -363,6 +365,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                             state.named_address_mapping.clone(),
                             &state.source_files().cloned().collect::<Vec<_>>(),
                             data_path.to_owned(),
+                            self.known_attributes(),
                         )?;
                         match unit {
                             AnnotatedCompiledUnit::Script(annot_script) => (annot_script.named_script.script, warning_opt),
@@ -702,6 +705,7 @@ fn compile_source_unit(
     named_address_mapping: BTreeMap<String, NumericalAddress>,
     deps: &[String],
     path: String,
+    known_attributes: &BTreeSet<String>,
 ) -> Result<(AnnotatedCompiledUnit, Option<String>)> {
     fn rendered_diags(files: &FilesSourceText, diags: Diagnostics) -> Option<String> {
         if diags.is_empty() {
@@ -717,11 +721,17 @@ fn compile_source_unit(
     }
 
     use move_compiler::PASS_COMPILATION;
-    let (mut files, comments_and_compiler_res) =
-        move_compiler::Compiler::from_files(vec![path], deps.to_vec(), named_address_mapping)
-            .set_pre_compiled_lib_opt(pre_compiled_deps)
-            .set_flags(move_compiler::Flags::empty().set_sources_shadow_deps(true))
-            .run::<PASS_COMPILATION>()?;
+    let (mut files, comments_and_compiler_res) = move_compiler::Compiler::from_files(
+        vec![path],
+        deps.to_vec(),
+        named_address_mapping,
+        move_compiler::Flags::empty()
+            .set_sources_shadow_deps(true)
+            .set_skip_attribute_checks(false), // In case of bugs in transactional test code.
+        known_attributes,
+    )
+    .set_pre_compiled_lib_opt(pre_compiled_deps)
+    .run::<PASS_COMPILATION>()?;
     let units_or_diags = comments_and_compiler_res
         .map(|(_comments, move_compiler)| move_compiler.into_compiled_units());
 

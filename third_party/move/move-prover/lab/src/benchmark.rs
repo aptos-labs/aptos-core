@@ -14,7 +14,7 @@ use clap::{
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use itertools::Itertools;
 use log::LevelFilter;
-use move_compiler::shared::PackagePaths;
+use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
 use move_model::{
     model::{FunctionEnv, GlobalEnv, ModuleEnv, VerificationScope},
     parse_addresses_from_options, run_model_builder_with_options,
@@ -150,6 +150,8 @@ fn run_benchmark(
     };
     let addrs = parse_addresses_from_options(options.move_named_address_values.clone())?;
     options.move_deps.append(&mut dep_dirs.to_vec());
+    let skip_attribute_checks = true;
+    let known_attributes = KnownAttribute::get_all_attribute_names().clone();
     let env = run_model_builder_with_options(
         vec![PackagePaths {
             name: None,
@@ -162,6 +164,8 @@ fn run_benchmark(
             named_address_map: addrs,
         }],
         options.model_builder.clone(),
+        skip_attribute_checks,
+        &known_attributes,
     )?;
     let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
 

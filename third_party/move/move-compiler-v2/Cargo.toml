@@ -12,6 +12,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.62"
 move-binary-format = { path = "../move-binary-format" }
+move-compiler = { path = "../move-compiler" }
 move-core-types = { path = "../move-core/types" }
 move-model = { path = "../move-model" }
 move-stackless-bytecode = { path = "../move-prover/bytecode" }
