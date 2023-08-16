@@ -139,6 +139,9 @@ struct Opt {
     connected_tx_grps: usize,
 
     #[clap(long)]
+    shuffle_connected_txns: bool,
+
+    #[clap(long)]
     concurrency_level: Option<usize>,
 
     #[clap(flatten)]
@@ -300,6 +303,7 @@ where
                 transaction_mix,
                 opt.transactions_per_sender,
                 opt.connected_tx_grps,
+                opt.shuffle_connected_txns,
                 main_signer_accounts,
                 additional_dst_pool_accounts,
                 data_dir,
