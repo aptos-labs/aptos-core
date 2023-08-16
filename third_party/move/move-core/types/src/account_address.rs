@@ -119,11 +119,10 @@ impl AccountAddress {
         self.0
     }
 
-    /// NOTE: Where possible use from_str instead, it handles the widest range of
-    /// inputs and conforms to AIP-40.
+    /// NOTE: Where possible use from_str_strict or from_str instead.
     pub fn from_hex_literal(literal: &str) -> Result<Self, AccountAddressParseError> {
         if !literal.starts_with("0x") {
-            return Err(AccountAddressParseError);
+            return Err(AccountAddressParseError::LeadingZeroXRequired);
         }
 
         let hex_len = literal.len() - 2;
@@ -147,11 +146,10 @@ impl AccountAddress {
         format!("0x{}", self.short_str_lossless())
     }
 
-    /// NOTE: Where possible use from_str instead, it handles the widest range of
-    /// inputs and conforms to AIP-40.
+    /// NOTE: Where possible use from_str_strict or from_str instead.
     pub fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, AccountAddressParseError> {
         <[u8; Self::LENGTH]>::from_hex(hex)
-            .map_err(|_| AccountAddressParseError)
+            .map_err(|e| AccountAddressParseError::InvalidHexChars(format!("{:#}", e)))
             .map(Self)
     }
 
@@ -163,7 +161,7 @@ impl AccountAddress {
 
     pub fn from_bytes<T: AsRef<[u8]>>(bytes: T) -> Result<Self, AccountAddressParseError> {
         <[u8; Self::LENGTH]>::try_from(bytes.as_ref())
-            .map_err(|_| AccountAddressParseError)
+            .map_err(|e| AccountAddressParseError::InvalidHexChars(format!("{:#}", e)))
             .map(Self)
     }
 
@@ -193,7 +191,7 @@ impl AccountAddress {
     pub fn from_str_strict(s: &str) -> Result<Self, AccountAddressParseError> {
         // Assert the string starts with 0x.
         if !s.starts_with("0x") {
-            return Err(AccountAddressParseError);
+            return Err(AccountAddressParseError::LeadingZeroXRequired);
         }
 
         let address = AccountAddress::from_str(s)?;
@@ -202,11 +200,11 @@ impl AccountAddress {
         // special addresses, in which case we check it is in proper SHORT form.
         if s.len() != (AccountAddress::LENGTH * 2) + 2 {
             if !address.is_special() {
-                return Err(AccountAddressParseError);
+                return Err(AccountAddressParseError::LongFormRequiredUnlessSpecial);
             } else {
                 // 0x + one hex char is the only valid SHORT form for special addresses.
                 if s.len() != 3 {
-                    return Err(AccountAddressParseError);
+                    return Err(AccountAddressParseError::InvalidPaddingZeroes);
                 }
             }
         }
@@ -356,12 +354,12 @@ impl FromStr for AccountAddress {
     fn from_str(s: &str) -> Result<Self, AccountAddressParseError> {
         if !s.starts_with("0x") {
             if s.is_empty() {
-                return Err(AccountAddressParseError);
+                return Err(AccountAddressParseError::TooShort);
             }
             AccountAddress::from_hex_literal(&format!("0x{}", s))
         } else {
             if s.len() == 2 {
-                return Err(AccountAddressParseError);
+                return Err(AccountAddressParseError::TooShort);
             }
             AccountAddress::from_hex_literal(s)
         }
@@ -404,19 +402,31 @@ impl Serialize for AccountAddress {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct AccountAddressParseError;
+#[derive(thiserror::Error, Debug)]
+pub enum AccountAddressParseError {
+    #[error("AccountAddress data should be exactly 32 bytes long")]
+    IncorrectNumberOfBytes,
 
-impl fmt::Display for AccountAddressParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "Unable to parse AccountAddress (must be hex string that conforms to AIP-40)",
-        )
-    }
+    #[error("Hex characters are invalid: {0}")]
+    InvalidHexChars(String),
+
+    #[error("Hex string is too short, must be 1 to 64 chars long, excluding the leading 0x")]
+    TooShort,
+
+    #[error("Hex string is too long, must be 1 to 64 chars long, excluding the leading 0x")]
+    TooLong,
+
+    #[error("Hex string must start with a leading 0x")]
+    LeadingZeroXRequired,
+
+    #[error(
+        "The given hex string is not a special address, it must be represented as 0x + 64 chars"
+    )]
+    LongFormRequiredUnlessSpecial,
+
+    #[error("The given hex string is a special address not in LONG form, it must be 0x0 to 0xf without padding zeroes")]
+    InvalidPaddingZeroes,
 }
-
-impl std::error::Error for AccountAddressParseError {}
 
 #[cfg(test)]
 mod tests {
