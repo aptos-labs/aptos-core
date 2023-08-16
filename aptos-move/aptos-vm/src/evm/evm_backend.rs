@@ -19,7 +19,7 @@ pub struct EVMBackend<'a> {
     pub(crate) balance_table_handle: TableHandle,
     pub(crate) code_table_handle: TableHandle,
     pub(crate) storage_table_handle: TableHandle,
-    origin: EthAddress,
+    origin: EthAddress
 }
 
 impl<'a> EVMBackend<'a> {
