@@ -1552,7 +1552,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 <pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
-<b>include</b> <a href="voting.md#0x1_voting_CreateProposalAbortsIf">CreateProposalAbortsIf</a>&lt;ProposalType&gt;{is_multi_step_proposal: <b>false</b>};
+<b>include</b> <a href="voting.md#0x1_voting_CreateProposalAbortsIfAndEnsures">CreateProposalAbortsIfAndEnsures</a>&lt;ProposalType&gt;{is_multi_step_proposal: <b>false</b>};
 <b>ensures</b> result == <b>old</b>(<b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address)).next_proposal_id;
 </code></pre>
 
@@ -1570,17 +1570,17 @@ Return true if the voting period of the given proposal has already ended.
 
 
 <pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
-<b>include</b> <a href="voting.md#0x1_voting_CreateProposalAbortsIf">CreateProposalAbortsIf</a>&lt;ProposalType&gt;;
+<b>include</b> <a href="voting.md#0x1_voting_CreateProposalAbortsIfAndEnsures">CreateProposalAbortsIfAndEnsures</a>&lt;ProposalType&gt;;
 <b>ensures</b> result == <b>old</b>(<b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address)).next_proposal_id;
 </code></pre>
 
 
 
 
-<a name="0x1_voting_CreateProposalAbortsIf"></a>
+<a name="0x1_voting_CreateProposalAbortsIfAndEnsures"></a>
 
 
-<pre><code><b>schema</b> <a href="voting.md#0x1_voting_CreateProposalAbortsIf">CreateProposalAbortsIf</a>&lt;ProposalType&gt; {
+<pre><code><b>schema</b> <a href="voting.md#0x1_voting_CreateProposalAbortsIfAndEnsures">CreateProposalAbortsIfAndEnsures</a>&lt;ProposalType&gt; {
     voting_forum_address: <b>address</b>;
     execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
     min_vote_threshold: u128;

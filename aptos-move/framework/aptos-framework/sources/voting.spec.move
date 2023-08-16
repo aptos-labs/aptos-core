@@ -33,7 +33,7 @@ spec aptos_framework::voting {
         use aptos_framework::chain_status;
 
         requires chain_status::is_operating();
-        include CreateProposalAbortsIf<ProposalType>{is_multi_step_proposal: false};
+        include CreateProposalAbortsIfAndEnsures<ProposalType>{is_multi_step_proposal: false};
         // property 1: Verify the proposal_id of the newly created proposal.
         ensures result == old(global<VotingForum<ProposalType>>(voting_forum_address)).next_proposal_id;
     }
@@ -57,12 +57,12 @@ spec aptos_framework::voting {
         use aptos_framework::chain_status;
 
         requires chain_status::is_operating();
-        include CreateProposalAbortsIf<ProposalType>;
+        include CreateProposalAbortsIfAndEnsures<ProposalType>;
         // property 1: Verify the proposal_id of the newly created proposal.
         ensures result == old(global<VotingForum<ProposalType>>(voting_forum_address)).next_proposal_id;
     }
 
-    spec schema CreateProposalAbortsIf<ProposalType> {
+    spec schema CreateProposalAbortsIfAndEnsures<ProposalType> {
         voting_forum_address: address;
         execution_hash: vector<u8>;
         min_vote_threshold: u128;
