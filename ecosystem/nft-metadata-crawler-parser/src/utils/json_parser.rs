@@ -37,7 +37,7 @@ impl JSONParser {
                 info!("Sending request for token_uri {}", uri);
 
                 let client = Client::builder()
-                    .timeout(Duration::from_secs(MAX_RETRY_TIME_SECONDS / 3))
+                    .timeout(Duration::from_secs(30)) // Allocate 30 seconds for downloading large JSON files
                     .build()
                     .context("Failed to build reqwest client")?;
 
