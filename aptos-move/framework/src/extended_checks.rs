@@ -44,11 +44,12 @@ const VIEW_FUN_ATTRIBUTE: &str = "view";
 
 // top-level attribute names, only.
 pub fn get_all_attribute_names() -> &'static BTreeSet<String> {
-    const ALL_ATTRIBUTE_NAMES: [&str; 4] = [
+    const ALL_ATTRIBUTE_NAMES: [&str; 5] = [
         LEGACY_ENTRY_FUN_ATTRIBUTE,
         RESOURCE_GROUP,
         RESOURCE_GROUP_MEMBER,
         VIEW_FUN_ATTRIBUTE,
+        EVENT_STRUCT_ATTRIBUTE,
     ];
 
     fn extended_attribute_names() -> BTreeSet<String> {
