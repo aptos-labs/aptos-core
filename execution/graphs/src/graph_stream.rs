@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 
-use namable_closures::{Closure, closure};
 use crate::graph::{Graph, NodeIndex, WeightedGraph};
-use rand::seq::SliceRandom;
+use aptos_types::batched_stream::BatchedStream;
 use aptos_types::closuretools::{ClosureTools, MapClosure};
+use namable_closures::{closure, Closure};
+use rand::seq::SliceRandom;
 
 /// A trait for batched streams for undirected graphs with weighted nodes and edges.
 pub trait GraphStream: Sized {
@@ -26,7 +27,7 @@ pub trait GraphStream: Sized {
     /// Advances the stream and returns the next value.
     ///
     /// Returns [`None`] when stream is finished.
-    fn next_batch(&mut self) -> Option<Self::Batch<'_>>;
+    fn next_batch(&mut self) -> Option<(Self::Batch<'_>, StreamBatchInfo<Self>)>;
 
     /// Returns the total number of batches remaining in the stream, if available.
     fn opt_remaining_batch_count(&self) -> Option<usize> {
@@ -64,6 +65,19 @@ pub trait GraphStream: Sized {
     }
 }
 
+/// A more ergonomic shortcut type alias for `BatchInfo`.
+pub type StreamBatchInfo<S> =
+    BatchInfo<<S as GraphStream>::NodeWeight, <S as GraphStream>::EdgeWeight>;
+
+/// A struct containing optional information about a batch.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BatchInfo<NW, EW> {
+    pub opt_total_batch_node_count: Option<usize>,
+    pub opt_total_batch_edge_count: Option<usize>,
+    pub opt_total_batch_node_weight: Option<NW>,
+    pub opt_total_batch_edge_weight: Option<EW>,
+}
+
 /// A trait for graph streams with known exact node count.
 pub trait ExactNodeCountGraphStream: GraphStream {
     fn remaining_node_count(&self) -> usize {
@@ -91,7 +105,7 @@ where
     where
         Self: 'b;
 
-    fn next_batch(&mut self) -> Option<Self::Batch<'_>> {
+    fn next_batch(&mut self) -> Option<(Self::Batch<'_>, StreamBatchInfo<Self>)> {
         (**self).next_batch()
     }
 
@@ -122,10 +136,7 @@ where
 
 /// A trait for a generic graph streamer.
 pub trait GraphStreamer<G: WeightedGraph> {
-    type Stream<'graph>: GraphStream<
-        NodeWeight = G::NodeWeight,
-        EdgeWeight = G::EdgeWeight,
-    >
+    type Stream<'graph>: GraphStream<NodeWeight = G::NodeWeight, EdgeWeight = G::EdgeWeight>
     where
         Self: 'graph,
         G: 'graph;
@@ -210,7 +221,7 @@ impl<'graph, G: WeightedGraph> GraphStream for InputOrderGraphStream<'graph, G> 
     where
         Self: 'a;
 
-    fn next_batch(&mut self) -> Option<Self::Batch<'_>> {
+    fn next_batch(&mut self) -> Option<(Self::Batch<'_>, StreamBatchInfo<Self>)> {
         if self.current_node == self.graph.node_count() as NodeIndex {
             return None;
         }
@@ -219,13 +230,19 @@ impl<'graph, G: WeightedGraph> GraphStream for InputOrderGraphStream<'graph, G> 
         self.current_node = (self.current_node + self.batch_size as NodeIndex)
             .min(self.graph.node_count() as NodeIndex);
 
-        Some(
+        Some((
             (batch_start..self.current_node).map_closure(closure!(self_ = self => |node| {
                 let node_weight = self_.graph.node_weight(node);
                 let neighbours = self_.graph.weighted_edges(node);
                 (node, node_weight, neighbours)
-            }))
-        )
+            })),
+            BatchInfo {
+                opt_total_batch_node_count: Some(self.batch_size),
+                opt_total_batch_edge_count: None,
+                opt_total_batch_node_weight: None,
+                opt_total_batch_edge_weight: None,
+            },
+        ))
     }
 
     fn opt_remaining_batch_count(&self) -> Option<usize> {
@@ -292,7 +309,7 @@ impl<'graph, G: WeightedGraph> GraphStream for RandomOrderGraphStream<'graph, G>
     where
         Self: 'a;
 
-    fn next_batch(&mut self) -> Option<Self::Batch<'_>> {
+    fn next_batch(&mut self) -> Option<(Self::Batch<'_>, StreamBatchInfo<Self>)> {
         if self.current_node == self.order.len() as NodeIndex {
             return None;
         }
@@ -301,7 +318,7 @@ impl<'graph, G: WeightedGraph> GraphStream for RandomOrderGraphStream<'graph, G>
         self.current_node =
             (self.current_node + self.batch_size as NodeIndex).min(self.order.len() as NodeIndex);
 
-        Some(
+        Some((
             (&self.order[batch_start as usize..self.current_node as usize])
                 .into_iter()
                 .copied()
@@ -310,7 +327,13 @@ impl<'graph, G: WeightedGraph> GraphStream for RandomOrderGraphStream<'graph, G>
                     let neighbours = self_.graph.weighted_edges(node);
                     (node, node_weight, neighbours)
                 })),
-        )
+            BatchInfo {
+                opt_total_batch_node_count: Some(self.batch_size),
+                opt_total_batch_edge_count: None,
+                opt_total_batch_node_weight: None,
+                opt_total_batch_edge_weight: None,
+            },
+        ))
     }
 
     fn opt_remaining_batch_count(&self) -> Option<usize> {

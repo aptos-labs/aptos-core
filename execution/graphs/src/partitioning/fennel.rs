@@ -1,24 +1,66 @@
 // Copyright © Aptos Foundation
 
 use crate::graph::NodeIndex;
-use crate::graph_stream::GraphStream;
+use crate::graph_stream::{GraphStream, StreamBatchInfo};
 use crate::partitioning::{PartitionId, StreamingGraphPartitioner};
 use aptos_types::batched_stream::BatchedStream;
 use itertools::Itertools;
 
-#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum BalanceConstraintMode {
-    /// Enforce the balancing constraint on each prefix of the stream.
+    /// Fixed maximum per-partition load.
+    FixedMaxLoad(f64),
+
+    /// Enforce the balancing constraint on each prefix of nodes in the stream.
+    ///
+    /// I.e., recompute the max allowed per-partition load after receiving each graph node.
+    /// Presumably, provides the worst quality partitions, but does not require any
+    /// global information about the graph.
     Prefix,
+
+    /// Enforce the balancing constraint on each prefix of batches in the stream.
+    ///
+    /// I.e., recompute the max allowed per-partition load after receiving each batch
+    /// of the graph nodes. Presumably, provides better quality partitions than `Prefix`,
+    /// by requires `BatchInfo` returned from `next_batch()` to contain the total node
+    /// weight of the batch.
+    Batched,
+
     /// Enforce the balancing constraint only on the entire partitioning.
+    ///
+    /// I.e., compute the max allowed per-partition load once, for the whole graph.
+    /// Presumably, provides the best quality partitions, but requires the total node
+    /// weight of the graph to be known before any batches are received, which may
+    /// be not realistic for some applications.
     Global,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum AlphaComputationMode {
-    /// Compute alpha for each prefix of the stream.
+    /// Fixed alpha.
+    Fixed(f64),
+
+    /// Compute alpha based on the previous partitioned prefix.
+    ///
+    /// I.e., recompute alpha after receiving each graph node.
+    /// Presumably, provides the worst quality partitions, but does not require any
+    /// global information about the graph.
     Prefix,
+
+    /// Compute alpha based on the previously partitioned prefix and the current batch.
+    ///
+    /// I.e., recompute alpha after receiving each batch of the graph nodes.
+    /// Presumably, provides better quality partitions than `Prefix`,
+    /// by requires `BatchInfo` returned from `next_batch()` to contain the total node
+    /// and edge weight of the batch.
+    Batched,
+
     /// Compute alpha once, for the whole graph.
+    ///
+    /// I.e., compute alpha once, for the whole graph.
+    /// Presumably, provides the best quality partitions, but requires the total node
+    /// and edge weight of the graph to be known before any batches are received, which may
+    /// be not realistic for some applications.
     Global,
 }
 
@@ -28,13 +70,22 @@ pub enum Error {
     BalancingConstraint,
 
     #[error("Cannot compute alpha. Total edge weight is unknown")]
-    AlphaUnknownEdgeWeight,
+    AlphaUnknownTotalEdgeWeight,
 
     #[error("Cannot compute alpha. Total node weight is unknown")]
-    AlphaUnknownNodeWeight,
+    AlphaUnknownTotalNodeWeight,
+
+    #[error("Cannot compute alpha. Total batch node weight is unknown")]
+    AlphaUnknownBatchNodeWeight,
+
+    #[error("Cannot compute alpha. Total batch edge weight is unknown")]
+    AlphaUnknownBatchEdgeWeight,
 
     #[error("Cannot compute max load. Total node weight is unknown")]
     MaxLoadUnknownNodeWeight,
+
+    #[error("Cannot compute max load. Total batch node weight is unknown")]
+    MaxLoadUnknownBatchNodeWeight,
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -82,8 +133,8 @@ impl Default for FennelGraphPartitioner {
 
 impl<NW, EW> StreamingGraphPartitioner<NW, EW> for FennelGraphPartitioner
 where
-    NW: Into<f64>,
-    EW: Into<f64>,
+    NW: Into<f64> + Copy,
+    EW: Into<f64> + Copy,
 {
     type Error = Error;
     type ResultStream<S> = FennelStream<S>
@@ -106,15 +157,15 @@ impl FennelGraphPartitioner {
 
     fn alpha(
         &self,
-        total_edge_weight: impl Into<f64>,
         total_node_weight: impl Into<f64>,
+        total_edge_weight: impl Into<f64>,
         n_partitions: usize,
     ) -> f64 {
         // See: page 4 of the Fennel paper.
         // This formula is generalized for weighted graphs.
         let k = n_partitions as f64;
-        let total_edge_weight = total_edge_weight.into();
         let total_node_weight = total_node_weight.into();
+        let total_edge_weight = total_edge_weight.into();
         total_edge_weight * k.powf(self.gamma - 1.) / total_node_weight.powf(self.gamma)
     }
 }
@@ -122,11 +173,10 @@ impl FennelGraphPartitioner {
 pub struct FennelStream<S> {
     /// The `GraphStream` to be partitioned.
     ///
-    /// `None` indicates that the partitioning has failed and shouldn't be continued.
-    graph_stream: Option<S>,
-
-    /// Last error, if any.
-    err: Option<Error>,
+    /// `Err` indicates that the partitioning has failed and shouldn't be continued.
+    /// The inner `Option` is used to temporarily take ownership of `graph_stream`
+    /// to avoid borrowing `self` mutably (see the `next_batch` implementation).
+    graph_stream: Result<Option<S>>,
 
     /// The partitioning parameters.
     params: FennelGraphPartitioner,
@@ -159,8 +209,8 @@ pub struct FennelStream<S> {
 impl<S> FennelStream<S>
 where
     S: GraphStream,
-    S::NodeWeight: Into<f64>,
-    S::EdgeWeight: Into<f64>,
+    S::NodeWeight: Into<f64> + Copy,
+    S::EdgeWeight: Into<f64> + Copy,
 {
     fn new(graph_stream: S, params: FennelGraphPartitioner, n_partitions: usize) -> Self {
         assert!(params.gamma >= 1.);
@@ -168,9 +218,8 @@ where
 
         let opt_total_node_count = graph_stream.opt_total_node_count();
 
-        let build_res = |graph_stream, init_err, alpha, max_load| Self {
+        let build_res = |graph_stream, alpha, max_load| Self {
             graph_stream,
-            err: init_err,
             params,
             n_partitions,
             load: vec![0.; n_partitions],
@@ -183,31 +232,35 @@ where
             max_load,
         };
 
-        let alpha = if params.alpha_computation_mode == AlphaComputationMode::Global {
-            let Some(total_edge_weight) = graph_stream.opt_total_edge_weight() else {
-                return build_res(None, Some(Error::AlphaUnknownEdgeWeight), None, None);
-            };
+        let alpha = match params.alpha_computation_mode {
+            AlphaComputationMode::Global => {
+                let Some(total_edge_weight) = graph_stream.opt_total_edge_weight() else {
+                    return build_res(Err(Error::AlphaUnknownTotalEdgeWeight), None, None);
+                };
 
-            let Some(total_node_weight) = graph_stream.opt_total_node_weight() else {
-                return build_res(None, Some(Error::AlphaUnknownNodeWeight), None, None);
-            };
+                let Some(total_node_weight) = graph_stream.opt_total_node_weight() else {
+                    return build_res(Err(Error::AlphaUnknownTotalNodeWeight), None, None);
+                };
 
-            Some(params.alpha(total_edge_weight, total_node_weight, n_partitions))
-        } else {
-            None
+                Some(params.alpha(total_node_weight, total_edge_weight, n_partitions))
+            },
+            AlphaComputationMode::Fixed(alpha) => Some(alpha),
+            _ => None,
         };
 
-        let max_load = if params.balance_constraint_mode == BalanceConstraintMode::Global {
-            let Some(total_node_weight) = graph_stream.opt_total_node_weight() else {
-                return build_res(None, Some(Error::MaxLoadUnknownNodeWeight), None, None);
-            };
+        let max_load = match params.balance_constraint_mode {
+            BalanceConstraintMode::Global => {
+                let Some(total_node_weight) = graph_stream.opt_total_node_weight() else {
+                    return build_res(Err(Error::MaxLoadUnknownNodeWeight), None, None);
+                };
 
-            Some(params.max_load(total_node_weight, n_partitions))
-        } else {
-            None
+                Some(params.max_load(total_node_weight, n_partitions))
+            },
+            BalanceConstraintMode::FixedMaxLoad(max_load) => Some(max_load),
+            _ => None,
         };
 
-        build_res(Some(graph_stream), None, alpha, max_load)
+        build_res(Ok(Some(graph_stream)), alpha, max_load)
     }
 
     /// Returns the partition of the given node, if it has been assigned one.
@@ -219,7 +272,41 @@ where
 
     #[allow(clippy::needless_lifetimes)] // Suppressed a false positive warning.
     /// Partitions the given batch of nodes.
-    fn partition<'a>(&mut self, batch: S::Batch<'a>) -> Result<Vec<(NodeIndex, PartitionId)>> {
+    fn partition_batch<'a>(
+        &mut self,
+        batch: S::Batch<'a>,
+        batch_info: StreamBatchInfo<S>,
+    ) -> Result<Vec<(NodeIndex, PartitionId)>> {
+        let mut alpha = self.alpha;
+        let mut max_load = self.max_load;
+
+        if self.params.alpha_computation_mode == AlphaComputationMode::Batched {
+            let Some(batch_node_weight) = batch_info.opt_total_batch_node_weight else {
+                return Err(Error::AlphaUnknownBatchNodeWeight);
+            };
+            let total_node_weight = self.partitioned_node_weight + batch_node_weight.into();
+
+            let Some(batch_edge_weight) = batch_info.opt_total_batch_edge_weight else {
+                return Err(Error::AlphaUnknownBatchEdgeWeight);
+            };
+            let total_edge_weight = self.partitioned_edge_weight + batch_edge_weight.into();
+
+            alpha = Some(self.params.alpha(
+                total_node_weight,
+                total_edge_weight,
+                self.n_partitions,
+            ));
+        }
+
+        if self.params.balance_constraint_mode == BalanceConstraintMode::Batched {
+            let Some(batch_node_weight) = batch_info.opt_total_batch_node_weight else {
+                return Err(Error::MaxLoadUnknownBatchNodeWeight);
+            };
+            let total_node_weight = self.partitioned_node_weight + batch_node_weight.into();
+
+            max_load = Some(self.params.max_load(total_node_weight, self.n_partitions));
+        }
+
         batch
             .into_iter()
             .map(|(node, node_weight, node_edges)| {
@@ -228,7 +315,8 @@ where
 
                 // Allocate more space if necessary.
                 if node as usize >= self.partition.len() {
-                    self.partition.resize(self.partition.len() * 2, None);
+                    let new_len = (self.partition.len() * 2).max(node as usize + 1).max(16);
+                    self.partition.resize(new_len, None);
                 }
 
                 // It is important to update it in the beginning as we may later use it
@@ -247,19 +335,19 @@ where
                     }
                 }
 
-                // Compute the max allowed per-partition load, if it hasn't been computed globally,
-                // for the whole graph (see: `BalanceConstraintMode`).
-                let max_load = self.max_load.unwrap_or_else(|| {
+                // Compute the max allowed per-partition load, if it hasn't been computed yet
+                // (see: `BalanceConstraintMode`).
+                let max_load = max_load.unwrap_or_else(|| {
                     self.params
                         .max_load(self.partitioned_node_weight, self.n_partitions)
                 });
 
-                // Compute the alpha parameter, if it hasn't been computed globally,
-                // for the whole graph (see: `AlphaComputationMode`).
-                let alpha = self.alpha.unwrap_or_else(|| {
+                // Compute the alpha parameter if it hasn't been computed yet.
+                // (see: `AlphaComputationMode`).
+                let alpha = alpha.unwrap_or_else(|| {
                     self.params.alpha(
-                        self.partitioned_edge_weight,
                         self.partitioned_node_weight,
+                        self.partitioned_edge_weight,
                         self.n_partitions,
                     )
                 });
@@ -304,51 +392,59 @@ where
 impl<S> BatchedStream for FennelStream<S>
 where
     S: GraphStream,
-    S::NodeWeight: Into<f64>,
-    S::EdgeWeight: Into<f64>,
+    S::NodeWeight: Into<f64> + Copy,
+    S::EdgeWeight: Into<f64> + Copy,
 {
     type StreamItem = (NodeIndex, PartitionId);
     type Batch = Vec<Self::StreamItem>;
     type Error = Error;
 
     fn next_batch(&mut self) -> Option<Result<Vec<(NodeIndex, PartitionId)>>> {
-        // If there was an error during initialization, return it.
-        if let Some(err) = &self.err {
-            return Some(Err(err.clone()));
+        let mut graph_stream = match &mut self.graph_stream {
+            Ok(graph_stream) => {
+                // Temporarily take ownership of `graph_stream` to avoid borrowing `self` mutably.
+                graph_stream.take().unwrap()
+            },
+            Err(err) => return Some(Err(err.clone())),
+        };
+
+        // Get the next batch and partition it.
+        let (batch, batch_info) = graph_stream.next_batch()?;
+        match self.partition_batch(batch, batch_info) {
+            Ok(batch) => {
+                // Return the ownership of `graph_stream` back to `self`.
+                self.graph_stream = Ok(Some(graph_stream));
+                Some(Ok(batch))
+            },
+            Err(err) => {
+                self.graph_stream = Err(err);
+                Some(Err(err.clone()))
+            },
         }
-
-        // Temporarily take ownership of `graph_stream` to avoid borrowing `self` mutably.
-        let mut graph_stream = self.graph_stream.take().unwrap();
-        // Partition the next batch.
-        let res = graph_stream.next_batch().map(|batch| self.partition(batch));
-        // Return the ownership of `graph_stream` back to `self`.
-        self.graph_stream = Some(graph_stream);
-
-        res
     }
 
     fn opt_items_count(&self) -> Option<usize> {
-        self.graph_stream
-            .as_ref()
-            .unwrap()
-            .opt_remaining_node_count()
+        let Ok(graph_stream) = &self.graph_stream else {
+            return None;
+        };
+        graph_stream.as_ref().unwrap().opt_remaining_node_count()
     }
 
     fn opt_batch_count(&self) -> Option<usize> {
-        self.graph_stream
-            .as_ref()
-            .unwrap()
-            .opt_remaining_batch_count()
+        let Ok(graph_stream) = &self.graph_stream else {
+            return None;
+        };
+        graph_stream.as_ref().unwrap().opt_remaining_node_count()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use aptos_types::batched_stream::BatchedStream;
     use crate::graph_stream::{GraphStreamer, InputOrderGraphStreamer};
     use crate::partitioning::fennel::FennelGraphPartitioner;
     use crate::partitioning::StreamingGraphPartitioner;
     use crate::test_utils::simple_four_nodes_two_partitions_graph;
+    use aptos_types::batched_stream::BatchedStream;
 
     #[test]
     fn simple_four_nodes_two_partitions_test() {
@@ -359,10 +455,7 @@ mod tests {
         let mut partitioner = FennelGraphPartitioner::default();
         partitioner.balance_constraint = 0.2;
 
-        let partition_stream = partitioner.partition_stream(
-            graph_streamer.stream(&graph),
-            2,
-        );
+        let partition_stream = partitioner.partition_stream(graph_streamer.stream(&graph), 2);
 
         let mut partition_iter = partition_stream.into_items_iter();
 
