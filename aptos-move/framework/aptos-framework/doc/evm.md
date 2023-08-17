@@ -13,16 +13,23 @@
 -  [Function `create`](#0x1_evm_create)
 -  [Function `call`](#0x1_evm_call)
 -  [Function `view`](#0x1_evm_view)
--  [Function `create_impl`](#0x1_evm_create_impl)
+-  [Function `view2`](#0x1_evm_view2)
 -  [Function `call_impl`](#0x1_evm_call_impl)
+-  [Function `create2`](#0x1_evm_create2)
+-  [Function `call2`](#0x1_evm_call2)
 -  [Function `view_impl`](#0x1_evm_view_impl)
+-  [Function `create_impl`](#0x1_evm_create_impl)
 -  [Function `get_balance`](#0x1_evm_get_balance)
 -  [Function `get_nonce`](#0x1_evm_get_nonce)
 -  [Function `get_code`](#0x1_evm_get_code)
 -  [Function `get_pub_key`](#0x1_evm_get_pub_key)
+-  [Function `create_impl2`](#0x1_evm_create_impl2)
+-  [Function `call_impl2`](#0x1_evm_call_impl2)
+-  [Function `view_impl2`](#0x1_evm_view_impl2)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="../../aptos-stdlib/doc/debug.md#0x1_debug">0x1::debug</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
 </code></pre>
@@ -150,10 +157,14 @@ Aptos framework doesn't have ETH Data resource
     };
     <b>let</b> balance = <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>();
     <a href="../../aptos-stdlib/doc/table.md#0x1_table_upsert">table::upsert</a>(&<b>mut</b> balance, eth_faucet_address, 1000000000000);
+    <b>let</b> nonce = <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>();
+    <a href="../../aptos-stdlib/doc/table.md#0x1_table_upsert">table::upsert</a>(&<b>mut</b> nonce, eth_faucet_address, 1);
+    <b>let</b> <a href="code.md#0x1_code">code</a> = <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>();
+    <a href="../../aptos-stdlib/doc/table.md#0x1_table_upsert">table::upsert</a>(&<b>mut</b> <a href="code.md#0x1_code">code</a>, eth_faucet_address, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;());
     <b>move_to</b>&lt;<a href="evm.md#0x1_evm_EvmData">EvmData</a>&gt;(aptos_framework, <a href="evm.md#0x1_evm_EvmData">EvmData</a> {
-        nonce: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>(),
+        nonce: nonce,
         balance: balance,
-        <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>(),
+        <a href="code.md#0x1_code">code</a>: <a href="code.md#0x1_code">code</a>,
         storage: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>(),
         pub_keys: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>(),
     });
@@ -244,7 +255,7 @@ Aptos framework doesn't have ETH Data resource
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="evm.md#0x1_evm_ENO_ETH_DATA">ENO_ETH_DATA</a>),
     );
     <b>let</b> data_ref = <b>borrow_global</b>&lt;<a href="evm.md#0x1_evm_EvmData">EvmData</a>&gt;(@aptos_framework);
-
+    print(&data_ref.balance);
     <a href="evm.md#0x1_evm_call_impl">call_impl</a>(&data_ref.nonce, &data_ref.balance, &data_ref.<a href="code.md#0x1_code">code</a>, &data_ref.storage, &data_ref.pub_keys, caller, payload, signature);
 }
 </code></pre>
@@ -284,13 +295,14 @@ Aptos framework doesn't have ETH Data resource
 
 </details>
 
-<a name="0x1_evm_create_impl"></a>
+<a name="0x1_evm_view2"></a>
 
-## Function `create_impl`
+## Function `view2`
 
 
 
-<pre><code><b>fun</b> <a href="evm.md#0x1_evm_create_impl">create_impl</a>(nonce: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, balance: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, <a href="code.md#0x1_code">code</a>: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, storage: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="evm.md#0x1_evm_StorageKey">evm::StorageKey</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, pub_keys: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>&gt;, caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="evm.md#0x1_evm_view2">view2</a>(caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, data: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -299,7 +311,15 @@ Aptos framework doesn't have ETH Data resource
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="evm.md#0x1_evm_create_impl">create_impl</a>(nonce: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, balance: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, <a href="code.md#0x1_code">code</a>: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, storage: &Table&lt;<a href="evm.md#0x1_evm_StorageKey">StorageKey</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, pub_keys: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>&gt;, caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>public</b> <b>fun</b> <a href="evm.md#0x1_evm_view2">view2</a>(caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, data: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="evm.md#0x1_evm_EvmData">EvmData</a> {
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="evm.md#0x1_evm_EvmData">EvmData</a>&gt;(@aptos_framework),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="evm.md#0x1_evm_ENO_ETH_DATA">ENO_ETH_DATA</a>),
+    );
+    <b>let</b> data_ref = <b>borrow_global</b>&lt;<a href="evm.md#0x1_evm_EvmData">EvmData</a>&gt;(@aptos_framework);
+
+    <a href="evm.md#0x1_evm_view_impl2">view_impl2</a>(&data_ref.nonce, &data_ref.balance, &data_ref.<a href="code.md#0x1_code">code</a>, &data_ref.storage, &data_ref.pub_keys, caller, <b>address</b>, value, data)
+}
 </code></pre>
 
 
@@ -328,6 +348,63 @@ Aptos framework doesn't have ETH Data resource
 
 </details>
 
+<a name="0x1_evm_create2"></a>
+
+## Function `create2`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="evm.md#0x1_evm_create2">create2</a>(caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, init_code: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gas_limit: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="evm.md#0x1_evm_create2">create2</a>(caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, init_code: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gas_limit: u64) <b>acquires</b> <a href="evm.md#0x1_evm_EvmData">EvmData</a> {
+
+    //TODO: How <b>to</b> borrow <b>mut</b>?
+    <b>let</b> data_ref = <b>borrow_global</b>&lt;<a href="evm.md#0x1_evm_EvmData">EvmData</a>&gt;(@aptos_framework);
+    <a href="evm.md#0x1_evm_create_impl2">create_impl2</a>(&data_ref.nonce, &data_ref.balance, &data_ref.<a href="code.md#0x1_code">code</a>, &data_ref.storage, &data_ref.pub_keys, caller, value, init_code, gas_limit);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_evm_call2"></a>
+
+## Function `call2`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="evm.md#0x1_evm_call2">call2</a>(caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, data: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gas_limit: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="evm.md#0x1_evm_call2">call2</a>(caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, data: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gas_limit: u64) <b>acquires</b> <a href="evm.md#0x1_evm_EvmData">EvmData</a> {
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="evm.md#0x1_evm_EvmData">EvmData</a>&gt;(@aptos_framework),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="evm.md#0x1_evm_ENO_ETH_DATA">ENO_ETH_DATA</a>),
+    );
+    <b>let</b> data_ref = <b>borrow_global</b>&lt;<a href="evm.md#0x1_evm_EvmData">EvmData</a>&gt;(@aptos_framework);
+    print(&data_ref.balance);
+    <a href="evm.md#0x1_evm_call_impl2">call_impl2</a>(&data_ref.nonce, &data_ref.balance, &data_ref.<a href="code.md#0x1_code">code</a>, &data_ref.storage, &data_ref.pub_keys, caller, <b>address</b>, value, data, gas_limit);
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_evm_view_impl"></a>
 
 ## Function `view_impl`
@@ -344,6 +421,28 @@ Aptos framework doesn't have ETH Data resource
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="evm.md#0x1_evm_view_impl">view_impl</a>(nonce: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, balance: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, <a href="code.md#0x1_code">code</a>: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, storage: &Table&lt;<a href="evm.md#0x1_evm_StorageKey">StorageKey</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, pub_keys: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>&gt;, caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_evm_create_impl"></a>
+
+## Function `create_impl`
+
+
+
+<pre><code><b>fun</b> <a href="evm.md#0x1_evm_create_impl">create_impl</a>(nonce: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, balance: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, <a href="code.md#0x1_code">code</a>: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, storage: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="evm.md#0x1_evm_StorageKey">evm::StorageKey</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, pub_keys: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>&gt;, caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="evm.md#0x1_evm_create_impl">create_impl</a>(nonce: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, balance: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, <a href="code.md#0x1_code">code</a>: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, storage: &Table&lt;<a href="evm.md#0x1_evm_StorageKey">StorageKey</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, pub_keys: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>&gt;, caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;);
 </code></pre>
 
 
@@ -464,6 +563,72 @@ Aptos framework doesn't have ETH Data resource
     <b>let</b> data_ref = <b>borrow_global</b>&lt;<a href="evm.md#0x1_evm_EvmData">EvmData</a>&gt;(@aptos_framework);
     *<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&data_ref.pub_keys, caller)
 }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_evm_create_impl2"></a>
+
+## Function `create_impl2`
+
+
+
+<pre><code><b>fun</b> <a href="evm.md#0x1_evm_create_impl2">create_impl2</a>(nonce: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, balance: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, <a href="code.md#0x1_code">code</a>: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, storage: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="evm.md#0x1_evm_StorageKey">evm::StorageKey</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, pub_keys: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>&gt;, caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, init_code: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gas_limit: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="evm.md#0x1_evm_create_impl2">create_impl2</a>(nonce: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, balance: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, <a href="code.md#0x1_code">code</a>: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, storage: &Table&lt;<a href="evm.md#0x1_evm_StorageKey">StorageKey</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, pub_keys: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>&gt;, caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, init_code: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gas_limit: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_evm_call_impl2"></a>
+
+## Function `call_impl2`
+
+
+
+<pre><code><b>fun</b> <a href="evm.md#0x1_evm_call_impl2">call_impl2</a>(nonce: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, balance: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, <a href="code.md#0x1_code">code</a>: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, storage: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="evm.md#0x1_evm_StorageKey">evm::StorageKey</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, pub_keys: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>&gt;, caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, data: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gas_limit: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="evm.md#0x1_evm_call_impl2">call_impl2</a>(nonce: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, balance: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, <a href="code.md#0x1_code">code</a>: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, storage: &Table&lt;<a href="evm.md#0x1_evm_StorageKey">StorageKey</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, pub_keys: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>&gt;, caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, data: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gas_limit: u64) : <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_evm_view_impl2"></a>
+
+## Function `view_impl2`
+
+
+
+<pre><code><b>fun</b> <a href="evm.md#0x1_evm_view_impl2">view_impl2</a>(nonce: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, balance: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, <a href="code.md#0x1_code">code</a>: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, storage: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="evm.md#0x1_evm_StorageKey">evm::StorageKey</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, pub_keys: &<a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>&gt;, caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, data: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="evm.md#0x1_evm_view_impl2">view_impl2</a>(nonce: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, balance: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u256&gt;, <a href="code.md#0x1_code">code</a>: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, storage: &Table&lt;<a href="evm.md#0x1_evm_StorageKey">StorageKey</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, pub_keys: &Table&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>&gt;, caller: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <b>address</b>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, data: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) : <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 

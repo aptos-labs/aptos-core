@@ -11,7 +11,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
     aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
-    evm::NativeEvmContext
+    evm_natives::NativeEvmContext,
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
@@ -159,14 +159,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let evm_context: NativeEvmContext = extensions.remove();
         let evm_change_set = evm_context.into_change_set();
-
         let table_context: NativeTableContext = extensions.remove();
         let mut table_change_set = table_context
             .into_change_set()
             .map_err(|e| e.finish(Location::Undefined))?;
 
-        table_change_set.new_tables.extend(evm_change_set.new_tables);
-        table_change_set.removed_tables.extend(evm_change_set.removed_tables);
+        table_change_set
+            .new_tables
+            .extend(evm_change_set.new_tables);
+        table_change_set
+            .removed_tables
+            .extend(evm_change_set.removed_tables);
         table_change_set.changes.extend(evm_change_set.changes);
 
         let aggregator_context: NativeAggregatorContext = extensions.remove();
@@ -185,7 +188,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             configs,
         )
         .map_err(|status| PartialVMError::new(status.status_code()).finish(Location::Undefined))?;
-
         Ok(change_set)
     }
 
@@ -435,7 +437,6 @@ impl<'r> WriteOpConverter<'r> {
     ) -> Result<WriteOp, VMStatus> {
         use MoveStorageOp::*;
         use WriteOp::*;
-
         let existing_value_opt = self.remote.get_state_value(state_key).map_err(|_| {
             VMStatus::error(
                 StatusCode::STORAGE_ERROR,
@@ -444,21 +445,14 @@ impl<'r> WriteOpConverter<'r> {
         })?;
 
         let write_op = match (existing_value_opt, move_storage_op) {
-            (None, Modify(_) | Delete) => {
+            (None, Delete) => {
                 return Err(VMStatus::error(
                     // Possible under speculative execution, returning storage error waiting for re-execution
                     StatusCode::STORAGE_ERROR,
-                    err_msg("When converting write op: updating non-existent value."),
+                    err_msg("When converting write op: deleting existing value."),
                 ));
             },
-            (Some(_), New(_)) => {
-                return Err(VMStatus::error(
-                    // Possible under speculative execution, returning storage error waiting for re-execution
-                    StatusCode::STORAGE_ERROR,
-                    err_msg("When converting write op: Recreating existing value."),
-                ));
-            },
-            (None, New(data)) => match &self.new_slot_metadata {
+            (_, New(data)) => match &self.new_slot_metadata {
                 None => {
                     if legacy_creation_as_modification {
                         Modification(data)
@@ -477,6 +471,19 @@ impl<'r> WriteOpConverter<'r> {
                     None => Modification(data),
                     Some(metadata) => ModificationWithMetadata { data, metadata },
                 }
+            },
+            (_, Modify(data)) => match &self.new_slot_metadata {
+                None => {
+                    if legacy_creation_as_modification {
+                        Modification(data)
+                    } else {
+                        Creation(data)
+                    }
+                },
+                Some(metadata) => ModificationWithMetadata {
+                    data,
+                    metadata: metadata.clone(),
+                },
             },
             (Some(existing_value), Delete) => {
                 // Inherit metadata even if the feature flags is turned off, for compatibility.

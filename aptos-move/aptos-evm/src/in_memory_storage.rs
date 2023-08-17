@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 
-use anyhow::{bail, Error, Result};
+use anyhow::Error;
 use aptos_table_natives::{TableHandle, TableResolver};
-use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, language_storage::StructTag,
-};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]

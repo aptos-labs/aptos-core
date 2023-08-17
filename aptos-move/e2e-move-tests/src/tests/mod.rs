@@ -9,6 +9,7 @@ mod code_publishing;
 mod common;
 mod constructor_args;
 mod error_map;
+mod evm;
 mod fee_payer;
 mod fungible_asset;
 mod gas;
