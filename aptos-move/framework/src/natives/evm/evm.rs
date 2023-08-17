@@ -173,8 +173,8 @@ fn native_call_impl(
     builder: &SafeNativeBuilder,
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [
-        ("create", native_create_impl as RawSafeNative),
-        ("call", native_call_impl),
+        ("create_impl", native_create_impl as RawSafeNative),
+        ("call_impl", native_call_impl),
     ];
     builder.make_named_natives(natives)
 }
