@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::{get_uri_metadata, utils::constants::MAX_RETRY_TIME_SECONDS};
+use crate::{
+    get_uri_metadata,
+    utils::constants::{MAX_IMAGE_REQUEST_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
+};
 use anyhow::Context;
 use backoff::{future::retry, ExponentialBackoff};
 use futures::FutureExt;
@@ -33,7 +36,7 @@ impl ImageOptimizer {
         let op = || {
             async {
                 let client = Client::builder()
-                    .timeout(Duration::from_secs(MAX_RETRY_TIME_SECONDS / 3))
+                    .timeout(Duration::from_secs(MAX_IMAGE_REQUEST_RETRY_SECONDS))
                     .build()
                     .context("Failed to build reqwest client")?;
 
