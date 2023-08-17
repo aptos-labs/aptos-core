@@ -234,9 +234,12 @@ fn test_initialize_and_enable_fee_collection_and_distribution(burn_percentage: u
     //   4. A single transaction enabling fees collection.
     //   5. Remaining transactions are p2p (should end up being Retry).
     let mut txns = universe.create_block(50);
-    universe.inject_proposal_into_block(&mut txns, 10, "initialize_collection", vec![
-        TransactionArgument::U8(burn_percentage),
-    ]);
+    universe.inject_proposal_into_block(
+        &mut txns,
+        10,
+        "initialize_collection",
+        vec![TransactionArgument::U8(burn_percentage)],
+    );
     universe.inject_proposal_into_block(&mut txns, 21, "enable_collection", vec![]);
 
     // Simulate block execution.
@@ -353,9 +356,12 @@ fn test_upgrade_burn_percentage(burn_percentage: u8) {
     //   2. A single transaction upgrading the burn percentage.
     //   3. Remaining transactions are p2p (should end up being Retry).
     let mut txns = universe.create_block(100);
-    universe.inject_proposal_into_block(&mut txns, 10, "upgrade_burn_percentage", vec![
-        TransactionArgument::U8(new_burn_percentage),
-    ]);
+    universe.inject_proposal_into_block(
+        &mut txns,
+        10,
+        "upgrade_burn_percentage",
+        vec![TransactionArgument::U8(new_burn_percentage)],
+    );
     let validator_addr = *universe.validators[0].address();
 
     // Simulate block execution.
@@ -444,9 +450,12 @@ fn test_leaving_validator_is_rewarded(burn_percentage: u8) {
     //   3. Remaining transactions are p2p (should end up being Retry).
     let removed_validator_addr = *universe.validators[0].address();
     let mut txns = universe.create_block(20);
-    universe.inject_proposal_into_block(&mut txns, 10, "remove_validator", vec![
-        TransactionArgument::Address(removed_validator_addr),
-    ]);
+    universe.inject_proposal_into_block(
+        &mut txns,
+        10,
+        "remove_validator",
+        vec![TransactionArgument::Address(removed_validator_addr)],
+    );
 
     // Simulate block execution and calculate how much gas was used for
     // transactions and for the governance proposal.

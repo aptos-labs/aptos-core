@@ -309,9 +309,12 @@ fn is_implicit_control_flow(block: &BasicBlock) -> bool {
     block.len() == 1
         && match &block.front().unwrap().value {
             C::Jump { from_user, .. } => !*from_user,
-            C::Return { exp: e, from_user } if !*from_user => matches!(&e.exp.value, E::Unit {
-                case: UnitCase::Implicit
-            }),
+            C::Return { exp: e, from_user } if !*from_user => matches!(
+                &e.exp.value,
+                E::Unit {
+                    case: UnitCase::Implicit
+                }
+            ),
             _ => false,
         }
 }

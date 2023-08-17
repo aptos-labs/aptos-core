@@ -71,10 +71,10 @@ pub fn fuzz_target(
     // before that.
     let dash_dash_pos = args.iter().position(|x| x == "--");
     let splice_pos = dash_dash_pos.unwrap_or(args.len());
-    args.splice(splice_pos..splice_pos, vec![
-        FUZZ_RUNNER.into(),
-        corpus_dir.into(),
-    ]);
+    args.splice(
+        splice_pos..splice_pos,
+        vec![FUZZ_RUNNER.into(), corpus_dir.into()],
+    );
 
     // The artifact dir goes at the end.
     if dash_dash_pos.is_none() {

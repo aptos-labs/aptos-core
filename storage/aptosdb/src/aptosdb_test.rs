@@ -100,13 +100,15 @@ fn test_pruner_config() {
         assert_eq!(state_merkle_pruner.is_pruner_enabled(), enable);
         assert_eq!(state_merkle_pruner.get_prune_window(), 20);
 
-        let ledger_pruner =
-            LedgerPrunerManager::new(Arc::clone(&aptos_db.ledger_db), LedgerPrunerConfig {
+        let ledger_pruner = LedgerPrunerManager::new(
+            Arc::clone(&aptos_db.ledger_db),
+            LedgerPrunerConfig {
                 enable,
                 prune_window: 100,
                 batch_size: 1,
                 user_pruning_window_offset: 0,
-            });
+            },
+        );
         assert_eq!(ledger_pruner.is_pruner_enabled(), enable);
         assert_eq!(ledger_pruner.get_prune_window(), 100);
     }

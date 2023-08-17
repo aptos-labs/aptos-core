@@ -95,18 +95,16 @@ impl ProofManager {
                     return_non_full,
                 );
 
-                let res = GetPayloadResponse::GetPayloadResponse(
-                    if proof_block.is_empty() {
-                        Payload::empty(true)
-                    } else {
-                        trace!(
-                            "QS: GetBlockRequest excluded len {}, block len {}",
-                            excluded_batches.len(),
-                            proof_block.len()
-                        );
-                        Payload::InQuorumStore(ProofWithData::new(proof_block))
-                    },
-                );
+                let res = GetPayloadResponse::GetPayloadResponse(if proof_block.is_empty() {
+                    Payload::empty(true)
+                } else {
+                    trace!(
+                        "QS: GetBlockRequest excluded len {}, block len {}",
+                        excluded_batches.len(),
+                        proof_block.len()
+                    );
+                    Payload::InQuorumStore(ProofWithData::new(proof_block))
+                });
                 match callback.send(Ok(res)) {
                     Ok(_) => (),
                     Err(err) => debug!("BlockResponse receiver not available! error {:?}", err),

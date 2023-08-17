@@ -11,11 +11,14 @@ use warp::{filters::BoxedFilter, reply, Filter, Rejection, Reply};
 pub fn telemetry_log_env(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("config" / "env" / "telemetry-log")
         .and(warp::get())
-        .and(with_auth(context.clone(), vec![
-            NodeType::Validator,
-            NodeType::ValidatorFullNode,
-            NodeType::PublicFullNode,
-        ]))
+        .and(with_auth(
+            context.clone(),
+            vec![
+                NodeType::Validator,
+                NodeType::ValidatorFullNode,
+                NodeType::PublicFullNode,
+            ],
+        ))
         .and(context.filter())
         .and_then(handle_telemetry_log_env)
         .boxed()

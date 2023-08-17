@@ -1138,8 +1138,10 @@ dependencies = [
  "primitive-types 0.12.1",
  "proptest",
  "rand 0.7.3",
+ "rlp",
  "serde 1.0.149",
  "serde_json",
+ "sha3 0.10.6",
 ]
 
 [[package]]

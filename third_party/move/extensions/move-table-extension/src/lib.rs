@@ -368,9 +368,10 @@ fn native_new_table_handle(
         .insert(TableHandle(handle), TableInfo::new(key_type, value_type))
         .is_none());
 
-    Ok(NativeResult::ok(gas_params.base, smallvec![
-        Value::address(handle)
-    ]))
+    Ok(NativeResult::ok(
+        gas_params.base,
+        smallvec![Value::address(handle)],
+    ))
 }
 
 pub fn make_native_new_table_handle(gas_params: NewTableHandleGasParameters) -> NativeFunction {

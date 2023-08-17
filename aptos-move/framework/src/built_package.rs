@@ -120,10 +120,13 @@ pub fn build_model(
         skip_fetch_latest_git_deps: true,
         bytecode_version,
     };
-    build_config.move_model_for_package(package_path, ModelConfig {
-        target_filter,
-        all_files_as_targets: false,
-    })
+    build_config.move_model_for_package(
+        package_path,
+        ModelConfig {
+            target_filter,
+            all_files_as_targets: false,
+        },
+    )
 }
 
 impl BuiltPackage {

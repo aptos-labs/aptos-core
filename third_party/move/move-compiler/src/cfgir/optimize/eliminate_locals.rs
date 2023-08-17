@@ -461,9 +461,12 @@ mod eliminate {
     fn unit(loc: Loc) -> Exp {
         H::exp(
             sp(loc, Type_::Unit),
-            sp(loc, UnannotatedExp_::Unit {
-                case: UnitCase::Implicit,
-            }),
+            sp(
+                loc,
+                UnannotatedExp_::Unit {
+                    case: UnitCase::Implicit,
+                },
+            ),
         )
     }
 }

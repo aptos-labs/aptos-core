@@ -238,17 +238,18 @@ impl MintFunder {
             return Ok(vec![]);
         }
 
-        let txn =
-            {
-                let mut faucet_account = self.faucet_account.write().await;
-                let transaction_factory = self.get_transaction_factory().await?;
-                faucet_account.sign_with_transaction_builder(transaction_factory.script(
-                    Script::new(MINTER_SCRIPT.to_vec(), vec![], vec![
-                        TransactionArgument::Address(receiver_address),
-                        TransactionArgument::U64(amount),
-                    ]),
-                ))
-            };
+        let txn = {
+            let mut faucet_account = self.faucet_account.write().await;
+            let transaction_factory = self.get_transaction_factory().await?;
+            faucet_account.sign_with_transaction_builder(transaction_factory.script(Script::new(
+                MINTER_SCRIPT.to_vec(),
+                vec![],
+                vec![
+                    TransactionArgument::Address(receiver_address),
+                    TransactionArgument::U64(amount),
+                ],
+            )))
+        };
 
         Ok(vec![
             submit_transaction(

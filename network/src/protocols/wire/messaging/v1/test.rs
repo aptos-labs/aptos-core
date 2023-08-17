@@ -63,17 +63,19 @@ fn stream_message() {
         num_fragments: 10,
         message,
     };
-    assert_eq!(bcs::to_bytes(&stream_header).unwrap(), vec![
-        42, 0, 0, 0, 10, 3, 2, 0, 11, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100
-    ],);
+    assert_eq!(
+        bcs::to_bytes(&stream_header).unwrap(),
+        vec![42, 0, 0, 0, 10, 3, 2, 0, 11, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100],
+    );
     let stream_fragment = StreamFragment {
         request_id: 42,
         fragment_id: 254,
         raw_data: vec![11, 22, 33],
     };
-    assert_eq!(bcs::to_bytes(&stream_fragment).unwrap(), vec![
-        42, 0, 0, 0, 254, 3, 11, 22, 33
-    ],);
+    assert_eq!(
+        bcs::to_bytes(&stream_fragment).unwrap(),
+        vec![42, 0, 0, 0, 254, 3, 11, 22, 33],
+    );
 }
 
 #[test]

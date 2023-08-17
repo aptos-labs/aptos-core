@@ -129,10 +129,13 @@ impl SMRNode {
         let payload = OnChainConfigPayload::new(1, InMemoryOnChainConfig::new(configs));
 
         reconfig_sender
-            .push((), ReconfigNotification {
-                version: 1,
-                on_chain_configs: payload,
-            })
+            .push(
+                (),
+                ReconfigNotification {
+                    version: 1,
+                    on_chain_configs: payload,
+                },
+            )
             .unwrap();
 
         let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));

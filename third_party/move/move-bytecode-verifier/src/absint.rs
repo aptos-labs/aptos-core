@@ -120,9 +120,12 @@ pub trait AbstractInterpreter: TransferFunctions {
                     None => {
                         // Haven't visited the next block yet. Use the post of the current block as
                         // its pre
-                        inv_map.insert(*successor_block_id, BlockInvariant {
-                            pre: post_state.clone(),
-                        });
+                        inv_map.insert(
+                            *successor_block_id,
+                            BlockInvariant {
+                                pre: post_state.clone(),
+                            },
+                        );
                     },
                 }
             }

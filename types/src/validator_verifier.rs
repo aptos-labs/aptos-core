@@ -500,14 +500,17 @@ pub fn random_validator_verifier(
         ));
         signers.push(random_signer);
     }
-    (signers, match custom_voting_power_quorum {
-        Some(custom_voting_power_quorum) => ValidatorVerifier::new_with_quorum_voting_power(
-            validator_infos,
-            custom_voting_power_quorum,
-        )
-        .expect("Unable to create testing validator verifier"),
-        None => ValidatorVerifier::new(validator_infos),
-    })
+    (
+        signers,
+        match custom_voting_power_quorum {
+            Some(custom_voting_power_quorum) => ValidatorVerifier::new_with_quorum_voting_power(
+                validator_infos,
+                custom_voting_power_quorum,
+            )
+            .expect("Unable to create testing validator verifier"),
+            None => ValidatorVerifier::new(validator_infos),
+        },
+    )
 }
 
 #[cfg(test)]

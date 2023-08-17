@@ -729,73 +729,121 @@ fn state_sync_failures_catching_up() -> ForgeConfig {
 }
 
 fn state_sync_slow_processing_catching_up() -> ForgeConfig {
-    changing_working_quorum_test_helper(7, 300, 3000, 2500, true, true, ChangingWorkingQuorumTest {
-        min_tps: 750,
-        always_healthy_nodes: 2,
-        max_down_nodes: 0,
-        num_large_validators: 2,
-        add_execution_delay: true,
-        check_period_s: 57,
-    })
+    changing_working_quorum_test_helper(
+        7,
+        300,
+        3000,
+        2500,
+        true,
+        true,
+        ChangingWorkingQuorumTest {
+            min_tps: 750,
+            always_healthy_nodes: 2,
+            max_down_nodes: 0,
+            num_large_validators: 2,
+            add_execution_delay: true,
+            check_period_s: 57,
+        },
+    )
 }
 
 fn different_node_speed_and_reliability_test() -> ForgeConfig {
-    changing_working_quorum_test_helper(20, 120, 70, 50, true, false, ChangingWorkingQuorumTest {
-        min_tps: 30,
-        always_healthy_nodes: 6,
-        max_down_nodes: 5,
-        num_large_validators: 3,
-        add_execution_delay: true,
-        check_period_s: 27,
-    })
+    changing_working_quorum_test_helper(
+        20,
+        120,
+        70,
+        50,
+        true,
+        false,
+        ChangingWorkingQuorumTest {
+            min_tps: 30,
+            always_healthy_nodes: 6,
+            max_down_nodes: 5,
+            num_large_validators: 3,
+            add_execution_delay: true,
+            check_period_s: 27,
+        },
+    )
 }
 
 fn large_test_only_few_nodes_down() -> ForgeConfig {
-    changing_working_quorum_test_helper(60, 120, 100, 70, false, false, ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 40,
-        max_down_nodes: 10,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        check_period_s: 27,
-    })
+    changing_working_quorum_test_helper(
+        60,
+        120,
+        100,
+        70,
+        false,
+        false,
+        ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 40,
+            max_down_nodes: 10,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            check_period_s: 27,
+        },
+    )
 }
 
 fn changing_working_quorum_test_high_load() -> ForgeConfig {
-    changing_working_quorum_test_helper(16, 120, 500, 300, true, true, ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 0,
-        max_down_nodes: 16,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        // Use longer check duration, as we are bringing enough nodes
-        // to require state-sync to catch up to have consensus.
-        check_period_s: 53,
-    })
+    changing_working_quorum_test_helper(
+        16,
+        120,
+        500,
+        300,
+        true,
+        true,
+        ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 0,
+            max_down_nodes: 16,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            // Use longer check duration, as we are bringing enough nodes
+            // to require state-sync to catch up to have consensus.
+            check_period_s: 53,
+        },
+    )
 }
 
 fn changing_working_quorum_test() -> ForgeConfig {
-    changing_working_quorum_test_helper(16, 120, 100, 70, true, true, ChangingWorkingQuorumTest {
-        min_tps: 15,
-        always_healthy_nodes: 0,
-        max_down_nodes: 16,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        // Use longer check duration, as we are bringing enough nodes
-        // to require state-sync to catch up to have consensus.
-        check_period_s: 53,
-    })
+    changing_working_quorum_test_helper(
+        16,
+        120,
+        100,
+        70,
+        true,
+        true,
+        ChangingWorkingQuorumTest {
+            min_tps: 15,
+            always_healthy_nodes: 0,
+            max_down_nodes: 16,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            // Use longer check duration, as we are bringing enough nodes
+            // to require state-sync to catch up to have consensus.
+            check_period_s: 53,
+        },
+    )
 }
 
 fn consensus_stress_test() -> ForgeConfig {
-    changing_working_quorum_test_helper(10, 60, 100, 80, true, false, ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 10,
-        max_down_nodes: 0,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        check_period_s: 27,
-    })
+    changing_working_quorum_test_helper(
+        10,
+        60,
+        100,
+        80,
+        true,
+        false,
+        ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 10,
+            max_down_nodes: 0,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            check_period_s: 27,
+        },
+    )
 }
 
 fn realistic_env_sweep_wrap(
@@ -831,95 +879,111 @@ fn realistic_env_sweep_wrap(
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
-        test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TPS(&[10, 100, 1000, 3000, 5000]),
-        criteria: [
-            (9, 1.5, 3., 4.),
-            (95, 1.5, 3., 4.),
-            (950, 2., 3., 4.),
-            (2750, 2.5, 3.5, 4.5),
-            (4600, 3., 4., 5.),
-        ]
-        .into_iter()
-        .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
-            SuccessCriteria::new(min_tps)
-                .add_max_expired_tps(0)
-                .add_max_failed_submission_tps(0)
-                .add_latency_threshold(max_lat_p50, LatencyType::P50)
-                .add_latency_threshold(max_lat_p90, LatencyType::P90)
-                .add_latency_threshold(max_lat_p99, LatencyType::P99)
-        })
-        .collect(),
-    })
+    realistic_env_sweep_wrap(
+        20,
+        10,
+        LoadVsPerfBenchmark {
+            test: Box::new(PerformanceBenchmark),
+            workloads: Workloads::TPS(&[10, 100, 1000, 3000, 5000]),
+            criteria: [
+                (9, 1.5, 3., 4.),
+                (95, 1.5, 3., 4.),
+                (950, 2., 3., 4.),
+                (2750, 2.5, 3.5, 4.5),
+                (4600, 3., 4., 5.),
+            ]
+            .into_iter()
+            .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
+                SuccessCriteria::new(min_tps)
+                    .add_max_expired_tps(0)
+                    .add_max_failed_submission_tps(0)
+                    .add_latency_threshold(max_lat_p50, LatencyType::P50)
+                    .add_latency_threshold(max_lat_p90, LatencyType::P90)
+                    .add_latency_threshold(max_lat_p99, LatencyType::P99)
+            })
+            .collect(),
+        },
+    )
 }
 
 fn realistic_env_workload_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
-        test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TRANSACTIONS(&[
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::CoinTransfer,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::NoOp,
-                num_modules: 100,
-                unique_senders: false,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::ModifyGlobalResource,
-                num_modules: 1,
-                unique_senders: true,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
-                num_modules: 1,
-                unique_senders: true,
-                mempool_backlog: 10000,
-            },
-            // transactions get rejected, to fix.
-            // TransactionWorkload {
-            //     transaction_type: TransactionTypeArg::PublishPackage,
-            //     num_modules: 1,
-            //     unique_senders: true,
-            //     mempool_backlog: 1000,
-            // },
-        ]),
-        // Investigate/improve to make latency more predictable on different workloads
-        criteria: [
-            (3700, 0.35, 0.5, 0.8, 0.65),
-            (2800, 0.35, 0.5, 1.2, 1.2),
-            (1800, 0.35, 0.5, 1.5, 2.7),
-            (950, 0.35, 0.65, 1.5, 2.7),
-            // (150, 0.5, 1.0, 1.5, 0.65),
-        ]
-        .into_iter()
-        .map(
-            |(min_tps, batch_to_pos, pos_to_proposal, proposal_to_ordered, ordered_to_commit)| {
-                SuccessCriteria::new(min_tps)
-                    .add_max_expired_tps(200)
-                    .add_max_failed_submission_tps(200)
-                    .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
-                        (LatencyBreakdownSlice::QsBatchToPos, batch_to_pos),
-                        (LatencyBreakdownSlice::QsPosToProposal, pos_to_proposal),
-                        (
-                            LatencyBreakdownSlice::ConsensusProposalToOrdered,
-                            proposal_to_ordered,
-                        ),
-                        (
-                            LatencyBreakdownSlice::ConsensusOrderedToCommit,
-                            ordered_to_commit,
-                        ),
-                    ]))
-            },
-        )
-        .collect(),
-    })
+    realistic_env_sweep_wrap(
+        7,
+        3,
+        LoadVsPerfBenchmark {
+            test: Box::new(PerformanceBenchmark),
+            workloads: Workloads::TRANSACTIONS(&[
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::CoinTransfer,
+                    num_modules: 1,
+                    unique_senders: false,
+                    mempool_backlog: 20000,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::NoOp,
+                    num_modules: 100,
+                    unique_senders: false,
+                    mempool_backlog: 20000,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::ModifyGlobalResource,
+                    num_modules: 1,
+                    unique_senders: true,
+                    mempool_backlog: 20000,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
+                    num_modules: 1,
+                    unique_senders: true,
+                    mempool_backlog: 10000,
+                },
+                // transactions get rejected, to fix.
+                // TransactionWorkload {
+                //     transaction_type: TransactionTypeArg::PublishPackage,
+                //     num_modules: 1,
+                //     unique_senders: true,
+                //     mempool_backlog: 1000,
+                // },
+            ]),
+            // Investigate/improve to make latency more predictable on different workloads
+            criteria: [
+                (3700, 0.35, 0.5, 0.8, 0.65),
+                (2800, 0.35, 0.5, 1.2, 1.2),
+                (1800, 0.35, 0.5, 1.5, 2.7),
+                (950, 0.35, 0.65, 1.5, 2.7),
+                // (150, 0.5, 1.0, 1.5, 0.65),
+            ]
+            .into_iter()
+            .map(
+                |(
+                    min_tps,
+                    batch_to_pos,
+                    pos_to_proposal,
+                    proposal_to_ordered,
+                    ordered_to_commit,
+                )| {
+                    SuccessCriteria::new(min_tps)
+                        .add_max_expired_tps(200)
+                        .add_max_failed_submission_tps(200)
+                        .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(
+                            vec![
+                                (LatencyBreakdownSlice::QsBatchToPos, batch_to_pos),
+                                (LatencyBreakdownSlice::QsPosToProposal, pos_to_proposal),
+                                (
+                                    LatencyBreakdownSlice::ConsensusProposalToOrdered,
+                                    proposal_to_ordered,
+                                ),
+                                (
+                                    LatencyBreakdownSlice::ConsensusOrderedToCommit,
+                                    ordered_to_commit,
+                                ),
+                            ],
+                        ))
+                },
+            )
+            .collect(),
+        },
+    )
 }
 
 fn load_vs_perf_benchmark() -> ForgeConfig {
@@ -1211,39 +1275,35 @@ fn individual_workload_tests(test_name: String) -> ForgeConfig {
             helm_values["validator"]["config"]["execution"]
                 ["processed_transactions_detailed_counters"] = true.into();
         }))
-        .with_emit_job(
-            if test_name == "write_new_resource" {
-                let account_creation_type = TransactionType::AccountGeneration {
-                    add_created_accounts_to_pool: true,
-                    max_account_working_set: 20_000_000,
-                    creation_balance: 200_000_000,
-                };
-                let write_type = TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::BytesMakeOrChange {
-                        data_length: Some(32),
-                    },
-                    num_modules: 1,
-                    use_account_pool: true,
-                };
-                job.transaction_mix_per_phase(vec![
-                    // warmup
-                    vec![(account_creation_type, 1)],
-                    vec![(account_creation_type, 1)],
-                    vec![(write_type, 1)],
-                    // cooldown
-                    vec![(write_type, 1)],
-                ])
-            } else {
-                job.transaction_type(match test_name.as_str() {
-                    "account_creation" => {
-                        TransactionTypeArg::AccountGeneration.materialize_default()
-                    },
-                    "publishing" => TransactionTypeArg::PublishPackage.materialize_default(),
-                    "module_loading" => TransactionTypeArg::NoOp.materialize(1000, false),
-                    _ => unreachable!("{}", test_name),
-                })
-            },
-        )
+        .with_emit_job(if test_name == "write_new_resource" {
+            let account_creation_type = TransactionType::AccountGeneration {
+                add_created_accounts_to_pool: true,
+                max_account_working_set: 20_000_000,
+                creation_balance: 200_000_000,
+            };
+            let write_type = TransactionType::CallCustomModules {
+                entry_point: EntryPoints::BytesMakeOrChange {
+                    data_length: Some(32),
+                },
+                num_modules: 1,
+                use_account_pool: true,
+            };
+            job.transaction_mix_per_phase(vec![
+                // warmup
+                vec![(account_creation_type, 1)],
+                vec![(account_creation_type, 1)],
+                vec![(write_type, 1)],
+                // cooldown
+                vec![(write_type, 1)],
+            ])
+        } else {
+            job.transaction_type(match test_name.as_str() {
+                "account_creation" => TransactionTypeArg::AccountGeneration.materialize_default(),
+                "publishing" => TransactionTypeArg::PublishPackage.materialize_default(),
+                "module_loading" => TransactionTypeArg::NoOp.materialize(1000, false),
+                _ => unreachable!("{}", test_name),
+            })
+        })
         .with_success_criteria(
             SuccessCriteria::new(match test_name.as_str() {
                 "account_creation" => 3600,
@@ -1537,13 +1597,11 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(
-                if duration.as_secs() > 1200 {
-                    4500
-                } else {
-                    5000
-                },
-            )
+            SuccessCriteria::new(if duration.as_secs() > 1200 {
+                4500
+            } else {
+                5000
+            })
             .add_no_restarts()
             .add_wait_for_catchup_s(
                 // Give at least 60s for catchup, give 10% of the run for longer durations.
@@ -1708,13 +1766,11 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig {
         .add_network_test(ThreeRegionSameCloudSimulationTest)
         .add_network_test(NetworkLossTest)
         .with_success_criteria(
-            SuccessCriteria::new(
-                if duration > Duration::from_secs(1200) {
-                    100
-                } else {
-                    1000
-                },
-            )
+            SuccessCriteria::new(if duration > Duration::from_secs(1200) {
+                100
+            } else {
+                1000
+            })
             .add_no_restarts()
             .add_system_metrics_threshold(SYSTEM_12_CORES_5GB_THRESHOLD.clone()),
         )
@@ -1734,13 +1790,11 @@ fn changing_working_quorum_test_helper(
     let max_down_nodes = test.max_down_nodes;
     config
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
-        .with_initial_fullnode_count(
-            if max_down_nodes == 0 {
-                0
-            } else {
-                std::cmp::max(2, target_tps / 1000)
-            },
-        )
+        .with_initial_fullnode_count(if max_down_nodes == 0 {
+            0
+        } else {
+            std::cmp::max(2, target_tps / 1000)
+        })
         .add_network_test(test)
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration.into();

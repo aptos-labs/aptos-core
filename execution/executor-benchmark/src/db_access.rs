@@ -108,14 +108,18 @@ impl DbAccessUtil {
     }
 
     pub fn new_state_key_aptos_coin(address: AccountAddress) -> StateKey {
-        Self::new_state_key(address, AccountAddress::ONE, "coin", "CoinStore", vec![
-            TypeTag::Struct(Box::new(Self::new_struct_tag(
+        Self::new_state_key(
+            address,
+            AccountAddress::ONE,
+            "coin",
+            "CoinStore",
+            vec![TypeTag::Struct(Box::new(Self::new_struct_tag(
                 AccountAddress::ONE,
                 "aptos_coin",
                 "AptosCoin",
                 vec![],
-            ))),
-        ])
+            )))],
+        )
     }
 
     pub fn get_account(

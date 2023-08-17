@@ -82,11 +82,13 @@ impl<'env> ErrmapGen<'env> {
         for named_constant in module.get_named_constants() {
             let name = self.name_string(named_constant.get_name());
             let error_category = self.get_abort_code(&named_constant)?;
-            self.output
-                .add_error_category(error_category, ErrorDescription {
+            self.output.add_error_category(
+                error_category,
+                ErrorDescription {
                     code_name: name.to_string(),
                     code_description: named_constant.get_doc().to_string(),
-                })?
+                },
+            )?
         }
         Ok(())
     }

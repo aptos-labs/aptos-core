@@ -832,10 +832,13 @@ impl Symbolicator {
                 },
             };
 
-            structs.insert(*name, StructDef {
-                name_start,
-                field_defs,
-            });
+            structs.insert(
+                *name,
+                StructDef {
+                    name_start,
+                    field_defs,
+                },
+            );
         }
 
         for (pos, name, _) in &mod_def.constants {
@@ -881,17 +884,20 @@ impl Symbolicator {
                     .map(|(k, v)| Self::create_struct_type(*mod_ident, *k, *v, vec![]))
                     .collect(),
             );
-            functions.insert(*name, FunctionDef {
-                name: *name,
-                start: name_start,
-                attrs: fun
-                    .attributes
-                    .clone()
-                    .iter()
-                    .map(|(_loc, name, _attr)| name.to_string())
-                    .collect(),
-                ident_type,
-            });
+            functions.insert(
+                *name,
+                FunctionDef {
+                    name: *name,
+                    start: name_start,
+                    attrs: fun
+                        .attributes
+                        .clone()
+                        .iter()
+                        .map(|(_loc, name, _attr)| name.to_string())
+                        .collect(),
+                    ident_type,
+                },
+            );
         }
 
         let use_def_map = UseDefMap::new();

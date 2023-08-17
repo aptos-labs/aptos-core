@@ -98,12 +98,16 @@ fn test_peers_and_metadata_simple_interface() {
         &[ProtocolId::MempoolDirectSend],
         all_peers.clone(),
     );
-    check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::StorageServiceRpc], vec![
-        peer_network_id_1,
-    ]);
-    check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::ConsensusRpcBcs], vec![
-        peer_network_id_2,
-    ]);
+    check_connected_supported_peers(
+        &peers_and_metadata,
+        &[ProtocolId::StorageServiceRpc],
+        vec![peer_network_id_1],
+    );
+    check_connected_supported_peers(
+        &peers_and_metadata,
+        &[ProtocolId::ConsensusRpcBcs],
+        vec![peer_network_id_2],
+    );
     check_connected_supported_peers(
         &peers_and_metadata,
         &[ProtocolId::PeerMonitoringServiceRpc],
@@ -118,9 +122,11 @@ fn test_peers_and_metadata_simple_interface() {
 
     // Verify peer 1 is no longer connected or supported
     check_connected_peers_and_metadata(&peers_and_metadata, vec![peer_network_id_2]);
-    check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::MempoolDirectSend], vec![
-        peer_network_id_2,
-    ]);
+    check_connected_supported_peers(
+        &peers_and_metadata,
+        &[ProtocolId::MempoolDirectSend],
+        vec![peer_network_id_2],
+    );
     check_connected_supported_peers(
         &peers_and_metadata,
         &[ProtocolId::StorageServiceRpc],
@@ -169,9 +175,11 @@ fn test_peers_and_metadata_simple_interface() {
     .unwrap();
     check_all_peers(&peers_and_metadata, vec![peer_network_id_1]);
     check_connected_peers_and_metadata(&peers_and_metadata, vec![peer_network_id_1]);
-    check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::MempoolDirectSend], vec![
-        peer_network_id_1,
-    ]);
+    check_connected_supported_peers(
+        &peers_and_metadata,
+        &[ProtocolId::MempoolDirectSend],
+        vec![peer_network_id_1],
+    );
     check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::ConsensusRpcBcs], vec![]);
 }
 
@@ -323,21 +331,20 @@ fn test_network_client_available_peers() {
     // Verify the correct number of available and connected peers
     let peers_and_metadata = network_client.get_peers_and_metadata();
     check_available_peers(&network_client, vec![peer_network_id_1, peer_network_id_2]);
-    check_connected_peers_and_metadata(&peers_and_metadata, vec![
-        peer_network_id_1,
-        peer_network_id_2,
-        peer_network_id_3,
-    ]);
+    check_connected_peers_and_metadata(
+        &peers_and_metadata,
+        vec![peer_network_id_1, peer_network_id_2, peer_network_id_3],
+    );
 
     // Mark peer 3 as disconnected
     disconnect_peer(&peers_and_metadata, peer_network_id_3);
 
     // Verify the correct number of available and connected peers
     check_available_peers(&network_client, vec![peer_network_id_1, peer_network_id_2]);
-    check_connected_peers_and_metadata(&peers_and_metadata, vec![
-        peer_network_id_1,
-        peer_network_id_2,
-    ]);
+    check_connected_peers_and_metadata(
+        &peers_and_metadata,
+        vec![peer_network_id_1, peer_network_id_2],
+    );
 
     // Remove peer 2
     remove_peer_metadata(
@@ -358,25 +365,23 @@ fn test_network_client_available_peers() {
 
     // Verify the correct number of available and connected peers
     check_available_peers(&network_client, vec![peer_network_id_1, peer_network_id_3]);
-    check_connected_peers_and_metadata(&peers_and_metadata, vec![
-        peer_network_id_1,
-        peer_network_id_3,
-    ]);
+    check_connected_peers_and_metadata(
+        &peers_and_metadata,
+        vec![peer_network_id_1, peer_network_id_3],
+    );
 
     // Reconnect peer 2
     update_connection_metadata(&peers_and_metadata, peer_network_id_2, connection_2);
 
     // Verify the correct number of available and connected peers
-    check_available_peers(&network_client, vec![
-        peer_network_id_1,
-        peer_network_id_2,
-        peer_network_id_3,
-    ]);
-    check_connected_peers_and_metadata(&peers_and_metadata, vec![
-        peer_network_id_1,
-        peer_network_id_2,
-        peer_network_id_3,
-    ]);
+    check_available_peers(
+        &network_client,
+        vec![peer_network_id_1, peer_network_id_2, peer_network_id_3],
+    );
+    check_connected_peers_and_metadata(
+        &peers_and_metadata,
+        vec![peer_network_id_1, peer_network_id_2, peer_network_id_3],
+    );
 }
 
 #[tokio::test]
@@ -563,10 +568,10 @@ async fn test_network_client_network_senders_direct_send() {
     // Verify that broadcast messages are sent on matching networks and protocols
     let dummy_message = DummyMessage::new(2323);
     network_client
-        .send_to_peers(dummy_message.clone(), &[
-            peer_network_id_1,
-            peer_network_id_2,
-        ])
+        .send_to_peers(
+            dummy_message.clone(),
+            &[peer_network_id_1, peer_network_id_2],
+        )
         .unwrap();
     wait_for_network_event(
         peer_network_id_1,

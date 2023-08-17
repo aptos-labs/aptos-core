@@ -634,19 +634,23 @@ impl Value_ {
 impl fmt::Display for BuiltinTypeName_ {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         use BuiltinTypeName_ as BT;
-        write!(f, "{}", match self {
-            BT::Address => BT::ADDRESS,
-            BT::Signer => BT::SIGNER,
-            BT::U8 => BT::U_8,
-            BT::U16 => BT::U_16,
-            BT::U32 => BT::U_32,
-            BT::U64 => BT::U_64,
-            BT::U128 => BT::U_128,
-            BT::U256 => BT::U_256,
-            BT::Bool => BT::BOOL,
-            BT::Vector => BT::VECTOR,
-            BT::Fun => BT::FUN,
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                BT::Address => BT::ADDRESS,
+                BT::Signer => BT::SIGNER,
+                BT::U8 => BT::U_8,
+                BT::U16 => BT::U_16,
+                BT::U32 => BT::U_32,
+                BT::U64 => BT::U_64,
+                BT::U128 => BT::U_128,
+                BT::U256 => BT::U_256,
+                BT::Bool => BT::BOOL,
+                BT::Vector => BT::VECTOR,
+                BT::Fun => BT::FUN,
+            }
+        )
     }
 }
 

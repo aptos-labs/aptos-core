@@ -344,13 +344,16 @@ impl AnalyzeValidators {
             validator_stats: validators
                 .iter()
                 .map(|validator| {
-                    (validator.address, ValidatorStats {
-                        proposal_successes: *successes.get(&validator.address).unwrap_or(&0),
-                        proposal_failures: *failures.get(&validator.address).unwrap_or(&0),
-                        votes: *votes.get(&validator.address).unwrap_or(&0),
-                        transactions: *transactions.get(&validator.address).unwrap_or(&0),
-                        voting_power: validator.voting_power,
-                    })
+                    (
+                        validator.address,
+                        ValidatorStats {
+                            proposal_successes: *successes.get(&validator.address).unwrap_or(&0),
+                            proposal_failures: *failures.get(&validator.address).unwrap_or(&0),
+                            votes: *votes.get(&validator.address).unwrap_or(&0),
+                            transactions: *transactions.get(&validator.address).unwrap_or(&0),
+                            voting_power: validator.voting_power,
+                        },
+                    )
                 })
                 .collect(),
             total_rounds,

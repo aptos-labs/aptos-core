@@ -161,13 +161,11 @@ pub static APTOS_NETWORK_DISCOVERY_NOTES: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 pub static APTOS_NETWORK_RPC_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!("aptos_network_rpc_messages", "Number of RPC messages", &[
-        "role_type",
-        "network_id",
-        "peer_id",
-        "type",
-        "state"
-    ])
+    register_int_counter_vec!(
+        "aptos_network_rpc_messages",
+        "Number of RPC messages",
+        &["role_type", "network_id", "peer_id", "type", "state"]
+    )
     .unwrap()
 });
 

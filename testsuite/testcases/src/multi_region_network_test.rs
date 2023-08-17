@@ -331,27 +331,30 @@ mod tests {
         assert_eq!(netem.group_netems.len(), 10);
         assert_eq!(netem.group_netems[0].source_nodes.len(), 4);
         assert_eq!(netem.group_netems[0].target_nodes.len(), 4);
-        assert_eq!(netem.group_netems[0], GroupNetEm {
-            name: "aws--ap-northeast-1-self-netem".to_owned(),
-            rate_in_mbps: 10000,
-            source_nodes: vec![
-                all_peers[0][0],
-                all_peers[1][0],
-                all_peers[8][0],
-                all_peers[9][0],
-            ],
-            target_nodes: vec![
-                all_peers[0][0],
-                all_peers[1][0],
-                all_peers[8][0],
-                all_peers[9][0],
-            ],
-            delay_latency_ms: 50,
-            delay_jitter_ms: 5,
-            delay_correlation_percentage: 50,
-            loss_percentage: 1,
-            loss_correlation_percentage: 50
-        })
+        assert_eq!(
+            netem.group_netems[0],
+            GroupNetEm {
+                name: "aws--ap-northeast-1-self-netem".to_owned(),
+                rate_in_mbps: 10000,
+                source_nodes: vec![
+                    all_peers[0][0],
+                    all_peers[1][0],
+                    all_peers[8][0],
+                    all_peers[9][0],
+                ],
+                target_nodes: vec![
+                    all_peers[0][0],
+                    all_peers[1][0],
+                    all_peers[8][0],
+                    all_peers[9][0],
+                ],
+                delay_latency_ms: 50,
+                delay_jitter_ms: 5,
+                delay_correlation_percentage: 50,
+                loss_percentage: 1,
+                loss_correlation_percentage: 50
+            }
+        )
     }
 
     #[test]

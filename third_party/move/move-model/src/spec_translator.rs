@@ -507,16 +507,20 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                 ExpData::LocalVar(_, sym) => (self.let_locals.contains_key(sym), e),
                 ExpData::Call(id, Operation::Global(None), args) => (
                     true,
-                    ExpData::Call(*id, Operation::Global(None), vec![
-                        self.auto_trace_sub(&args[0])
-                    ])
+                    ExpData::Call(
+                        *id,
+                        Operation::Global(None),
+                        vec![self.auto_trace_sub(&args[0])],
+                    )
                     .into_exp(),
                 ),
                 ExpData::Call(id, Operation::Exists(None), args) => (
                     true,
-                    ExpData::Call(*id, Operation::Exists(None), vec![
-                        self.auto_trace_sub(&args[0])
-                    ])
+                    ExpData::Call(
+                        *id,
+                        Operation::Exists(None),
+                        vec![self.auto_trace_sub(&args[0])],
+                    )
                     .into_exp(),
                 ),
                 _ => (false, e),

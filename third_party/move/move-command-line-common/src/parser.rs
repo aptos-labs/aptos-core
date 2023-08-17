@@ -409,10 +409,13 @@ pub fn parse_u256(s: &str) -> Result<(U256, NumberFormat), U256FromStrError> {
 // Parse an address from a decimal or hex encoding
 pub fn parse_address_number(s: &str) -> Option<([u8; AccountAddress::LENGTH], NumberFormat)> {
     let (txt, base) = determine_num_text_and_base(s);
-    let parsed = BigUint::parse_bytes(txt.as_bytes(), match base {
-        NumberFormat::Hex => 16,
-        NumberFormat::Decimal => 10,
-    })?;
+    let parsed = BigUint::parse_bytes(
+        txt.as_bytes(),
+        match base {
+            NumberFormat::Hex => 16,
+            NumberFormat::Decimal => 10,
+        },
+    )?;
     let bytes = parsed.to_bytes_be();
     if bytes.len() > AccountAddress::LENGTH {
         return None;

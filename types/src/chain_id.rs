@@ -151,13 +151,17 @@ impl fmt::Display for ChainId {
 
 impl fmt::Display for NamedChain {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", match self {
-            NamedChain::DEVNET => DEVNET,
-            NamedChain::TESTNET => TESTNET,
-            NamedChain::MAINNET => MAINNET,
-            NamedChain::TESTING => TESTING,
-            NamedChain::PREMAINNET => PREMAINNET,
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                NamedChain::DEVNET => DEVNET,
+                NamedChain::TESTNET => TESTNET,
+                NamedChain::MAINNET => MAINNET,
+                NamedChain::TESTING => TESTING,
+                NamedChain::PREMAINNET => PREMAINNET,
+            }
+        )
     }
 }
 

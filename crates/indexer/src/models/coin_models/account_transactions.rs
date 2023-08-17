@@ -63,10 +63,13 @@ impl AccountTransaction {
         };
         let mut account_transactions = HashMap::new();
         for sig in &signatures {
-            account_transactions.insert((sig.signer.clone(), txn_version), Self {
-                transaction_version: txn_version,
-                account_address: sig.signer.clone(),
-            });
+            account_transactions.insert(
+                (sig.signer.clone(), txn_version),
+                Self {
+                    transaction_version: txn_version,
+                    account_address: sig.signer.clone(),
+                },
+            );
         }
         for event in events {
             account_transactions.extend(Self::from_event(event, txn_version));
@@ -89,10 +92,13 @@ impl AccountTransaction {
     /// objects here because it'll be taken care of in the resource section
     fn from_event(event: &Event, txn_version: i64) -> HashMap<AccountTransactionPK, Self> {
         let account_address = standardize_address(&event.guid.account_address.to_string());
-        HashMap::from([((account_address.clone(), txn_version), Self {
-            transaction_version: txn_version,
-            account_address,
-        })])
+        HashMap::from([(
+            (account_address.clone(), txn_version),
+            Self {
+                transaction_version: txn_version,
+                account_address,
+            },
+        )])
     }
 
     /// Base case, record resource account. If the resource is an object, then we record the owner as well
@@ -103,16 +109,22 @@ impl AccountTransaction {
     ) -> anyhow::Result<HashMap<AccountTransactionPK, Self>> {
         let mut result = HashMap::new();
         let account_address = standardize_address(&write_resource.address.to_string());
-        result.insert((account_address.clone(), txn_version), Self {
-            transaction_version: txn_version,
-            account_address,
-        });
+        result.insert(
+            (account_address.clone(), txn_version),
+            Self {
+                transaction_version: txn_version,
+                account_address,
+            },
+        );
         if let Some(inner) = &ObjectWithMetadata::from_write_resource(write_resource, txn_version)?
         {
-            result.insert((inner.object_core.get_owner_address(), txn_version), Self {
-                transaction_version: txn_version,
-                account_address: inner.object_core.get_owner_address(),
-            });
+            result.insert(
+                (inner.object_core.get_owner_address(), txn_version),
+                Self {
+                    transaction_version: txn_version,
+                    account_address: inner.object_core.get_owner_address(),
+                },
+            );
         }
         Ok(result)
     }
@@ -127,10 +139,13 @@ impl AccountTransaction {
     ) -> anyhow::Result<HashMap<AccountTransactionPK, Self>> {
         let mut result = HashMap::new();
         let account_address = standardize_address(&delete_resource.address.to_string());
-        result.insert((account_address.clone(), txn_version), Self {
-            transaction_version: txn_version,
-            account_address,
-        });
+        result.insert(
+            (account_address.clone(), txn_version),
+            Self {
+                transaction_version: txn_version,
+                account_address,
+            },
+        );
         Ok(result)
     }
 }

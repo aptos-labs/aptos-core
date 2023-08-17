@@ -865,10 +865,11 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             MoveBytecode::WriteRef => {
                 let ref_operand_index = self.temp_stack.pop().unwrap();
                 let val_operand_index = self.temp_stack.pop().unwrap();
-                self.code.push(mk_call(Operation::WriteRef, vec![], vec![
-                    ref_operand_index,
-                    val_operand_index,
-                ]));
+                self.code.push(mk_call(
+                    Operation::WriteRef,
+                    vec![],
+                    vec![ref_operand_index, val_operand_index],
+                ));
             },
 
             MoveBytecode::Add

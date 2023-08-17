@@ -294,11 +294,11 @@ impl EntryPoints {
                 let data_len = data_length.unwrap_or_else(|| rng.gen_range(0usize, 1000usize));
                 bytes_make_or_change(rng, module_id, data_len)
             },
-            EntryPoints::EmitEvents { count } => {
-                get_payload(module_id, ident_str!("emit_events").to_owned(), vec![
-                    bcs::to_bytes(count).unwrap(),
-                ])
-            },
+            EntryPoints::EmitEvents { count } => get_payload(
+                module_id,
+                ident_str!("emit_events").to_owned(),
+                vec![bcs::to_bytes(count).unwrap()],
+            ),
             EntryPoints::MakeOrChangeTable { offset, count } => get_payload(
                 module_id,
                 ident_str!("make_or_change_table").to_owned(),
@@ -469,9 +469,11 @@ pub fn rand_gen_function(rng: &mut StdRng, module_id: ModuleId) -> TransactionPa
 //
 
 fn loopy(module_id: ModuleId, count: u64) -> TransactionPayload {
-    get_payload(module_id, ident_str!("loopy").to_owned(), vec![
-        bcs::to_bytes(&count).unwrap(),
-    ])
+    get_payload(
+        module_id,
+        ident_str!("loopy").to_owned(),
+        vec![bcs::to_bytes(&count).unwrap()],
+    )
 }
 
 fn get_from_random_const(module_id: ModuleId, idx: u64) -> TransactionPayload {
@@ -484,41 +486,53 @@ fn get_from_random_const(module_id: ModuleId, idx: u64) -> TransactionPayload {
 
 fn set_id(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
     let id: u64 = rng.gen();
-    get_payload(module_id, ident_str!("set_id").to_owned(), vec![
-        bcs::to_bytes(&id).unwrap(),
-    ])
+    get_payload(
+        module_id,
+        ident_str!("set_id").to_owned(),
+        vec![bcs::to_bytes(&id).unwrap()],
+    )
 }
 
 fn set_name(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
     let len = rng.gen_range(0usize, 1000usize);
     let name: String = rand_string(rng, len);
-    get_payload(module_id, ident_str!("set_name").to_owned(), vec![
-        bcs::to_bytes(&name).unwrap(),
-    ])
+    get_payload(
+        module_id,
+        ident_str!("set_name").to_owned(),
+        vec![bcs::to_bytes(&name).unwrap()],
+    )
 }
 
 fn maximize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
-    get_payload(module_id, ident_str!("maximize").to_owned(), vec![
-        bcs::to_bytes(other).unwrap(),
-    ])
+    get_payload(
+        module_id,
+        ident_str!("maximize").to_owned(),
+        vec![bcs::to_bytes(other).unwrap()],
+    )
 }
 
 fn minimize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
-    get_payload(module_id, ident_str!("minimize").to_owned(), vec![
-        bcs::to_bytes(other).unwrap(),
-    ])
+    get_payload(
+        module_id,
+        ident_str!("minimize").to_owned(),
+        vec![bcs::to_bytes(other).unwrap()],
+    )
 }
 
 fn step_dst(module_id: ModuleId, dst: &AccountAddress) -> TransactionPayload {
-    get_payload(module_id, ident_str!("step_destination").to_owned(), vec![
-        bcs::to_bytes(dst).unwrap(),
-    ])
+    get_payload(
+        module_id,
+        ident_str!("step_destination").to_owned(),
+        vec![bcs::to_bytes(dst).unwrap()],
+    )
 }
 
 fn mint_new_token(module_id: ModuleId, other: AccountAddress) -> TransactionPayload {
-    get_payload(module_id, ident_str!("mint_new_token").to_owned(), vec![
-        bcs::to_bytes(&other).unwrap(),
-    ])
+    get_payload(
+        module_id,
+        ident_str!("mint_new_token").to_owned(),
+        vec![bcs::to_bytes(&other).unwrap()],
+    )
 }
 
 fn rand_string(rng: &mut StdRng, len: usize) -> String {
@@ -538,11 +552,15 @@ fn make_or_change(
     let name: String = rand_string(rng, str_len);
     let mut bytes = Vec::<u8>::with_capacity(data_len);
     rng.fill_bytes(&mut bytes);
-    get_payload(module_id, ident_str!("make_or_change").to_owned(), vec![
-        bcs::to_bytes(&id).unwrap(),
-        bcs::to_bytes(&name).unwrap(),
-        bcs::to_bytes(&bytes).unwrap(),
-    ])
+    get_payload(
+        module_id,
+        ident_str!("make_or_change").to_owned(),
+        vec![
+            bcs::to_bytes(&id).unwrap(),
+            bcs::to_bytes(&name).unwrap(),
+            bcs::to_bytes(&bytes).unwrap(),
+        ],
+    )
 }
 
 fn bytes_make_or_change(

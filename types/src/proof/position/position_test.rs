@@ -181,30 +181,39 @@ pub fn test_sibling_sequence() {
         .take(20)
         .map(Position::to_inorder_index)
         .collect::<Vec<u64>>();
-    assert_eq!(sibling_sequence1, vec![
-        2, 5, 11, 23, 47, 95, 191, 383, 767, 1535, 3071, 6143, 12287, 24575, 49151, 98303, 196_607,
-        393_215, 786_431, 1_572_863
-    ]);
+    assert_eq!(
+        sibling_sequence1,
+        vec![
+            2, 5, 11, 23, 47, 95, 191, 383, 767, 1535, 3071, 6143, 12287, 24575, 49151, 98303,
+            196_607, 393_215, 786_431, 1_572_863
+        ]
+    );
 
     let sibling_sequence2 = Position::from_inorder_index(6)
         .iter_ancestor_sibling()
         .take(20)
         .map(Position::to_inorder_index)
         .collect::<Vec<u64>>();
-    assert_eq!(sibling_sequence2, vec![
-        4, 1, 11, 23, 47, 95, 191, 383, 767, 1535, 3071, 6143, 12287, 24575, 49151, 98303, 196_607,
-        393_215, 786_431, 1_572_863
-    ]);
+    assert_eq!(
+        sibling_sequence2,
+        vec![
+            4, 1, 11, 23, 47, 95, 191, 383, 767, 1535, 3071, 6143, 12287, 24575, 49151, 98303,
+            196_607, 393_215, 786_431, 1_572_863
+        ]
+    );
 
     let sibling_sequence3 = Position::from_inorder_index(7)
         .iter_ancestor_sibling()
         .take(20)
         .map(Position::to_inorder_index)
         .collect::<Vec<u64>>();
-    assert_eq!(sibling_sequence3, vec![
-        23, 47, 95, 191, 383, 767, 1535, 3071, 6143, 12287, 24575, 49151, 98303, 196_607, 393_215,
-        786_431, 1_572_863, 3_145_727, 6_291_455, 12_582_911
-    ]);
+    assert_eq!(
+        sibling_sequence3,
+        vec![
+            23, 47, 95, 191, 383, 767, 1535, 3071, 6143, 12287, 24575, 49151, 98303, 196_607,
+            393_215, 786_431, 1_572_863, 3_145_727, 6_291_455, 12_582_911
+        ]
+    );
 }
 
 #[test]
@@ -214,20 +223,26 @@ pub fn test_parent_sequence() {
         .take(20)
         .map(Position::to_inorder_index)
         .collect::<Vec<u64>>();
-    assert_eq!(parent_sequence1, vec![
-        0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4095, 8191, 16383, 32767, 65535,
-        131_071, 262_143, 524_287
-    ]);
+    assert_eq!(
+        parent_sequence1,
+        vec![
+            0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4095, 8191, 16383, 32767, 65535,
+            131_071, 262_143, 524_287
+        ]
+    );
 
     let parent_sequence2 = Position::from_inorder_index(12)
         .iter_ancestor()
         .take(20)
         .map(Position::to_inorder_index)
         .collect::<Vec<u64>>();
-    assert_eq!(parent_sequence2, vec![
-        12, 13, 11, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4095, 8191, 16383, 32767, 65535,
-        131_071, 262_143, 524_287
-    ]);
+    assert_eq!(
+        parent_sequence2,
+        vec![
+            12, 13, 11, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4095, 8191, 16383, 32767, 65535,
+            131_071, 262_143, 524_287
+        ]
+    );
 }
 
 fn slow_get_frozen_subtree_roots_impl(root: Position, max_leaf_index: u64) -> Vec<Position> {

@@ -261,19 +261,25 @@ impl MempoolNode {
         let data = protocol_id.to_bytes(&msg).unwrap().into();
         let (notif, maybe_receiver) = match protocol_id {
             ProtocolId::MempoolDirectSend => (
-                PeerManagerNotification::RecvMessage(remote_peer_id, Message {
-                    protocol_id,
-                    mdata: data,
-                }),
+                PeerManagerNotification::RecvMessage(
+                    remote_peer_id,
+                    Message {
+                        protocol_id,
+                        mdata: data,
+                    },
+                ),
                 None,
             ),
             ProtocolId::MempoolRpc => {
                 let (res_tx, res_rx) = oneshot::channel();
-                let notif = PeerManagerNotification::RecvRpc(remote_peer_id, InboundRpcRequest {
-                    protocol_id,
-                    data,
-                    res_tx,
-                });
+                let notif = PeerManagerNotification::RecvRpc(
+                    remote_peer_id,
+                    InboundRpcRequest {
+                        protocol_id,
+                        data,
+                        res_tx,
+                    },
+                );
                 (notif, Some(res_rx))
             },
 
@@ -402,10 +408,13 @@ impl MempoolNode {
         if let Some(rpc_sender) = maybe_rpc_sender {
             rpc_sender.send(Ok(bytes.into())).unwrap();
         } else {
-            let notif = PeerManagerNotification::RecvMessage(peer_id, Message {
-                protocol_id,
-                mdata: bytes.into(),
-            });
+            let notif = PeerManagerNotification::RecvMessage(
+                peer_id,
+                Message {
+                    protocol_id,
+                    mdata: bytes.into(),
+                },
+            );
             inbound_handle
                 .inbound_message_sender
                 .push((peer_id, protocol_id), notif)
@@ -595,13 +604,16 @@ fn setup_mempool(
         notification_receiver: reconfig_events,
     };
     reconfig_sender
-        .push((), ReconfigNotification {
-            version: 1,
-            on_chain_configs: OnChainConfigPayload::new(
-                1,
-                InMemoryOnChainConfig::new(HashMap::new()),
-            ),
-        })
+        .push(
+            (),
+            ReconfigNotification {
+                version: 1,
+                on_chain_configs: OnChainConfigPayload::new(
+                    1,
+                    InMemoryOnChainConfig::new(HashMap::new()),
+                ),
+            },
+        )
         .unwrap();
 
     start_shared_mempool(

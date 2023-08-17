@@ -209,12 +209,10 @@ fn test_multi_ed25519_signature_serialization() {
     let multi_sig32 = MultiEd25519Signature::new(sig32_tuple);
     assert!(multi_sig32.is_ok());
     let multi_sig32_unwrapped = multi_sig32.unwrap();
-    assert_eq!(multi_sig32_unwrapped.bitmap(), &[
-        0b1111_1111,
-        0b1111_1111,
-        0b1111_1111,
-        0b1111_1111
-    ]);
+    assert_eq!(
+        multi_sig32_unwrapped.bitmap(),
+        &[0b1111_1111, 0b1111_1111, 0b1111_1111, 0b1111_1111]
+    );
     let pub_key_32 = vec![priv_keys_3[0].public_key(); 32];
     let multi_pub_key_32 = MultiEd25519PublicKey::new(pub_key_32, 32).unwrap();
     assert!(multi_sig32_unwrapped
@@ -275,12 +273,10 @@ fn test_multi_ed25519_signature_verification() {
 
     // Verifying a 7-of-10 signature against a public key with the same threshold should pass.
     let multi_signature_7of10 = multi_private_key_7of10.sign(message()).unwrap();
-    assert_eq!(multi_signature_7of10.bitmap(), &[
-        0b1111_1110,
-        0u8,
-        0u8,
-        0u8
-    ]);
+    assert_eq!(
+        multi_signature_7of10.bitmap(),
+        &[0b1111_1110, 0u8, 0u8, 0u8]
+    );
     assert!(multi_signature_7of10
         .verify(message(), &multi_public_key_7of10)
         .is_ok());
@@ -318,12 +314,10 @@ fn test_multi_ed25519_signature_verification() {
     let multi_sig_signed_by_2nd_key = MultiEd25519Signature::new(vec![(sig_with_2nd_key, 1)]);
     assert!(multi_sig_signed_by_2nd_key.is_ok());
     let multi_sig_signed_by_2nd_key_unwrapped = multi_sig_signed_by_2nd_key.unwrap();
-    assert_eq!(multi_sig_signed_by_2nd_key_unwrapped.bitmap(), &[
-        0b0100_0000,
-        0u8,
-        0u8,
-        0u8
-    ]);
+    assert_eq!(
+        multi_sig_signed_by_2nd_key_unwrapped.bitmap(),
+        &[0b0100_0000, 0u8, 0u8, 0u8]
+    );
     assert!(multi_sig_signed_by_2nd_key_unwrapped
         .verify(message(), &multi_public_key_1of3)
         .is_ok());
@@ -347,12 +341,10 @@ fn test_multi_ed25519_signature_verification() {
     assert!(multi_sig_signed_by_2nd_and_3rd_key.is_ok());
     let multi_sig_signed_by_2nd_and_3rd_key_unwrapped =
         multi_sig_signed_by_2nd_and_3rd_key.unwrap();
-    assert_eq!(multi_sig_signed_by_2nd_and_3rd_key_unwrapped.bitmap(), &[
-        0b0110_0000,
-        0u8,
-        0u8,
-        0u8
-    ]);
+    assert_eq!(
+        multi_sig_signed_by_2nd_and_3rd_key_unwrapped.bitmap(),
+        &[0b0110_0000, 0u8, 0u8, 0u8]
+    );
     assert!(multi_sig_signed_by_2nd_and_3rd_key_unwrapped
         .verify(message(), &multi_public_key_1of3)
         .is_ok());
@@ -394,12 +386,10 @@ fn test_multi_ed25519_signature_verification() {
     ]);
     assert!(signed_by_1st_and_2nd_key.is_ok());
     let signed_by_1st_and_2nd_key_unwrapped = signed_by_1st_and_2nd_key.unwrap();
-    assert_eq!(signed_by_1st_and_2nd_key_unwrapped.bitmap(), &[
-        0b1100_0000,
-        0u8,
-        0u8,
-        0u8
-    ]);
+    assert_eq!(
+        signed_by_1st_and_2nd_key_unwrapped.bitmap(),
+        &[0b1100_0000, 0u8, 0u8, 0u8]
+    );
     assert!(signed_by_1st_and_2nd_key_unwrapped
         .verify(message(), &multi_public_key_2of3)
         .is_ok());
@@ -411,12 +401,10 @@ fn test_multi_ed25519_signature_verification() {
     ]);
     assert!(signed_by_1st_and_3rd_key.is_ok());
     let signed_by_1st_and_3rd_key_unwrapped = signed_by_1st_and_3rd_key.unwrap();
-    assert_eq!(signed_by_1st_and_3rd_key_unwrapped.bitmap(), &[
-        0b1010_0000,
-        0u8,
-        0u8,
-        0u8
-    ]);
+    assert_eq!(
+        signed_by_1st_and_3rd_key_unwrapped.bitmap(),
+        &[0b1010_0000, 0u8, 0u8, 0u8]
+    );
     assert!(signed_by_1st_and_3rd_key_unwrapped
         .verify(message(), &multi_public_key_2of3)
         .is_ok());
@@ -428,12 +416,10 @@ fn test_multi_ed25519_signature_verification() {
     ]);
     assert!(signed_by_2nd_and_3rd_key.is_ok());
     let signed_by_2nd_and_3rd_key_unwrapped = signed_by_2nd_and_3rd_key.unwrap();
-    assert_eq!(signed_by_2nd_and_3rd_key_unwrapped.bitmap(), &[
-        0b0110_0000,
-        0u8,
-        0u8,
-        0u8
-    ]);
+    assert_eq!(
+        signed_by_2nd_and_3rd_key_unwrapped.bitmap(),
+        &[0b0110_0000, 0u8, 0u8, 0u8]
+    );
     assert!(signed_by_2nd_and_3rd_key_unwrapped
         .verify(message(), &multi_public_key_2of3)
         .is_ok());
@@ -446,12 +432,10 @@ fn test_multi_ed25519_signature_verification() {
     ]);
     assert!(signed_by_all_3_keys.is_ok());
     let signed_by_all_3_keys_unwrapped = signed_by_all_3_keys.unwrap();
-    assert_eq!(signed_by_all_3_keys_unwrapped.bitmap(), &[
-        0b1110_0000,
-        0u8,
-        0u8,
-        0u8
-    ]);
+    assert_eq!(
+        signed_by_all_3_keys_unwrapped.bitmap(),
+        &[0b1110_0000, 0u8, 0u8, 0u8]
+    );
     assert!(signed_by_all_3_keys_unwrapped
         .verify(message(), &multi_public_key_2of3)
         .is_ok());
@@ -460,12 +444,10 @@ fn test_multi_ed25519_signature_verification() {
     let signed_by_2nd_key = MultiEd25519Signature::new(vec![(sig_with_2nd_key, 1)]);
     assert!(signed_by_2nd_key.is_ok());
     let signed_by_2nd_key_unwrapped = signed_by_2nd_key.unwrap();
-    assert_eq!(signed_by_2nd_key_unwrapped.bitmap(), &[
-        0b0100_0000,
-        0u8,
-        0u8,
-        0u8
-    ]);
+    assert_eq!(
+        signed_by_2nd_key_unwrapped.bitmap(),
+        &[0b0100_0000, 0u8, 0u8, 0u8]
+    );
     assert!(signed_by_2nd_key_unwrapped
         .verify(message(), &multi_public_key_2of3)
         .is_err());

@@ -363,16 +363,22 @@ pub trait TestNode: ApplicationNode + Sync {
 
         // TODO: Add timeout functionality
         let peer_manager_notif = if let Some((_timeout, res_tx)) = maybe_rpc_info {
-            PeerManagerNotification::RecvRpc(sender_peer_id, InboundRpcRequest {
-                protocol_id,
-                data,
-                res_tx,
-            })
+            PeerManagerNotification::RecvRpc(
+                sender_peer_id,
+                InboundRpcRequest {
+                    protocol_id,
+                    data,
+                    res_tx,
+                },
+            )
         } else {
-            PeerManagerNotification::RecvMessage(sender_peer_id, Message {
-                protocol_id,
-                mdata: data,
-            })
+            PeerManagerNotification::RecvMessage(
+                sender_peer_id,
+                Message {
+                    protocol_id,
+                    mdata: data,
+                },
+            )
         };
         receiver_handle
             .inbound_message_sender

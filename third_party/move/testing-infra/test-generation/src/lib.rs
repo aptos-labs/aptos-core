@@ -430,14 +430,12 @@ pub fn abilities(
         Reference(_) | MutableReference(_) => AbilitySet::REFERENCES,
         Signer => AbilitySet::SIGNER,
         TypeParameter(idx) => constraints[*idx as usize],
-        Vector(ty) => {
-            AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![abilities(
-                module,
-                ty,
-                constraints,
-            )])
-            .unwrap()
-        },
+        Vector(ty) => AbilitySet::polymorphic_abilities(
+            AbilitySet::VECTOR,
+            vec![false],
+            vec![abilities(module, ty, constraints)],
+        )
+        .unwrap(),
         Struct(idx) => {
             let sh = module.struct_handle_at(*idx);
             sh.abilities

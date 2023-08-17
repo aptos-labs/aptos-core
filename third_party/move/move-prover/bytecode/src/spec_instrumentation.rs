@@ -650,11 +650,11 @@ impl<'a> Instrumenter<'a> {
             // Emit placeholders for assuming well-formedness of return values and mutable ref
             // parameters.
             for idx in mut_srcs.into_iter().chain(dests.iter().cloned()) {
-                let exp = self
-                    .builder
-                    .mk_call(&BOOL_TYPE, ast::Operation::WellFormed, vec![self
-                        .builder
-                        .mk_temporary(idx)]);
+                let exp = self.builder.mk_call(
+                    &BOOL_TYPE,
+                    ast::Operation::WellFormed,
+                    vec![self.builder.mk_temporary(idx)],
+                );
                 self.builder.emit_with(move |id| Prop(id, Assume, exp));
             }
 

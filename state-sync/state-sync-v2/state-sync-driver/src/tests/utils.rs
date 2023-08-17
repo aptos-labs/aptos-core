@@ -194,9 +194,10 @@ pub fn create_transaction_info() -> TransactionInfo {
 
 /// Creates a test transaction info list with proof
 pub fn create_transaction_info_list_with_proof() -> TransactionInfoListWithProof {
-    TransactionInfoListWithProof::new(TransactionAccumulatorRangeProof::new_empty(), vec![
-        create_transaction_info(),
-    ])
+    TransactionInfoListWithProof::new(
+        TransactionAccumulatorRangeProof::new_empty(),
+        vec![create_transaction_info()],
+    )
 }
 
 /// Creates a test transaction list with proof

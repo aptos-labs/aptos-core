@@ -11,7 +11,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
     aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
-    evm::NativeEvmContext
+    evm::NativeEvmContext,
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
@@ -165,8 +165,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .into_change_set()
             .map_err(|e| e.finish(Location::Undefined))?;
 
-        table_change_set.new_tables.extend(evm_change_set.new_tables);
-        table_change_set.removed_tables.extend(evm_change_set.removed_tables);
+        table_change_set
+            .new_tables
+            .extend(evm_change_set.new_tables);
+        table_change_set
+            .removed_tables
+            .extend(evm_change_set.removed_tables);
         table_change_set.changes.extend(evm_change_set.changes);
 
         let aggregator_context: NativeAggregatorContext = extensions.remove();

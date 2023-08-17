@@ -36,23 +36,29 @@ async fn generate_traffic_and_assert_committed(
         .await
         .unwrap();
 
-    let txn_stat = generate_traffic(swarm, nodes, duration, 1, vec![vec![
-        (
-            TransactionType::CoinTransfer {
-                invalid_transaction_ratio: 0,
-                sender_use_account_pool: false,
-            },
-            70,
-        ),
-        (
-            TransactionType::AccountGeneration {
-                add_created_accounts_to_pool: true,
-                max_account_working_set: 1_000_000,
-                creation_balance: 1_000_000,
-            },
-            20,
-        ),
-    ]])
+    let txn_stat = generate_traffic(
+        swarm,
+        nodes,
+        duration,
+        1,
+        vec![vec![
+            (
+                TransactionType::CoinTransfer {
+                    invalid_transaction_ratio: 0,
+                    sender_use_account_pool: false,
+                },
+                70,
+            ),
+            (
+                TransactionType::AccountGeneration {
+                    add_created_accounts_to_pool: true,
+                    max_account_working_set: 1_000_000,
+                    creation_balance: 1_000_000,
+                },
+                20,
+            ),
+        ]],
+    )
     .await
     .unwrap();
     println!("{:?}", txn_stat.rate());

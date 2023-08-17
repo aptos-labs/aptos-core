@@ -607,12 +607,15 @@ impl<'a> Context<'a> {
     ) -> Result<StructHandleIndex> {
         let module = self.module_handle_index(&sname.module)?;
         let name = self.identifier_index(sname.name.0)?;
-        self.structs.insert(sname.clone(), StructHandle {
-            module,
-            name,
-            abilities,
-            type_parameters,
-        });
+        self.structs.insert(
+            sname.clone(),
+            StructHandle {
+                module,
+                name,
+                abilities,
+                type_parameters,
+            },
+        );
         Ok(StructHandleIndex(get_or_add_item_ref(
             &mut self.struct_handles,
             self.structs.get(&sname).unwrap(),

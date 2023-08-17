@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
-use primitive_types::{H160, H256, U256};
 use move_core_types::value::{MoveTypeLayout, MoveValue};
+use primitive_types::{H160, H256, U256};
 
 pub fn u256_to_h160(value: &U256) -> H160 {
     let mut result = [0u8; 32];
@@ -27,7 +27,8 @@ pub fn h256_to_arr(value: &H256) -> [u8; 32] {
 }
 
 pub fn read_u256_from_move_bytes(bytes: &[u8]) -> U256 {
-    let move_value: MoveValue = MoveValue::simple_deserialize(&bytes, &MoveTypeLayout::U256).unwrap();
+    let move_value: MoveValue =
+        MoveValue::simple_deserialize(&bytes, &MoveTypeLayout::U256).unwrap();
     move_value.to_u256().into_inner()
 }
 
@@ -40,16 +41,15 @@ pub fn read_h256_from_bytes(bytes: &[u8]) -> H256 {
     H256(buf)
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
     use primitive_types::U256;
+    use std::str::FromStr;
 
     #[test]
     fn test_ser_de() {
         let value = U256::from("111000");
-        let bytes  = super::u256_to_move_arr(&value);
+        let bytes = super::u256_to_move_arr(&value);
         let value2 = super::read_u256_from_move_bytes(&bytes);
         assert_eq!(value, value2);
     }

@@ -158,12 +158,11 @@ mod tests {
         assert_eq!(flattened_metric, "counter_2.hello".to_string());
 
         // Generate another counter for testing
-        let another_counter_2 =
-            IntCounterVec::new(Opts::new(counter_name_2, "Example counter for testing"), &[
-                "label_me",
-                "label_me_too",
-            ])
-            .unwrap();
+        let another_counter_2 = IntCounterVec::new(
+            Opts::new(counter_name_2, "Example counter for testing"),
+            &["label_me", "label_me_too"],
+        )
+        .unwrap();
 
         // Flatten a mismatched metric (without a label) and check the result
         let counter_name_3 = "counter_3";
@@ -186,9 +185,10 @@ mod tests {
     #[test]
     fn test_encoder() {
         // Generate a counter for testing
-        let counter = IntCounterVec::new(Opts::new("testing_count", "Test Counter"), &[
-            "method", "result",
-        ])
+        let counter = IntCounterVec::new(
+            Opts::new("testing_count", "Test Counter"),
+            &["method", "result"],
+        )
         .unwrap();
 
         // Add test data to the counter

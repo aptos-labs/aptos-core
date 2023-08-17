@@ -75,9 +75,10 @@ impl CommandAdapter {
 impl BackupStorage for CommandAdapter {
     async fn create_backup(&self, name: &ShellSafeName) -> Result<BackupHandle> {
         let mut child = self
-            .cmd(&self.config.commands.create_backup, vec![
-                EnvVar::backup_name(name.to_string()),
-            ])
+            .cmd(
+                &self.config.commands.create_backup,
+                vec![EnvVar::backup_name(name.to_string())],
+            )
             .spawn()?;
         let mut backup_handle = BackupHandle::new();
         child
@@ -97,10 +98,13 @@ impl BackupStorage for CommandAdapter {
         name: &ShellSafeName,
     ) -> Result<(FileHandle, Box<dyn AsyncWrite + Send + Unpin>)> {
         let mut child = self
-            .cmd(&self.config.commands.create_for_write, vec![
-                EnvVar::backup_handle(backup_handle.to_string()),
-                EnvVar::file_name(name.as_ref()),
-            ])
+            .cmd(
+                &self.config.commands.create_for_write,
+                vec![
+                    EnvVar::backup_handle(backup_handle.to_string()),
+                    EnvVar::file_name(name.as_ref()),
+                ],
+            )
             .spawn()?;
         let mut file_handle = FileHandle::new();
         child
@@ -117,9 +121,10 @@ impl BackupStorage for CommandAdapter {
         file_handle: &FileHandleRef,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>> {
         let child = self
-            .cmd(&self.config.commands.open_for_read, vec![
-                EnvVar::file_handle(file_handle.to_string()),
-            ])
+            .cmd(
+                &self.config.commands.open_for_read,
+                vec![EnvVar::file_handle(file_handle.to_string())],
+            )
             .spawn()?;
         Ok(Box::new(child.into_data_source()))
     }
@@ -166,9 +171,10 @@ impl BackupStorage for CommandAdapter {
         lines: &[TextLine],
     ) -> Result<FileHandle> {
         let mut child = self
-            .cmd(&self.config.commands.save_metadata_line, vec![
-                EnvVar::file_name(name.as_ref()),
-            ])
+            .cmd(
+                &self.config.commands.save_metadata_line,
+                vec![EnvVar::file_name(name.as_ref())],
+            )
             .spawn()?;
         let mut file_handle = FileHandle::new();
         child

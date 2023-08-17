@@ -35,10 +35,13 @@ impl Errmap {
             .with_extension(move_command_line_common::files::MOVE_ERROR_DESC_EXTENSION)
             .to_string_lossy()
             .to_string();
-        let model = config.move_model_for_package(&rerooted_path, ModelConfig {
-            all_files_as_targets: true,
-            target_filter: None,
-        })?;
+        let model = config.move_model_for_package(
+            &rerooted_path,
+            ModelConfig {
+                all_files_as_targets: true,
+                target_filter: None,
+            },
+        )?;
         let mut errmap_gen = move_errmapgen::ErrmapGen::new(&model, &errmap_options);
         errmap_gen.gen();
         errmap_gen.save_result();

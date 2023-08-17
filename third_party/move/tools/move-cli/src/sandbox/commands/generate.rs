@@ -32,13 +32,15 @@ pub fn generate_struct_layouts(
                 name,
                 type_params,
             };
-            let mut layout_builder =
-                SerdeLayoutBuilder::new_with_config(&state, SerdeLayoutConfig {
+            let mut layout_builder = SerdeLayoutBuilder::new_with_config(
+                &state,
+                SerdeLayoutConfig {
                     separator,
                     omit_addresses,
                     ignore_phantom_types,
                     shallow,
-                });
+                },
+            );
             layout_builder.build_struct_layout(&struct_tag)?;
             let layout = serde_yaml::to_string(layout_builder.registry())?;
             state.save_struct_layouts(&layout)?;

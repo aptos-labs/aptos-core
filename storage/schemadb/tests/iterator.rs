@@ -139,9 +139,10 @@ fn test_seek_to_first() {
 
     let mut iter = db.iter();
     iter.seek_to_first();
-    assert_eq!(collect_values(iter), [
-        100, 102, 104, 110, 112, 114, 200, 202
-    ]);
+    assert_eq!(
+        collect_values(iter),
+        [100, 102, 104, 110, 112, 114, 200, 202]
+    );
 
     let mut iter = db.rev_iter();
     iter.seek_to_first();
@@ -158,9 +159,10 @@ fn test_seek_to_last() {
 
     let mut iter = db.rev_iter();
     iter.seek_to_last();
-    assert_eq!(collect_values(iter), [
-        202, 200, 114, 112, 110, 104, 102, 100
-    ]);
+    assert_eq!(
+        collect_values(iter),
+        [202, 200, 114, 112, 110, 104, 102, 100]
+    );
 }
 
 #[test]

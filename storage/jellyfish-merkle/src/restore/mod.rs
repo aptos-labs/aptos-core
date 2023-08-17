@@ -313,10 +313,13 @@ where
             // partial node and we do not know its hash yet. For the lowest partial node, we just
             // find all its known children from storage in the loop above.
             if let Some(index) = previous_child_index {
-                internal_info.set_child(index, ChildInfo::Internal {
-                    hash: None,
-                    leaf_count: None,
-                });
+                internal_info.set_child(
+                    index,
+                    ChildInfo::Internal {
+                        hash: None,
+                        leaf_count: None,
+                    },
+                );
             }
 
             partial_nodes.push(internal_info);
@@ -501,10 +504,13 @@ where
             let new_node_key = NodeKey::new(self.version, visited_nibbles);
 
             let mut internal_info = InternalInfo::new_empty(new_node_key);
-            internal_info.set_child(u8::from(next_nibble) as usize, ChildInfo::Internal {
-                hash: None,
-                leaf_count: None,
-            });
+            internal_info.set_child(
+                u8::from(next_nibble) as usize,
+                ChildInfo::Internal {
+                    hash: None,
+                    leaf_count: None,
+                },
+            );
             self.partial_nodes.push(internal_info);
         }
 

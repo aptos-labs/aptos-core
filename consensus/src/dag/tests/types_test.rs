@@ -129,9 +129,13 @@ fn test_dag_snapshot_bitmask() {
     assert!(!bitmask.has(2, 0));
     assert_eq!(bitmask.first_round(), 1);
 
-    let bitmask = DagSnapshotBitmask::new(1, vec![vec![false, true, true, true], vec![
-        false, true, false, false,
-    ]]);
+    let bitmask = DagSnapshotBitmask::new(
+        1,
+        vec![
+            vec![false, true, true, true],
+            vec![false, true, false, false],
+        ],
+    );
 
     assert!(!bitmask.has(1, 0));
     assert!(bitmask.has(1, 3));

@@ -230,10 +230,13 @@ fn module(
         function_declarations,
     );
 
-    let sp!(ident_loc, ModuleIdent_ {
-        address: _,
-        module: module_name
-    }) = ident;
+    let sp!(
+        ident_loc,
+        ModuleIdent_ {
+            address: _,
+            module: module_name
+        }
+    ) = ident;
     let ir_module = IR::ModuleDefinition {
         loc: ident_loc,
         identifier: IR::ModuleIdent {
@@ -524,13 +527,16 @@ fn struct_def(
     let abilities = abilities(&abs);
     let type_formals = struct_type_parameters(tys);
     let fields = struct_fields(context, loc, fields);
-    sp(loc, IR::StructDefinition_ {
-        name,
-        abilities,
-        type_formals,
-        fields,
-        invariants: vec![],
-    })
+    sp(
+        loc,
+        IR::StructDefinition_ {
+            name,
+            abilities,
+            type_formals,
+            fields,
+            invariants: vec![],
+        },
+    )
 }
 
 fn struct_fields(
@@ -1178,65 +1184,74 @@ fn module_call(
 fn builtin(context: &mut Context, code: &mut IR::BytecodeBlock, sp!(loc, b_): H::BuiltinFunction) {
     use H::BuiltinFunction_ as HB;
     use IR::Bytecode_ as B;
-    code.push(sp(loc, match b_ {
-        HB::MoveTo(bt) => {
-            let (n, tys) = struct_definition_name_base(context, bt);
-            B::MoveTo(n, tys)
+    code.push(sp(
+        loc,
+        match b_ {
+            HB::MoveTo(bt) => {
+                let (n, tys) = struct_definition_name_base(context, bt);
+                B::MoveTo(n, tys)
+            },
+            HB::MoveFrom(bt) => {
+                let (n, tys) = struct_definition_name_base(context, bt);
+                B::MoveFrom(n, tys)
+            },
+            HB::BorrowGlobal(false, bt) => {
+                let (n, tys) = struct_definition_name_base(context, bt);
+                B::ImmBorrowGlobal(n, tys)
+            },
+            HB::BorrowGlobal(true, bt) => {
+                let (n, tys) = struct_definition_name_base(context, bt);
+                B::MutBorrowGlobal(n, tys)
+            },
+            HB::Exists(bt) => {
+                let (n, tys) = struct_definition_name_base(context, bt);
+                B::Exists(n, tys)
+            },
         },
-        HB::MoveFrom(bt) => {
-            let (n, tys) = struct_definition_name_base(context, bt);
-            B::MoveFrom(n, tys)
-        },
-        HB::BorrowGlobal(false, bt) => {
-            let (n, tys) = struct_definition_name_base(context, bt);
-            B::ImmBorrowGlobal(n, tys)
-        },
-        HB::BorrowGlobal(true, bt) => {
-            let (n, tys) = struct_definition_name_base(context, bt);
-            B::MutBorrowGlobal(n, tys)
-        },
-        HB::Exists(bt) => {
-            let (n, tys) = struct_definition_name_base(context, bt);
-            B::Exists(n, tys)
-        },
-    }))
+    ))
 }
 
 fn unary_op(code: &mut IR::BytecodeBlock, sp!(loc, op_): UnaryOp) {
     use UnaryOp_ as O;
     use IR::Bytecode_ as B;
-    code.push(sp(loc, match op_ {
-        O::Not => B::Not,
-    }));
+    code.push(sp(
+        loc,
+        match op_ {
+            O::Not => B::Not,
+        },
+    ));
 }
 
 fn binary_op(code: &mut IR::BytecodeBlock, sp!(loc, op_): BinOp) {
     use BinOp_ as O;
     use IR::Bytecode_ as B;
-    code.push(sp(loc, match op_ {
-        O::Add => B::Add,
-        O::Sub => B::Sub,
-        O::Mul => B::Mul,
-        O::Mod => B::Mod,
-        O::Div => B::Div,
-        O::BitOr => B::BitOr,
-        O::BitAnd => B::BitAnd,
-        O::Xor => B::Xor,
-        O::Shl => B::Shl,
-        O::Shr => B::Shr,
+    code.push(sp(
+        loc,
+        match op_ {
+            O::Add => B::Add,
+            O::Sub => B::Sub,
+            O::Mul => B::Mul,
+            O::Mod => B::Mod,
+            O::Div => B::Div,
+            O::BitOr => B::BitOr,
+            O::BitAnd => B::BitAnd,
+            O::Xor => B::Xor,
+            O::Shl => B::Shl,
+            O::Shr => B::Shr,
 
-        O::And => B::And,
-        O::Or => B::Or,
+            O::And => B::And,
+            O::Or => B::Or,
 
-        O::Eq => B::Eq,
-        O::Neq => B::Neq,
+            O::Eq => B::Eq,
+            O::Neq => B::Neq,
 
-        O::Lt => B::Lt,
-        O::Gt => B::Gt,
+            O::Lt => B::Lt,
+            O::Gt => B::Gt,
 
-        O::Le => B::Le,
-        O::Ge => B::Ge,
+            O::Le => B::Le,
+            O::Ge => B::Ge,
 
-        O::Range | O::Implies | O::Iff => panic!("specification operator unexpected"),
-    }));
+            O::Range | O::Implies | O::Iff => panic!("specification operator unexpected"),
+        },
+    ));
 }

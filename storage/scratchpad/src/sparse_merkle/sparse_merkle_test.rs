@@ -299,10 +299,10 @@ fn test_update() {
     let x_hash = hash_internal(leaf1.hash(), leaf2.hash());
     let y_hash = hash_internal(x_hash, *SPARSE_MERKLE_PLACEHOLDER_HASH);
     let old_root_hash = hash_internal(y_hash, leaf3.hash());
-    let proof = SparseMerkleProofExt::new(None, vec![
-        NodeInProof::Other(x_hash),
-        NodeInProof::Leaf(leaf3),
-    ]);
+    let proof = SparseMerkleProofExt::new(
+        None,
+        vec![NodeInProof::Other(x_hash), NodeInProof::Leaf(leaf3)],
+    );
     assert!(proof
         .verify::<StateValue>(old_root_hash, key4, None)
         .is_ok());
@@ -342,11 +342,14 @@ fn test_update() {
     assert!(Arc::ptr_eq(&smt1.get_oldest_ancestor().inner, &smt1.inner));
 
     // Next, we are going to delete key1. Create a proof for key1.
-    let proof = SparseMerkleProofExt::new(Some(leaf1), vec![
-        leaf2.into(),
-        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-        leaf3.into(),
-    ]);
+    let proof = SparseMerkleProofExt::new(
+        Some(leaf1),
+        vec![
+            leaf2.into(),
+            (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+            leaf3.into(),
+        ],
+    );
     assert!(proof.verify(old_root_hash, key1, Some(&value1)).is_ok());
 
     let proof_reader = ProofReader::new(vec![(key1, proof)]);

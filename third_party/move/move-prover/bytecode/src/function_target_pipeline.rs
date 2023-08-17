@@ -595,11 +595,14 @@ impl FunctionTargetPipeline {
         targets: &FunctionTargetsHolder,
         processor: &dyn FunctionTargetProcessor,
     ) -> String {
-        let mut dump = format!("{}", ProcessorResultDisplay {
-            env,
-            targets,
-            processor,
-        });
+        let mut dump = format!(
+            "{}",
+            ProcessorResultDisplay {
+                env,
+                targets,
+                processor,
+            }
+        );
         if !processor.is_single_run() {
             if !dump.is_empty() {
                 dump = format!("\n\n{}", dump);

@@ -52,10 +52,10 @@ impl TransactionGenerator for BatchTransferTransactionGenerator {
                 .collect::<Vec<_>>();
             requests.push(
                 account.sign_with_transaction_builder(self.txn_factory.payload(
-                    aptos_stdlib::aptos_account_batch_transfer(receivers, vec![
-                        self.send_amount;
-                        self.batch_size
-                    ]),
+                    aptos_stdlib::aptos_account_batch_transfer(
+                        receivers,
+                        vec![self.send_amount; self.batch_size],
+                    ),
                 )),
             );
         }

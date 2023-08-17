@@ -248,12 +248,10 @@ async fn test_entry_function_payload() {
     // The purpose of patches is to convert bytes arrays to hex-coded strings.
     // Patches the serde_json result is easier comparing to implement a customized serializer.
     fn patch(raw_txn_json: &mut serde_json::Value) {
-        let args = visit_json_field(raw_txn_json, &[
-            "raw_txn",
-            "payload",
-            "EntryFunction",
-            "args",
-        ]);
+        let args = visit_json_field(
+            raw_txn_json,
+            &["raw_txn", "payload", "EntryFunction", "args"],
+        );
 
         let mut hex_args: Vec<serde_json::Value> = vec![];
         for arg in args.as_array_mut().unwrap() {
@@ -329,12 +327,10 @@ async fn test_script_payload() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_module_payload() {
     fn patch(raw_txn_json: &mut serde_json::Value) {
-        let codes = visit_json_field(raw_txn_json, &[
-            "raw_txn",
-            "payload",
-            "ModuleBundle",
-            "codes",
-        ]);
+        let codes = visit_json_field(
+            raw_txn_json,
+            &["raw_txn", "payload", "ModuleBundle", "codes"],
+        );
 
         for code_element in codes.as_array_mut().unwrap() {
             let code_obj = code_element.as_object_mut().unwrap();

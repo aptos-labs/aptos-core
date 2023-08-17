@@ -7,9 +7,9 @@ use crate::{
 };
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext,
-    evm::NativeEvmContext,
     code::NativeCodeContext,
     cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
+    evm::NativeEvmContext,
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
@@ -87,17 +87,20 @@ impl MoveVmExt {
         }
 
         Ok(Self {
-            inner: MoveVM::new_with_config(aptos_natives_with_builder(&mut builder), VMConfig {
-                verifier: verifier_config,
-                max_binary_format_version,
-                paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
-                enable_invariant_violation_check_in_swap_loc,
-                type_size_limit,
-                max_value_nest_depth: Some(128),
-                type_max_cost,
-                type_base_cost,
-                type_byte_cost,
-            })?,
+            inner: MoveVM::new_with_config(
+                aptos_natives_with_builder(&mut builder),
+                VMConfig {
+                    verifier: verifier_config,
+                    max_binary_format_version,
+                    paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
+                    enable_invariant_violation_check_in_swap_loc,
+                    type_size_limit,
+                    max_value_nest_depth: Some(128),
+                    type_max_cost,
+                    type_base_cost,
+                    type_byte_cost,
+                },
+            )?,
             chain_id,
             features: Arc::new(features),
         })

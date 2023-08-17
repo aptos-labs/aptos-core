@@ -321,15 +321,18 @@ impl BuildPlan {
 
         // TODO: should inherit color settings from current shell
         let mut error_buffer = Buffer::ansi();
-        if let Err(err) = run_to_yul(&mut error_buffer, MoveToYulOptions {
-            dependencies,
-            named_address_mapping,
-            sources,
-            output: yul_output.clone(),
-            abi_output,
+        if let Err(err) = run_to_yul(
+            &mut error_buffer,
+            MoveToYulOptions {
+                dependencies,
+                named_address_mapping,
+                sources,
+                output: yul_output.clone(),
+                abi_output,
 
-            ..MoveToYulOptions::default()
-        }) {
+                ..MoveToYulOptions::default()
+            },
+        ) {
             writeln!(
                 writer,
                 "{} Failed to compile Move into Yul {}",

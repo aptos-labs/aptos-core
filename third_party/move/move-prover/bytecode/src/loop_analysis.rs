@@ -139,10 +139,13 @@ impl LoopAnalysisProcessor {
 
         let back_edge_locs = loop_annotation.back_edges_locations();
         let invariant_locs = loop_annotation.invariants_locations();
-        let mut builder =
-            FunctionDataBuilder::new_with_options(func_env, data, FunctionDataBuilderOptions {
+        let mut builder = FunctionDataBuilder::new_with_options(
+            func_env,
+            data,
+            FunctionDataBuilderOptions {
                 no_fallthrough_jump_removal: true,
-            });
+            },
+        );
         let mut goto_fixes = vec![];
         let code = std::mem::take(&mut builder.data.code);
         for (offset, bytecode) in code.into_iter().enumerate() {
@@ -377,10 +380,13 @@ impl LoopAnalysisProcessor {
         unrolling_mark: &LoopUnrollingMark,
     ) -> FunctionData {
         let options = ProverOptions::get(func_env.module_env.env);
-        let mut builder =
-            FunctionDataBuilder::new_with_options(func_env, data, FunctionDataBuilderOptions {
+        let mut builder = FunctionDataBuilder::new_with_options(
+            func_env,
+            data,
+            FunctionDataBuilderOptions {
                 no_fallthrough_jump_removal: true,
-            });
+            },
+        );
 
         // collect labels that belongs to this loop
         let in_loop_labels: BTreeSet<_> = unrolling_mark
@@ -750,12 +756,15 @@ impl LoopAnalysisProcessor {
                     // loop invariant instrumentation route
                     let (val_targets, mut_targets) =
                         Self::collect_loop_targets(&cfg, &func_target, &sub_loops);
-                    fat_loops_with_invariants.insert(label, FatLoop {
-                        invariants,
-                        val_targets,
-                        mut_targets,
-                        back_edges,
-                    });
+                    fat_loops_with_invariants.insert(
+                        label,
+                        FatLoop {
+                            invariants,
+                            val_targets,
+                            mut_targets,
+                            back_edges,
+                        },
+                    );
                 },
                 Some((attr_id, count)) => {
                     if !invariants.is_empty() {
@@ -770,12 +779,15 @@ impl LoopAnalysisProcessor {
                     }
                     // loop unrolling route
                     let loop_body = Self::collect_loop_body_bytecode(code, &cfg, &sub_loops);
-                    fat_loops_for_unrolling.insert(label, LoopUnrollingMark {
-                        marker: attr_id,
-                        loop_body,
-                        back_edges,
-                        iter_count: count,
-                    });
+                    fat_loops_for_unrolling.insert(
+                        label,
+                        LoopUnrollingMark {
+                            marker: attr_id,
+                            loop_body,
+                            back_edges,
+                            iter_count: count,
+                        },
+                    );
                 },
             }
         }

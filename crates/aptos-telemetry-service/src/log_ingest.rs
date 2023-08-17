@@ -24,13 +24,16 @@ pub fn log_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("ingest" / "logs")
         .and(warp::post())
         .and(context.clone().filter())
-        .and(with_auth(context, vec![
-            NodeType::Validator,
-            NodeType::ValidatorFullNode,
-            NodeType::PublicFullNode,
-            NodeType::UnknownFullNode,
-            NodeType::UnknownValidator,
-        ]))
+        .and(with_auth(
+            context,
+            vec![
+                NodeType::Validator,
+                NodeType::ValidatorFullNode,
+                NodeType::PublicFullNode,
+                NodeType::UnknownFullNode,
+                NodeType::UnknownValidator,
+            ],
+        ))
         .and(warp::header::optional(CONTENT_ENCODING.as_str()))
         .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
         .and(warp::body::aggregate())

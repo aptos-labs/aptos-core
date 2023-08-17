@@ -631,17 +631,20 @@ fn attribute(
 ) -> Option<E::Attribute> {
     use E::Attribute_ as EA;
     use P::Attribute_ as PA;
-    Some(sp(loc, match attribute_ {
-        PA::Name(n) => EA::Name(n),
-        PA::Assigned(n, v) => EA::Assigned(n, Box::new(attribute_value(context, *v)?)),
-        PA::Parameterized(n, sp!(_, pattrs_)) => {
-            let attrs = pattrs_
-                .into_iter()
-                .map(|a| attribute(context, attr_position, a))
-                .collect::<Option<Vec<_>>>()?;
-            EA::Parameterized(n, unique_attributes(context, attr_position, true, attrs))
+    Some(sp(
+        loc,
+        match attribute_ {
+            PA::Name(n) => EA::Name(n),
+            PA::Assigned(n, v) => EA::Assigned(n, Box::new(attribute_value(context, *v)?)),
+            PA::Parameterized(n, sp!(_, pattrs_)) => {
+                let attrs = pattrs_
+                    .into_iter()
+                    .map(|a| attribute(context, attr_position, a))
+                    .collect::<Option<Vec<_>>>()?;
+                EA::Parameterized(n, unique_attributes(context, attr_position, true, attrs))
+            },
         },
-    }))
+    ))
 }
 
 fn attribute_value(
@@ -650,55 +653,58 @@ fn attribute_value(
 ) -> Option<E::AttributeValue> {
     use E::AttributeValue_ as EV;
     use P::{AttributeValue_ as PV, LeadingNameAccess_ as LN, NameAccessChain_ as PN};
-    Some(sp(loc, match avalue_ {
-        PV::Value(v) => EV::Value(value(context, v)?),
-        PV::ModuleAccess(sp!(ident_loc, PN::Two(sp!(aloc, LN::AnonymousAddress(a)), n))) => {
-            let addr = Address::Numerical(None, sp(aloc, a));
-            let mident = sp(ident_loc, ModuleIdent_::new(addr, ModuleName(n)));
-            if context.module_members.get(&mident).is_none() {
-                context.env.add_diag(diag!(
-                    NameResolution::UnboundModule,
-                    (ident_loc, format!("Unbound module '{}'", mident))
-                ));
-            }
-            EV::Module(mident)
+    Some(sp(
+        loc,
+        match avalue_ {
+            PV::Value(v) => EV::Value(value(context, v)?),
+            PV::ModuleAccess(sp!(ident_loc, PN::Two(sp!(aloc, LN::AnonymousAddress(a)), n))) => {
+                let addr = Address::Numerical(None, sp(aloc, a));
+                let mident = sp(ident_loc, ModuleIdent_::new(addr, ModuleName(n)));
+                if context.module_members.get(&mident).is_none() {
+                    context.env.add_diag(diag!(
+                        NameResolution::UnboundModule,
+                        (ident_loc, format!("Unbound module '{}'", mident))
+                    ));
+                }
+                EV::Module(mident)
+            },
+            // bit wonky, but this is the only spot currently where modules and expressions exist
+            // in the same namespace.
+            // TODO consider if we want to just force all of these checks into the well-known
+            // attribute setup
+            PV::ModuleAccess(sp!(ident_loc, PN::One(n)))
+                if context.aliases.module_alias_get(&n).is_some() =>
+            {
+                let sp!(_, mident_) = context.aliases.module_alias_get(&n).unwrap();
+                let mident = sp(ident_loc, mident_);
+                if context.module_members.get(&mident).is_none() {
+                    context.env.add_diag(diag!(
+                        NameResolution::UnboundModule,
+                        (ident_loc, format!("Unbound module '{}'", mident))
+                    ));
+                }
+                EV::Module(mident)
+            },
+            PV::ModuleAccess(sp!(ident_loc, PN::Two(sp!(aloc, LN::Name(n1)), n2)))
+                if context
+                    .named_address_mapping
+                    .as_ref()
+                    .map(|m| m.contains_key(&n1.value))
+                    .unwrap_or(false) =>
+            {
+                let addr = address(context, false, sp(aloc, LN::Name(n1)));
+                let mident = sp(ident_loc, ModuleIdent_::new(addr, ModuleName(n2)));
+                if context.module_members.get(&mident).is_none() {
+                    context.env.add_diag(diag!(
+                        NameResolution::UnboundModule,
+                        (ident_loc, format!("Unbound module '{}'", mident))
+                    ));
+                }
+                EV::Module(mident)
+            },
+            PV::ModuleAccess(ma) => EV::ModuleAccess(name_access_chain(context, Access::Type, ma)?),
         },
-        // bit wonky, but this is the only spot currently where modules and expressions exist
-        // in the same namespace.
-        // TODO consider if we want to just force all of these checks into the well-known
-        // attribute setup
-        PV::ModuleAccess(sp!(ident_loc, PN::One(n)))
-            if context.aliases.module_alias_get(&n).is_some() =>
-        {
-            let sp!(_, mident_) = context.aliases.module_alias_get(&n).unwrap();
-            let mident = sp(ident_loc, mident_);
-            if context.module_members.get(&mident).is_none() {
-                context.env.add_diag(diag!(
-                    NameResolution::UnboundModule,
-                    (ident_loc, format!("Unbound module '{}'", mident))
-                ));
-            }
-            EV::Module(mident)
-        },
-        PV::ModuleAccess(sp!(ident_loc, PN::Two(sp!(aloc, LN::Name(n1)), n2)))
-            if context
-                .named_address_mapping
-                .as_ref()
-                .map(|m| m.contains_key(&n1.value))
-                .unwrap_or(false) =>
-        {
-            let addr = address(context, false, sp(aloc, LN::Name(n1)));
-            let mident = sp(ident_loc, ModuleIdent_::new(addr, ModuleName(n2)));
-            if context.module_members.get(&mident).is_none() {
-                context.env.add_diag(diag!(
-                    NameResolution::UnboundModule,
-                    (ident_loc, format!("Unbound module '{}'", mident))
-                ));
-            }
-            EV::Module(mident)
-        },
-        PV::ModuleAccess(ma) => EV::ModuleAccess(name_access_chain(context, Access::Type, ma)?),
-    }))
+    ))
 }
 
 //**************************************************************************************************
@@ -777,11 +783,14 @@ fn module_members(
                 cur_members.insert(s.name.0, ModuleMemberKind::Struct);
             },
             P::ModuleMember::Spec(
-                sp!(_, SB {
-                    target,
-                    members,
-                    ..
-                }),
+                sp!(
+                    _,
+                    SB {
+                        target,
+                        members,
+                        ..
+                    }
+                ),
             ) => match &target.value {
                 SBT::Schema(n, _) => {
                     cur_members.insert(*n, ModuleMemberKind::Schema);
@@ -851,11 +860,14 @@ fn aliases_from_member(
             Some(P::ModuleMember::Struct(s))
         },
         P::ModuleMember::Spec(s) => {
-            let sp!(_, SB {
-                target,
-                members,
-                ..
-            }) = &s;
+            let sp!(
+                _,
+                SB {
+                    target,
+                    members,
+                    ..
+                }
+            ) = &s;
             match &target.value {
                 SBT::Schema(n, _) => {
                     check_name_and_add_implicit_alias!(ModuleMemberKind::Schema, *n);
@@ -1298,11 +1310,14 @@ fn spec(context: &mut Context, sp!(loc, pspec): P::SpecBlock) -> E::SpecBlock {
     context.set_to_outer_scope(old_aliases);
     context.in_spec_context = false;
 
-    sp(loc, E::SpecBlock_ {
-        attributes,
-        target: spec_target(context, target),
-        members,
-    })
+    sp(
+        loc,
+        E::SpecBlock_ {
+            attributes,
+            target: spec_target(context, target),
+            members,
+        },
+    )
 }
 
 fn spec_target(context: &mut Context, sp!(loc, pt): P::SpecBlockTarget) -> E::SpecBlockTarget {

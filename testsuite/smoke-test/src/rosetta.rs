@@ -144,10 +144,13 @@ async fn test_block_transactions() {
     )
     .await
     .unwrap();
-    assert_eq!(response.block_identifier, BlockIdentifier {
-        index: 0,
-        hash: BlockHash::new(chain_id, 0).to_string(),
-    });
+    assert_eq!(
+        response.block_identifier,
+        BlockIdentifier {
+            index: 0,
+            hash: BlockHash::new(chain_id, 0).to_string(),
+        }
+    );
 
     // First fund account 1 with lots more gas
     cli.fund_account(0, Some(DEFAULT_FUNDED_COINS * 10))
@@ -264,10 +267,13 @@ async fn test_account_balance() {
     )
     .await
     .unwrap();
-    assert_eq!(response.block_identifier, BlockIdentifier {
-        index: 0,
-        hash: BlockHash::new(chain_id, 0).to_string(),
-    });
+    assert_eq!(
+        response.block_identifier,
+        BlockIdentifier {
+            index: 0,
+            hash: BlockHash::new(chain_id, 0).to_string(),
+        }
+    );
 
     // First fund account 1 with lots more gas
     cli.fund_account(0, Some(DEFAULT_FUNDED_COINS * 2))

@@ -85,10 +85,13 @@ pub(crate) fn make_abi_enum_container(abis: &[EntryABI]) -> ContainerFormat {
             _ => abi.name().to_camel_case(),
         };
 
-        variants.insert(index as u32, Named {
-            name,
-            value: VariantFormat::Struct(fields),
-        });
+        variants.insert(
+            index as u32,
+            Named {
+                name,
+                value: VariantFormat::Struct(fields),
+            },
+        );
     }
     ContainerFormat::Enum(variants)
 }
@@ -127,12 +130,10 @@ pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
 }
 
 pub(crate) fn get_external_definitions(aptos_types: &str) -> serde_generate::ExternalDefinitions {
-    let definitions = vec![(aptos_types, vec![
-        "AccountAddress",
-        "TypeTag",
-        "Script",
-        "TransactionArgument",
-    ])];
+    let definitions = vec![(
+        aptos_types,
+        vec!["AccountAddress", "TypeTag", "Script", "TransactionArgument"],
+    )];
     definitions
         .into_iter()
         .map(|(module, defs)| {

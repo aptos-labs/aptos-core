@@ -110,12 +110,15 @@ pub trait ReliableTransactionSubmitter: Sync + Send {
     async fn query_sequence_number(&self, account_address: AccountAddress) -> Result<u64>;
 
     async fn execute_transactions(&self, txns: &[SignedTransaction]) -> Result<()> {
-        self.execute_transactions_with_counter(txns, &CounterState {
-            submit_failures: vec![AtomicUsize::new(0)],
-            wait_failures: vec![AtomicUsize::new(0)],
-            successes: AtomicUsize::new(0),
-            by_client: HashMap::new(),
-        })
+        self.execute_transactions_with_counter(
+            txns,
+            &CounterState {
+                submit_failures: vec![AtomicUsize::new(0)],
+                wait_failures: vec![AtomicUsize::new(0)],
+                successes: AtomicUsize::new(0),
+                by_client: HashMap::new(),
+            },
+        )
         .await
     }
 
@@ -330,11 +333,9 @@ pub fn create_account_transaction(
     txn_factory: &TransactionFactory,
     creation_balance: u64,
 ) -> SignedTransaction {
-    from.sign_with_transaction_builder(txn_factory.payload(
-        if creation_balance > 0 {
-            aptos_stdlib::aptos_account_transfer(to, creation_balance)
-        } else {
-            aptos_stdlib::aptos_account_create_account(to)
-        },
-    ))
+    from.sign_with_transaction_builder(txn_factory.payload(if creation_balance > 0 {
+        aptos_stdlib::aptos_account_transfer(to, creation_balance)
+    } else {
+        aptos_stdlib::aptos_account_create_account(to)
+    }))
 }

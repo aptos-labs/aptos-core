@@ -494,113 +494,119 @@ impl NetworkTask {
 
     pub async fn start(mut self) {
         while let Some(message) = self.all_events.next().await {
-            monitor!("network_main_loop", match message {
-                Event::Message(peer_id, msg) => {
-                    counters::CONSENSUS_RECEIVED_MSGS
-                        .with_label_values(&[msg.name()])
-                        .inc();
-                    match msg {
-                        ConsensusMsg::BatchRequestMsg(_) | ConsensusMsg::BatchResponse(_) => {
-                            warn!("unexpected rpc msg");
-                        },
-                        quorum_store_msg @ (ConsensusMsg::SignedBatchInfo(_)
-                        | ConsensusMsg::BatchMsg(_)
-                        | ConsensusMsg::ProofOfStoreMsg(_)) => {
-                            Self::push_msg(
-                                peer_id,
-                                quorum_store_msg,
-                                &self.quorum_store_messages_tx,
-                            );
-                        },
-                        buffer_manager_msg @ (ConsensusMsg::CommitVoteMsg(_)
-                        | ConsensusMsg::CommitDecisionMsg(_)) => {
-                            Self::push_msg(
-                                peer_id,
-                                buffer_manager_msg,
-                                &self.buffer_manager_messages_tx,
-                            );
-                        },
-                        consensus_msg => {
-                            if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
-                                observe_block(
-                                    proposal.proposal().timestamp_usecs(),
-                                    BlockStage::NETWORK_RECEIVED,
+            monitor!(
+                "network_main_loop",
+                match message {
+                    Event::Message(peer_id, msg) => {
+                        counters::CONSENSUS_RECEIVED_MSGS
+                            .with_label_values(&[msg.name()])
+                            .inc();
+                        match msg {
+                            ConsensusMsg::BatchRequestMsg(_) | ConsensusMsg::BatchResponse(_) => {
+                                warn!("unexpected rpc msg");
+                            },
+                            quorum_store_msg @ (ConsensusMsg::SignedBatchInfo(_)
+                            | ConsensusMsg::BatchMsg(_)
+                            | ConsensusMsg::ProofOfStoreMsg(_)) => {
+                                Self::push_msg(
+                                    peer_id,
+                                    quorum_store_msg,
+                                    &self.quorum_store_messages_tx,
                                 );
-                            }
-                            Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
-                        },
-                    }
-                },
-                Event::RpcRequest(peer_id, msg, protocol, callback) => match msg {
-                    ConsensusMsg::BlockRetrievalRequest(request) => {
-                        counters::CONSENSUS_RECEIVED_MSGS
-                            .with_label_values(&["BlockRetrievalRequest"])
-                            .inc();
-                        debug!(
-                            remote_peer = peer_id,
-                            event = LogEvent::ReceiveBlockRetrieval,
-                            "{}",
-                            request
-                        );
-                        if request.num_blocks() > MAX_BLOCKS_PER_REQUEST {
-                            warn!(
+                            },
+                            buffer_manager_msg @ (ConsensusMsg::CommitVoteMsg(_)
+                            | ConsensusMsg::CommitDecisionMsg(_)) => {
+                                Self::push_msg(
+                                    peer_id,
+                                    buffer_manager_msg,
+                                    &self.buffer_manager_messages_tx,
+                                );
+                            },
+                            consensus_msg => {
+                                if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
+                                    observe_block(
+                                        proposal.proposal().timestamp_usecs(),
+                                        BlockStage::NETWORK_RECEIVED,
+                                    );
+                                }
+                                Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
+                            },
+                        }
+                    },
+                    Event::RpcRequest(peer_id, msg, protocol, callback) => match msg {
+                        ConsensusMsg::BlockRetrievalRequest(request) => {
+                            counters::CONSENSUS_RECEIVED_MSGS
+                                .with_label_values(&["BlockRetrievalRequest"])
+                                .inc();
+                            debug!(
                                 remote_peer = peer_id,
-                                "Ignore block retrieval with too many blocks: {}",
-                                request.num_blocks()
+                                event = LogEvent::ReceiveBlockRetrieval,
+                                "{}",
+                                request
                             );
+                            if request.num_blocks() > MAX_BLOCKS_PER_REQUEST {
+                                warn!(
+                                    remote_peer = peer_id,
+                                    "Ignore block retrieval with too many blocks: {}",
+                                    request.num_blocks()
+                                );
+                                continue;
+                            }
+                            let req_with_callback =
+                                IncomingRpcRequest::BlockRetrieval(IncomingBlockRetrievalRequest {
+                                    req: *request,
+                                    protocol,
+                                    response_sender: callback,
+                                });
+                            if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback))
+                            {
+                                warn!(error = ?e, "aptos channel closed");
+                            }
+                        },
+                        ConsensusMsg::BatchRequestMsg(request) => {
+                            counters::CONSENSUS_RECEIVED_MSGS
+                                .with_label_values(&["BatchRetrievalRequest"])
+                                .inc();
+                            debug!(
+                                remote_peer = peer_id,
+                                event = LogEvent::ReceiveBatchRetrieval,
+                                "{:?}",
+                                request
+                            );
+                            let req_with_callback =
+                                IncomingRpcRequest::BatchRetrieval(IncomingBatchRetrievalRequest {
+                                    req: *request,
+                                    protocol,
+                                    response_sender: callback,
+                                });
+                            if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback))
+                            {
+                                warn!(error = ?e, "aptos channel closed");
+                            }
+                        },
+                        ConsensusMsg::DAGMessage(request) => {
+                            let req_with_callback =
+                                IncomingRpcRequest::DAGRequest(IncomingDAGRequest {
+                                    req: request,
+                                    sender: peer_id,
+                                    protocol,
+                                    response_sender: callback,
+                                });
+                            if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback))
+                            {
+                                warn!(error = ?e, "aptos channel closed");
+                            }
+                        },
+                        _ => {
+                            warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);
                             continue;
-                        }
-                        let req_with_callback =
-                            IncomingRpcRequest::BlockRetrieval(IncomingBlockRetrievalRequest {
-                                req: *request,
-                                protocol,
-                                response_sender: callback,
-                            });
-                        if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
-                            warn!(error = ?e, "aptos channel closed");
-                        }
-                    },
-                    ConsensusMsg::BatchRequestMsg(request) => {
-                        counters::CONSENSUS_RECEIVED_MSGS
-                            .with_label_values(&["BatchRetrievalRequest"])
-                            .inc();
-                        debug!(
-                            remote_peer = peer_id,
-                            event = LogEvent::ReceiveBatchRetrieval,
-                            "{:?}",
-                            request
-                        );
-                        let req_with_callback =
-                            IncomingRpcRequest::BatchRetrieval(IncomingBatchRetrievalRequest {
-                                req: *request,
-                                protocol,
-                                response_sender: callback,
-                            });
-                        if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
-                            warn!(error = ?e, "aptos channel closed");
-                        }
-                    },
-                    ConsensusMsg::DAGMessage(request) => {
-                        let req_with_callback =
-                            IncomingRpcRequest::DAGRequest(IncomingDAGRequest {
-                                req: request,
-                                sender: peer_id,
-                                protocol,
-                                response_sender: callback,
-                            });
-                        if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
-                            warn!(error = ?e, "aptos channel closed");
-                        }
+                        },
                     },
                     _ => {
-                        warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);
-                        continue;
+                        // Ignore `NewPeer` and `LostPeer` events
                     },
-                },
-                _ => {
-                    // Ignore `NewPeer` and `LostPeer` events
-                },
-            });
+                }
+            );
         }
     }
 }

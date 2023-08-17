@@ -226,16 +226,19 @@ fn module(
     let constants = tconstants.map(|name, c| constant(context, name, c));
     let functions = tfunctions.map(|name, f| function(context, name, f));
 
-    (module_ident, H::ModuleDefinition {
-        package_name,
-        attributes,
-        is_source_module,
-        dependency_order,
-        friends,
-        structs,
-        constants,
-        functions,
-    })
+    (
+        module_ident,
+        H::ModuleDefinition {
+            package_name,
+            attributes,
+            is_source_module,
+            dependency_order,
+            friends,
+            structs,
+            constants,
+            functions,
+        },
+    )
 }
 
 fn scripts(
@@ -351,10 +354,13 @@ fn function_body_defined(
         _ => {
             use H::{Command_ as C, Statement_ as S};
             let eloc = final_exp.exp.loc;
-            let ret = sp(eloc, C::Return {
-                from_user: false,
-                exp: final_exp,
-            });
+            let ret = sp(
+                eloc,
+                C::Return {
+                    from_user: false,
+                    exp: final_exp,
+                },
+            );
             body.push_back(sp(eloc, S::Command(ret)))
         },
     }
@@ -545,9 +551,12 @@ fn block(
         None => {
             return H::exp(
                 sp(loc, H::Type_::Unit),
-                sp(loc, H::UnannotatedExp_::Unit {
-                    case: H::UnitCase::FromUser,
-                }),
+                sp(
+                    loc,
+                    H::UnannotatedExp_::Unit {
+                        case: H::UnitCase::FromUser,
+                    },
+                ),
             )
         },
         Some(sp!(_, S::Seq(last))) => last,
@@ -958,10 +967,13 @@ fn exp_(
                 let mut stmts = VecDeque::new();
 
                 let bvar = |v, st| sp(loc, T::LValue_::Var(v, st));
-                let bind_list = sp(loc, vec![
-                    bvar(vcond, Box::new(tbool.clone())),
-                    bvar(vcode, Box::new(tu64.clone())),
-                ]);
+                let bind_list = sp(
+                    loc,
+                    vec![
+                        bvar(vcond, Box::new(tbool.clone())),
+                        bvar(vcode, Box::new(tu64.clone())),
+                    ],
+                );
                 let tys = vec![Some(tbool.clone()), Some(tu64.clone())];
                 let bind = sp(loc, T::SequenceItem_::Bind(bind_list, tys, arguments));
                 stmts.push_back(bind);
@@ -1091,10 +1103,13 @@ fn exp_impl(
         TE::Return(te) => {
             let expected_type = context.signature.as_ref().map(|s| s.return_type.clone());
             let e = exp_(context, result, expected_type.as_ref(), *te);
-            let c = sp(eloc, C::Return {
-                from_user: true,
-                exp: e,
-            });
+            let c = sp(
+                eloc,
+                C::Return {
+                    from_user: true,
+                    exp: e,
+                },
+            );
             result.push_back(sp(eloc, S::Command(c)));
             HE::Unreachable
         },
@@ -1780,39 +1795,54 @@ fn check_trailing_unit(context: &mut Context, block: &mut Block) {
     }
     macro_rules! hignored {
         ($loc:pat, $e:pat) => {
-            hcmd!(_, C::IgnoreAndPop {
-                exp: H::Exp {
-                    exp: sp!($loc, $e),
+            hcmd!(
+                _,
+                C::IgnoreAndPop {
+                    exp: H::Exp {
+                        exp: sp!($loc, $e),
+                        ..
+                    },
                     ..
-                },
-                ..
-            })
+                }
+            )
         };
     }
     macro_rules! trailing {
         ($uloc:pat) => {
-            hcmd!(_, C::IgnoreAndPop {
-                exp: H::Exp {
-                    exp: sp!($uloc, E::Unit {
-                        case: H::UnitCase::Trailing
-                    }),
+            hcmd!(
+                _,
+                C::IgnoreAndPop {
+                    exp: H::Exp {
+                        exp: sp!(
+                            $uloc,
+                            E::Unit {
+                                case: H::UnitCase::Trailing
+                            }
+                        ),
+                        ..
+                    },
                     ..
-                },
-                ..
-            })
+                }
+            )
         };
     }
     macro_rules! trailing_returned {
         ($uloc:pat) => {
-            hcmd!(_, C::Return {
-                exp: H::Exp {
-                    exp: sp!($uloc, E::Unit {
-                        case: H::UnitCase::Trailing
-                    }),
+            hcmd!(
+                _,
+                C::Return {
+                    exp: H::Exp {
+                        exp: sp!(
+                            $uloc,
+                            E::Unit {
+                                case: H::UnitCase::Trailing
+                            }
+                        ),
+                        ..
+                    },
                     ..
-                },
-                ..
-            })
+                }
+            )
         };
     }
     fn divergent_block(block: &Block) -> bool {
@@ -1850,19 +1880,25 @@ fn check_trailing_unit(context: &mut Context, block: &mut Block) {
     }
     match (&block[len - 2], &block[len - 1]) {
         (
-            sp!(loc, S::IfElse {
-                if_block,
-                else_block,
-                ..
-            }),
+            sp!(
+                loc,
+                S::IfElse {
+                    if_block,
+                    else_block,
+                    ..
+                }
+            ),
             trailing!(uloc),
         )
         | (
-            sp!(loc, S::IfElse {
-                if_block,
-                else_block,
-                ..
-            }),
+            sp!(
+                loc,
+                S::IfElse {
+                    if_block,
+                    else_block,
+                    ..
+                }
+            ),
             trailing_returned!(uloc),
         ) if divergent_block(if_block) && divergent_block(else_block) => {
             invalid_trailing_unit!(context, *loc, *uloc)

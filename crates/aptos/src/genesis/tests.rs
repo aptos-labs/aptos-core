@@ -87,24 +87,27 @@ async fn test_mainnet_genesis_e2e_flow() {
     // Create initial balances and employee vesting account files.
     let git_dir = git_options.local_repository_dir.as_ref().unwrap().as_path();
 
-    create_account_balances_file(PathBuf::from(git_dir), vec![
-        owner_identity1.account_address,
-        owner_identity2.account_address,
-        operator_identity1.account_address,
-        operator_identity2.account_address,
-        voter_identity1.account_address,
-        voter_identity2.account_address,
-        account_1,
-        account_2,
-        employee_1,
-        employee_2,
-        employee_3,
-        employee_4,
-        admin_identity1.account_address,
-        admin_identity2.account_address,
-        employee_operator_identity1.account_address,
-        employee_operator_identity2.account_address,
-    ])
+    create_account_balances_file(
+        PathBuf::from(git_dir),
+        vec![
+            owner_identity1.account_address,
+            owner_identity2.account_address,
+            operator_identity1.account_address,
+            operator_identity2.account_address,
+            voter_identity1.account_address,
+            voter_identity2.account_address,
+            account_1,
+            account_2,
+            employee_1,
+            employee_2,
+            employee_3,
+            employee_4,
+            admin_identity1.account_address,
+            admin_identity2.account_address,
+            employee_operator_identity1.account_address,
+            employee_operator_identity2.account_address,
+        ],
+    )
     .await;
     create_employee_vesting_accounts_file(
         PathBuf::from(git_dir),

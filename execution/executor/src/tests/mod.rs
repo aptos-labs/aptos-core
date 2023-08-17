@@ -523,10 +523,10 @@ fn test_deleted_key_from_state_store() {
     .freeze()
     .unwrap();
 
-    apply_transaction_by_writeset(db, vec![
-        (transaction1, write_set1),
-        (transaction2, write_set2),
-    ]);
+    apply_transaction_by_writeset(
+        db,
+        vec![(transaction1, write_set1), (transaction2, write_set2)],
+    );
 
     let state_value1_from_db = db
         .reader

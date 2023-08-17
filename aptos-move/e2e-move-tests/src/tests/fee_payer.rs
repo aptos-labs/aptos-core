@@ -54,13 +54,17 @@ fn test_two_to_two_transfer_fee_payer() {
     let payer_start = read_coin(&h, payer.address());
 
     let code = package.extract_script_code()[0].clone();
-    let script = Script::new(code, vec![], vec![
-        TransactionArgument::U64(amount_alice),
-        TransactionArgument::U64(amount_bob),
-        TransactionArgument::Address(*carol.address()),
-        TransactionArgument::Address(*david.address()),
-        TransactionArgument::U64(amount_carol),
-    ]);
+    let script = Script::new(
+        code,
+        vec![],
+        vec![
+            TransactionArgument::U64(amount_alice),
+            TransactionArgument::U64(amount_bob),
+            TransactionArgument::Address(*carol.address()),
+            TransactionArgument::Address(*david.address()),
+            TransactionArgument::U64(amount_carol),
+        ],
+    );
 
     let transaction = TransactionBuilder::new(alice.clone())
         .secondary_signers(vec![bob.clone()])
@@ -126,13 +130,17 @@ fn test_two_to_two_transfer_fee_payer_is_sender() {
     let payer_start = read_coin(&h, payer.address());
 
     let code = package.extract_script_code()[0].clone();
-    let script = Script::new(code, vec![], vec![
-        TransactionArgument::U64(amount_alice),
-        TransactionArgument::U64(amount_bob),
-        TransactionArgument::Address(*carol.address()),
-        TransactionArgument::Address(*david.address()),
-        TransactionArgument::U64(amount_carol),
-    ]);
+    let script = Script::new(
+        code,
+        vec![],
+        vec![
+            TransactionArgument::U64(amount_alice),
+            TransactionArgument::U64(amount_bob),
+            TransactionArgument::Address(*carol.address()),
+            TransactionArgument::Address(*david.address()),
+            TransactionArgument::U64(amount_carol),
+        ],
+    );
 
     let transaction = TransactionBuilder::new(alice.clone())
         .secondary_signers(vec![bob.clone()])
@@ -191,13 +199,17 @@ fn test_two_to_two_transfer_fee_payer_without_feature() {
     .expect("building package must succeed");
 
     let code = package.extract_script_code()[0].clone();
-    let script = Script::new(code, vec![], vec![
-        TransactionArgument::U64(amount_alice),
-        TransactionArgument::U64(amount_bob),
-        TransactionArgument::Address(*carol.address()),
-        TransactionArgument::Address(*david.address()),
-        TransactionArgument::U64(amount_carol),
-    ]);
+    let script = Script::new(
+        code,
+        vec![],
+        vec![
+            TransactionArgument::U64(amount_alice),
+            TransactionArgument::U64(amount_bob),
+            TransactionArgument::Address(*carol.address()),
+            TransactionArgument::Address(*david.address()),
+            TransactionArgument::U64(amount_carol),
+        ],
+    );
 
     let transaction = TransactionBuilder::new(alice.clone())
         .secondary_signers(vec![bob])
@@ -230,10 +242,12 @@ fn test_normal_tx_with_signer_with_fee_payer() {
     assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
 
     let fun: MemberId = str::parse("0xcafe::test::hi").unwrap();
-    let entry = EntryFunction::new(fun.module_id, fun.member_id, vec![], vec![bcs::to_bytes(
-        &"Hi",
-    )
-    .unwrap()]);
+    let entry = EntryFunction::new(
+        fun.module_id,
+        fun.member_id,
+        vec![],
+        vec![bcs::to_bytes(&"Hi").unwrap()],
+    );
     let transaction = TransactionBuilder::new(alice.clone())
         .fee_payer(bob.clone())
         .entry_function(entry)

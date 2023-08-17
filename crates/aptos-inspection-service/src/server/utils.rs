@@ -16,9 +16,11 @@ pub const CONTENT_TYPE_TEXT: &str = "text/plain";
 
 /// Counter for the number of metrics in various states
 pub static NUM_METRICS: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!("aptos_metrics", "Number of metrics in certain states", &[
-        "type"
-    ])
+    register_int_counter_vec!(
+        "aptos_metrics",
+        "Number of metrics in certain states",
+        &["type"]
+    )
     .unwrap()
 });
 

@@ -1695,10 +1695,13 @@ fn lvalue_list(
             context,
             loc,
             || {
-                format!("Invalid value for {}", match case {
-                    C::Bind => "binding",
-                    C::Assign => "assignment",
-                })
+                format!(
+                    "Invalid value for {}",
+                    match case {
+                        C::Bind => "binding",
+                        C::Assign => "assignment",
+                    }
+                )
             },
             ty,
             var_ty,

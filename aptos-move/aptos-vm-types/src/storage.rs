@@ -248,13 +248,11 @@ impl StoragePricing {
         use StoragePricing::*;
 
         match self {
-            V1(v1) => Either::Left(v1.calculate_read_gas(
-                if resource_exists {
-                    Some(bytes_loaded)
-                } else {
-                    None
-                },
-            )),
+            V1(v1) => Either::Left(v1.calculate_read_gas(if resource_exists {
+                Some(bytes_loaded)
+            } else {
+                None
+            })),
             V2(v2) => Either::Left(v2.calculate_read_gas(bytes_loaded)),
             V3(v3) => Either::Right(v3.calculate_read_gas(bytes_loaded)),
         }

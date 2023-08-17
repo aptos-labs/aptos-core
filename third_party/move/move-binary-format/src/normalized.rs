@@ -203,47 +203,45 @@ impl Type {
 
     pub fn into_type_tag(self) -> Option<TypeTag> {
         use Type::*;
-        Some(
-            if self.is_closed() {
-                match self {
-                    Reference(_) | MutableReference(_) => return None,
-                    Bool => TypeTag::Bool,
-                    U8 => TypeTag::U8,
-                    U16 => TypeTag::U16,
-                    U32 => TypeTag::U32,
-                    U64 => TypeTag::U64,
-                    U128 => TypeTag::U128,
-                    U256 => TypeTag::U256,
-                    Address => TypeTag::Address,
-                    Signer => TypeTag::Signer,
-                    Vector(t) => TypeTag::Vector(Box::new(
-                        t.into_type_tag()
-                            .expect("Invariant violation: vector type argument contains reference"),
-                    )),
-                    Struct {
-                        address,
-                        module,
-                        name,
-                        type_arguments,
-                    } => TypeTag::Struct(Box::new(StructTag {
-                        address,
-                        module,
-                        name,
-                        type_params: type_arguments
-                            .into_iter()
-                            .map(|t| {
-                                t.into_type_tag().expect(
-                                    "Invariant violation: struct type argument contains reference",
-                                )
-                            })
-                            .collect(),
-                    })),
-                    TypeParameter(_) => unreachable!(),
-                }
-            } else {
-                return None;
-            },
-        )
+        Some(if self.is_closed() {
+            match self {
+                Reference(_) | MutableReference(_) => return None,
+                Bool => TypeTag::Bool,
+                U8 => TypeTag::U8,
+                U16 => TypeTag::U16,
+                U32 => TypeTag::U32,
+                U64 => TypeTag::U64,
+                U128 => TypeTag::U128,
+                U256 => TypeTag::U256,
+                Address => TypeTag::Address,
+                Signer => TypeTag::Signer,
+                Vector(t) => TypeTag::Vector(Box::new(
+                    t.into_type_tag()
+                        .expect("Invariant violation: vector type argument contains reference"),
+                )),
+                Struct {
+                    address,
+                    module,
+                    name,
+                    type_arguments,
+                } => TypeTag::Struct(Box::new(StructTag {
+                    address,
+                    module,
+                    name,
+                    type_params: type_arguments
+                        .into_iter()
+                        .map(|t| {
+                            t.into_type_tag().expect(
+                                "Invariant violation: struct type argument contains reference",
+                            )
+                        })
+                        .collect(),
+                })),
+                TypeParameter(_) => unreachable!(),
+            }
+        } else {
+            return None;
+        })
     }
 
     pub fn into_struct_tag(self) -> Option<StructTag> {

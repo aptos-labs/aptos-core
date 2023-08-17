@@ -143,14 +143,17 @@ async fn test_move_publish_flow() {
 
     // Ensure the downloaded package can build. This is a test that the information is correctly
     // roundtripped.
-    let _ = match BuiltPackage::build(cli.move_dir().join(PACKAGE_NAME), BuildOptions {
-        named_addresses: std::iter::once((
-            HELLO_BLOCKCHAIN.to_owned(),
-            AccountAddress::from_hex_literal(&account).expect("account address parsable"),
-        ))
-        .collect(),
-        ..BuildOptions::default()
-    }) {
+    let _ = match BuiltPackage::build(
+        cli.move_dir().join(PACKAGE_NAME),
+        BuildOptions {
+            named_addresses: std::iter::once((
+                HELLO_BLOCKCHAIN.to_owned(),
+                AccountAddress::from_hex_literal(&account).expect("account address parsable"),
+            ))
+            .collect(),
+            ..BuildOptions::default()
+        },
+    ) {
         Ok(response) => response,
         Err(err) => panic!(
             "Should not have failed to build downloaded package {:?}",

@@ -95,13 +95,11 @@ impl ProverTaskRunner {
         // Listens until one of the workers finishes.
         loop {
             // Result received from one worker.
-            let timeout = Duration::from_secs(
-                if hard_timeout_secs > 0 {
-                    hard_timeout_secs
-                } else {
-                    u64::MAX
-                },
-            );
+            let timeout = Duration::from_secs(if hard_timeout_secs > 0 {
+                hard_timeout_secs
+            } else {
+                u64::MAX
+            });
             let res = master_rx.recv_timeout(timeout);
             match res {
                 Ok((task_id, result)) => {

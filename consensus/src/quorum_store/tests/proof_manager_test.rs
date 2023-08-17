@@ -159,10 +159,12 @@ async fn test_proposal_fairness() {
     get_proposal_and_assert(&mut proof_manager, 100, &[], &expected).await;
 
     // The first two proofs are taken fairly from each peer
-    get_proposal_and_assert(&mut proof_manager, 2, &[], &vec![
-        peer0_proofs[0].clone(),
-        peer1_proof_0.clone(),
-    ])
+    get_proposal_and_assert(
+        &mut proof_manager,
+        2,
+        &[],
+        &vec![peer0_proofs[0].clone(), peer1_proof_0.clone()],
+    )
     .await;
 
     // The next two proofs are taken from the remaining peer

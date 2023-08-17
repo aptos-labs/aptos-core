@@ -75,9 +75,10 @@ fn native_to_bytes(
             gas_params.legacy_min_output_size,
         );
 
-    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(
-        serialized_value
-    )]))
+    Ok(NativeResult::ok(
+        cost,
+        smallvec![Value::vector_u8(serialized_value)],
+    ))
 }
 
 pub fn make_native_to_bytes(gas_params: ToBytesGasParameters) -> NativeFunction {

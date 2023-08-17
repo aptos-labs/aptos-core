@@ -141,12 +141,16 @@ impl fmt::Debug for DiscoverySource {
 
 impl fmt::Display for DiscoverySource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", match self {
-            DiscoverySource::OnChainValidatorSet => "OnChainValidatorSet",
-            DiscoverySource::File => "File",
-            DiscoverySource::Config => "Config",
-            DiscoverySource::Rest => "Rest",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                DiscoverySource::OnChainValidatorSet => "OnChainValidatorSet",
+                DiscoverySource::File => "File",
+                DiscoverySource::Config => "Config",
+                DiscoverySource::Rest => "Rest",
+            }
+        )
     }
 }
 

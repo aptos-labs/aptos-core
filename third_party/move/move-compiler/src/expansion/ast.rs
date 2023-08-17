@@ -798,11 +798,15 @@ impl fmt::Display for ModuleAccess_ {
 
 impl fmt::Display for Visibility {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", match &self {
-            Visibility::Public(_) => Visibility::PUBLIC,
-            Visibility::Friend(_) => Visibility::FRIEND,
-            Visibility::Internal => Visibility::INTERNAL,
-        })
+        write!(
+            f,
+            "{}",
+            match &self {
+                Visibility::Public(_) => Visibility::PUBLIC,
+                Visibility::Friend(_) => Visibility::FRIEND,
+                Visibility::Internal => Visibility::INTERNAL,
+            }
+        )
     }
 }
 
@@ -959,13 +963,11 @@ impl AstDebug for ModuleDefinition {
             w.writeln(&format!("{}", n))
         }
         attributes.ast_debug(w);
-        w.writeln(
-            if *is_source_module {
-                "source module"
-            } else {
-                "library module"
-            },
-        );
+        w.writeln(if *is_source_module {
+            "source module"
+        } else {
+            "library module"
+        });
         w.writeln(&format!("dependency order #{}", dependency_order));
         for (mident, neighbor) in immediate_neighbors.key_cloned_iter() {
             w.write(&format!("{} {};", neighbor, mident));

@@ -246,10 +246,13 @@ mod test {
 
     #[test]
     fn test_local_proxy_protocol() {
-        let address_bytes: [&[u8; 1]; 5] =
-            [&[LOCAL_PROTOCOL], &[UDP_IPV4], &[UDP_IPV6], &[TCP_UNIX], &[
-                UDP_UNIX,
-            ]];
+        let address_bytes: [&[u8; 1]; 5] = [
+            &[LOCAL_PROTOCOL],
+            &[UDP_IPV4],
+            &[UDP_IPV6],
+            &[TCP_UNIX],
+            &[UDP_UNIX],
+        ];
 
         address_bytes
             .iter()

@@ -195,16 +195,19 @@ fn module(
 
     let constants = hconstants.map(|name, c| constant(context, name, c));
     let functions = hfunctions.map(|name, f| function(context, name, f));
-    (module_ident, G::ModuleDefinition {
-        package_name,
-        attributes,
-        is_source_module,
-        dependency_order,
-        friends,
-        structs,
-        constants,
-        functions,
-    })
+    (
+        module_ident,
+        G::ModuleDefinition {
+            package_name,
+            attributes,
+            is_source_module,
+            dependency_order,
+            friends,
+            structs,
+            constants,
+            functions,
+        },
+    )
 }
 
 fn scripts(
@@ -481,10 +484,13 @@ fn block(context: &mut Context, mut cur_label: Label, blocks: H::Block) {
 
     match context.next_label {
         Some(next) if !basic_block.back().unwrap().value.is_terminal() => {
-            basic_block.push_back(sp(loc, C::Jump {
-                target: next,
-                from_user: false,
-            }));
+            basic_block.push_back(sp(
+                loc,
+                C::Jump {
+                    target: next,
+                    from_user: false,
+                },
+            ));
         },
         _ => (),
     }
@@ -560,16 +566,22 @@ fn block_(context: &mut Context, cur_label: &mut Label, blocks: H::Block) -> Bas
                 let loop_body = context.new_label();
                 let loop_end = context.new_label();
 
-                context.loop_bounds.insert(loop_cond, LoopInfo {
-                    is_loop_stmt: false,
-                    loop_end: G::LoopEnd::Target(loop_end),
-                });
+                context.loop_bounds.insert(
+                    loop_cond,
+                    LoopInfo {
+                        is_loop_stmt: false,
+                        loop_end: G::LoopEnd::Target(loop_end),
+                    },
+                );
 
                 // Jump to loop condition
-                basic_block.push_back(sp(loc, C::Jump {
-                    target: loop_cond,
-                    from_user: false,
-                }));
+                basic_block.push_back(sp(
+                    loc,
+                    C::Jump {
+                        target: loop_cond,
+                        from_user: false,
+                    },
+                ));
                 finish_block!(next_label: loop_cond);
 
                 // Loop condition and case to jump into loop or end
@@ -597,16 +609,22 @@ fn block_(context: &mut Context, cur_label: &mut Label, blocks: H::Block) -> Bas
                 assert!(cur_label.0 < loop_body.0);
                 assert!(loop_body.0 < loop_end.0);
 
-                context.loop_bounds.insert(loop_body, LoopInfo {
-                    is_loop_stmt: true,
-                    loop_end: G::LoopEnd::Target(loop_end),
-                });
+                context.loop_bounds.insert(
+                    loop_body,
+                    LoopInfo {
+                        is_loop_stmt: true,
+                        loop_end: G::LoopEnd::Target(loop_end),
+                    },
+                );
 
                 // Jump to loop
-                basic_block.push_back(sp(loc, C::Jump {
-                    target: loop_body,
-                    from_user: false,
-                }));
+                basic_block.push_back(sp(
+                    loc,
+                    C::Jump {
+                        target: loop_body,
+                        from_user: false,
+                    },
+                ));
                 finish_block!(next_label: loop_end);
 
                 // Loop body

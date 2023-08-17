@@ -522,14 +522,18 @@ impl MoveHarness {
         let acc = self.aptos_framework_account();
         let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
-        self.executor
-            .exec("features", "change_feature_flags", vec![], vec![
+        self.executor.exec(
+            "features",
+            "change_feature_flags",
+            vec![],
+            vec![
                 MoveValue::Signer(*acc.address())
                     .simple_serialize()
                     .unwrap(),
                 bcs::to_bytes(&enabled).unwrap(),
                 bcs::to_bytes(&disabled).unwrap(),
-            ]);
+            ],
+        );
     }
 
     /// Increase maximal transaction size.
@@ -554,15 +558,19 @@ impl MoveHarness {
             entries,
         };
         let schedule_bytes = bcs::to_bytes(&gas_schedule).expect("bcs");
-        self.executor
-            .exec("gas_schedule", "set_gas_schedule", vec![], vec![
+        self.executor.exec(
+            "gas_schedule",
+            "set_gas_schedule",
+            vec![],
+            vec![
                 MoveValue::Signer(AccountAddress::ONE)
                     .simple_serialize()
                     .unwrap(),
                 MoveValue::vector_u8(schedule_bytes)
                     .simple_serialize()
                     .unwrap(),
-            ]);
+            ],
+        );
     }
 
     pub fn sequence_number(&self, addr: &AccountAddress) -> u64 {

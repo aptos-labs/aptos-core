@@ -124,13 +124,16 @@ impl MockSharedMempool {
             notification_receiver: reconfig_events,
         };
         reconfig_sender
-            .push((), ReconfigNotification {
-                version: 1,
-                on_chain_configs: OnChainConfigPayload::new(
-                    1,
-                    InMemoryOnChainConfig::new(HashMap::new()),
-                ),
-            })
+            .push(
+                (),
+                ReconfigNotification {
+                    version: 1,
+                    on_chain_configs: OnChainConfigPayload::new(
+                        1,
+                        InMemoryOnChainConfig::new(HashMap::new()),
+                    ),
+                },
+            )
             .unwrap();
         let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Validator]);
         let network_senders = hashmap! {NetworkId::Validator => network_sender};

@@ -342,9 +342,12 @@ impl<'env> Generator<'env> {
                         ),
                     );
                 }
-                self.emit_call(*id, targets, BytecodeOperation::WriteRef, vec![
-                    lhs_temp, rhs_temp,
-                ])
+                self.emit_call(
+                    *id,
+                    targets,
+                    BytecodeOperation::WriteRef,
+                    vec![lhs_temp, rhs_temp],
+                )
             },
             ExpData::Assign(id, lhs, rhs) => self.gen_assign(*id, lhs, rhs, None),
             ExpData::Return(id, exp) => {
@@ -981,9 +984,12 @@ impl<'env> Generator<'env> {
             vec![oper_temp],
         );
         if need_read_ref {
-            self.emit_call(id, vec![target], BytecodeOperation::ReadRef, vec![
-                borrow_dest,
-            ])
+            self.emit_call(
+                id,
+                vec![target],
+                BytecodeOperation::ReadRef,
+                vec![borrow_dest],
+            )
         }
     }
 }
