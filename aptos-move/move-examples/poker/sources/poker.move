@@ -8,6 +8,8 @@ use std::option::Option;
 use std::signer;
 use std::error;
 
+    const MIN_PLAYERS: u64 = 3;
+
     const MAX_PLAYERS: u64 = 7;
 
     /// User tries to make two games
@@ -46,6 +48,7 @@ struct Player has copy, drop, store {
 struct Game has key {
     deck: Option<Deck>,
     players: vector<Player>,
+    pk: Option<elgamal::CompressedPubkey>,
     started: bool,
 }
 
@@ -63,6 +66,26 @@ public entry fun init_game(creator: &signer, pk: vector<u8>) {
     vector::push_back(&mut players, player);
     let game = Game { deck: option::none(), players, started: false };
     move_to<Game>(creator, game);
+}
+
+public entry fun end_registration(sender: &signer) {
+    let user_addr = signer::address_of(sender);
+    assert!(exists<Game>(user_addr), error::not_found(EGAME_DOESNT_EXIST));
+
+    let game = borrow_global_mut<Game>(game_addr);
+    assert!(vector::length(game.players) >= MIN_PLAYERS);
+
+    let first_player = vector::borrow(&game.players, 0);
+    let agg_pubkey = elgamal::pubkey_to_point(&first_player.pk);
+    let n = vector::length(&game.players);
+    let i = 1;
+    while (i < n) {
+        let player = vector::borrow(&game.players, i);
+        let point = elgamal::pubkey_to_point(&player.pk);
+        ristretto255::point_add_assign(&mut agg_pubkey, &point);
+        i = i + 1;
+    }
+    game.pk = option::some(elgamal::pubkey_from_point(&agg_pubkey));
 }
 
 // Joins an already existing game owned by `game_addr`. Takes in an ElGamal public key `pk` to be associated with the sender as player
