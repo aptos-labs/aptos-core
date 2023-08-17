@@ -337,6 +337,25 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    EvmCall {
+        caller: Vec<u8>,
+        payload: Vec<u8>,
+        signature: Vec<u8>,
+    },
+
+    EvmCreate {
+        caller: Vec<u8>,
+        payload: Vec<u8>,
+        signature: Vec<u8>,
+    },
+
+    EvmCreateAccount {
+        eth_addr: Vec<u8>,
+        pub_key: AccountAddress,
+    },
+
+    EvmInitialize {},
+
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     ManagedCoinBurn {
         coin_type: TypeTag,
@@ -1055,6 +1074,18 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_withdraw(pool_address, amount),
+            EvmCall {
+                caller,
+                payload,
+                signature,
+            } => evm_call(caller, payload, signature),
+            EvmCreate {
+                caller,
+                payload,
+                signature,
+            } => evm_create(caller, payload, signature),
+            EvmCreateAccount { eth_addr, pub_key } => evm_create_account(eth_addr, pub_key),
+            EvmInitialize {} => evm_initialize(),
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -2235,6 +2266,77 @@ pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> Tr
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
+    ))
+}
+
+pub fn evm_call(caller: Vec<u8>, payload: Vec<u8>, signature: Vec<u8>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("evm").to_owned(),
+        ),
+        ident_str!("call").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&caller).unwrap(),
+            bcs::to_bytes(&payload).unwrap(),
+            bcs::to_bytes(&signature).unwrap(),
+        ],
+    ))
+}
+
+pub fn evm_create(caller: Vec<u8>, payload: Vec<u8>, signature: Vec<u8>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("evm").to_owned(),
+        ),
+        ident_str!("create").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&caller).unwrap(),
+            bcs::to_bytes(&payload).unwrap(),
+            bcs::to_bytes(&signature).unwrap(),
+        ],
+    ))
+}
+
+pub fn evm_create_account(eth_addr: Vec<u8>, pub_key: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("evm").to_owned(),
+        ),
+        ident_str!("create_account").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&eth_addr).unwrap(),
+            bcs::to_bytes(&pub_key).unwrap(),
+        ],
+    ))
+}
+
+pub fn evm_initialize() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("evm").to_owned(),
+        ),
+        ident_str!("initialize").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -4353,6 +4455,49 @@ mod decoder {
         }
     }
 
+    pub fn evm_call(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::EvmCall {
+                caller: bcs::from_bytes(script.args().get(0)?).ok()?,
+                payload: bcs::from_bytes(script.args().get(1)?).ok()?,
+                signature: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn evm_create(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::EvmCreate {
+                caller: bcs::from_bytes(script.args().get(0)?).ok()?,
+                payload: bcs::from_bytes(script.args().get(1)?).ok()?,
+                signature: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn evm_create_account(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::EvmCreateAccount {
+                eth_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+                pub_key: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn evm_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::EvmInitialize {})
+        } else {
+            None
+        }
+    }
+
     pub fn managed_coin_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinBurn {
@@ -5474,6 +5619,16 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_withdraw".to_string(),
             Box::new(decoder::delegation_pool_withdraw),
+        );
+        map.insert("evm_call".to_string(), Box::new(decoder::evm_call));
+        map.insert("evm_create".to_string(), Box::new(decoder::evm_create));
+        map.insert(
+            "evm_create_account".to_string(),
+            Box::new(decoder::evm_create_account),
+        );
+        map.insert(
+            "evm_initialize".to_string(),
+            Box::new(decoder::evm_initialize),
         );
         map.insert(
             "managed_coin_burn".to_string(),
