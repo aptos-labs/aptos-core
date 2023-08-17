@@ -62,15 +62,12 @@ pub enum MoveValue {
 impl MoveValue {
     pub fn to_u256(self) -> u256::U256 {
         match self {
-            MoveValue::U256(val) => {
-                val
-            }
+            MoveValue::U256(val) => val,
             _ => {
                 panic!("MoveValue is not a U256");
-            }
+            },
         }
     }
-
 }
 
 /// A layout associated with a named field

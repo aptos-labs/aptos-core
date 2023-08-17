@@ -13,11 +13,8 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
     aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
-<<<<<<< HEAD
     event::NativeEventContext,
-=======
-    evm::NativeEvmContext
->>>>>>> b8ac2a6be9 (Maintain Native EVM Context)
+    evm_natives::NativeEvmContext,
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
@@ -157,14 +154,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let evm_context: NativeEvmContext = extensions.remove();
         let evm_change_set = evm_context.into_change_set();
-
         let table_context: NativeTableContext = extensions.remove();
         let mut table_change_set = table_context
             .into_change_set()
             .map_err(|e| e.finish(Location::Undefined))?;
 
-        table_change_set.new_tables.extend(evm_change_set.new_tables);
-        table_change_set.removed_tables.extend(evm_change_set.removed_tables);
+        table_change_set
+            .new_tables
+            .extend(evm_change_set.new_tables);
+        table_change_set
+            .removed_tables
+            .extend(evm_change_set.removed_tables);
         table_change_set.changes.extend(evm_change_set.changes);
 
         let aggregator_context: NativeAggregatorContext = extensions.remove();
@@ -189,7 +189,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             configs,
         )
         .map_err(|status| PartialVMError::new(status.status_code()).finish(Location::Undefined))?;
-
         Ok(change_set)
     }
 
@@ -395,3 +394,111 @@ impl<'r, 'l> DerefMut for SessionExt<'r, 'l> {
         &mut self.inner
     }
 }
+<<<<<<< HEAD
+=======
+
+struct WriteOpConverter<'r> {
+    remote: &'r dyn MoveResolverExt,
+    new_slot_metadata: Option<StateValueMetadata>,
+}
+
+impl<'r> WriteOpConverter<'r> {
+    fn convert(
+        &self,
+        state_key: &StateKey,
+        move_storage_op: MoveStorageOp<Vec<u8>>,
+        legacy_creation_as_modification: bool,
+    ) -> Result<WriteOp, VMStatus> {
+        use MoveStorageOp::*;
+        use WriteOp::*;
+        let existing_value_opt = self.remote.get_state_value(state_key).map_err(|_| {
+            VMStatus::error(
+                StatusCode::STORAGE_ERROR,
+                err_msg("Storage read failed when converting change set."),
+            )
+        })?;
+
+        let write_op = match (existing_value_opt, move_storage_op) {
+            (None, Delete) => {
+                return Err(VMStatus::error(
+                    // Possible under speculative execution, returning storage error waiting for re-execution
+                    StatusCode::STORAGE_ERROR,
+                    err_msg("When converting write op: deleting existing value."),
+                ));
+            },
+            (_, New(data)) => match &self.new_slot_metadata {
+                None => {
+                    if legacy_creation_as_modification {
+                        Modification(data)
+                    } else {
+                        Creation(data)
+                    }
+                },
+                Some(metadata) => CreationWithMetadata {
+                    data,
+                    metadata: metadata.clone(),
+                },
+            },
+            (Some(existing_value), Modify(data)) => {
+                // Inherit metadata even if the feature flags is turned off, for compatibility.
+                match existing_value.into_metadata() {
+                    None => Modification(data),
+                    Some(metadata) => ModificationWithMetadata { data, metadata },
+                }
+            },
+            (_, Modify(data)) => match &self.new_slot_metadata {
+                None => {
+                    if legacy_creation_as_modification {
+                        Modification(data)
+                    } else {
+                        Creation(data)
+                    }
+                },
+                Some(metadata) => ModificationWithMetadata {
+                    data,
+                    metadata: metadata.clone(),
+                },
+            },
+            (Some(existing_value), Delete) => {
+                // Inherit metadata even if the feature flags is turned off, for compatibility.
+                match existing_value.into_metadata() {
+                    None => Deletion,
+                    Some(metadata) => DeletionWithMetadata { metadata },
+                }
+            },
+        };
+        Ok(write_op)
+    }
+
+    fn convert_aggregator_mod(
+        &self,
+        state_key: &StateKey,
+        value: u128,
+    ) -> Result<WriteOp, VMStatus> {
+        let existing_value_opt = self
+            .remote
+            .get_state_value(state_key)
+            .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+        let data = serialize(&value);
+
+        let op = match existing_value_opt {
+            None => {
+                match &self.new_slot_metadata {
+                    // n.b. Aggregator writes historically did not distinguish Create vs Modify.
+                    None => WriteOp::Modification(data),
+                    Some(metadata) => WriteOp::CreationWithMetadata {
+                        data,
+                        metadata: metadata.clone(),
+                    },
+                }
+            },
+            Some(existing_value) => match existing_value.into_metadata() {
+                None => WriteOp::Modification(data),
+                Some(metadata) => WriteOp::ModificationWithMetadata { data, metadata },
+            },
+        };
+
+        Ok(op)
+    }
+}
+>>>>>>> 609ea5ecb8 (Duplicating changes)

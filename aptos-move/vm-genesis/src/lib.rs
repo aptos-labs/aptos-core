@@ -50,6 +50,7 @@ const GENESIS_MODULE_NAME: &str = "genesis";
 const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
+const EVM_MODULE_NAME: &str = "evm";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
@@ -134,6 +135,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     create_accounts(&mut session, accounts);
     create_employee_validators(&mut session, employees, genesis_config);
     create_and_initialize_validators_with_commission(&mut session, validators);
+    initialize_evm(&mut session);
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -240,6 +242,7 @@ pub fn encode_genesis_change_set(
         initialize_aptos_coin(&mut session);
     }
     initialize_on_chain_governance(&mut session, genesis_config);
+    initialize_evm(&mut session);
     create_and_initialize_validators(&mut session, validators);
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
@@ -483,6 +486,23 @@ fn initialize_core_resources_and_aptos_coin(
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
             MoveValue::vector_u8(core_resources_auth_key.to_vec()),
+        ]),
+    );
+}
+
+/// Create and initialize Association and Core Code accounts.
+fn initialize_evm(session: &mut SessionExt) {
+    let addr: Vec<u8> = vec![
+        147, 139, 107, 200, 81, 82, 65, 97, 55, 231, 218, 108, 56, 9, 146, 20, 74, 222, 241, 104,
+    ];
+    exec_function(
+        session,
+        EVM_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            MoveValue::vector_u8(addr),
         ]),
     );
 }

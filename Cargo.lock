@@ -1187,7 +1187,7 @@ dependencies = [
  "proptest",
  "rand 0.7.3",
  "rlp",
- "serde 1.0.149",
+ "serde",
  "serde_json",
  "sha3 0.10.6",
 ]

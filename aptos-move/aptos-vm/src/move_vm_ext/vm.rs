@@ -7,10 +7,9 @@ use crate::{
 };
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext,
-    evm::NativeEvmContext,
     code::NativeCodeContext,
     cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
-    event::NativeEventContext,
+    evm_natives::NativeEvmContext,
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };

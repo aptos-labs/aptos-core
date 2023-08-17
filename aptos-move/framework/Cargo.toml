@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
+aptos-evm = { workspace = true }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-move-stdlib = { workspace = true }
@@ -24,7 +25,6 @@ aptos-sdk-builder = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
-aptos-evm = { workspace = true }
 ark-bls12-381 = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
@@ -44,7 +44,7 @@ codespan-reporting = { workspace = true }
 # we work with version 3. Instead, we use `zkcrypto/bulleproofs` which relies on `zkcrypto/curve25519-dalek-ng`.
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 either = { workspace = true }
-evm = {workspace = true }
+evm = { workspace = true }
 evm-core = { workspace = true }
 evm-gasometer = { workspace = true }
 evm-runtime = { workspace = true }
