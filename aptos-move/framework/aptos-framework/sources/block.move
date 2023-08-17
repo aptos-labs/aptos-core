@@ -155,9 +155,6 @@ module aptos_framework::block {
         stake::update_performance_statistics(proposer_index, failed_proposer_indices);
         state_storage::on_new_block(reconfiguration::current_epoch());
 
-        // dkg todo: move dkg transcript to on-chain state
-
-        // dkg todo: trigger reconfiguration only if dkg transcript is ready
         if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
             reconfiguration::reconfigure();
         };

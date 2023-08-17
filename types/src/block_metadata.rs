@@ -28,7 +28,6 @@ pub struct BlockMetadata {
     previous_block_votes_bitvec: Vec<u8>,
     failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,
-    // dkg todo
     maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
     maybe_randomness: Option<Randomness>,
 }
@@ -89,7 +88,6 @@ impl BlockMetadata {
             MoveValue::U64(self.timestamp_usecs),
         ];
 
-        //dkg todo: currently assuming the first transcript is valid.
         ret.push(MoveValue::Bool(!self.maybe_dkg_transcript.is_some()));
         ret.push(MoveValue::Vector(
             self.maybe_dkg_transcript

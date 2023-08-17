@@ -2,6 +2,7 @@
 
 use crate::validator_info::ValidatorInfo;
 use anyhow::Result;
+use aptos_crypto::ValidCryptoMaterial;
 use aptos_dkg::pvss::{das, traits::Transcript, WeightedTranscript};
 use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
@@ -78,5 +79,9 @@ impl DKGTranscriptWrapper {
             .aggregate_with(&dkg_pvss_config.wc_1, &other.trx_one_third);
         self.trx_two_third
             .aggregate_with(&dkg_pvss_config.wc_2, &other.trx_two_third);
+    }
+
+    pub fn num_bytes(&self) -> usize {
+        self.trx_one_third.to_bytes().len() + self.trx_two_third.to_bytes().len()
     }
 }

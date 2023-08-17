@@ -25,6 +25,14 @@ impl DKGAggNodeMetadata {
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bcs::to_bytes(self).expect("[DKG] DKGAggNodeMetadata serialization failed!")
+    }
+
+    pub fn num_bytes(&self) -> usize {
+        self.to_bytes().len()
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq, Eq)]
@@ -65,8 +73,7 @@ impl DKGAggNode {
     }
 
     pub fn num_bytes(&self) -> usize {
-        // dkg todo: compute size
-        0
+        self.metadata.num_bytes() + self.agg_trx.num_bytes()
     }
 
     pub fn verify(&self, pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {

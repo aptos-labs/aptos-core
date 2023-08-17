@@ -257,8 +257,6 @@ pub struct StateComputeResult {
 
     reconfig_events: Vec<ContractEvent>,
 
-    // dkg todo: add the event
-    // event to trigger the start of DKG
     dkg_events: Vec<ContractEvent>,
 }
 

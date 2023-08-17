@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 pub trait TDKGMessage: Into<DKGMessage> + TryFrom<DKGMessage> {
-    // dkg todo: pass in public keys for verification
     fn verify(&self, dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()>;
 }
 
@@ -87,9 +86,7 @@ impl DKGNode {
 }
 
 impl TDKGMessage for DKGNode {
-    // dkg todo: verification requires public keys
     fn verify(&self, dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
-        // dkg todo: verify pvss transcript
         self.trx.verify(dkg_pvss_config)?;
 
         Ok(())
@@ -143,7 +140,6 @@ where
 
 impl TDKGMessage for DKGAggNode {
     fn verify(&self, dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
-        // dkg todo: verify aggregated pvss transcript
         self.agg_trx.verify(dkg_pvss_config)?;
 
         Ok(())
@@ -208,8 +204,6 @@ pub enum DKGMessage {
     DKGNodeAckMsg(DKGNodeAck),
     DKGAggNodeMsg(DKGAggNode),
     DKGAggNodeAckMsg(DKGAggNodeAck),
-    // dkg todo: If the on-chain verification of aggregated pvss transcript is too expensive, we can move it to off-chain.
-    // We can let validators verify and sign the aggregated transcript off-chain, and only verify the multi-signature on-chain.
     #[cfg(test)]
     DKGTestMessage(DKGTestMessage),
     #[cfg(test)]

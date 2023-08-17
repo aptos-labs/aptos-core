@@ -703,12 +703,11 @@ impl EpochManager {
             self.config.wait_for_full_blocks_above_pending_blocks,
         );
 
-        // dkg stuff
-        // dkg todo: connect the dkg_handler channel
+        // dkg todo: add feature flag to guard changes
         let (dkg_handler_tx, dkg_handler_rx) = aptos_channel::new(
             QueueStyle::FIFO,
             100,
-            None, // dkg todo: add counters
+            None,
         );
         self.dkg_handler_tx = Some(dkg_handler_tx.clone());
         let dkg_network_sender = NetworkSenderWrapper::<DKGMessage>::new(network_sender.clone());

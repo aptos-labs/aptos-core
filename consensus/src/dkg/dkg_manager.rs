@@ -10,7 +10,7 @@ use crate::dkg::types::DKGNode;
 use aptos_consensus_types::common::Author;
 use aptos_dkg::{
     constants::DST_PVSS_TESTING_APP,
-    pvss::{das, test_utils, traits::Transcript, WeightedTranscript},
+    pvss::{das, traits::Transcript, WeightedTranscript},
     utils::random::random_scalar,
 };
 use aptos_infallible::Mutex;
@@ -25,6 +25,7 @@ use futures::future::{AbortHandle, Abortable};
 use rand::{rngs::StdRng, thread_rng, SeedableRng};
 use std::sync::Arc;
 use tokio_retry::strategy::ExponentialBackoff;
+use aptos_crypto::Uniform;
 
 // the transcript size is 3.25MB
 // const TRANSCRIPT_SIZE: usize = 3_250_000;
@@ -55,6 +56,19 @@ impl DKGManagerWrapper {
                 let dkg_manager_clone = dkg_manager.clone();
                 let mut guard = dkg_manager_clone.lock();
                 guard.start_dkg(dkg_events);
+            },
+        }
+    }
+
+    pub fn finish_dkg(&self) {
+        match self {
+            DKGManagerWrapper::NoDKG => {
+                error!("[DKG] No DKG manager!");
+            },
+            DKGManagerWrapper::WithDKG(dkg_manager) => {
+                let dkg_manager_clone = dkg_manager.clone();
+                let mut guard = dkg_manager_clone.lock();
+                guard.finish_dkg();
             },
         }
     }
@@ -125,6 +139,7 @@ impl DKGManager {
             dkg_rounding.weighted_config_2().get_threshold_weight(),
         );
 
+        // dkg todo: decide whether to use consensus key as encryption key
         let consensus_keys: Vec<<das::Transcript as Transcript>::EncryptPubKey> = dkg_rounding.validator_consensus_keys().iter().map(|k| k.to_bytes().as_slice().try_into().unwrap()).collect::<Vec<_>>();
 
         let wc_1 = dkg_rounding.weighted_config_1().clone();
@@ -135,9 +150,8 @@ impl DKGManager {
         let seed = random_scalar(&mut rng);
         let mut rng = StdRng::from_seed(seed.to_bytes_le());
 
-        // dkg todo: generate these parameters
-        // dkg todo: decide whether to use consensus key as encryption key
-        let (pp, _dks, _eks, s, _sk) = test_utils::setup_dealing::<WT, StdRng>(&wc_1, &mut rng);
+        let pp = <WT as Transcript>::PvssPublicParameters::default();
+        let s = <WT as Transcript>::InputSecret::generate(&mut rng);
 
         let trx_1 = WT::deal(
             &wc_1,
@@ -178,11 +192,9 @@ impl DKGManager {
         let dkg_node = DKGNode::new(self.epoch_state.epoch, self.author, dkg_trx_wrapper);
 
         debug!("[DKG] Node {:?} finish computing DKG Node of epoch {:?}", self.author, dkg_node.epoch());
-        match self.add_node(dkg_node.clone()) {
-            Ok(_) => {},
-            Err(e) => {
-                error!("[DKG] Error when adding DKG node: {:?}", e);
-            },
+
+        if let Err(e) = self.add_node(dkg_node.clone()) {
+            error!("[DKG] Error when adding DKG node: {:?}", e);
         }
         self.broadcast_node(dkg_node);
     }
@@ -212,7 +224,6 @@ impl DKGManager {
             prev_handle.abort();
         }
         debug!("[DKG] Node {:?} broadcast DKG Aggregated Node of epoch {:?}", self.author, agg_node.epoch());
-        // dkg todo: abort the broadcast when DKG is done
     }
 
     pub fn add_node(&mut self, node: DKGNode) -> anyhow::Result<()> {
@@ -247,5 +258,14 @@ impl DKGManager {
     // Will be called by the proposal generator
     pub fn take_agg_node(&mut self) -> Option<DKGAggNode> {
         self.dkg_store.take_agg_node()
+    }
+
+    // Will be called by the state computer
+    pub fn finish_dkg(&mut self) {
+        // terminate the ongoing broadcast when the DKG aggregated node is committed
+        if let Some(handle) = self.rb_abort_handle.take() {
+            debug!("[DKG] Node {:?} abort broadcast due to DKG finish", self.author);
+            handle.abort();
+        }
     }
 }
