@@ -24,8 +24,8 @@ use crate::{
     },
     EventStore, TransactionStore,
 };
-use anyhow::Result;
 use aptos_logger::info;
+use aptos_storage_interface::errors::AptosDbError;
 use aptos_types::transaction::{AtomicVersion, Version};
 use std::{
     cmp::min,
@@ -33,6 +33,7 @@ use std::{
 };
 
 pub const LEDGER_PRUNER_NAME: &str = "ledger_pruner";
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 /// Responsible for pruning everything except for the state tree.
 pub(crate) struct LedgerPruner {

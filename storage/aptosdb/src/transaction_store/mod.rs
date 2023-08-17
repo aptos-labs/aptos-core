@@ -12,7 +12,7 @@ use crate::{
     },
     transaction_accumulator::TransactionAccumulatorSchema,
     transaction_info::TransactionInfoSchema,
-    utils::iterators::{AccountTransactionVersionIter},
+    utils::iterators::{AccountTransactionVersionIter, ExpectContinuousVersions},
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_schemadb::{ReadOptions, SchemaBatch};
@@ -199,10 +199,9 @@ impl TransactionStore {
 
         let mut ret = Vec::with_capacity((end_version - begin_version) as usize);
         for current_version in begin_version..end_version {
-            let (version, write_set) = iter
-                .next()
-                .transpose()?
-                .ok_or_else(|| AptosDbError::NotFound(format!("Write set missing for version {}", current_version)))?;
+            let (version, write_set) = iter.next().transpose()?.ok_or_else(|| {
+                AptosDbError::NotFound(format!("Write set missing for version {}", current_version))
+            })?;
             ensure!(
                 version == current_version,
                 "Write set missing for version {}, got version {}",

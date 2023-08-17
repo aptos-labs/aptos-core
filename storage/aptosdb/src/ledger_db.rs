@@ -18,12 +18,12 @@ use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{ColumnFamilyDescriptor, ColumnFamilyName, SchemaBatch, DB};
+use aptos_storage_interface::errors::AptosDbError;
 use aptos_types::transaction::Version;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use aptos_storage_interface::errors::AptosDbError;
 
 pub const LEDGER_DB_FOLDER_NAME: &str = "ledger_db";
 pub const LEDGER_DB_NAME: &str = "ledger_db";
@@ -34,7 +34,7 @@ pub const TRANSACTION_DB_NAME: &str = "transaction_db";
 pub const TRANSACTION_INFO_DB_NAME: &str = "transaction_info_db";
 pub const WRITE_SET_DB_NAME: &str = "write_set_db";
 
-type Result<T, E=AptosDbError> = std::result::Result<T, E>;
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 #[derive(Debug)]
 pub struct LedgerDbSchemaBatches {

@@ -18,9 +18,8 @@ use crate::{
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     utils::get_progress,
-    EventStore, TransactionStore, NUM_STATE_SHARDS,
+    EventStore, Result, TransactionStore, NUM_STATE_SHARDS,
 };
-use anyhow::Result;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_schemadb::{
     schema::{Schema, SeekKeyCodec},

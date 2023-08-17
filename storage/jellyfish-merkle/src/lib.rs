@@ -84,8 +84,8 @@ pub mod restore;
 pub mod test_helper;
 
 use crate::metrics::{APTOS_JELLYFISH_LEAF_COUNT, APTOS_JELLYFISH_LEAF_DELETION_COUNT};
-use anyhow::{bail, ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_storage_interface::{db_ensure as ensure, db_other_bail, errors::AptosDbError};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleProofExt, SparseMerkleRangeProof},
@@ -108,6 +108,8 @@ use std::{
 };
 use thiserror::Error;
 
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
+
 const MAX_PARALLELIZABLE_DEPTH: usize = 2;
 const NUM_IO_THREADS: usize = 32;
 
@@ -128,6 +130,15 @@ pub struct MissingRootError {
     pub version: Version,
 }
 
+impl From<MissingRootError> for AptosDbError {
+    fn from(error: MissingRootError) -> Self {
+        AptosDbError::NotFound(format!(
+            "Missing state root node at version {}.",
+            error.version
+        ))
+    }
+}
+
 /// `TreeReader` defines the interface between
 /// [`JellyfishMerkleTree`](struct.JellyfishMerkleTree.html)
 /// and underlying storage holding nodes.
@@ -140,7 +151,7 @@ pub trait TreeReader<K> {
     /// Gets node given a node key. Returns error if the node does not exist.
     fn get_node_with_tag(&self, node_key: &NodeKey, tag: &str) -> Result<Node<K>> {
         self.get_node_option(node_key, tag)?
-            .ok_or_else(|| format_err!("Missing node at {:?}.", node_key))
+            .ok_or_else(|| AptosDbError::NotFound(format!("Missing node at {:?}.", node_key)))
     }
 
     /// Gets node given a node key. Returns `None` if the node does not exist.
@@ -435,7 +446,11 @@ where
         persisted_version: Option<Version>,
         version: Version,
     ) -> Result<(HashValue, TreeUpdateBatch<K>)> {
-        ensure!(shard_root_nodes.len() == 16);
+        ensure!(
+            shard_root_nodes.len() == 16,
+            "sharded root nodes {} must be 16",
+            shard_root_nodes.len()
+        );
 
         let children: Children = shard_root_nodes
             .iter()
@@ -753,7 +768,7 @@ where
                     }
                     let queried_child_index = nibble_iter
                         .next()
-                        .ok_or_else(|| format_err!("ran out of nibbles"))?;
+                        .ok_or_else(|| AptosDbError::Other("ran out of nibbles".to_string()))?;
                     let (child_node_key, mut siblings_in_internal) = internal_node
                         .get_child_with_siblings(
                             &next_node_key,
@@ -792,7 +807,7 @@ where
                 },
             }
         }
-        bail!("Jellyfish Merkle tree has cyclic graph inside.");
+        db_other_bail!("Jellyfish Merkle tree has cyclic graph inside.");
     }
 
     /// Gets the proof that shows a list of keys up to `rightmost_key_to_prove` exist at `version`.
@@ -828,8 +843,9 @@ where
     }
 
     fn get_root_node(&self, version: Version) -> Result<Node<K>> {
-        self.get_root_node_option(version)?
-            .ok_or_else(|| format_err!("Root node not found for version {}.", version))
+        self.get_root_node_option(version)?.ok_or_else(|| {
+            AptosDbError::NotFound(format!("Root node not found for version {}.", version))
+        })
     }
 
     fn get_root_node_option(&self, version: Version) -> Result<Option<Node<K>>> {

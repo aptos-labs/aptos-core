@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    db_options::state_merkle_db_column_families, ledger_db::LedgerDb, STATE_MERKLE_DB_NAME,
+    db_options::state_merkle_db_column_families, ledger_db::LedgerDb, Result, STATE_MERKLE_DB_NAME,
 };
-use anyhow::Result;
 use aptos_config::config::RocksdbConfigs;
 use aptos_types::nibble::{nibble_path::NibblePath, Nibble};
 use clap::Parser;

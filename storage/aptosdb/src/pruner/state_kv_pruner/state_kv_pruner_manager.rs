@@ -8,8 +8,8 @@ use crate::{
         state_kv_pruner::StateKvPruner,
     },
     state_kv_db::StateKvDb,
+    Result,
 };
-use anyhow::Result;
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_types::transaction::{AtomicVersion, Version};
 use std::sync::{atomic::Ordering, Arc};

@@ -4,8 +4,10 @@
 pub mod iterators;
 pub(crate) mod truncation_helper;
 
-use crate::schema::db_metadata::{DbMetadataKey, DbMetadataSchema};
-use anyhow::Result;
+use crate::{
+    schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
+    Result,
+};
 use aptos_schemadb::DB;
 use aptos_types::transaction::Version;
 

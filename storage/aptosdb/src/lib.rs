@@ -73,10 +73,10 @@ use aptos_db_indexer::Indexer;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{SchemaBatch, DB};
-use aptos_storage_interface::{db_ensure as ensure, db_other_bail,
-    cached_state_view::ShardedStateCache, errors::AptosDbError, state_delta::StateDelta,
-    state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order, StateSnapshotReceiver,
-    MAX_REQUEST_LIMIT,
+use aptos_storage_interface::{
+    cached_state_view::ShardedStateCache, db_ensure as ensure, db_other_bail, errors::AptosDbError,
+    state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
+    StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -116,7 +116,6 @@ use rayon::prelude::*;
 use std::{
     borrow::Borrow,
     collections::HashMap,
-    default::Default,
     fmt::{Debug, Formatter},
     iter::Iterator,
     path::Path,
@@ -198,10 +197,7 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
     }
 }
 
-fn update_rocksdb_properties(
-    ledger_rocksdb: &DB,
-    state_merkle_db: &StateMerkleDb,
-) -> Result<()> {
+fn update_rocksdb_properties(ledger_rocksdb: &DB, state_merkle_db: &StateMerkleDb) -> Result<()> {
     let _timer = OTHER_TIMERS_SECONDS
         .with_label_values(&["update_rocksdb_properties"])
         .start_timer();

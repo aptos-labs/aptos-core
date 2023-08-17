@@ -27,7 +27,7 @@ use crate::{
     StaleNodeIndexSchema, StateKvPrunerManager, StateMerklePrunerManager, TransactionStore,
     NUM_STATE_SHARDS, OTHER_TIMERS_SECONDS,
 };
-use anyhow::{Context};
+use anyhow::Context;
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -38,9 +38,10 @@ use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
 use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_state_view::StateViewId;
-use aptos_storage_interface::{db_ensure as ensure,
+use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher,
     cached_state_view::{CachedStateView, ShardedStateCache},
+    db_ensure as ensure,
     state_delta::StateDelta,
     DbReader, StateSnapshotReceiver,
 };
@@ -217,10 +218,7 @@ impl DbReader for StateDb {
 impl StateDb {
     /// Get the latest ended epoch strictly before required version, i.e. if the passed in version
     /// ends an epoch, return one epoch early than that.
-    pub fn get_previous_epoch_ending(
-        &self,
-        version: Version,
-    ) -> Result<Option<(u64, Version)>> {
+    pub fn get_previous_epoch_ending(&self, version: Version) -> Result<Option<(u64, Version)>> {
         if version == 0 {
             return Ok(None);
         }
@@ -1009,7 +1007,8 @@ impl StateStore {
             Arc::clone(&self.state_merkle_db),
             version,
             start_hashed_key,
-        )?.map(|it| it.map_err(Into::into))
+        )?
+        .map(|it| it.map_err(Into::into))
         .map(move |res| match res {
             Ok((_hashed_key, (key, version))) => {
                 Ok((key.clone(), store.expect_value_by_version(&key, version)?))
@@ -1029,7 +1028,8 @@ impl StateStore {
             version,
             first_index,
         )?
-        .take(chunk_size).map(|it| it.map_err(Into::into));
+        .take(chunk_size)
+        .map(|it| it.map_err(Into::into));
         let state_key_values: Vec<(StateKey, StateValue)> = result_iter
             .into_iter()
             .map(|res| {

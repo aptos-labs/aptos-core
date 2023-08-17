@@ -21,16 +21,18 @@ use crate::{
     state_merkle_db::StateMerkleDb,
     OTHER_TIMERS_SECONDS,
 };
-use anyhow::Result;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_schemadb::{schema::KeyCodec, ReadOptions, DB};
+use aptos_storage_interface::errors::AptosDbError;
 use aptos_types::transaction::{AtomicVersion, Version};
 use once_cell::sync::Lazy;
 use std::{
     marker::PhantomData,
     sync::{atomic::Ordering, Arc},
 };
+
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 static TREE_PRUNER_WORKER_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()

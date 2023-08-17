@@ -13,7 +13,9 @@ use crate::{
     OTHER_TIMERS_SECONDS,
 };
 use aptos_logger::trace;
-use aptos_storage_interface::{jmt_update_refs, jmt_updates, state_delta::StateDelta};
+use aptos_storage_interface::{
+    errors::AptosDbError, jmt_update_refs, jmt_updates, state_delta::StateDelta,
+};
 use rayon::prelude::*;
 use static_assertions::const_assert;
 use std::{
@@ -24,7 +26,6 @@ use std::{
     },
     thread::JoinHandle,
 };
-use aptos_storage_interface::errors::AptosDbError;
 
 type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 

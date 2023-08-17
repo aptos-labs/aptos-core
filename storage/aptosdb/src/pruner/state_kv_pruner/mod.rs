@@ -17,13 +17,15 @@ use crate::{
     state_kv_db::StateKvDb,
     OTHER_TIMERS_SECONDS,
 };
-use anyhow::Result;
 use aptos_logger::info;
+use aptos_storage_interface::errors::AptosDbError;
 use aptos_types::transaction::{AtomicVersion, Version};
 use std::{
     cmp::min,
     sync::{atomic::Ordering, Arc},
 };
+
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 pub const STATE_KV_PRUNER_NAME: &str = "state_kv_pruner";
 

@@ -5,6 +5,7 @@
 //! This module defines error types used by [`AptosDB`](crate::AptosDB).
 
 use rocksdb;
+use std::sync::mpsc::RecvError;
 use thiserror::Error;
 
 /// This enum defines errors commonly used among [`AptosDB`](crate::AptosDB) APIs.
@@ -39,5 +40,8 @@ impl From<rocksdb::Error> for AptosDbError {
     }
 }
 
-
-
+impl From<RecvError> for AptosDbError {
+    fn from(error: RecvError) -> Self {
+        Self::Other(format!("{}", error))
+    }
+}

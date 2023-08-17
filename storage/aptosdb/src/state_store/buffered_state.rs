@@ -8,7 +8,7 @@ use crate::{
     state_store::{state_snapshot_committer::StateSnapshotCommitter, StateDb},
 };
 use aptos_logger::info;
-use aptos_storage_interface::{db_ensure as ensure, state_delta::StateDelta};
+use aptos_storage_interface::{db_ensure as ensure, errors::AptosDbError, state_delta::StateDelta};
 use aptos_types::{state_store::ShardedStateUpdates, transaction::Version};
 use itertools::zip_eq;
 use std::{
@@ -20,9 +20,8 @@ use std::{
     },
     thread::JoinHandle,
 };
-use aptos_storage_interface::errors::AptosDbError;
 
-type Result<T, E=AptosDbError> = std::result::Result<T, E>;
+type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 
 pub(crate) const ASYNC_COMMIT_CHANNEL_BUFFER_SIZE: u64 = 1;
 pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 20_000;
@@ -180,7 +179,8 @@ impl BufferedState {
             }
         } else {
             ensure!(
-                new_state_after_checkpoint.base_version == self.state_after_checkpoint.base_version, "new state base version not equal to checkpoint base version"
+                new_state_after_checkpoint.base_version == self.state_after_checkpoint.base_version,
+                "new state base version not equal to checkpoint base version"
             );
             self.state_after_checkpoint = new_state_after_checkpoint;
         }

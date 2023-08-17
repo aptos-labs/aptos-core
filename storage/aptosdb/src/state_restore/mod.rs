@@ -2,19 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::OTHER_TIMERS_SECONDS;
+use anyhow::anyhow;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{
     restore::JellyfishMerkleRestore, Key, TreeReader, TreeWriter, Value, IO_POOL,
 };
-use aptos_storage_interface::StateSnapshotReceiver;
+use aptos_storage_interface::{errors::AptosDbError, StateSnapshotReceiver};
 use aptos_types::{
     proof::SparseMerkleRangeProof, state_store::state_storage_usage::StateStorageUsage,
     transaction::Version,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, hash::Hash, str::FromStr, sync::Arc};
-use aptos_storage_interface::errors::AptosDbError;
 
 #[cfg(test)]
 mod restore_test;
@@ -69,16 +69,12 @@ impl Default for StateSnapshotRestoreMode {
 impl FromStr for StateSnapshotRestoreMode {
     type Err = anyhow::Error;
 
-    fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> Result<Self, anyhow::Error> {
         match s {
             "default" => Ok(Self::Default),
             "kv_only" => Ok(Self::KvOnly),
             "tree_only" => Ok(Self::TreeOnly),
-            _ => Err(AptosDbError::Other(
-                format!("Invalid state snapshot restore mode: {}",
-                s
-                )
-            )),
+            _ => Err(anyhow!("Invalid state snapshot restore mode: {}", s)),
         }
     }
 }
@@ -226,7 +222,8 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
             .lock()
             .as_mut()
             .unwrap()
-            .wait_for_async_commit().map_err(Into::into)
+            .wait_for_async_commit()
+            .map_err(Into::into)
     }
 }
 
