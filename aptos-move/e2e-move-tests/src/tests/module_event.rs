@@ -112,5 +112,5 @@ fn verify_module_event_upgrades() {
     builder.add_source("m.move", source);
     let path = builder.write_to_temp().unwrap();
     let result = h.publish_package(&account, path.path());
-    assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
+    assert_vm_status!(result, StatusCode::EVENT_METADATA_VALIDATION_ERROR);
 }
