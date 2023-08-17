@@ -1186,7 +1186,7 @@ dependencies = [
  "primitive-types 0.12.1",
  "proptest",
  "rand 0.7.3",
- "serde 1.0.149",
+ "serde",
  "serde_json",
 ]
 
@@ -6440,7 +6440,7 @@ dependencies = [
  "rlp",
  "rlp-derive",
  "scale-info 1.0.0",
- "serde 1.0.149",
+ "serde",
  "sha3 0.9.1",
  "triehash",
 ]
@@ -6533,7 +6533,7 @@ dependencies = [
  "primitive-types 0.10.1",
  "rlp",
  "scale-info 1.0.0",
- "serde 1.0.149",
+ "serde",
  "sha3 0.8.2",
 ]
 
@@ -6553,6 +6553,18 @@ dependencies = [
  "sha3 0.10.6",
 ]
 
+[[package]]
+name = "evm-core"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dfe4f2a56c4c05a8107b8596380e2332fc2019ffcf56b8f2d01971393a30c4d"
+dependencies = [
+ "funty 1.1.0",
+ "parity-scale-codec 2.3.1",
+ "primitive-types 0.10.1",
+ "scale-info 1.0.0",
+ "serde",
+]
 
 [[package]]
 name = "evm-core"
@@ -6562,7 +6574,7 @@ dependencies = [
  "parity-scale-codec 3.4.0",
  "primitive-types 0.12.1",
  "scale-info 2.9.0",
- "serde 1.0.149",
+ "serde",
 ]
 
 [[package]]
@@ -7858,7 +7870,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebc88fc67028ae3db0c853baa36269d398d5f45b6982f95549ff5def78c935cd"
 dependencies = [
- "serde 1.0.149",
+ "serde",
 ]
 
 [[package]]

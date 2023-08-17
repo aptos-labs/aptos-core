@@ -15,6 +15,8 @@ use std::collections::VecDeque;
 use primitive_types::U256;
 use aptos_evm::{utils::vec_to_h160, engine::Engine, eth_address::EthAddress};
 
+use crate::natives::evm::NativeEvmContext;
+
 /// The index of the `handle` field in the `Table` Move struct.
 const TABLE_HANDLE_FIELD_INDEX: usize = 0;
 
@@ -56,6 +58,7 @@ fn native_create_impl(
     let init_code = [].to_vec();
 
     let table_context = context.extensions().get::<NativeTableContext>();
+    let evm_context = context.extensions().get::<NativeEvmContext>();
     let mut engine = Engine::new(
         table_context.resolver,
         nonce_table_handle,
@@ -64,8 +67,10 @@ fn native_create_impl(
         storage_table_handle,
         EthAddress::new(caller)
     );
-    let (exit_reason, output, change_set) = engine.transact_create(caller, value, init_code, gas_limit, [].to_vec());
-    // context.add_change_set(change_set);
+    let (exit_reason, output, mut change_set) = engine.transact_create(caller, value, init_code, gas_limit, [].to_vec());
+    evm_context.table_change_set.borrow_mut().new_tables.append(&mut change_set.new_tables);
+    evm_context.table_change_set.borrow_mut().removed_tables.append(&mut change_set.removed_tables);
+    evm_context.table_change_set.borrow_mut().changes.append(&mut change_set.changes);
     Ok(smallvec![Value::bool(true)])
 }
 
@@ -98,6 +103,7 @@ fn native_call_impl(
     let address = caller;
 
     let table_context = context.extensions().get::<NativeTableContext>();
+    let evm_context = context.extensions().get::<NativeEvmContext>();
     let mut engine = Engine::new(
         table_context.resolver,
         nonce_table_handle,
@@ -106,8 +112,10 @@ fn native_call_impl(
         storage_table_handle,
         EthAddress::new(caller)
     );
-    let (exit_reason, output, change_set) = engine.transact_call(caller, address, value, data, gas_limit, [].to_vec());
-    // context.add_change_set(change_set);
+    let (exit_reason, output, mut change_set) = engine.transact_call(caller, address, value, data, gas_limit, [].to_vec());
+    evm_context.table_change_set.borrow_mut().new_tables.append(&mut change_set.new_tables);
+    evm_context.table_change_set.borrow_mut().removed_tables.append(&mut change_set.removed_tables);
+    evm_context.table_change_set.borrow_mut().changes.append(&mut change_set.changes);
     Ok(smallvec![])
 }
 

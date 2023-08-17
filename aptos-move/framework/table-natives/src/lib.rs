@@ -45,7 +45,7 @@ use std::{
 pub struct NativeTableContext<'a> {
     pub resolver: &'a dyn TableResolver,
     txn_hash: [u8; 32],
-    table_data: RefCell<TableData>,
+    pub table_data: RefCell<TableData>,
 }
 
 // See stdlib/Error.move
@@ -63,14 +63,14 @@ const _NOT_EMPTY: u64 = (102 << 8) + _ECATEGORY_INVALID_STATE as u64;
 /// A structure representing mutable data of the NativeTableContext. This is in a RefCell
 /// of the overall context so we can mutate while still accessing the overall context.
 #[derive(Default)]
-struct TableData {
-    new_tables: BTreeMap<TableHandle, TableInfo>,
-    removed_tables: BTreeSet<TableHandle>,
-    tables: BTreeMap<TableHandle, Table>,
+pub struct TableData {
+    pub new_tables: BTreeMap<TableHandle, TableInfo>,
+    pub removed_tables: BTreeSet<TableHandle>,
+    pub tables: BTreeMap<TableHandle, Table>,
 }
 
 /// A structure representing a single table.
-struct Table {
+pub struct Table {
     handle: TableHandle,
     key_layout: MoveTypeLayout,
     value_layout: MoveTypeLayout,

@@ -162,6 +162,7 @@ impl MoveVmExt {
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, resolver));
+        extensions.add(NativeEvmContext::new());
 
         let script_hash = match session_id {
             SessionId::Txn {

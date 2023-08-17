@@ -13,7 +13,11 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
     aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
+<<<<<<< HEAD
     event::NativeEventContext,
+=======
+    evm::NativeEvmContext
+>>>>>>> b8ac2a6be9 (Maintain Native EVM Context)
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
@@ -151,10 +155,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let (change_set, resource_group_change_set) =
             Self::split_and_merge_resource_groups(move_vm, self.remote, change_set, ap_cache)?;
 
+        let evm_context: NativeEvmContext = extensions.remove();
+        let evm_change_set = evm_context.into_change_set();
+
         let table_context: NativeTableContext = extensions.remove();
-        let table_change_set = table_context
+        let mut table_change_set = table_context
             .into_change_set()
             .map_err(|e| e.finish(Location::Undefined))?;
+
+        table_change_set.new_tables.extend(evm_change_set.new_tables);
+        table_change_set.removed_tables.extend(evm_change_set.removed_tables);
+        table_change_set.changes.extend(evm_change_set.changes);
 
         let aggregator_context: NativeAggregatorContext = extensions.remove();
         let aggregator_change_set = aggregator_context.into_change_set();
