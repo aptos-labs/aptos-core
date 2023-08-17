@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 
-use primitive_types::{H256, U256};
-use serde::{Deserialize, Serialize};
-use aptos_table_natives::{TableHandle, TableResolver};
 use crate::eth_address::EthAddress;
 use crate::utils::{read_h256_from_bytes, read_u256_from_move_bytes};
+use aptos_table_natives::{TableHandle, TableResolver};
+use primitive_types::{H256, U256};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 pub struct IO<'a> {
@@ -60,7 +60,10 @@ impl<'a> IO<'a> {
         let storage_key = StorageKey::new(address.as_bytes().to_vec(), index.as_bytes().to_vec());
         let bytes = self
             .resolver
-            .resolve_table_entry(&self.storage_table_handle, bcs::to_bytes(&storage_key).unwrap().as_slice())
+            .resolve_table_entry(
+                &self.storage_table_handle,
+                bcs::to_bytes(&storage_key).unwrap().as_slice(),
+            )
             .unwrap();
         bytes.map(|bytes| read_h256_from_bytes(&bytes))
     }
