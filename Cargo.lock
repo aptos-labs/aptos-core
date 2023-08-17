@@ -1067,6 +1067,7 @@ dependencies = [
  "aptos-jellyfish-merkle",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-profiler",
  "aptos-push-metrics",
  "aptos-schemadb",
  "aptos-scratchpad",
@@ -1886,6 +1887,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-network",
+ "aptos-profiler",
  "aptos-runtimes",
  "aptos-telemetry",
  "assert_approx_eq",
@@ -1904,13 +1906,6 @@ dependencies = [
  "serde_json",
  "sysinfo",
  "tokio",
-]
-
-[[package]]
-name = "aptos-iuchild"
-version = "0.1.0"
-dependencies = [
- "rstack-self",
 ]
 
 [[package]]
@@ -2556,12 +2551,17 @@ dependencies = [
 name = "aptos-profiler"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "backtrace",
  "jemalloc-sys",
  "jemallocator",
  "pprof",
  "rstack",
  "rstack-self",
+ "serde 1.0.149",
+ "serde_json",
+ "serde_yaml 0.8.26",
+ "tokio",
 ]
 
 [[package]]

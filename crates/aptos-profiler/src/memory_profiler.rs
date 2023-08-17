@@ -1,29 +1,26 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{utils::convert_svg_to_string, MemProfilerConfig, Profiler};
 use anyhow::{anyhow, Result};
-use crate::{MemProfilerConfig, Profiler, utils::convert_svg_to_string};
-use std::{thread, fs, path::{Path, PathBuf}, time::Duration, process::Command};
-use std::ffi::CString;
+use std::{path::PathBuf, process::Command, thread, time::Duration};
 
 pub struct MemProfiler {
-    duration: u64,
-    memory_profiling_result_txt: PathBuf,
-    memory_profiling_result_svg: PathBuf,
+    txt_result_path: PathBuf,
+    svg_result_path: PathBuf,
 }
 
 impl MemProfiler {
     pub(crate) fn new(config: &MemProfilerConfig) -> Self {
         Self {
-            duration: config.duration,
-            memory_profiling_result_txt: config.mem_profiling_result_txt.clone(),
-            memory_profiling_result_svg: config.mem_profiling_result_svg.clone(),
+            txt_result_path: config.txt_result_path.clone(),
+            svg_result_path: config.svg_result_path.clone(),
         }
     }
 }
+
 impl Profiler for MemProfiler {
-    
-    fn start_profiling(&self) -> Result<()> {
+    fn profile_for(&self, duration_secs: u64, binary_path: &str) -> Result<()> {
         let mut prof_active: bool = true;
 
         let result = unsafe {
@@ -35,16 +32,13 @@ impl Profiler for MemProfiler {
                 std::mem::size_of::<bool>(),
             )
         };
-    
+
         if result != 0 {
             return Err(anyhow!("Failed to activate jemalloc profiling"));
         }
 
-    
-        let duration = self.duration; // Replace with your desired duration
-        thread::sleep(Duration::from_secs(duration));
-    
-        // Disable the profiling
+        thread::sleep(Duration::from_secs(duration_secs));
+
         let mut prof_active: bool = false;
         let result = unsafe {
             jemalloc_sys::mallctl(
@@ -55,22 +49,46 @@ impl Profiler for MemProfiler {
                 std::mem::size_of::<bool>(),
             )
         };
-    
+
         if result != 0 {
             return Err(anyhow!("Failed to deactivate jemalloc profiling"));
         }
-    
-        let output = Command::new("python3")
+
+        // TODO: Run jeprof commands from within Rust, current tries give unresolved errors
+        Command::new("python3")
             .arg("./crates/aptos-profiler/src/jeprof.py")
-            .arg(&self.memory_profiling_result_txt.to_string_lossy().as_ref())
-            .arg(&self.memory_profiling_result_svg.to_string_lossy().as_ref())
+            .arg(self.txt_result_path.to_string_lossy().as_ref())
+            .arg(self.svg_result_path.to_string_lossy().as_ref())
+            .arg(binary_path)
             .output()
             .expect("Failed to execute command");
 
         Ok(())
     }
 
-    fn end_profiling(&self) -> Result<()> {
+    /// Enable memory profiling until it is disabled
+    fn start_profiling(&mut self) -> Result<()> {
+        let mut prof_active: bool = true;
+
+        let result = unsafe {
+            jemalloc_sys::mallctl(
+                b"prof.active\0".as_ptr() as *const _,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                &mut prof_active as *mut _ as *mut _,
+                std::mem::size_of::<bool>(),
+            )
+        };
+
+        if result != 0 {
+            return Err(anyhow!("Failed to activate jemalloc profiling"));
+        }
+
+        Ok(())
+    }
+
+    /// Disable profiling and run jeprof to obtain results
+    fn end_profiling(&mut self, binary_path: &str) -> Result<()> {
         let mut prof_active: bool = false;
         let result = unsafe {
             jemalloc_sys::mallctl(
@@ -81,30 +99,32 @@ impl Profiler for MemProfiler {
                 std::mem::size_of::<bool>(),
             )
         };
-        
+
         if result != 0 {
             return Err(anyhow!("Failed to deactivate jemalloc profiling"));
         }
-    
-        let output = Command::new("python3")
+
+        // TODO: Run jeprof commands from within Rust, current tries give unresolved errors
+        Command::new("python3")
             .arg("./crates/aptos-profiler/src/jeprof.py")
-            .arg(&self.memory_profiling_result_txt.to_string_lossy().as_ref())
-            .arg(&self.memory_profiling_result_svg.to_string_lossy().as_ref())
+            .arg(self.txt_result_path.to_string_lossy().as_ref())
+            .arg(self.svg_result_path.to_string_lossy().as_ref())
+            .arg(binary_path)
             .output()
             .expect("Failed to execute command");
+
         Ok(())
     }
 
-    // End profiling
+    /// Expose the results in TXT format
     fn expose_text_results(&self) -> Result<String> {
-        let content = fs::read_to_string(self.memory_profiling_result_txt.as_path())
-        .expect("Failed to read input");
-        return Ok(content);
+        let content = convert_svg_to_string(self.txt_result_path.as_path());
+        content
     }
-    // Expose the results as a JSON string for visualization
+
+    /// Expose the results in SVG format
     fn expose_svg_results(&self) -> Result<String> {
-        let content = convert_svg_to_string(self.memory_profiling_result_svg.as_path())
-        .expect("Failed to read input");
-        return Ok(content);
+        let content = convert_svg_to_string(self.svg_result_path.as_path());
+        content
     }
 }

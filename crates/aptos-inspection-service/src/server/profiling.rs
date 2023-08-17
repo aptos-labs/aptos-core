@@ -24,12 +24,11 @@ pub fn handle_profiling_request() -> (StatusCode, Body, String) {
 #[cfg(target_os = "linux")]
 pub fn handle_cpu_profiling_request() -> (StatusCode, Body, String) {
     // Call aptos-profiling cpu profiling
-    //let config = ProfilerConfig::load_from_file(PathBuf::from("./config.yml"));
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
     let cpu_profiler = handler.get_cpu_profiler();
 
-    match cpu_profiler.start_profiling() {
+    match cpu_profiler.profile_for(10, "") {
         Ok(_) => {
             // If profiling started successfully, return the OK status code
             (StatusCode::OK, Body::from("Success"), CONTENT_TYPE_TEXT.into())
@@ -45,9 +44,9 @@ pub fn handle_cpu_profiling_request() -> (StatusCode, Body, String) {
 pub fn handle_memory_profiling_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
-    let memory_profiler = handler.get_mem_profiler();
+    let mut memory_profiler = handler.get_mem_profiler();
 
-    match memory_profiler.start_profiling() {
+    match memory_profiler.profile_for(60, "./target/release/aptos-node") {
         Ok(_) => {
             (StatusCode::OK, Body::from("Success"), CONTENT_TYPE_TEXT.into())
         }
@@ -112,7 +111,7 @@ pub fn handle_memory_txt_request() -> (StatusCode, Body, String) {
 pub fn handle_thread_dump_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
-    let thread_profiler = handler.get_thread_profiler();
+    let mut thread_profiler = handler.get_thread_profiler();
 
     match thread_profiler.start_profiling() {
         Ok(_) => {
@@ -145,7 +144,7 @@ pub fn handle_thread_dump_result_request() -> (StatusCode, Body, String) {
 pub fn handle_offcpu_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
-    let offcpu_profiler = handler.get_offcpu_profiler();
+    let mut offcpu_profiler = handler.get_offcpu_profiler();
 
     match offcpu_profiler.start_profiling() {
         Ok(_) => {

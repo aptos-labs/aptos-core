@@ -147,8 +147,8 @@ async fn serve_requests(
             system_information::handle_system_information_request(node_config)
         },
         CPU_PROFILING_PATH => {
-            // /cpu_profiling
-            // Exposes the CPU usage
+            //cpu_profiling
+            //Exposes the CPU usage
             profiling::handle_cpu_profiling_request()
         },
         MEMORY_PROFILING_PATH => {
