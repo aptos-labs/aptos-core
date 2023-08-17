@@ -12,9 +12,8 @@ use move_core_types::account_address::AccountAddress;
 use evm::backend::{Apply, Backend, Basic, MemoryAccount};
 #[cfg(test)]
 use crate::in_memory_storage::InMemoryTableResolver;
-use crate::utils::{u256_to_arr, u256_to_move_arr};
+use crate::utils::{u256_to_move_arr};
 use std::str::FromStr;
-use aptos_vm_types::change_set;
 use move_core_types::effects::Op;
 
 pub struct Engine<'a> {
@@ -162,6 +161,7 @@ impl<'a> Engine<'a> {
         let mut balance_change_set = BTreeMap::new();
         let mut code_change_set = BTreeMap::new();
         let mut storage_change_set = BTreeMap::new();
+        //println!("values: {:?}", values);
         for apply in values {
             match apply {
                 Apply::Modify {
@@ -171,6 +171,9 @@ impl<'a> Engine<'a> {
                     storage,
                     reset_storage,
                 } => {
+                    // println!("Apply::Modify: {:?}", address);
+                    // println!("Apply::Modify: {:?}", basic);
+                    // println!("Apply::Modify: {:?}", code);
                     let eth_addr = EthAddress::new(address);
                     if !backend.exists(address.clone()) {
                         let cs = Self::add_nonce(&eth_addr, &basic.nonce);
@@ -256,8 +259,8 @@ fn test_contract_in_memory_table() {
                           code_table_handle: &TableHandle,
                           storage_table_handle: &TableHandle,
                           address: &EthAddress, account: MemoryAccount) {
-        resolver.add_table_entry(nonce_table_handle, address.as_bytes().to_vec(), u256_to_arr( &account.nonce).to_vec());
-        resolver.add_table_entry(balance_table_handle, address.as_bytes().to_vec(), u256_to_arr( &account.balance).to_vec());
+        resolver.add_table_entry(nonce_table_handle, address.as_bytes().to_vec(), u256_to_move_arr( &account.nonce).to_vec());
+        resolver.add_table_entry(balance_table_handle, address.as_bytes().to_vec(), u256_to_move_arr( &account.balance).to_vec());
         resolver.add_table_entry(code_table_handle, address.as_bytes().to_vec(), account.code);
         for (index, value) in account.storage {
             let mut buf = [0u8; 52];
@@ -306,19 +309,28 @@ fn test_contract_in_memory_table() {
                                  EthAddress::new(H160::default())
     );
 
-    let (_, _, table_cs) = engine.transact_call(
+    // let (_, _, table_cs) = engine.transact_call(
+    //     H160::from_str("0xf000000000000000000000000000000000000000").unwrap(),
+    //     H160::from_str("0x1000000000000000000000000000000000000000").unwrap(),
+    //     U256::zero(),
+    //     // hex::decode("0f14a4060000000000000000000000000000000000000000000000000000000000b71b00")
+    //     // 	.unwrap(),
+    //     hex::decode("0f14a4060000000000000000000000000000000000000000000000000000000000002ee0")
+    //         .unwrap(),
+    //     u64::MAX,
+    //     Vec::new(),
+    // );
+
+
+    let (exit_reason, _, table_cs) = engine.transact_create(
         H160::from_str("0xf000000000000000000000000000000000000000").unwrap(),
-        H160::from_str("0x1000000000000000000000000000000000000000").unwrap(),
         U256::zero(),
-        // hex::decode("0f14a4060000000000000000000000000000000000000000000000000000000000b71b00")
-        // 	.unwrap(),
-        hex::decode("0f14a4060000000000000000000000000000000000000000000000000000000000002ee0")
-            .unwrap(),
+       hex::decode("608060405234801561001057600080fd5b506101e7806100206000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c806306661abd14610051578063371303c01461006f5780636d4ce63c14610079578063b3bcfa8214610097575b600080fd5b6100596100a1565b60405161006691906100ff565b60405180910390f35b6100776100a7565b005b6100816100c2565b60405161008e91906100ff565b60405180910390f35b61009f6100cb565b005b60005481565b60016000808282546100b99190610149565b92505081905550565b60008054905090565b60016000808282546100dd919061017d565b92505081905550565b6000819050919050565b6100f9816100e6565b82525050565b600060208201905061011460008301846100f0565b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b6000610154826100e6565b915061015f836100e6565b92508282019050808211156101775761017661011a565b5b92915050565b6000610188826100e6565b9150610193836100e6565b92508282039050818111156101ab576101aa61011a565b5b9291505056fea264697066735822122053546e6543071d1df5660aa17b6350143abd9a8d50b3783b39730ed27283673e64736f6c63430008120033").unwrap(),
         u64::MAX,
         Vec::new(),
     );
 
-
+    println!("exit_reason: {:?}", exit_reason);
     println!("Result: {:?}", table_cs);
 }
 
