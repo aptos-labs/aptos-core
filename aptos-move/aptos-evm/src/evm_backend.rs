@@ -1,16 +1,8 @@
 // Copyright © Aptos Foundation
 
-use crate::eth_address::EthAddress;
-use crate::evm_io::{StorageKey, IO};
-use crate::utils::{read_h256_from_bytes, read_u256_from_move_bytes};
-use aptos_table_natives::{TableHandle, TableResolver};
-use evm::backend::{Backend, Basic, MemoryAccount, MemoryBackend, MemoryVicinity};
-use evm::executor::stack::{MemoryStackState, StackExecutor, StackSubstateMetadata};
-use evm_runtime::Config;
+use crate::{eth_address::EthAddress, evm_io::IO};
+use evm::backend::{Backend, Basic};
 use primitive_types::{H160, H256, U256};
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::str::FromStr;
 
 pub struct EVMBackend<'a> {
     pub(crate) io: IO<'a>,
@@ -100,7 +92,7 @@ impl<'a> Backend for EVMBackend<'a> {
         let address = EthAddress::new(address);
         let nonce = self.io.get_nonce(&address);
         let balance = self.io.get_balance(&address);
-        if !balance.is_none() || !nonce.is_none() {
+        if balance.is_some() || nonce.is_some() {
             return true;
         }
         let code = self.io.get_code(&address);
@@ -142,6 +134,13 @@ impl<'a> Backend for EVMBackend<'a> {
 
 #[cfg(test)]
 fn run_loop_contract_in_memory() {
+    use evm::{
+        backend::{MemoryAccount, MemoryBackend, MemoryVicinity},
+        executor::stack::{MemoryStackState, StackExecutor, StackSubstateMetadata},
+    };
+    use evm_runtime::Config;
+    use std::{collections::BTreeMap, str::FromStr};
+
     let config = Config::istanbul();
 
     let vicinity = MemoryVicinity {

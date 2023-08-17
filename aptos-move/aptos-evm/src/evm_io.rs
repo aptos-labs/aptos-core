@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::eth_address::EthAddress;
-use crate::utils::{read_bytes_from_move_bytes, read_h256_from_bytes, read_u256_from_move_bytes};
+use crate::{
+    eth_address::EthAddress,
+    utils::{read_bytes_from_move_bytes, read_h256_from_bytes, read_u256_from_move_bytes},
+};
 use aptos_table_natives::{TableHandle, TableResolver};
 use primitive_types::{H256, U256};
 use serde::{Deserialize, Serialize};
@@ -35,7 +37,10 @@ impl<'a> IO<'a> {
     pub fn get_nonce(&self, address: &EthAddress) -> Option<U256> {
         let bytes = self
             .resolver
-            .resolve_table_entry(&self.nonce_table_handle, &address.as_bytes())
+            .resolve_table_entry(
+                &self.nonce_table_handle,
+                &bcs::to_bytes(&address.as_bytes()).unwrap(),
+            )
             .unwrap();
         bytes.map(|bytes| read_u256_from_move_bytes(&bytes))
     }
@@ -43,17 +48,25 @@ impl<'a> IO<'a> {
     pub fn get_balance(&self, address: &EthAddress) -> Option<U256> {
         let bytes = self
             .resolver
-            .resolve_table_entry(&self.balance_table_handle, &address.as_bytes())
+            .resolve_table_entry(
+                &self.balance_table_handle,
+                &bcs::to_bytes(&address.as_bytes()).unwrap(),
+            )
             .unwrap();
-        bytes.map(|bytes| read_u256_from_move_bytes(&bytes))
+        bytes.clone().map(|bytes| read_u256_from_move_bytes(&bytes))
     }
 
     pub fn get_code(&self, address: &EthAddress) -> Vec<u8> {
         let bytes = self
             .resolver
-            .resolve_table_entry(&self.code_table_handle, &address.as_bytes())
+            .resolve_table_entry(
+                &self.code_table_handle,
+                &bcs::to_bytes(&address.as_bytes()).unwrap(),
+            )
             .unwrap();
-        bytes.map(|bytes| read_bytes_from_move_bytes(&bytes)).unwrap_or_default()
+        bytes
+            .map(|bytes| read_bytes_from_move_bytes(&bytes))
+            .unwrap_or_default()
     }
 
     pub fn get_storage(&self, address: &EthAddress, index: H256) -> Option<H256> {

@@ -4,13 +4,13 @@
 
 pub mod account;
 pub mod aggregator_natives;
-pub mod evm;
 pub mod any;
 pub mod code;
 pub mod create_signer;
 pub mod cryptography;
 pub mod debug;
 pub mod event;
+pub mod evm_natives;
 pub mod hash;
 mod helpers;
 pub mod object;
@@ -80,7 +80,7 @@ pub fn all_natives(
     add_natives_from_module!("object", object::make_all(builder));
     add_natives_from_module!("debug", debug::make_all(builder));
     add_natives_from_module!("string_utils", string_utils::make_all(builder));
-    add_natives_from_module!("evm", evm::evm::make_all(builder));
+    add_natives_from_module!("evm", evm_natives::evm::make_all(builder));
     make_table_from_iter(framework_addr, natives)
 }
 

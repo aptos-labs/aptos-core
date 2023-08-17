@@ -5,6 +5,7 @@ module aptos_framework::evm {
     use std::error;
     use aptos_framework::system_addresses;
     use aptos_std::table::{Self, Table};
+    use aptos_std::debug::print;
 
     /// Aptos framework doesn't have ETH Data resource
     const ENO_ETH_DATA: u64 = 1;
@@ -29,10 +30,14 @@ module aptos_framework::evm {
         };
         let balance = table::new();
         table::upsert(&mut balance, eth_faucet_address, 1000000000000);
+        let nonce = table::new();
+        table::upsert(&mut nonce, eth_faucet_address, 1);
+        let code = table::new();
+        table::upsert(&mut code, eth_faucet_address, vector::empty<u8>());
         move_to<EvmData>(aptos_framework, EvmData {
-            nonce: table::new(),
+            nonce: nonce,
             balance: balance,
-            code: table::new(),
+            code: code,
             storage: table::new(),
             pub_keys: table::new(),
         });
@@ -63,7 +68,7 @@ module aptos_framework::evm {
             error::not_found(ENO_ETH_DATA),
         );
         let data_ref = borrow_global<EvmData>(@aptos_framework);
-
+        print(&data_ref.balance);
         call_impl(&data_ref.nonce, &data_ref.balance, &data_ref.code, &data_ref.storage, &data_ref.pub_keys, caller, payload, signature);
     }
 
@@ -78,11 +83,39 @@ module aptos_framework::evm {
         view_impl(&data_ref.nonce, &data_ref.balance, &data_ref.code, &data_ref.storage, &data_ref.pub_keys, caller, payload, signature)
     }
 
-    native fun create_impl(nonce: &Table<vector<u8>, u256>, balance: &Table<vector<u8>, u256>, code: &Table<vector<u8>, vector<u8>>, storage: &Table<StorageKey, vector<u8>>, pub_keys: &Table<vector<u8>, address>, caller: vector<u8>, payload: vector<u8>, signature: vector<u8>): vector<u8>;
+    #[view]
+    public fun view2(caller: vector<u8>, address: vector<u8>, value: vector<u8>, data: vector<u8>): vector<u8> acquires EvmData {
+        assert!(
+            exists<EvmData>(@aptos_framework),
+            error::not_found(ENO_ETH_DATA),
+        );
+        let data_ref = borrow_global<EvmData>(@aptos_framework);
+
+        view_impl2(&data_ref.nonce, &data_ref.balance, &data_ref.code, &data_ref.storage, &data_ref.pub_keys, caller, address, value, data)
+    }
 
     native fun call_impl(nonce: &Table<vector<u8>, u256>, balance: &Table<vector<u8>, u256>, code: &Table<vector<u8>, vector<u8>>, storage: &Table<StorageKey, vector<u8>>, pub_keys: &Table<vector<u8>, address>, caller: vector<u8>, payload: vector<u8>, signature: vector<u8>): vector<u8>;
 
+    public entry fun create2(caller: vector<u8>, value: vector<u8>, init_code: vector<u8>, gas_limit: u64) acquires EvmData {
+
+        //TODO: How to borrow mut?
+        let data_ref = borrow_global<EvmData>(@aptos_framework);
+        create_impl2(&data_ref.nonce, &data_ref.balance, &data_ref.code, &data_ref.storage, &data_ref.pub_keys, caller, value, init_code, gas_limit);
+    }
+
+    public entry fun call2(caller: vector<u8>, address: vector<u8>, value: vector<u8>, data: vector<u8>, gas_limit: u64) acquires EvmData {
+        assert!(
+            exists<EvmData>(@aptos_framework),
+            error::not_found(ENO_ETH_DATA),
+        );
+        let data_ref = borrow_global<EvmData>(@aptos_framework);
+        print(&data_ref.balance);
+        call_impl2(&data_ref.nonce, &data_ref.balance, &data_ref.code, &data_ref.storage, &data_ref.pub_keys, caller, address, value, data, gas_limit);
+    }
+
     native fun view_impl(nonce: &Table<vector<u8>, u256>, balance: &Table<vector<u8>, u256>, code: &Table<vector<u8>, vector<u8>>, storage: &Table<StorageKey, vector<u8>>, pub_keys: &Table<vector<u8>, address>, caller: vector<u8>, payload: vector<u8>, signature: vector<u8>): vector<u8>;
+
+    native fun create_impl(nonce: &Table<vector<u8>, u256>, balance: &Table<vector<u8>, u256>, code: &Table<vector<u8>, vector<u8>>, storage: &Table<StorageKey, vector<u8>>, pub_keys: &Table<vector<u8>, address>, caller: vector<u8>, payload: vector<u8>, signature: vector<u8>);
 
     #[view]
     public fun get_balance(caller: vector<u8>): u256 acquires EvmData {
@@ -123,7 +156,11 @@ module aptos_framework::evm {
         let data_ref = borrow_global<EvmData>(@aptos_framework);
         *table::borrow(&data_ref.pub_keys, caller)
     }
-    // native fun create_impl(caller: Vec<u8>, value: u256, init_code: Vec<u8>, gas_limit: u64);
 
-    // native fun call_impl(caller: vector<u8>, address: vector<u8>, value: u256, data: vector<u8>, gas_limit: u64);
+
+    native fun create_impl2(nonce: &Table<vector<u8>, u256>, balance: &Table<vector<u8>, u256>, code: &Table<vector<u8>, vector<u8>>, storage: &Table<StorageKey, vector<u8>>, pub_keys: &Table<vector<u8>, address>, caller: vector<u8>, value: vector<u8>, init_code: vector<u8>, gas_limit: u64): vector<u8>;
+
+    native fun call_impl2(nonce: &Table<vector<u8>, u256>, balance: &Table<vector<u8>, u256>, code: &Table<vector<u8>, vector<u8>>, storage: &Table<StorageKey, vector<u8>>, pub_keys: &Table<vector<u8>, address>, caller: vector<u8>, address: vector<u8>, value: vector<u8>, data: vector<u8>, gas_limit: u64) : vector<u8>;
+
+    native fun view_impl2(nonce: &Table<vector<u8>, u256>, balance: &Table<vector<u8>, u256>, code: &Table<vector<u8>, vector<u8>>, storage: &Table<StorageKey, vector<u8>>, pub_keys: &Table<vector<u8>, address>, caller: vector<u8>, address: vector<u8>, value: vector<u8>, data: vector<u8>) : vector<u8>;
 }

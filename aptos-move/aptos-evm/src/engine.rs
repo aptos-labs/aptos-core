@@ -1,22 +1,24 @@
 // Copyright © Aptos Foundation
 
-use crate::eth_address::EthAddress;
-use crate::evm_backend::EVMBackend;
-use crate::evm_io::{StorageKey, IO};
 #[cfg(test)]
 use crate::in_memory_storage::InMemoryTableResolver;
-use crate::utils::u256_to_move_arr;
+use crate::{
+    eth_address::EthAddress,
+    evm_backend::EVMBackend,
+    evm_io::{StorageKey, IO},
+    utils::u256_to_move_arr,
+};
 use aptos_table_natives::{TableChange, TableChangeSet, TableHandle, TableResolver};
-use evm::backend::{Apply, Backend, MemoryAccount};
-use evm::executor::stack::{MemoryStackState, PrecompileFn, StackExecutor, StackSubstateMetadata};
+use evm::{
+    backend::{Apply, Backend},
+    executor::stack::{MemoryStackState, PrecompileFn, StackExecutor, StackSubstateMetadata},
+};
 use evm_core::ExitReason;
 use evm_runtime::Config;
-use move_core_types::account_address::AccountAddress;
 use move_core_types::effects::Op;
 use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
 use std::collections::BTreeMap;
-use std::str::FromStr;
 pub struct Engine<'a> {
     pub(crate) io: IO<'a>,
     origin: EthAddress,
@@ -33,10 +35,10 @@ impl<'a> Engine<'a> {
     ) -> Self {
         let io = IO::new(
             resolver,
-            nonce_table_handle.clone(),
-            balance_table_handle.clone(),
-            code_table_handle.clone(),
-            storage_table_handle.clone(),
+            nonce_table_handle,
+            balance_table_handle,
+            code_table_handle,
+            storage_table_handle,
         );
         Self { io, origin }
     }
@@ -68,8 +70,8 @@ impl<'a> Engine<'a> {
         let mut executor = StackExecutor::new_with_precompiles(state, &config, &precompiles);
         let ret = executor.transact_call(caller, address, value, data, gas_limit, access_list);
 
-        let (values, logs) = executor.into_state().deconstruct();
-        let table_cs = self.into_change_set(values, backend);
+        let (values, _logs) = executor.into_state().deconstruct();
+        let table_cs = self.generate_change_set(values, backend);
         (ret.0, ret.1, table_cs)
     }
 
@@ -89,9 +91,9 @@ impl<'a> Engine<'a> {
         let precompiles: BTreeMap<_, PrecompileFn> = BTreeMap::new();
         let mut executor = StackExecutor::new_with_precompiles(state, &config, &precompiles);
         let ret = executor.transact_create(caller, value, init_code, gas_limit, access_list);
-        let (values, logs) = executor.into_state().deconstruct();
+        let (values, _logs) = executor.into_state().deconstruct();
 
-        let table_cs = self.into_change_set(values, backend);
+        let table_cs = self.generate_change_set(values, backend);
         (ret.0, ret.1, table_cs)
     }
 
@@ -129,13 +131,17 @@ impl<'a> Engine<'a> {
         )
     }
 
-    fn modify_code(address: &EthAddress, code: &Vec<u8>) -> (Vec<u8>, Op<Vec<u8>>) {
-        (            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(), Op::Modify(code.clone()))
+    fn modify_code(address: &EthAddress, code: &[u8]) -> (Vec<u8>, Op<Vec<u8>>) {
+        (
+            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(),
+            Op::Modify(code.to_owned()),
+        )
     }
 
     fn modify_storage(address: &EthAddress, index: &H256, value: &H256) -> (Vec<u8>, Op<Vec<u8>>) {
+        let move_bytes = bcs::to_bytes(&value.as_bytes().to_vec()).unwrap();
         let storage_key = StorageKey::new(address.as_bytes().to_vec(), index.as_bytes().to_vec());
-        (bcs::to_bytes(&storage_key).unwrap(), Op::Modify(value.as_bytes().to_vec()))
+        (bcs::to_bytes(&storage_key).unwrap(), Op::Modify(move_bytes))
     }
 
     fn add_nonce(address: &EthAddress, nonce: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
@@ -155,12 +161,13 @@ impl<'a> Engine<'a> {
     fn add_code(address: &EthAddress, code: &Vec<u8>) -> (Vec<u8>, Op<Vec<u8>>) {
         let move_bytes = bcs::to_bytes(code).unwrap();
         (
-            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(), Op::New(move_bytes)
+            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(),
+            Op::New(move_bytes),
         )
     }
 
     fn add_storage(address: &EthAddress, index: &H256, value: &H256) -> (Vec<u8>, Op<Vec<u8>>) {
-        let move_bytes =  bcs::to_bytes(&value.as_bytes().to_vec());
+        let move_bytes = bcs::to_bytes(&value.as_bytes().to_vec());
         let storage_key = StorageKey::new(address.as_bytes().to_vec(), index.as_bytes().to_vec());
         (
             bcs::to_bytes(&storage_key).unwrap(),
@@ -169,20 +176,27 @@ impl<'a> Engine<'a> {
     }
 
     fn delete_nonce(address: &EthAddress) -> (Vec<u8>, Op<Vec<u8>>) {
-        (            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(),
-         Op::Delete)
+        (
+            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(),
+            Op::Delete,
+        )
     }
 
     fn delete_balance(address: &EthAddress) -> (Vec<u8>, Op<Vec<u8>>) {
-        (            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(), Op::Delete)
+        (
+            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(),
+            Op::Delete,
+        )
     }
 
     fn delete_code(address: &EthAddress) -> (Vec<u8>, Op<Vec<u8>>) {
-        (            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(),
-         Op::Delete)
+        (
+            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(),
+            Op::Delete,
+        )
     }
 
-    fn into_change_set<A, I>(&self, values: A, backend: EVMBackend) -> TableChangeSet
+    fn generate_change_set<A, I>(&self, values: A, backend: EVMBackend) -> TableChangeSet
     where
         A: IntoIterator<Item = Apply<I>>,
         I: IntoIterator<Item = (H256, H256)>,
@@ -191,7 +205,6 @@ impl<'a> Engine<'a> {
         let mut balance_change_set = BTreeMap::new();
         let mut code_change_set = BTreeMap::new();
         let mut storage_change_set = BTreeMap::new();
-        //println!("values: {:?}", values);
         for apply in values {
             match apply {
                 Apply::Modify {
@@ -199,13 +212,10 @@ impl<'a> Engine<'a> {
                     basic,
                     code,
                     storage,
-                    reset_storage,
+                    reset_storage: _,
                 } => {
-                    // println!("Apply::Modify: {:?}", address);
-                    // println!("Apply::Modify: {:?}", basic);
-                    // println!("Apply::Modify: {:?}", code);
                     let eth_addr = EthAddress::new(address);
-                    if !backend.exists(address.clone()) {
+                    if !backend.exists(address) {
                         println!("Created a new account at address {:?}", address);
                         let cs = Self::add_nonce(&eth_addr, &basic.nonce);
                         nonce_change_set.insert(cs.0, cs.1);
@@ -245,7 +255,6 @@ impl<'a> Engine<'a> {
                                 let cs = Self::add_storage(&eth_addr, &index, &value);
                                 storage_change_set.insert(cs.0, cs.1);
                             }
-
                         }
                     }
                 },
@@ -288,17 +297,21 @@ pub fn get_contract_address(sender: &H160, nonce: &U256) -> H160 {
 
 #[cfg(test)]
 fn test_view_function() {
-    let config = Config::istanbul();
+    use evm::backend::MemoryAccount;
+    use move_core_types::account_address::AccountAddress;
+    use std::str::FromStr;
+
+    let _config = Config::istanbul();
 
     let mut table_resolver = InMemoryTableResolver::new();
     let nonce_table_handle = TableHandle(AccountAddress::random());
-    table_resolver.add_table(nonce_table_handle.clone());
+    table_resolver.add_table(nonce_table_handle);
     let balance_table_handle = TableHandle(AccountAddress::random());
-    table_resolver.add_table(balance_table_handle.clone());
+    table_resolver.add_table(balance_table_handle);
     let code_table_handle = TableHandle(AccountAddress::random());
-    table_resolver.add_table(code_table_handle.clone());
+    table_resolver.add_table(code_table_handle);
     let storage_table_handle = TableHandle(AccountAddress::random());
-    table_resolver.add_table(storage_table_handle.clone());
+    table_resolver.add_table(storage_table_handle);
 
     fn add_memory_account(
         resolver: &mut InMemoryTableResolver,
@@ -322,8 +335,8 @@ fn test_view_function() {
         resolver.add_table_entry(code_table_handle, address.as_bytes().to_vec(), account.code);
         for (index, value) in account.storage {
             let mut buf = [0u8; 52];
-            buf[..20].copy_from_slice(&address.as_bytes());
-            buf[20..].copy_from_slice(&index.as_bytes());
+            buf[..20].copy_from_slice(address.as_bytes());
+            buf[20..].copy_from_slice(index.as_bytes());
             resolver.add_table_entry(
                 storage_table_handle,
                 buf.to_vec(),
@@ -366,7 +379,7 @@ fn test_view_function() {
         account2,
     );
 
-    let mut engine = Engine::new(
+    let engine = Engine::new(
         &table_resolver,
         nonce_table_handle,
         balance_table_handle,
@@ -442,17 +455,21 @@ fn test_view_function() {
 
 #[cfg(test)]
 fn test_contract_in_memory_table() {
-    let config = Config::istanbul();
+    use evm::backend::MemoryAccount;
+    use move_core_types::account_address::AccountAddress;
+    use std::str::FromStr;
+
+    let _config = Config::istanbul();
 
     let mut table_resolver = InMemoryTableResolver::new();
     let nonce_table_handle = TableHandle(AccountAddress::random());
-    table_resolver.add_table(nonce_table_handle.clone());
+    table_resolver.add_table(nonce_table_handle);
     let balance_table_handle = TableHandle(AccountAddress::random());
-    table_resolver.add_table(balance_table_handle.clone());
+    table_resolver.add_table(balance_table_handle);
     let code_table_handle = TableHandle(AccountAddress::random());
-    table_resolver.add_table(code_table_handle.clone());
+    table_resolver.add_table(code_table_handle);
     let storage_table_handle = TableHandle(AccountAddress::random());
-    table_resolver.add_table(storage_table_handle.clone());
+    table_resolver.add_table(storage_table_handle);
 
     fn add_memory_account(
         resolver: &mut InMemoryTableResolver,
@@ -476,8 +493,8 @@ fn test_contract_in_memory_table() {
         resolver.add_table_entry(code_table_handle, address.as_bytes().to_vec(), account.code);
         for (index, value) in account.storage {
             let mut buf = [0u8; 52];
-            buf[..20].copy_from_slice(&address.as_bytes());
-            buf[20..].copy_from_slice(&index.as_bytes());
+            buf[..20].copy_from_slice(address.as_bytes());
+            buf[20..].copy_from_slice(index.as_bytes());
             resolver.add_table_entry(
                 storage_table_handle,
                 buf.to_vec(),
@@ -555,17 +572,21 @@ fn test_contract_in_memory_table() {
 
 #[cfg(test)]
 fn test_balance_transfer() {
-    let config = Config::istanbul();
+    use evm::backend::MemoryAccount;
+    use move_core_types::account_address::AccountAddress;
+    use std::str::FromStr;
+
+    let _config = Config::istanbul();
 
     let mut table_resolver = InMemoryTableResolver::new();
     let nonce_table_handle = TableHandle(AccountAddress::random());
-    table_resolver.add_table(nonce_table_handle.clone());
+    table_resolver.add_table(nonce_table_handle);
     let balance_table_handle = TableHandle(AccountAddress::random());
-    table_resolver.add_table(balance_table_handle.clone());
+    table_resolver.add_table(balance_table_handle);
     let code_table_handle = TableHandle(AccountAddress::random());
-    table_resolver.add_table(code_table_handle.clone());
+    table_resolver.add_table(code_table_handle);
     let storage_table_handle = TableHandle(AccountAddress::random());
-    table_resolver.add_table(storage_table_handle.clone());
+    table_resolver.add_table(storage_table_handle);
 
     fn add_memory_account(
         resolver: &mut InMemoryTableResolver,
@@ -589,8 +610,8 @@ fn test_balance_transfer() {
         resolver.add_table_entry(code_table_handle, address.as_bytes().to_vec(), account.code);
         for (index, value) in account.storage {
             let mut buf = [0u8; 52];
-            buf[..20].copy_from_slice(&address.as_bytes());
-            buf[20..].copy_from_slice(&index.as_bytes());
+            buf[..20].copy_from_slice(address.as_bytes());
+            buf[20..].copy_from_slice(index.as_bytes());
             resolver.add_table_entry(
                 storage_table_handle,
                 buf.to_vec(),

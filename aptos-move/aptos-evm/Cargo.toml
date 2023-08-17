@@ -48,9 +48,9 @@ ouroboros = { workspace = true }
 primitive-types = { version = "0.12.1", default-features = false, features = ["rlp", "serde_no_std"] }
 rand = { workspace = true }
 rlp = { version = "0.5", default-features = false }
-sha3 = { version = "0.10", default-features = false }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha3 = { version = "0.10", default-features = false }
 
 [dev-dependencies]
 aptos-language-e2e-tests = { workspace = true }

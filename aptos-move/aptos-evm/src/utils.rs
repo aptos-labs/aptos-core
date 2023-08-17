@@ -10,7 +10,7 @@ pub fn vec_to_h160(value: &[u8]) -> H160 {
 }
 
 pub fn u256_to_move_arr(value: &U256) -> Vec<u8> {
-    let move_value = MoveValue::U256(move_core_types::u256::U256::from_inner(value.clone()));
+    let move_value = MoveValue::U256(move_core_types::u256::U256::from_inner(*value));
     move_value.simple_serialize().unwrap()
 }
 
@@ -22,7 +22,7 @@ pub fn h256_to_arr(value: &H256) -> [u8; 32] {
 
 pub fn read_u256_from_move_bytes(bytes: &[u8]) -> U256 {
     let move_value: MoveValue =
-        MoveValue::simple_deserialize(&bytes, &MoveTypeLayout::U256).unwrap();
+        MoveValue::simple_deserialize(bytes, &MoveTypeLayout::U256).unwrap();
     move_value.to_u256().into_inner()
 }
 
@@ -39,15 +39,16 @@ pub fn read_h256_from_bytes(bytes: &[u8]) -> H256 {
     if bytes.len() != 32 {
         panic!("InvalidU256 length expected 32, got {}", bytes.len());
     }
-    let mut buf = [0u8; 32];
-    buf.copy_from_slice(&bytes);
-    H256(buf)
+    H256::from_slice(bytes)
+    // let mut buf = [0u8; 32];
+    // buf.copy_from_slice(&bytes);
+    // H256(buf)
 }
 
 #[cfg(test)]
 mod tests {
     use primitive_types::U256;
-    use std::str::FromStr;
+    //use std::str::FromStr;
 
     #[test]
     fn test_ser_de() {
