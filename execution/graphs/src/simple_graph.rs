@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 
-use std::iter::Sum;
 use crate::graph::{Graph, NodeIndex, WeightedEdges, WeightedNodes};
 use crate::graph_stream::{FromGraphStream, GraphStream};
+use std::iter::Sum;
 
 /// A weighted undirected graph represented in a simple format, where for each node
 /// we store its weight and a list of its neighbours with the corresponding edge weights.

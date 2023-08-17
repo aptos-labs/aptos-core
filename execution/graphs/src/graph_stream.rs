@@ -74,7 +74,7 @@ pub trait GraphStream: Sized {
     /// Collects the stream into a graph.
     fn collect<G>(self) -> G
     where
-        G: FromGraphStream<Self>
+        G: FromGraphStream<Self>,
     {
         G::from_graph_stream(self)
     }

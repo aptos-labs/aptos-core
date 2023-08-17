@@ -190,8 +190,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::partitioning::GraphPartitioner;
     use crate::partitioning::metis::MetisGraphPartitioner;
+    use crate::partitioning::GraphPartitioner;
     use crate::test_utils::simple_four_nodes_two_partitions_graph;
 
     // NOTE: Metis should be installed on the system.

@@ -157,9 +157,10 @@ impl<I, II, E> IntoBatchedStream for I
 where
     I: Iterator<Item = Result<II, E>>,
     II: IntoIterator,
-{}
+{
+}
 
-/// Adss method `as_no_error_batched_stream` for all types
+/// Adds method `as_no_error_batched_stream` for all types
 /// implementing `Iterator<Item = impl IntoIterator>`.
 pub trait IntoNoErrorBatchedStream: Sized {
     fn into_no_error_batched_stream(self) -> IterIntoNoErrorBatchedStream<Self> {
@@ -492,13 +493,15 @@ pub struct Once<Batch, Error> {
 
 impl<Batch, Error> Once<Batch, Error> {
     pub fn new(result: Result<Batch, Error>) -> Self {
-        Self { result: Some(result) }
+        Self {
+            result: Some(result),
+        }
     }
 }
 
 impl<Batch, Error> BatchedStream for Once<Batch, Error>
 where
-    Batch: IntoIterator
+    Batch: IntoIterator,
 {
     type StreamItem = Batch::Item;
     type Batch = Batch;

@@ -81,12 +81,13 @@ pub trait WeightedEdges: Graph {
     /// edge weights, counting each edge only once, when it goes from a node with the higher
     /// index to a node with the lower index.
     fn total_edge_weight(&self) -> Self::EdgeWeight {
-        self.nodes().flat_map(|u| {
-            self
-                .weighted_edges(u)
-                .filter(move |&(v, _)| v <= u)
-                .map(|(_, weight)| weight)
-        }).sum()
+        self.nodes()
+            .flat_map(|u| {
+                self.weighted_edges(u)
+                    .filter(move |&(v, _)| v <= u)
+                    .map(|(_, weight)| weight)
+            })
+            .sum()
     }
 
     /// Returns an iterator over the neighbors of a node with their edge weights.
