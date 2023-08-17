@@ -4,6 +4,7 @@
 
 pub mod account;
 pub mod aggregator_natives;
+pub mod evm;
 pub mod any;
 pub mod code;
 pub mod create_signer;

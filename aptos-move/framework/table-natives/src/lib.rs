@@ -43,7 +43,7 @@ use std::{
 /// extension.
 #[derive(Tid)]
 pub struct NativeTableContext<'a> {
-    resolver: &'a dyn TableResolver,
+    pub resolver: &'a dyn TableResolver,
     txn_hash: [u8; 32],
     table_data: RefCell<TableData>,
 }
