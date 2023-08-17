@@ -57,11 +57,11 @@ impl MemProfilerConfig {
 /// This defines the interface for caller to start profiling
 pub trait Profiler {
     // Perform profiling for duration_secs
-    fn profile_for(&self, duration_secs: u64) -> Result<()>;
+    fn profile_for(&self, duration_secs: u64, binary_path: &str) -> Result<()>;
     // Start profiling
-    fn start_profiling(&self) -> Result<()>;
+    fn start_profiling(&mut self) -> Result<()>;
     // End profiling
-    fn end_profiling(&self) -> Result<()>;
+    fn end_profiling(&mut self, binary_path: &str) -> Result<()>;
     // Expose the results as a JSON string for visualization
     fn expose_text_results(&self) -> Result<String>;
     // Expose the results as a JSON string for visualization

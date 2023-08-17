@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::{get_uri_metadata, utils::constants::MAX_RETRY_TIME_SECONDS};
+use crate::{
+    get_uri_metadata,
+    utils::constants::{MAX_JSON_REQUEST_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
+};
 use anyhow::Context;
 use backoff::{future::retry, ExponentialBackoff};
 use futures::FutureExt;
@@ -8,7 +11,7 @@ use image::ImageFormat;
 use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
-use tracing::{error, info};
+use tracing::{info, warn};
 
 pub struct JSONParser;
 
@@ -37,7 +40,7 @@ impl JSONParser {
                 info!("Sending request for token_uri {}", uri);
 
                 let client = Client::builder()
-                    .timeout(Duration::from_secs(MAX_RETRY_TIME_SECONDS / 3))
+                    .timeout(Duration::from_secs(MAX_JSON_REQUEST_RETRY_SECONDS))
                     .build()
                     .context("Failed to build reqwest client")?;
 
@@ -69,7 +72,7 @@ impl JSONParser {
         match retry(backoff, op).await {
             Ok(result) => Ok(result),
             Err(e) => {
-                error!(
+                warn!(
                     uri = uri,
                     error = ?e,
                     "[NFT Metadata Parser] Exponential backoff timed out, skipping JSON"

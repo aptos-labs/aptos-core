@@ -8,7 +8,11 @@ use codespan_reporting::{
 };
 use log::LevelFilter;
 use move_core_types::account_address::AccountAddress;
-use std::{collections::BTreeMap, path::Path, time::Instant};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+    time::Instant,
+};
 use tempfile::TempDir;
 
 #[derive(Debug, Clone, clap::Parser, serde::Serialize, serde::Deserialize)]
@@ -114,6 +118,8 @@ impl ProverOptions {
         package_path: &Path,
         named_addresses: BTreeMap<String, AccountAddress>,
         bytecode_version: Option<u32>,
+        skip_attribute_checks: bool,
+        known_attributes: &BTreeSet<String>,
     ) -> anyhow::Result<()> {
         let now = Instant::now();
         let for_test = self.for_test;
@@ -123,6 +129,8 @@ impl ProverOptions {
             named_addresses,
             self.filter.clone(),
             bytecode_version,
+            skip_attribute_checks,
+            known_attributes.clone(),
         )?;
         let mut options = self.convert_options();
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test
