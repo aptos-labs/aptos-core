@@ -24,6 +24,7 @@ aptos-sdk-builder = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
+aptos-evm = { workspace = true }
 ark-bls12-381 = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
@@ -69,6 +70,7 @@ move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }
+primitive-types = { version = "0.12.1", default-features = false, features = ["rlp", "serde_no_std"] }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }

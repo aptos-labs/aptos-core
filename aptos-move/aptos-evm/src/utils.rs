@@ -1,7 +1,19 @@
 // Copyright © Aptos Foundation
 
-use primitive_types::{H256, U256};
+use primitive_types::{H160, H256, U256};
 use move_core_types::value::{MoveTypeLayout, MoveValue};
+
+pub fn u256_to_h160(value: &U256) -> H160 {
+    let mut result = [0u8; 32];
+    value.to_big_endian(&mut result);
+    H160::from_slice(&result[12..])
+}
+
+pub fn vec_to_h160(value: &[u8]) -> H160 {
+    let mut result = [0u8; 20];
+    result.copy_from_slice(value);
+    H160::from_slice(&result)
+}
 
 pub fn u256_to_arr(value: &U256) -> [u8; 32] {
     let mut result = [0u8; 32];

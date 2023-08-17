@@ -3,3 +3,5 @@
 
 pub mod evm;
 pub mod context;
+
+pub use context::NativeEvmContext;

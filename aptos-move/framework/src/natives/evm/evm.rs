@@ -2,20 +2,37 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_table_natives::{NativeTableContext, TableHandle};
+use move_binary_format::errors::PartialVMResult;
+use aptos_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    values::{Struct, StructRef, Value},
+    values::{StructRef, Value, Reference},
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
-use aptos_vm::evm::engine::Engine;
+use primitive_types::U256;
+use aptos_evm::{utils::vec_to_h160, engine::Engine, eth_address::EthAddress};
+
+/// The index of the `handle` field in the `Table` Move struct.
+const TABLE_HANDLE_FIELD_INDEX: usize = 0;
+
+pub(crate) fn get_handle(table_data: &StructRef) -> PartialVMResult<TableHandle> {
+    Ok(TableHandle(
+        table_data
+            .borrow_field(TABLE_HANDLE_FIELD_INDEX)?
+            .value_as::<Reference>()?
+            .read_ref()?
+            .value_as::<AccountAddress>()?,
+    ))
+}
 
 /***************************************************************************************************
-* public native fun create(caller: H160, value: u256, init_code: Vec<u8>, gas_limit: u64) -> Vec<u8>;
+* public native fun native fun create_impl(nonce: Table, balance: Table, code: Table, storage: Table, pub_keys: Table, caller: vec<u8>, payload: vector<u8>, signature: vector<u8>);
 ***************************************************************************************************/
 
-fn native_create(
+fn native_create_impl(
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -23,28 +40,40 @@ fn native_create(
     debug_assert_eq!(args.len(), 4);
     context.charge(EVM_CREATE_BASE)?;
     
-    let gas_limit = safely_pop_arg!(args, u64);
-    let init_code = safely_pop_arg!(args, Vec<u8>);
-    let value = safely_pop_arg!(args, u256);
-    let caller = safely_pop_arg!(args, H160);
+    let signature = safely_pop_arg!(args, Vec<u8>);
+    let payload = safely_pop_arg!(args, Vec<u8>);
+    let caller = safely_pop_arg!(args, Vec<u8>);
+    let pub_keys_table_handle = get_handle(&safely_pop_arg!(args, StructRef))?;
+    let storage_table_handle = get_handle(&safely_pop_arg!(args, StructRef))?;
+    let code_table_handle = get_handle(&safely_pop_arg!(args, StructRef))?;
+    let balance_table_handle = get_handle(&safely_pop_arg!(args, StructRef))?;
+    let nonce_table_handle = get_handle(&safely_pop_arg!(args, StructRef))?;
+    // let deserialized_payload = payload.deserialize();
+    let caller = vec_to_h160(&caller);
 
-    let evm_context = context.extensions().get::<NativeEvmContext>();
-    let engine = Engine::new(
-        evm_context.resolver,
-        evm_context.nonce_table_handle,
-        evm_context.balance_table_handle,
-        evm_context.code_table_handle,
-        evm_context.storage_table_handle,
-        evm_context.origin
+    let gas_limit = 5;
+    let value = U256::zero();
+    let init_code = [].to_vec();
+
+    let table_context = context.extensions().get::<NativeTableContext>();
+    let mut engine = Engine::new(
+        table_context.resolver,
+        nonce_table_handle,
+        balance_table_handle,
+        code_table_handle,
+        storage_table_handle,
+        EthAddress::new(caller)
     );
-    let (exit_reason, output) = engine.transact_create(caller, value, init_code, gas_limit);
+    let (exit_reason, output, change_set) = engine.transact_create(caller, value, init_code, gas_limit, [].to_vec());
+    // context.add_change_set(change_set);
+    Ok(smallvec![Value::bool(true)])
 }
 
 /***************************************************************************************************
-* public native fun call(caller: H160, address: H160, value: u256, data: Vec<u8>, gas_limit: u64);
+* public native fun call_impl(nonce: Table, balance: Table, code: Table, storage: Table, pub_keys: Table, caller: U256, payload: Vec<u8>, signature: Vec<u8>);
 ***************************************************************************************************/
 
-fn native_call(
+fn native_call_impl(
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -52,23 +81,34 @@ fn native_call(
     debug_assert_eq!(args.len(), 5);
     context.charge(EVM_CALL_BASE)?;
 
-    let gas_limit = safely_pop_arg!(args, u64);
-    let data = safely_pop_arg!(args, Vec<u8>);
-    let value = safely_pop_arg!(args, u256);
-    let address = safely_pop_arg!(args, H160);
-    let caller = safely_pop_arg!(args, H160);
+    let signature = safely_pop_arg!(args, Vec<u8>);
+    let payload = safely_pop_arg!(args, Vec<u8>);
+    let caller = safely_pop_arg!(args, Vec<u8>);
+    let pub_keys_table_handle = get_handle(&safely_pop_arg!(args, StructRef))?;
+    let storage_table_handle = get_handle(&safely_pop_arg!(args, StructRef))?;
+    let code_table_handle = get_handle(&safely_pop_arg!(args, StructRef))?;
+    let balance_table_handle = get_handle(&safely_pop_arg!(args, StructRef))?;
+    let nonce_table_handle = get_handle(&safely_pop_arg!(args, StructRef))?;
+    // let deserialized_data = payload.deserialize();
+    let caller = vec_to_h160(&caller);
 
-    let evm_context = context.extensions().get::<NativeEvmContext>();
-    let engine = Engine::new(
-        evm_context.resolver,
-        evm_context.nonce_table_handle,
-        evm_context.balance_table_handle,
-        evm_context.code_table_handle,
-        evm_context.storage_table_handle,
-        evm_context.origin
+    let gas_limit = 5;
+    let value = U256::zero();
+    let data = [].to_vec();
+    let address = caller;
+
+    let table_context = context.extensions().get::<NativeTableContext>();
+    let mut engine = Engine::new(
+        table_context.resolver,
+        nonce_table_handle,
+        balance_table_handle,
+        code_table_handle,
+        storage_table_handle,
+        EthAddress::new(caller)
     );
-    let (exit_reason, output) = engine.transact_call(caller, address, value, data, gas_limit);
-    
+    let (exit_reason, output, change_set) = engine.transact_call(caller, address, value, data, gas_limit, [].to_vec());
+    // context.add_change_set(change_set);
+    Ok(smallvec![])
 }
 
 /***************************************************************************************************
@@ -79,9 +119,8 @@ fn native_call(
     builder: &SafeNativeBuilder,
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [
-        ("create", native_create as RawSafeNative),
-        ("call", native_call),
+        ("create", native_create_impl as RawSafeNative),
+        ("call", native_call_impl),
     ];
-
     builder.make_named_natives(natives)
 }

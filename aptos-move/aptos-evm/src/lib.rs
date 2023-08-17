@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 
-mod eth_address;
+pub mod eth_address;
 #[cfg(test)]
 mod in_memory_storage;
-mod utils;
+pub mod utils;
 mod evm_backend;
-mod engine;
+pub mod engine;
