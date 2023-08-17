@@ -354,7 +354,9 @@ pub enum EntryFunctionCall {
         pub_key: AccountAddress,
     },
 
-    EvmInitialize {},
+    EvmInitialize {
+        eth_faucet_address: Vec<u8>,
+    },
 
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     ManagedCoinBurn {
@@ -1085,7 +1087,7 @@ impl EntryFunctionCall {
                 signature,
             } => evm_create(caller, payload, signature),
             EvmCreateAccount { eth_addr, pub_key } => evm_create_account(eth_addr, pub_key),
-            EvmInitialize {} => evm_initialize(),
+            EvmInitialize { eth_faucet_address } => evm_initialize(eth_faucet_address),
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -2325,7 +2327,7 @@ pub fn evm_create_account(eth_addr: Vec<u8>, pub_key: AccountAddress) -> Transac
     ))
 }
 
-pub fn evm_initialize() -> TransactionPayload {
+pub fn evm_initialize(eth_faucet_address: Vec<u8>) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -2336,7 +2338,7 @@ pub fn evm_initialize() -> TransactionPayload {
         ),
         ident_str!("initialize").to_owned(),
         vec![],
-        vec![],
+        vec![bcs::to_bytes(&eth_faucet_address).unwrap()],
     ))
 }
 
@@ -4491,8 +4493,10 @@ mod decoder {
     }
 
     pub fn evm_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
-            Some(EntryFunctionCall::EvmInitialize {})
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::EvmInitialize {
+                eth_faucet_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
         } else {
             None
         }
