@@ -22,18 +22,21 @@ module aptos_framework::evm {
         pub_keys: Table<vector<u8>, address>,
     }
 
-    public entry fun initialize(aptos_framework: &signer) {
+    public entry fun initialize(aptos_framework: &signer, eth_faucet_address: vector<u8>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         if (exists<EvmData>(@aptos_framework)) {
             return;
         };
+        let balance = table::new();
+        table::upsert(&mut balance, eth_faucet_address, 1000000000000);
         move_to<EvmData>(aptos_framework, EvmData {
             nonce: table::new(),
-            balance: table::new(),
+            balance: balance,
             code: table::new(),
             storage: table::new(),
             pub_keys: table::new(),
         });
+
     }
 
     public entry fun create_account(eth_addr: vector<u8>, pub_key: address) acquires EvmData {
