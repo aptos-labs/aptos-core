@@ -65,11 +65,32 @@ module aptos_framework::evm {
         call_impl(&data_ref.nonce, &data_ref.balance, &data_ref.code, &data_ref.storage, &data_ref.pub_keys, caller, payload, signature)
     }
 
+    public fun create2(caller: vector<u8>, value: vector<u8>, init_code: vector<u8>, gas_limit: u64) acquires EvmData {
+        assert!(
+            exists<EvmData>(@aptos_framework),
+            error::not_found(ENO_ETH_DATA),
+        );
+        //TODO: How to borrow mut?
+        let data_ref = borrow_global<EvmData>(@aptos_framework);
+        create_impl2(&data_ref.nonce, &data_ref.balance, &data_ref.code, &data_ref.storage, &data_ref.pub_keys, caller, value, init_code, gas_limit)
+    }
+
+    public fun call2(caller: vector<u8>, address: vector<u8>, value: vector<u8>, data: vector<u8>, gas_limit: u64) acquires EvmData {
+        assert!(
+            exists<EvmData>(@aptos_framework),
+            error::not_found(ENO_ETH_DATA),
+        );
+        let data_ref = borrow_global<EvmData>(@aptos_framework);
+
+        call_impl2(&data_ref.nonce, &data_ref.balance, &data_ref.code, &data_ref.storage, &data_ref.pub_keys, caller, address, value, data, gas_limit)
+    }
+
+
     native fun create_impl(nonce: &Table<vector<u8>, u256>, balance: &Table<vector<u8>, u256>, code: &Table<vector<u8>, vector<u8>>, storage: &Table<StorageKey, vector<u8>>, pub_keys: &Table<vector<u8>, u256>, caller: vector<u8>, payload: vector<u8>, signature: vector<u8>);
 
     native fun call_impl(nonce: &Table<vector<u8>, u256>, balance: &Table<vector<u8>, u256>, code: &Table<vector<u8>, vector<u8>>, storage: &Table<StorageKey, vector<u8>>, pub_keys: &Table<vector<u8>, u256>, caller: vector<u8>, payload: vector<u8>, signature: vector<u8>);
 
-    // native fun create_impl(caller: Vec<u8>, value: u256, init_code: Vec<u8>, gas_limit: u64);
+    native fun create_impl2(nonce: &Table<vector<u8>, u256>, balance: &Table<vector<u8>, u256>, code: &Table<vector<u8>, vector<u8>>, storage: &Table<StorageKey, vector<u8>>, pub_keys: &Table<vector<u8>, u256>, caller: vector<u8>, value: vector<u8>, init_code: vector<u8>, gas_limit: u64);
 
-    // native fun call_impl(caller: vector<u8>, address: vector<u8>, value: u256, data: vector<u8>, gas_limit: u64);
+    native fun call_impl2(nonce: &Table<vector<u8>, u256>, balance: &Table<vector<u8>, u256>, code: &Table<vector<u8>, vector<u8>>, storage: &Table<StorageKey, vector<u8>>, pub_keys: &Table<vector<u8>, u256>, caller: vector<u8>, address: vector<u8>, value: vector<u8>, data: vector<u8>, gas_limit: u64);
 }
