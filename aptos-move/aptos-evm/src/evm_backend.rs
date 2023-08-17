@@ -1,31 +1,25 @@
 // Copyright © Aptos Foundation
 
-use evm_runtime::Config;
+use crate::eth_address::EthAddress;
+use crate::evm_io::{StorageKey, IO};
+use crate::utils::{read_h256_from_bytes, read_u256_from_move_bytes};
 use aptos_table_natives::{TableHandle, TableResolver};
 use evm::backend::{Backend, Basic, MemoryAccount, MemoryBackend, MemoryVicinity};
-use primitive_types::{H160, H256, U256};
-use std::collections::BTreeMap;
 use evm::executor::stack::{MemoryStackState, StackExecutor, StackSubstateMetadata};
-use std::str::FromStr;
+use evm_runtime::Config;
+use primitive_types::{H160, H256, U256};
 use serde::{Deserialize, Serialize};
-use crate::eth_address::EthAddress;
-use crate::evm_io::{IO, StorageKey};
-use crate::utils::{read_h256_from_bytes, read_u256_from_move_bytes};
+use std::collections::BTreeMap;
+use std::str::FromStr;
 
 pub struct EVMBackend<'a> {
     pub(crate) io: IO<'a>,
-    origin: EthAddress
+    origin: EthAddress,
 }
 
 impl<'a> EVMBackend<'a> {
-    pub fn new(
-        io: IO<'a>,
-        origin: EthAddress,
-    ) -> Self {
-        Self {
-            io,
-            origin,
-        }
+    pub fn new(io: IO<'a>, origin: EthAddress) -> Self {
+        Self { io, origin }
     }
 }
 
