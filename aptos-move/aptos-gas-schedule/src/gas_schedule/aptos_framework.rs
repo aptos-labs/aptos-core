@@ -203,6 +203,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
 
         [evm_create_base: InternalGas, "evm.create.per_byte", 100],
         [evm_call_base: InternalGas, "evm.call.per_byte", 100],
+        [evm_view_base: InternalGas, "evm.view_impl2.per_byte", 100],
 
         [object_exists_at_base: InternalGas, { 7.. => "object.exists_at.base" }, 5000],
         // These are dummy value, they copied from storage gas in aptos-core/aptos-vm/src/aptos_vm_impl.rs
