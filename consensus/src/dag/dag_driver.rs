@@ -124,6 +124,7 @@ impl DagDriver {
             timestamp.as_micros() as u64,
             payload,
             strong_links,
+            vec![], // TODO: add real randomness shares
         );
         self.storage
             .save_node(&new_node)

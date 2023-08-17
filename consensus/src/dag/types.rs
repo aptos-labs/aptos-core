@@ -46,6 +46,7 @@ struct NodeWithoutDigest<'a> {
     timestamp: u64,
     payload: &'a Payload,
     parents: &'a Vec<NodeCertificate>,
+    shares: &'a Vec<u8>, // serialized bytes of randomness shares
 }
 
 impl<'a> CryptoHash for NodeWithoutDigest<'a> {
@@ -68,6 +69,7 @@ impl<'a> From<&'a Node> for NodeWithoutDigest<'a> {
             timestamp: node.metadata.timestamp,
             payload: &node.payload,
             parents: &node.parents,
+            shares: &node.shares,
         }
     }
 }
@@ -131,6 +133,7 @@ pub struct Node {
     metadata: NodeMetadata,
     payload: Payload,
     parents: Vec<NodeCertificate>,
+    shares: Vec<u8>, // serialized bytes of randomness shares
 }
 
 impl Node {
@@ -141,9 +144,11 @@ impl Node {
         timestamp: u64,
         payload: Payload,
         parents: Vec<NodeCertificate>,
+        shares: Vec<u8>,
     ) -> Self {
-        let digest =
-            Self::calculate_digest_internal(epoch, round, author, timestamp, &payload, &parents);
+        let digest = Self::calculate_digest_internal(
+            epoch, round, author, timestamp, &payload, &parents, &shares,
+        );
 
         Self {
             metadata: NodeMetadata {
@@ -157,6 +162,7 @@ impl Node {
             },
             payload,
             parents,
+            shares,
         }
     }
 
@@ -165,11 +171,13 @@ impl Node {
         metadata: NodeMetadata,
         payload: Payload,
         parents: Vec<NodeCertificate>,
+        shares: Vec<u8>,
     ) -> Self {
         Self {
             metadata,
             payload,
             parents,
+            shares,
         }
     }
 
@@ -181,6 +189,7 @@ impl Node {
         timestamp: u64,
         payload: &Payload,
         parents: &Vec<NodeCertificate>,
+        shares: &Vec<u8>,
     ) -> HashValue {
         let node_with_out_digest = NodeWithoutDigest {
             epoch,
@@ -189,6 +198,7 @@ impl Node {
             timestamp,
             payload,
             parents,
+            shares,
         };
         node_with_out_digest.hash()
     }
@@ -201,6 +211,7 @@ impl Node {
             self.metadata.timestamp,
             &self.payload,
             &self.parents,
+            &self.shares,
         )
     }
 

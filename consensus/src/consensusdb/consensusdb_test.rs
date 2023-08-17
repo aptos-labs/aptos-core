@@ -93,7 +93,15 @@ fn test_dag() {
     let tmp_dir = TempPath::new();
     let db = ConsensusDB::new(&tmp_dir);
 
-    let node = Node::new(1, 1, Author::random(), 123, Payload::empty(false), vec![]);
+    let node = Node::new(
+        1,
+        1,
+        Author::random(),
+        123,
+        Payload::empty(false),
+        vec![],
+        vec![],
+    );
     test_dag_type::<NodeSchema, <NodeSchema as Schema>::Key>(node.digest(), node.clone(), &db);
 
     let certified_node = CertifiedNode::new(node.clone(), AggregateSignature::empty());

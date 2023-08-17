@@ -24,6 +24,7 @@ fn test_node_verify() {
         NodeMetadata::new_for_test(0, 0, signers[0].author(), 0, HashValue::random()),
         Payload::empty(false),
         vec![],
+        vec![],
     );
     assert_eq!(
         invalid_node
@@ -63,6 +64,7 @@ fn test_certified_node_verify() {
     let invalid_node = Node::new_for_test(
         NodeMetadata::new_for_test(0, 0, signers[0].author(), 0, HashValue::random()),
         Payload::empty(false),
+        vec![],
         vec![],
     );
     let invalid_certified_node = CertifiedNode::new(invalid_node, AggregateSignature::empty());
