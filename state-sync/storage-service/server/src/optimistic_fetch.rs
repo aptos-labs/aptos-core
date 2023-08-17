@@ -8,6 +8,7 @@ use crate::{
     moderator::RequestModerator,
     network::ResponseSender,
     storage::StorageReaderInterface,
+    subscription::SubscriptionStreamRequests,
     utils, LogEntry, LogSchema,
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -52,11 +53,6 @@ impl OptimisticFetchRequest {
             fetch_start_time: time_service.now(),
             time_service,
         }
-    }
-
-    /// Returns the response sender and consumes the request
-    pub fn get_response_sender(self) -> ResponseSender {
-        self.response_sender
     }
 
     /// Creates a new storage service request to satisfy the optimistic fetch
@@ -170,9 +166,14 @@ impl OptimisticFetchRequest {
             .as_millis();
         elapsed_time > timeout_ms as u128
     }
+
+    /// Returns the response sender and consumes the request
+    pub fn take_response_sender(self) -> ResponseSender {
+        self.response_sender
+    }
 }
 
-/// Handles ready optimistic fetches
+/// Handles active and ready optimistic fetches
 pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     bounded_executor: BoundedExecutor,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
@@ -181,6 +182,7 @@ pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
+    subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
     time_service: TimeService,
 ) -> Result<(), Error> {
     // Update the number of active optimistic fetches
@@ -195,6 +197,7 @@ pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
         lru_response_cache.clone(),
         request_moderator.clone(),
         storage.clone(),
+        subscriptions.clone(),
         time_service.clone(),
     )
     .await?;
@@ -208,6 +211,7 @@ pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
         lru_response_cache,
         request_moderator,
         storage,
+        subscriptions,
         time_service,
         peers_with_ready_optimistic_fetches,
     )
@@ -226,6 +230,7 @@ async fn handle_ready_optimistic_fetches<T: StorageReaderInterface>(
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
+    subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
     time_service: TimeService,
     peers_with_ready_optimistic_fetches: Vec<(PeerNetworkId, LedgerInfoWithSignatures)>,
 ) {
@@ -241,6 +246,7 @@ async fn handle_ready_optimistic_fetches<T: StorageReaderInterface>(
             let lru_response_cache = lru_response_cache.clone();
             let request_moderator = request_moderator.clone();
             let storage = storage.clone();
+            let subscriptions = subscriptions.clone();
             let time_service = time_service.clone();
 
             // Spawn a blocking task to handle the optimistic fetch
@@ -250,18 +256,32 @@ async fn handle_ready_optimistic_fetches<T: StorageReaderInterface>(
                     let optimistic_fetch_start_time = optimistic_fetch.fetch_start_time;
                     let optimistic_fetch_request = optimistic_fetch.request.clone();
 
+                    // Get the storage service request for the missing data
+                    let missing_data_request = match optimistic_fetch
+                        .get_storage_request_for_missing_data(config, &target_ledger_info)
+                    {
+                        Ok(storage_service_request) => storage_service_request,
+                        Err(error) => {
+                            // Failed to get the storage service request
+                            warn!(LogSchema::new(LogEntry::OptimisticFetchResponse)
+                                .error(&Error::UnexpectedErrorEncountered(error.to_string())));
+                            return;
+                        },
+                    };
+
                     // Notify the peer of the new data
                     if let Err(error) = utils::notify_peer_of_new_data(
                         cached_storage_server_summary.clone(),
-                        config,
                         optimistic_fetches.clone(),
+                        subscriptions.clone(),
                         lru_response_cache.clone(),
                         request_moderator.clone(),
                         storage.clone(),
                         time_service.clone(),
                         &peer_network_id,
-                        optimistic_fetch,
+                        missing_data_request,
                         target_ledger_info,
+                        optimistic_fetch.take_response_sender(),
                     ) {
                         warn!(LogSchema::new(LogEntry::OptimisticFetchResponse)
                             .error(&Error::UnexpectedErrorEncountered(error.to_string())));
@@ -294,6 +314,7 @@ pub(crate) async fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInte
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
+    subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
     time_service: TimeService,
 ) -> aptos_storage_service_types::Result<Vec<(PeerNetworkId, LedgerInfoWithSignatures)>, Error> {
     // Fetch the latest storage summary and highest synced version
@@ -315,6 +336,7 @@ pub(crate) async fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInte
         config,
         cached_storage_server_summary,
         optimistic_fetches.clone(),
+        subscriptions,
         lru_response_cache,
         request_moderator,
         storage,
@@ -345,6 +367,7 @@ async fn identify_expired_invalid_and_ready_fetches<T: StorageReaderInterface>(
     config: StorageServiceConfig,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
+    subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
@@ -387,6 +410,7 @@ async fn identify_expired_invalid_and_ready_fetches<T: StorageReaderInterface>(
             bounded_executor,
             cached_storage_server_summary,
             optimistic_fetches,
+            subscriptions,
             lru_response_cache,
             request_moderator,
             storage,
@@ -412,6 +436,7 @@ async fn identify_ready_and_invalid_optimistic_fetches<T: StorageReaderInterface
     bounded_executor: BoundedExecutor,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
+    subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
@@ -437,6 +462,7 @@ async fn identify_ready_and_invalid_optimistic_fetches<T: StorageReaderInterface
         let cached_storage_server_summary = cached_storage_server_summary.clone();
         let highest_synced_ledger_info = highest_synced_ledger_info.clone();
         let optimistic_fetches = optimistic_fetches.clone();
+        let subscriptions = subscriptions.clone();
         let lru_response_cache = lru_response_cache.clone();
         let request_moderator = request_moderator.clone();
         let storage = storage.clone();
@@ -445,7 +471,7 @@ async fn identify_ready_and_invalid_optimistic_fetches<T: StorageReaderInterface
         let peers_with_ready_optimistic_fetches = peers_with_ready_optimistic_fetches.clone();
 
         // Spawn a blocking task to determine if the optimistic fetch is ready or
-        // invalid. We do this because each entry requires reading from storage.
+        // invalid. We do this because each entry may require reading from storage.
         let active_task = bounded_executor
             .spawn_blocking(move || {
                 // Check if we have synced beyond the highest known version
@@ -456,6 +482,7 @@ async fn identify_ready_and_invalid_optimistic_fetches<T: StorageReaderInterface
                         let epoch_ending_ledger_info = match utils::get_epoch_ending_ledger_info(
                             cached_storage_server_summary.clone(),
                             optimistic_fetches.clone(),
+                            subscriptions.clone(),
                             highest_known_epoch,
                             lru_response_cache.clone(),
                             request_moderator.clone(),
@@ -497,6 +524,8 @@ async fn identify_ready_and_invalid_optimistic_fetches<T: StorageReaderInterface
                 }
             })
             .await;
+
+        // Add the task to the list of active tasks
         active_tasks.push(active_task);
     }
 

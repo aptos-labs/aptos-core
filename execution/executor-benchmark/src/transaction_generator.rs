@@ -274,6 +274,7 @@ impl TransactionGenerator {
         num_transfer_blocks: usize,
         transactions_per_sender: usize,
         connected_tx_grps: usize,
+        shuffle_connected_txns: bool,
     ) {
         assert!(self.block_sender.is_some());
         self.gen_transfer_transactions(
@@ -281,6 +282,7 @@ impl TransactionGenerator {
             num_transfer_blocks,
             transactions_per_sender,
             connected_tx_grps,
+            shuffle_connected_txns,
         );
     }
 
@@ -451,91 +453,89 @@ impl TransactionGenerator {
         }
     }
 
-    /// To generate 'n' connected groups, we divide the signer accounts into 'n' groups, and create
-    /// 'block_size / n' transactions in each group.
-    /// To get all the transactions in a group to be connected, we pick at random at-least one of
-    /// the sender or receiver accounts from the pool of accounts already used for a transaction in
-    /// the same group.
-    fn get_connected_grps_transfer_indices(
+    /// 'Conflicting groups of txns' are a type of 'connected groups of txns'.
+    /// Here we generate conflicts completely on one particular address (which can be sender or
+    /// receiver).
+    /// To generate 'n' conflicting groups, we divide the signer accounts into 'n' pools, and
+    /// create 'block_size / n' transactions in each group. In each group, we randomly pick
+    /// an address from the pool belonging to that group, and create all txns with that address as
+    /// a sender or receiver (thereby generating conflicts around that address). In other words,
+    /// all txns in a group would have to be executed in serial order.
+    /// Finally, after generating such groups of conflicting txns, we shuffle them to generate a
+    /// more realistic workload (that is conflicting txns need not always be consecutive).
+    fn get_conflicting_grps_transfer_indices(
         rng: &mut StdRng,
         num_signer_accounts: usize,
         block_size: usize,
-        connected_tx_grps: usize,
+        conflicting_tx_grps: usize,
+        shuffle_indices: bool,
     ) -> Vec<(usize, usize)> {
-        let num_accounts_per_grp = num_signer_accounts / connected_tx_grps;
+        let num_accounts_per_grp = num_signer_accounts / conflicting_tx_grps;
         // TODO: handle when block_size isn't divisible by connected_tx_grps; an easy
         //       way to do this is to just generate a few more transactions in the last group
-        let num_txns_per_grp = block_size / connected_tx_grps;
+        let num_txns_per_grp = block_size / conflicting_tx_grps;
 
-        if num_txns_per_grp >= num_accounts_per_grp {
+        if 2 * conflicting_tx_grps >= num_signer_accounts {
             panic!(
-                "For the desired workload we want num_accounts_per_grp ({}) > num_txns_per_grp ({})",
-                num_accounts_per_grp, num_txns_per_grp);
-        } else if connected_tx_grps > block_size {
+                "For the desired workload we want num_signer_accounts ({}) > 2 * num_txns_per_grp ({})",
+                num_signer_accounts, num_txns_per_grp);
+        } else if conflicting_tx_grps > block_size {
             panic!(
                 "connected_tx_grps ({}) > block_size ({}) cannot guarantee at least 1 txn per grp",
-                connected_tx_grps, block_size
+                conflicting_tx_grps, block_size
             );
         }
 
         let mut signer_account_indices: Vec<_> = (0..num_signer_accounts).collect();
         signer_account_indices.shuffle(rng);
 
-        let mut transfer_indices: Vec<_> = (0..connected_tx_grps)
+        let mut transfer_indices: Vec<_> = (0..conflicting_tx_grps)
             .flat_map(|grp_idx| {
                 let accounts_start_idx = grp_idx * num_accounts_per_grp;
                 let accounts_end_idx = accounts_start_idx + num_accounts_per_grp - 1;
-                let mut unused_indices: Vec<_> =
+                let mut accounts_pool: Vec<_> =
                     signer_account_indices[accounts_start_idx..=accounts_end_idx].to_vec();
-                let mut used_indices: Vec<_> =
-                    vec![unused_indices.pop().unwrap(), unused_indices.pop().unwrap()];
-                let mut transfer_indices: Vec<(_, _)> = vec![(used_indices[0], used_indices[1])];
+                let index1 = accounts_pool.pop().unwrap();
 
-                for _ in 1..num_txns_per_grp {
-                    // index1 is always from used_indices, so that all the txns are connected
-                    let mut index1 = used_indices[rng.gen_range(0, used_indices.len())];
-
-                    // index2 is either from used_indices or unused_indices with equal probability
-                    let mut index2;
-                    if rng.gen::<bool>() {
-                        index2 = used_indices[rng.gen_range(0, used_indices.len())];
-                    } else {
-                        // unused_indices is shuffled already, so last element is random
-                        index2 = unused_indices.pop().unwrap();
-                        used_indices.push(index2);
-                    }
-
-                    if rng.gen::<bool>() {
-                        // with 50% probability, swap the indices of sender and receiver
-                        (index1, index2) = (index2, index1);
-                    }
-                    transfer_indices.push((index1, index2));
-                }
-                transfer_indices
+                let conflicting_indices: Vec<_> = (0..num_txns_per_grp)
+                    .map(|_| {
+                        let index2 = accounts_pool[rng.gen_range(0, accounts_pool.len())];
+                        if rng.gen::<bool>() {
+                            (index1, index2)
+                        } else {
+                            (index2, index1)
+                        }
+                    })
+                    .collect();
+                conflicting_indices
             })
             .collect();
-        transfer_indices.shuffle(rng);
+        if shuffle_indices {
+            transfer_indices.shuffle(rng);
+        }
         transfer_indices
     }
 
     /// A 'connected transaction group' is a group of transactions where all the transactions are
-    /// connected to each other, that is they cannot be executed in parallel.
-    /// Transactions across different groups can be executed in parallel.
+    /// connected to each other. For now we generate connected groups of txns as conflicting, but
+    /// real world workloads can be more complex (and we can generate them as needed in the future).
     pub fn gen_connected_grps_transfer_transactions(
         &mut self,
         block_size: usize,
         num_blocks: usize,
         connected_tx_grps: usize,
+        shuffle_connected_txns: bool,
     ) {
         for _ in 0..num_blocks {
             let num_signer_accounts = self.main_signer_accounts.as_ref().unwrap().accounts.len();
             let rng = &mut self.main_signer_accounts.as_mut().unwrap().rng;
             let transfer_indices: Vec<_> =
-                TransactionGenerator::get_connected_grps_transfer_indices(
+                TransactionGenerator::get_conflicting_grps_transfer_indices(
                     rng,
                     num_signer_accounts,
                     block_size,
                     connected_tx_grps,
+                    shuffle_connected_txns,
                 );
 
             let mut transactions: Vec<_> = transfer_indices
@@ -567,12 +567,14 @@ impl TransactionGenerator {
         num_blocks: usize,
         transactions_per_sender: usize,
         connected_tx_grps: usize,
+        shuffle_connected_txns: bool,
     ) {
         if connected_tx_grps > 0 {
             self.gen_connected_grps_transfer_transactions(
                 block_size,
                 num_blocks,
                 connected_tx_grps,
+                shuffle_connected_txns,
             );
         } else {
             self.gen_random_transfer_transactions(block_size, num_blocks, transactions_per_sender);
@@ -623,7 +625,7 @@ impl TransactionGenerator {
 }
 
 #[test]
-fn test_get_connected_grps_transfer_indices() {
+fn test_get_conflicting_grps_transfer_indices() {
     let mut rng = StdRng::from_entropy();
 
     fn dfs(node: usize, adj_list: &HashMap<usize, HashSet<usize>>, visited: &mut HashSet<usize>) {
@@ -653,11 +655,12 @@ fn test_get_connected_grps_transfer_indices() {
         // we check for (i) block_size not divisible by connected_txn_grps (ii) when divisible
         // (iii) when all txns in the block are independent (iv) all txns are dependent
         for connected_txn_grps in [3, block_size / 10, block_size, 1] {
-            let transfer_indices = TransactionGenerator::get_connected_grps_transfer_indices(
+            let transfer_indices = TransactionGenerator::get_conflicting_grps_transfer_indices(
                 &mut rng,
                 num_signer_accounts,
                 block_size,
                 connected_txn_grps,
+                true,
             );
 
             let mut adj_list: HashMap<usize, HashSet<usize>> = HashMap::new();

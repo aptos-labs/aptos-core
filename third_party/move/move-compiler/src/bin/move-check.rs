@@ -8,7 +8,7 @@ use clap::*;
 use move_command_line_common::files::verify_and_create_named_address_mapping;
 use move_compiler::{
     command_line::{self as cli},
-    shared::{self, Flags, NumericalAddress},
+    shared::{self, known_attributes::KnownAttribute, Flags, NumericalAddress},
 };
 
 #[derive(Debug, Parser)]
@@ -65,10 +65,16 @@ pub fn main() -> anyhow::Result<()> {
         named_addresses,
     } = Options::parse();
     let named_addr_map = verify_and_create_named_address_mapping(named_addresses)?;
-    let _files = move_compiler::Compiler::from_files(source_files, dependencies, named_addr_map)
-        .set_interface_files_dir_opt(out_dir)
-        .set_flags(flags)
-        .check_and_report()?;
+
+    let _files = move_compiler::Compiler::from_files(
+        source_files,
+        dependencies,
+        named_addr_map,
+        flags,
+        KnownAttribute::get_all_attribute_names(),
+    )
+    .set_interface_files_dir_opt(out_dir)
+    .check_and_report()?;
     Ok(())
 }
 

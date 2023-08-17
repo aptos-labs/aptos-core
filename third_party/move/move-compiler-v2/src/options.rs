@@ -27,6 +27,9 @@ pub struct Options {
     /// Whether to dump intermediate bytecode for debugging.
     #[clap(long = "dump-bytecode")]
     pub dump_bytecode: bool,
+    /// Do not complain about unknown attributes in Move code.
+    #[clap(long, default_value = "false")]
+    pub skip_attribute_checks: bool,
     /// Whether we generate code for tests. This specifically guarantees stable output
     /// for baseline testing.
     #[clap(long)]
