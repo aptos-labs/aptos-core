@@ -1,15 +1,17 @@
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
+use evm_core::ExitReason;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_table_natives::{NativeTableContext, TableHandle};
-use move_binary_format::errors::PartialVMResult;
+use move_binary_format::errors::{PartialVMResult, PartialVMError};
 use aptos_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{StructRef, Value, Reference},
 };
+use aptos_types::vm_status::StatusCode;
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 use primitive_types::U256;
@@ -71,7 +73,29 @@ fn native_create_impl(
     evm_context.table_change_set.borrow_mut().new_tables.append(&mut change_set.new_tables);
     evm_context.table_change_set.borrow_mut().removed_tables.append(&mut change_set.removed_tables);
     evm_context.table_change_set.borrow_mut().changes.append(&mut change_set.changes);
-    Ok(smallvec![Value::bool(true)])
+    match exit_reason {
+        ExitReason::Succeed(_) => {
+            Ok(smallvec![Value::vector_u8(output)])
+        },
+        ExitReason::Error(_) => {
+            Err(PartialVMError::new(StatusCode::ABORTED)
+                    .with_message("EVM returned an error".to_string())
+                    .with_sub_status(0x03_0002)
+                    .into())
+        },
+        ExitReason::Revert(_) => {
+            Err(PartialVMError::new(StatusCode::ABORTED)
+                    .with_message("EVM reverted".to_string())
+                    .with_sub_status(0x03_0002)
+                    .into())
+        },
+        ExitReason::Fatal(_) => {
+            Err(PartialVMError::new(StatusCode::ABORTED)
+            .with_message("EVM returned fatal".to_string())
+            .with_sub_status(0x03_0003)
+            .into())
+        }
+    }
 }
 
 /***************************************************************************************************
@@ -116,7 +140,29 @@ fn native_call_impl(
     evm_context.table_change_set.borrow_mut().new_tables.append(&mut change_set.new_tables);
     evm_context.table_change_set.borrow_mut().removed_tables.append(&mut change_set.removed_tables);
     evm_context.table_change_set.borrow_mut().changes.append(&mut change_set.changes);
-    Ok(smallvec![])
+    match exit_reason {
+        ExitReason::Succeed(_) => {
+            Ok(smallvec![Value::vector_u8(output)])
+        },
+        ExitReason::Error(_) => {
+            Err(PartialVMError::new(StatusCode::ABORTED)
+                    .with_message("EVM returned an error".to_string())
+                    .with_sub_status(0x03_0002)
+                    .into())
+        },
+        ExitReason::Revert(_) => {
+            Err(PartialVMError::new(StatusCode::ABORTED)
+                    .with_message("EVM reverted".to_string())
+                    .with_sub_status(0x03_0002)
+                    .into())
+        },
+        ExitReason::Fatal(_) => {
+            Err(PartialVMError::new(StatusCode::ABORTED)
+            .with_message("EVM returned fatal".to_string())
+            .with_sub_status(0x03_0003)
+            .into())
+        }
+    }
 }
 
 /***************************************************************************************************
