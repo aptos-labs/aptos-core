@@ -7,8 +7,8 @@ use crate::no_error::NoError;
 ///
 /// Any type implementing `Iterator<Item = Result<impl IntoIterator, _>`
 /// or `Iterator<Item = impl IntoIterator>` can be converted to a batched stream via
-/// `as_batched_stream()` or `as_no_error_batched_stream()` methods respectively
-/// (from traits `AsBatchedStream` and `AsNoErrorBatchedStream`).
+/// `into_batched_stream()` or `into_no_error_batched_stream()` methods respectively
+/// (from traits `IntoBatchedStream` and `IntoNoErrorBatchedStream`).
 /// Conversely, any batched stream can be converted to
 /// `Iterator<Item = Result<Self::Batch, Self::Error>>` via method `into_batch_iter`.
 /// A batched stream with special `NoError` error type can be converted to
@@ -49,11 +49,13 @@ pub trait BatchedStream: Sized {
 
     /// Returns the total number of items in all remaining batches of the stream combined,
     /// if available.
+    /// However, the stream may end prematurely if an error occurs.
     fn opt_items_count(&self) -> Option<usize> {
         None
     }
 
     /// Returns the total number of batches remaining in the stream, if available.
+    /// However, the stream may end prematurely if an error occurs.
     fn opt_batch_count(&self) -> Option<usize> {
         None
     }
@@ -145,28 +147,27 @@ where
 
 /// Adds method `as_batched_stream` for all types
 /// implementing `Iterator<Item = Result<impl IntoIterator, _>`.
-pub trait AsBatchedStream {
-    fn as_batched_stream(&mut self) -> IterAsBatchedStream<&'_ mut Self> {
-        IterAsBatchedStream { iter: self }
+pub trait IntoBatchedStream: Sized {
+    fn into_batched_stream(self) -> IterIntoBatchedStream<Self> {
+        IterIntoBatchedStream { iter: self }
     }
 }
 
-impl<I, II, E> AsBatchedStream for I
+impl<I, II, E> IntoBatchedStream for I
 where
     I: Iterator<Item = Result<II, E>>,
     II: IntoIterator,
-{
-}
+{}
 
 /// Adss method `as_no_error_batched_stream` for all types
 /// implementing `Iterator<Item = impl IntoIterator>`.
-pub trait AsNoErrorBatchedStream {
-    fn as_no_error_batched_stream(&mut self) -> IterAsNoErrorBatchedStream<&'_ mut Self> {
-        IterAsNoErrorBatchedStream { iter: self }
+pub trait IntoNoErrorBatchedStream: Sized {
+    fn into_no_error_batched_stream(self) -> IterIntoNoErrorBatchedStream<Self> {
+        IterIntoNoErrorBatchedStream { iter: self }
     }
 }
 
-impl<I> AsNoErrorBatchedStream for I
+impl<I> IntoNoErrorBatchedStream for I
 where
     I: Iterator,
     I::Item: IntoIterator,
@@ -185,13 +186,22 @@ pub trait Batched: Iterator + Sized {
 
 impl<I: Iterator> Batched for I {}
 
+/// Returns a batched stream that returns a single batch or a single error.
+pub fn once<Batch, Error>(result: Result<Batch, Error>) -> Once<Batch, Error>
+where
+    Batch: IntoIterator,
+{
+    Once::new(result)
+}
+
 // Wrapper types:
 
-pub struct IterAsBatchedStream<I> {
+/// A batched stream that wraps an iterator over `Result`s of batches.
+pub struct IterIntoBatchedStream<I> {
     iter: I,
 }
 
-impl<I, II, E> BatchedStream for IterAsBatchedStream<I>
+impl<I, II, E> BatchedStream for IterIntoBatchedStream<I>
 where
     I: Iterator<Item = Result<II, E>>,
     II: IntoIterator,
@@ -214,11 +224,12 @@ where
     }
 }
 
-pub struct IterAsNoErrorBatchedStream<I> {
+/// A batched stream that wraps an iterator over batches of items, with no errors.
+pub struct IterIntoNoErrorBatchedStream<I> {
     iter: I,
 }
 
-impl<I> BatchedStream for IterAsNoErrorBatchedStream<I>
+impl<I> BatchedStream for IterIntoNoErrorBatchedStream<I>
 where
     I: Iterator,
     I::Item: IntoIterator,
@@ -471,5 +482,33 @@ where
     fn opt_batch_count(&self) -> Option<usize> {
         self.opt_items_count()
             .map(|len| (len + self.batch_size - 1) / self.batch_size)
+    }
+}
+
+/// A batched stream that returns a single batch or a single error.
+pub struct Once<Batch, Error> {
+    result: Option<Result<Batch, Error>>,
+}
+
+impl<Batch, Error> Once<Batch, Error> {
+    pub fn new(result: Result<Batch, Error>) -> Self {
+        Self { result: Some(result) }
+    }
+}
+
+impl<Batch, Error> BatchedStream for Once<Batch, Error>
+where
+    Batch: IntoIterator
+{
+    type StreamItem = Batch::Item;
+    type Batch = Batch;
+    type Error = Error;
+
+    fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
+        self.result.take()
+    }
+
+    fn opt_batch_count(&self) -> Option<usize> {
+        Some(if self.result.is_some() { 1 } else { 0 })
     }
 }

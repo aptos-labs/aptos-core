@@ -3,7 +3,7 @@
 
 use std::hash::Hash;
 use aptos_transaction_orderer::common::PTransaction;
-// use crate::TxnInfo::{Partitioned, Pending};
+use crate::TxnInfo::{Partitioned, Pending};
 
 // /// Indicates the position of the transaction in the serialization order of the block.
 // pub type SerializationIdx = u32;

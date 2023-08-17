@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 
 use crate::graph::{Graph, NodeIndex, WeightedGraph};
-use aptos_types::batched_stream::BatchedStream;
 use aptos_types::closuretools::{ClosureTools, MapClosure};
 use namable_closures::{closure, Closure};
 use rand::seq::SliceRandom;
@@ -28,6 +27,14 @@ pub trait GraphStream: Sized {
     ///
     /// Returns [`None`] when stream is finished.
     fn next_batch(&mut self) -> Option<(Self::Batch<'_>, StreamBatchInfo<Self>)>;
+
+    /// Borrows a stream, rather than consuming it.
+    ///
+    /// This is useful to allow applying stream adapters while still retaining
+    /// ownership of the original iterator, similarly to [`Iterator::by_ref`].
+    fn by_ref(&mut self) -> &mut Self {
+        self
+    }
 
     /// Returns the total number of batches remaining in the stream, if available.
     fn opt_remaining_batch_count(&self) -> Option<usize> {
@@ -63,6 +70,14 @@ pub trait GraphStream: Sized {
     fn opt_total_edge_weight(&self) -> Option<Self::EdgeWeight> {
         None
     }
+
+    /// Collects the stream into a graph.
+    fn collect<G>(self) -> G
+    where
+        G: FromGraphStream<Self>
+    {
+        G::from_graph_stream(self)
+    }
 }
 
 /// A more ergonomic shortcut type alias for `BatchInfo`.
@@ -76,6 +91,15 @@ pub struct BatchInfo<NW, EW> {
     pub opt_total_batch_edge_count: Option<usize>,
     pub opt_total_batch_node_weight: Option<NW>,
     pub opt_total_batch_edge_weight: Option<EW>,
+}
+
+/// A trait for types that can be constructed from a `GraphStream`.
+pub trait FromGraphStream<S>: Sized
+where
+    S: GraphStream,
+{
+    /// Reconstructs a graph from a `GraphStream`.
+    fn from_graph_stream(graph_stream: S) -> Self;
 }
 
 /// A trait for graph streams with known exact node count.
