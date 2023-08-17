@@ -1,0 +1,55 @@
+name: Release Processor Images
+on:
+  workflow_dispatch:
+    inputs:
+      processor_language:
+        required: true
+        type: string
+        default: rust
+        choices: [rust, python, typescript]
+      version_tag:
+        required: false
+        type: string
+        description: the version tag to use for the image tag.
+      GIT_SHA:
+        required: true
+        type: string
+        description: the git sha to use for the image tag.
+      
+
+      
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation
+
+jobs:
+  copy-processor-images:
+    # Run on a machine with more local storage for large docker images
+    runs-on: medium-perf-docker-with-local-ssd
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
+        with:
+          username: ${{ secrets.ENV_DOCKERHUB_USERNAME }}
+          password: ${{ secrets.ENV_DOCKERHUB_PASSWORD }}
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+
+      - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
+
+      - name: Release Images
+        env:
+          FORCE_COLOR: 3 # Force color output as per https://github.com/google/zx#using-github-actions
+          GIT_SHA: ${{ inputs.GIT_SHA }}
+          GCP_DOCKER_ARTIFACT_PROCESSOR_REPO_US: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO_US }}
+        run: ./docker/release-processor-images.mjs --language=${{ inputs.processor_language }} --version-tag=${{ inputs.version_tag }} --wait-for-image-seconds=3600
