@@ -69,6 +69,45 @@ module aptos_framework::evm {
 
     native fun call_impl(nonce: &Table<vector<u8>, u256>, balance: &Table<vector<u8>, u256>, code: &Table<vector<u8>, vector<u8>>, storage: &Table<StorageKey, vector<u8>>, pub_keys: &Table<vector<u8>, address>, caller: vector<u8>, payload: vector<u8>, signature: vector<u8>): vector<u8>;
 
+    #[view]
+    public fun get_balance(caller: vector<u8>): u256 acquires EvmData {
+        assert!(
+            exists<EvmData>(@aptos_framework),
+            error::not_found(ENO_ETH_DATA),
+        );
+        let data_ref = borrow_global<EvmData>(@aptos_framework);
+        *table::borrow(&data_ref.balance, caller)
+    }
+
+    #[view]
+    public fun get_nonce(caller: vector<u8>): u256 acquires EvmData {
+        assert!(
+            exists<EvmData>(@aptos_framework),
+            error::not_found(ENO_ETH_DATA),
+        );
+        let data_ref = borrow_global<EvmData>(@aptos_framework);
+        *table::borrow(&data_ref.nonce, caller)
+    }
+
+    #[view]
+    public fun get_code(caller: vector<u8>): vector<u8> acquires EvmData {
+        assert!(
+            exists<EvmData>(@aptos_framework),
+            error::not_found(ENO_ETH_DATA),
+        );
+        let data_ref = borrow_global<EvmData>(@aptos_framework);
+        *table::borrow(&data_ref.code, caller)
+    }
+
+    #[view]
+    public fun get_pub_key(caller: vector<u8>): address acquires EvmData {
+        assert!(
+            exists<EvmData>(@aptos_framework),
+            error::not_found(ENO_ETH_DATA),
+        );
+        let data_ref = borrow_global<EvmData>(@aptos_framework);
+        *table::borrow(&data_ref.pub_keys, caller)
+    }
     // native fun create_impl(caller: Vec<u8>, value: u256, init_code: Vec<u8>, gas_limit: u64);
 
     // native fun call_impl(caller: vector<u8>, address: vector<u8>, value: u256, data: vector<u8>, gas_limit: u64);
