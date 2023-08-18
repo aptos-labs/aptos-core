@@ -2,7 +2,6 @@ name: "Run Python SDK Publish"
 
 on:
   workflow_dispatch:
-  push: 
 
 jobs:
   release:
@@ -18,12 +17,6 @@ jobs:
 
       - name: Build project for distribution
         run: poetry build
-        working-directory: ./ecosystem/python/sdk
-
-      - name: Check Version
-        id: check-version
-        run: |
-          [[ "$(poetry version --short)" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && [[ $(grep $(poetry version --short) CHANGELOG.md) =~ $(poetry version --short)  ]] || echo prerelease=true >> $GITHUB_OUTPUT
         working-directory: ./ecosystem/python/sdk
 
       - name: Publish to PyPI
