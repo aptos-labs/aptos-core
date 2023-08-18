@@ -3,12 +3,6 @@
 use move_core_types::value::{MoveTypeLayout, MoveValue};
 use primitive_types::{H160, H256, U256};
 
-pub fn u256_to_h160(value: &U256) -> H160 {
-    let mut result = [0u8; 32];
-    value.to_big_endian(&mut result);
-    H160::from_slice(&result[12..])
-}
-
 pub fn vec_to_h160(value: &[u8]) -> H160 {
     let mut result = [0u8; 20];
     result.copy_from_slice(value);
@@ -30,6 +24,15 @@ pub fn read_u256_from_move_bytes(bytes: &[u8]) -> U256 {
     let move_value: MoveValue =
         MoveValue::simple_deserialize(&bytes, &MoveTypeLayout::U256).unwrap();
     move_value.to_u256().into_inner()
+}
+
+pub fn read_bytes_from_move_bytes(bytes: &[u8]) -> Vec<u8> {
+    let bytes: Vec<u8> = bcs::from_bytes(bytes).unwrap();
+    bytes
+}
+
+pub fn write_bytes_to_move_bytes(bytes: &[u8]) -> Vec<u8> {
+    bcs::to_bytes(bytes).unwrap()
 }
 
 pub fn read_h256_from_bytes(bytes: &[u8]) -> H256 {

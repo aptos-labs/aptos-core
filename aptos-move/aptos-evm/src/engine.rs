@@ -117,68 +117,67 @@ impl<'a> Engine<'a> {
 
     fn modify_nonce(address: &EthAddress, nonce: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
         (
-            address.as_bytes().to_vec(),
+            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(),
             Op::Modify(u256_to_move_arr(nonce).to_vec()),
         )
     }
 
     fn modify_balance(address: &EthAddress, balance: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
         (
-            address.as_bytes().to_vec(),
+            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(),
             Op::Modify(u256_to_move_arr(balance).to_vec()),
         )
     }
 
     fn modify_code(address: &EthAddress, code: &Vec<u8>) -> (Vec<u8>, Op<Vec<u8>>) {
-        (address.as_bytes().to_vec(), Op::Modify(code.clone()))
+        (            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(), Op::Modify(code.clone()))
     }
 
     fn modify_storage(address: &EthAddress, index: &H256, value: &H256) -> (Vec<u8>, Op<Vec<u8>>) {
-        let mut buf = [0u8; 52];
-        buf[..20].copy_from_slice(&address.as_bytes());
-        buf[20..].copy_from_slice(&index.as_bytes());
-        (buf.to_vec(), Op::Modify(value.as_bytes().to_vec()))
+        let storage_key = StorageKey::new(address.as_bytes().to_vec(), index.as_bytes().to_vec());
+        (bcs::to_bytes(&storage_key).unwrap(), Op::Modify(value.as_bytes().to_vec()))
     }
 
     fn add_nonce(address: &EthAddress, nonce: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
         (
-            address.as_bytes().to_vec(),
+            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(),
             Op::New(u256_to_move_arr(nonce).to_vec()),
         )
     }
 
     fn add_balance(address: &EthAddress, balance: &U256) -> (Vec<u8>, Op<Vec<u8>>) {
         (
-            address.as_bytes().to_vec(),
+            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(),
             Op::New(u256_to_move_arr(balance).to_vec()),
         )
     }
 
     fn add_code(address: &EthAddress, code: &Vec<u8>) -> (Vec<u8>, Op<Vec<u8>>) {
-        (address.as_bytes().to_vec(), Op::New(code.clone()))
+        let move_bytes = bcs::to_bytes(code).unwrap();
+        (address.as_bytes().to_vec(), Op::New(move_bytes))
     }
 
     fn add_storage(address: &EthAddress, index: &H256, value: &H256) -> (Vec<u8>, Op<Vec<u8>>) {
-        let mut buf = [0u8; 52];
-        buf[..20].copy_from_slice(&address.as_bytes());
-        buf[20..].copy_from_slice(&index.as_bytes());
+        let move_bytes =  bcs::to_bytes(&value.as_bytes().to_vec());
         let storage_key = StorageKey::new(address.as_bytes().to_vec(), index.as_bytes().to_vec());
         (
             bcs::to_bytes(&storage_key).unwrap(),
-            Op::New(value.as_bytes().to_vec()),
+            Op::New(move_bytes.unwrap()),
         )
     }
 
     fn delete_nonce(address: &EthAddress) -> (Vec<u8>, Op<Vec<u8>>) {
-        (address.as_bytes().to_vec(), Op::Delete)
+        (            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(),
+         Op::Delete)
     }
 
     fn delete_balance(address: &EthAddress) -> (Vec<u8>, Op<Vec<u8>>) {
-        (address.as_bytes().to_vec(), Op::Delete)
+        (            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(), Op::Delete)
     }
 
     fn delete_code(address: &EthAddress) -> (Vec<u8>, Op<Vec<u8>>) {
-        (address.as_bytes().to_vec(), Op::Delete)
+        (            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(),
+         Op::Delete)
     }
 
     fn into_change_set<A, I>(&self, values: A, backend: EVMBackend) -> TableChangeSet
