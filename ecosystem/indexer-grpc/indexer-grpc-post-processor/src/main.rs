@@ -33,7 +33,7 @@ pub struct IndexerGrpcFileStorageVerifierConfig {
 pub struct IndexerGrpcDataServiceCheckerConfig {
     pub indexer_grpc_address: String,
     pub indexer_grpc_auth_token: String,
-    pub ledger_version: u64,
+    pub starting_version: u64,
 }
 
 // TODO: change this to match pattern.
@@ -104,7 +104,7 @@ impl RunnableConfig for IndexerGrpcPostProcessorConfig {
                     let checker = DataServiceChecker::new(
                         config.indexer_grpc_address.clone(),
                         config.indexer_grpc_auth_token.clone(),
-                        config.ledger_version,
+                        config.starting_version,
                     )
                     .expect("Failed to initialize DataServiceChecker");
                     info!("Starting DataServiceChecker");

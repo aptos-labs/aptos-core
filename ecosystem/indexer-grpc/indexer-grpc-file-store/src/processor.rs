@@ -111,7 +111,7 @@ impl Processor {
                 .cache_operator
                 .as_mut()
                 .unwrap()
-                .batch_get_encoded_proto_data(current_cache_version, None)
+                .batch_get_encoded_proto_data(current_cache_version, Some(5000))
                 .await;
 
             let batch_get_result =

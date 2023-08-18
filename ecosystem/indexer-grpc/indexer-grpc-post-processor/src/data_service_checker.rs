@@ -8,32 +8,29 @@ use aptos_indexer_grpc_utils::constants::GRPC_AUTH_TOKEN_HEADER;
 use aptos_moving_average::MovingAverage;
 use aptos_protos::indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest};
 use futures::StreamExt;
-use rand::Rng;
 pub struct DataServiceChecker {
     pub indexer_grpc_address: String,
     pub indexer_grpc_auth_token: String,
-    pub ledger_version: u64,
+    pub starting_version: u64,
 }
 
 impl DataServiceChecker {
     pub fn new(
         indexer_grpc_address: String,
         indexer_grpc_auth_token: String,
-        ledger_version: u64,
+        starting_version: u64,
     ) -> Result<Self> {
         Ok(Self {
             indexer_grpc_address,
             indexer_grpc_auth_token,
-            ledger_version,
+            starting_version,
         })
     }
 
     pub async fn run(&self) -> anyhow::Result<()> {
         let mut client = RawDataClient::connect(self.indexer_grpc_address.clone()).await?;
-        let starting_version =
-            rand::thread_rng().gen_range(self.ledger_version - 3_000_000, self.ledger_version);
         let mut request = tonic::Request::new(GetTransactionsRequest {
-            starting_version: Some(starting_version),
+            starting_version: Some(self.starting_version),
             ..GetTransactionsRequest::default()
         });
         request.metadata_mut().insert(

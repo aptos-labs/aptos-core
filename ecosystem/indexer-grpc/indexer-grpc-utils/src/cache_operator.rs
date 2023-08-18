@@ -200,7 +200,7 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
         } else {
             Ok(CacheCoverageStatus::CacheHit(std::cmp::min(
                 latest_version - requested_version,
-                size_hint.unwrap_or(BLOB_STORAGE_SIZE as usize) as u64,
+                size_hint.unwrap_or(BLOB_STORAGE_SIZE) as u64,
             )))
         }
     }
@@ -271,7 +271,9 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
         start_version: u64,
         size_hint: Option<usize>,
     ) -> anyhow::Result<CacheBatchGetStatus> {
-        let cache_coverage_status = self.check_cache_coverage_status(start_version, size_hint).await;
+        let cache_coverage_status = self
+            .check_cache_coverage_status(start_version, size_hint)
+            .await;
         match cache_coverage_status {
             Ok(CacheCoverageStatus::CacheHit(v)) => {
                 let versions = (start_version..start_version + v)
@@ -359,7 +361,10 @@ mod tests {
             CacheOperator::new(mock_connection);
 
         assert_eq!(
-            cache_operator.check_cache_coverage_status(1, None).await.unwrap(),
+            cache_operator
+                .check_cache_coverage_status(1, None)
+                .await
+                .unwrap(),
             CacheCoverageStatus::CacheEvicted
         );
     }
