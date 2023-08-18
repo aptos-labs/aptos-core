@@ -97,11 +97,11 @@ impl ImageOptimizer {
         if width > height {
             let new_width = goal;
             let new_height = (goal as f64 * (height as f64 / width as f64)).round() as u32;
-            return (new_width, new_height);
+            (new_width, new_height)
         } else {
             let new_height = goal;
             let new_width = (goal as f64 * (width as f64 / height as f64)).round() as u32;
-            return (new_width, new_height);
+            (new_width, new_height)
         }
     }
 
