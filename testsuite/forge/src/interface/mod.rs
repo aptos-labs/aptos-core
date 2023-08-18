@@ -19,7 +19,7 @@ pub use chaos::*;
 mod node;
 pub use node::*;
 mod chain_info;
-pub mod system_metrics;
+pub mod prometheus_metrics;
 
 use aptos_framework::ReleaseBundle;
 pub use chain_info::*;

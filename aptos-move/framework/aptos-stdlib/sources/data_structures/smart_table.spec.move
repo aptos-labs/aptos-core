@@ -42,6 +42,16 @@ spec aptos_std::smart_table {
         pragma verify = false;
     }
 
+    spec to_simple_map<K: store + copy + drop, V: store + copy>(
+    table: &SmartTable<K, V>,
+    ): SimpleMap<K, V> {
+        pragma verify = false;
+    }
+
+    spec add_all<K, V>(table: &mut SmartTable<K, V>, keys: vector<K>, values: vector<V>) {
+        pragma verify = false;
+    }
+
     spec update_split_load_threshold<K, V>(table: &mut SmartTable<K, V>, split_load_threshold: u8) {
         pragma verify = false;
     }

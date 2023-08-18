@@ -75,6 +75,9 @@ spec aptos_framework::resource_account {
         aborts_if exists<Container>(source_addr) && simple_map::spec_contains_key(container.store, resource_addr);
         aborts_if get && !(exists<Account>(resource_addr) && len(global<Account>(source_addr).authentication_key) == 32);
         aborts_if !get && !(exists<Account>(resource_addr) && len(optional_auth_key) == 32);
+
+        ensures simple_map::spec_contains_key(global<Container>(source_addr).store, resource_addr);
+        ensures exists<Container>(source_addr);
     }
 
     spec schema RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIfWithoutAccountLimit {
@@ -96,6 +99,9 @@ spec aptos_framework::resource_account {
         aborts_if exists<Container>(source_addr) && simple_map::spec_contains_key(container.store, resource_addr);
         aborts_if get && len(global<account::Account>(source_addr).authentication_key) != 32;
         aborts_if !get && len(optional_auth_key) != 32;
+
+        ensures simple_map::spec_contains_key(global<Container>(source_addr).store, resource_addr);
+        ensures exists<Container>(source_addr);
     }
 
     spec retrieve_resource_account_cap(
@@ -109,6 +115,7 @@ spec aptos_framework::resource_account {
         aborts_if !simple_map::spec_contains_key(container.store, resource_addr);
         aborts_if !exists<account::Account>(resource_addr);
         ensures simple_map::spec_contains_key(old(global<Container>(source_addr)).store, resource_addr) &&
-        simple_map::spec_len(old(global<Container>(source_addr)).store) == 1 ==> !exists<Container>(source_addr);
+            simple_map::spec_len(old(global<Container>(source_addr)).store) == 1 ==> !exists<Container>(source_addr);
+        ensures exists<Container>(source_addr) ==> !simple_map::spec_contains_key(global<Container>(source_addr).store, resource_addr);
     }
 }

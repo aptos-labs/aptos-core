@@ -348,6 +348,7 @@ where
         base_view: &S,
     ) {
         let (num_deltas, delta_keys) = last_input_output.delta_keys(txn_idx);
+        let _events = last_input_output.events(txn_idx);
         let mut delta_writes = Vec::with_capacity(num_deltas);
         for k in delta_keys {
             // Note that delta materialization happens concurrently, but under concurrent
@@ -599,7 +600,9 @@ where
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
+        let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(executor_arguments);
+        drop(init_timer);
         let data_map = UnsyncMap::new();
 
         let mut ret = Vec::with_capacity(num_txns);

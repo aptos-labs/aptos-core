@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use aptos_indexer_grpc_server_framework::ServerArgs;
-use nft_metadata_crawler_parser::worker::ParserConfig;
+use aptos_nft_metadata_crawler_parser::worker::ParserConfig;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

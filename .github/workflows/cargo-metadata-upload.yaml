@@ -1,0 +1,26 @@
+name: Target Determinator Cargo Metadata Uploader
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    paths:
+      - ".github/workflows/cargo-metadata-upload.yaml"
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  cargo-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af # pin@v1
+      - id: auth
+        uses: "google-github-actions/auth@35b0e87d162680511bf346c299f71c9c5c379033" # pin@v
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+      - uses: 'google-github-actions/setup-gcloud@v1'
+      - shell: bash
+        run: |
+          cargo metadata --all-features | gsutil cp - gs://aptos-core-cargo-metadata-public/metadata-${{ github.sha }}.json

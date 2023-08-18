@@ -127,9 +127,21 @@ jobs:
       FORGE_TEST_SUITE: realistic_env_load_sweep
       POST_TO_SLACK: true
 
-  run-forge-realistic-env-graceful-overload:
+  run-forge-realistic-env-workload-sweep:
     if: ${{ github.event_name != 'pull_request' && always() }}
     needs: [determine-test-metadata, run-forge-realistic-env-load-sweep] # Only run after the previous job completes
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-realistic-env-workload-sweep-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 1600 # Run for 26 minutes (4 tests, each for 400 seconds)
+      FORGE_TEST_SUITE: realistic_env_workload_sweep
+      POST_TO_SLACK: true
+
+  run-forge-realistic-env-graceful-overload:
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-realistic-env-workload-sweep] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -258,3 +270,16 @@ jobs:
       FORGE_TEST_SUITE: changing_working_quorum_test_high_load
       POST_TO_SLACK: true
       FORGE_ENABLE_FAILPOINTS: true
+
+  # Measures PFN latencies with a constant TPS (with a realistic environment)
+  run-forge-pfn-const-tps-realistic-env:
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-changing-working-quorum-test-high-load] # Only run after the previous job completes
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-pfn-const-tps-with-realistic-env-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
+      FORGE_TEST_SUITE: pfn_const_tps_with_realistic_env
+      POST_TO_SLACK: true

@@ -27,6 +27,7 @@
 !api/doc/
 !crates/indexer/migrations/**/*.sql
 !ecosystem/indexer-grpc/indexer-grpc-parser/migrations/**/*.sql
+!ecosystem/nft-metadata-crawler-parser/migrations/**/*.sql
 !terraform/helm/aptos-node/
 !terraform/helm/genesis/
 !testsuite/forge/src/backend/k8s/

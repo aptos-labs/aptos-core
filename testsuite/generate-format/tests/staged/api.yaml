@@ -234,8 +234,6 @@ StateValueMetadata:
     0:
       V0:
         STRUCT:
-          - payer:
-              TYPENAME: AccountAddress
           - deposit: U64
           - creation_time_usecs: U64
 StructTag:

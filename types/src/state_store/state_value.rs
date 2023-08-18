@@ -10,7 +10,6 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use move_core_types::account_address::AccountAddress;
 use once_cell::sync::OnceCell;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, prelude::*};
@@ -31,22 +30,22 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 )]
 pub enum StateValueMetadata {
     V0 {
-        payer: AccountAddress,
         deposit: u64,
         creation_time_usecs: u64,
     },
 }
 
 impl StateValueMetadata {
-    pub fn new(
-        payer: AccountAddress,
-        deposit: u64,
-        creation_time_usecs: &CurrentTimeMicroseconds,
-    ) -> Self {
+    pub fn new(deposit: u64, creation_time_usecs: &CurrentTimeMicroseconds) -> Self {
         Self::V0 {
-            payer,
             deposit,
             creation_time_usecs: creation_time_usecs.microseconds,
+        }
+    }
+
+    pub fn set_deposit(&mut self, amount: u64) {
+        match self {
+            StateValueMetadata::V0 { deposit, .. } => *deposit = amount,
         }
     }
 }

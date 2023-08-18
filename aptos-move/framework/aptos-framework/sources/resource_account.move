@@ -4,25 +4,27 @@
 /// ## Resource Accounts to manage liquidity pools
 ///
 /// A dev wishing to use resource accounts for a liquidity pool, would likely do the following:
-/// 1. Create a new account using `resource_account::create_resource_account`. This creates the
-/// account, stores the `signer_cap` within a `resource_account::Container`, and rotates the key to
-/// the current accounts authentication key or a provided authentication key.
-/// 2. Define the LiquidityPool module's address to be the same as the resource account.
-/// 3. Construct a transaction package publishing transaction for the resource account using the
-/// authentication key used in step 1.
-/// 4. In the LiquidityPool module's `init_module` function, call `retrieve_resource_account_cap`
-/// which will retrive the `signer_cap` and rotate the resource account's authentication key to
-/// `0x0`, effectively locking it off.
-/// 5. When adding a new coin, the liquidity pool will load the capability and hence the signer to
-/// register and store new LiquidityCoin resources.
+///
+///  1. Create a new account using `resource_account::create_resource_account`. This creates the
+///     account, stores the `signer_cap` within a `resource_account::Container`, and rotates the key to
+///     the current account's authentication key or a provided authentication key.
+///  2. Define the liquidity pool module's address to be the same as the resource account.
+///  3. Construct a package-publishing transaction for the resource account using the
+///     authentication key used in step 1.
+///  4. In the liquidity pool module's `init_module` function, call `retrieve_resource_account_cap`
+///     which will retrieve the `signer_cap` and rotate the resource account's authentication key to
+///     `0x0`, effectively locking it off.
+///  5. When adding a new coin, the liquidity pool will load the capability and hence the `signer` to
+///     register and store new `LiquidityCoin` resources.
 ///
 /// Code snippets to help:
+///
 /// ```
-/// fun init_module(resource: &signer) {
+/// fun init_module(resource_account: &signer) {
 ///   let dev_address = @DEV_ADDR;
-///   let signer_cap = retrieve_resource_account_cap(resource, dev_address);
+///   let signer_cap = retrieve_resource_account_cap(resource_account, dev_address);
 ///   let lp = LiquidityPoolInfo { signer_cap: signer_cap, ... };
-///   move_to(resource, lp);
+///   move_to(resource_account, lp);
 /// }
 /// ```
 ///

@@ -855,6 +855,7 @@ module std::vector_tests {
         assert!(&v == &vector[2, 4, 3, 1, 5], 1);
     }
 
+    #[test]
     fun test_stable_partition() {
         let v:vector<u64> = vector[1, 2, 3, 4, 5];
 
@@ -868,6 +869,7 @@ module std::vector_tests {
         assert!(&v == &vector[2, 4, 1, 3, 5], 1);
     }
 
+    #[test]
     fun test_insert() {
         let v:vector<u64> = vector[1, 2, 3, 4, 5];
 

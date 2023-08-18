@@ -471,7 +471,8 @@ fn parse_qualified_function_name(
         | Tok::ToU32
         | Tok::ToU64
         | Tok::ToU128
-        | Tok::ToU256 => {
+        | Tok::ToU256
+        | Tok::Nop => {
             let f = parse_builtin(tokens)?;
             FunctionCall_::Builtin(f)
         },
@@ -618,7 +619,8 @@ fn parse_call_or_term_(tokens: &mut Lexer) -> Result<Exp_, ParseError<Loc, anyho
         | Tok::ToU32
         | Tok::ToU64
         | Tok::ToU128
-        | Tok::ToU256 => {
+        | Tok::ToU256
+        | Tok::Nop => {
             let f = parse_qualified_function_name(tokens)?;
             let exp = parse_call_or_term(tokens)?;
             Ok(Exp_::FunctionCall(f, Box::new(exp)))
@@ -876,6 +878,10 @@ fn parse_builtin(tokens: &mut Lexer) -> Result<Builtin, ParseError<Loc, anyhow::
         Tok::ToU256 => {
             tokens.advance()?;
             Ok(Builtin::ToU256)
+        },
+        Tok::Nop => {
+            tokens.advance()?;
+            Ok(Builtin::Nop)
         },
         t => Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),

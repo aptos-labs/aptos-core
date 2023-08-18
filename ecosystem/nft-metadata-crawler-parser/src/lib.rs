@@ -5,19 +5,7 @@ pub mod schema;
 pub mod utils;
 pub mod worker;
 
-use diesel::{
-    pg::PgConnection,
-    r2d2::{ConnectionManager, Pool},
-};
 use reqwest::{header, Client};
-
-/// Establishes a connection pool to Postgres
-pub fn establish_connection_pool(database_url: String) -> Pool<ConnectionManager<PgConnection>> {
-    let manager = ConnectionManager::<PgConnection>::new(database_url);
-    Pool::builder()
-        .build(manager)
-        .expect("Failed to create pool.")
-}
 
 /// HEAD request to get MIME type and size of content
 pub async fn get_uri_metadata(url: String) -> anyhow::Result<(String, u32)> {

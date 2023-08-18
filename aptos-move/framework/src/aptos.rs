@@ -4,8 +4,9 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    docgen::DocgenOptions, path_in_crate, release_builder::RELEASE_BUNDLE_EXTENSION,
-    release_bundle::ReleaseBundle, BuildOptions, ReleaseOptions,
+    docgen::DocgenOptions, extended_checks, path_in_crate,
+    release_builder::RELEASE_BUNDLE_EXTENSION, release_bundle::ReleaseBundle, BuildOptions,
+    ReleaseOptions,
 };
 use clap::ValueEnum;
 use move_command_line_common::address::NumericalAddress;
@@ -118,6 +119,8 @@ impl ReleaseTarget {
                 }),
                 skip_fetch_latest_git_deps: true,
                 bytecode_version: None,
+                skip_attribute_checks: false,
+                known_attributes: extended_checks::get_all_attribute_names().clone(),
             },
             packages: packages.iter().map(|(path, _)| path.to_owned()).collect(),
             rust_bindings: packages

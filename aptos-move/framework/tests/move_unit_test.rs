@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_framework::path_in_crate;
+use aptos_framework::{extended_checks, path_in_crate};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use aptos_vm::natives;
@@ -18,6 +18,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         move_package::BuildConfig {
             test_mode: true,
             install_dir: Some(tempdir().unwrap().path().to_path_buf()),
+            known_attributes: extended_checks::get_all_attribute_names().clone(),
             ..Default::default()
         },
         // TODO(Gas): double check if this is correct

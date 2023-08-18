@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_framework::extended_checks;
 use aptos_types::account_address::AccountAddress;
 use move_cli::base::prove::run_move_prover;
 use std::{collections::BTreeMap, path::PathBuf};
@@ -24,6 +25,7 @@ pub fn run_prover_for_pkg(
         additional_named_addresses: named_addr,
         test_mode: true,
         install_dir: Some(tempdir().unwrap().path().to_path_buf()),
+        known_attributes: extended_checks::get_all_attribute_names().clone(),
         ..Default::default()
     };
     run_move_prover(

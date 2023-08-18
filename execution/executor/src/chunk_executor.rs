@@ -475,6 +475,10 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                     batch_begin,
                     batch_begin + 1,
                 )?;
+                info!(
+                    version_skipped = batch_begin,
+                    "Skipped known broken transaction, applied transaction output directly."
+                );
                 batch_begin += 1;
                 batch_end = *batch_ends.next().unwrap();
                 continue;

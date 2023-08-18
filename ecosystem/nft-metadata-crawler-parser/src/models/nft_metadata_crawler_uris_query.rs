@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 
-use crate::{schema::nft_metadata_crawler_uris, utils::constants::MAX_RETRY_TIME_SECONDS};
+use crate::{
+    schema::nft_metadata_crawler::parsed_token_uris, utils::constants::MAX_RETRY_TIME_SECONDS,
+};
 use backoff::{retry, ExponentialBackoff};
 use diesel::{
     prelude::*,
@@ -12,7 +14,7 @@ use tracing::warn;
 
 #[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
 #[diesel(primary_key(token_uri))]
-#[diesel(table_name = nft_metadata_crawler_uris)]
+#[diesel(table_name = parsed_token_uris)]
 pub struct NFTMetadataCrawlerURIsQuery {
     pub token_uri: String,
     pub raw_image_uri: Option<String>,
@@ -32,7 +34,7 @@ impl NFTMetadataCrawlerURIsQuery {
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> anyhow::Result<Option<Self>> {
         let mut op = || {
-            nft_metadata_crawler_uris::table
+            parsed_token_uris::table
                 .find(token_uri.clone())
                 .first::<NFTMetadataCrawlerURIsQuery>(conn)
                 .optional()
@@ -54,12 +56,14 @@ impl NFTMetadataCrawlerURIsQuery {
     }
 
     pub fn get_by_raw_image_uri(
+        token_uri: String,
         raw_image_uri: String,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> anyhow::Result<Option<Self>> {
         let mut op = || {
-            nft_metadata_crawler_uris::table
-                .filter(nft_metadata_crawler_uris::raw_image_uri.eq(raw_image_uri.clone()))
+            parsed_token_uris::table
+                .filter(parsed_token_uris::raw_image_uri.eq(raw_image_uri.clone()))
+                .filter(parsed_token_uris::token_uri.ne(token_uri.clone()))
                 .first::<NFTMetadataCrawlerURIsQuery>(conn)
                 .optional()
                 .map_err(Into::into)
@@ -83,12 +87,14 @@ impl NFTMetadataCrawlerURIsQuery {
     }
 
     pub fn get_by_raw_animation_uri(
+        token_uri: String,
         raw_animation_uri: String,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> anyhow::Result<Option<Self>> {
         let mut op = || {
-            nft_metadata_crawler_uris::table
-                .filter(nft_metadata_crawler_uris::raw_animation_uri.eq(raw_animation_uri.clone()))
+            parsed_token_uris::table
+                .filter(parsed_token_uris::raw_animation_uri.eq(raw_animation_uri.clone()))
+                .filter(parsed_token_uris::token_uri.ne(token_uri.clone()))
                 .first::<NFTMetadataCrawlerURIsQuery>(conn)
                 .optional()
                 .map_err(Into::into)

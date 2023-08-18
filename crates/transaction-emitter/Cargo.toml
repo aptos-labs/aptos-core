@@ -20,7 +20,5 @@ aptos-sdk = { workspace = true }
 aptos-transaction-emitter-lib = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
-itertools = { workspace = true }
 rand = { workspace = true }
-rand_core = { workspace = true }
 tokio = { workspace = true }

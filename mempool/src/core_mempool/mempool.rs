@@ -156,12 +156,14 @@ impl Mempool {
 
             let insertion_timestamp =
                 aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
-            counters::core_mempool_txn_commit_latency(
-                counters::COMMIT_ACCEPTED_BLOCK_LABEL,
-                insertion_info.submitted_by_label(),
-                bucket,
-                block_timestamp.saturating_sub(insertion_timestamp),
-            );
+            if let Some(insertion_to_block) = block_timestamp.checked_sub(insertion_timestamp) {
+                counters::core_mempool_txn_commit_latency(
+                    counters::COMMIT_ACCEPTED_BLOCK_LABEL,
+                    insertion_info.submitted_by_label(),
+                    bucket,
+                    insertion_to_block,
+                );
+            }
         }
     }
 

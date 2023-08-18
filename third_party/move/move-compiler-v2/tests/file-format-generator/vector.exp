@@ -13,6 +13,26 @@ fun vector::create(): vector<u64> {
   4: return $t0
 }
 
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun vector::create(): vector<u64> {
+     var $t0: vector<u64>
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t2 := 2
+     # live vars: $t1, $t2
+  2: $t3 := 3
+     # live vars: $t1, $t2, $t3
+  3: $t0 := vector($t1, $t2, $t3)
+     # live vars: $t0
+  4: return $t0
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v6

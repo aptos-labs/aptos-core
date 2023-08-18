@@ -6,7 +6,7 @@ use aptos_gas_schedule::VMGasParameters;
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
 };
-use aptos_vm_types::storage::StorageGasParameters;
+use aptos_vm_types::{change_set::VMChangeSet, storage::StorageGasParameters};
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
 use move_core_types::gas_algebra::{InternalGas, InternalGasUnit, NumBytes};
 use move_vm_types::gas::GasMeter as MoveGasMeter;
@@ -103,8 +103,11 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// storage costs.
     fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOp) -> VMResult<()>;
 
-    /// Calculates the storage fee for a write operation.
-    fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee;
+    /// Calculates the storage fee for a state slot allocation.
+    fn storage_fee_for_state_slot(&self, op: &WriteOp) -> Fee;
+
+    /// Calculates the storage fee for state bytes.
+    fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee;
 
     /// Calculates the storage fee for an event.
     fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
@@ -116,16 +119,16 @@ pub trait AptosGasMeter: MoveGasMeter {
     fn storage_fee_for_transaction_storage(&self, txn_size: NumBytes) -> Fee;
 
     /// Charges the storage fees for writes, events & txn storage in a lump sum, minimizing the
-    /// loss of precision.
+    /// loss of precision. Refundable portion of the charge is recorded on the WriteOp itself,
+    /// due to which mutable references are required on the parameter list wherever proper.
     ///
     /// The contract requires that this function behaves in a way that is consistent to
     /// the ones defining the costs.
     /// Due to this reason, you should normally not override the default implementation,
     /// unless you are doing something special, such as injecting additional logging logic.
-    fn charge_storage_fee_for_all<'a>(
+    fn process_storage_fee_for_all(
         &mut self,
-        write_ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
-        events: impl IntoIterator<Item = &'a ContractEvent>,
+        change_set: &mut VMChangeSet,
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
     ) -> VMResult<()> {
@@ -142,10 +145,16 @@ pub trait AptosGasMeter: MoveGasMeter {
         }
 
         // Calculate the storage fees.
-        let write_fee = write_ops.into_iter().fold(Fee::new(0), |acc, (key, op)| {
-            acc + self.storage_fee_per_write(key, op)
-        });
-        let event_fee = events.into_iter().fold(Fee::new(0), |acc, event| {
+        let write_fee = change_set
+            .write_set_iter_mut()
+            .fold(Fee::new(0), |acc, (key, op)| {
+                let slot_fee = self.storage_fee_for_state_slot(op);
+                let bytes_fee = self.storage_fee_for_state_bytes(key, op);
+                Self::maybe_record_storage_deposit(op, slot_fee);
+
+                acc + slot_fee + bytes_fee
+            });
+        let event_fee = change_set.events().iter().fold(Fee::new(0), |acc, event| {
             acc + self.storage_fee_per_event(event)
         });
         let event_discount = self.storage_discount_for_events(event_fee);
@@ -159,6 +168,28 @@ pub trait AptosGasMeter: MoveGasMeter {
             .map_err(|err| err.finish(Location::Undefined))?;
 
         Ok(())
+    }
+
+    // The slot fee is refundable, we record it on the WriteOp itself and it'll end up in
+    // the state DB.
+    fn maybe_record_storage_deposit(write_op: &mut WriteOp, slot_fee: Fee) {
+        use WriteOp::*;
+
+        match write_op {
+            CreationWithMetadata {
+                ref mut metadata,
+                data: _,
+            } => {
+                if !slot_fee.is_zero() {
+                    metadata.set_deposit(slot_fee.into())
+                }
+            },
+            Creation(..)
+            | Modification(..)
+            | Deletion
+            | ModificationWithMetadata { .. }
+            | DeletionWithMetadata { .. } => {},
+        }
     }
 
     // Below are getters reexported from the gas algebra.

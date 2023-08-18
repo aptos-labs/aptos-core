@@ -1,0 +1,4 @@
+# config: prover_stdlib.toml
+# time  : 2023-08-07 21:30:19.900861 UTC
+test::f1                                          561           ok
+test::f2                                          553           ok

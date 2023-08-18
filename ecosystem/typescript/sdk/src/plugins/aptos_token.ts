@@ -42,7 +42,7 @@ const PropertyTypeMap = {
 
 export type PropertyType = keyof typeof PropertyTypeMap;
 
-type FungibleTokenParameters = {
+export type FungibleTokenParameters = {
   owner: AptosAccount;
   tokenAddress: MaybeHexString;
   recipient: MaybeHexString;
@@ -50,7 +50,7 @@ type FungibleTokenParameters = {
   extraArgs?: OptionalTransactionArgs;
 };
 
-type NonFungibleTokenParameters = {
+export type NonFungibleTokenParameters = {
   owner: AptosAccount;
   tokenAddress: MaybeHexString;
   recipient: MaybeHexString;

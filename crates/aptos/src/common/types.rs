@@ -987,6 +987,10 @@ pub struct MovePackageDir {
     /// Specify the version of the bytecode the compiler is going to emit.
     #[clap(long)]
     pub bytecode_version: Option<u32>,
+
+    /// Do not complain about unknown attributes in Move code.
+    #[clap(long)]
+    pub skip_attribute_checks: bool,
 }
 
 impl MovePackageDir {
@@ -998,6 +1002,7 @@ impl MovePackageDir {
             named_addresses: Default::default(),
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
+            skip_attribute_checks: false,
         }
     }
 

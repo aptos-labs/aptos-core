@@ -149,3 +149,76 @@ def test_account_rotate_key(run_helper: RunHelper, test_name=None):
         raise TestError(
             f"lookup-address of new public key does not match original address: {old_profile.account_address}"
         )
+
+
+@test_case
+def test_account_resource_account(run_helper: RunHelper, test_name=None):
+    # Seed for the resource account
+    seed = "1"
+
+    # Create the new resource account.
+    result = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "account",
+            "create-resource-account",
+            "--seed",
+            seed,
+            "--assume-yes",  # assume yes to gas prompt
+        ],
+    )
+
+    result = json.loads(result.stdout)
+    sender = result["Result"].get("sender")
+    resource_account_address = result["Result"].get("resource_account")
+
+    if resource_account_address == None or sender == None:
+        raise TestError("Resource account creation failed")
+
+    # Derive the resource account
+    result = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "account",
+            "derive-resource-account-address",
+            "--seed",
+            seed,
+            "--address",
+            sender,
+        ],
+    )
+
+    if resource_account_address not in result.stdout:
+        raise TestError(
+            f"derive-resource-account-address result does not match expected: {resource_account_address}"
+        )
+
+    # List the resource account
+    result = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "account",
+            "list",
+            "--query=resources",
+        ],
+    )
+
+    json_result = json.loads(result.stdout)
+    found_resource = False
+
+    # Check if the resource account is in the list
+    for module in json_result["Result"]:
+        if module.get("0x1::resource_account::Container") != None:
+            data = module["0x1::resource_account::Container"]["store"]["data"]
+            for resource in data:
+                if resource.get("key") == f"0x{resource_account_address}":
+                    found_resource = True
+                    break
+
+    if not found_resource:
+        raise TestError(
+            "Cannot find the resource account in the account list after resource account creation"
+        )

@@ -17,7 +17,6 @@ Standard math utilities missing in the Move Language.
 -  [Function `log2`](#0x1_math64_log2)
 -  [Function `sqrt`](#0x1_math64_sqrt)
 -  [Function `ceil_div`](#0x1_math64_ceil_div)
--  [Function `assert_approx_the_same`](#0x1_math64_assert_approx_the_same)
 -  [Specification](#@Specification_1)
     -  [Function `max`](#@Specification_1_max)
     -  [Function `min`](#@Specification_1_min)
@@ -364,39 +363,6 @@ Returns square root of x, precisely floor(sqrt(x))
         0
     }
     <b>else</b> (x - 1) / y + 1
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_math64_assert_approx_the_same"></a>
-
-## Function `assert_approx_the_same`
-
-For functions that approximate a value it's useful to test a value is close
-to the most correct value up to last digit
-
-
-<pre><code>#[testonly]
-<b>fun</b> <a href="math64.md#0x1_math64_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128, precission: u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="math64.md#0x1_math64_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128, precission: u64) {
-    <b>if</b> (x &lt; y) {
-        <b>let</b> tmp = x;
-        x = y;
-        y = tmp;
-    };
-    <b>let</b> mult = (<a href="math64.md#0x1_math64_pow">pow</a>(10, precission) <b>as</b> u128);
-    <b>assert</b>!((x - y) * mult &lt; x, 0);
 }
 </code></pre>
 

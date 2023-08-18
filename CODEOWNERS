@@ -1,7 +1,7 @@
 # **Please** keep this file ordered alphabetically by directory paths.
 
 # Owners for the `.github` directory and all its subdirectories.
-/.github/ @aptos-labs/prod-eng
+/.github/ @aptos-labs/prod-eng @aptos-labs/security
 
 # Owners for the `/api` directory and all its subdirectories.
 /api/ @banool @gregnazario @0xmaayan

@@ -3390,22 +3390,23 @@ impl<'env> FunctionEnv<'env> {
     /// is attached. If the local is an argument, use that for naming, otherwise generate
     /// a unique name.
     pub fn get_local_name(&self, idx: usize) -> Option<Symbol> {
-        if idx < self.data.params.len() {
-            return Some(self.data.params[idx].0);
-        }
-        // Try to obtain name from source map.
-        let source_map = self.module_env.data.source_map.as_ref()?;
-        if let Ok(fmap) = source_map.get_function_source_map(self.data.def_idx?) {
-            if let Some((ident, _)) = fmap.get_parameter_or_local_name(idx as u64) {
-                // The Move compiler produces temporary names of the form `<foo>%#<num>`,
-                // where <num> seems to be generated non-deterministically.
-                // Substitute this by a deterministic name which the backend accepts.
-                let clean_ident = if ident.contains("%#") {
-                    format!("tmp#${}", idx)
-                } else {
-                    ident
-                };
-                return Some(self.module_env.env.symbol_pool.make(clean_ident.as_str()));
+        // Try to obtain user name
+        if let Some(source_map) = &self.module_env.data.source_map {
+            if idx < self.data.params.len() {
+                return Some(self.data.params[idx].0);
+            }
+            if let Ok(fmap) = source_map.get_function_source_map(self.data.def_idx?) {
+                if let Some((ident, _)) = fmap.get_parameter_or_local_name(idx as u64) {
+                    // The Move compiler produces temporary names of the form `<foo>%#<num>`,
+                    // where <num> seems to be generated non-deterministically.
+                    // Substitute this by a deterministic name which the backend accepts.
+                    let clean_ident = if ident.contains("%#") {
+                        format!("tmp#${}", idx)
+                    } else {
+                        ident
+                    };
+                    return Some(self.module_env.env.symbol_pool.make(clean_ident.as_str()));
+                }
             }
         }
         Some(self.module_env.env.symbol_pool.make(&format!("$t{}", idx)))

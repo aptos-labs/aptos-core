@@ -1,0 +1,51 @@
+name: Rust Unit Tests
+description: Runs all Rust unit tests
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    # Checkout the repository and setup the rust toolchain
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      with:
+        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+
+    # Check the VM features
+    - name: Check VM features
+      run: cargo test --locked --features check-vm-features -p aptos-node
+      shell: bash
+
+    # Run the rust doc tests
+    - name: Run rust doc tests
+      run: cargo test --locked --doc --workspace --exclude aptos-node-checker
+      shell: bash
+
+    # Install nextest
+    - uses: taiki-e/install-action@v1.5.6
+      with:
+        tool: nextest
+
+    # Run a postgres database
+    - name: Run postgres database
+      run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      shell: bash
+
+    # Run the rust unit tests
+    - name: Run all unit tests
+      run: cargo nextest run --profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast
+      shell: bash
+      env:
+        INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+        RUST_MIN_STACK: 4297152
+        MVP_TEST_ON_CI: true
+        SOLC_EXE: /home/runner/bin/solc
+        Z3_EXE: /home/runner/bin/z3
+        CVC5_EXE: /home/runner/bin/cvc5
+        DOTNET_ROOT: /home/runner/.dotnet
+        BOOGIE_EXE: /home/runner/.dotnet/tools/boogie

@@ -34,7 +34,10 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_storage_interface::mock::MockDbReaderWriter;
-use aptos_types::{on_chain_config::OnChainConfigPayload, PeerId};
+use aptos_types::{
+    on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
+    PeerId,
+};
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use enum_dispatch::enum_dispatch;
 use futures::{
@@ -609,7 +612,10 @@ fn start_node_mempool(
     reconfig_sender
         .push((), ReconfigNotification {
             version: 1,
-            on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
+            on_chain_configs: OnChainConfigPayload::new(
+                1,
+                InMemoryOnChainConfig::new(HashMap::new()),
+            ),
         })
         .unwrap();
 

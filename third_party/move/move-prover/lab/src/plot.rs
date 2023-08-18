@@ -10,7 +10,7 @@ use crate::{
     benchmark::{Benchmark, BenchmarkData},
 };
 use anyhow::Context;
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction::Set, Command};
 use itertools::Itertools;
 use plotters::{
     coord::types::RangedCoordu32,
@@ -37,50 +37,42 @@ pub fn plot_svg(args: &[String]) -> anyhow::Result<()> {
         .arg(
             Arg::new("out")
                 .long("out")
-                .takes_value(true)
+                .num_args(1)
                 .value_name("FILE")
                 .help("file where output will be written too"),
         )
         .arg(
             Arg::new("sort")
                 .long("sort")
+                .short('s')
+                .num_args(0)
+                .action(Set)
                 .help("whether to sort the benchmark data based on the first data file"),
         )
         .arg(
             Arg::new("top")
                 .long("top")
-                .takes_value(true)
+                .num_args(1)
                 .value_name("NUMBER")
-                .validator(is_number)
+                .value_parser(is_number)
                 .help("plot only the top N entries"),
         )
         .arg(
             Arg::new("data-files")
-                .multiple_occurrences(true)
                 .value_name("PATH_TO_BENCHMARK_DATA")
-                .min_values(1)
-                .default_value("")
-                .forbid_empty_values(true)
+                .num_args(1..)
                 .help("the benchmark data files to plot"),
         );
     let matches = cmd_line_parser.try_get_matches_from(args)?;
     let get_vec = |s: &str| -> Vec<String> {
-        match matches.values_of(s) {
-            Some(vs) => vs.map(|v| v.to_string()).collect(),
-            _ => vec![],
-        }
+        let vs = matches.get_many::<String>(s);
+        vs.map_or(vec![], |vs| vs.cloned().collect())
     };
-    let out_file = if matches.is_present("out") {
-        matches.value_of("out").unwrap().to_string()
-    } else {
-        "plot.svg".to_owned()
-    };
-    let sort = matches.is_present("sort");
-    let top = if matches.is_present("top") {
-        Some(matches.value_of("top").unwrap().parse::<usize>()?)
-    } else {
-        None
-    };
+    let out_file = matches
+        .get_one::<String>("out")
+        .map_or("plot.svg".to_owned(), |s| s.clone());
+    let sort = matches.contains_id("sort");
+    let top = matches.get_one::<usize>("top");
     let data_files = get_vec("data-files");
     let mut data = vec![];
     for file in data_files {
@@ -92,7 +84,7 @@ pub fn plot_svg(args: &[String]) -> anyhow::Result<()> {
     }
 
     if let Some(n) = top {
-        data[0].take(n)
+        data[0].take(*n)
     }
 
     println!("plotting to `{}`", out_file);
@@ -103,8 +95,16 @@ pub const LIGHT_GRAY: RGBColor = RGBColor(0xB4, 0xB4, 0xB4);
 pub const MEDIUM_GRAY: RGBColor = RGBColor(0x90, 0x90, 0x90);
 pub const GRAY: RGBColor = RGBColor(0x63, 0x63, 0x63);
 pub const DARK_GRAY: RGBColor = RGBColor(0x49, 0x48, 0x48);
+pub const STONE_GRAY: RGBColor = RGBColor(0x92, 0x8E, 0x85);
 
-pub const GRAY_PALETTE: &[&RGBColor] = &[&LIGHT_GRAY, &MEDIUM_GRAY, &GRAY, &DARK_GRAY, &BLACK];
+pub const GRAY_PALETTE: &[&RGBColor] = &[
+    &LIGHT_GRAY,
+    &MEDIUM_GRAY,
+    &GRAY,
+    &DARK_GRAY,
+    &STONE_GRAY,
+    &BLACK,
+];
 pub const COLOR_PALETTE: &[&RGBColor] = &[&GREEN, &BLUE, &RED, &CYAN, &YELLOW, &MAGENTA];
 
 /// Plot a set of benchmarks to an SVG file.
@@ -169,7 +169,7 @@ pub fn plot_benchmarks_to_file(fname: &str, benchmarks: &[Benchmark]) -> anyhow:
     // We are drawing data points as horizontal bars, therefore x-axis is max_duration
     // and y-axis datapoints.
     let real_x = 1000u32;
-    let real_y = data_points * 60u32;
+    let real_y = data_points * (20u32 + (benchmarks.len() as u32) * 15);
     let root = SVGBackend::new(fname, (real_x, real_y)).into_drawing_area();
 
     let duration_percent = |p: usize| ((max_duration as f64) * (p as f64) / 100f64) as u32;
@@ -183,7 +183,7 @@ pub fn plot_benchmarks_to_file(fname: &str, benchmarks: &[Benchmark]) -> anyhow:
 
     let root = root.apply_coord_spec(Cartesian2d::<RangedCoordu32, RangedCoordu32>::new(
         0..max_duration + duration_percent(10), // + 10% for label
-        0..(data_points + 1) * ((1 + benchmarks.len() as u32) * 10),
+        0..(data_points + 1) * ((2 + benchmarks.len() as u32) * 10),
         (0..real_x as i32, 0..real_y as i32),
     ));
     root.fill(&WHITE)?;
@@ -204,7 +204,7 @@ pub fn plot_benchmarks_to_file(fname: &str, benchmarks: &[Benchmark]) -> anyhow:
     // Draw samples.
     for (sample, variants) in joined {
         root.draw(&label(sample, 0, ycoord, 15.0))?;
-        ycoord += 7;
+        ycoord += 10;
         for (i, (_, result)) in variants.iter().enumerate() {
             let (weight, note, style) = match result {
                 Result::Duration(d) => (
@@ -224,7 +224,7 @@ pub fn plot_benchmarks_to_file(fname: &str, benchmarks: &[Benchmark]) -> anyhow:
             ))?;
             ycoord += 10;
         }
-        ycoord += 3;
+        ycoord += 10;
     }
     Ok(())
 }

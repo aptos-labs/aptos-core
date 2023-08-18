@@ -64,6 +64,7 @@ impl CliCommand<Vec<EntryABI>> for ShowAbi {
                     self.move_options.skip_fetch_latest_git_deps,
                     self.move_options.named_addresses(),
                     self.move_options.bytecode_version,
+                    self.move_options.skip_attribute_checks,
                 )
         };
 

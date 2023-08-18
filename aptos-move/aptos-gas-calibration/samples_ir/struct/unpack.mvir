@@ -1,0 +1,260 @@
+module 0xcafe.Unpack {
+    struct Foo has drop { x: u64, y: u64 }
+    struct Bar has drop { x: u64, y: u64, z: Self.Foo }
+    
+    struct T1 has drop { x: u64 }
+    struct T2 has drop { x: Self.T1 }
+    struct T3 has drop { x: Self.T2 }
+    struct T4 has drop { x: Self.T3 }
+    struct T5 has drop { x: Self.T4 }
+    struct T6 has drop { x: Self.T5 }
+    struct T7 has drop { x: Self.T6 }
+    struct T8 has drop { x: Self.T7 }
+    struct T9 has drop { x: Self.T8 }
+    struct T10 has drop { x: Self.T9 }
+    struct T11 has drop { x: Self.T10 }
+    struct T12 has drop { x: Self.T11 }
+    struct T13 has drop { x: Self.T12 }
+    struct T14 has drop { x: Self.T13 }
+    struct T15 has drop { x: Self.T14 }
+    struct T16 has drop { x: Self.T15 }
+    struct T17 has drop { x: Self.T16 }
+    struct T18 has drop { x: Self.T17 }
+    struct T19 has drop { x: Self.T18 }
+    struct T20 has drop { x: Self.T19 }
+    struct T21 has drop { x: Self.T20 }
+    struct T22 has drop { x: Self.T21 }
+    struct T23 has drop { x: Self.T22 }
+    struct T24 has drop { x: Self.T23 }
+    struct T25 has drop { x: Self.T24 }
+    struct T26 has drop { x: Self.T25 }
+    struct T27 has drop { x: Self.T26 }
+    struct T28 has drop { x: Self.T27 }
+    struct T29 has drop { x: Self.T28 }
+    struct T30 has drop { x: Self.T29 }
+    struct T31 has drop { x: Self.T30 }
+
+    public calibrate_unpack_foo_impl(n: u64) {
+        let i: u64;
+        let x: u64;
+        let y: u64;
+        let t: Self.Foo;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        t = Foo{x:0,y:0};
+        Foo{x,y} = move(t);        
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_unpack_foo_x100() {
+    label b0:
+        Self.calibrate_unpack_foo_impl(10);
+        return;       
+    }
+
+    public entry calibrate_unpack_foo_x500() {
+    label b0:
+        Self.calibrate_unpack_foo_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_unpack_foo_x1000() {
+    label b0:
+        Self.calibrate_unpack_foo_impl(100);
+        return;       
+    }
+
+    public calibrate_unpack_bar_impl(n: u64) {
+        let i: u64;
+        let x: u64;
+        let y: u64;
+        let s: u64;
+        let w: u64;        
+        let z: Self.Foo;
+        let t: Self.Bar;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        t = Bar{x:0,y:0,z:Foo{x:0,y:0}};
+        Bar{x,y,z} = move(t);
+        Foo{s,w} = move(z);
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_unpack_bar_x100() {
+    label b0:
+        Self.calibrate_unpack_bar_impl(10);
+        return;       
+    }
+
+    public entry calibrate_unpack_bar_x500() {
+    label b0:
+        Self.calibrate_unpack_bar_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_unpack_bar_x1000() {
+    label b0:
+        Self.calibrate_unpack_bar_impl(100);
+        return;       
+    }
+
+    public calibrate_unpack_t8_impl(n: u64) {
+        let i: u64;
+        let t8: Self.T8;
+        let x7: Self.T7;
+        let x6: Self.T6;
+        let x5: Self.T5;
+        let x4: Self.T4;
+        let x3: Self.T3;
+        let x2: Self.T2;
+        let x1: Self.T1;
+        let x: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        t8 = T8{x:T7{x:T6{x:T5{x:T4{x:T3{x:T2{x:T1{x:0}}}}}}}};
+        T8{x7} = move(t8);
+        T7{x6} = move(x7);
+        T6{x5} = move(x6);
+        T5{x4} = move(x5);
+        T4{x3} = move(x4);
+        T3{x2} = move(x3);
+        T2{x1} = move(x2);
+        T1{x} = move(x1);
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_unpack_t8_x100() {
+    label b0:
+        Self.calibrate_unpack_t8_impl(10);
+        return;       
+    }
+
+    public entry calibrate_unpack_t8_x500() {
+    label b0:
+        Self.calibrate_unpack_t8_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_unpack_t8_x1000() {
+    label b0:
+        Self.calibrate_unpack_t8_impl(100);
+        return;       
+    }  
+
+    public calibrate_unpack_t32_impl(n: u64) {
+        let i: u64;
+        let t31: Self.T31;
+        let x30: Self.T30;
+        let x29: Self.T29;
+        let x28: Self.T28;
+        let x27: Self.T27;
+        let x26: Self.T26;
+        let x25: Self.T25;
+        let x24: Self.T24;
+        let x23: Self.T23;
+        let x22: Self.T22;
+        let x21: Self.T21;
+        let x20: Self.T20;
+        let x19: Self.T19;
+        let x18: Self.T18;
+        let x17: Self.T17;
+        let x16: Self.T16;
+        let x15: Self.T15;
+        let x14: Self.T14;
+        let x13: Self.T13;
+        let x12: Self.T12;
+        let x11: Self.T11;
+        let x10: Self.T10;
+        let x9: Self.T9;
+        let x8: Self.T8;
+        let x7: Self.T7;
+        let x6: Self.T6;
+        let x5: Self.T5;
+        let x4: Self.T4;
+        let x3: Self.T3;
+        let x2: Self.T2;
+        let x1: Self.T1;
+        let x0: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        t31 = T31{x:T30{x:T29{x:T28{x:T27{x:T26{x:T25{x:T24{x:T23{x:T22{x:T21{x:T20{x:T19{x:T18{x:T17{x:T16{x:T15{x:T14{x:T13{x:T12{x:T11{x:T10{x:T9{x:T8{x:T7{x:T6{x:T5{x:T4{x:T3{x:T2{x:T1{x:0}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}};
+        T31{x30} = move(t31);
+        T30{x29} = move(x30);
+        T29{x28} = move(x29);
+        T28{x27} = move(x28);
+        T27{x26} = move(x27);
+        T26{x25} = move(x26);
+        T25{x24} = move(x25);
+        T24{x23} = move(x24);
+        T23{x22} = move(x23);
+        T22{x21} = move(x22);
+        T21{x20} = move(x21);
+        T20{x19} = move(x20);
+        T19{x18} = move(x19);
+        T18{x17} = move(x18);
+        T17{x16} = move(x17);
+        T16{x15} = move(x16);
+        T15{x14} = move(x15);
+        T14{x13} = move(x14);
+        T13{x12} = move(x13);
+        T12{x11} = move(x12);
+        T11{x10} = move(x11);
+        T10{x9} = move(x10);
+        T9{x8} = move(x9);
+        T8{x7} = move(x8);
+        T7{x6} = move(x7);
+        T6{x5} = move(x6);
+        T5{x4} = move(x5);
+        T4{x3} = move(x4);
+        T3{x2} = move(x3);
+        T2{x1} = move(x2);
+        T1{x0} = move(x1);
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_unpack_t32_x100() {
+    label b0:
+        Self.calibrate_unpack_t32_impl(10);
+        return;       
+    }
+
+    public entry calibrate_unpack_t32_x500() {
+    label b0:
+        Self.calibrate_unpack_t32_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_unpack_t32_x1000() {
+    label b0:
+        Self.calibrate_unpack_t32_impl(100);
+        return;       
+    }            
+}

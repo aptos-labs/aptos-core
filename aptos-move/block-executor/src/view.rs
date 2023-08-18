@@ -292,10 +292,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
         self.base_view.id()
     }
 
-    fn is_genesis(&self) -> bool {
-        self.base_view.is_genesis()
-    }
-
     fn get_usage(&self) -> Result<StateStorageUsage> {
         self.base_view.get_usage()
     }

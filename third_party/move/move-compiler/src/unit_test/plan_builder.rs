@@ -10,7 +10,7 @@ use crate::{
     },
     parser::ast::ConstantName,
     shared::{
-        known_attributes::{KnownAttribute, TestingAttribute},
+        known_attributes::{AttributeKind, KnownAttribute, TestingAttribute},
         unique_map::UniqueMap,
         CompilationEnv, Identifier, NumericalAddress,
     },

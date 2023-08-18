@@ -282,7 +282,7 @@ public fun mint<CoinType>(
 }
 ```
 
-`ManagedCoin` makes this easier by providing a entry function `managed_coin::mint`.
+`ManagedCoin` makes this easier by providing an entry function `managed_coin::mint`.
 
 ---
 

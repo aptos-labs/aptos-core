@@ -3,6 +3,7 @@
 
 use crate::{KnownAttribute, RuntimeModuleMetadataV1};
 use move_binary_format::file_format::{Ability, AbilitySet, Visibility};
+use move_compiler::shared::known_attributes;
 use move_core_types::{
     account_address::AccountAddress,
     errmap::{ErrorDescription, ErrorMapping},
@@ -18,17 +19,47 @@ use move_model::{
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
 };
-use std::{collections::BTreeMap, rc::Rc, str::FromStr};
+use once_cell::sync::Lazy;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    rc::Rc,
+    str::FromStr,
+};
 use thiserror::Error;
 
 const INIT_MODULE_FUN: &str = "init_module";
-const LEGAC_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
+const LEGACY_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
 const ERROR_PREFIX: &str = "E";
 const RESOURCE_GROUP: &str = "resource_group";
 const RESOURCE_GROUP_MEMBER: &str = "resource_group_member";
 const RESOURCE_GROUP_NAME: &str = "group";
 const RESOURCE_GROUP_SCOPE: &str = "scope";
 const VIEW_FUN_ATTRIBUTE: &str = "view";
+
+// top-level attribute names, only.
+pub fn get_all_attribute_names() -> &'static BTreeSet<String> {
+    const ALL_ATTRIBUTE_NAMES: [&str; 4] = [
+        LEGACY_ENTRY_FUN_ATTRIBUTE,
+        RESOURCE_GROUP,
+        RESOURCE_GROUP_MEMBER,
+        VIEW_FUN_ATTRIBUTE,
+    ];
+
+    fn extended_attribute_names() -> BTreeSet<String> {
+        ALL_ATTRIBUTE_NAMES
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect::<BTreeSet<String>>()
+    }
+
+    static KNOWN_ATTRIBUTES_SET: Lazy<BTreeSet<String>> = Lazy::new(|| {
+        use known_attributes::AttributeKind;
+        let mut attributes = extended_attribute_names();
+        known_attributes::KnownAttribute::add_attribute_names(&mut attributes);
+        attributes
+    });
+    &KNOWN_ATTRIBUTES_SET
+}
 
 /// Run the extended context checker on target modules in the environment and returns a map
 /// from module to extended runtime metadata. Any errors during context checking are reported to
@@ -118,7 +149,7 @@ impl<'a> ExtendedChecker<'a> {
             if !fun.is_entry() {
                 continue;
             }
-            if self.has_attribute(fun, LEGAC_ENTRY_FUN_ATTRIBUTE) {
+            if self.has_attribute(fun, LEGACY_ENTRY_FUN_ATTRIBUTE) {
                 // Skip checking for legacy entries
                 continue;
             }

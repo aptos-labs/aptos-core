@@ -34,8 +34,16 @@
   "panels": [
     {
       "collapsed": false,
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 3305,
+      "panels": [],
+      "title": "Resource usage",
+      "type": "row"
+    },
+    {
+      "collapsed": false,
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 1 },
       "id": 284,
       "panels": [],
       "targets": [{ "datasource": { "type": "prometheus", "uid": "${Datasource}" }, "refId": "A" }],
@@ -55,7 +63,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 7, "w": 17, "x": 0, "y": 1 },
+      "gridPos": { "h": 7, "w": 17, "x": 0, "y": 2 },
       "id": 255,
       "options": {
         "displayMode": "lcd",
@@ -66,7 +74,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "10.0.3-cloud.4.aed62623",
+      "pluginVersion": "10.2.0-59422pre",
       "repeatDirection": "h",
       "targets": [
         {
@@ -81,7 +89,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "last_over_time(aptos_db_backup_coordinator_heartbeat_timestamp_s{cluster=~ \".*testnet.*\"}[7d]) * 1000",
+          "expr": "last_over_time(aptos_db_backup_coordinator_heartbeat_timestamp_s{cluster=~\"$cluster\", chain_name=\"$chain_name\"}[7d]) * 1000",
           "interval": "",
           "legendFormat": " {{cluster}} {{kubernetes_pod_name}}",
           "range": true,
@@ -99,12 +107,12 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
           "unit": "none"
         },
         "overrides": []
       },
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 8 },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 9 },
       "id": 3299,
       "options": {
         "displayMode": "lcd",
@@ -115,7 +123,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+      "pluginVersion": "10.2.0-59422pre",
       "repeatDirection": "h",
       "targets": [
         {
@@ -155,6 +163,7 @@
             "fillOpacity": 0,
             "gradientMode": "none",
             "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -166,7 +175,13 @@
           },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "none"
         },
         "overrides": [
@@ -176,7 +191,7 @@
           }
         ]
       },
-      "gridPos": { "h": 7, "w": 9, "x": 8, "y": 8 },
+      "gridPos": { "h": 7, "w": 9, "x": 8, "y": 9 },
       "id": 741,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -234,12 +249,12 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
           "unit": "none"
         },
         "overrides": []
       },
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 15 },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 16 },
       "id": 3298,
       "options": {
         "displayMode": "lcd",
@@ -250,7 +265,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+      "pluginVersion": "10.2.0-59422pre",
       "repeatDirection": "h",
       "targets": [
         {
@@ -291,6 +306,7 @@
             "fillOpacity": 0,
             "gradientMode": "none",
             "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -302,7 +318,7 @@
           },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
           "unit": "none"
         },
         "overrides": [
@@ -312,7 +328,7 @@
           }
         ]
       },
-      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 15 },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 16 },
       "id": 746,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -374,7 +390,7 @@
       "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 15 },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 16 },
       "hiddenSeries": false,
       "id": 659,
       "legend": {
@@ -392,7 +408,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+      "pluginVersion": "10.2.0-59422pre",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -432,12 +448,12 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
           "unit": "none"
         },
         "overrides": []
       },
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 22 },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 23 },
       "id": 3300,
       "options": {
         "displayMode": "lcd",
@@ -448,7 +464,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+      "pluginVersion": "10.2.0-59422pre",
       "repeatDirection": "h",
       "targets": [
         {
@@ -489,6 +505,7 @@
             "fillOpacity": 0,
             "gradientMode": "none",
             "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -500,7 +517,7 @@
           },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
           "unit": "none"
         },
         "overrides": [
@@ -510,7 +527,7 @@
           }
         ]
       },
-      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 22 },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 23 },
       "id": 660,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -581,7 +598,7 @@
       "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 22 },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 23 },
       "hiddenSeries": false,
       "id": 658,
       "legend": {
@@ -599,7 +616,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+      "pluginVersion": "10.2.0-59422pre",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -647,6 +664,7 @@
             "fillOpacity": 0,
             "gradientMode": "none",
             "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -658,7 +676,13 @@
           },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "none"
         },
         "overrides": [
@@ -668,7 +692,7 @@
           }
         ]
       },
-      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 29 },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 30 },
       "id": 744,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -702,7 +726,7 @@
     {
       "collapsed": true,
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 },
       "id": 3289,
       "panels": [
         {
@@ -718,7 +742,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 37 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 2 },
           "id": 3302,
           "options": {
             "displayMode": "lcd",
@@ -729,7 +753,7 @@
             "showUnfilled": true,
             "valueMode": "color"
           },
-          "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+          "pluginVersion": "10.1.0-cloud.3.2a3062e8",
           "repeatDirection": "h",
           "targets": [
             {
@@ -763,7 +787,7 @@
           "description": "Epoch of the epoch ending LedgerInfo verified",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 37 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 2 },
           "hiddenSeries": false,
           "id": 3292,
           "legend": {
@@ -780,7 +804,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+          "pluginVersion": "10.1.0-cloud.3.2a3062e8",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -820,7 +844,7 @@
           "description": "Version of the epoch ending LedgerInfo verified",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 37 },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 2 },
           "hiddenSeries": false,
           "id": 3294,
           "legend": {
@@ -837,7 +861,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+          "pluginVersion": "10.1.0-cloud.3.2a3062e8",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -881,7 +905,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 45 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
           "id": 3301,
           "options": {
             "displayMode": "lcd",
@@ -892,7 +916,7 @@
             "showUnfilled": true,
             "valueMode": "color"
           },
-          "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+          "pluginVersion": "10.1.0-cloud.3.2a3062e8",
           "repeatDirection": "h",
           "targets": [
             {
@@ -926,7 +950,7 @@
           "description": "Version of the transaction verified",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 45 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
           "hiddenSeries": false,
           "id": 3293,
           "legend": {
@@ -943,7 +967,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+          "pluginVersion": "10.1.0-cloud.3.2a3062e8",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -983,7 +1007,7 @@
           "description": "The speed of transaction verification.",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 45 },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
           "hiddenSeries": false,
           "id": 3296,
           "legend": {
@@ -1000,7 +1024,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+          "pluginVersion": "10.1.0-cloud.3.2a3062e8",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1044,7 +1068,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 53 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 },
           "id": 3303,
           "options": {
             "displayMode": "lcd",
@@ -1055,7 +1079,7 @@
             "showUnfilled": true,
             "valueMode": "color"
           },
-          "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+          "pluginVersion": "10.1.0-cloud.3.2a3062e8",
           "repeatDirection": "h",
           "targets": [
             {
@@ -1089,7 +1113,7 @@
           "description": "Version of the state snapshot being verified",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 53 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 },
           "hiddenSeries": false,
           "id": 3295,
           "legend": {
@@ -1106,7 +1130,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+          "pluginVersion": "10.1.0-cloud.3.2a3062e8",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1153,6 +1177,7 @@
                 "fillOpacity": 0,
                 "gradientMode": "none",
                 "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "insertNulls": false,
                 "lineInterpolation": "linear",
                 "lineWidth": 1,
                 "pointSize": 5,
@@ -1180,7 +1205,7 @@
               }
             ]
           },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 61 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 26 },
           "id": 3287,
           "options": {
             "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": false },
@@ -1227,7 +1252,7 @@
     {
       "collapsed": true,
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
       "id": 240,
       "panels": [
         {
@@ -1352,7 +1377,7 @@
     {
       "collapsed": true,
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 },
       "id": 1101,
       "panels": [
         {
@@ -1847,344 +1872,345 @@
       "type": "row"
     },
     {
-      "collapsed": false,
+      "collapsed": true,
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
       "id": 1084,
-      "panels": [],
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "Right edge of the graph shows latest state of the restore job and when it entered such state.",
+          "fill": 0,
+          "fillGradient": 0,
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 40 },
+          "hiddenSeries": false,
+          "id": 3290,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "options": { "alertThreshold": true },
+          "percentage": false,
+          "pluginVersion": "10.1.0-cloud.3.2a3062e8",
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_db_restore_coordinator_start_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(aptos_db_restore_epoch_ending_epoch[1m]) > 0 or rate(aptos_db_restore_state_snapshot_leaf_index[1m]) > 0 or rate(aptos_db_restore_transaction_save_version[1m]) > 0 or rate(aptos_db_restore_transaction_replay_version[1m]) > 0) == bool 1",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}} running since",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_db_restore_coordinator_succeed_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}} succeeded since",
+              "refId": "B"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_db_restore_coordinator_fail_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s",
+              "hide": false,
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}} failed since",
+              "refId": "C"
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Job State",
+          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
+          "type": "graph",
+          "xaxis": { "mode": "time", "show": true, "values": [] },
+          "yaxes": [
+            { "format": "dateTimeAsLocal", "logBase": 1, "show": true },
+            { "format": "short", "logBase": 1, "show": true }
+          ],
+          "yaxis": { "align": false }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "save: Version of txn being saved without replaying\nreplay: Version of txn being replayed\ntarget: When \"replay\" hits this version, the restore is done.",
+          "fill": 0,
+          "fillGradient": 0,
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 40 },
+          "hiddenSeries": false,
+          "id": 1108,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "options": { "alertThreshold": true },
+          "percentage": false,
+          "pluginVersion": "10.1.0-cloud.3.2a3062e8",
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_db_restore_transaction_save_version and irate(aptos_db_restore_transaction_save_version[1m]) > 0",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}} saved",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_db_restore_transaction_replay_version and irate(aptos_db_restore_transaction_replay_version[1m]) > 0",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}}  replayed",
+              "refId": "B"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_db_restore_coordinator_target_version and (irate(aptos_db_restore_transaction_save_version[1m]) > 0 or irate(aptos_db_restore_transaction_replay_version[1m]) > 0)",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}} target",
+              "refId": "C"
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Transaction Restore Progress",
+          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
+          "type": "graph",
+          "xaxis": { "mode": "time", "show": true, "values": [] },
+          "yaxes": [
+            { "format": "none", "logBase": 1, "show": true },
+            { "format": "none", "logBase": 1, "show": true }
+          ],
+          "yaxis": { "align": true }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "",
+          "fill": 0,
+          "fillGradient": 0,
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 40 },
+          "hiddenSeries": false,
+          "id": 1109,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "options": { "alertThreshold": true },
+          "percentage": false,
+          "pluginVersion": "10.1.0-cloud.3.2a3062e8",
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "(aptos_db_restore_transaction_save_version and irate(aptos_db_restore_transaction_save_version[1m]) > 0) / aptos_db_restore_coordinator_target_version",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}} saved",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "(aptos_db_restore_transaction_replay_version and irate(aptos_db_restore_transaction_replay_version[1m]) > 0) / aptos_db_restore_coordinator_target_version",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}} replayed",
+              "refId": "B"
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Transaction Restore Progress %",
+          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
+          "type": "graph",
+          "xaxis": { "mode": "time", "show": true, "values": [] },
+          "yaxes": [
+            { "format": "percentunit", "logBase": 1, "max": "1.1", "min": "0", "show": true },
+            { "format": "percentunit", "logBase": 1, "show": true }
+          ],
+          "yaxis": { "align": true }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "save: Version of txn being saved without replaying\nreplay: Version of txn being replayed\ntarget: When \"replay\" hits this version, the restore is done.",
+          "fill": 0,
+          "fillGradient": 0,
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 48 },
+          "hiddenSeries": false,
+          "id": 3304,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "options": { "alertThreshold": true },
+          "percentage": false,
+          "pluginVersion": "10.1.0-cloud.3.2a3062e8",
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "expr": "aptos_db_restore_state_snapshot_leaf_index and irate(aptos_db_restore_state_snapshot_leaf_index[1m])",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}} saved",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "expr": "aptos_db_restore_state_snapshot_target_leaf_index and irate(aptos_db_restore_state_snapshot_leaf_index[1m])",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}}  target",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "State Snapshot Restore Progress",
+          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
+          "type": "graph",
+          "xaxis": { "mode": "time", "show": true, "values": [] },
+          "yaxes": [
+            { "format": "none", "logBase": 1, "show": true },
+            { "format": "none", "logBase": 1, "show": true }
+          ],
+          "yaxis": { "align": true }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "\"Committed\" version is the version on the latest ledger info saved.\n\n\"Synced\" version is the version on the latest transaction saved, it's only different when state-sync is working to catch up with peers.\n",
+          "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
+          "fill": 0,
+          "fillGradient": 0,
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 48 },
+          "hiddenSeries": false,
+          "id": 1086,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "options": { "alertThreshold": true },
+          "percentage": false,
+          "pluginVersion": "10.1.0-cloud.3.2a3062e8",
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"validator|fullnode\"}",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} synced",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "expr": "aptos_storage_ledger_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"validator|fullnode\"}",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} committed",
+              "refId": "B"
+            }
+          ],
+          "thresholds": [],
+          "timeRegions": [],
+          "title": "Committed and Synced Versions",
+          "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
+          "type": "graph",
+          "xaxis": { "mode": "time", "show": true, "values": [] },
+          "yaxes": [
+            { "format": "none", "logBase": 1, "show": true },
+            { "format": "short", "logBase": 1, "show": true }
+          ],
+          "yaxis": { "align": false }
+        }
+      ],
       "targets": [{ "datasource": { "type": "prometheus", "uid": "${Datasource}" }, "refId": "A" }],
       "title": "Restore Status Monitoring",
       "type": "row"
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "description": "Right edge of the graph shows latest state of the restore job and when it entered such state.",
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 40 },
-      "hiddenSeries": false,
-      "id": 3290,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "options": { "alertThreshold": true },
-      "percentage": false,
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_db_restore_coordinator_start_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(aptos_db_restore_epoch_ending_epoch[1m]) > 0 or rate(aptos_db_restore_state_snapshot_leaf_index[1m]) > 0 or rate(aptos_db_restore_transaction_save_version[1m]) > 0 or rate(aptos_db_restore_transaction_replay_version[1m]) > 0) == bool 1",
-          "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}} running since",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_db_restore_coordinator_succeed_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s",
-          "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}} succeeded since",
-          "refId": "B"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_db_restore_coordinator_fail_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}} failed since",
-          "refId": "C"
-        }
-      ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Job State",
-      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-      "type": "graph",
-      "xaxis": { "mode": "time", "show": true, "values": [] },
-      "yaxes": [
-        { "format": "dateTimeAsLocal", "logBase": 1, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "yaxis": { "align": false }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "description": "save: Version of txn being saved without replaying\nreplay: Version of txn being replayed\ntarget: When \"replay\" hits this version, the restore is done.",
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 40 },
-      "hiddenSeries": false,
-      "id": 1108,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "options": { "alertThreshold": true },
-      "percentage": false,
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_db_restore_transaction_save_version and irate(aptos_db_restore_transaction_save_version[1m]) > 0",
-          "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}} saved",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_db_restore_transaction_replay_version and irate(aptos_db_restore_transaction_replay_version[1m]) > 0",
-          "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}  replayed",
-          "refId": "B"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_db_restore_coordinator_target_version and (irate(aptos_db_restore_transaction_save_version[1m]) > 0 or irate(aptos_db_restore_transaction_replay_version[1m]) > 0)",
-          "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}} target",
-          "refId": "C"
-        }
-      ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Transaction Restore Progress",
-      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-      "type": "graph",
-      "xaxis": { "mode": "time", "show": true, "values": [] },
-      "yaxes": [
-        { "format": "none", "logBase": 1, "show": true },
-        { "format": "none", "logBase": 1, "show": true }
-      ],
-      "yaxis": { "align": true }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "description": "",
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 40 },
-      "hiddenSeries": false,
-      "id": 1109,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "options": { "alertThreshold": true },
-      "percentage": false,
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "(aptos_db_restore_transaction_save_version and irate(aptos_db_restore_transaction_save_version[1m]) > 0) / aptos_db_restore_coordinator_target_version",
-          "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}} saved",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "(aptos_db_restore_transaction_replay_version and irate(aptos_db_restore_transaction_replay_version[1m]) > 0) / aptos_db_restore_coordinator_target_version",
-          "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}} replayed",
-          "refId": "B"
-        }
-      ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Transaction Restore Progress %",
-      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-      "type": "graph",
-      "xaxis": { "mode": "time", "show": true, "values": [] },
-      "yaxes": [
-        { "format": "percentunit", "logBase": 1, "max": "1.1", "min": "0", "show": true },
-        { "format": "percentunit", "logBase": 1, "show": true }
-      ],
-      "yaxis": { "align": true }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "description": "save: Version of txn being saved without replaying\nreplay: Version of txn being replayed\ntarget: When \"replay\" hits this version, the restore is done.",
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 48 },
-      "hiddenSeries": false,
-      "id": 3304,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "options": { "alertThreshold": true },
-      "percentage": false,
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editorMode": "code",
-          "expr": "aptos_db_restore_state_snapshot_leaf_index and irate(aptos_db_restore_state_snapshot_leaf_index[1m])",
-          "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}} saved",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "editorMode": "code",
-          "expr": "aptos_db_restore_state_snapshot_target_leaf_index and irate(aptos_db_restore_state_snapshot_leaf_index[1m])",
-          "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}  target",
-          "range": true,
-          "refId": "B"
-        }
-      ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "State Snapshot Restore Progress",
-      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-      "type": "graph",
-      "xaxis": { "mode": "time", "show": true, "values": [] },
-      "yaxes": [
-        { "format": "none", "logBase": 1, "show": true },
-        { "format": "none", "logBase": 1, "show": true }
-      ],
-      "yaxis": { "align": true }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "description": "\"Committed\" version is the version on the latest ledger info saved.\n\n\"Synced\" version is the version on the latest transaction saved, it's only different when state-sync is working to catch up with peers.\n",
-      "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 48 },
-      "hiddenSeries": false,
-      "id": 1086,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "options": { "alertThreshold": true },
-      "percentage": false,
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"validator|fullnode\"}",
-          "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} synced",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "aptos_storage_ledger_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"validator|fullnode\"}",
-          "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} committed",
-          "refId": "B"
-        }
-      ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Committed and Synced Versions",
-      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-      "type": "graph",
-      "xaxis": { "mode": "time", "show": true, "values": [] },
-      "yaxes": [
-        { "format": "none", "logBase": 1, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "yaxis": { "align": false }
     }
   ],
   "refresh": "10s",
@@ -2377,6 +2403,6 @@
   "timezone": "",
   "title": "storage-backup-and-restore",
   "uid": "9oXpx4n4z",
-  "version": 20,
+  "version": 24,
   "weekStart": ""
 }

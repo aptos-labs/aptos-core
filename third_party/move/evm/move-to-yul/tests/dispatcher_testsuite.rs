@@ -5,8 +5,13 @@
 use anyhow::Result;
 use evm::{backend::MemoryVicinity, ExitReason};
 use evm_exec_utils::{compile, exec::Executor};
-use move_compiler::shared::{NumericalAddress, PackagePaths};
-use move_model::{options::ModelBuilderOptions, run_model_builder_with_options};
+use move_compiler::{
+    attr_derivation::get_known_attributes_for_flavor,
+    shared::{Flags, NumericalAddress, PackagePaths},
+};
+use move_model::{
+    options::ModelBuilderOptions, run_model_builder_with_options_and_compilation_flags,
+};
 use move_stdlib::move_stdlib_named_addresses;
 use move_to_yul::{generator::Generator, options::Options};
 use primitive_types::{H160, U256};
@@ -60,7 +65,9 @@ fn compile_yul_to_bytecode_bytes(filename: &str) -> Result<Vec<u8>> {
         "Async".to_string(),
         NumericalAddress::parse_str("0x1").unwrap(),
     );
-    let env = run_model_builder_with_options(
+    let flags = Flags::verification().set_flavor("evm");
+    let known_attributes = get_known_attributes_for_flavor(&flags);
+    let env = run_model_builder_with_options_and_compilation_flags(
         vec![PackagePaths {
             name: None,
             paths: vec![contract_path(filename).to_string_lossy().to_string()],
@@ -72,12 +79,14 @@ fn compile_yul_to_bytecode_bytes(filename: &str) -> Result<Vec<u8>> {
             named_address_map,
         }],
         ModelBuilderOptions::default(),
+        flags,
+        &known_attributes,
     )?;
     let options = Options::default();
     let (_, out, _) = Generator::run(&options, &env)
         .pop()
         .expect("not contract in test case");
-    let (bc, _) = compile::solc_yul(&out, false)?;
+    let (bc, _) = compile::solc_yul(&out, true)?;
     Ok(bc)
 }
 

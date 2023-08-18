@@ -16,7 +16,7 @@ use crate::{
     proptest_types::types::{MockOutput, MockTransaction, STORAGE_AGGREGATOR_VALUE},
 };
 use aptos_aggregator::{delta_change_set::serialize, transaction::AggregatorValue};
-use aptos_types::write_set::TransactionWrite;
+use aptos_types::{contract_event::ReadWriteEvent, write_set::TransactionWrite};
 use claims::{assert_matches, assert_none, assert_some_eq};
 use itertools::izip;
 use std::{collections::HashMap, fmt::Debug, hash::Hash, result::Result, sync::atomic::Ordering};
@@ -87,8 +87,8 @@ pub(crate) struct BaselineOutput<V> {
 impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
     /// Must be invoked after parallel execution to have incarnation information set and
     /// work with dynamic read/writes.
-    pub(crate) fn generate<K: Hash + Clone + Eq>(
-        txns: &[MockTransaction<K, V>],
+    pub(crate) fn generate<K: Hash + Clone + Eq, E: Debug + Clone + ReadWriteEvent>(
+        txns: &[MockTransaction<K, V, E>],
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {
         let mut current_world = HashMap::<K, BaselineValue<_>>::new();
@@ -207,9 +207,9 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
 
     // Used for testing, hence the function asserts the correctness conditions within
     // itself to be easily traceable in case of an error.
-    pub(crate) fn assert_output<K: Debug>(
+    pub(crate) fn assert_output<K: Debug, E: Debug>(
         &self,
-        results: &BlockExecutorResult<Vec<MockOutput<K, V>>, usize>,
+        results: &BlockExecutorResult<Vec<MockOutput<K, V, E>>, usize>,
     ) {
         match results {
             Ok(results) => {

@@ -7,7 +7,7 @@ name: "fullnode-intelligent-mainnet-main"
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 4 * * *" # Once a day, at 04:30 (UTC)
+    - cron: "30 4 */3 * *" # Once every three days, at 04:30 (UTC)
 
 permissions:
   contents: read

@@ -104,6 +104,12 @@ impl CliCommand<RotateSummary> for RotateKey {
 
         let (current_private_key, sender_address) = self.txn_options.get_key_and_address()?;
 
+        if new_private_key == current_private_key {
+            return Err(CliError::CommandArgumentError(
+                "New private key cannot be the same as the current private key".to_string(),
+            ));
+        }
+
         // Get sequence number for account
         let sequence_number = self.txn_options.sequence_number(sender_address).await?;
         let auth_key = self.txn_options.auth_key(sender_address).await?;

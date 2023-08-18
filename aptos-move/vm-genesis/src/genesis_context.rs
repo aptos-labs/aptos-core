@@ -46,10 +46,6 @@ impl TStateView for GenesisStateView {
             .map(StateValue::new_legacy))
     }
 
-    fn is_genesis(&self) -> bool {
-        true
-    }
-
     fn get_usage(&self) -> Result<StateStorageUsage> {
         Ok(StateStorageUsage::zero())
     }

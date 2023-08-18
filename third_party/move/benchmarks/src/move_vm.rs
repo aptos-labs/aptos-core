@@ -40,6 +40,7 @@ fn compile_modules() -> Vec<CompiledModule> {
     let (_files, compiled_units) = Compiler::from_files(
         src_files,
         vec![],
+        Flags::empty().set_skip_attribute_checks(false),
         move_stdlib::move_stdlib_named_addresses(),
     )
     .build_and_report()

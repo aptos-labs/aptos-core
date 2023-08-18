@@ -32,19 +32,6 @@ async fn test_get_account_resources_by_address_0x0() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_account_resources_by_invalid_address_missing_0x_prefix() {
-    let mut context = new_test_context(current_function_name!());
-    let invalid_addresses = vec!["1", "0xzz", "01"];
-    for invalid_address in &invalid_addresses {
-        let resp = context
-            .expect_status_code(400)
-            .get(&account_resources(invalid_address))
-            .await;
-        context.check_golden_output(resp);
-    }
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_resources_by_valid_account_address() {
     let context = new_test_context(current_function_name!());
     let addresses = vec!["0x1", "0x00000000000000000000000000000001"];

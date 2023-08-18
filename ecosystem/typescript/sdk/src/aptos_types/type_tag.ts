@@ -421,7 +421,7 @@ export class TypeTagParser {
       return new TypeTagVector(res);
     }
     if (tokenVal === "string") {
-      return stringStructTag;
+      return new TypeTagStruct(stringStructTag);
     }
     if (tokenTy === "IDENT" && (tokenVal.startsWith("0x") || tokenVal.startsWith("0X"))) {
       const address = AccountAddress.fromHex(tokenVal);

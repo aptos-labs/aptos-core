@@ -2,35 +2,61 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::sharded_block_partitioner::ShardedBlockPartitioner;
+use aptos_types::block_executor::partitioner::RoundId;
+
 pub mod sharded_block_partitioner;
 pub mod test_utils;
 
-use aptos_types::transaction::Transaction;
-
-pub trait BlockPartitioner: Send + Sync {
-    fn partition(&self, transactions: Vec<Transaction>, num_shards: usize)
-        -> Vec<Vec<Transaction>>;
+pub struct BlockPartitionerConfig {
+    num_shards: usize,
+    max_partitioning_rounds: RoundId,
+    cross_shard_dep_avoid_threshold: f32,
+    partition_last_round: bool,
 }
 
-/// An implementation of partitioner that splits the transactions into equal-sized chunks.
-pub struct UniformPartitioner {}
-
-impl BlockPartitioner for UniformPartitioner {
-    fn partition(
-        &self,
-        transactions: Vec<Transaction>,
-        num_shards: usize,
-    ) -> Vec<Vec<Transaction>> {
-        let total_txns = transactions.len();
-        if total_txns == 0 {
-            return vec![];
+impl BlockPartitionerConfig {
+    pub fn new() -> Self {
+        BlockPartitionerConfig {
+            num_shards: 0,
+            max_partitioning_rounds: 3,
+            cross_shard_dep_avoid_threshold: 0.9,
+            partition_last_round: false,
         }
-        let txns_per_shard = (total_txns as f64 / num_shards as f64).ceil() as usize;
+    }
 
-        let mut result = Vec::new();
-        for chunk in transactions.chunks(txns_per_shard) {
-            result.push(chunk.to_vec());
-        }
-        result
+    pub fn num_shards(mut self, num_shards: usize) -> Self {
+        self.num_shards = num_shards;
+        self
+    }
+
+    pub fn max_partitioning_rounds(mut self, max_partitioning_rounds: RoundId) -> Self {
+        self.max_partitioning_rounds = max_partitioning_rounds;
+        self
+    }
+
+    pub fn cross_shard_dep_avoid_threshold(mut self, threshold: f32) -> Self {
+        self.cross_shard_dep_avoid_threshold = threshold;
+        self
+    }
+
+    pub fn partition_last_round(mut self, partition_last_round: bool) -> Self {
+        self.partition_last_round = partition_last_round;
+        self
+    }
+
+    pub fn build(self) -> ShardedBlockPartitioner {
+        ShardedBlockPartitioner::new(
+            self.num_shards,
+            self.max_partitioning_rounds,
+            self.cross_shard_dep_avoid_threshold,
+            self.partition_last_round,
+        )
+    }
+}
+
+impl Default for BlockPartitionerConfig {
+    fn default() -> Self {
+        Self::new()
     }
 }

@@ -49,7 +49,7 @@ async fn test_invalid_entry_function_argument_address_string() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_missing_entry_function_arguments() {
     let mut req = signing_message_request();
-    req["payload"]["arguments"] = json!(["0"]);
+    req["payload"]["arguments"] = json!([]);
 
     response_error_msg(req, current_function_name!()).await;
 }

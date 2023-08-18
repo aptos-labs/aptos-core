@@ -4,6 +4,7 @@
 
 use super::aliases::{AliasMapBuilder, OldAliasMap};
 use crate::{
+    command_line::SKIP_ATTRIBUTE_CHECKS,
     diag,
     diagnostics::Diagnostic,
     expansion::{
@@ -14,16 +15,23 @@ use crate::{
     parser::ast::{
         self as P, Ability, ConstantName, Field, FunctionName, ModuleName, StructName, Var,
     },
-    shared::{known_attributes::AttributePosition, unique_map::UniqueMap, *},
+    shared::{
+        known_attributes::{AttributeKind, AttributePosition, KnownAttribute},
+        parse_u128, parse_u64, parse_u8,
+        unique_map::UniqueMap,
+        CompilationEnv, Identifier, Name, NamedAddressMap, NamedAddressMaps, NumericalAddress,
+    },
     FullyCompiledProgram,
 };
 use move_command_line_common::parser::{parse_u16, parse_u256, parse_u32};
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
+use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     iter::IntoIterator,
 };
+use str;
 
 //**************************************************************************************************
 // Context
@@ -39,6 +47,7 @@ struct Context<'env, 'map> {
     in_spec_context: bool,
     exp_specs: BTreeMap<SpecId, E::SpecBlock>,
     env: &'env mut CompilationEnv,
+    in_aptos_stdlib: bool, // TODO(https://github.com/aptos-labs/aptos-core/issues/9410) remove after bugfix propagates.
 }
 impl<'env, 'map> Context<'env, 'map> {
     fn new(
@@ -53,6 +62,7 @@ impl<'env, 'map> Context<'env, 'map> {
             aliases: AliasMap::new(),
             is_source_definition: false,
             in_spec_context: false,
+            in_aptos_stdlib: false,
             exp_specs: BTreeMap::new(),
         }
     }
@@ -384,6 +394,32 @@ fn set_sender_address(
     })
 }
 
+// This is a hack to recognize APTOS StdLib to avoid warnings on some old errors.
+// This will be removed after library attributes are cleaned up.
+// (See https://github.com/aptos-labs/aptos-core/issues/9410)
+fn module_is_in_aptos_stdlib(module_address: Option<Spanned<Address>>) -> bool {
+    const APTOS_STDLIB_NAME: &str = "aptos_std";
+    static APTOS_STDLIB_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
+        Lazy::new(|| NumericalAddress::parse_str("0x1").unwrap());
+    match &module_address {
+        Some(spanned_address) => {
+            let address = spanned_address.value;
+            match address {
+                Address::Numerical(optional_name, spanned_numerical_address) => match optional_name
+                {
+                    Some(spanned_symbol) => {
+                        (&spanned_symbol.value as &str) == APTOS_STDLIB_NAME
+                            && (spanned_numerical_address.value == *APTOS_STDLIB_NUMERICAL_ADDRESS)
+                    },
+                    None => false,
+                },
+                Address::NamedUnassigned(_) => false,
+            }
+        },
+        None => false,
+    }
+}
+
 fn module_(
     context: &mut Context,
     package_name: Option<Symbol>,
@@ -398,7 +434,9 @@ fn module_(
         name,
         members,
     } = mdef;
+    context.in_aptos_stdlib = module_is_in_aptos_stdlib(module_address);
     let attributes = flatten_attributes(context, AttributePosition::Module, attributes);
+
     assert!(context.address.is_none());
     assert!(address.is_none());
     set_sender_address(context, &name, module_address);
@@ -574,12 +612,40 @@ fn unique_attributes(
             | E::Attribute_::Assigned(n, _)
             | E::Attribute_::Parameterized(n, _) => *n,
         };
-        let name_ = match known_attributes::KnownAttribute::resolve(sym) {
-            None => E::AttributeName_::Unknown(sym),
+        let name_ = match KnownAttribute::resolve(sym) {
+            None => {
+                let flags = &context.env.flags();
+                if !flags.skip_attribute_checks() {
+                    let known_attributes = &context.env.get_known_attributes();
+                    // TODO(See https://github.com/aptos-labs/aptos-core/issues/9410) remove after bugfix propagates.
+                    if !is_nested && !known_attributes.contains(sym.as_str()) {
+                        if !context.in_aptos_stdlib {
+                            let msg = format!("Attribute name '{}' is unknown (use --{} CLI option to ignore); known attributes are '{:?}'.",
+					      sym.as_str(),
+					      SKIP_ATTRIBUTE_CHECKS, known_attributes);
+                            context
+                                .env
+                                .add_diag(diag!(Declarations::UnknownAttribute, (nloc, msg)));
+                        }
+                    } else if is_nested && known_attributes.contains(sym.as_str()) {
+                        let msg = format!(
+                            "Known attribute '{}' is not expected in a nested attribute position.",
+                            sym.as_str()
+                        );
+                        context
+                            .env
+                            .add_diag(diag!(Declarations::InvalidAttribute, (nloc, msg)));
+                    };
+                }
+                E::AttributeName_::Unknown(sym)
+            },
             Some(known) => {
                 debug_assert!(known.name() == sym.as_str());
                 if is_nested {
-                    let msg = "Known attribute '{}' is not expected in a nested attribute position";
+                    let msg = format!(
+                        "Known attribute '{}' is not expected in a nested attribute position",
+                        sym.as_str()
+                    );
                     context
                         .env
                         .add_diag(diag!(Declarations::InvalidAttribute, (nloc, msg)));

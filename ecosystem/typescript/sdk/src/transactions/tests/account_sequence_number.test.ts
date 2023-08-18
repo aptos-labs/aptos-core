@@ -24,11 +24,15 @@ describe("account sequence number", () => {
     getAccountSpy.mockRestore();
   });
 
-  it("initializes with correct sequence number", async () => {
-    await accountSequenceNumber.initialize();
-    expect(accountSequenceNumber.currentNumber).toEqual(BigInt(0));
-    expect(accountSequenceNumber.lastUncommintedNumber).toEqual(BigInt(0));
-  });
+  it(
+    "initializes with correct sequence number",
+    async () => {
+      await accountSequenceNumber.initialize();
+      expect(accountSequenceNumber.currentNumber).toEqual(BigInt(0));
+      expect(accountSequenceNumber.lastUncommintedNumber).toEqual(BigInt(0));
+    },
+    longTestTimeout,
+  );
 
   it("updates with correct sequence number", async () => {
     const seqNum = "2";
@@ -71,16 +75,20 @@ describe("account sequence number", () => {
     longTestTimeout,
   );
 
-  it("synchronize completes when local and on-chain sequnec number equal", async () => {
-    const nextSequenceNumber = lastSeqNumber! + BigInt(1);
+  it(
+    "synchronize completes when local and on-chain sequnec number equal",
+    async () => {
+      const nextSequenceNumber = lastSeqNumber! + BigInt(1);
 
-    getAccountSpy.mockResolvedValue({
-      sequence_number: nextSequenceNumber + "",
-      authentication_key: account.authKey().hex(),
-    });
+      getAccountSpy.mockResolvedValue({
+        sequence_number: nextSequenceNumber + "",
+        authentication_key: account.authKey().hex(),
+      });
 
-    expect(accountSequenceNumber.currentNumber).not.toEqual(lastSeqNumber);
-    await accountSequenceNumber.synchronize();
-    expect(accountSequenceNumber.currentNumber).toEqual(nextSequenceNumber);
-  });
+      expect(accountSequenceNumber.currentNumber).not.toEqual(lastSeqNumber);
+      await accountSequenceNumber.synchronize();
+      expect(accountSequenceNumber.currentNumber).toEqual(nextSequenceNumber);
+    },
+    longTestTimeout,
+  );
 });

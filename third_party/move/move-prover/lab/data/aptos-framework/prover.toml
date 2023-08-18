@@ -1,0 +1,14 @@
+move_named_address_values = [
+    "std=0x1",
+    "aptos_std=0x1",
+    "aptos_framework=0x1",
+    "aptos_token=0x3",
+    "core_resources=0xA550C18",
+    "vm_reserved=0x0",
+    "Extensions=0x1",
+]
+move_deps = [
+    "../../../../../../aptos-move/framework/move-stdlib/sources",
+    "../../../../../../aptos-move/framework/aptos-stdlib/sources",
+    "../../../../../../aptos-move/framework/aptos-framework/sources",
+]

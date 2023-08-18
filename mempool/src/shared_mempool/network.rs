@@ -481,11 +481,12 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
 
         // Log all the metrics
         let latency = start_time.elapsed();
-        trace!(
+        debug!(
             LogSchema::event_log(LogEntry::BroadcastTransaction, LogEvent::Success)
                 .peer(&peer)
                 .batch_id(&batch_id)
                 .backpressure(scheduled_backoff)
+                .num_txns(num_txns)
         );
         let network_id = peer.network_id();
         counters::shared_mempool_broadcast_size(network_id, num_txns);

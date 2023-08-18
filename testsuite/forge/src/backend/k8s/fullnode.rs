@@ -190,6 +190,7 @@ fn create_fullnode_container(
                 ..VolumeMount::default()
             },
         ]),
+        name: "fullnode".to_string(),
         // specifically, inherit resources, env,ports, securityContext from the validator's container
         ..validator_container.clone()
     })

@@ -159,6 +159,13 @@ impl VMChangeSet {
             .chain(self.aggregator_write_set.iter())
     }
 
+    pub fn write_set_iter_mut(&mut self) -> impl Iterator<Item = (&StateKey, &mut WriteOp)> {
+        self.resource_write_set
+            .iter_mut()
+            .chain(self.module_write_set.iter_mut())
+            .chain(self.aggregator_write_set.iter_mut())
+    }
+
     pub fn resource_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
         &self.resource_write_set
     }

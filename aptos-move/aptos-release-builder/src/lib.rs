@@ -54,9 +54,3 @@ pub(crate) fn aptos_framework_path() -> PathBuf {
     path.push("aptos-move/framework/aptos-framework");
     path
 }
-
-pub(crate) fn release_builder_path() -> PathBuf {
-    let mut path = aptos_core_path();
-    path.push("aptos-move/aptos-release-builder");
-    path
-}

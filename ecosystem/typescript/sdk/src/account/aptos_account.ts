@@ -37,7 +37,7 @@ export class AptosAccount {
   }
 
   /**
-   * Test derive path
+   * Check's if the derive path is valid
    */
   static isValidPath(path: string): boolean {
     return /^m\/44'\/637'\/[0-9]+'\/[0-9]+'\/[0-9]+'+$/.test(path);

@@ -5,6 +5,7 @@ use crate::{
     context::SafeNativeContext,
     errors::{SafeNativeError, SafeNativeResult},
 };
+use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
@@ -27,10 +28,10 @@ struct SharedData {
 /// Factory object that allows one to build native functions with ease.
 ///
 /// This enables native functions to access shared data, and interface with `SafeNativeContext`.
-#[derive(Debug)]
 pub struct SafeNativeBuilder {
     data: Arc<SharedData>,
     enable_incremental_gas_charging: bool,
+    gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
 }
 
 impl SafeNativeBuilder {
@@ -53,7 +54,15 @@ impl SafeNativeBuilder {
                 features,
             }),
             enable_incremental_gas_charging: true,
+            gas_hook: None,
         }
+    }
+
+    pub fn set_gas_hook<F>(&mut self, action: F)
+    where
+        F: Fn(DynamicExpression) + Send + Sync + 'static,
+    {
+        self.gas_hook = Some(Arc::new(action));
     }
 
     /// Controls the default incremental gas charging behavior of the natives created from this builder.
@@ -97,6 +106,7 @@ impl SafeNativeBuilder {
             + 'static,
     {
         let data = Arc::clone(&self.data);
+        let hook = self.gas_hook.clone();
 
         let enable_incremental_gas_charging = self.enable_incremental_gas_charging;
 
@@ -118,6 +128,8 @@ impl SafeNativeBuilder {
                 gas_used: 0.into(),
 
                 enable_incremental_gas_charging,
+
+                gas_hook: hook.as_deref(),
             };
 
             let res: Result<SmallVec<[Value; 1]>, SafeNativeError> =

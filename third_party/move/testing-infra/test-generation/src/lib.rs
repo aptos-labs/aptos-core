@@ -25,7 +25,11 @@ use move_binary_format::{
     },
 };
 use move_bytecode_verifier::verify_module;
-use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler};
+use move_compiler::{
+    compiled_unit::AnnotatedCompiledUnit,
+    shared::{known_attributes::KnownAttribute, Flags},
+    Compiler,
+};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
@@ -59,6 +63,8 @@ static STORAGE_WITH_MOVE_STDLIB: Lazy<InMemoryStorage> = Lazy::new(|| {
         move_stdlib::move_stdlib_files(),
         vec![],
         move_stdlib::move_stdlib_named_addresses(),
+        Flags::empty().set_skip_attribute_checks(true), // Not much point in checking it here.
+        KnownAttribute::get_all_attribute_names(),
     )
     .build_and_report()
     .unwrap();

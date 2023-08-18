@@ -15,7 +15,7 @@ use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_logger::prelude::*;
 use aptos_network::{counters::inc_by_with_context, logging::NetworkSchema};
 use aptos_short_hex_str::AsShortHexStr;
-use aptos_types::on_chain_config::{OnChainConfigPayload, ValidatorSet};
+use aptos_types::on_chain_config::{OnChainConfigPayload, OnChainConfigProvider, ValidatorSet};
 use futures::Stream;
 use std::{
     collections::HashSet,
@@ -23,17 +23,17 @@ use std::{
     task::{Context, Poll},
 };
 
-pub struct ValidatorSetStream {
+pub struct ValidatorSetStream<P: OnChainConfigProvider> {
     pub(crate) network_context: NetworkContext,
     expected_pubkey: x25519::PublicKey,
-    reconfig_events: ReconfigNotificationListener,
+    reconfig_events: ReconfigNotificationListener<P>,
 }
 
-impl ValidatorSetStream {
+impl<P: OnChainConfigProvider> ValidatorSetStream<P> {
     pub(crate) fn new(
         network_context: NetworkContext,
         expected_pubkey: x25519::PublicKey,
-        reconfig_events: ReconfigNotificationListener,
+        reconfig_events: ReconfigNotificationListener<P>,
     ) -> Self {
         Self {
             network_context,
@@ -66,7 +66,7 @@ impl ValidatorSetStream {
             .set(mismatch);
     }
 
-    fn extract_updates(&mut self, payload: OnChainConfigPayload) -> PeerSet {
+    fn extract_updates(&mut self, payload: OnChainConfigPayload<P>) -> PeerSet {
         let _process_timer = EVENT_PROCESSING_LOOP_BUSY_DURATION_S.start_timer();
 
         let node_set: ValidatorSet = payload
@@ -92,7 +92,7 @@ impl ValidatorSetStream {
     }
 }
 
-impl Stream for ValidatorSetStream {
+impl<P: OnChainConfigProvider> Stream for ValidatorSetStream<P> {
     type Item = Result<PeerSet, DiscoveryError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -159,12 +159,15 @@ mod tests {
     use aptos_crypto::{bls12381, x25519::PrivateKey, PrivateKey as PK, Uniform};
     use aptos_event_notifications::ReconfigNotification;
     use aptos_types::{
-        network_address::NetworkAddress, on_chain_config::OnChainConfig,
-        validator_config::ValidatorConfig, validator_info::ValidatorInfo, PeerId,
+        network_address::NetworkAddress,
+        on_chain_config::{InMemoryOnChainConfig, OnChainConfig},
+        validator_config::ValidatorConfig,
+        validator_info::ValidatorInfo,
+        PeerId,
     };
     use futures::executor::block_on;
     use rand::{rngs::StdRng, SeedableRng};
-    use std::{collections::HashMap, sync::Arc, time::Instant};
+    use std::{collections::HashMap, time::Instant};
     use tokio::{
         runtime::Runtime,
         time::{timeout_at, Duration},
@@ -236,7 +239,10 @@ mod tests {
         peer_id: PeerId,
         consensus_pubkey: bls12381::PublicKey,
         pubkey: x25519::PublicKey,
-        reconfig_tx: &mut aptos_channels::aptos_channel::Sender<(), ReconfigNotification>,
+        reconfig_tx: &mut aptos_channels::aptos_channel::Sender<
+            (),
+            ReconfigNotification<InMemoryOnChainConfig>,
+        >,
     ) {
         let validator_address =
             NetworkAddress::mock().append_prod_protos(pubkey, HANDSHAKE_VERSION);
@@ -259,7 +265,7 @@ mod tests {
             ValidatorSet::CONFIG_ID,
             bcs::to_bytes(&validator_set).unwrap(),
         );
-        let payload = OnChainConfigPayload::new(1, Arc::new(configs));
+        let payload = OnChainConfigPayload::new(1, InMemoryOnChainConfig::new(configs));
         reconfig_tx
             .push((), ReconfigNotification {
                 version: 1,

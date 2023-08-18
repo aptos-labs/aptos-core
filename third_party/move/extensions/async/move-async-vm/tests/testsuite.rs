@@ -13,7 +13,7 @@ use move_async_vm::{
 use move_binary_format::access::ModuleAccess;
 use move_command_line_common::testing::EXP_EXT;
 use move_compiler::{
-    compiled_unit::CompiledUnit, diagnostics::report_diagnostics_to_buffer,
+    attr_derivation, compiled_unit::CompiledUnit, diagnostics::report_diagnostics_to_buffer,
     shared::NumericalAddress, Compiler, Flags,
 };
 use move_core_types::{
@@ -349,8 +349,10 @@ impl Harness {
                 .filter(|p| *p != path)
                 .cloned()
                 .collect();
-            let compiler = Compiler::from_files(targets, deps, address_map.clone())
-                .set_flags(Flags::empty().set_flavor("async"));
+            let flags = Flags::empty().set_flavor("async");
+            let known_attributes = attr_derivation::get_known_attributes_for_flavor(&flags);
+            let compiler =
+                Compiler::from_files(targets, deps, address_map.clone(), flags, &known_attributes);
             let (sources, inner) = compiler.build()?;
             match inner {
                 Err(diags) => bail!(

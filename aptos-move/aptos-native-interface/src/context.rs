@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::errors::{SafeNativeError, SafeNativeResult};
-use aptos_gas_algebra::{AbstractValueSize, GasExpression, GasQuantity, InternalGasUnit};
+use aptos_gas_algebra::{
+    AbstractValueSize, DynamicExpression, GasExpression, GasQuantity, InternalGasUnit,
+};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
 use move_core_types::gas_algebra::InternalGas;
@@ -31,6 +33,8 @@ pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
     pub(crate) gas_used: InternalGas,
 
     pub(crate) enable_incremental_gas_charging: bool,
+
+    pub(crate) gas_hook: Option<&'c (dyn Fn(DynamicExpression) + Send + Sync)>,
 }
 
 impl<'a, 'b, 'c, 'd> Deref for SafeNativeContext<'a, 'b, 'c, 'd> {
@@ -58,6 +62,11 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
         abstract_amount: impl GasExpression<NativeGasParameters, Unit = InternalGasUnit>,
     ) -> SafeNativeResult<()> {
         let amount = abstract_amount.evaluate(self.gas_feature_version, self.native_gas_params);
+
+        if let Some(hook) = self.gas_hook {
+            let node = abstract_amount.to_dynamic();
+            hook(node);
+        }
 
         self.gas_used += amount;
 

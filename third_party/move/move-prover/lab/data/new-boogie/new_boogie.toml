@@ -1,4 +1,13 @@
-# Use experimental boogie. Path is expected  in env var EXP_BOOGIE_EXE.
-backend.use_exp_boogie = true
-boogie_exp = true
-prover.run_mono = true
+move_named_address_values = [
+    "std=0x1",
+    "DiemFramework=0x1",
+    "DiemRoot=0xA550C18",
+    "TreasuryCompliance=0xB1E55ED",
+    "CurrencyInfo=0xA550C18",
+    "VMReserved=0x0",
+]
+move_deps = [
+    "../../../../documentation/examples/diem-framework/move-packages/DPN/sources",
+    "../../../../move-stdlib/sources",
+    "../../../../move-stdlib/nursery/sources",
+]
