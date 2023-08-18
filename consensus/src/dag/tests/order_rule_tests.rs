@@ -167,7 +167,7 @@ proptest! {
                     let dag = Arc::new(RwLock::new(dag.clone()));
                     let (mut order_rule, mut receiver) = create_order_rule(epoch_state.clone(), dag);
                     for idx in seq {
-                        order_rule.process_new_node(&flatten_nodes[idx]);
+                        order_rule.process_new_node(flatten_nodes[idx].metadata());
                     }
                     let mut ordered = vec![];
                     while let Ok(Some(mut ordered_nodes)) = receiver.try_next() {
@@ -241,7 +241,7 @@ fn test_order_rule_basic() {
     let dag = Arc::new(RwLock::new(dag.clone()));
     let (mut order_rule, mut receiver) = create_order_rule(epoch_state, dag);
     for node in nodes.iter().flatten().flatten() {
-        order_rule.process_new_node(node);
+        order_rule.process_new_node(node.metadata());
     }
     let expected_order = vec![
         // anchor (1, 0) has 1 votes, anchor (3, 1) has 2 votes and a path to (1, 0)

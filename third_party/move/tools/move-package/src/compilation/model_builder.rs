@@ -115,6 +115,14 @@ impl ModelBuilder {
             ),
         };
 
-        run_model_builder_with_options(all_targets, all_deps, ModelBuilderOptions::default())
+        let skip_attribute_checks = self.resolution_graph.build_options.skip_attribute_checks;
+        let known_attributes = &self.resolution_graph.build_options.known_attributes;
+        run_model_builder_with_options(
+            all_targets,
+            all_deps,
+            ModelBuilderOptions::default(),
+            skip_attribute_checks,
+            known_attributes,
+        )
     }
 }

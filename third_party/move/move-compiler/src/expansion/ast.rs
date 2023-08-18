@@ -8,8 +8,11 @@ use crate::{
         QuantKind, SpecApplyPattern, StructName, UnaryOp, Var, ENTRY_MODIFIER,
     },
     shared::{
-        ast_debug::*, known_attributes::KnownAttribute, unique_map::UniqueMap,
-        unique_set::UniqueSet, *,
+        ast_debug::*,
+        known_attributes::{AttributeKind, KnownAttribute},
+        unique_map::UniqueMap,
+        unique_set::UniqueSet,
+        *,
     },
 };
 use move_ir_types::location::*;

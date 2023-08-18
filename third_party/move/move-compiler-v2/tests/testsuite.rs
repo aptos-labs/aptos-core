@@ -5,12 +5,16 @@
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use move_binary_format::{binary_views::BinaryIndexedView, file_format as FF};
 use move_command_line_common::files::FileHash;
-use move_compiler_v2::{run_file_format_gen, Options};
+use move_compiler_v2::{
+    pipeline::livevar_analysis_processor::LiveVarAnalysisProcessor, run_file_format_gen, Options,
+};
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location;
 use move_model::model::GlobalEnv;
 use move_prover_test_utils::{baseline_test, extract_test_directives};
-use move_stackless_bytecode::function_target_pipeline::FunctionTargetPipeline;
+use move_stackless_bytecode::{
+    function_target::FunctionTarget, function_target_pipeline::FunctionTargetPipeline,
+};
 use std::{
     cell::RefCell,
     path::{Path, PathBuf},
@@ -66,25 +70,27 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
 impl TestConfig {
     fn get_config_from_path(path: &Path) -> TestConfig {
         let path = path.to_string_lossy();
+        let mut pipeline = FunctionTargetPipeline::default();
         if path.contains("/checking/") {
             Self {
                 check_only: true,
                 dump_ast: true,
-                pipeline: FunctionTargetPipeline::default(),
+                pipeline,
                 generate_file_format: false,
             }
         } else if path.contains("/bytecode-generator/") {
             Self {
                 check_only: false,
                 dump_ast: true,
-                pipeline: FunctionTargetPipeline::default(),
+                pipeline,
                 generate_file_format: false,
             }
         } else if path.contains("/file-format-generator/") {
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             Self {
                 check_only: false,
                 dump_ast: false,
-                pipeline: FunctionTargetPipeline::default(),
+                pipeline,
                 generate_file_format: true,
             }
         } else {
@@ -131,22 +137,28 @@ impl TestConfig {
                     |targets_before| {
                         let out = &mut test_output.borrow_mut();
                         Self::check_diags(out, &env);
-                        out.push_str(&move_stackless_bytecode::print_targets_for_test(
-                            &env,
-                            "initial bytecode",
-                            targets_before,
-                        ));
+                        out.push_str(
+                            &move_stackless_bytecode::print_targets_with_annotations_for_test(
+                                &env,
+                                "initial bytecode",
+                                targets_before,
+                                Self::register_formatters,
+                            ),
+                        );
                     },
                     // Hook which is run after every step in the pipeline. Prints out
                     // bytecode after the processor.
                     |_, processor, targets_after| {
                         let out = &mut test_output.borrow_mut();
                         Self::check_diags(out, &env);
-                        out.push_str(&move_stackless_bytecode::print_targets_for_test(
-                            &env,
-                            &format!("after {}:", processor.name()),
-                            targets_after,
-                        ));
+                        out.push_str(
+                            &move_stackless_bytecode::print_targets_with_annotations_for_test(
+                                &env,
+                                &format!("after {}:", processor.name()),
+                                targets_after,
+                                Self::register_formatters,
+                            ),
+                        );
                     },
                 );
                 let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
@@ -168,6 +180,11 @@ impl TestConfig {
         baseline_test::verify_or_update_baseline(baseline_path.as_path(), &test_output.borrow())?;
 
         Ok(())
+    }
+
+    /// Callback from the framework to register formatters for annotations.
+    fn register_formatters(target: &FunctionTarget) {
+        LiveVarAnalysisProcessor::register_formatters(target)
     }
 
     fn check_diags(baseline: &mut String, env: &GlobalEnv) -> bool {

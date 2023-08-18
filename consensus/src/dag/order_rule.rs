@@ -46,8 +46,8 @@ impl OrderRule {
         (r1 ^ r2) & 1 == 0
     }
 
-    pub fn process_new_node(&mut self, node: &CertifiedNode) {
-        let round = node.round();
+    pub fn process_new_node(&mut self, node_metadata: &NodeMetadata) {
+        let round = node_metadata.round();
         // If the node comes from the proposal round in the current instance, it can't trigger any ordering
         if round <= self.lowest_unordered_anchor_round
             || Self::check_parity(round, self.lowest_unordered_anchor_round)

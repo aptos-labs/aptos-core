@@ -50,6 +50,7 @@ pub fn upsert_uris(
             cdn_animation_uri.eq(excluded(cdn_animation_uri)),
             image_optimizer_retry_count.eq(excluded(image_optimizer_retry_count)),
             json_parser_retry_count.eq(excluded(json_parser_retry_count)),
+            animation_optimizer_retry_count.eq(excluded(animation_optimizer_retry_count)),
         ));
 
     let debug_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
