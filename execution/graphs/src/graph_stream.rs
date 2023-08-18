@@ -1,12 +1,23 @@
 // Copyright © Aptos Foundation
 
-use crate::graph::{Graph, NodeIndex, WeightedGraph};
+use crate::graph::NodeIndex;
+use crate::{graph, WeightedGraph};
 use aptos_types::closuretools::{ClosureTools, MapClosure};
 use namable_closures::{closure, Closure};
 use rand::seq::SliceRandom;
 
+/// Convenience type alias for a node in a graph stream.
+pub type StreamNode<S> = graph::Node<<S as GraphStream>::NodeData, <S as GraphStream>::NodeWeight>;
+
+/// Convenience type alias for a reference to a node in a graph stream.
+pub type StreamNodeRef<'a, S> =
+    graph::NodeRef<'a, <S as GraphStream>::NodeData, <S as GraphStream>::NodeWeight>;
+
 /// A trait for batched streams for undirected graphs with weighted nodes and edges.
 pub trait GraphStream: Sized {
+    /// The type of the nodes in the graph.
+    type NodeData;
+
     /// The weight of a node.
     type NodeWeight;
 
@@ -19,7 +30,7 @@ pub trait GraphStream: Sized {
         Self: 'a;
 
     /// An iterator over the nodes in a batch.
-    type Batch<'a>: IntoIterator<Item = (NodeIndex, Self::NodeWeight, Self::NodeEdgesIter<'a>)>
+    type Batch<'a>: IntoIterator<Item = (StreamNode<Self>, Self::NodeEdgesIter<'a>)>
     where
         Self: 'a;
 
@@ -71,12 +82,12 @@ pub trait GraphStream: Sized {
         None
     }
 
-    /// Collects the stream into a graph.
-    fn collect<G>(self) -> G
+    /// Collects the stream into a graph or any other container implementing `FromGraphStream`.
+    fn collect<B>(self) -> B
     where
-        G: FromGraphStream<Self>,
+        B: FromGraphStream<Self>,
     {
-        G::from_graph_stream(self)
+        B::from_graph_stream(self)
     }
 }
 
@@ -118,6 +129,7 @@ impl<'a, S> GraphStream for &'a mut S
 where
     S: GraphStream,
 {
+    type NodeData = S::NodeData;
     type NodeWeight = S::NodeWeight;
     type EdgeWeight = S::EdgeWeight;
 
@@ -158,59 +170,20 @@ where
     }
 }
 
-/// A trait for a generic graph streamer.
-pub trait GraphStreamer<G: WeightedGraph> {
-    type Stream<'graph>: GraphStream<NodeWeight = G::NodeWeight, EdgeWeight = G::EdgeWeight>
-    where
-        Self: 'graph,
-        G: 'graph;
-
-    fn stream<'graph>(&self, graph: &'graph G) -> Self::Stream<'graph>;
-}
-
-/// Streams graphs in batches of fixed size, in order from `0` to `node_count() - 1`.
-pub struct InputOrderGraphStreamer {
-    batch_size: usize,
-}
-
-impl InputOrderGraphStreamer {
-    pub fn new(batch_size: usize) -> Self {
-        Self { batch_size }
-    }
-}
-
-impl<G: WeightedGraph> GraphStreamer<G> for InputOrderGraphStreamer {
-    type Stream<'graph> = InputOrderGraphStream<'graph, G>
-    where
-        G: 'graph;
-
-    fn stream<'graph>(&self, graph: &'graph G) -> Self::Stream<'graph> {
-        InputOrderGraphStream::new(graph, self.batch_size)
-    }
+/// Streams a graph in batches of fixed size, in order of nodes from `0` to `node_count() - 1`.
+pub fn input_order_stream<G>(graph: &G, batch_size: usize) -> InputOrderGraphStream<'_, G>
+where
+    G: WeightedGraph,
+{
+    InputOrderGraphStream::new(graph, batch_size)
 }
 
 /// Streams graphs in batches of fixed size, in random order.
-pub struct RandomOrderGraphStreamer {
-    // TODO: add support for custom RNG / seed.
-    batch_size: usize,
-}
-
-impl RandomOrderGraphStreamer {
-    /// Creates a new `RandomOrderGraphStreamer` with the given batch size.
-    pub fn new(batch_size: usize) -> Self {
-        Self { batch_size }
-    }
-}
-
-impl<G: WeightedGraph> GraphStreamer<G> for RandomOrderGraphStreamer {
-    type Stream<'graph> = RandomOrderGraphStream<'graph, G>
-    where
-        Self: 'graph,
-        G: 'graph;
-
-    fn stream<'graph>(&self, graph: &'graph G) -> Self::Stream<'graph> {
-        RandomOrderGraphStream::new(graph, self.batch_size)
-    }
+pub fn random_order_stream<G>(graph: &G, batch_size: usize) -> RandomOrderGraphStream<'_, G>
+where
+    G: WeightedGraph,
+{
+    RandomOrderGraphStream::new(graph, batch_size)
 }
 
 /// Streams a graph in batches of fixed size, in order from `0` to `node_count() - 1`.
@@ -220,7 +193,7 @@ pub struct InputOrderGraphStream<'graph, G> {
     current_node: NodeIndex,
 }
 
-impl<'graph, G: Graph> InputOrderGraphStream<'graph, G> {
+impl<'graph, G: WeightedGraph> InputOrderGraphStream<'graph, G> {
     pub fn new(graph: &'graph G, batch_size: usize) -> Self {
         Self {
             graph,
@@ -231,6 +204,7 @@ impl<'graph, G: Graph> InputOrderGraphStream<'graph, G> {
 }
 
 impl<'graph, G: WeightedGraph> GraphStream for InputOrderGraphStream<'graph, G> {
+    type NodeData = &'graph G::NodeData;
     type NodeWeight = G::NodeWeight;
     type EdgeWeight = G::EdgeWeight;
 
@@ -240,7 +214,7 @@ impl<'graph, G: WeightedGraph> GraphStream for InputOrderGraphStream<'graph, G> 
 
     type Batch<'a> = MapClosure<
         std::ops::Range<NodeIndex>,
-        Closure<'a, Self, (NodeIndex,), (NodeIndex, Self::NodeWeight, Self::NodeEdgesIter<'a>)>,
+        Closure<'a, Self, (NodeIndex,), (StreamNode<Self>, Self::NodeEdgesIter<'a>)>,
     >
     where
         Self: 'a;
@@ -255,10 +229,14 @@ impl<'graph, G: WeightedGraph> GraphStream for InputOrderGraphStream<'graph, G> 
             .min(self.graph.node_count() as NodeIndex);
 
         Some((
-            (batch_start..self.current_node).map_closure(closure!(self_ = self => |node| {
-                let node_weight = self_.graph.node_weight(node);
-                let neighbours = self_.graph.weighted_edges(node);
-                (node, node_weight, neighbours)
+            (batch_start..self.current_node).map_closure(closure!(self_ = self => |idx| {
+                let node_ref = self_.graph.get_node(idx);
+                let neighbours = self_.graph.weighted_edges(idx);
+                (graph::Node {
+                    index: idx,
+                    data: node_ref.data,
+                    weight: node_ref.weight,
+                }, neighbours)
             })),
             BatchInfo {
                 opt_total_batch_node_count: Some(self.batch_size),
@@ -303,7 +281,7 @@ pub struct RandomOrderGraphStream<'graph, G> {
     current_node: NodeIndex,
 }
 
-impl<'graph, G: Graph> RandomOrderGraphStream<'graph, G> {
+impl<'graph, G: WeightedGraph> RandomOrderGraphStream<'graph, G> {
     pub fn new(graph: &'graph G, batch_size: usize) -> Self {
         let mut order: Vec<_> = graph.nodes().collect();
         let mut rng = rand::thread_rng();
@@ -319,6 +297,7 @@ impl<'graph, G: Graph> RandomOrderGraphStream<'graph, G> {
 }
 
 impl<'graph, G: WeightedGraph> GraphStream for RandomOrderGraphStream<'graph, G> {
+    type NodeData = &'graph G::NodeData;
     type NodeWeight = G::NodeWeight;
     type EdgeWeight = G::EdgeWeight;
 
@@ -328,7 +307,7 @@ impl<'graph, G: WeightedGraph> GraphStream for RandomOrderGraphStream<'graph, G>
 
     type Batch<'a> = MapClosure<
         std::iter::Copied<std::slice::Iter<'a, NodeIndex>>,
-        Closure<'a, Self, (NodeIndex,), (NodeIndex, Self::NodeWeight, Self::NodeEdgesIter<'a>)>
+        Closure<'a, Self, (NodeIndex,), (StreamNode<Self>, Self::NodeEdgesIter<'a>)>
     >
     where
         Self: 'a;
@@ -346,10 +325,14 @@ impl<'graph, G: WeightedGraph> GraphStream for RandomOrderGraphStream<'graph, G>
             (&self.order[batch_start as usize..self.current_node as usize])
                 .into_iter()
                 .copied()
-                .map_closure(closure!(self_ = self => |node| {
-                    let node_weight = self_.graph.node_weight(node);
-                    let neighbours = self_.graph.weighted_edges(node);
-                    (node, node_weight, neighbours)
+                .map_closure(closure!(self_ = self => |idx| {
+                    let node_ref = self_.graph.get_node(idx);
+                    let neighbours = self_.graph.weighted_edges(idx);
+                    (graph::Node {
+                        index: idx,
+                        data: node_ref.data,
+                        weight: node_ref.weight,
+                    }, neighbours)
                 })),
             BatchInfo {
                 opt_total_batch_node_count: Some(self.batch_size),

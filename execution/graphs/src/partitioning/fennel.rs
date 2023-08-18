@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::graph::NodeIndex;
-use crate::graph_stream::{GraphStream, StreamBatchInfo};
+use crate::graph_stream::{GraphStream, StreamBatchInfo, StreamNode};
 use crate::partitioning::{PartitionId, StreamingGraphPartitioner};
 use aptos_types::batched_stream::BatchedStream;
 use itertools::Itertools;
@@ -131,20 +131,16 @@ impl Default for FennelGraphPartitioner {
     }
 }
 
-impl<NW, EW> StreamingGraphPartitioner<NW, EW> for FennelGraphPartitioner
+impl<S> StreamingGraphPartitioner<S> for FennelGraphPartitioner
 where
-    NW: Into<f64> + Copy,
-    EW: Into<f64> + Copy,
+    S: GraphStream,
+    S::NodeWeight: Into<f64> + Copy,
+    S::EdgeWeight: Into<f64> + Copy,
 {
     type Error = Error;
-    type ResultStream<S> = FennelStream<S>
-    where
-        S: GraphStream<NodeWeight = NW, EdgeWeight = EW>;
+    type ResultStream = FennelStream<S>;
 
-    fn partition_stream<S>(&self, graph_stream: S, n_partitions: usize) -> FennelStream<S>
-    where
-        S: GraphStream<NodeWeight = NW, EdgeWeight = EW>,
-    {
+    fn partition_stream(&self, graph_stream: S, n_partitions: usize) -> FennelStream<S> {
         FennelStream::new(graph_stream, self.clone(), n_partitions)
     }
 }
@@ -276,7 +272,7 @@ where
         &mut self,
         batch: S::Batch<'a>,
         batch_info: StreamBatchInfo<S>,
-    ) -> Result<Vec<(NodeIndex, PartitionId)>> {
+    ) -> Result<Vec<(StreamNode<S>, PartitionId)>> {
         let mut alpha = self.alpha;
         let mut max_load = self.max_load;
 
@@ -309,14 +305,16 @@ where
 
         batch
             .into_iter()
-            .map(|(node, node_weight, node_edges)| {
+            .map(|(node, edges)| {
                 // Convert the node weight to f64.
-                let node_weight = node_weight.into();
+                let node_weight = node.weight.into();
 
                 // Allocate more space if necessary.
-                if node as usize >= self.partition.len() {
-                    let new_len = (self.partition.len() * 2).max(node as usize + 1).max(16);
-                    self.partition.resize(new_len, None);
+                if node.index as usize >= self.partition.len() {
+                    // NB: Depending on the implementation, `resize` may lead to quadratic
+                    // time complexity. However, Rust's implementation does not suffer from
+                    // this problem.
+                    self.partition.resize(node.index as usize + 1, None);
                 }
 
                 // It is important to update it in the beginning as we may later use it
@@ -324,7 +322,7 @@ where
                 self.partitioned_node_weight += node_weight;
 
                 let mut edges_to = vec![0.; self.n_partitions];
-                for (v, w) in node_edges {
+                for (v, w) in edges {
                     if let Some(partition) = self.partition_of(v) {
                         let w = w.into();
                         edges_to[partition as usize] += w;
@@ -380,7 +378,7 @@ where
                 // is guaranteed to succeed.
                 let choice = choose(true).unwrap_or_else(|| choose(false).unwrap());
 
-                self.partition[node as usize] = Some(choice as PartitionId);
+                self.partition[node.index as usize] = Some(choice as PartitionId);
                 self.load[choice] += node_weight;
 
                 Ok((node, choice as PartitionId))
@@ -395,11 +393,11 @@ where
     S::NodeWeight: Into<f64> + Copy,
     S::EdgeWeight: Into<f64> + Copy,
 {
-    type StreamItem = (NodeIndex, PartitionId);
+    type StreamItem = (StreamNode<S>, PartitionId);
     type Batch = Vec<Self::StreamItem>;
     type Error = Error;
 
-    fn next_batch(&mut self) -> Option<Result<Vec<(NodeIndex, PartitionId)>>> {
+    fn next_batch(&mut self) -> Option<Result<Vec<(StreamNode<S>, PartitionId)>>> {
         let mut graph_stream = match &mut self.graph_stream {
             Ok(graph_stream) => {
                 // Temporarily take ownership of `graph_stream` to avoid borrowing `self` mutably.
@@ -411,10 +409,10 @@ where
         // Get the next batch and partition it.
         let (batch, batch_info) = graph_stream.next_batch()?;
         match self.partition_batch(batch, batch_info) {
-            Ok(batch) => {
+            Ok(partitioned_batch) => {
                 // Return the ownership of `graph_stream` back to `self`.
                 self.graph_stream = Ok(Some(graph_stream));
-                Some(Ok(batch))
+                Some(Ok(partitioned_batch))
             },
             Err(err) => {
                 self.graph_stream = Err(err);
@@ -440,7 +438,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::graph_stream::{GraphStreamer, InputOrderGraphStreamer};
+    use crate::graph_stream::input_order_stream;
     use crate::partitioning::fennel::FennelGraphPartitioner;
     use crate::partitioning::StreamingGraphPartitioner;
     use crate::test_utils::simple_four_nodes_two_partitions_graph;
@@ -450,29 +448,36 @@ mod tests {
     fn simple_four_nodes_two_partitions_test() {
         let graph = simple_four_nodes_two_partitions_graph();
 
-        let graph_streamer = InputOrderGraphStreamer::new(2);
+        let graph_stream = input_order_stream(&graph, 1);
 
         let mut partitioner = FennelGraphPartitioner::default();
         partitioner.balance_constraint = 0.2;
 
-        let partition_stream = partitioner.partition_stream(graph_streamer.stream(&graph), 2);
+        let partition_stream = partitioner.partition_stream(graph_stream, 2);
 
         let mut partition_iter = partition_stream.into_items_iter();
 
         // The first node may be sent to any partition, depending on the implementation.
-        let (first_item, first_partition) = partition_iter.next().unwrap().unwrap();
-        assert_eq!(first_item, 0);
+        let (node, first_partition) = partition_iter.next().unwrap().unwrap();
+        assert_eq!(node.index, 0);
 
         // The second node must be sent to the other partition to satisfy the balancing constraint.
-        assert_eq!(partition_iter.next(), Some(Ok((1, 1 - first_partition))));
+        let (node, partition) = partition_iter.next().unwrap().unwrap();
+        assert_eq!(node.index, 1);
+        assert_eq!(partition, 1 - first_partition);
 
         // The third node must be sent to the same partition as the first one
         // due to a heavy edge between them.
-        assert_eq!(partition_iter.next(), Some(Ok((2, first_partition))));
+        let (node, partition) = partition_iter.next().unwrap().unwrap();
+        assert_eq!(node.index, 2);
+        assert_eq!(partition, first_partition);
 
         // Finally, the fourth node must be sent to the same partition as the second node
         // as it has equal weight edges to both partitions, but the second one is less loaded.
-        assert_eq!(partition_iter.next(), Some(Ok((3, 1 - first_partition))));
+        let (node, partition) = partition_iter.next().unwrap().unwrap();
+        assert_eq!(node.index, 3);
+        assert_eq!(partition, 1 - first_partition);
+
         assert_eq!(partition_iter.next(), None);
     }
 }

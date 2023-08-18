@@ -1,35 +1,39 @@
 // Copyright © Aptos Foundation
 
-use crate::graph::{Graph, NodeIndex, WeightedEdges, WeightedNodes};
+use crate::graph::{GraphNode, GraphNodeRef, Node, NodeIndex, NodeRef};
 use crate::graph_stream::{FromGraphStream, GraphStream};
+use crate::WeightedGraph;
 use std::iter::Sum;
 
 /// A weighted undirected graph represented in a simple format, where for each node
 /// we store its weight and a list of its neighbours with the corresponding edge weights.
-///
-/// Used as an example implementation of the `WeightedGraph` trait and
-/// for testing of the graph algorithms.
-#[derive(Debug, Clone, Hash)]
-pub struct SimpleUndirectedGraph<NW, EW> {
+pub struct SimpleUndirectedGraph<Data, NW, EW> {
     node_weights: Vec<NW>,
+    node_data: Vec<Data>,
     edges: Vec<Vec<(NodeIndex, EW)>>,
 }
 
-impl<NW: Copy, EW: Copy> SimpleUndirectedGraph<NW, EW> {
+impl<Data, NW, EW> SimpleUndirectedGraph<Data, NW, EW>
+where
+    NW: Copy + Sum,
+    EW: Copy + Sum,
+{
     /// Creates a new empty graph.
     pub fn new() -> Self {
         Self {
             node_weights: Vec::new(),
+            node_data: Vec::new(),
             edges: Vec::new(),
         }
     }
 
     /// Adds a node to the graph.
-    pub fn add_node(&mut self, weight: NW) -> NodeIndex {
-        let node = self.node_weights.len() as NodeIndex;
+    pub fn add_node(&mut self, data: Data, weight: NW) -> NodeIndex {
+        let idx = self.node_weights.len() as NodeIndex;
         self.node_weights.push(weight);
+        self.node_data.push(data);
         self.edges.push(Vec::new());
-        node
+        idx
     }
 
     /// Adds an undirected edge to the graph.
@@ -38,54 +42,77 @@ impl<NW: Copy, EW: Copy> SimpleUndirectedGraph<NW, EW> {
         self.edges[target as usize].push((source, weight));
     }
 
-    /// Resizes the graph to the given number of nodes.
-    /// If the graph is already larger than the given number of nodes, does nothing.
-    /// If the graph is smaller than the given number of nodes,
-    /// adds new nodes with the given default weight.
-    pub fn upsize(&mut self, new_size: usize, default_weight: NW) -> NodeIndex {
-        let old_size = self.node_weights.len();
-        if new_size > old_size {
-            self.node_weights.resize(new_size, default_weight);
-            self.edges.resize(new_size, Vec::new());
-        }
-        old_size as NodeIndex
+    /// Returns an iterator over the nodes of the graph.
+    pub fn into_nodes(self) -> impl Iterator<Item = GraphNode<Self>> {
+        self.nodes()
+            .zip(self.node_data)
+            .zip(self.node_weights)
+            .map(|((index, data), weight)| Node {index, data, weight})
     }
 }
 
-impl<S: GraphStream> FromGraphStream<S> for SimpleUndirectedGraph<S::NodeWeight, S::EdgeWeight>
+impl<S, Data, NW, EW> FromGraphStream<S> for SimpleUndirectedGraph<Data, NW, EW>
 where
-    S::NodeWeight: Copy + Default,
-    S::EdgeWeight: Copy + Default,
+    S: GraphStream<NodeWeight = NW, EdgeWeight = EW, NodeData = Data>,
+    NW: Copy + Default,
+    EW: Copy + Default,
 {
     /// Reconstructs an undirected graph from a `GraphStream`.
     fn from_graph_stream(mut graph_stream: S) -> Self {
-        let mut graph = Self {
-            node_weights: Vec::new(),
-            edges: Vec::new(),
-        };
+        let mut node_weights: Vec<NW> = Vec::new();
+        let mut node_data: Vec<Option<Data>> = Vec::new();
+        let mut graph_edges: Vec<Vec<_>> = Vec::new();
 
         while let Some((batch, _)) = graph_stream.next_batch() {
-            for (node, node_weight, edges) in batch {
-                graph.upsize(node as usize + 1, S::NodeWeight::default());
-                graph.node_weights[node as usize] = node_weight;
+            for (node, edges) in batch {
+                if node.index as usize >= node_weights.len() {
+                    node_weights.resize(node.index as usize + 1, NW::default());
+                    node_data.resize_with(node.index as usize + 1, || None);
+                    graph_edges.resize(node.index as usize + 1, Vec::new());
+                }
+
+                node_weights[node.index as usize] = node.weight;
+                node_data[node.index as usize] = Some(node.data);
                 for (target, edge_weight) in edges {
                     // We only add edges with target >= node to avoid adding the same edge twice.
-                    if target <= node {
-                        graph.add_edge(node, target, edge_weight);
+                    if target <= node.index {
+                        graph_edges[node.index as usize].push((target, edge_weight));
+                        graph_edges[target as usize].push((node.index, edge_weight));
                     }
                 }
             }
         }
 
-        graph
+        Self {
+            node_weights,
+            node_data: node_data
+                .into_iter()
+                .map(|opt_data| opt_data.expect("Missing node in a graph stream"))
+                .collect(),
+            edges: graph_edges,
+        }
     }
 }
 
-impl<NW, EW> Graph for SimpleUndirectedGraph<NW, EW> {
+impl<Data, NW, EW> WeightedGraph for SimpleUndirectedGraph<Data, NW, EW>
+where
+    NW: Copy + Sum,
+    EW: Copy + Sum,
+{
+    type NodeData = Data;
+    type NodeWeight = NW;
+    type EdgeWeight = EW;
+
+    type NodesIter<'a> = NodesIter<'a, Data, NW, EW>
+    where Self: 'a;
+
     type NodeEdgesIter<'a> = std::iter::Map<
         std::slice::Iter<'a, (NodeIndex, EW)>,
         fn(&'a (NodeIndex, EW)) -> NodeIndex,
     >
+    where Self: 'a;
+
+    type WeightedNodeEdgesIter<'a> = std::iter::Copied<std::slice::Iter<'a, (NodeIndex, EW)>>
     where Self: 'a;
 
     fn node_count(&self) -> usize {
@@ -96,6 +123,14 @@ impl<NW, EW> Graph for SimpleUndirectedGraph<NW, EW> {
         self.edges.iter().map(|neighbours| neighbours.len()).sum()
     }
 
+    fn get_node(&self, idx: NodeIndex) -> GraphNodeRef<'_, Self> {
+        NodeRef {
+            index: idx,
+            data: &self.node_data[idx as usize],
+            weight: self.node_weights[idx as usize],
+        }
+    }
+
     fn degree(&self, node: NodeIndex) -> usize {
         self.edges[node as usize].len()
     }
@@ -103,39 +138,35 @@ impl<NW, EW> Graph for SimpleUndirectedGraph<NW, EW> {
     fn edges(&self, node: NodeIndex) -> Self::NodeEdgesIter<'_> {
         self.edges[node as usize].iter().map(|&(v, _)| v)
     }
-}
 
-impl<NW, EW> WeightedNodes for SimpleUndirectedGraph<NW, EW>
-where
-    NW: Sum<NW> + Copy,
-{
-    type NodeWeight = NW;
-
-    type WeightedNodesIter<'a> = std::iter::Zip<
-        std::ops::Range<NodeIndex>,
-        std::iter::Copied<std::slice::Iter<'a, NW>>,
-    >
-    where Self: 'a;
-
-    fn node_weight(&self, node: NodeIndex) -> Self::NodeWeight {
-        self.node_weights[node as usize]
+    fn weighted_nodes(&self) -> Self::NodesIter<'_> {
+        let nodes = self.nodes();
+        NodesIter {
+            graph: self,
+            node_indices: nodes,
+        }
     }
-
-    fn weighted_nodes(&self) -> Self::WeightedNodesIter<'_> {
-        self.nodes().zip(self.node_weights.iter().copied())
-    }
-}
-
-impl<NW, EW> WeightedEdges for SimpleUndirectedGraph<NW, EW>
-where
-    EW: Sum<EW> + Copy,
-{
-    type EdgeWeight = EW;
-
-    type WeightedNodeEdgesIter<'a> = std::iter::Copied<std::slice::Iter<'a, (NodeIndex, EW)>>
-    where Self: 'a;
 
     fn weighted_edges(&self, node: NodeIndex) -> Self::WeightedNodeEdgesIter<'_> {
         self.edges[node as usize].iter().copied()
+    }
+}
+
+pub struct NodesIter<'a, Data, NW, EW> {
+    graph: &'a SimpleUndirectedGraph<Data, NW, EW>,
+    node_indices: std::ops::Range<NodeIndex>,
+}
+
+impl<'a, Data, NW: Copy, EW> Iterator for NodesIter<'a, Data, NW, EW> {
+    type Item = NodeRef<'a, Data, NW>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.node_indices.next().map(|idx| {
+            NodeRef {
+                index: idx,
+                data: &self.graph.node_data[idx as usize],
+                weight: self.graph.node_weights[idx as usize],
+            }
+        })
     }
 }

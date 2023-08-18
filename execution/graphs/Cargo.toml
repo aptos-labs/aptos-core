@@ -20,4 +20,3 @@ namable_closures = { workspace = true }
 nonmax = { workspace = true }
 rand = { workspace = true }
 thiserror = { workspace = true }
-

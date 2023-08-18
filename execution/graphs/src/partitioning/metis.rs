@@ -111,7 +111,7 @@ impl MetisGraph {
     {
         let mut res = Self::unweighted(graph);
 
-        res.vwgt = Some(graph.weighted_nodes().map(|(_, w)| w.into()).collect());
+        res.vwgt = Some(graph.weighted_nodes().map(|node| node.weight.into()).collect());
 
         res.adjwgt = Some(
             graph
