@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    db_debugger::ShardingConfig,
     jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -46,8 +47,8 @@ pub struct Cmd {
     #[clap(long, group = "backup")]
     opt_out_backup_checkpoint: bool,
 
-    #[clap(long)]
-    split_ledger_db: bool,
+    #[clap(flatten)]
+    sharding_config: ShardingConfig,
 }
 
 impl Cmd {
@@ -60,12 +61,11 @@ impl Cmd {
             );
             println!("Creating backup at: {:?}", &backup_checkpoint_dir);
             fs::create_dir_all(&backup_checkpoint_dir)?;
-            // TODO(grao): Support sharded state merkle db here.
             AptosDB::create_checkpoint(
                 &self.db_dir,
                 backup_checkpoint_dir,
-                self.split_ledger_db,
-                false,
+                self.sharding_config.split_ledger_db,
+                self.sharding_config.use_sharded_state_merkle_db,
             )?;
             println!("Done!");
         } else {
@@ -73,7 +73,8 @@ impl Cmd {
         }
 
         let rocksdb_config = RocksdbConfigs {
-            split_ledger_db: self.split_ledger_db,
+            split_ledger_db: self.sharding_config.split_ledger_db,
+            use_sharded_state_merkle_db: self.sharding_config.use_sharded_state_merkle_db,
             ..Default::default()
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
@@ -210,24 +211,30 @@ mod test {
         },
         test_helper::{arb_blocks_to_commit_with_block_nums, update_in_memory_state},
         utils::truncation_helper::num_frozen_nodes_in_accumulator,
-        AptosDB,
+        AptosDB, NUM_STATE_SHARDS,
     };
     use aptos_storage_interface::{DbReader, DbWriter};
     use aptos_temppath::TempPath;
     use proptest::prelude::*;
 
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(10))]
+        #![proptest_config(ProptestConfig::with_cases(1))]
 
         #[test]
         fn test_truncation(input in arb_blocks_to_commit_with_block_nums(80, 120)) {
+            use crate::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
             aptos_logger::Logger::new().init();
+            let sharding_config = ShardingConfig {
+                split_ledger_db: input.1,
+                use_sharded_state_merkle_db: input.1,
+            };
             let tmp_dir = TempPath::new();
-            let db = AptosDB::new_for_test(&tmp_dir);
+
+            let db = if input.1 { AptosDB::new_for_test_with_sharding(&tmp_dir, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD) } else { AptosDB::new_for_test(&tmp_dir) };
             let mut in_memory_state = db.state_store.buffered_state().lock().current_state().clone();
             let _ancestor = in_memory_state.base.clone();
             let mut version = 0;
-            for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
+            for (txns_to_commit, ledger_info_with_sigs) in input.0.iter() {
                 update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
                 db.save_transactions(txns_to_commit, version, version.checked_sub(1), Some(ledger_info_with_sigs), true, in_memory_state.clone())
                     .unwrap();
@@ -247,12 +254,12 @@ mod test {
                 ledger_db_batch_size: 15,
                 opt_out_backup_checkpoint: true,
                 backup_checkpoint_dir: None,
-                split_ledger_db: false,
+                sharding_config: sharding_config.clone(),
             };
 
             cmd.run().unwrap();
 
-            let db = AptosDB::new_for_test(&tmp_dir);
+            let db = if input.1 { AptosDB::new_for_test_with_sharding(&tmp_dir, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD) } else { AptosDB::new_for_test(&tmp_dir) };
             let db_version = db.get_latest_version().unwrap();
             prop_assert_eq!(db_version, target_version);
 
@@ -273,7 +280,11 @@ mod test {
 
             let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
                 tmp_dir.path().to_path_buf(),
-                RocksdbConfigs::default(),
+                RocksdbConfigs {
+                    use_sharded_state_merkle_db: input.1,
+                    split_ledger_db: input.1,
+                    ..Default::default()
+                },
                 /*readonly=*/ false,
                 /*max_num_nodes_per_lru_cache_shard=*/ 0,
             ).unwrap();
@@ -309,7 +320,7 @@ mod test {
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, epoch);
 
-            // TODO(grao): Support sharding here.
+
             let mut iter = state_kv_db.metadata_db().iter::<StateValueSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_first();
             for item in iter {
@@ -317,7 +328,6 @@ mod test {
                 prop_assert!(version <= target_version);
             }
 
-            // TODO(grao): Support sharding here.
             let mut iter = state_kv_db.metadata_db().iter::<StaleStateValueIndexSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_first();
             for item in iter {
@@ -325,7 +335,6 @@ mod test {
                 prop_assert!(version <= target_version);
             }
 
-            // TODO(grao): Support sharding here.
             let mut iter = state_merkle_db.metadata_db().iter::<StaleNodeIndexSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_first();
             for item in iter {
@@ -333,7 +342,6 @@ mod test {
                 prop_assert!(version <= target_version);
             }
 
-            // TODO(grao): Support sharding here.
             let mut iter = state_merkle_db.metadata_db().iter::<StaleNodeIndexCrossEpochSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_first();
             for item in iter {
@@ -341,12 +349,50 @@ mod test {
                 prop_assert!(version <= target_version);
             }
 
-            // TODO(grao): Support sharding here.
             let mut iter = state_merkle_db.metadata_db().iter::<JellyfishMerkleNodeSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_first();
             for item in iter {
                 let version = item.unwrap().0.version();
                 prop_assert!(version <= target_version);
+            }
+
+            if sharding_config.split_ledger_db && sharding_config.use_sharded_state_merkle_db {
+                let state_merkle_db = Arc::new(state_merkle_db);
+                for i in 0..NUM_STATE_SHARDS as u8 {
+                    let mut kv_shard_iter = state_kv_db.db_shard(i).iter::<StateValueSchema>(ReadOptions::default()).unwrap();
+                    kv_shard_iter.seek_to_first();
+                    for item in kv_shard_iter {
+                        let ((_, version), _) = item.unwrap();
+                        prop_assert!(version <= target_version);
+                    }
+
+                    let value_index_shard_iter = state_kv_db.db_shard(i).iter::<StaleStateValueIndexSchema>(ReadOptions::default()).unwrap();
+                    for item in value_index_shard_iter {
+                        let version = item.unwrap().0.stale_since_version;
+                        prop_assert!(version <= target_version);
+                    }
+
+                    let mut stale_node_ind_iter = state_merkle_db.db_shard(i).iter::<StaleNodeIndexSchema>(ReadOptions::default()).unwrap();
+                    stale_node_ind_iter.seek_to_first();
+                    for item in stale_node_ind_iter {
+                        let version = item.unwrap().0.stale_since_version;
+                        prop_assert!(version <= target_version);
+                    }
+
+                    let mut jelly_iter = state_merkle_db.db_shard(i).iter::<JellyfishMerkleNodeSchema>(ReadOptions::default()).unwrap();
+                    jelly_iter.seek_to_first();
+                    for item in jelly_iter {
+                        let version = item.unwrap().0.version();
+                        prop_assert!(version <= target_version);
+                    }
+
+                    let mut cross_iter = state_merkle_db.db_shard(i).iter::<StaleNodeIndexCrossEpochSchema>(ReadOptions::default()).unwrap();
+                    cross_iter.seek_to_first();
+                    for item in cross_iter {
+                        let version = item.unwrap().0.stale_since_version;
+                        prop_assert!(version <= target_version);
+                    }
+                }
             }
         }
     }

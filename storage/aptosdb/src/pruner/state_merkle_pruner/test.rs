@@ -8,7 +8,7 @@ use crate::{
     state_merkle_db::StateMerkleDb,
     state_store::StateStore,
     test_helper::{arb_state_kv_sets, update_store},
-    AptosDB, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager,
+    AptosDB, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager, NUM_STATE_SHARDS,
 };
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::HashValue;
@@ -194,7 +194,7 @@ fn test_state_store_pruner_partial_version() {
 
     let prune_batch_size = 1;
     let tmp_dir = TempPath::new();
-    let aptos_db = AptosDB::new_for_test_no_cache(&tmp_dir);
+    let aptos_db = AptosDB::new_for_test_with_sharding(&tmp_dir, 0);
     let state_store = &aptos_db.state_store;
 
     let _root0 = put_value_set(
@@ -265,7 +265,6 @@ fn test_state_store_pruner_partial_version() {
 
     // Make sure all stale indices are gone.
     //
-    // TODO(grao): Support sharding here.
     assert_eq!(
         aptos_db
             .state_merkle_db
@@ -275,6 +274,20 @@ fn test_state_store_pruner_partial_version() {
             .count(),
         0
     );
+
+    if aptos_db.state_merkle_db.sharding_enabled() {
+        for i in 0..NUM_STATE_SHARDS as u8 {
+            assert_eq!(
+                aptos_db
+                    .state_merkle_db
+                    .db_shard(i)
+                    .iter::<StaleNodeIndexSchema>(ReadOptions::default())
+                    .unwrap()
+                    .count(),
+                0
+            );
+        }
+    }
 }
 
 #[test]
