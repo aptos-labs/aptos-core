@@ -249,7 +249,7 @@ impl<TMessage> Stream for NetworkEvents<TMessage> {
 }
 
 /// Deserialize inbound direct send and rpc messages into the application `TMessage`
-/// type, logging and dropping messages that fail to deserialize.
+/// type, logging and dropping messages that fail to deserialize!
 fn peer_mgr_notif_to_event<TMessage: Message>(
     notification: PeerManagerNotification,
 ) -> Option<Event<TMessage>> {
