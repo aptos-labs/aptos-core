@@ -8,6 +8,7 @@ use aptos_indexer_grpc_utils::constants::GRPC_AUTH_TOKEN_HEADER;
 use aptos_moving_average::MovingAverage;
 use aptos_protos::indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest};
 use futures::StreamExt;
+use rand::Rng;
 pub struct DataServiceChecker {
     pub indexer_grpc_address: String,
     pub indexer_grpc_auth_token: String,
@@ -31,6 +32,10 @@ impl DataServiceChecker {
     }
 
     pub async fn run(&self) -> anyhow::Result<()> {
+        // wait for a random time to avoid thundering herd to a large transaction.
+        let mut rng = rand::thread_rng();
+        let sleep_time = rng.gen_range(0,10000);
+        tokio::time::sleep(std::time::Duration::from_millis(sleep_time)).await;
         loop {
             let mut client = RawDataClient::connect(self.indexer_grpc_address.clone()).await?;
             let mut request = tonic::Request::new(GetTransactionsRequest {
