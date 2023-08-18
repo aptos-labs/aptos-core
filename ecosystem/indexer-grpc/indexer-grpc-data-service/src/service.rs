@@ -224,7 +224,7 @@ impl RawData for RawDataServerWrapper {
                         current_version,
                         &mut cache_operator,
                         file_store_operator.as_ref(),
-                        Some(10_000),
+                        Some(5_000),
                     )
                     .await
                     {
