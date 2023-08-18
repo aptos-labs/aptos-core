@@ -213,6 +213,9 @@ impl<'a> Engine<'a> {
                         if let Some(code) = code {
                             let cs = Self::add_code(&eth_addr, &code);
                             code_change_set.insert(cs.0, cs.1);
+                        } else {
+                            let cs = Self::add_code(&eth_addr, &vec![]);
+                            code_change_set.insert(cs.0, cs.1);
                         }
                         for (index, value) in storage {
                             let cs = Self::add_storage(&eth_addr, &index, &value);
@@ -233,8 +236,15 @@ impl<'a> Engine<'a> {
                             code_change_set.insert(cs.0, cs.1);
                         }
                         for (index, value) in storage {
-                            let cs = Self::modify_storage(&eth_addr, &index, &value);
-                            storage_change_set.insert(cs.0, cs.1);
+                            let current_storage = self.io.get_storage(&eth_addr, index);
+                            if current_storage.is_some() {
+                                let cs = Self::modify_storage(&eth_addr, &index, &value);
+                                storage_change_set.insert(cs.0, cs.1);
+                            } else {
+                                let cs = Self::add_storage(&eth_addr, &index, &value);
+                                storage_change_set.insert(cs.0, cs.1);
+                            }
+
                         }
                     }
                 },
