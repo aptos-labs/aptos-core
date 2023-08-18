@@ -40,12 +40,24 @@ impl DataServiceChecker {
 
         let mut stream = client.get_transactions(request).await?.into_inner();
         let mut ma = MovingAverage::new(100_000);
+        let mut current_version = self.starting_version;
         while let Some(transaction) = stream.next().await {
             let transaction = transaction?;
             let num_res = transaction.transactions.len();
             DATA_SERVICE_CHECKER_TRANSACTION_COUNT.inc_by(num_res as u64);
             ma.tick_now(num_res as u64);
             DATA_SERVICE_CHECKER_TRANSACTION_TPS.set(ma.avg() * 1000.0);
+            anyhow::ensure!(
+                current_version == transaction.transactions.first().unwrap().version,
+                "Version mismatch"
+            );
+            tracing::info!(
+                current_version = current_version,
+                batch_start_version = transaction.transactions.first().unwrap().version,
+                batch_size = num_res,
+                "New batch received from data service."
+            );
+            current_version += num_res as u64;
         }
         Ok(())
     }
