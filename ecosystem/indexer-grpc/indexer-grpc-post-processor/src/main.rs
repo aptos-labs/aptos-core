@@ -34,6 +34,7 @@ pub struct IndexerGrpcDataServiceCheckerConfig {
     pub indexer_grpc_address: String,
     pub indexer_grpc_auth_token: String,
     pub starting_version: u64,
+    pub ending_version: u64,
 }
 
 // TODO: change this to match pattern.
@@ -105,6 +106,7 @@ impl RunnableConfig for IndexerGrpcPostProcessorConfig {
                         config.indexer_grpc_address.clone(),
                         config.indexer_grpc_auth_token.clone(),
                         config.starting_version,
+                        config.ending_version,
                     )
                     .expect("Failed to initialize DataServiceChecker");
                     info!("Starting DataServiceChecker");
