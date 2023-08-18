@@ -154,7 +154,9 @@ impl<'a> Engine<'a> {
 
     fn add_code(address: &EthAddress, code: &Vec<u8>) -> (Vec<u8>, Op<Vec<u8>>) {
         let move_bytes = bcs::to_bytes(code).unwrap();
-        (address.as_bytes().to_vec(), Op::New(move_bytes))
+        (
+            bcs::to_bytes(&address.as_bytes().to_vec()).unwrap(), Op::New(move_bytes)
+        )
     }
 
     fn add_storage(address: &EthAddress, index: &H256, value: &H256) -> (Vec<u8>, Op<Vec<u8>>) {
