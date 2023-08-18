@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::eth_address::EthAddress;
-use crate::utils::{read_h256_from_bytes, read_u256_from_move_bytes};
+use crate::utils::{read_bytes_from_move_bytes, read_h256_from_bytes, read_u256_from_move_bytes};
 use aptos_table_natives::{TableHandle, TableResolver};
 use primitive_types::{H256, U256};
 use serde::{Deserialize, Serialize};
@@ -53,7 +53,7 @@ impl<'a> IO<'a> {
             .resolver
             .resolve_table_entry(&self.code_table_handle, &address.as_bytes())
             .unwrap();
-        bytes.unwrap_or_default()
+        bytes.map(|bytes| read_bytes_from_move_bytes(&bytes)).unwrap_or_default()
     }
 
     pub fn get_storage(&self, address: &EthAddress, index: H256) -> Option<H256> {
@@ -65,7 +65,10 @@ impl<'a> IO<'a> {
                 bcs::to_bytes(&storage_key).unwrap().as_slice(),
             )
             .unwrap();
-        bytes.map(|bytes| read_h256_from_bytes(&bytes))
+        bytes.map(|bytes| {
+            let bytes = read_bytes_from_move_bytes(&bytes);
+            read_h256_from_bytes(&bytes)
+        })
     }
 }
 
