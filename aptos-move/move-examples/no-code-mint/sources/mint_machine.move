@@ -12,7 +12,6 @@ module no_code_mint::mint_machine {
     use aptos_std::smart_table::{Self, SmartTable};
     use aptos_token_objects::aptos_token::{Self, AptosToken};
     use aptos_token_objects::collection::{Self, Collection};
-    use no_code_mint::auid_manager::{Self, AuidManager};
     use aptos_token_objects::property_map::{Self};
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -272,41 +271,32 @@ module no_code_mint::mint_machine {
     //////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////
 
-    // Right now these functions need to be private entry, because they require single tx-specific context
-    // Specifically, they need to declare a new auid_manager, otherwise it isn't possible to find the token
-    // object address to transfer it to the receiver.
-    // This also disallows abuse of the pseudo-random number generation based on the timestamp
+    // These functions need to be private entry to disallow abuse of the pseudo-random number generation based on the timestamp
     entry fun mint_multiple(
         receiver: &signer,
         admin_addr: address,
         amount: u64
     ) acquires MintConfiguration {
-        let auids = auid_manager::create();
         let i = 0;
         while(i < amount) {
-            mint_internal(receiver, admin_addr, &mut auids);
+            mint_internal(receiver, admin_addr);
             i = i + 1;
         };
     }
 
-    // Right now these functions need to be private entry, because they require single tx-specific context
-    // Specifically, they need to declare a new auid_manager, otherwise it isn't possible to find the token
-    // object address to transfer it to the receiver.
-    // This also disallows abuse of the pseudo-random number generation based on the timestamp
+    // These functions need to be private entry to disallow abuse of the pseudo-random number generation based on the timestamp
     entry fun mint(
         receiver: &signer,
         admin_addr: address,
     ) acquires MintConfiguration {
-        let auids = auid_manager::create();
-        mint_internal(receiver, admin_addr, &mut auids);
+        mint_internal(receiver, admin_addr);
     }
 
     /// Mint an NFT to a receiver who requests it as long as they are eligible to do so
     fun mint_internal(
         receiver: &signer,
         admin_addr: address,
-        auids: &mut AuidManager,
-    ) acquires MintConfiguration {
+    ): Object<AptosToken> acquires MintConfiguration {
         // must come first due to borrow
         let creator = get_creator(admin_addr);
 
@@ -337,7 +327,7 @@ module no_code_mint::mint_machine {
         let full_token_name = concat_u64(mint_configuration.token_base_name, mint_configuration.max_supply - tokens_left);
 
         // mint token to the receiver
-        aptos_token::mint(
+        let token_object = aptos_token::mint_token_object(
             &creator,
             mint_configuration.collection_name,
             token_metadata.description,
@@ -348,12 +338,10 @@ module no_code_mint::mint_machine {
             token_metadata.property_values,
         );
 
-        // Increment the auid manager counter and get the newest token address
-        let token_address = auid_manager::increment(auids);
-
         // Transfer the token object from the creator to the receiver/minter
-        let token_object = object::address_to_object<AptosToken>(token_address);
         object::transfer(&creator, token_object, signer::address_of(receiver));
+
+        token_object
     }
 
     #[test_only]
@@ -362,13 +350,15 @@ module no_code_mint::mint_machine {
         receiver: &signer,
         admin_addr: address,
         amount: u64,
-        auids: &mut AuidManager,
-    ) acquires MintConfiguration {
+    ): vector<Object<AptosToken>> acquires MintConfiguration {
+        let objects = vector<Object<AptosToken>> [];
         let i = 0;
         while(i < amount) {
-            mint_internal(receiver, admin_addr, auids);
+            let obj = mint_internal(receiver, admin_addr);
+            vector::push_back(&mut objects, obj);
             i = i + 1;
         };
+        objects
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////
@@ -581,7 +571,6 @@ module no_code_mint::unit_tests {
     use no_code_mint::allowlist;
     use no_code_mint::package_manager;
     use no_code_mint::mint_machine;
-    use no_code_mint::auid_manager::{Self, AuidManager};
     use std::account;
     use std::bcs;
     use std::vector;
@@ -622,9 +611,7 @@ module no_code_mint::unit_tests {
         minter_1: &signer,
         aptos_framework: &signer,
         timestamp: u64,
-    ): AuidManager {
-        auid_manager::enable_auids_for_test(aptos_framework);
-
+    ) {
         timestamp::set_time_has_started_for_testing(aptos_framework);
         timestamp::update_global_time_for_test_secs(timestamp);
         account::create_account_for_test(signer::address_of(admin));
@@ -639,8 +626,6 @@ module no_code_mint::unit_tests {
         coin::destroy_mint_cap(mint);
 
         init_mint_machine_for_test(admin);
-
-        auid_manager::create()
     }
 
     fun init_mint_machine_for_test(admin: &signer) {
@@ -673,7 +658,7 @@ module no_code_mint::unit_tests {
         aptos_framework: &signer,
     ) {
         let admin_addr = signer::address_of(admin);
-        let auids = setup_test(admin, resource_signer, minter_1, aptos_framework, START_TIMESTAMP_PUBLIC + 1);
+        setup_test(admin, resource_signer, minter_1, aptos_framework, START_TIMESTAMP_PUBLIC + 1);
         mint_machine::upsert_tier(
             admin,
             str(b"public"),
@@ -694,19 +679,12 @@ module no_code_mint::unit_tests {
         let allowlist_addr = mint_machine::get_creator_addr(admin_addr);
         allowlist::assert_eligible_for_tier(allowlist_addr, minter_1_addr, str(b"public"));
 
-        let i = 0;
-        while(i < MAX_SUPPLY) {
-            mint_machine::mint_for_test(minter_1, admin_addr, 1, &mut auids);
-            let aptos_token_object = object::address_to_object<AptosToken>(*auid_manager::get(&auids, i));
-            assert!(object::is_owner(aptos_token_object, minter_1_addr), i);
-            let token_object = object::convert<AptosToken, Token>(aptos_token_object);
-            // NOTE: the name and uris will be randomly matched. This is because the vector of token_uris is randomly popped from
-            // the minting machine. This would normally be obstructive for indexing the names => metadata after, but
-            // since the object addresses are random (and can't be derived from creator+collection+name anymore),
-            // we'll already be indexing by object address anyway.
+        let aptos_token_objects = mint_machine::mint_for_test(minter_1, admin_addr, MAX_SUPPLY);
+        vector::enumerate_ref(&aptos_token_objects, |i, aptos_token_object| {
+            assert!(object::is_owner(*aptos_token_object, minter_1_addr), i);
+            let token_object = object::convert<AptosToken, Token>(*aptos_token_object);
             assert!(token::name(token_object) == mint_machine::concat_u64(str(TOKEN_BASE_NAME), i), i);
-            i = i + 1;
-        };
+        });
 
         // destroy the allowlist, only possible if all tokens have been minted
         mint_machine::destroy_allowlist(admin);

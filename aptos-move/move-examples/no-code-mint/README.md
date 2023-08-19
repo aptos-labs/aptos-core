@@ -122,10 +122,3 @@ If you'd like to see the Move representation of the e2e flow from initialization
 ### Clean up
 
 You can destroy the whitelist object oncoe minting is complete by calling the `destroy_allowlist` function as the admin.
-
-## AUID Manager (auid_manager.move)
-
-This module currently exists as a workaround to the issue of not being able to know the address of a token object
-when it's generated as an auid address and the address isn't returned from the function it's minted from.
-
-The `aptos_token.move` module will eventually return the address, but for now, we must track it manually.
