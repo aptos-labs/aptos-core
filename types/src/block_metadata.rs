@@ -85,7 +85,7 @@ impl BlockMetadata {
         ];
 
         //dkg todo: currently assuming the first transcript is valid.
-        ret.push(MoveValue::Bool(!self.maybe_dkg_transcript.is_some()));
+        ret.push(MoveValue::Bool(self.maybe_dkg_transcript.is_some()));
         ret.push(MoveValue::Vector(
             self.maybe_dkg_transcript
                 .map_or_else(|| vec![], |trx| bcs::to_bytes(&trx).unwrap())
