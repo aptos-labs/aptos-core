@@ -12,6 +12,7 @@ import threading
 import time
 from typing import List
 
+from .account_address import AccountAddress
 from .async_client import FaucetClient, RestClient
 
 # Assume that the binary is in the global path if one is not provided.
@@ -27,14 +28,43 @@ class AptosCLIWrapper:
     """Tooling to make easy access to the Aptos CLI tool from within Python."""
 
     @staticmethod
+    def compile_package(package_dir: str, named_addresses: Dict[str, AccountAddress]):
+        AptosCLIWrapper.assert_cli_exists()
+        args = [
+            DEFAULT_BINARY,
+            "move",
+            "compile",
+            "--save-metadata",
+            "--package-dir",
+            package_dir,
+        ]
+
+        if len(named_addresses) > 0:
+            args.append("--named-addresses")
+            total_names = len(named_addresses)
+            for idx, (name, addr) in enumerate(named_addresses.items()):
+                to_append = f"{name}={addr}"
+                if idx < total_names - 1:
+                    to_append += ","
+                args.append(to_append)
+
+        process_output = subprocess.run(args, capture_output=True)
+        if process_output.returncode != 0:
+            raise CLIError(args, process_output.stdout, process_output.stderr)
+
+    @staticmethod
     def start_node() -> AptosInstance:
         AptosCLIWrapper.assert_cli_exists()
         return AptosInstance.start()
 
     @staticmethod
     def assert_cli_exists():
-        if shutil.which(DEFAULT_BINARY) is None:
+        if not AptosCLIWrapper.does_cli_exist():
             raise MissingCLIError()
+
+    @staticmethod
+    def does_cli_exist():
+        return shutil.which(DEFAULT_BINARY) is not None
 
 
 class MissingCLIError(Exception):
@@ -42,6 +72,15 @@ class MissingCLIError(Exception):
 
     def __init__(self):
         super().__init__("The CLI was not found in the expected path, {DEFAULT_BINARY}")
+
+
+class CLIError(Exception):
+    """The CLI failed execution of a command."""
+
+    def __init__(self, command, output, error):
+        super().__init__(
+            f"The CLI operation failed:\n\tCommand: {' '.join(command)}\n\tOutput: {output}\n\tError: {error}"
+        )
 
 
 class AptosInstance:

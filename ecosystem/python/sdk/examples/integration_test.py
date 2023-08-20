@@ -24,6 +24,15 @@ class Test(unittest.IsolatedAsyncioTestCase):
         os.environ["APTOS_NODE_URL"] = "http://127.0.0.1:8080/v1"
         os.environ["APTOS_FAUCET_URL"] = "http://127.0.0.1:8081"
 
+    async def test_hello_blockchain(self):
+        from . import hello_blockchain
+
+        hello_blockchain_dir = os.path.join(
+            "..", "..", "..", "aptos-move", "move-examples", "hello_blockchain"
+        )
+        contract_address = await hello_blockchain.publish_contract(hello_blockchain_dir)
+        await hello_blockchain.main(contract_address)
+
     async def test_read_aggreagtor(self):
         from . import read_aggregator
 
@@ -53,6 +62,14 @@ class Test(unittest.IsolatedAsyncioTestCase):
         from . import transfer_two_by_two
 
         await transfer_two_by_two.main()
+
+    async def test_your_coin(self):
+        from . import your_coin
+
+        moon_coin_path = os.path.join(
+            "..", "..", "..", "aptos-move", "move-examples", "moon_coin"
+        )
+        await your_coin.main(moon_coin_path)
 
     def tearDown(self):
         self._node.stop()
