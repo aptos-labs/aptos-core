@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from typing import List
+from typing import Dict, List
 
 from .account_address import AccountAddress
 from .async_client import FaucetClient, RestClient
@@ -28,6 +28,23 @@ class AptosCLIWrapper:
     """Tooling to make easy access to the Aptos CLI tool from within Python."""
 
     @staticmethod
+    def prepare_named_addresses(
+        named_addresses: Dict[str, AccountAddress]
+    ) -> List[str]:
+        total_names = len(named_addresses)
+        args: List[str] = []
+        if total_names == 0:
+            return args
+
+        args.append("--named-addresses")
+        for idx, (name, addr) in enumerate(named_addresses.items()):
+            to_append = f"{name}={addr}"
+            if idx < total_names - 1:
+                to_append += ","
+            args.append(to_append)
+        return args
+
+    @staticmethod
     def compile_package(package_dir: str, named_addresses: Dict[str, AccountAddress]):
         AptosCLIWrapper.assert_cli_exists()
         args = [
@@ -38,15 +55,7 @@ class AptosCLIWrapper:
             "--package-dir",
             package_dir,
         ]
-
-        if len(named_addresses) > 0:
-            args.append("--named-addresses")
-            total_names = len(named_addresses)
-            for idx, (name, addr) in enumerate(named_addresses.items()):
-                to_append = f"{name}={addr}"
-                if idx < total_names - 1:
-                    to_append += ","
-                args.append(to_append)
+        args.extend(AptosCLIWrapper.prepare_named_addresses(named_addresses))
 
         process_output = subprocess.run(args, capture_output=True)
         if process_output.returncode != 0:
@@ -56,6 +65,22 @@ class AptosCLIWrapper:
     def start_node() -> AptosInstance:
         AptosCLIWrapper.assert_cli_exists()
         return AptosInstance.start()
+
+    @staticmethod
+    def test_package(package_dir: str, named_addresses: Dict[str, AccountAddress]):
+        AptosCLIWrapper.assert_cli_exists()
+        args = [
+            DEFAULT_BINARY,
+            "move",
+            "test",
+            "--package-dir",
+            package_dir,
+        ]
+        args.extend(AptosCLIWrapper.prepare_named_addresses(named_addresses))
+
+        process_output = subprocess.run(args, capture_output=True)
+        if process_output.returncode != 0:
+            raise CLIError(args, process_output.stdout, process_output.stderr)
 
     @staticmethod
     def assert_cli_exists():
