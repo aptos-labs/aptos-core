@@ -849,8 +849,9 @@ impl EpochManager {
                 debug!("[DKG] No DKG agg transcript found for the new epoch.");
             }
             Some(state) => {
-                debug!("[DKG] from payload, serialized_transcript={:?}", state.serialized_transcript);
-                let trxs = bcs::from_bytes::<DKGTranscriptWrapper>(state.serialized_transcript.as_slice());
+                debug!("[DKG] start_new_epoch with dkg_state={:?}", state);
+                // let trxs = bcs::from_bytes::<DKGTranscriptWrapper>(state.serialized_transcript.as_slice()).unwrap();
+                // debug!("[DKG] trxs={trxs:?}");
                 let st: Storage = (&self.config.safety_rules.backend).try_into().unwrap();
                 if let Err(error) = st.available() {
                     panic!("Storage is not available: {:?}", error);

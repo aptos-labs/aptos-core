@@ -2,6 +2,7 @@ module aptos_framework::dkg {
     use std::error;
     use std::option::Option;
     use std::signer;
+    use std::string::utf8;
     use aptos_std::debug;
     use aptos_framework::account;
     use aptos_framework::event;
@@ -20,7 +21,8 @@ module aptos_framework::dkg {
     }
 
     struct DKGState has key {
-        state_id: u64, // 0: inactive, 1: active,
+        target_epoch: u64,
+        state_id: u64, // 0: done, 1: in progress,
         countdown: u64, // For debugging...
         /// DKG Transcript for current epoch.
         serialized_transcript: vector<u8>,
@@ -33,6 +35,7 @@ module aptos_framework::dkg {
         move_to<DKGState>(
             aptos_framework,
             DKGState {
+                target_epoch: 1,
                 state_id: 0,
                 countdown: 0,
                 serialized_transcript: vector[],
@@ -41,9 +44,9 @@ module aptos_framework::dkg {
         );
     }
 
-    public (friend) fun get_state(): u64 acquires DKGState  {
+    public (friend) fun get_state(): (u64, u64) acquires DKGState  {
         let dkg_state = borrow_global<DKGState>(@aptos_framework);
-        dkg_state.state_id
+        (dkg_state.target_epoch, dkg_state.state_id)
     }
 
     public (friend) fun state_active(): u64 {
@@ -54,20 +57,25 @@ module aptos_framework::dkg {
         0
     }
 
-    public(friend) fun start(locked_new_validator_set: vector<ValidatorInfo>) acquires DKGState {
-        debug::print(&std::string::utf8(b"dkg::start() started."));
+    public(friend) fun start(target_epoch: u64, locked_new_validator_set: vector<ValidatorInfo>) acquires DKGState {
+        debug::print(&utf8(b"dkg::start() started."));
         let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
-        if (dkg_state.state_id != 0) {
-            debug::print(&std::string::utf8(b"dkg::start() called while dkg already started."));
-            return;
+        debug::print(&utf8(b"dkg_state="));
+        debug::print(dkg_state);
+        debug::print(&utf8(b"target_epoch="));
+        debug::print(&target_epoch);
+        if (target_epoch == dkg_state.target_epoch + 1 && dkg_state.state_id == 0) {
+            dkg_state.target_epoch = target_epoch;
+            dkg_state.state_id = 1;
+            dkg_state.countdown = 5; //TODO: for debugging
+            event::emit_event<StartDKGEvent>(
+                &mut dkg_state.events,
+                StartDKGEvent { locked_new_validator_set },
+            );
+        } else {
+            debug::print(&utf8(b"unexpected dkg::start()..."));
         };
-        dkg_state.state_id = 1;
-        dkg_state.countdown = 5; //TODO: for debugging
-        event::emit_event<StartDKGEvent>(
-            &mut dkg_state.events,
-            StartDKGEvent { locked_new_validator_set },
-        );
-        debug::print(&std::string::utf8(b"dkg::start() finished."));
+        debug::print(&utf8(b"dkg::start() finished."));
     }
 
     public(friend) fun on_potential_transcript(maybe_serialized_transcript: Option<vector<u8>>): bool acquires DKGState {
@@ -79,6 +87,7 @@ module aptos_framework::dkg {
             dkg_state.state_id = 0;
             dkg_state.countdown = 0;
             dkg_state.serialized_transcript = std::option::extract(&mut maybe_serialized_transcript);
+            debug::print(&dkg_state.serialized_transcript);
             true
         } else if (dkg_state.countdown == 0) {
             debug::print(&std::string::utf8(b"dkg::on_potential_transcript() - Current DKG is taking too long. Aborting."));

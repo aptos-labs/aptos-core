@@ -6,6 +6,7 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DKGState {
+    pub target_epoch: u64,
     pub state_id: u64,
     pub countdown: u64,
     pub serialized_transcript: Vec<u8>,
