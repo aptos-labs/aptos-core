@@ -99,6 +99,12 @@ use std::{
     time::Duration,
 };
 use tokio_retry::strategy::ExponentialBackoff;
+use aptos_crypto::bls12381;
+use aptos_dkg::pvss::traits::Transcript;
+use aptos_global_constants::CONSENSUS_KEY;
+use aptos_secure_storage::Storage;
+use aptos_types::dkg::DKGTranscriptWrapper;
+use aptos_secure_storage::KVStorage;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -837,8 +843,28 @@ impl EpochManager {
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
-        // dkg todo: the new epoch validators read and decrypt their private keys from DKG
         let maybe_dkg_state: Option<DKGState> = payload.get().ok();
+        match maybe_dkg_state {
+            None => {
+                debug!("[DKG] No DKG agg transcript found for the new epoch.");
+            }
+            Some(state) => {
+                debug!("[DKG] from payload, serialized_transcript={:?}", state.serialized_transcript);
+                let trxs = bcs::from_bytes::<DKGTranscriptWrapper>(state.serialized_transcript.as_slice());
+                let st: Storage = (&self.config.safety_rules.backend).try_into().unwrap();
+                if let Err(error) = st.available() {
+                    panic!("Storage is not available: {:?}", error);
+                }
+                let private_key: bls12381::PrivateKey = st
+                    .get(CONSENSUS_KEY)
+                    .map(|v| v.value)
+                    .expect("Unable to get private key");
+                debug!("[DKG] private_key={private_key}");
+
+                // let (sk, pk) = trxs.unwrap().trx_one_third.decrypt_own_share();
+                // debug!("[DKG] starting new epoch with sk={sk}, pk={pk}");
+            }
+        }
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");

@@ -28,13 +28,8 @@ pub struct BlockMetadata {
     previous_block_votes_bitvec: Vec<u8>,
     failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,
-    // dkg todo
     maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
     maybe_randomness: Option<Randomness>,
-}
-
-fn serialize_transcript(_ts: &DKGTranscriptWrapper) -> Vec<u8> {
-    vec![3, 3, 3] //dkg todo: use something from aptos-dkg.
 }
 
 impl BlockMetadata {
@@ -93,7 +88,7 @@ impl BlockMetadata {
         ret.push(MoveValue::Bool(!self.maybe_dkg_transcript.is_some()));
         ret.push(MoveValue::Vector(
             self.maybe_dkg_transcript
-                .map_or_else(|| vec![], |trx| serialize_transcript(&trx))
+                .map_or_else(|| vec![], |trx| bcs::to_bytes(&trx).unwrap())
                 .into_iter()
                 .map(MoveValue::U8)
                 .collect(),
