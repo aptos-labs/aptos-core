@@ -803,6 +803,10 @@ class FaucetClient:
         for txn_hash in response.json():
             await self.rest_client.wait_for_transaction(txn_hash)
 
+    async def healthy(self) -> bool:
+        response = await self.rest_client.client.get(self.base_url)
+        return "tap:ok" == response.text
+
 
 class ApiError(Exception):
     """The API returned a non-success status code, e.g., >= 400"""
