@@ -9,6 +9,7 @@ import os
 import unittest
 from typing import Optional
 
+from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.aptos_cli_wrapper import AptosCLIWrapper, AptosInstance
 
 
@@ -29,6 +30,9 @@ class Test(unittest.IsolatedAsyncioTestCase):
 
         hello_blockchain_dir = os.path.join(
             "..", "..", "..", "aptos-move", "move-examples", "hello_blockchain"
+        )
+        AptosCLIWrapper.test_package(
+            hello_blockchain_dir, {"hello_blockchain": AccountAddress.from_str("0x0a")}
         )
         contract_address = await hello_blockchain.publish_contract(hello_blockchain_dir)
         await hello_blockchain.main(contract_address)
@@ -68,6 +72,9 @@ class Test(unittest.IsolatedAsyncioTestCase):
 
         moon_coin_path = os.path.join(
             "..", "..", "..", "aptos-move", "move-examples", "moon_coin"
+        )
+        AptosCLIWrapper.test_package(
+            moon_coin_path, {"MoonCoin": AccountAddress.from_str("0x0a")}
         )
         await your_coin.main(moon_coin_path)
 

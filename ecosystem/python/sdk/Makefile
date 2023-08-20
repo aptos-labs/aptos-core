@@ -9,7 +9,7 @@ test-coverage:
 	poetry run python -m coverage report
 
 fmt:
-	find ./examples ./aptos_sdk *.py -type f -name "*.py" | xargs poetry run autoflake -i -r --remove-all-unused-imports --remove-unused-variables --ignore-init-module-imports
+	find ./examples ./aptos_sdk . -type f -name "*.py" | xargs poetry run autoflake -i -r --remove-all-unused-imports --remove-unused-variables --ignore-init-module-imports
 	poetry run isort aptos_sdk examples
 	poetry run black aptos_sdk examples
 
