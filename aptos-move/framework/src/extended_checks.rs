@@ -13,16 +13,11 @@ use move_core_types::{
 use move_model::{
     ast::{Attribute, AttributeValue, Value},
     model::{
-        FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, NamedConstantEnv, Parameter, QualifiedId,
+        FunctionEnv, GlobalEnv, Loc, ModuleEnv, NamedConstantEnv, Parameter, QualifiedId,
         StructEnv, StructId,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
-};
-use move_stackless_bytecode::{
-    function_target::{FunctionData, FunctionTarget},
-    stackless_bytecode::{AttrId, Bytecode, Operation},
-    stackless_bytecode_generator::StacklessBytecodeGenerator,
 };
 use once_cell::sync::Lazy;
 use std::{
@@ -104,7 +99,6 @@ impl<'a> ExtendedChecker<'a> {
                 self.check_and_record_resource_group_members(module);
                 self.check_and_record_view_functions(module);
                 self.check_entry_functions(module);
-                self.check_events(module);
                 self.check_init_module(module);
                 self.build_error_map(module)
             }
@@ -467,59 +461,6 @@ impl<'a> ExtendedChecker<'a> {
 }
 
 // ----------------------------------------------------------------------------------
-// Events
-
-impl<'a> ExtendedChecker<'a> {
-    fn check_events(&mut self, module: &ModuleEnv) {
-        for fun in module.get_functions() {
-            if fun.is_inline() || fun.is_native() {
-                continue;
-            }
-            // Holder for stackless function data
-            let data = self.get_stackless_data(&fun);
-            // Handle to work with stackless functions -- function targets.
-            let target = FunctionTarget::new(&fun, &data);
-            // Now check for event emit calls.
-            for bc in target.get_bytecode() {
-                if let Bytecode::Call(attr_id, _, Operation::Function(mid, fid, type_inst), _, _) =
-                    bc
-                {
-                    self.check_emit_event_call(&target, *attr_id, mid.qualified(*fid), type_inst);
-                }
-            }
-        }
-    }
-
-    fn check_emit_event_call(
-        &mut self,
-        target: &FunctionTarget,
-        attr_id: AttrId,
-        callee: QualifiedId<FunId>,
-        type_inst: &[Type],
-    ) {
-        if !self.is_function(callee, "0x1::event::emit") {
-            return;
-        }
-        // We are looking at `0x1::event::emit<T>` and extracting the `T`
-        let event_type = &type_inst[0];
-        // Now check whether this type has the event attribute
-        let type_ok = match event_type {
-            Type::Struct(mid, sid, _) => {
-                let struct_ = self.env.get_struct(mid.qualified(*sid));
-                self.has_attribute_iter(struct_.get_attributes().iter(), "event")
-            },
-            _ => false,
-        };
-        if !type_ok {
-            let loc = target.get_bytecode_loc(attr_id);
-            self.env.error(&loc,
-                           &format!("`0x1::event::emit` called with type `{}` which does not have the `#[event]` attribute",
-                                    event_type.display(&self.env.get_type_display_ctx())));
-        }
-    }
-}
-
-// ----------------------------------------------------------------------------------
 // Error Map
 
 impl<'a> ExtendedChecker<'a> {
@@ -567,15 +508,7 @@ impl<'a> ExtendedChecker<'a> {
 
 impl<'a> ExtendedChecker<'a> {
     fn has_attribute(&self, fun: &FunctionEnv, attr_name: &str) -> bool {
-        self.has_attribute_iter(fun.get_attributes().iter(), attr_name)
-    }
-
-    fn has_attribute_iter(
-        &self,
-        mut attrs: impl Iterator<Item = &'a Attribute>,
-        attr_name: &str,
-    ) -> bool {
-        attrs.any(|attr| {
+        fun.get_attributes().iter().any(|attr| {
             if let Attribute::Apply(_, name, _) = attr {
                 self.env.symbol_pool().string(*name).as_str() == attr_name
             } else {
@@ -595,15 +528,6 @@ impl<'a> ExtendedChecker<'a> {
 
     fn name_string(&self, symbol: Symbol) -> Rc<String> {
         self.env.symbol_pool().string(symbol)
-    }
-
-    fn get_stackless_data(&self, fun: &FunctionEnv) -> FunctionData {
-        StacklessBytecodeGenerator::new(fun).generate_function()
-    }
-
-    fn is_function(&self, id: QualifiedId<FunId>, full_name_str: &str) -> bool {
-        let fun = &self.env.get_function(id);
-        fun.get_full_name_str() == full_name_str
     }
 }
 
