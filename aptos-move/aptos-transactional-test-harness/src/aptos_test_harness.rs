@@ -51,7 +51,7 @@ use move_transactional_test_runner::{
 use move_vm_runtime::session::SerializedReturnValues;
 use once_cell::sync::Lazy;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     convert::TryFrom,
     fmt,
     path::Path,
@@ -294,6 +294,7 @@ static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
         deps,
         None,
         move_compiler::Flags::empty().set_sources_shadow_deps(false),
+        aptos_framework::extended_checks::get_all_attribute_names(),
     )
     .unwrap();
     match program_res {
@@ -549,6 +550,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
     fn default_syntax(&self) -> SyntaxChoice {
         self.default_syntax
+    }
+
+    fn known_attributes(&self) -> &BTreeSet<String> {
+        aptos_framework::extended_checks::get_all_attribute_names()
     }
 
     fn init(
@@ -929,8 +934,13 @@ struct PrettyEvent<'a>(&'a ContractEvent);
 impl<'a> fmt::Display for PrettyEvent<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{{")?;
-        writeln!(f, "    key:     {}", self.0.key())?;
-        writeln!(f, "    seq_num: {}", self.0.sequence_number())?;
+        match self.0 {
+            ContractEvent::V1(v1) => {
+                writeln!(f, "    key:     {}", v1.key())?;
+                writeln!(f, "    seq_num: {}", v1.sequence_number())?;
+            },
+            ContractEvent::V2(_v2) => (),
+        }
         writeln!(f, "    type:    {}", self.0.type_tag())?;
         writeln!(f, "    data:    {:?}", hex::encode(self.0.event_data()))?;
         write!(f, "}}")

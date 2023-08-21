@@ -5,7 +5,9 @@ use crate::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
         NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
-        StateValuesWithProofRequest, TransactionOutputsWithProofRequest,
+        StateValuesWithProofRequest, SubscribeTransactionOutputsWithProofRequest,
+        SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
+        SubscriptionStreamMetadata, TransactionOutputsWithProofRequest,
         TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
     },
     responses::{CompleteDataRange, DataSummary, ProtocolMetadata},
@@ -125,6 +127,54 @@ fn test_data_summary_service_optimistic_fetch() {
             highest_synced_version + (max_optimistic_fetch_version_lag * 2),
         ];
         verify_can_service_optimistic_fetch_requests(
+            &data_client_config,
+            &data_summary,
+            compression,
+            known_versions,
+            false,
+        );
+    }
+}
+
+#[test]
+fn test_data_summary_service_subscription() {
+    // Create a data client config with the specified max subscription lag
+    let max_subscription_version_lag = 1000;
+    let data_client_config = AptosDataClientConfig {
+        max_subscription_version_lag,
+        ..Default::default()
+    };
+
+    // Create a data summary with the specified synced ledger info version
+    let highest_synced_version = 50_000;
+    let data_summary = DataSummary {
+        synced_ledger_info: Some(create_ledger_info_at_version(highest_synced_version)),
+        ..Default::default()
+    };
+
+    // Verify the different requests that can be serviced
+    for compression in [true, false] {
+        // Test the known versions that are within the subscription lag
+        let known_versions = vec![
+            highest_synced_version,
+            highest_synced_version + (max_subscription_version_lag / 2),
+            highest_synced_version + max_subscription_version_lag - 1,
+        ];
+        verify_can_service_subscription_requests(
+            &data_client_config,
+            &data_summary,
+            compression,
+            known_versions,
+            true,
+        );
+
+        // Test the known versions that are outside the subscription lag
+        let known_versions = vec![
+            highest_synced_version + max_subscription_version_lag,
+            highest_synced_version + max_subscription_version_lag + 1,
+            highest_synced_version + (max_subscription_version_lag * 2),
+        ];
+        verify_can_service_subscription_requests(
             &data_client_config,
             &data_summary,
             compression,
@@ -455,27 +505,27 @@ fn create_optimistic_fetch_request(
     use_compression: bool,
 ) -> StorageServiceRequest {
     // Generate a random number
-    let random_number: u64 = thread_rng().gen();
+    let random_number = get_random_u64();
 
     // Determine the data request type based on the random number
     let data_request = if random_number % 3 == 0 {
         DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
             known_version,
-            known_epoch: 1,
+            known_epoch: get_random_u64(),
             include_events: false,
         })
     } else if random_number % 3 == 1 {
         DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
             known_version,
-            known_epoch: 1,
+            known_epoch: get_random_u64(),
         })
     } else {
         DataRequest::GetNewTransactionsOrOutputsWithProof(
             NewTransactionsOrOutputsWithProofRequest {
                 known_version,
-                known_epoch: 1,
+                known_epoch: get_random_u64(),
                 include_events: false,
-                max_num_output_reductions: 0,
+                max_num_output_reductions: get_random_u64(),
             },
         )
     };
@@ -495,6 +545,45 @@ fn create_outputs_request(
             start_version,
             end_version,
         });
+    StorageServiceRequest::new(data_request, use_compression)
+}
+
+/// Creates a new subscription request
+fn create_subscription_request(known_version: u64, use_compression: bool) -> StorageServiceRequest {
+    // Create a new subscription stream metadata
+    let subscription_stream_metadata = SubscriptionStreamMetadata {
+        known_version_at_stream_start: known_version,
+        known_epoch_at_stream_start: get_random_u64(),
+        subscription_stream_id: get_random_u64(),
+    };
+
+    // Generate a random number
+    let random_number = get_random_u64();
+
+    // Determine the data request type based on the random number
+    let data_request = if random_number % 3 == 0 {
+        DataRequest::SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest {
+            subscription_stream_metadata,
+            include_events: false,
+            subscription_stream_index: get_random_u64(),
+        })
+    } else if random_number % 3 == 1 {
+        DataRequest::SubscribeTransactionOutputsWithProof(
+            SubscribeTransactionOutputsWithProofRequest {
+                subscription_stream_metadata,
+                subscription_stream_index: get_random_u64(),
+            },
+        )
+    } else {
+        DataRequest::SubscribeTransactionsOrOutputsWithProof(
+            SubscribeTransactionsOrOutputsWithProofRequest {
+                subscription_stream_metadata,
+                include_events: false,
+                max_num_output_reductions: get_random_u64(),
+                subscription_stream_index: get_random_u64(),
+            },
+        )
+    };
     StorageServiceRequest::new(data_request, use_compression)
 }
 
@@ -555,6 +644,11 @@ fn create_state_values_request_at_version(
     create_state_values_request(version, 0, 1000, use_compression)
 }
 
+/// Generates a random u64
+fn get_random_u64() -> u64 {
+    thread_rng().gen()
+}
+
 /// Verifies the serviceability of the epoch ending request ranges against
 /// the specified data summary. If `expect_service` is true, then the
 /// request should be serviceable.
@@ -606,6 +700,25 @@ fn verify_can_service_state_chunk_requests(
     for version in versions {
         // Create the state chunk request
         let request = create_state_values_request_at_version(version, use_compression);
+
+        // Verify the serviceability of the request
+        verify_serviceability(data_client_config, data_summary, request, expect_service);
+    }
+}
+
+/// Verifies the serviceability of the subscription versions against
+/// the specified data summary. If `expect_service` is true, then the
+/// request should be serviceable.
+fn verify_can_service_subscription_requests(
+    data_client_config: &AptosDataClientConfig,
+    data_summary: &DataSummary,
+    compression: bool,
+    known_versions: Vec<Version>,
+    expect_service: bool,
+) {
+    for known_version in known_versions {
+        // Create the subscription request
+        let request = create_subscription_request(known_version, compression);
 
         // Verify the serviceability of the request
         verify_serviceability(data_client_config, data_summary, request, expect_service);
