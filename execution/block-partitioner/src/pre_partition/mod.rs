@@ -15,7 +15,9 @@ pub trait PrePartitioner: Send {
 
 pub mod uniform_partitioner;
 
-pub fn start_txn_idxs(pre_partitioned: &Vec<Vec<PrePartitionedTxnIdx>>) -> Vec<PrePartitionedTxnIdx> {
+pub fn start_txn_idxs(
+    pre_partitioned: &Vec<Vec<PrePartitionedTxnIdx>>,
+) -> Vec<PrePartitionedTxnIdx> {
     let num_shards = pre_partitioned.len();
     let mut ret: Vec<PrePartitionedTxnIdx> = vec![0; num_shards];
     for shard_id in 1..num_shards {

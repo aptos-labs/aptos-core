@@ -84,7 +84,10 @@ impl PartitionerV2 {
         state: &mut PartitionState,
         round_id: RoundId,
         remaining_txns: Vec<Vec<PrePartitionedTxnIdx>>,
-    ) -> (Vec<Vec<PrePartitionedTxnIdx>>, Vec<Vec<PrePartitionedTxnIdx>>) {
+    ) -> (
+        Vec<Vec<PrePartitionedTxnIdx>>,
+        Vec<Vec<PrePartitionedTxnIdx>>,
+    ) {
         let _timer = MISC_TIMERS_SECONDS
             .with_label_values(&[format!("round_{round_id}").as_str()])
             .start_timer();
@@ -97,7 +100,8 @@ impl PartitionerV2 {
         let mut discarded: Vec<RwLock<Vec<PrePartitionedTxnIdx>>> = Vec::with_capacity(num_shards);
         let mut tentatively_accepted: Vec<RwLock<Vec<PrePartitionedTxnIdx>>> =
             Vec::with_capacity(num_shards);
-        let mut finally_accepted: Vec<RwLock<Vec<PrePartitionedTxnIdx>>> = Vec::with_capacity(num_shards);
+        let mut finally_accepted: Vec<RwLock<Vec<PrePartitionedTxnIdx>>> =
+            Vec::with_capacity(num_shards);
 
         for txns in remaining_txns.iter() {
             tentatively_accepted.push(RwLock::new(Vec::with_capacity(txns.len())));
