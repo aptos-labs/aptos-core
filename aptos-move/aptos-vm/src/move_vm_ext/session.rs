@@ -392,7 +392,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                             state,
                         } => {
                             match state {
-                                AggregatorState::Data { value} => {
+                                AggregatorState::Data { value } => {
                                     let write_op = woc.convert_aggregator_mod(&state_key, value)?;
                                     aggregator_v1_write_set.insert(state_key, write_op);
                                 },

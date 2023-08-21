@@ -207,8 +207,8 @@ impl VMChangeSet {
         } = self;
 
         let into_write =
-            |(state_key, delta): (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
-                let write = delta.try_into_write_op(state_view, &state_key)?;
+            |(state_key, aggregator_change): (StateKey, AggregatorChange)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
+                let write = aggregator_change.try_into_write_op(state_view, &state_key)?;
                 Ok((state_key, write))
             };
 
@@ -233,13 +233,14 @@ impl VMChangeSet {
         aggregator_v1_write_set: &mut BTreeMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: &mut BTreeMap<StateKey, AggregatorChange>,
         aggregator_v2_change_set: &mut BTreeMap<AggregatorID, AggregatorChange>,
-        additional_aggregator_write_set: BTreeMap<StateKey, WriteOp>,
-        additional_aggregator_delta_set: BTreeMap<StateKey, AggregatorChange>,
+        additional_aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
+        additional_aggregator_v1_delta_set: BTreeMap<StateKey, AggregatorChange>,
+        additional_aggregator_v2_change_set: &mut BTreeMap<AggregatorID, AggregatorChange>,
     ) -> anyhow::Result<(), VMStatus> {
         use WriteOp::*;
 
         // First, squash deltas.
-        for (key, additional_delta_op) in additional_aggregator_delta_set {
+        for (key, additional_delta_op) in additional_aggregator_v1_delta_set {
             if let Some(write_op) = aggregator_v1_write_set.get_mut(&key) {
                 // In this case, delta follows a write op.
                 match write_op {
