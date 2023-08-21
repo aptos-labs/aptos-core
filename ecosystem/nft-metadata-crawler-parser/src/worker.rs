@@ -120,15 +120,15 @@ async fn spawn_parser(
     semaphore: Arc<Semaphore>,
     receiver: Arc<Mutex<Receiver<(Worker, String)>>>,
     subscription: Subscription,
-    send_ack: bool,
+    ack_parsed_uris: bool,
 ) -> anyhow::Result<()> {
     loop {
         // Pulls worker from Channel
         let _ = semaphore.acquire().await?;
         let (mut worker, ack) = receiver.lock().await.recv()?;
 
-        // Sends ack to PubSub only if running on release mode
-        if send_ack {
+        // Sends ack to PubSub only if ack_parsed_uris flag is true
+        if ack_parsed_uris {
             info!(
                 token_data_id = worker.token_data_id,
                 token_uri = worker.token_uri,
