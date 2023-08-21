@@ -231,7 +231,7 @@ spec aptos_framework::voting {
         aborts_if !is_multi_step && len(next_execution_hash) != 0;
 
         aborts_if len(next_execution_hash) == 0 && !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
-        aborts_if len(next_execution_hash) == 0 && is_multi_step && simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key);
+        aborts_if len(next_execution_hash) == 0 && is_multi_step && !simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key);
         // property 4: For single-step proposals, it ensures that the next_execution_hash parameter is empty and resolves the proposal.
         ensures len(next_execution_hash) == 0 ==> post_proposal.is_resolved == true && post_proposal.resolution_time_secs == timestamp::spec_now_seconds();
         ensures len(next_execution_hash) == 0 && is_multi_step ==> simple_map::spec_get(post_proposal.metadata, multi_step_in_execution_key) == std::bcs::serialize(false);
