@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_framework::extended_checks;
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     on_chain_config::{Features, TimedFeatures},
@@ -10,7 +11,7 @@ use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::native_functions::NativeFunctionTable;
-use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, path::PathBuf};
 use tempfile::tempdir;
 
 pub fn path_in_crate<S>(relative: S) -> PathBuf
@@ -33,6 +34,7 @@ pub fn run_tests_for_pkg(
             test_mode: true,
             install_dir: Some(tempdir().unwrap().path().to_path_buf()),
             additional_named_addresses: named_addr,
+            known_attributes: extended_checks::get_all_attribute_names().clone(),
             ..Default::default()
         },
         UnitTestingConfig::default_with_bound(Some(100_000)),
@@ -51,11 +53,11 @@ pub fn run_tests_for_pkg(
 pub fn aptos_test_natives() -> NativeFunctionTable {
     natives::configure_for_unit_test();
     natives::aptos_natives(
-        NativeGasParameters::zeros(),
-        AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        NativeGasParameters::zeros(),
+        MiscGasParameters::zeros(),
         TimedFeatures::enable_all(),
-        Arc::new(Features::default()),
+        Features::default(),
     )
 }
 
@@ -73,6 +75,15 @@ fn test_resource_account_common(pkg: &str) {
         create_resource_address(AccountAddress::from_hex_literal("0xcafe").unwrap(), &[]),
     )]);
     run_tests_for_pkg(pkg, named_address);
+}
+
+#[test]
+fn test_veiled_coin() {
+    let named_address = BTreeMap::from([(
+        String::from("veiled_coin"),
+        AccountAddress::from_hex_literal("0x1").unwrap(),
+    )]);
+    run_tests_for_pkg("veiled_coin", named_address);
 }
 
 #[test]
@@ -98,6 +109,11 @@ fn test_groth16() {
 #[test]
 fn test_hello_blockchain() {
     test_common("hello_blockchain");
+}
+
+#[test]
+fn test_drand_lottery() {
+    test_common("drand");
 }
 
 #[test]
@@ -180,13 +196,28 @@ fn test_shared_account() {
 
 #[test]
 fn test_token_objects() {
-    let named_address = BTreeMap::from([(
-        String::from("token_objects"),
-        AccountAddress::from_hex_literal("0xcafe").unwrap(),
-    )]);
-    run_tests_for_pkg("token_objects/hero", named_address.clone());
-    run_tests_for_pkg("token_objects/token_lockup", named_address.clone());
-    run_tests_for_pkg("token_objects/ambassador/move", named_address);
+    let named_addresses = BTreeMap::from([
+        (
+            String::from("ambassador"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("hero"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("knight"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("token_lockup"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+    ]);
+    run_tests_for_pkg("token_objects/ambassador", named_addresses.clone());
+    run_tests_for_pkg("token_objects/hero", named_addresses.clone());
+    run_tests_for_pkg("token_objects/knight", named_addresses.clone());
+    run_tests_for_pkg("token_objects/token_lockup", named_addresses);
 }
 
 #[test]
@@ -223,4 +254,19 @@ fn test_swap() {
         ),
     ]);
     run_tests_for_pkg("swap", named_address);
+}
+
+#[test]
+fn test_package_manager() {
+    let named_address = BTreeMap::from([
+        (
+            String::from("deployer"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("package"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+    ]);
+    run_tests_for_pkg("package_manager", named_address);
 }

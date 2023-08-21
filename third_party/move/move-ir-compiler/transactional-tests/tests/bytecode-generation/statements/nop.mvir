@@ -1,0 +1,14 @@
+//# print-bytecode --input=module
+module 0xcafe.Nop {
+    nop_valid() {
+    label b0:
+        (nop());
+        return;
+    }
+
+    nop_invalid() {
+    label b0:
+        _ = (nop());
+        return;
+    }    
+}

@@ -27,7 +27,6 @@ use aptos_types::{
     block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValue,
-    transaction::Transaction,
 };
 use aptos_vm::AptosVM;
 use fail::fail_point;
@@ -35,7 +34,7 @@ use std::{marker::PhantomData, sync::Arc};
 
 pub trait TransactionBlockExecutor: Send + Sync {
     fn execute_transaction_block(
-        transactions: ExecutableTransactions<Transaction>,
+        transactions: ExecutableTransactions,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput>;
@@ -43,7 +42,7 @@ pub trait TransactionBlockExecutor: Send + Sync {
 
 impl TransactionBlockExecutor for AptosVM {
     fn execute_transaction_block(
-        transactions: ExecutableTransactions<Transaction>,
+        transactions: ExecutableTransactions,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
@@ -107,7 +106,7 @@ where
 
     fn execute_block(
         &self,
-        block: ExecutableBlock<Transaction>,
+        block: ExecutableBlock,
         parent_block_id: HashValue,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error> {
@@ -177,7 +176,7 @@ where
 
     fn execute_block(
         &self,
-        block: ExecutableBlock<Transaction>,
+        block: ExecutableBlock,
         parent_block_id: HashValue,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error> {
@@ -186,7 +185,7 @@ where
             block_id,
             transactions,
         } = block;
-        let committed_block = self.block_tree.root_block();
+        let committed_block_id = self.committed_block_id();
         let mut block_vec = self
             .block_tree
             .get_blocks_opt(&[block_id, parent_block_id])?;
@@ -204,7 +203,7 @@ where
             return Ok(b.output.as_state_compute_result(parent_accumulator));
         }
 
-        let output = if parent_block_id != committed_block.id && parent_output.has_reconfiguration()
+        let output = if parent_block_id != committed_block_id && parent_output.has_reconfiguration()
         {
             info!(
                 LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),

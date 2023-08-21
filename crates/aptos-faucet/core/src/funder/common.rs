@@ -121,8 +121,15 @@ impl ApiConnectionConfig {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TransactionSubmissionConfig {
-    /// Maximum amount of OCTA to mint to an account.
-    pub maximum_amount: Option<u64>,
+    /// Maximum amount of OCTA to give an account.
+    maximum_amount: Option<u64>,
+
+    /// With this it is possible to set a different maximum amount for requests that
+    /// were allowed to skip the Checkers by a Bypasser. This can be helpful for CI,
+    /// where we might need to mint a greater amount than is normally required in the
+    /// standard case. If not given, maximum_amount is used whether the request
+    /// bypassed the checks or not.
+    maximum_amount_with_bypass: Option<u64>,
 
     /// How long to wait between fetching updated gas unit prices.
     #[serde(default = "TransactionSubmissionConfig::default_gas_unit_price_ttl_secs")]
@@ -152,6 +159,7 @@ pub struct TransactionSubmissionConfig {
 impl TransactionSubmissionConfig {
     pub fn new(
         maximum_amount: Option<u64>,
+        maximum_amount_with_bypass: Option<u64>,
         gas_unit_price_ttl_secs: u16,
         gas_unit_price_override: Option<u64>,
         max_gas_amount: u64,
@@ -161,6 +169,7 @@ impl TransactionSubmissionConfig {
     ) -> Self {
         Self {
             maximum_amount,
+            maximum_amount_with_bypass,
             gas_unit_price_ttl_secs,
             gas_unit_price_override,
             max_gas_amount,
@@ -188,6 +197,20 @@ impl TransactionSubmissionConfig {
 
     pub fn get_gas_unit_price_ttl_secs(&self) -> Duration {
         Duration::from_secs(self.gas_unit_price_ttl_secs.into())
+    }
+
+    /// If a Bypasser let the request bypass the Checkers and
+    /// maximum_amount_with_bypass is set, this function will return
+    /// that. Otherwise it will return maximum_amount.
+    pub fn get_maximum_amount(
+        &self,
+        // True if a Bypasser let the request bypass the Checkers.
+        did_bypass_checkers: bool,
+    ) -> Option<u64> {
+        match (self.maximum_amount_with_bypass, did_bypass_checkers) {
+            (Some(max), true) => Some(max),
+            _ => self.maximum_amount,
+        }
     }
 }
 

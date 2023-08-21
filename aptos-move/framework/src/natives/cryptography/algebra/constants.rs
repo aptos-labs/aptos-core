@@ -2,18 +2,16 @@
 
 use crate::{
     abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
-    natives::{
-        cryptography::algebra::{
-            feature_flag_from_structure, gas::GasParameters, AlgebraContext, Structure,
-            BLS12381_GT_GENERATOR, BLS12381_Q12_LENDIAN, BLS12381_R_LENDIAN,
-            E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        },
-        helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
+    natives::cryptography::algebra::{
+        feature_flag_from_structure, AlgebraContext, Structure, BLS12381_GT_GENERATOR,
+        BLS12381_Q12_LENDIAN, BLS12381_R_LENDIAN, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
+        MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     store_element, structure_from_ty_arg,
 };
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{SafeNativeContext, SafeNativeError, SafeNativeResult};
 use ark_ec::Group;
-use move_core_types::gas_algebra::NumArgs;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use num_traits::{One, Zero};
 use once_cell::sync::Lazy;
@@ -30,7 +28,6 @@ macro_rules! ark_constant_op_internal {
 }
 
 pub fn zero_internal(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
@@ -42,31 +39,31 @@ pub fn zero_internal(
             context,
             ark_bls12_381::Fr,
             zero,
-            gas_params.ark_bls12_381_fr_zero * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_FR_ZERO
         ),
         Some(Structure::BLS12381Fq12) => ark_constant_op_internal!(
             context,
             ark_bls12_381::Fq12,
             zero,
-            gas_params.ark_bls12_381_fq12_zero * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_FQ12_ZERO
         ),
         Some(Structure::BLS12381G1) => ark_constant_op_internal!(
             context,
             ark_bls12_381::G1Projective,
             zero,
-            gas_params.ark_bls12_381_g1_proj_infinity * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_G1_PROJ_INFINITY
         ),
         Some(Structure::BLS12381G2) => ark_constant_op_internal!(
             context,
             ark_bls12_381::G2Projective,
             zero,
-            gas_params.ark_bls12_381_g2_proj_infinity * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_G2_PROJ_INFINITY
         ),
         Some(Structure::BLS12381Gt) => ark_constant_op_internal!(
             context,
             ark_bls12_381::Fq12,
             one,
-            gas_params.ark_bls12_381_fq12_one * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_FQ12_ONE
         ),
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
@@ -75,7 +72,6 @@ pub fn zero_internal(
 }
 
 pub fn one_internal(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
@@ -87,28 +83,28 @@ pub fn one_internal(
             context,
             ark_bls12_381::Fr,
             one,
-            gas_params.ark_bls12_381_fr_one * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_FR_ONE
         ),
         Some(Structure::BLS12381Fq12) => ark_constant_op_internal!(
             context,
             ark_bls12_381::Fq12,
             one,
-            gas_params.ark_bls12_381_fq12_one * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_FQ12_ONE
         ),
         Some(Structure::BLS12381G1) => ark_constant_op_internal!(
             context,
             ark_bls12_381::G1Projective,
             generator,
-            gas_params.ark_bls12_381_g1_proj_generator * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_G1_PROJ_GENERATOR
         ),
         Some(Structure::BLS12381G2) => ark_constant_op_internal!(
             context,
             ark_bls12_381::G2Projective,
             generator,
-            gas_params.ark_bls12_381_g2_proj_generator * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_G2_PROJ_GENERATOR
         ),
         Some(Structure::BLS12381Gt) => {
-            context.charge(gas_params.ark_bls12_381_fq12_clone * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_FQ12_CLONE)?;
             let element = *Lazy::force(&BLS12381_GT_GENERATOR);
             let handle = store_element!(context, element)?;
             Ok(smallvec![Value::u64(handle as u64)])
@@ -120,7 +116,6 @@ pub fn one_internal(
 }
 
 pub fn order_internal(
-    _gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,

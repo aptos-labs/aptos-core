@@ -11,7 +11,7 @@ use crate::{
         test_get_with_proof, test_get_with_proof_with_distinct_last_nibble, ValueBlob,
     },
 };
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_types::nibble::Nibble;
 use mock_tree_store::MockTreeStore;
 use proptest::{collection::hash_set, prelude::*};
@@ -91,14 +91,14 @@ fn test_insert_at_leaf_with_internal_created() {
     assert_eq!(tree.get(key1, 0).unwrap().unwrap(), value1.0);
 
     // Insert at the previous leaf node. Should generate an internal node at the root.
-    // Change the 1st nibble to 15.
-    let key2 = update_nibble(&key1, 0, 15);
+    // Change the 2st nibble to 15.
+    let key2 = update_nibble(&key1, 1, 15);
     let value2 = gen_value();
 
     let (_root1_hash, batch) = tree
         .put_value_set_test(vec![(key2, Some(&value2))], 1 /* version */)
         .unwrap();
-    assert_eq!(batch.num_stale_node(), 1);
+    assert_eq!(batch.num_stale_node(), 2);
     db.write_tree_update_batch(batch).unwrap();
 
     assert_eq!(tree.get(key1, 0).unwrap().unwrap(), value1.0);
@@ -106,9 +106,10 @@ fn test_insert_at_leaf_with_internal_created() {
     assert_eq!(tree.get(key2, 1).unwrap().unwrap(), value2.0);
 
     // get # of nodes
-    assert_eq!(db.num_nodes(), 4 /* 1 + 3 */);
+    assert_eq!(db.num_nodes(), 6 /* 2 + 4 */);
 
-    let internal_node_key = NodeKey::new_empty_path(1);
+    let nibble_path = NibblePath::new_odd(vec![key2.nibble(0) << 4]);
+    let internal_node_key = NodeKey::new(1, nibble_path.clone());
 
     let leaf1 = gen_leaf(key1, &value1, 0);
     let leaf2 = gen_leaf(key2, &value2, 1);
@@ -122,7 +123,7 @@ fn test_insert_at_leaf_with_internal_created() {
         Child::new(leaf2.hash(), 1 /* version */, NodeType::Leaf),
     );
     let internal = Node::new_internal(children);
-    assert_eq!(db.get_node(&NodeKey::new_empty_path(0)).unwrap(), leaf1);
+    assert_eq!(db.get_node(&NodeKey::new(0, nibble_path)).unwrap(), leaf1);
     assert_eq!(
         db.get_node(&internal_node_key.gen_child_node_key(1 /* version */, Nibble::from(0)))
             .unwrap(),
@@ -139,7 +140,7 @@ fn test_insert_at_leaf_with_internal_created() {
     let (root2_hash, batch) = tree
         .put_value_set_test(vec![(key2, None)], 2 /* version */)
         .unwrap();
-    assert_eq!(batch.num_stale_node(), 3);
+    assert_eq!(batch.num_stale_node(), 4);
     db.write_tree_update_batch(batch).unwrap();
 
     assert_eq!(tree.get(key1, 0).unwrap().unwrap(), value1.0);
@@ -148,7 +149,7 @@ fn test_insert_at_leaf_with_internal_created() {
     assert!(tree.get(key2, 2).unwrap().is_none());
     assert_eq!(root0_hash, root2_hash);
     // get # of nodes
-    assert_eq!(db.num_nodes(), 5 /* 1 + 3 + 1 */);
+    assert_eq!(db.num_nodes(), 8 /* 2 + 4 + 2 */);
 }
 
 #[test]
@@ -166,7 +167,7 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
     db.write_tree_update_batch(batch).unwrap();
     assert_eq!(tree.get(key1, 0).unwrap().unwrap(), value1.0);
 
-    // 2. Insert at the previous leaf node. Should generate a branch node at root.
+    // 2. Insert at the previous leaf node. Should generate a branch node.
     // Change the 2nd nibble to 1.
     let key2 = update_nibble(&key1, 1 /* nibble_index */, 1 /* nibble */);
     let value2 = gen_value();
@@ -179,9 +180,10 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
     assert!(tree.get(key2, 0).unwrap().is_none());
     assert_eq!(tree.get(key2, 1).unwrap().unwrap(), value2.0);
 
-    assert_eq!(db.num_nodes(), 5);
+    assert_eq!(db.num_nodes(), 6);
 
-    let internal_node_key = NodeKey::new(1, NibblePath::new_odd(vec![0x00]));
+    let nibble_path = NibblePath::new_odd(vec![key2.nibble(0) << 4]);
+    let internal_node_key = NodeKey::new(1, nibble_path.clone());
 
     let leaf1 = gen_leaf(key1, &value1, 0);
     let leaf2 = gen_leaf(key2, &value2, 1);
@@ -211,7 +213,7 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
         Node::new_internal(children)
     };
 
-    assert_eq!(db.get_node(&NodeKey::new_empty_path(0)).unwrap(), leaf1);
+    assert_eq!(db.get_node(&NodeKey::new(0, nibble_path)).unwrap(), leaf1);
     assert_eq!(
         db.get_node(&internal_node_key.gen_child_node_key(1 /* version */, Nibble::from(0)))
             .unwrap(),
@@ -239,7 +241,7 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
     assert_eq!(tree.get(key2, 2).unwrap().unwrap(), value2_update.0);
 
     // Get # of nodes.
-    assert_eq!(db.num_nodes(), 8);
+    assert_eq!(db.num_nodes(), 9 /* 2 + 4 + 3 */);
 
     // Purge retired nodes.
     db.purge_stale_nodes(1).unwrap();
@@ -255,9 +257,9 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
         .unwrap();
     db.write_tree_update_batch(batch).unwrap();
     // Get # of nodes.
-    assert_eq!(db.num_nodes(), 5);
+    assert_eq!(db.num_nodes(), 6 /* 4 + 2 */);
     db.purge_stale_nodes(3).unwrap();
-    assert_eq!(db.num_nodes(), 1);
+    assert_eq!(db.num_nodes(), 2);
     assert_eq!(tree.get(key1, 3).unwrap().unwrap(), value1.0);
 }
 
@@ -345,46 +347,49 @@ fn test_batch_insertion() {
         verify_fn(&tree, 6);
 
         // get # of nodes
-        assert_eq!(db.num_nodes(), 26 /* 1 + 3 + 4 + 3 + 8 + 5 + 2 */);
+        assert_eq!(db.num_nodes(), 32 /* 2 + 3 + 5 + 4 + 8 + 5 + 3 */);
 
         // Purge retired nodes('p' means purged and 'a' means added).
         // The initial state of the tree at version 0
         // ```test
-        //   1(root)
+        //     internal
+        //    /
+        //   1
         // ```
         db.purge_stale_nodes(1).unwrap();
         // ```text
-        //   1 (p)           internal(a)
-        //           ->     /        \
-        //                 1(a)       2(a)
-        // add 3, prune 1
+        //     internal(p)         internal(a)
+        //    /             ->    /        \
+        //   1(p)                1(a)       2(a)
+        //
+        // add 3, prune 2
         // ```
-        assert_eq!(db.num_nodes(), 25);
+        assert_eq!(db.num_nodes(), 30);
         db.purge_stale_nodes(2).unwrap();
         // ```text
         //     internal(p)             internal(a)
         //    /        \              /        \
-        //   1(p)       2   ->   internal(a)    2
+        //   1(p)       2(p) ->  internal(a)    2(a)
         //                       /       \
         //                      1(a)      3(a)
-        // add 4, prune 2
+        // add 5, prune 3
         // ```
-        assert_eq!(db.num_nodes(), 23);
+        assert_eq!(db.num_nodes(), 27);
         db.purge_stale_nodes(3).unwrap();
         // ```text
         //         internal(p)                internal(a)
         //        /        \                 /        \
-        //   internal(p)    2   ->     internal(a)     2
+        //   internal(p)    2(p)   ->  internal(a)     2(a)
         //   /       \                /   |   \
         //  1         3              1    3    4(a)
-        // add 3, prune 2
+        // add 4, prune 3
         // ```
-        assert_eq!(db.num_nodes(), 21);
+        assert_eq!(db.num_nodes(), 24);
         db.purge_stale_nodes(4).unwrap();
         // ```text
         //            internal(p)                         internal(a)
         //           /        \                          /        \
-        //     internal(p)     2                    internal(a)    2
+        //     internal(p)     2(p)                 internal(a)    2(a)
         //    /   |   \                            /   |   \
         //   1(p) 3    4           ->      internal(a) 3    4
         //                                     |
@@ -395,14 +400,14 @@ fn test_batch_insertion() {
         //                                 internal(a)
         //                                 /      \
         //                                1(a)     5(a)
-        // add 8, prune 3
+        // add 9, prune 4
         // ```
-        assert_eq!(db.num_nodes(), 18);
+        assert_eq!(db.num_nodes(), 20);
         db.purge_stale_nodes(5).unwrap();
         // ```text
         //                  internal(p)                             internal(a)
         //                 /        \                              /        \
-        //            internal(p)    2                        internal(a)    2
+        //            internal(p)    2(p)                     internal(a)    2(a)
         //           /   |   \                               /   |   \
         //   internal(p) 3    4                      internal(a) 3    4
         //       |                                      |
@@ -413,14 +418,14 @@ fn test_batch_insertion() {
         //   internal                          internal
         //   /      \                          /      \
         //  1        5                        1        5
-        // add 5, prune 4
+        // add 6, prune 5
         // ```
-        assert_eq!(db.num_nodes(), 14);
+        assert_eq!(db.num_nodes(), 15);
         db.purge_stale_nodes(6).unwrap();
         // ```text
         //                         internal(p)                               internal(a)
         //                        /        \                                /        \
-        //                   internal       2(p)                       internal       2(a)
+        //                   internal(p)    2(p)                       internal(a)    2(a)
         //                  /   |   \                                 /   |   \
         //          internal    3    4                        internal    3    4
         //             |                                         |
@@ -431,7 +436,7 @@ fn test_batch_insertion() {
         //    internal                                  internal
         //    /      \                                  /      \
         //   1        5                                1        5
-        // add 2, prune 2
+        // add 3, prune 3
         // ```
         assert_eq!(db.num_nodes(), 12);
         verify_fn(&tree, 6);
@@ -499,7 +504,7 @@ fn test_deletion() {
         .put_value_set_test(vec![(key3, None)], idx as Version)
         .unwrap();
     db.write_tree_update_batch(batch).unwrap();
-    assert_eq!(db.num_nodes(), 14 /* 12 + 2 */);
+    assert_eq!(db.num_nodes(), 15 /* 12 + 3 */);
     db.purge_stale_nodes(idx).unwrap();
     assert_eq!(db.num_nodes(), 11);
 
@@ -509,7 +514,7 @@ fn test_deletion() {
         .put_value_set_test(vec![(key1, None)], idx as Version)
         .unwrap();
     db.write_tree_update_batch(batch).unwrap();
-    assert_eq!(db.num_nodes(), 16 /* 11 + 5 */);
+    assert_eq!(db.num_nodes(), 17 /* 11 + 6 */);
     db.purge_stale_nodes(idx).unwrap();
     assert_eq!(db.num_nodes(), 8);
 
@@ -522,9 +527,9 @@ fn test_deletion() {
         )
         .unwrap();
     db.write_tree_update_batch(batch).unwrap();
-    assert_eq!(db.num_nodes(), 9 /* 8 + 1 */);
+    assert_eq!(db.num_nodes(), 10 /* 8 + 2 */);
     db.purge_stale_nodes(idx).unwrap();
-    assert_eq!(db.num_nodes(), 1);
+    assert_eq!(db.num_nodes(), 2);
 
     idx += 1;
     // Delete key2
@@ -532,7 +537,7 @@ fn test_deletion() {
         .put_value_set_test(vec![(key2, None)], idx as Version)
         .unwrap();
     db.write_tree_update_batch(batch).unwrap();
-    assert_eq!(db.num_nodes(), 2 /* 1 + 1 */);
+    assert_eq!(db.num_nodes(), 3 /* 2 + 1 */);
     db.purge_stale_nodes(idx).unwrap();
     assert_eq!(db.num_nodes(), 1);
     assert_eq!(root, *SPARSE_MERKLE_PLACEHOLDER_HASH);

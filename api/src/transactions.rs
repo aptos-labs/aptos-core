@@ -12,8 +12,8 @@ use crate::{
     page::Page,
     response::{
         api_disabled, api_forbidden, transaction_not_found_by_hash,
-        transaction_not_found_by_version, BadRequestError, BasicError, BasicErrorWith404,
-        BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
+        transaction_not_found_by_version, version_pruned, BadRequestError, BasicError,
+        BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
         InsufficientStorageError, InternalError,
     },
     ApiTags,
@@ -452,9 +452,9 @@ impl TransactionsApi {
         let estimated_max_gas_amount = if estimate_max_gas_amount.0.unwrap_or_default() {
             // Retrieve max possible gas units
             let (_, gas_params) = self.context.get_gas_schedule(&ledger_info)?;
-            let min_number_of_gas_units = u64::from(gas_params.txn.min_transaction_gas_units)
-                / u64::from(gas_params.txn.gas_unit_scaling_factor);
-            let max_number_of_gas_units = u64::from(gas_params.txn.maximum_number_of_gas_units);
+            let min_number_of_gas_units = u64::from(gas_params.vm.txn.min_transaction_gas_units)
+                / u64::from(gas_params.vm.txn.gas_unit_scaling_factor);
+            let max_number_of_gas_units = u64::from(gas_params.vm.txn.maximum_number_of_gas_units);
 
             // Retrieve account balance to determine max gas available
             let account_state = self
@@ -700,15 +700,18 @@ impl TransactionsApi {
                     AptosErrorCode::InternalError,
                     &ledger_info,
                 )
-            })?
-            .context(format!(
-                "Failed to find transaction at version: {}",
-                version
-            ))
-            .map_err(|_| transaction_not_found_by_version(version.0, &ledger_info))?;
+            })?;
 
-        self.get_transaction_inner(accept_type, txn_data, &ledger_info)
-            .await
+        match txn_data {
+            GetByVersionResponse::Found(txn_data) => {
+                self.get_transaction_inner(accept_type, txn_data, &ledger_info)
+                    .await
+            },
+            GetByVersionResponse::VersionTooNew => {
+                Err(transaction_not_found_by_version(version.0, &ledger_info))
+            },
+            GetByVersionResponse::VersionTooOld => Err(version_pruned(version.0, &ledger_info)),
+        }
     }
 
     /// Converts a transaction into the outgoing type
@@ -766,11 +769,14 @@ impl TransactionsApi {
         &self,
         version: u64,
         ledger_info: &LedgerInfo,
-    ) -> anyhow::Result<Option<TransactionData>> {
+    ) -> anyhow::Result<GetByVersionResponse> {
         if version > ledger_info.version() {
-            return Ok(None);
+            return Ok(GetByVersionResponse::VersionTooNew);
         }
-        Ok(Some(
+        if version < ledger_info.oldest_version() {
+            return Ok(GetByVersionResponse::VersionTooOld);
+        }
+        Ok(GetByVersionResponse::Found(
             self.context
                 .get_transaction_by_version(version, ledger_info.version())?
                 .into(),
@@ -1324,4 +1330,10 @@ fn override_gas_parameters(
 
     // TODO: Check that signature is null, this would just be helpful for downstream use
     SignedTransaction::new_with_authenticator(raw_txn, signed_txn.authenticator())
+}
+
+enum GetByVersionResponse {
+    VersionTooNew,
+    VersionTooOld,
+    Found(TransactionData),
 }

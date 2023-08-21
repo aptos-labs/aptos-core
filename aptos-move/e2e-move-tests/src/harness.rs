@@ -7,10 +7,10 @@ use aptos::move_tool::MemberId;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
-use aptos_gas::{
+use aptos_gas_profiling::TransactionGasLog;
+use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule,
 };
-use aptos_gas_profiling::TransactionGasLog;
 use aptos_language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
@@ -30,6 +30,7 @@ use aptos_types::{
         TransactionPayload, TransactionStatus,
     },
 };
+use aptos_vm::AptosVM;
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
     move_resource::MoveStructType,
@@ -168,6 +169,7 @@ impl MoveHarness {
         let output = self.executor.execute_transaction(txn);
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
+            self.executor.append_events(output.events().to_vec());
         }
         output
     }
@@ -431,6 +433,10 @@ impl MoveHarness {
             .run_block_with_metadata(proposer, failed_proposer_indices, txns)
     }
 
+    pub fn get_events(&self) -> &[ContractEvent] {
+        self.executor.get_events()
+    }
+
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<StateValue> {
         self.executor.read_state_value(state_key)
     }
@@ -537,7 +543,7 @@ impl MoveHarness {
         // explicitly manipulating gas entries. Wasn't obvious from the gas code how to
         // do this differently then below, so perhaps improve this...
         let entries = AptosGasParameters::initial()
-            .to_on_chain_gas_schedule(aptos_gas::LATEST_GAS_FEATURE_VERSION);
+            .to_on_chain_gas_schedule(aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION);
         let entries = entries
             .into_iter()
             .map(|(name, val)| {
@@ -549,7 +555,7 @@ impl MoveHarness {
             })
             .collect::<Vec<_>>();
         let gas_schedule = GasScheduleV2 {
-            feature_version: aptos_gas::LATEST_GAS_FEATURE_VERSION,
+            feature_version: aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION,
             entries,
         };
         let schedule_bytes = bcs::to_bytes(&gas_schedule).expect("bcs");
@@ -601,6 +607,10 @@ impl MoveHarness {
                 entries: gas_params.to_on_chain_gas_schedule(feature_version),
             },
         );
+    }
+
+    pub fn new_vm(&self) -> AptosVM {
+        AptosVM::new(self.executor.data_store())
     }
 
     pub fn set_default_gas_unit_price(&mut self, gas_unit_price: u64) {

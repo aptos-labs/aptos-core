@@ -130,7 +130,7 @@ impl NativeExecutor {
         ];
 
         // TODO(grao): Some values are fake, because I'm lazy.
-        let events = vec![ContractEvent::new(
+        let events = vec![ContractEvent::new_v1(
             EventKey::new(0, sender_address),
             0,
             TypeTag::Struct(Box::new(WithdrawEvent::struct_tag())),
@@ -224,7 +224,7 @@ impl NativeExecutor {
         }
 
         let events = vec![
-            ContractEvent::new(
+            ContractEvent::new_v1(
                 EventKey::new(0, recipient_address),
                 0,
                 TypeTag::Struct(Box::new(DepositEvent::struct_tag())),
@@ -337,7 +337,7 @@ impl NativeExecutor {
 
 impl TransactionBlockExecutor for NativeExecutor {
     fn execute_transaction_block(
-        transactions: ExecutableTransactions<Transaction>,
+        transactions: ExecutableTransactions,
         state_view: CachedStateView,
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {

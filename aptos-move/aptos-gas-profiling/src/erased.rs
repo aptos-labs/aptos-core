@@ -9,7 +9,7 @@ use crate::{
     render::Render,
     FrameName, TransactionGasLog,
 };
-use aptos_gas::{Fee, GasQuantity, GasScalingFactor, InternalGas, InternalGasUnit, Octa};
+use aptos_gas_algebra::{Fee, GasQuantity, GasScalingFactor, InternalGas, InternalGasUnit, Octa};
 
 /// Represents a node in a general tree structure with some text & cost attached to each node.
 pub struct Node<U> {

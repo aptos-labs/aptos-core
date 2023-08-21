@@ -9,7 +9,9 @@ use crate::{
     models::{
         coin_models::{
             coin_utils::COIN_ADDR,
-            v2_fungible_asset_utils::{FungibleAssetMetadata, FungibleAssetSupply},
+            v2_fungible_asset_utils::{
+                FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
+            },
         },
         default_models::{move_resources::MoveResource, v2_objects::CurrentObjectPK},
     },
@@ -37,12 +39,14 @@ pub type TokenV2Burned = HashSet<CurrentObjectPK>;
 /// Index of the event so that we can write its inverse to the db as primary key (to avoid collisiona)
 pub type EventIndex = i64;
 
+/// This contains both metadata for fungible assets and fungible tokens
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenV2AggregatedData {
     pub aptos_collection: Option<AptosCollection>,
     pub fixed_supply: Option<FixedSupply>,
     pub fungible_asset_metadata: Option<FungibleAssetMetadata>,
     pub fungible_asset_supply: Option<FungibleAssetSupply>,
+    pub fungible_asset_store: Option<FungibleAssetStore>,
     pub object: ObjectWithMetadata,
     pub property_map: Option<PropertyMapModel>,
     pub token: Option<TokenV2>,

@@ -14,7 +14,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
-    block_executor::partitioner::{ExecutableTransactions, SubBlocksForShard},
+    block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
@@ -31,7 +31,10 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
+use aptos_vm::{
+    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
+    VMExecutor,
+};
 use move_core_types::{language_storage::TypeTag, move_resource::MoveResource};
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Arc};
@@ -60,7 +63,7 @@ pub struct MockVM;
 
 impl TransactionBlockExecutor for MockVM {
     fn execute_transaction_block(
-        transactions: ExecutableTransactions<Transaction>,
+        transactions: ExecutableTransactions,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
@@ -78,27 +81,6 @@ impl VMExecutor for MockVM {
         state_view: &impl StateView,
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        if state_view.is_genesis() {
-            assert_eq!(
-                transactions.len(),
-                1,
-                "Genesis block should have only one transaction."
-            );
-            let output = TransactionOutput::new(
-                gen_genesis_writeset(),
-                // mock the validator set event
-                vec![ContractEvent::new(
-                    new_epoch_event_key(),
-                    0,
-                    TypeTag::Bool,
-                    bcs::to_bytes(&0).unwrap(),
-                )],
-                0,
-                KEEP_STATUS.clone(),
-            );
-            return Ok(vec![output]);
-        }
-
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
         let mut output_cache = HashMap::new();
@@ -129,7 +111,7 @@ impl VMExecutor for MockVM {
                     // WriteSet cannot be empty so use genesis writeset only for testing.
                     gen_genesis_writeset(),
                     // mock the validator set event
-                    vec![ContractEvent::new(
+                    vec![ContractEvent::new_v1(
                         new_epoch_event_key(),
                         0,
                         TypeTag::Bool,
@@ -207,9 +189,9 @@ impl VMExecutor for MockVM {
         Ok(outputs)
     }
 
-    fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
-        _sharded_block_executor: &ShardedBlockExecutor<S>,
-        _block: Vec<SubBlocksForShard<Transaction>>,
+    fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
+        _sharded_block_executor: &ShardedBlockExecutor<S, E>,
+        _transactions: PartitionedTransactions,
         _state_view: Arc<S>,
         _maybe_block_gas_limit: Option<u64>,
     ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {
@@ -338,7 +320,7 @@ fn gen_payment_writeset(
 }
 
 fn gen_events(sender: AccountAddress) -> Vec<ContractEvent> {
-    vec![ContractEvent::new(
+    vec![ContractEvent::new_v1(
         EventKey::new(111, sender),
         0,
         TypeTag::Vector(Box::new(TypeTag::U8)),

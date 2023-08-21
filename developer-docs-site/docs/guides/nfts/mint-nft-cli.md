@@ -12,7 +12,7 @@ This tutorial assumes you have:
 
 * a [GitHub account](https://docs.github.com/en/get-started/signing-up-for-github/signing-up-for-a-new-github-account)
 * the [GitHub CLI](https://cli.github.com/)
-* the [Aptos CLI](../../tools/install-cli/index.md) (or you can run from [aptos-core](https://github.com/aptos-labs/aptos-core) source via `cargo run`)
+* the [Aptos CLI](../../tools/aptos-cli/install-cli/index.md) (or you can run from [aptos-core](https://github.com/aptos-labs/aptos-core) source via `cargo run`)
 * the `aptos-core` repository checked out: `git clone https://github.com/aptos-labs/aptos-core.git`
 
 Then:
@@ -44,7 +44,7 @@ In this section, we create a collection and token. This work maps to the demonst
 
 ### Create an account
 
-1. [Install the Aptos CLI](../../tools/install-cli/index.md).
+1. [Install the Aptos CLI](../../tools/aptos-cli/install-cli/index.md).
 
 2. Create a default (typical) account on Aptos devnet to receive the NFT by running the following command and selecting `devnet`:
   ```shell

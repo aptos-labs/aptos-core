@@ -4,9 +4,10 @@
 
 use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
-use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
+use aptos_block_partitioner::{
+    sharded_block_partitioner::ShardedBlockPartitioner, BlockPartitionerConfig,
+};
 use aptos_crypto::HashValue;
-use aptos_executor_service::remote_executor_client::RemoteExecutorClient;
 use aptos_language_e2e_tests::{
     account_universe::{AUTransactionGen, AccountPickStyle, AccountUniverse, AccountUniverseGen},
     data_store::FakeDataStore,
@@ -14,16 +15,21 @@ use aptos_language_e2e_tests::{
     gas_costs::TXN_RESERVED,
 };
 use aptos_types::{
-    block_executor::partitioner::BlockExecutorTransactions,
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},
-    transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
+    transaction::{
+        analyzed_transaction::AnalyzedTransaction, ExecutionStatus, Transaction, TransactionOutput,
+        TransactionStatus,
+    },
     vm_status::VMStatus,
 };
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
-    sharded_block_executor::{block_executor_client::VMExecutorClient, ShardedBlockExecutor},
+    sharded_block_executor::{
+        local_executor_shard::{LocalExecutorClient, LocalExecutorService},
+        ShardedBlockExecutor,
+    },
 };
 use criterion::{measurement::Measurement, BatchSize, Bencher};
 use once_cell::sync::Lazy;
@@ -152,17 +158,15 @@ where
         } else {
             AccountPickStyle::Unlimited
         };
-
-        let mut state = TransactionBenchState::with_size(
-            &self.strategy,
-            num_accounts,
-            num_txn,
-            num_executor_shards,
-            remote_executor_addresses,
-            account_pick_style,
-        );
-
         for i in 0..total_runs {
+            let mut state = TransactionBenchState::with_size(
+                &self.strategy,
+                num_accounts,
+                num_txn,
+                num_executor_shards,
+                remote_executor_addresses.clone(),
+                account_pick_style.clone(),
+            );
             if i < num_warmups {
                 println!("WARMUP - ignore results");
                 state.execute_blockstm_benchmark(
@@ -193,7 +197,8 @@ struct TransactionBenchState<S> {
     num_transactions: usize,
     strategy: S,
     account_universe: AccountUniverse,
-    parallel_block_executor: Option<Arc<ShardedBlockExecutor<FakeDataStore>>>,
+    parallel_block_executor:
+        Option<Arc<ShardedBlockExecutor<FakeDataStore, LocalExecutorClient<FakeDataStore>>>>,
     block_partitioner: Option<ShardedBlockPartitioner>,
     validator_set: ValidatorSet,
     state_view: Arc<FakeDataStore>,
@@ -229,7 +234,8 @@ where
         universe_strategy: impl Strategy<Value = AccountUniverseGen>,
         num_transactions: usize,
         num_executor_shards: usize,
-        remote_executor_addresses: Option<Vec<SocketAddr>>,
+        // TODO(skedia): add support for remote executor addresses.
+        _remote_executor_addresses: Option<Vec<SocketAddr>>,
     ) -> Self {
         let mut runner = TestRunner::default();
         let universe_gen = universe_strategy
@@ -247,21 +253,19 @@ where
         let (parallel_block_executor, block_partitioner) = if num_executor_shards == 1 {
             (None, None)
         } else {
-            let parallel_block_executor =
-                if let Some(remote_executor_addresses) = remote_executor_addresses {
-                    let remote_executor_clients = remote_executor_addresses
-                        .into_iter()
-                        .map(|addr| RemoteExecutorClient::new(addr, 10000))
-                        .collect::<Vec<RemoteExecutorClient>>();
-                    Arc::new(ShardedBlockExecutor::new(remote_executor_clients))
-                } else {
-                    let local_executor_client =
-                        VMExecutorClient::create_vm_clients(num_executor_shards, None);
-                    Arc::new(ShardedBlockExecutor::new(local_executor_client))
-                };
+            let client =
+                LocalExecutorService::setup_local_executor_shards(num_executor_shards, None);
+            let parallel_block_executor = Arc::new(ShardedBlockExecutor::new(client));
             (
                 Some(parallel_block_executor),
-                Some(ShardedBlockPartitioner::new(num_executor_shards)),
+                Some(
+                    BlockPartitionerConfig::default()
+                        .num_shards(num_executor_shards)
+                        .max_partitioning_rounds(4)
+                        .cross_shard_dep_avoid_threshold(0.9)
+                        .partition_last_round(true)
+                        .build(),
+                ),
             )
         };
 
@@ -341,15 +345,15 @@ where
         &self,
         transactions: Vec<Transaction>,
         maybe_block_gas_limit: Option<u64>,
-    ) -> usize {
+    ) -> (Vec<TransactionOutput>, usize) {
         let block_size = transactions.len();
         let timer = Instant::now();
-        BlockAptosVM::execute_block::<
+        let output = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
             Arc::clone(&RAYON_EXEC_POOL),
-            BlockExecutorTransactions::Unsharded(transactions),
+            transactions,
             self.state_view.as_ref(),
             1,
             maybe_block_gas_limit,
@@ -358,7 +362,7 @@ where
         .expect("VM should not fail to start");
         let exec_time = timer.elapsed().as_millis();
 
-        block_size * 1000 / exec_time as usize
+        (output, block_size * 1000 / exec_time as usize)
     }
 
     fn execute_benchmark_parallel(
@@ -366,10 +370,10 @@ where
         transactions: Vec<Transaction>,
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
-    ) -> usize {
+    ) -> (Vec<TransactionOutput>, usize) {
         let block_size = transactions.len();
         let timer = Instant::now();
-        if let Some(parallel_block_executor) = self.parallel_block_executor.as_ref() {
+        let output = if let Some(parallel_block_executor) = self.parallel_block_executor.as_ref() {
             // TODO(skedia) partition in a pipelined way and evaluate how expensive it is to
             // parse the txns in a single thread.
             let partitioned_block = self.block_partitioner.as_ref().unwrap().partition(
@@ -377,8 +381,6 @@ where
                     .into_iter()
                     .map(|txn| txn.into())
                     .collect::<Vec<AnalyzedTransaction>>(),
-                4,
-                0.9,
             );
             parallel_block_executor
                 .execute_block(
@@ -387,24 +389,24 @@ where
                     concurrency_level_per_shard,
                     maybe_block_gas_limit,
                 )
-                .expect("VM should not fail to start");
+                .expect("VM should not fail to start")
         } else {
             BlockAptosVM::execute_block::<
                 _,
                 NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
             >(
                 Arc::clone(&RAYON_EXEC_POOL),
-                BlockExecutorTransactions::Unsharded(transactions),
+                transactions,
                 self.state_view.as_ref(),
                 concurrency_level_per_shard,
                 maybe_block_gas_limit,
                 None,
             )
-            .expect("VM should not fail to start");
-        }
+            .expect("VM should not fail to start")
+        };
         let exec_time = timer.elapsed().as_millis();
 
-        block_size * 1000 / exec_time as usize
+        (output, block_size * 1000 / exec_time as usize)
     }
 
     fn execute_blockstm_benchmark(
@@ -416,26 +418,39 @@ where
         maybe_block_gas_limit: Option<u64>,
     ) -> (usize, usize) {
         let transactions = self.gen_transaction(no_conflict_txns);
-        let par_tps = if run_par {
+        let (output, par_tps) = if run_par {
             println!("Parallel execution starts...");
-            let tps = self.execute_benchmark_parallel(
+            let (output, tps) = self.execute_benchmark_parallel(
                 transactions.clone(),
                 conurrency_level_per_shard,
                 maybe_block_gas_limit,
             );
             println!("Parallel execution finishes, TPS = {}", tps);
-            tps
+            (output, tps)
         } else {
-            0
+            (vec![], 0)
         };
-        let seq_tps = if run_seq {
+        output.iter().for_each(|txn_output| {
+            assert_eq!(
+                txn_output.status(),
+                &TransactionStatus::Keep(ExecutionStatus::Success)
+            );
+        });
+        let (output, seq_tps) = if run_seq {
             println!("Sequential execution starts...");
-            let tps = self.execute_benchmark_sequential(transactions, maybe_block_gas_limit);
+            let (output, tps) =
+                self.execute_benchmark_sequential(transactions, maybe_block_gas_limit);
             println!("Sequential execution finishes, TPS = {}", tps);
-            tps
+            (output, tps)
         } else {
-            0
+            (vec![], 0)
         };
+        output.iter().for_each(|txn_output| {
+            assert_eq!(
+                txn_output.status(),
+                &TransactionStatus::Keep(ExecutionStatus::Success)
+            );
+        });
         (par_tps, seq_tps)
     }
 }

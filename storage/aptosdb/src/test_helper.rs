@@ -60,7 +60,6 @@ pub(crate) fn update_store(
         root_hash = store
             .merklize_value_set(
                 jmt_update_refs(&jmt_updates),
-                None,
                 version,
                 version.checked_sub(1),
             )
@@ -517,14 +516,25 @@ fn get_events_by_event_key(
         };
 
         let events: Vec<_> = itertools::zip_eq(events, expected_seq_nums)
-            .map(|(e, _)| (e.transaction_version, e.event))
-            .collect();
+            .map(|(e, _)| Ok((e.transaction_version, e.event)))
+            .collect::<Result<_>>()
+            .unwrap();
 
         let num_results = events.len() as u64;
         if num_results == 0 {
             break;
         }
-        assert_eq!(events.first().unwrap().1.sequence_number(), cursor);
+        assert_eq!(
+            events
+                .first()
+                .unwrap()
+                .1
+                .clone()
+                .v1()
+                .unwrap()
+                .sequence_number(),
+            cursor
+        );
 
         if order == Order::Ascending {
             if cursor + num_results > last_seq_num {
@@ -574,11 +584,17 @@ fn verify_events_by_event_key(
                 .first()
                 .expect("Shouldn't be empty")
                 .1
+                .clone()
+                .v1()
+                .unwrap()
                 .sequence_number();
             let last_seq = events
                 .last()
                 .expect("Shouldn't be empty")
                 .1
+                .clone()
+                .v1()
+                .unwrap()
                 .sequence_number();
 
             let traversed = get_events_by_event_key(
@@ -617,10 +633,12 @@ fn group_events_by_event_key(
     let mut event_key_to_events: HashMap<EventKey, Vec<(Version, ContractEvent)>> = HashMap::new();
     for (batch_idx, txn) in txns_to_commit.iter().enumerate() {
         for event in txn.events() {
-            event_key_to_events
-                .entry(*event.key())
-                .or_default()
-                .push((first_version + batch_idx as u64, event.clone()));
+            if let ContractEvent::V1(v1) = event {
+                event_key_to_events
+                    .entry(*v1.key())
+                    .or_default()
+                    .push((first_version + batch_idx as u64, event.clone()));
+            }
         }
     }
     event_key_to_events.into_iter().collect()

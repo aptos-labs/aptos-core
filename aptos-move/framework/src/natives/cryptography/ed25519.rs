@@ -2,33 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(feature = "testing")]
-use crate::natives::helpers::make_test_only_native_from_func;
-use crate::{
-    natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
-    safely_pop_arg,
-};
-#[cfg(feature = "testing")]
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 #[cfg(feature = "testing")]
 use aptos_crypto::test_utils::KeyPair;
 use aptos_crypto::{ed25519, ed25519::ED25519_PUBLIC_KEY_LENGTH, traits::*};
-use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatures};
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
+};
+use aptos_types::on_chain_config::FeatureFlag;
 use curve25519_dalek::edwards::CompressedEdwardsY;
-#[cfg(feature = "testing")]
-use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes,
 };
-#[cfg(feature = "testing")]
-use move_vm_runtime::native_functions::NativeContext;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 #[cfg(feature = "testing")]
-use move_vm_types::{natives::function::NativeResult, pop_arg};
-#[cfg(feature = "testing")]
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
+use std::{collections::VecDeque, convert::TryFrom};
 
 pub mod abort_codes {
     pub const E_WRONG_PUBKEY_SIZE: u64 = 1;
@@ -44,7 +37,6 @@ pub mod abort_codes {
  * failed
  **************************************************************************************************/
 fn native_public_key_validate(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -54,7 +46,7 @@ fn native_public_key_validate(
 
     let key_bytes = safely_pop_arg!(arguments, Vec<u8>);
 
-    context.charge(gas_params.base + gas_params.per_pubkey_deserialize * NumArgs::one())?;
+    context.charge(ED25519_BASE + ED25519_PER_PUBKEY_DESERIALIZE * NumArgs::one())?;
 
     let key_bytes_slice = match <[u8; ED25519_PUBLIC_KEY_LENGTH]>::try_from(key_bytes) {
         Ok(slice) => slice,
@@ -84,7 +76,7 @@ fn native_public_key_validate(
     // Check if the point lies on a small subgroup. This is required when using curves with a
     // small cofactor (e.g., in Ed25519, cofactor = 8).
     // NOTE(Gas): O(1) cost: multiplies the point by the cofactor
-    context.charge(gas_params.per_pubkey_small_order_check * NumArgs::one())?;
+    context.charge(ED25519_PER_PUBKEY_SMALL_ORDER_CHECK * NumArgs::one())?;
     let valid = !point.is_small_order();
 
     Ok(smallvec![Value::bool(valid)])
@@ -102,7 +94,6 @@ fn native_public_key_validate(
  * failed
  **************************************************************************************************/
 fn native_signature_verify_strict(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -114,9 +105,9 @@ fn native_signature_verify_strict(
     let pubkey = safely_pop_arg!(arguments, Vec<u8>);
     let signature = safely_pop_arg!(arguments, Vec<u8>);
 
-    context.charge(gas_params.base)?;
+    context.charge(ED25519_BASE)?;
 
-    context.charge(gas_params.per_pubkey_deserialize * NumArgs::one())?;
+    context.charge(ED25519_PER_PUBKEY_DESERIALIZE * NumArgs::one())?;
 
     let pk = match ed25519::Ed25519PublicKey::try_from(pubkey.as_slice()) {
         Ok(pk) => pk,
@@ -125,7 +116,7 @@ fn native_signature_verify_strict(
         },
     };
 
-    context.charge(gas_params.per_sig_deserialize * NumArgs::one())?;
+    context.charge(ED25519_PER_SIG_DESERIALIZE * NumArgs::one())?;
 
     let sig = match ed25519::Ed25519Signature::try_from(signature.as_slice()) {
         Ok(sig) => sig,
@@ -135,9 +126,9 @@ fn native_signature_verify_strict(
     };
 
     // NOTE(Gas): hashing the message to the group and a size-2 multi-scalar multiplication
-    let hash_then_verify_cost = gas_params.per_sig_strict_verify * NumArgs::one()
-        + gas_params.per_msg_hashing_base * NumArgs::one()
-        + gas_params.per_msg_byte_hashing * NumBytes::new(msg.len() as u64);
+    let hash_then_verify_cost = ED25519_PER_SIG_STRICT_VERIFY * NumArgs::one()
+        + ED25519_PER_MSG_HASHING_BASE * NumArgs::one()
+        + ED25519_PER_MSG_BYTE_HASHING * NumBytes::new(msg.len() as u64);
     context.charge(hash_then_verify_cost)?;
 
     let verify_result = sig.verify_arbitrary_msg(msg.as_slice(), &pk).is_ok();
@@ -160,74 +151,56 @@ pub struct GasParameters {
 }
 
 pub fn make_all(
-    gas_params: GasParameters,
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let mut natives = vec![];
 
-    // Always-on natives.
-    natives.append(&mut vec![
+    natives.extend([
         (
             "public_key_validate_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                native_public_key_validate,
-            ),
+            native_public_key_validate as RawSafeNative,
         ),
         (
             "signature_verify_strict_internal",
-            make_safe_native(
-                gas_params,
-                timed_features,
-                features,
-                native_signature_verify_strict,
-            ),
+            native_signature_verify_strict,
         ),
     ]);
 
     // Test-only natives.
     #[cfg(feature = "testing")]
-    natives.append(&mut vec![
+    natives.extend([
         (
             "generate_keys_internal",
-            make_test_only_native_from_func(native_test_only_generate_keys_internal),
+            native_test_only_generate_keys_internal as RawSafeNative,
         ),
-        (
-            "sign_internal",
-            make_test_only_native_from_func(native_test_only_sign_internal),
-        ),
+        ("sign_internal", native_test_only_sign_internal),
     ]);
 
-    crate::natives::helpers::make_module_natives(natives)
+    builder.make_named_natives(natives)
 }
 
 #[cfg(feature = "testing")]
 fn native_test_only_generate_keys_internal(
-    _context: &mut NativeContext,
+    _context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let key_pair = KeyPair::<Ed25519PrivateKey, Ed25519PublicKey>::generate(&mut OsRng);
-    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+    Ok(smallvec![
         Value::vector_u8(key_pair.private_key.to_bytes()),
         Value::vector_u8(key_pair.public_key.to_bytes())
-    ]))
+    ])
 }
 
 #[cfg(feature = "testing")]
 fn native_test_only_sign_internal(
-    _context: &mut NativeContext,
+    _context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    let msg_bytes = pop_arg!(args, Vec<u8>);
-    let sk_bytes = pop_arg!(args, Vec<u8>);
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    let msg_bytes = safely_pop_arg!(args, Vec<u8>);
+    let sk_bytes = safely_pop_arg!(args, Vec<u8>);
     let sk = Ed25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
     let sig = sk.sign_arbitrary_message(msg_bytes.as_slice());
-    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-        Value::vector_u8(sig.to_bytes())
-    ]))
+    Ok(smallvec![Value::vector_u8(sig.to_bytes())])
 }
