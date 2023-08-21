@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::get_metadata;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
@@ -11,13 +12,16 @@ use aptos_types::account_address::AccountAddress;
 use aptos_types::contract_event::ContractEvent;
 #[cfg(feature = "testing")]
 use aptos_types::event::EventKey;
+use ark_std::iterable::Iterable;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 #[cfg(feature = "testing")]
 use move_binary_format::errors::PartialVMResult;
-#[cfg(feature = "testing")]
-use move_core_types::language_storage::TypeTag;
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{
+    language_storage::{StructTag, TypeTag},
+    resolver::MoveResolver,
+    vm_status::StatusCode,
+};
 use move_vm_runtime::native_functions::NativeFunction;
 #[cfg(feature = "testing")]
 use move_vm_types::values::{Reference, Struct, StructRef};
@@ -26,12 +30,16 @@ use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
 /// Cached emitted module events.
-#[derive(Default, Tid)]
+#[derive(Tid)]
 pub struct NativeEventContext {
     events: Vec<ContractEvent>,
 }
 
 impl NativeEventContext {
+    pub fn new() -> Self {
+        Self { events: Vec::new() }
+    }
+
     pub fn into_events(self) -> Vec<ContractEvent> {
         self.events
     }
@@ -210,6 +218,14 @@ fn native_write_module_event_to_store(
 
     let type_tag = context.type_to_type_tag(&ty)?;
 
+    // Maybe not necessary but just in case
+    let struct_tag = match type_tag {
+        TypeTag::Struct(ref struct_tag) => Ok(struct_tag),
+        _ => Err(SafeNativeError::Abort {
+            // not an struct type
+            abort_code: 0x10001,
+        }),
+    }?;
     let layout = context.type_to_type_layout(&ty)?;
     let blob = msg.simple_serialize(&layout).ok_or_else(|| {
         SafeNativeError::InvariantViolation(
