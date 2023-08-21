@@ -32,10 +32,6 @@ pub struct BlockMetadata {
     maybe_randomness: Option<Randomness>,
 }
 
-fn serialize_transcript(_ts: &DKGTranscriptWrapper) -> Vec<u8> {
-    vec![3, 3, 3] //dkg todo: use something from aptos-dkg.
-}
-
 impl BlockMetadata {
     pub fn new(
         id: HashValue,
@@ -88,10 +84,11 @@ impl BlockMetadata {
             MoveValue::U64(self.timestamp_usecs),
         ];
 
-        ret.push(MoveValue::Bool(!self.maybe_dkg_transcript.is_some()));
+        //dkg todo: currently assuming the first transcript is valid.
+        ret.push(MoveValue::Bool(self.maybe_dkg_transcript.is_some()));
         ret.push(MoveValue::Vector(
             self.maybe_dkg_transcript
-                .map_or_else(|| vec![], |trx| serialize_transcript(&trx))
+                .map_or_else(|| vec![], |trx| bcs::to_bytes(&trx).unwrap())
                 .into_iter()
                 .map(MoveValue::U8)
                 .collect(),

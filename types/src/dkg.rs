@@ -1,11 +1,14 @@
 // Copyright © Aptos Foundation
 
+use std::io::{Read, Write};
 use crate::validator_info::ValidatorInfo;
 use anyhow::Result;
-use aptos_crypto::ValidCryptoMaterial;
-use aptos_dkg::pvss::{das, traits::Transcript, WeightedTranscript};
+use byteorder::{LittleEndian, WriteBytesExt};
+use aptos_dkg::pvss::{das, Player, traits::Transcript, WeightedTranscript};
 use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
+use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
+use crate::on_chain_config::{ConfigID, OnChainConfig};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StartDKGEvent {
@@ -30,6 +33,7 @@ pub struct DKGPvssConfig {
     pub wc_2: <WT as Transcript>::SecretSharingConfig,
     pub pp: <das::Transcript as Transcript>::PvssPublicParameters,
     pub eks: Vec<<das::Transcript as Transcript>::EncryptPubKey>,
+    pub my_index: Player,
     pub dst: &'static [u8],
 }
 
@@ -39,6 +43,7 @@ impl DKGPvssConfig {
         wc_2: <WT as Transcript>::SecretSharingConfig,
         pp: <das::Transcript as Transcript>::PvssPublicParameters,
         eks: Vec<<das::Transcript as Transcript>::EncryptPubKey>,
+        my_index: Player,
         dst: &'static [u8],
     ) -> Self {
         Self {
@@ -46,6 +51,7 @@ impl DKGPvssConfig {
             wc_2,
             pp,
             eks,
+            my_index,
             dst,
         }
     }

@@ -73,6 +73,12 @@
 
 <dl>
 <dt>
+<code>target_epoch: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
 <code>state_id: u64</code>
 </dt>
 <dd>
@@ -137,6 +143,7 @@ An invalid block time was encountered.
     <b>move_to</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(
         aptos_framework,
         <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+            target_epoch: 1,
             state_id: 0,
             countdown: 0,
             serialized_transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
@@ -156,7 +163,7 @@ An invalid block time was encountered.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_get_state">get_state</a>(): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_get_state">get_state</a>(): (u64, u64)
 </code></pre>
 
 
@@ -165,9 +172,9 @@ An invalid block time was encountered.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> (<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_get_state">get_state</a>(): u64 <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a>  {
+<pre><code><b>public</b> (<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_get_state">get_state</a>(): (u64, u64) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a>  {
     <b>let</b> dkg_state = <b>borrow_global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
-    dkg_state.state_id
+    (dkg_state.target_epoch, dkg_state.state_id)
 }
 </code></pre>
 
@@ -229,7 +236,7 @@ An invalid block time was encountered.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(locked_new_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="stake.md#0x1_stake_ValidatorInfo">stake::ValidatorInfo</a>&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(target_epoch: u64, locked_new_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="stake.md#0x1_stake_ValidatorInfo">stake::ValidatorInfo</a>&gt;)
 </code></pre>
 
 
@@ -238,20 +245,25 @@ An invalid block time was encountered.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(locked_new_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorInfo&gt;) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="dkg.md#0x1_dkg_start">dkg::start</a>() started."));
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(target_epoch: u64, locked_new_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorInfo&gt;) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"<a href="dkg.md#0x1_dkg_start">dkg::start</a>() started."));
     <b>let</b> dkg_state = <b>borrow_global_mut</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
-    <b>if</b> (dkg_state.state_id != 0) {
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="dkg.md#0x1_dkg_start">dkg::start</a>() called <b>while</b> <a href="dkg.md#0x1_dkg">dkg</a> already started."));
-        <b>return</b>;
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"dkg_state="));
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(dkg_state);
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"target_epoch="));
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&target_epoch);
+    <b>if</b> (target_epoch == dkg_state.target_epoch + 1 && dkg_state.state_id == 0) {
+        dkg_state.target_epoch = target_epoch;
+        dkg_state.state_id = 1;
+        dkg_state.countdown = 5; //TODO: for debugging
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a>&gt;(
+            &<b>mut</b> dkg_state.events,
+            <a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a> { locked_new_validator_set },
+        );
+    } <b>else</b> {
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"unexpected <a href="dkg.md#0x1_dkg_start">dkg::start</a>()..."));
     };
-    dkg_state.state_id = 1;
-    dkg_state.countdown = 5; //TODO: for debugging
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a>&gt;(
-        &<b>mut</b> dkg_state.events,
-        <a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a> { locked_new_validator_set },
-    );
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="dkg.md#0x1_dkg_start">dkg::start</a>() finished."));
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"<a href="dkg.md#0x1_dkg_start">dkg::start</a>() finished."));
 }
 </code></pre>
 
@@ -283,6 +295,7 @@ An invalid block time was encountered.
         dkg_state.state_id = 0;
         dkg_state.countdown = 0;
         dkg_state.serialized_transcript = std::option::extract(&<b>mut</b> maybe_serialized_transcript);
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&dkg_state.serialized_transcript);
         <b>true</b>
     } <b>else</b> <b>if</b> (dkg_state.countdown == 0) {
         <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="dkg.md#0x1_dkg_on_potential_transcript">dkg::on_potential_transcript</a>() - Current DKG is taking too long. Aborting."));

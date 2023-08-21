@@ -6,6 +6,7 @@ module aptos_framework::block {
     use std::vector;
     use std::option;
     use std::option::{some, none};
+    use std::string::utf8;
     use aptos_std::debug;
 
     use aptos_framework::account;
@@ -216,17 +217,21 @@ module aptos_framework::block {
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
         stake::update_performance_statistics(proposer_index, failed_proposer_indices);
-        state_storage::on_new_block(reconfiguration::current_epoch());
+        let cur_epoch = reconfiguration::current_epoch();
+        state_storage::on_new_block(cur_epoch);
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
             debug::print(&std::string::utf8(b"on_expire() started."));
-            let dkg_state = dkg::get_state();
-            if (dkg_state == dkg::state_inactive()) {
-                debug::print(&std::string::utf8(b"DKG state: inactive."));
+            let (target_epoch, status) = dkg::get_state();
+            debug::print(&cur_epoch);
+            debug::print(&target_epoch);
+            debug::print(&status);
+            if (target_epoch == cur_epoch && status == dkg::state_inactive()) {
+                debug::print(&std::string::utf8(b"case 0."));
                 let validator_set_and_stake_dist = reconfiguration::reconfigure_a();
-                dkg::start(validator_set_and_stake_dist);
-            } else if (dkg_state == dkg::state_active()) {
-                debug::print(&std::string::utf8(b"DKG state: active."));
+                dkg::start(cur_epoch + 1, validator_set_and_stake_dist);
+            } else if (target_epoch == cur_epoch + 1 && status == dkg::state_active()) {
+                debug::print(&std::string::utf8(b"case 1."));
                 let maybe_transcript = if (dkg_transcript_available) {
                     some(serialized_dkg_transcript)
                 } else {
@@ -237,6 +242,7 @@ module aptos_framework::block {
                     reconfiguration::reconfigure_b();
                 };
             } else {
+                debug::print(&utf8(b"case 2. This should not happen."));
                 abort(1);
             };
             debug::print(&std::string::utf8(b"on_expire() finished."));

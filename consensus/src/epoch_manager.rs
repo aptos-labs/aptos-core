@@ -75,7 +75,7 @@ use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
         LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
-        OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
+        OnChainExecutionConfig, ProposerElectionType, ValidatorSet, DKGState,
     },
     validator_verifier::ValidatorVerifier,
 };
@@ -98,6 +98,13 @@ use std::{
     time::Duration,
 };
 use tokio_retry::strategy::ExponentialBackoff;
+use aptos_crypto::bls12381;
+use aptos_dkg::pvss::{das, Player};
+use aptos_dkg::pvss::traits::Transcript;
+use aptos_global_constants::CONSENSUS_KEY;
+use aptos_secure_storage::Storage;
+use aptos_types::dkg::DKGTranscriptWrapper;
+use aptos_secure_storage::KVStorage;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -127,6 +134,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
     reconfig_events: ReconfigNotificationListener<P>,
+    dkg_manager_wrapper: Arc<DKGManagerWrapper>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
@@ -194,6 +202,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             dkg_handler_tx: None,
             bounded_executor,
             recovery_mode: false,
+            dkg_manager_wrapper: Arc::new(DKGManagerWrapper::NoDKG),
         }
     }
 
@@ -715,17 +724,20 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ExponentialBackoff::from_millis(5),
             aptos_time_service::TimeService::real(),
         ));
+
         let dkg_manager = Arc::new(Mutex::new(DKGManager::new(
             self.author,
             epoch_state.clone(),
             dkg_reliable_broadcast,
         )));
-        let dkg_manager_wrapper = Arc::new(DKGManagerWrapper::WithDKG(dkg_manager.clone()));
+        //dkg todo: old instance is silently dropped. Is it fine? any clean-up needed?
+        self.dkg_manager_wrapper = Arc::new(DKGManagerWrapper::WithDKG(dkg_manager.clone()));
+
         let dkg_handler: DKGNetworkHandler = DKGNetworkHandler::new(
             self.author,
             dkg_handler_rx,
             Arc::new(epoch_state.clone()),
-            dkg_manager,
+            dkg_manager.clone(),
         );
         // start the dkg handler
         tokio::spawn(dkg_handler.start());
@@ -733,7 +745,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.commit_state_computer.new_epoch(
             &epoch_state,
             payload_manager.clone(),
-            dkg_manager_wrapper.clone(),
+            self.dkg_manager_wrapper.clone(),
             transaction_shuffler,
             block_gas_limit,
             transaction_deduper,
@@ -782,7 +794,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
-            dkg_manager_wrapper.clone(),
+            self.dkg_manager_wrapper.clone(),
         );
 
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
@@ -821,7 +833,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config,
             round_manager_tx,
             self.config.clone(),
-            dkg_manager_wrapper,
+            self.dkg_manager_wrapper.clone(),
         );
 
         round_manager.init(last_vote).await;
@@ -834,7 +846,37 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload<P>) {
-        // dkg todo: the new epoch validators read and decrypt their private keys from DKG
+        let maybe_dkg_state: anyhow::Result<DKGState> = payload.get();
+        match maybe_dkg_state {
+            Err(_) => {
+                debug!("On-chain DKGState not initialized. Probably the DKG feature is not enabled.");
+                //dkg todo: when epoch starts with no dkg transcript, proceed epoch without randomness.
+            }
+            Ok(state) if state.target_epoch > 1 => {
+                debug!("[DKG] start_new_epoch with dkg_state={:?}", state);
+                let trxs = bcs::from_bytes::<DKGTranscriptWrapper>(state.serialized_transcript.as_slice()).unwrap();
+                let st: Storage = (&self.config.safety_rules.backend).try_into().unwrap();
+                if let Err(error) = st.available() {
+                    panic!("Storage is not available: {:?}", error);
+                }
+                let private_key: bls12381::PrivateKey = st
+                    .get(CONSENSUS_KEY)
+                    .map(|v| v.value)
+                    .expect("Unable to get private key");
+                let mut dk_bytes = private_key.to_bytes(); //in big-endian
+                dk_bytes.reverse();// now in small-endian, needed by pvss API.
+                let dk = aptos_dkg::pvss::encryption_dlog::g1::DecryptPrivKey::try_from(dk_bytes.as_slice()).unwrap();
+                let pvss_config = self.dkg_manager_wrapper.get_pvss_config().unwrap();
+                let (sk1, pk1) = trxs.trx_one_third.decrypt_own_share(&pvss_config.wc_1, &pvss_config.my_index, &dk);
+                let (sk2, pk2) = trxs.trx_two_third.decrypt_own_share(&pvss_config.wc_2, &pvss_config.my_index, &dk);
+                //dkg todo: start randgen with these keys.
+                debug!("[DKG] starting new epoch with sk1={:?}, sk2={:?}", sk1, sk2);
+            }
+            _ => {
+                debug!("No trxs in epoch 1. This is expected.");
+                //dkg todo: decide if we need to hardcode the dkg keys for epoch 1, for forge testing etc.
+            }
+        }
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");

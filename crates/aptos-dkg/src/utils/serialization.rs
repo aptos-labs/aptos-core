@@ -46,10 +46,9 @@ pub(crate) fn scalar_from_bytes_le(bytes: &[u8]) -> Result<Scalar, CryptoMateria
         Err(_) => return Err(CryptoMaterialError::WrongLengthError),
     };
 
-    let s = Scalar::from_bytes_le(slice).unwrap_or_else(|| Scalar::ZERO);
-
-    if s.is_zero().unwrap_u8() == 1u8 {
-        Ok(s)
+    let opt = Scalar::from_bytes_le(slice);
+    if opt.is_some().unwrap_u8() == 1u8 {
+        Ok(opt.unwrap())
     } else {
         Err(CryptoMaterialError::DeserializationError)
     }

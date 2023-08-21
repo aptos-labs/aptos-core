@@ -24,8 +24,10 @@ use aptos_types::{
 use futures::future::{AbortHandle, Abortable};
 use rand::{rngs::StdRng, thread_rng, SeedableRng};
 use std::sync::Arc;
+use itertools::Itertools;
 use tokio_retry::strategy::ExponentialBackoff;
 use aptos_crypto::Uniform;
+use aptos_dkg::pvss::Player;
 
 // the transcript size is 3.25MB
 // const TRANSCRIPT_SIZE: usize = 3_250_000;
@@ -116,15 +118,12 @@ impl DKGManager {
 
     pub fn start_dkg(&mut self, dkg_events: Vec<ContractEvent>) {
         // thread::sleep(Duration::from_millis(TRANSCRIPT_COMPUTE_TIME_MS));
-        let dkg_rounding: DKGRounding = dkg_events
-            .first()
-            .map(|e| {
-                StartDKGEvent::try_from(e)
-                    .expect("[DKG]: Empty DKG events!")
-                    .into()
-            })
-            .expect("[DKG]: Convertion from DKG events to DKG Rounding failed!");
+        let first_event = StartDKGEvent::try_from(dkg_events
+            .first().unwrap()).unwrap();
 
+        let (my_index, _) = first_event.locked_new_validator_info.iter().find_position(|x|x.account_address == self.author).unwrap();
+        let dkg_rounding = DKGRounding::from(first_event);
+        debug!("[DKG] my_index={}", my_index);
         debug!(
             "[DKG] Starting DKG with the following parameters: \n
             number of validators: {:?} \n
@@ -141,7 +140,6 @@ impl DKGManager {
 
         // dkg todo: decide whether to use consensus key as encryption key
         let consensus_keys: Vec<<das::Transcript as Transcript>::EncryptPubKey> = dkg_rounding.validator_consensus_keys().iter().map(|k| k.to_bytes().as_slice().try_into().unwrap()).collect::<Vec<_>>();
-
         let wc_1 = dkg_rounding.weighted_config_1().clone();
         let wc_2 = dkg_rounding.weighted_config_2().clone();
         self.dkg_rounding.replace(dkg_rounding);
@@ -182,7 +180,7 @@ impl DKGManager {
         //     .expect("serialized transcript should deserialize correctly");
         // assert_eq!(trx_2, deserialized);
 
-        let dkg_pvss_config = DKGPvssConfig::new(wc_1.clone(), wc_2.clone(), pp, consensus_keys, &DST_PVSS_TESTING_APP[..]);
+        let dkg_pvss_config = DKGPvssConfig::new(wc_1.clone(), wc_2.clone(), pp, consensus_keys, Player{id: my_index}, &DST_PVSS_TESTING_APP[..]);
         self.dkg_store.add_pvss_config(dkg_pvss_config);
 
         let dkg_trx_wrapper = DKGTranscriptWrapper {
