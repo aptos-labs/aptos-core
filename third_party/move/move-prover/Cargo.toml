@@ -19,7 +19,7 @@ move-ir-types = { path = "../move-ir/types" }
 move-model = { path = "../move-model" }
 # move dependencies
 move-prover-boogie-backend = { path = "boogie-backend" }
-move-stackless-bytecode = { path = "bytecode" }
+move-stackless-bytecode = { path = "../move-model/bytecode" }
 
 # external dependencies
 async-trait = "0.1.42"
