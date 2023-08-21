@@ -12,7 +12,7 @@ use aptos_types::{
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use state::PartitionState;
 use std::sync::{Arc, RwLock};
-use types::PreParedTxnIdx;
+use types::PrePartitionedTxnIdx;
 
 mod build_edge;
 pub mod config;
@@ -63,7 +63,7 @@ impl PartitionerV2 {
         &self,
         txns: &[AnalyzedTransaction],
         num_shards: usize,
-    ) -> Vec<Vec<PreParedTxnIdx>> {
+    ) -> Vec<Vec<PrePartitionedTxnIdx>> {
         let _timer = MISC_TIMERS_SECONDS
             .with_label_values(&["pre_partition"])
             .start_timer();

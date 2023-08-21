@@ -4,7 +4,7 @@ use crate::v2::{
     counters::MISC_TIMERS_SECONDS,
     extract_and_sort,
     state::PartitionState,
-    types::{PreParedTxnIdx, SenderIdx},
+    types::{PrePartitionedTxnIdx, SenderIdx},
     PartitionerV2,
 };
 use aptos_logger::trace;
@@ -53,7 +53,7 @@ impl PartitionerV2 {
 
         if !state.partition_last_round {
             trace!("Merging txns after discarding stopped.");
-            let last_round_txns: Vec<PreParedTxnIdx> =
+            let last_round_txns: Vec<PrePartitionedTxnIdx> =
                 remaining_txns.into_iter().flatten().collect();
             remaining_txns = vec![vec![]; state.num_executor_shards];
             remaining_txns[state.num_executor_shards - 1] = last_round_txns;
@@ -83,8 +83,8 @@ impl PartitionerV2 {
     pub(crate) fn discarding_round(
         state: &mut PartitionState,
         round_id: RoundId,
-        remaining_txns: Vec<Vec<PreParedTxnIdx>>,
-    ) -> (Vec<Vec<PreParedTxnIdx>>, Vec<Vec<PreParedTxnIdx>>) {
+        remaining_txns: Vec<Vec<PrePartitionedTxnIdx>>,
+    ) -> (Vec<Vec<PrePartitionedTxnIdx>>, Vec<Vec<PrePartitionedTxnIdx>>) {
         let _timer = MISC_TIMERS_SECONDS
             .with_label_values(&[format!("round_{round_id}").as_str()])
             .start_timer();
@@ -94,10 +94,10 @@ impl PartitionerV2 {
         // Overview of the logic:
         // 1. Key conflicts are analyzed and a txn from `remaining_txns` either goes to `discarded` or `tentatively_accepted`.
         // 2. Relative orders of txns from the same sender are analyzed and a txn from `tentatively_accepted` either goes to `finally_accepted` or `discarded`.
-        let mut discarded: Vec<RwLock<Vec<PreParedTxnIdx>>> = Vec::with_capacity(num_shards);
-        let mut tentatively_accepted: Vec<RwLock<Vec<PreParedTxnIdx>>> =
+        let mut discarded: Vec<RwLock<Vec<PrePartitionedTxnIdx>>> = Vec::with_capacity(num_shards);
+        let mut tentatively_accepted: Vec<RwLock<Vec<PrePartitionedTxnIdx>>> =
             Vec::with_capacity(num_shards);
-        let mut finally_accepted: Vec<RwLock<Vec<PreParedTxnIdx>>> = Vec::with_capacity(num_shards);
+        let mut finally_accepted: Vec<RwLock<Vec<PrePartitionedTxnIdx>>> = Vec::with_capacity(num_shards);
 
         for txns in remaining_txns.iter() {
             tentatively_accepted.push(RwLock::new(Vec::with_capacity(txns.len())));

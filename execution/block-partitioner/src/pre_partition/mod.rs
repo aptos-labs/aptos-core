@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::v2::types::PreParedTxnIdx;
+use crate::v2::types::PrePartitionedTxnIdx;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 
 pub trait PrePartitioner: Send {
@@ -10,14 +10,14 @@ pub trait PrePartitioner: Send {
         &self,
         transactions: &[AnalyzedTransaction],
         num_shards: usize,
-    ) -> Vec<Vec<PreParedTxnIdx>>;
+    ) -> Vec<Vec<PrePartitionedTxnIdx>>;
 }
 
 pub mod uniform_partitioner;
 
-pub fn start_txn_idxs(pre_partitioned: &Vec<Vec<PreParedTxnIdx>>) -> Vec<PreParedTxnIdx> {
+pub fn start_txn_idxs(pre_partitioned: &Vec<Vec<PrePartitionedTxnIdx>>) -> Vec<PrePartitionedTxnIdx> {
     let num_shards = pre_partitioned.len();
-    let mut ret: Vec<PreParedTxnIdx> = vec![0; num_shards];
+    let mut ret: Vec<PrePartitionedTxnIdx> = vec![0; num_shards];
     for shard_id in 1..num_shards {
         ret[shard_id] = ret[shard_id - 1] + pre_partitioned[shard_id - 1].len();
     }

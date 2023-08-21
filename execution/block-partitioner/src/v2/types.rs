@@ -37,7 +37,7 @@ impl SubBlockIdx {
 }
 
 /// The position of a txn in the block after `pre_partition` and before `partition_to_matrix`.
-pub type PreParedTxnIdx = usize;
+pub type PrePartitionedTxnIdx = usize;
 
 /// Represent a specific storage location in a partitioning session.
 /// TODO: ensure this type can support max num of unique state keys in a block.
@@ -52,7 +52,7 @@ pub type SenderIdx = usize;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ShardedTxnIndexV2 {
     pub sub_block_idx: SubBlockIdx,
-    pub ori_txn_idx: PreParedTxnIdx,
+    pub ori_txn_idx: PrePartitionedTxnIdx,
 }
 
 impl Ord for ShardedTxnIndexV2 {
@@ -79,7 +79,7 @@ impl ShardedTxnIndexV2 {
 }
 
 impl ShardedTxnIndexV2 {
-    pub fn new(round_id: RoundId, shard_id: ShardId, ori_txn_idx: PreParedTxnIdx) -> Self {
+    pub fn new(round_id: RoundId, shard_id: ShardId, ori_txn_idx: PrePartitionedTxnIdx) -> Self {
         Self {
             sub_block_idx: SubBlockIdx::new(round_id, shard_id),
             ori_txn_idx,

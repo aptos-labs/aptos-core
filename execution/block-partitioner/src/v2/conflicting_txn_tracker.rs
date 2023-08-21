@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::v2::types::{PreParedTxnIdx, ShardedTxnIndexV2};
+use crate::v2::types::{PrePartitionedTxnIdx, ShardedTxnIndexV2};
 #[cfg(test)]
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::{
@@ -20,11 +20,11 @@ pub struct ConflictingTxnTracker {
     /// A randomly chosen owner shard of the storage location, for conflict resolution purpose.
     pub anchor_shard_id: ShardId,
     /// Txns that (1) read the current storage location and (2) have not been accepted.
-    pending_reads: BTreeSet<PreParedTxnIdx>,
+    pending_reads: BTreeSet<PrePartitionedTxnIdx>,
     /// Txns that (1) write the current storage location and (2) have not been accepted.
-    pending_writes: BTreeSet<PreParedTxnIdx>,
+    pending_writes: BTreeSet<PrePartitionedTxnIdx>,
     /// Txns that have been accepted.
-    pub finalized_all: BTreeSet<ShardedTxnIndexV2>,
+    pub finalized: BTreeSet<ShardedTxnIndexV2>,
     /// Txns that (1) write the current storage location and (2) have been accepted.
     pub finalized_writes: BTreeSet<ShardedTxnIndexV2>,
 }
@@ -36,23 +36,23 @@ impl ConflictingTxnTracker {
             anchor_shard_id,
             pending_reads: Default::default(),
             pending_writes: Default::default(),
-            finalized_all: Default::default(),
+            finalized: Default::default(),
             finalized_writes: Default::default(),
         }
     }
 
-    pub fn add_read_candidate(&mut self, txn_id: PreParedTxnIdx) {
+    pub fn add_read_candidate(&mut self, txn_id: PrePartitionedTxnIdx) {
         self.pending_reads.insert(txn_id);
     }
 
-    pub fn add_write_candidate(&mut self, txn_id: PreParedTxnIdx) {
+    pub fn add_write_candidate(&mut self, txn_id: PrePartitionedTxnIdx) {
         self.pending_writes.insert(txn_id);
     }
 
     /// Partitioner has finalized the position of a txn. Remove it from the pending txn list.
     pub fn mark_txn_ordered(
         &mut self,
-        txn_id: PreParedTxnIdx,
+        txn_id: PrePartitionedTxnIdx,
         round_id: RoundId,
         shard_id: ShardId,
     ) {
@@ -62,14 +62,14 @@ impl ConflictingTxnTracker {
         } else {
             assert!(self.pending_reads.remove(&txn_id));
         }
-        self.finalized_all.insert(sharded_txn_idx);
+        self.finalized.insert(sharded_txn_idx);
     }
 
     /// Check if there is a txn writing to the current storage location and its txn_id in the given wrapped range [start, end).
     pub fn has_write_in_range(
         &self,
-        start_txn_id: PreParedTxnIdx,
-        end_txn_id: PreParedTxnIdx,
+        start_txn_id: PrePartitionedTxnIdx,
+        end_txn_id: PrePartitionedTxnIdx,
     ) -> bool {
         if start_txn_id <= end_txn_id {
             self.pending_writes
@@ -120,7 +120,7 @@ fn test_conflicting_txn_tracker() {
             ShardedTxnIndexV2::new(99, 20, 7)
         ],
         tracker
-            .finalized_all
+            .finalized
             .range(ShardedTxnIndexV2::new(98, 0, 0)..ShardedTxnIndexV2::new(99, 20, 8))
             .copied()
             .collect::<Vec<_>>()
@@ -132,7 +132,7 @@ fn test_conflicting_txn_tracker() {
             ShardedTxnIndexV2::new(99, 30, 10)
         ],
         tracker
-            .finalized_all
+            .finalized
             .range(ShardedTxnIndexV2::new(99, 20, 7)..)
             .copied()
             .collect::<Vec<_>>()

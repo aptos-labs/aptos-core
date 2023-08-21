@@ -4,7 +4,7 @@ use crate::{
     get_anchor_shard_id,
     v2::{
         conflicting_txn_tracker::ConflictingTxnTracker, counters::MISC_TIMERS_SECONDS,
-        state::PartitionState, types::PreParedTxnIdx, PartitionerV2,
+        state::PartitionState, types::PrePartitionedTxnIdx, PartitionerV2,
     },
 };
 use rayon::{iter::ParallelIterator, prelude::IntoParallelIterator};
@@ -19,7 +19,7 @@ impl PartitionerV2 {
         state.thread_pool.install(|| {
             (0..state.num_txns())
                 .into_par_iter()
-                .for_each(|txn_idx: PreParedTxnIdx| {
+                .for_each(|txn_idx: PrePartitionedTxnIdx| {
                     let txn_read_guard = state.txns[txn_idx].read().unwrap();
                     let txn = txn_read_guard.as_ref().unwrap();
                     let sender_idx = state.add_sender(txn.sender());

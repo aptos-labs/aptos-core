@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 use crate::test_utils::P2PBlockGenerator;
-use crate::{pre_partition::PrePartitioner, v2::types::PreParedTxnIdx};
+use crate::{pre_partition::PrePartitioner, v2::types::PrePartitionedTxnIdx};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 #[cfg(test)]
 use rand::thread_rng;
@@ -15,7 +15,7 @@ impl PrePartitioner for UniformPartitioner {
         &self,
         transactions: &[AnalyzedTransaction],
         num_shards: usize,
-    ) -> Vec<Vec<PreParedTxnIdx>> {
+    ) -> Vec<Vec<PrePartitionedTxnIdx>> {
         let num_items = transactions.len();
         let num_chunks = num_shards;
         let num_big_chunks = num_items % num_chunks;
