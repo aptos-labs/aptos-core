@@ -1,52 +1,8 @@
 ---
 remote_endpoint: ~
-name: "step_1_upgrade_framework"
+name: "v1.6.1"
 proposals:
-  - name: upgrade_framework
-    metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.6"
-      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.6"
-    execution_mode: MultiStep
-    update_sequence:
-      - DefaultGas
-      - Framework:
-          bytecode_version: 6
-          git_hash: ~
-  - name: step_2_enable_fee_payer
-    metadata:
-      title: "Enable fee payer"
-      description: "AIP-39: Support secondary fee payer to pay gas cost on behalf of the sender."
-      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/8904"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-39.md"
-    execution_mode: MultiStep
-    update_sequence:
-    - FeatureFlag:
-        enabled:
-          - gas_payer_enabled
-  - name: step_3_enable_aptos_unique_identifiers
-    metadata:
-      title: "Enable Aptos Unique Identifiers"
-      description: "AIP-36: Support for aptos unique identifiers (generated using native function generate_unique_address)"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/154"
-    execution_mode: MultiStep
-    update_sequence:
-    - FeatureFlag:
-        enabled:
-          - aptos_unique_identifiers
-  - name: step_4_enable_partial_voting
-    metadata:
-      title: "Enable partial voting"
-      description: "AIP-28:  Partial voting for on chain governance."
-      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/8090"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-28.md"
-    execution_mode: MultiStep
-    update_sequence:
-    - RawScript: aptos-move/aptos-release-builder/data/proposals/aip_28_initialization.move
-    - FeatureFlag:
-        enabled:
-          - partial_governance_voting
-          - delegation_pool_partial_governance_voting
-  - name: enable_periodical_reward_rate_decrease
+  - name: enable_periodical_reward_rate_reduction
     metadata:
       title: "Enable periodical reward rate decrease"
       description: "AIP-30: Implement decrease in staking rewards"
@@ -56,4 +12,49 @@ proposals:
     update_sequence:
     - FeatureFlag:
         enabled:
-          - periodical_reward_rate_decrease
+          - periodical_reward_rate_reduction
+  ## v1.6.0
+  # - name: upgrade_framework
+  #   metadata:
+  #     title: "Multi-step proposal to upgrade mainnet framework to v1.6"
+  #     description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.6"
+  #   execution_mode: MultiStep
+  #   update_sequence:
+  #     - DefaultGas
+  #     - Framework:
+  #         bytecode_version: 6
+  #         git_hash: ~
+  # - name: step_2_enable_fee_payer
+  #   metadata:
+  #     title: "Enable fee payer"
+  #     description: "AIP-39: Support secondary fee payer to pay gas cost on behalf of the sender."
+  #     source_code_url: "https://github.com/aptos-labs/aptos-core/pull/8904"
+  #     discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-39.md"
+  #   execution_mode: MultiStep
+  #   update_sequence:
+  #   - FeatureFlag:
+  #       enabled:
+  #         - gas_payer_enabled
+  # - name: step_3_enable_aptos_unique_identifiers
+  #   metadata:
+  #     title: "Enable Aptos Unique Identifiers"
+  #     description: "AIP-36: Support for aptos unique identifiers (generated using native function generate_unique_address)"
+  #     discussion_url: "https://github.com/aptos-foundation/AIPs/issues/154"
+  #   execution_mode: MultiStep
+  #   update_sequence:
+  #   - FeatureFlag:
+  #       enabled:
+  #         - aptos_unique_identifiers
+  # - name: step_4_enable_partial_voting
+  #   metadata:
+  #     title: "Enable partial voting"
+  #     description: "AIP-28:  Partial voting for on chain governance."
+  #     source_code_url: "https://github.com/aptos-labs/aptos-core/pull/8090"
+  #     discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-28.md"
+  #   execution_mode: MultiStep
+  #   update_sequence:
+  #   - RawScript: aptos-move/aptos-release-builder/data/proposals/aip_28_initialization.move
+  #   - FeatureFlag:
+  #       enabled:
+  #         - partial_governance_voting
+  #         - delegation_pool_partial_governance_voting
