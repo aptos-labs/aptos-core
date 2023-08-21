@@ -16,9 +16,11 @@ use std::collections::BTreeMap;
 
 /// Allows to query storage metadata in the VM session. Needed for storage refunds.
 pub trait StateValueMetadataResolver {
-    // TODO: Nested options are ugly, but this is how StateValueMetadata is
-    // stored. First make it look nicer on storage side, then can change
-    // this API.
+    /// Returns metadata for a given state value:
+    ///   - None             if state value does not exist,
+    ///   - Some(None)       if state value has no metadata,
+    ///   - Some(Some(..))   otherwise.
+    // TODO: Nested options are ugly, refactor.
     fn get_state_value_metadata(
         &self,
         state_key: &StateKey,

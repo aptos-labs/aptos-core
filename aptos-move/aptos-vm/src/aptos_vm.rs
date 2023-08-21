@@ -34,7 +34,6 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, ConfigStorage, FeatureFlag, TimedFeatureOverride},
-    state_store::state_key::StateKey,
     transaction::{
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
@@ -42,7 +41,6 @@ use aptos_types::{
         WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
-    write_set::WriteOp,
 };
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
@@ -1235,14 +1233,19 @@ impl AptosVM {
         }
     }
 
-    fn read_write_set<'a>(
+    fn read_change_set(
         &self,
         state_view: &impl StateView,
-        write_set: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+        change_set: &VMChangeSet,
     ) -> Result<(), VMStatus> {
+        assert!(
+            change_set.aggregator_write_set().is_empty(),
+            "Waypoint change set should not have any aggregator writes."
+        );
+
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
-        for (state_key, _) in write_set.into_iter() {
+        for (state_key, _) in change_set.write_set_iter() {
             state_view
                 .get_state_value_bytes(state_key)
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
@@ -1276,24 +1279,20 @@ impl AptosVM {
     pub(crate) fn process_waypoint_change_set(
         &self,
         resolver: &impl MoveResolverExt,
-        writeset_payload: WriteSetPayload,
+        write_set_payload: WriteSetPayload,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         // TODO: user specified genesis id to distinguish different genesis write sets
         let genesis_id = HashValue::zero();
         let change_set = self.execute_write_set(
             resolver,
-            &writeset_payload,
+            &write_set_payload,
             Some(aptos_types::account_config::reserved_vm_address()),
             SessionId::genesis(genesis_id),
         )?;
 
         Self::validate_waypoint_change_set(&change_set, log_context)?;
-        self.read_write_set(resolver, change_set.write_set_iter())?;
-        assert!(
-            change_set.aggregator_write_set().is_empty(),
-            "Waypoint change set should not have any aggregator writes."
-        );
+        self.read_change_set(resolver, &change_set)?;
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 

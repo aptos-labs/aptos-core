@@ -33,6 +33,8 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     fn init(argument: &'a S) -> Self {
         // AptosVM has to be initialized using configs from storage.
         // Using adapter allows us to fetch those.
+        // TODO: with new adapter we can relax trait bounds on S and avoid
+        // creating `StorageAdapter` here.
         let config_storage = StorageAdapter::new(argument);
         let vm = AptosVM::new(&config_storage);
 

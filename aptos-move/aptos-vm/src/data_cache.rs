@@ -240,14 +240,14 @@ impl<'a, S: StateView> StateValueMetadataResolver for StorageAdapter<'a, S> {
         state_key: &StateKey,
     ) -> anyhow::Result<Option<Option<StateValueMetadata>>> {
         let maybe_state_value = self.state_store.get_state_value(state_key)?;
-        Ok(maybe_state_value.map(|state_value| state_value.into_metadata()))
+        Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 }
 
 // We need to implement StateView for adapter because:
 //   1. When processing write set payload, storage is accessed
 //      directly.
-//   3. When stacking Storage adapters on top of each other, e.g.
+//   2. When stacking Storage adapters on top of each other, e.g.
 //      in epilogue.
 impl<'a, S: StateView> TStateView for StorageAdapter<'a, S> {
     type Key = StateKey;
