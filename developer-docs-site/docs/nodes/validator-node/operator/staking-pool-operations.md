@@ -58,7 +58,7 @@ You can either enter the private key from an existing wallet, or create new wall
 aptos stake create-staking-contract \
 --operator <operator-address> \
 --voter <voter-address> \
---amount 1000000 \
+--amount 100000000000000 \
 --commission-percentage 10
 ```
 
