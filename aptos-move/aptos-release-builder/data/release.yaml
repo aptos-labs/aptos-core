@@ -46,3 +46,14 @@ proposals:
         enabled:
           - partial_governance_voting
           - delegation_pool_partial_governance_voting
+  - name: enable_periodical_reward_rate_decrease
+    metadata:
+      title: "Enable periodical reward rate decrease"
+      description: "AIP-30: Implement decrease in staking rewards"
+      source_code_url: "https://github.com/aptos-foundation/mainnet-proposals/tree/main/sources/v1.6.1"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/119"
+    execution_mode: SingleStep
+    update_sequence:
+    - FeatureFlag:
+        enabled:
+          - periodical_reward_rate_decrease
