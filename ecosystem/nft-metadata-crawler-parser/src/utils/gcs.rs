@@ -12,7 +12,7 @@ use serde_json::Value;
 pub async fn write_json_to_gcs(bucket: String, id: String, json: Value) -> anyhow::Result<String> {
     let client = init_client().await?;
 
-    let filename = format!("{}/json.json", id);
+    let filename = format!("cdn/{}.json", id);
     let json_string = json.to_string();
     let json_bytes = json_string.into_bytes();
 
@@ -55,7 +55,7 @@ pub async fn write_image_to_gcs(
         _ => "jpeg".to_string(),
     };
 
-    let filename = format!("{}/image.{}", id, extension);
+    let filename = format!("cdn/{}.{}", id, extension);
 
     let upload_type = UploadType::Simple(Media {
         name: filename.clone().into(),
@@ -72,8 +72,7 @@ pub async fn write_image_to_gcs(
             buffer,
             &upload_type,
         )
-        .await
-        .context("Error uploading image to GCS")?;
+        .await?;
 
     Ok(filename)
 }

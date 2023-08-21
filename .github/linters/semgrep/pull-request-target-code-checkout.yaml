@@ -1,0 +1,68 @@
+rules:
+  - id: pull-request-target-code-checkout
+    languages:
+      - yaml
+    message: This GitHub Actions workflow file uses `pull_request_target` and checks
+      out code from the incoming pull request. When using `pull_request_target`,
+      the Action runs in the context of the target repository, which includes
+      access to all repository secrets. Please ensure you have `permission-check`
+      enabled for the jobs that check out code. Please see
+      https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+      for additional mitigations.
+    metadata:
+      category: security
+      owasp:
+        - A01:2021 - Broken Access Control
+      cwe:
+        - "CWE-913: Improper Control of Dynamically-Managed Code Resources"
+      references:
+        - https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+        - https://github.com/justinsteven/advisories/blob/master/2021_github_actions_checkspelling_token_leak_via_advice_symlink.md
+      technology:
+        - github-actions
+      subcategory:
+        - audit
+      likelihood: MEDIUM
+      impact: LOW
+      confidence: MEDIUM
+      license: Commons Clause License Condition v1.0[LGPL-2.1-only]
+      vulnerability_class:
+        - Code Injection
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              on:
+                ...
+                pull_request_target: ...
+                ...
+              ...
+          - pattern-inside: |
+              on: [..., pull_request_target, ...]
+              ...
+          - pattern-inside: |
+              on: pull_request_target
+              ...
+      - pattern-inside: |
+          jobs:
+            ...
+            $JOBNAME:
+              ...
+      - pattern-not-inside: |
+          needs: [..., permission-check, ...]
+          ...
+      - pattern-not-inside: |
+          needs:
+            ...
+            - permission-check
+            ...
+          ...
+      - pattern-not-inside: |
+          needs: [permission-check]
+          ...
+      - pattern: |
+          ...
+          uses: "$ACTION"
+      - metavariable-regex:
+          metavariable: $ACTION
+          regex: actions/checkout@.*
+    severity: WARNING

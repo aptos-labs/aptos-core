@@ -261,7 +261,7 @@ impl ProposalGenerator {
         } else if let Some(dkg_agg_node) = self.dkg_manager_wrapper.take_agg_node() {
             // generate DKG payload
             // the block contains just one DKG aggregate node
-            // dkg todo: think the bad path where the submitted dkg payload does not get committed, we need to reset the aggregated node and retry
+            // dkg todo: handle the bad path where the submitted dkg payload does not get committed, i.e., when the validator sees its dkg payload is discarded, it needs to re-propose
             let payload = Payload::DKG(DKGPayload::new(dkg_agg_node));
             let timestamp = self.time_service.get_current_timestamp();
             (payload, timestamp.as_micros() as u64)
@@ -337,7 +337,6 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
-            // dkg todo: fetch dkg payload here
             (payload, timestamp.as_micros() as u64)
         };
 

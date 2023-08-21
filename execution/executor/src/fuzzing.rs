@@ -14,13 +14,10 @@ use aptos_storage_interface::{
     cached_state_view::CachedStateView, state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter,
 };
 use aptos_types::{
-    block_executor::partitioner::{ExecutableTransactions, SubBlocksForShard},
+    block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
     ledger_info::LedgerInfoWithSignatures,
     test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
-    transaction::{
-        analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput,
-        TransactionToCommit, Version,
-    },
+    transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
     vm_status::VMStatus,
 };
 use aptos_vm::{
@@ -74,7 +71,7 @@ impl TransactionBlockExecutor for FakeVM {
 impl VMExecutor for FakeVM {
     fn execute_block_sharded<S: StateView + Send + Sync, E: ExecutorClient<S>>(
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
-        _block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
+        _transactions: PartitionedTransactions,
         _state_view: Arc<S>,
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {

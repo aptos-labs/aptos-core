@@ -30,16 +30,16 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
-    block_executor::partitioner::SubBlocksForShard,
+    block_executor::partitioner::PartitionedTransactions,
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
     state_store::state_key::StateKey,
     transaction::{
-        analyzed_transaction::AnalyzedTransaction, EntryFunction, ExecutionError, ExecutionStatus,
-        ModuleBundle, Multisig, MultisigTransactionPayload, SignatureCheckedTransaction,
-        SignedTransaction, Transaction, TransactionOutput, TransactionPayload, TransactionStatus,
-        VMValidatorResult, WriteSetPayload,
+        EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
+        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
+        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
+        WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
     write_set::WriteOp,
@@ -234,7 +234,7 @@ impl AptosVM {
     pub fn failed_transaction_cleanup(
         &self,
         error_code: VMStatus,
-        gas_meter: &mut impl AptosGasMeter,
+        gas_meter: &impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         resolver: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
@@ -279,7 +279,7 @@ impl AptosVM {
     fn failed_transaction_cleanup_and_keep_vm_status(
         &self,
         error_code: VMStatus,
-        gas_meter: &mut impl AptosGasMeter,
+        gas_meter: &impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         resolver: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
@@ -312,6 +312,7 @@ impl AptosVM {
                     },
                     _ => status,
                 };
+                let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
                 // The transaction should be charged for gas, so run the epilogue to do that.
                 // This is running in a new session that drops any side effects from the
                 // attempted transaction (e.g., spending funds that were needed to pay for gas),
@@ -326,7 +327,6 @@ impl AptosVM {
                 ) {
                     return discard_error_vm_status(e);
                 }
-                let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
                 let txn_output = get_transaction_output(
                     &mut (),
                     session,
@@ -347,17 +347,17 @@ impl AptosVM {
     fn success_transaction_cleanup(
         &self,
         mut respawned_session: RespawnedSession,
-        gas_meter: &mut impl AptosGasMeter,
+        gas_meter: &impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
         respawned_session.execute(|session| {
             self.0
                 .run_success_epilogue(session, gas_meter.balance(), txn_data, log_context)
         })?;
         let change_set = respawned_session.finish(change_set_configs)?;
-        let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
         let output = VMOutput::new(
             change_set,
             fee_statement,
@@ -491,15 +491,14 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
         txn_data: &TransactionMetadata,
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
-        let change_set = session.finish(&mut (), change_set_configs)?;
+        let mut change_set = session.finish(&mut (), change_set_configs)?;
 
         for (key, op) in change_set.write_set_iter() {
             gas_meter.charge_io_gas_for_write(key, op)?;
         }
 
-        gas_meter.charge_storage_fee_for_all(
-            change_set.write_set_iter(),
-            change_set.events(),
+        gas_meter.process_storage_fee_for_all(
+            &mut change_set,
             txn_data.transaction_size,
             txn_data.gas_unit_price,
         )?;
@@ -1321,8 +1320,7 @@ impl AptosVM {
             .0
             .new_session(resolver, SessionId::block_meta(&block_metadata));
 
-        // dkg todo: verify the validity of the dkg transcript if there is one in block metadata
-        // only pass in the first valid dkg transcript to the prologue as args
+        // We already verify the validity of the dkg transcript in the state_computer, so it is valid.
 
         let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
         if self
@@ -1535,7 +1533,7 @@ impl VMExecutor for AptosVM {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>>(
         sharded_block_executor: &ShardedBlockExecutor<S, C>,
-        transactions: Vec<SubBlocksForShard<AnalyzedTransaction>>,
+        transactions: PartitionedTransactions,
         state_view: Arc<S>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
@@ -1543,10 +1541,10 @@ impl VMExecutor for AptosVM {
         info!(
             log_context,
             "Executing block, transaction count: {}",
-            transactions.iter().map(|s| s.num_txns()).sum::<usize>()
+            transactions.num_txns()
         );
 
-        let count = transactions.len();
+        let count = transactions.num_txns();
         let ret = sharded_block_executor.execute_block(
             state_view,
             transactions,
@@ -1891,7 +1889,7 @@ impl AptosSimulationVM {
 
                                 self.0.success_transaction_cleanup(
                                     respawned_session,
-                                    &mut gas_meter,
+                                    &gas_meter,
                                     &txn_data,
                                     log_context,
                                     &storage_gas_params.change_set_configs,
@@ -1940,7 +1938,7 @@ impl AptosSimulationVM {
                 } else {
                     let (vm_status, output) = self.0.failed_transaction_cleanup_and_keep_vm_status(
                         err,
-                        &mut gas_meter,
+                        &gas_meter,
                         &txn_data,
                         resolver,
                         log_context,

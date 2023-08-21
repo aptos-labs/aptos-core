@@ -7,7 +7,7 @@ name: "fullnode-intelligent-testnet-main"
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 5 * * *" # Once a day, at 05:30 (UTC)
+    - cron: "30 5 */3 * *" # Once every three days, at 05:30 (UTC)
 
 permissions:
   contents: read

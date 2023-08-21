@@ -127,7 +127,7 @@ module aptos_std::math_fixed64 {
         assert_approx_the_same(result,  1 << 65, 16);
     }
 
-    #[testonly]
+    #[test_only]
     /// For functions that approximate a value it's useful to test a value is close
     /// to the most correct value up to last digit
     fun assert_approx_the_same(x: u256, y: u256, precission: u128) {

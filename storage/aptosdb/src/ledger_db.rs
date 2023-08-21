@@ -18,7 +18,7 @@ use anyhow::Result;
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{ColumnFamilyDescriptor, ColumnFamilyName, DB};
+use aptos_schemadb::{ColumnFamilyDescriptor, ColumnFamilyName, SchemaBatch, DB};
 use aptos_types::transaction::Version;
 use std::{
     path::{Path, PathBuf},
@@ -35,9 +35,37 @@ pub const TRANSACTION_INFO_DB_NAME: &str = "transaction_info_db";
 pub const WRITE_SET_DB_NAME: &str = "write_set_db";
 
 #[derive(Debug)]
+pub struct LedgerDbSchemaBatches {
+    pub ledger_metadata_db_batches: SchemaBatch,
+    pub event_db_batches: SchemaBatch,
+    pub transaction_accumulator_db_batches: SchemaBatch,
+    pub transaction_db_batches: SchemaBatch,
+    pub transaction_info_db_batches: SchemaBatch,
+    pub write_set_db_batches: SchemaBatch,
+}
+
+impl Default for LedgerDbSchemaBatches {
+    fn default() -> Self {
+        Self {
+            ledger_metadata_db_batches: SchemaBatch::new(),
+            event_db_batches: SchemaBatch::new(),
+            transaction_accumulator_db_batches: SchemaBatch::new(),
+            transaction_db_batches: SchemaBatch::new(),
+            transaction_info_db_batches: SchemaBatch::new(),
+            write_set_db_batches: SchemaBatch::new(),
+        }
+    }
+}
+
+impl LedgerDbSchemaBatches {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+#[derive(Debug)]
 pub struct LedgerDb {
     ledger_metadata_db: Arc<DB>,
-
     event_db: Arc<DB>,
     transaction_accumulator_db: Arc<DB>,
     transaction_db: Arc<DB>,
@@ -319,5 +347,19 @@ impl LedgerDb {
         } else {
             ledger_db_folder
         }
+    }
+
+    pub fn write_schemas(&self, schemas: LedgerDbSchemaBatches) -> Result<()> {
+        self.write_set_db
+            .write_schemas(schemas.write_set_db_batches)?;
+        self.transaction_info_db
+            .write_schemas(schemas.transaction_info_db_batches)?;
+        self.transaction_db
+            .write_schemas(schemas.transaction_db_batches)?;
+        self.ledger_metadata_db
+            .write_schemas(schemas.ledger_metadata_db_batches)?;
+        self.event_db.write_schemas(schemas.event_db_batches)?;
+        self.transaction_accumulator_db
+            .write_schemas(schemas.transaction_accumulator_db_batches)
     }
 }

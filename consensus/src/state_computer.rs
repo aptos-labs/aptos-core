@@ -130,14 +130,14 @@ impl StateComputer for ExecutionProxy {
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
         let (txns, maybe_dkg_agg_node) = payload_manager.get_transactions(block).await?;
 
-        let dkg_transcript = maybe_dkg_agg_node.map_or_else(|| None, |node| {
+        let dkg_transcript = maybe_dkg_agg_node.map_or_else(|| None, |agg_node| {
             // verify the DKG aggregated transcript
-            match node.agg_trx().verify(self.dkg_manager_wrapper.lock().as_ref().unwrap().get_pvss_config().as_ref().unwrap()) {
+            match agg_node.verify(self.dkg_manager_wrapper.lock().as_ref().unwrap().get_pvss_config().as_ref().unwrap()) {
                 Ok(_) => {
-                    Some(node.agg_trx().clone())
+                    Some(agg_node.agg_trx().clone())
                 },
                 Err(e) => {
-                    debug!("[DKG] Aggregated transcript verification failed for epoch {:?}, error = {:?}", node.epoch(), e);
+                    debug!("[DKG] Aggregated transcript verification failed for epoch {:?}, error = {:?}", agg_node.epoch(), e);
                     None
                 }
             }
@@ -200,6 +200,7 @@ impl StateComputer for ExecutionProxy {
         let mut txns = Vec::new();
         let mut reconfig_events = Vec::new();
         let mut dkg_events = Vec::new();
+        let mut has_dkg_payloads = false;
         let mut payloads = Vec::new();
         let logical_time = LogicalTime::new(
             finality_proof.ledger_info().epoch(),
@@ -225,14 +226,15 @@ impl StateComputer for ExecutionProxy {
             let deduped_txns = txn_deduper.dedup(signed_txns);
             let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
-            let dkg_transcript = maybe_dkg_agg_node.map_or_else(|| None, |node| {
+            let dkg_transcript = maybe_dkg_agg_node.map_or_else(|| None, |agg_node| {
                 // verify the DKG aggregated transcript
-                match node.agg_trx().verify(self.dkg_manager_wrapper.lock().as_ref().unwrap().get_pvss_config().as_ref().unwrap()) {
+                match agg_node.verify(self.dkg_manager_wrapper.lock().as_ref().unwrap().get_pvss_config().as_ref().unwrap()) {
                     Ok(_) => {
-                        Some(node.agg_trx().clone())
+                        has_dkg_payloads = true;
+                        Some(agg_node.agg_trx().clone())
                     },
                     Err(e) => {
-                        debug!("[DKG] Aggregated transcript verification failed for epoch {:?}, error = {:?}", node.epoch(), e);
+                        debug!("[DKG] Aggregated transcript verification failed for epoch {:?}, error = {:?}", agg_node.epoch(), e);
                         None
                     }
                 }
@@ -277,6 +279,11 @@ impl StateComputer for ExecutionProxy {
         // trigger the start of dkg
         if !dkg_events.is_empty() {
             dkg_manager_wrapper.start_dkg(dkg_events).await;
+        }
+
+        // finish dkg when the aggregated transcript is committed
+        if has_dkg_payloads {
+            dkg_manager_wrapper.finish_dkg();
         }
 
         *latest_logical_time = logical_time;

@@ -51,6 +51,90 @@ fun if_else::if_else_nested($t0: bool, $t1: u64): u64 {
  20: return $t2
 }
 
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun if_else::if_else($t0: bool, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0, $t1
+  0: if ($t0) goto 1 else goto 5
+     # live vars: $t1
+  1: label L0
+     # live vars: $t1
+  2: $t3 := 1
+     # live vars: $t1, $t3
+  3: $t2 := +($t1, $t3)
+     # live vars: $t2
+  4: goto 8
+     # live vars: $t1
+  5: label L1
+     # live vars: $t1
+  6: $t4 := 1
+     # live vars: $t1, $t4
+  7: $t2 := -($t1, $t4)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+fun if_else::if_else_nested($t0: bool, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     # live vars: $t0, $t1
+  0: if ($t0) goto 1 else goto 5
+     # live vars: $t1
+  1: label L0
+     # live vars: $t1
+  2: $t5 := 1
+     # live vars: $t1, $t5
+  3: $t4 := +($t1, $t5)
+     # live vars: $t1, $t4
+  4: goto 8
+     # live vars: $t1
+  5: label L1
+     # live vars: $t1
+  6: $t6 := 1
+     # live vars: $t1, $t6
+  7: $t4 := -($t1, $t6)
+     # live vars: $t1, $t4
+  8: label L2
+     # live vars: $t1, $t4
+  9: $t7 := 10
+     # live vars: $t1, $t4, $t7
+ 10: $t3 := >($t4, $t7)
+     # live vars: $t1, $t3
+ 11: if ($t3) goto 12 else goto 16
+     # live vars: $t1
+ 12: label L3
+     # live vars: $t1
+ 13: $t8 := 2
+     # live vars: $t1, $t8
+ 14: $t2 := *($t1, $t8)
+     # live vars: $t2
+ 15: goto 19
+     # live vars: $t1
+ 16: label L4
+     # live vars: $t1
+ 17: $t9 := 2
+     # live vars: $t1, $t9
+ 18: $t2 := /($t1, $t9)
+     # live vars: $t2
+ 19: label L5
+     # live vars: $t2
+ 20: return $t2
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v6
@@ -60,25 +144,25 @@ module 42.if_else {
 if_else(Arg0: bool, Arg1: u64): u64 {
 L0:	loc2: u64
 B0:
-	0: CopyLoc[0](Arg0: bool)
+	0: MoveLoc[0](Arg0: bool)
 	1: BrFalse(9)
 B1:
 	2: LdConst[0](U64: [1, 0, 0, 0, 0, 0, 0, 0])
 	3: StLoc[2](loc0: u64)
-	4: CopyLoc[1](Arg1: u64)
-	5: CopyLoc[2](loc0: u64)
+	4: MoveLoc[1](Arg1: u64)
+	5: MoveLoc[2](loc0: u64)
 	6: Add
 	7: StLoc[3](loc1: u64)
 	8: Branch(15)
 B2:
 	9: LdConst[0](U64: [1, 0, 0, 0, 0, 0, 0, 0])
 	10: StLoc[4](loc2: u64)
-	11: CopyLoc[1](Arg1: u64)
-	12: CopyLoc[4](loc2: u64)
+	11: MoveLoc[1](Arg1: u64)
+	12: MoveLoc[4](loc2: u64)
 	13: Sub
 	14: StLoc[3](loc1: u64)
 B3:
-	15: CopyLoc[3](loc1: u64)
+	15: MoveLoc[3](loc1: u64)
 	16: Ret
 }
 if_else_nested(Arg0: bool, Arg1: u64): u64 {
@@ -88,13 +172,13 @@ L2:	loc4: u64
 L3:	loc5: u64
 L4:	loc6: u64
 B0:
-	0: CopyLoc[0](Arg0: bool)
+	0: MoveLoc[0](Arg0: bool)
 	1: BrFalse(9)
 B1:
 	2: LdConst[0](U64: [1, 0, 0, 0, 0, 0, 0, 0])
 	3: StLoc[2](loc0: u64)
 	4: CopyLoc[1](Arg1: u64)
-	5: CopyLoc[2](loc0: u64)
+	5: MoveLoc[2](loc0: u64)
 	6: Add
 	7: StLoc[3](loc1: u64)
 	8: Branch(15)
@@ -102,33 +186,33 @@ B2:
 	9: LdConst[0](U64: [1, 0, 0, 0, 0, 0, 0, 0])
 	10: StLoc[4](loc2: u64)
 	11: CopyLoc[1](Arg1: u64)
-	12: CopyLoc[4](loc2: u64)
+	12: MoveLoc[4](loc2: u64)
 	13: Sub
 	14: StLoc[3](loc1: u64)
 B3:
 	15: LdConst[1](U64: [10, 0, 0, 0, 0, 0, 0, 0])
 	16: StLoc[5](loc3: u64)
-	17: CopyLoc[3](loc1: u64)
-	18: CopyLoc[5](loc3: u64)
+	17: MoveLoc[3](loc1: u64)
+	18: MoveLoc[5](loc3: u64)
 	19: Gt
 	20: BrFalse(28)
 B4:
 	21: LdConst[2](U64: [2, 0, 0, 0, 0, 0, 0, 0])
 	22: StLoc[6](loc4: u64)
-	23: CopyLoc[1](Arg1: u64)
-	24: CopyLoc[6](loc4: u64)
+	23: MoveLoc[1](Arg1: u64)
+	24: MoveLoc[6](loc4: u64)
 	25: Mul
 	26: StLoc[7](loc5: u64)
 	27: Branch(34)
 B5:
 	28: LdConst[2](U64: [2, 0, 0, 0, 0, 0, 0, 0])
 	29: StLoc[8](loc6: u64)
-	30: CopyLoc[1](Arg1: u64)
-	31: CopyLoc[8](loc6: u64)
+	30: MoveLoc[1](Arg1: u64)
+	31: MoveLoc[8](loc6: u64)
 	32: Div
 	33: StLoc[7](loc5: u64)
 B6:
-	34: CopyLoc[7](loc5: u64)
+	34: MoveLoc[7](loc5: u64)
 	35: Ret
 }
 }

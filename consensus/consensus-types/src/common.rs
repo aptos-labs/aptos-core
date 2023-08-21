@@ -131,7 +131,6 @@ impl DKGPayload {
 pub enum Payload {
     DirectMempool(Vec<SignedTransaction>),
     InQuorumStore(ProofWithData),
-    // dkg todo: add a new payload type for dkg
     DKG(DKGPayload),
 }
 
@@ -199,7 +198,7 @@ impl Payload {
                 Ok(())
             },
             (_, Payload::DKG(_)) => {
-                // dkg todo: do we verify here?
+                // We will verify the DKG aggregated transcript in process_proposal and state_computer.
                 Ok(())
             }
             (_, _) => Err(anyhow::anyhow!(

@@ -44,7 +44,6 @@ use futures::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
-    marker::PhantomData,
     mem::{discriminant, Discriminant},
     time::Duration,
 };
@@ -357,19 +356,6 @@ impl NetworkSender {
         let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));
         self.broadcast(msg).await
     }
-
-    pub async fn send_rpc(
-        &self,
-        receiver: Author,
-        message: ConsensusMsg,
-        timeout: Duration,
-    ) -> anyhow::Result<ConsensusMsg> {
-        let response = self
-            .consensus_network_client
-            .send_rpc(receiver, message, timeout)
-            .await?;
-        Ok(response)
-    }
 }
 
 #[async_trait::async_trait]
@@ -430,34 +416,53 @@ impl QuorumStoreSender for NetworkSender {
     }
 }
 
-pub struct NetworkSenderWrapper<M> {
-    network_sender: NetworkSender,
-    _marker: PhantomData<M>,
-}
+// pub struct NetworkSenderWrapper<M> {
+//     network_sender: NetworkSender,
+//     _marker: PhantomData<M>,
+// }
 
-impl<M> NetworkSenderWrapper<M>
-where
-    M: Send + Sync,
-{
-    pub fn new(network_sender: NetworkSender) -> Self {
-        Self {
-            network_sender,
-            _marker: PhantomData,
-        }
-    }
-}
+// impl<M> NetworkSenderWrapper<M>
+// where
+//     M: Send + Sync,
+// {
+//     pub fn new(network_sender: NetworkSender) -> Self {
+//         Self {
+//             network_sender,
+//             _marker: PhantomData,
+//         }
+//     }
+// }
+
+// #[async_trait::async_trait]
+// impl<M> RBNetworkSender<M> for NetworkSenderWrapper<M>
+// where
+//     M: RBMessage + TConsensusMsg,
+// {
+//     async fn send_rb_rpc(&self, receiver: Author, message: M, timeout: Duration) -> anyhow::Result<M> {
+//         let response = self
+//             .network_sender
+//             .send_rpc(receiver, message.into_network_message(), timeout)
+//             .await?;
+//         TConsensusMsg::from_network_message(response)
+//     }
+// }
 
 #[async_trait::async_trait]
-impl<M> RBNetworkSender<M> for NetworkSenderWrapper<M>
+impl<M> RBNetworkSender<M> for NetworkSender
 where
-    M: RBMessage + TConsensusMsg,
+    M: RBMessage + TConsensusMsg + 'static,
 {
-    async fn send_rpc(&self, receiver: Author, message: M, timeout: Duration) -> anyhow::Result<M> {
-        let response = self
-            .network_sender
+    async fn send_rb_rpc(
+        &self,
+        receiver: Author,
+        message: M,
+        timeout: Duration,
+    ) -> anyhow::Result<M> {
+        self.consensus_network_client
             .send_rpc(receiver, message.into_network_message(), timeout)
-            .await?;
-        TConsensusMsg::from_network_message(response)
+            .await
+            .map_err(|e| anyhow!("invalid rpc response: {}", e))
+            .and_then(|msg| TConsensusMsg::from_network_message(msg))
     }
 }
 

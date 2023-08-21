@@ -5,8 +5,8 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    Error, EventNotificationListener, EventNotificationSender, EventSubscriptionService,
-    ReconfigNotificationListener,
+    DbBackedOnChainConfig, Error, EventNotificationListener, EventNotificationSender,
+    EventSubscriptionService, ReconfigNotificationListener,
 };
 use aptos_db::AptosDB;
 use aptos_executor_test_helpers::bootstrap_genesis;
@@ -17,7 +17,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     on_chain_config,
-    on_chain_config::{OnChainConfig, ON_CHAIN_CONFIG_REGISTRY},
+    on_chain_config::OnChainConfig,
     transaction::{Transaction, Version, WriteSetPayload},
 };
 use aptos_vm::AptosVM;
@@ -375,36 +375,6 @@ fn test_no_events_no_subscribers() {
     notify_events(&mut event_service, 1, vec![]);
 }
 
-#[test]
-fn test_missing_configs() {
-    // Create a subscription service and mock database with a custom config registry that
-    // includes a config that does not exist on-chain (TestOnChainConfig).
-    let mut config_registry = ON_CHAIN_CONFIG_REGISTRY.to_owned();
-    config_registry.push(TestOnChainConfig::CONFIG_ID);
-    let mut event_service = EventSubscriptionService::new(&config_registry, create_database());
-
-    // Create a reconfig subscriber
-    let mut reconfig_listener = event_service.subscribe_to_reconfigurations().unwrap();
-
-    // Notify the subscriber of a reconfiguration (where 1 on-chain config is missing from genesis)
-    assert_ok!(event_service.notify_reconfiguration_subscribers(0));
-
-    // Verify the reconfiguration notification contains everything except the missing config
-    if let Some(reconfig_notification) = reconfig_listener.select_next_some().now_or_never() {
-        let returned_configs = reconfig_notification.on_chain_configs.configs();
-        assert_eq!(
-            returned_configs.keys().len(),
-            ON_CHAIN_CONFIG_REGISTRY.len()
-        );
-        for config in ON_CHAIN_CONFIG_REGISTRY {
-            assert!(returned_configs.contains_key(config));
-        }
-        assert!(!returned_configs.contains_key(&TestOnChainConfig::CONFIG_ID));
-    } else {
-        panic!("Expected a reconfiguration notification but got None!");
-    }
-}
-
 /// Defines a new on-chain config for test purposes.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct TestOnChainConfig {
@@ -440,7 +410,9 @@ fn count_event_notifications_and_ensure_ordering(listener: &mut EventNotificatio
 }
 
 // Counts the number of reconfig notifications received by the listener.
-fn count_reconfig_notifications(listener: &mut ReconfigNotificationListener) -> u64 {
+fn count_reconfig_notifications(
+    listener: &mut ReconfigNotificationListener<DbBackedOnChainConfig>,
+) -> u64 {
     let mut notification_received = true;
     let mut notification_count = 0;
 
@@ -463,7 +435,9 @@ fn verify_no_event_notifications(listeners: Vec<&mut EventNotificationListener>)
 }
 
 // Ensures that no reconfig notifications have been received by the listeners
-fn verify_no_reconfig_notifications(listeners: Vec<&mut ReconfigNotificationListener>) {
+fn verify_no_reconfig_notifications(
+    listeners: Vec<&mut ReconfigNotificationListener<DbBackedOnChainConfig>>,
+) {
     for listener in listeners {
         assert!(listener.select_next_some().now_or_never().is_none());
     }
@@ -488,7 +462,7 @@ fn verify_event_notification_received(
 // Ensures that the specified listeners have received the expected notifications.
 // Also verifies that the reconfiguration notifications contain all on-chain configs.
 fn verify_reconfig_notifications_received(
-    listeners: Vec<&mut ReconfigNotificationListener>,
+    listeners: Vec<&mut ReconfigNotificationListener<DbBackedOnChainConfig>>,
     expected_version: Version,
     expected_epoch: u64,
 ) {
@@ -499,11 +473,6 @@ fn verify_reconfig_notifications_received(
                 reconfig_notification.on_chain_configs.epoch(),
                 expected_epoch
             );
-
-            let returned_configs = reconfig_notification.on_chain_configs.configs();
-            for config in ON_CHAIN_CONFIG_REGISTRY {
-                assert!(returned_configs.contains_key(config));
-            }
         } else {
             panic!("Expected a reconfiguration notification but got None!");
         }
@@ -531,7 +500,7 @@ fn create_random_event_key() -> EventKey {
 }
 
 fn create_event_subscription_service() -> EventSubscriptionService {
-    EventSubscriptionService::new(ON_CHAIN_CONFIG_REGISTRY, create_database())
+    EventSubscriptionService::new(create_database())
 }
 
 fn create_database() -> Arc<RwLock<DbReaderWriter>> {

@@ -337,11 +337,6 @@ impl FunctionTargetPipeline {
             let src_idx = nodes.get(&fun_id).unwrap();
             let fun_env = env.get_function(fun_id);
             for callee in fun_env.get_called_functions().expect("called functions") {
-                assert!(
-                    nodes.contains_key(callee),
-                    "{}",
-                    env.get_function(*callee).get_full_name_str()
-                );
                 let dst_idx = nodes
                     .get(callee)
                     .expect("callee is not in function targets");

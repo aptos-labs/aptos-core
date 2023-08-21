@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_framework::prover::ProverOptions;
+use aptos_framework::{extended_checks, prover::ProverOptions};
 use std::{collections::BTreeMap, path::PathBuf};
 
 const ENV_TEST_INCONSISTENCY: &str = "MVP_TEST_INCONSISTENCY";
@@ -51,8 +51,16 @@ pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
         options.vc_timeout = read_env_var(ENV_TEST_VC_TIMEOUT)
             .parse::<usize>()
             .unwrap_or(options.vc_timeout);
+        let skip_attribute_checks = false;
         options
-            .prove(false, pkg_path.as_path(), BTreeMap::default(), None)
+            .prove(
+                false,
+                pkg_path.as_path(),
+                BTreeMap::default(),
+                None,
+                skip_attribute_checks,
+                extended_checks::get_all_attribute_names(),
+            )
             .unwrap()
     }
 }

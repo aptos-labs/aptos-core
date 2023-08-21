@@ -4,5 +4,6 @@ query getNumberOfDelegators($poolAddress: String) {
     distinct_on: pool_address
   ) {
     num_active_delegator
+    pool_address
   }
 }

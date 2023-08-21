@@ -1,10 +1,12 @@
 # Benchmarking current vs alternative version of Boogie
 
-This compares the current version of Boogie with a an alternative, newer one
+To examine the performance regression, this compares the current version of Boogie with a an alternative, newer one.
 
-In the current instance, we are comparing Boogie 2.8.31 with the head version in which *zero weights are used for array
-axioms*. The comparison uses the new monomorphized Boogie backend. There is a ~10% improvement visible from the
-benchmarks. While some verification problems take longer, overall verification time is reduced.
+- The `current_boogie` benchmark uses Boogie 2.15.8.
+- The `new_boogie:` benchmark uses Boogie 2.16.9.
+  This benchmark ran on top of the recent update on Prover's boogie backend (commit: 52ac38a7b6194567c4c82ae75f38a46ca03b5304).
+- Both benchmarks use Z3 4.11.2.
+- We ran both benchmarks three times each. `current_boogie_x` (`new_boogie_x`) indicates the result of the `x`th run.
 
 ## Module Verification Time
 

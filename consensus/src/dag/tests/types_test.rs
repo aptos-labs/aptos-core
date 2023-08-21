@@ -33,20 +33,20 @@ fn test_node_verify() {
         "invalid digest"
     );
 
-    // Well-formed round 0 node
-    let zeroth_round_node = new_node(0, 10, signers[0].author(), vec![]);
-    assert_ok!(zeroth_round_node.verify(&validator_verifier));
+    // Well-formed round 1 node
+    let first_round_node = new_node(1, 10, signers[0].author(), vec![]);
+    assert_ok!(first_round_node.verify(&validator_verifier));
 
-    // Round 1 node without parents
+    // Round 2 node without parents
     let node = new_node(2, 20, signers[0].author(), vec![]);
     assert_eq!(
         node.verify(&validator_verifier).unwrap_err().to_string(),
         "not enough parents to satisfy voting power",
     );
 
-    // Round 1
+    // Round 1 cert
     let parent_cert = NodeCertificate::new(
-        zeroth_round_node.metadata().clone(),
+        first_round_node.metadata().clone(),
         AggregateSignature::empty(),
     );
     let node = new_node(3, 20, signers[0].author(), vec![parent_cert]);

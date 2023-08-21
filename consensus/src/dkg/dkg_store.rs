@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use super::{types::{DKGAggNode, TDKGMessage}, DKGNode};
 use aptos_consensus_types::common::Author;
-use aptos_logger::debug;
+use aptos_logger::{debug, error};
 use aptos_types::{
     dkg::{DKGPvssConfig, DKGTranscriptWrapper},
     validator_verifier::ValidatorVerifier,
@@ -44,6 +44,19 @@ impl DKGStore {
 
     pub fn add_pvss_config(&mut self, dkg_pvss_config: DKGPvssConfig) {
         self.dkg_pvss_config = Some(dkg_pvss_config);
+        // add buffered nodes received before the DKG locally starts
+        let buffered_nodes = self.take_buffered_nodes();
+        for node in buffered_nodes {
+            if let Err(e) = self.add_node(node) {
+                error!("[DKG] Error when adding DKG node: {:?}", e);
+            }
+        }
+        let buffered_agg_nodes = self.take_buffered_agg_nodes();
+        for agg_node in buffered_agg_nodes {
+            if let Err(e) = self.add_agg_node(agg_node) {
+                error!("[DKG] Error when adding DKG aggregated node: {:?}", e);
+            }
+        }
     }
 
     pub fn get_pvss_config(&self) -> Option<DKGPvssConfig> {
@@ -55,14 +68,9 @@ impl DKGStore {
         node: DKGNode,
     ) -> anyhow::Result<Option<DKGAggNode>> {
         if self.dkg_pvss_config.is_none() {
+            debug!("[DKG] Node {:?} pvss config is not ready! receiving node {:?}", self.author, node.metadata());
             self.buffer_nodes(node);
-            anyhow::bail!("[DKG] DKG PVSS config is not ready!");
-        } else {
-            // dkg todo: need to periodically check if there is any buffered node
-            let buffered_nodes = self.take_buffered_nodes();
-            for node in buffered_nodes {
-                self.add_node(node)?;
-            }
+            return Ok(None);
         }
         match node.verify(self.dkg_pvss_config.as_ref().unwrap()) {
             Ok(_) => {
@@ -100,7 +108,7 @@ impl DKGStore {
                 }
                 debug!("[DKG] Node {:?} has aggregated stake {:?}, threshold stake {:?}", self.author, aggregated_voting_power, self.validator_verifier.total_voting_power() - self.validator_verifier.quorum_voting_power());
 
-                // dkg todo: f+1 transcripts are sufficient to reconstruct the aggregated node
+                // transcripts from > one third stakes are sufficient to reconstruct the aggregated node
                 if self.validator_verifier
                     .check_voting_power(authors.iter(), false)
                     .is_ok()
@@ -133,14 +141,9 @@ impl DKGStore {
         }
 
         if self.dkg_pvss_config.is_none() {
+            debug!("[DKG] Node {:?} DKG PVSS config is not ready! receiving agg node {:?}", self.author, agg_node.metadata());
             self.buffer_agg_nodes(agg_node);
-            anyhow::bail!("[DKG] DKG PVSS config is not ready!");
-        } else {
-            // dkg todo: need to periodically check if there is any buffered node
-            let buffered_agg_nodes = self.take_buffered_agg_nodes();
-            for agg_node in buffered_agg_nodes {
-                self.add_agg_node(agg_node)?;
-            }
+            return Ok(None);
         }
         match agg_node.verify(self.dkg_pvss_config.as_ref().unwrap())
         {

@@ -6,11 +6,14 @@ mod bytecode_generator;
 mod experiments;
 mod file_format_generator;
 mod options;
+pub mod pipeline;
 
+use crate::pipeline::livevar_analysis_processor::LiveVarAnalysisProcessor;
 use anyhow::anyhow;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
 pub use experiments::*;
 use move_binary_format::{file_format as FF, file_format::CompiledScript, CompiledModule};
+use move_compiler::shared::known_attributes::KnownAttribute;
 use move_model::{model::GlobalEnv, PackageInfo};
 use move_stackless_bytecode::function_target_pipeline::{
     FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant,
@@ -74,6 +77,8 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             sources: options.dependencies.clone(),
             address_map: addrs,
         }],
+        options.skip_attribute_checks,
+        KnownAttribute::get_all_attribute_names(),
     )?;
     // Store options in env, for later access
     env.set_extension(options);
@@ -121,9 +126,9 @@ pub fn run_file_format_gen(
 
 /// Returns the bytecode processing pipeline.
 pub fn bytecode_pipeline(_env: &GlobalEnv) -> FunctionTargetPipeline {
-    // TODO: insert processors here as we proceed.
-    // Use `env.get_extension::<Options>()` to access compiler options
-    FunctionTargetPipeline::default()
+    let mut pipeline = FunctionTargetPipeline::default();
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor()));
+    pipeline
 }
 
 /// Report any diags in the env to the writer and fail if there are errors.

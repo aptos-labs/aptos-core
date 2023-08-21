@@ -1,4 +1,6 @@
-CREATE TABLE IF NOT EXISTS nft_metadata_crawler_uris (
+CREATE SCHEMA IF NOT EXISTS nft_metadata_crawler;
+
+CREATE TABLE IF NOT EXISTS nft_metadata_crawler.parsed_token_uris (
   token_uri VARCHAR UNIQUE PRIMARY KEY NOT NULL,
   raw_image_uri VARCHAR,
   raw_animation_uri VARCHAR,
@@ -11,6 +13,8 @@ CREATE TABLE IF NOT EXISTS nft_metadata_crawler_uris (
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS nft_raw_image_uri ON nft_metadata_crawler_uris (raw_image_uri);
-CREATE INDEX IF NOT EXISTS nft_raw_animation_uri ON nft_metadata_crawler_uris (raw_animation_uri);
-CREATE INDEX IF NOT EXISTS nft_inserted_at ON nft_metadata_crawler_uris (inserted_at);
+CREATE TABLE IF NOT EXISTS nft_metadata_crawler.ledger_infos (chain_id BIGINT UNIQUE PRIMARY KEY NOT NULL);
+
+CREATE INDEX IF NOT EXISTS nft_raw_image_uri ON nft_metadata_crawler.parsed_token_uris (raw_image_uri);
+CREATE INDEX IF NOT EXISTS nft_raw_animation_uri ON nft_metadata_crawler.parsed_token_uris (raw_animation_uri);
+CREATE INDEX IF NOT EXISTS nft_inserted_at ON nft_metadata_crawler.parsed_token_uris (inserted_at);

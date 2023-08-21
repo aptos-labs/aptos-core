@@ -3,12 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
-
+use anyhow::Result;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
-use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter};
+use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReader, DbReaderWriter};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     account_view::AccountView,
@@ -16,13 +16,14 @@ use aptos_types::{
     event::EventKey,
     move_resource::MoveStorage,
     on_chain_config,
-    on_chain_config::{ConfigID, OnChainConfigPayload},
+    on_chain_config::{OnChainConfig, OnChainConfigPayload, OnChainConfigProvider},
     transaction::Version,
 };
 use futures::{channel::mpsc::SendError, stream::FusedStream, Stream};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     iter::FromIterator,
     ops::Deref,
     pin::Pin,
@@ -84,20 +85,16 @@ pub struct EventSubscriptionService {
     // Database to fetch on-chain configuration data
     storage: Arc<RwLock<DbReaderWriter>>,
 
-    // The list of all on-chain configurations used to notify subscribers
-    config_registry: Vec<ConfigID>,
-
     // Internal subscription ID generator
     subscription_id_generator: U64IdGenerator,
 }
 
 impl EventSubscriptionService {
-    pub fn new(config_registry: &[ConfigID], storage: Arc<RwLock<DbReaderWriter>>) -> Self {
+    pub fn new(storage: Arc<RwLock<DbReaderWriter>>) -> Self {
         Self {
             event_key_subscriptions: HashMap::new(),
             subscription_id_to_event_subscription: HashMap::new(),
             reconfig_subscriptions: HashMap::new(),
-            config_registry: config_registry.to_vec(),
             storage,
             subscription_id_generator: U64IdGenerator::new(),
         }
@@ -160,7 +157,9 @@ impl EventSubscriptionService {
     /// begins. Note: if the notification buffer fills up too quickly, older
     /// notifications will be dropped. As such, it is the responsibility of the
     /// subscriber to ensure notifications are processed in a timely manner.
-    pub fn subscribe_to_reconfigurations(&mut self) -> Result<ReconfigNotificationListener, Error> {
+    pub fn subscribe_to_reconfigurations(
+        &mut self,
+    ) -> Result<ReconfigNotificationListener<DbBackedOnChainConfig>, Error> {
         let (notification_sender, notification_receiver) =
             aptos_channel::new(QueueStyle::KLAST, RECONFIG_NOTIFICATION_CHANNEL_SIZE, None);
 
@@ -171,13 +170,14 @@ impl EventSubscriptionService {
         };
 
         // Store the new subscription
-        if let Some(old_subscription) = self
+        if self
             .reconfig_subscriptions
             .insert(subscription_id, reconfig_subscription)
+            .is_some()
         {
             return Err(Error::UnexpectedErrorEncountered(format!(
-                "Duplicate reconfiguration subscription found! This should not occur! ID: {}, subscription: {:?}",
-                subscription_id, old_subscription
+                "Duplicate reconfiguration subscription found! This should not occur! ID: {}",
+                subscription_id,
             )));
         }
 
@@ -262,25 +262,10 @@ impl EventSubscriptionService {
     /// Note: We cannot assume that all configs will exist on-chain. As such, we
     /// must fetch each resource one at a time. Reconfig subscribers must be able
     /// to handle on-chain configs not existing in a reconfiguration notification.
-    fn read_on_chain_configs(&self, version: Version) -> Result<OnChainConfigPayload, Error> {
-        // Build a map from config ID to the config value found on-chain
-        let mut config_id_to_config = HashMap::new();
-        for config_id in self.config_registry.iter() {
-            if let Ok(config) = self
-                .storage
-                .read()
-                .reader
-                .deref()
-                .fetch_config_by_version(*config_id, version)
-            {
-                if let Some(old_entry) = config_id_to_config.insert(*config_id, config.clone()) {
-                    return Err(Error::UnexpectedErrorEncountered(format!(
-                        "Unexpected config values for duplicate config id found! Key: {}, Value: {:?}!",
-                        config_id, old_entry)));
-                }
-            }
-        }
-
+    fn read_on_chain_configs(
+        &self,
+        version: Version,
+    ) -> Result<OnChainConfigPayload<DbBackedOnChainConfig>, Error> {
         let db_state_view = &self
             .storage
             .read()
@@ -311,7 +296,7 @@ impl EventSubscriptionService {
         // Return the new on-chain config payload (containing all found configs at this version).
         Ok(OnChainConfigPayload::new(
             epoch,
-            Arc::new(config_id_to_config),
+            DbBackedOnChainConfig::new(self.storage.read().reader.clone(), version),
         ))
     }
 }
@@ -369,16 +354,16 @@ impl EventSubscription {
 
 /// A single reconfig subscription, holding the channel to send the
 /// corresponding notifications.
-#[derive(Debug)]
 struct ReconfigSubscription {
-    pub notification_sender: aptos_channels::aptos_channel::Sender<(), ReconfigNotification>,
+    pub notification_sender:
+        aptos_channels::aptos_channel::Sender<(), ReconfigNotification<DbBackedOnChainConfig>>,
 }
 
 impl ReconfigSubscription {
     fn notify_subscriber_of_configs(
         &mut self,
         version: Version,
-        on_chain_configs: OnChainConfigPayload,
+        on_chain_configs: OnChainConfigPayload<DbBackedOnChainConfig>,
     ) -> Result<(), Error> {
         let reconfig_notification = ReconfigNotification {
             version,
@@ -391,6 +376,34 @@ impl ReconfigSubscription {
     }
 }
 
+#[derive(Clone)]
+pub struct DbBackedOnChainConfig {
+    pub reader: Arc<dyn DbReader>,
+    pub version: Version,
+}
+
+impl DbBackedOnChainConfig {
+    pub fn new(reader: Arc<dyn DbReader>, version: Version) -> Self {
+        Self { reader, version }
+    }
+}
+
+impl OnChainConfigProvider for DbBackedOnChainConfig {
+    fn get<T: OnChainConfig>(&self) -> anyhow::Result<T> {
+        let bytes = self
+            .reader
+            .deref()
+            .fetch_config_by_version(T::CONFIG_ID, self.version)?;
+        T::deserialize_into_config(&bytes)
+    }
+}
+
+impl fmt::Debug for DbBackedOnChainConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DbBackedOnChainConfig {{ version: {:?} }}", self.version)
+    }
+}
+
 /// A notification for events.
 #[derive(Debug)]
 pub struct EventNotification {
@@ -400,16 +413,16 @@ pub struct EventNotification {
 
 /// A notification for reconfigurations.
 #[derive(Debug)]
-pub struct ReconfigNotification {
+pub struct ReconfigNotification<P: OnChainConfigProvider> {
     pub version: Version,
-    pub on_chain_configs: OnChainConfigPayload,
+    pub on_chain_configs: OnChainConfigPayload<P>,
 }
 
 /// A subscription listener for on-chain events.
 pub type EventNotificationListener = NotificationListener<EventNotification>;
 
 /// A subscription listener for reconfigurations.
-pub type ReconfigNotificationListener = NotificationListener<ReconfigNotification>;
+pub type ReconfigNotificationListener<P> = NotificationListener<ReconfigNotification<P>>;
 
 /// The component responsible for listening to subscription notifications.
 #[derive(Debug)]

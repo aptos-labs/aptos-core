@@ -119,10 +119,12 @@ impl<K: Key + CryptoHash + Eq + Hash, V: Value> StateValueRestore<K, V> {
             usage.add_item(k.key_size() + v.value_size());
         }
 
+        // prepare the sharded kv batch
         let kv_batch: StateValueBatch<K, Option<V>> = chunk
             .into_iter()
             .map(|(k, v)| ((k, self.version), Some(v)))
             .collect();
+
         self.db.write_kv_batch(
             self.version,
             &kv_batch,

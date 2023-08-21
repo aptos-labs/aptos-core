@@ -4,14 +4,14 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     AptosVM, VMExecutor,
 };
-use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
+use aptos_block_partitioner::BlockPartitionerConfig;
 use aptos_crypto::hash::CryptoHash;
 use aptos_language_e2e_tests::{
     account::AccountData, common_transactions::peer_to_peer_txn, data_store::FakeDataStore,
     executor::FakeExecutor,
 };
 use aptos_types::{
-    block_executor::partitioner::SubBlocksForShard,
+    block_executor::partitioner::PartitionedTransactions,
     state_store::state_key::StateKeyInner,
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput},
 };
@@ -104,6 +104,7 @@ pub fn compare_txn_outputs(
 
 pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>(
     sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
+    partition_last_round: bool,
 ) {
     let num_txns = 400;
     let num_shards = 8;
@@ -112,8 +113,13 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
     for _ in 0..num_txns {
         transactions.push(generate_non_conflicting_p2p(&mut executor).0)
     }
-    let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 2, 0.9);
+    let partitioner = BlockPartitionerConfig::default()
+        .num_shards(num_shards)
+        .max_partitioning_rounds(2)
+        .cross_shard_dep_avoid_threshold(0.9)
+        .partition_last_round(partition_last_round)
+        .build();
+    let partitioned_txns = partitioner.partition(transactions.clone());
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),
@@ -134,6 +140,7 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
 pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
     sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
     concurrency: usize,
+    partition_last_round: bool,
 ) {
     let num_txns = 800;
     let num_shards = sharded_block_executor.num_shards();
@@ -158,10 +165,15 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
         }
     }
 
-    let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 8, 0.9);
+    let partitioner = BlockPartitionerConfig::default()
+        .num_shards(num_shards)
+        .max_partitioning_rounds(8)
+        .cross_shard_dep_avoid_threshold(0.9)
+        .partition_last_round(partition_last_round)
+        .build();
+    let partitioned_txns = partitioner.partition(transactions.clone());
 
-    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone())
+    let execution_ordered_txns = PartitionedTransactions::flatten(partitioned_txns.clone())
         .into_iter()
         .map(|t| t.into_txn())
         .collect();
@@ -182,6 +194,7 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
 pub fn sharded_block_executor_with_random_transfers<E: ExecutorClient<FakeDataStore>>(
     sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
     concurrency: usize,
+    partition_last_round: bool,
 ) {
     let mut rng = OsRng;
     let max_accounts = 200;
@@ -209,10 +222,15 @@ pub fn sharded_block_executor_with_random_transfers<E: ExecutorClient<FakeDataSt
         transactions.push(txn)
     }
 
-    let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 8, 0.9);
+    let partitioner = BlockPartitionerConfig::default()
+        .num_shards(num_shards)
+        .max_partitioning_rounds(8)
+        .cross_shard_dep_avoid_threshold(0.9)
+        .partition_last_round(partition_last_round)
+        .build();
+    let partitioned_txns = partitioner.partition(transactions.clone());
 
-    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone())
+    let execution_ordered_txns = PartitionedTransactions::flatten(partitioned_txns.clone())
         .into_iter()
         .map(|t| t.into_txn())
         .collect();

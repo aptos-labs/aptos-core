@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use aptos_block_partitioner::sharded_block_partitioner::MAX_ALLOWED_PARTITIONING_ROUNDS;
 use aptos_secure_net::network_controller::{Message, NetworkController};
-use aptos_types::block_executor::partitioner::{RoundId, ShardId};
+use aptos_types::block_executor::partitioner::{RoundId, ShardId, MAX_ALLOWED_PARTITIONING_ROUNDS};
 use aptos_vm::sharded_block_executor::{
     cross_shard_client::CrossShardClient, messages::CrossShardMsg,
 };
@@ -49,6 +48,10 @@ impl RemoteCrossShardClient {
 }
 
 impl CrossShardClient for RemoteCrossShardClient {
+    fn send_global_msg(&self, _msg: CrossShardMsg) {
+        todo!("Global cross shard message is not supported yet in remote execution mode")
+    }
+
     fn send_cross_shard_msg(&self, shard_id: ShardId, round: RoundId, msg: CrossShardMsg) {
         let input_message = bcs::to_bytes(&msg).unwrap();
         let tx = self.message_txs[shard_id][round].lock().unwrap();

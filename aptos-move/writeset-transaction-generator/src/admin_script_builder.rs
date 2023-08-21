@@ -24,8 +24,11 @@ pub fn compile_script(source_file_str: String, bytecode_version: Option<u32>) ->
             .files()
             .unwrap(),
         aptos_framework::named_addresses().clone(),
+        Flags::empty()
+            .set_sources_shadow_deps(false)
+            .set_skip_attribute_checks(false),
+        aptos_framework::extended_checks::get_all_attribute_names(),
     )
-    .set_flags(Flags::empty().set_sources_shadow_deps(false))
     .build_and_report()
     .unwrap();
     assert!(compiled_program.len() == 1);

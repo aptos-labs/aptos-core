@@ -5,7 +5,7 @@ import asyncio
 
 from aptos_sdk.account import Account
 from aptos_sdk.account_address import AccountAddress
-from aptos_sdk.aptos_token_client import AptosTokenClient, Property, PropertyMap
+from aptos_sdk.aptos_token_client import AptosTokenClient, Object, Property, PropertyMap
 from aptos_sdk.async_client import FaucetClient, RestClient
 
 from .common import FAUCET_URL, NODE_URL
@@ -106,6 +106,17 @@ async def main():
     await rest_client.wait_for_transaction(txn_hash)
     token_data = await token_client.read_object(token_addr)
     print(f"Alice's token: {token_data}")
+
+    print("\n=== Transferring the Token from Alice to Bob ===")
+    print(f"Alice: {alice.address()}")
+    print(f"Bob:   {bob.address()}")
+    print(f"Token: {token_addr}\n")
+    print(f"Owner: {token_data.resources[Object].owner}")
+    print("    ...transferring...    ")
+    txn_hash = await rest_client.transfer_object(alice, token_addr, bob.address())
+    await rest_client.wait_for_transaction(txn_hash)
+    token_data = await token_client.read_object(token_addr)
+    print(f"Owner: {token_data.resources[Object].owner}\n")
 
     await rest_client.close()
 

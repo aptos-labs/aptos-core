@@ -24,7 +24,6 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_temppath::TempPath;
 use aptos_time_service::TimeService;
-use aptos_types::on_chain_config::ON_CHAIN_CONFIG_REGISTRY;
 use aptos_vm::AptosVM;
 use futures::{FutureExt, StreamExt};
 use std::{collections::HashMap, sync::Arc};
@@ -54,10 +53,8 @@ fn test_new_initialized_configs() {
     let (_, consensus_listener) = new_consensus_notifier_listener_pair(0);
 
     // Create the event subscription service and a reconfig subscriber
-    let mut event_subscription_service = EventSubscriptionService::new(
-        ON_CHAIN_CONFIG_REGISTRY,
-        Arc::new(RwLock::new(db_rw.clone())),
-    );
+    let mut event_subscription_service =
+        EventSubscriptionService::new(Arc::new(RwLock::new(db_rw.clone())));
     let mut reconfiguration_subscriber = event_subscription_service
         .subscribe_to_reconfigurations()
         .unwrap();

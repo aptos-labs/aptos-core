@@ -12,7 +12,7 @@ use aptos_logger::trace;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::{RoundId, ShardId, SubBlock},
+    block_executor::partitioner::{RoundId, ShardId, SubBlock, GLOBAL_ROUND_ID},
     state_store::state_key::StateKey,
     transaction::analyzed_transaction::AnalyzedTransaction,
     write_set::TransactionWrite,
@@ -119,11 +119,15 @@ impl CrossShardCommitSender {
                         state_key.clone(),
                         Some(write_op.clone()),
                     ));
-                    self.cross_shard_client.send_cross_shard_msg(
-                        *dependent_shard_id,
-                        *round_id,
-                        message,
-                    );
+                    if *round_id == GLOBAL_ROUND_ID {
+                        self.cross_shard_client.send_global_msg(message);
+                    } else {
+                        self.cross_shard_client.send_cross_shard_msg(
+                            *dependent_shard_id,
+                            *round_id,
+                            message,
+                        );
+                    }
                 }
             }
         }
@@ -148,6 +152,8 @@ impl TransactionCommitHook for CrossShardCommitSender {
 // CrossShardClient is a trait that defines the interface for sending and receiving messages across
 // shards.
 pub trait CrossShardClient: Send + Sync {
+    fn send_global_msg(&self, msg: CrossShardMsg);
+
     fn send_cross_shard_msg(&self, shard_id: ShardId, round: RoundId, msg: CrossShardMsg);
 
     fn receive_cross_shard_msg(&self, current_round: RoundId) -> CrossShardMsg;

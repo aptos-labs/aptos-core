@@ -1,5 +1,6 @@
 # A wrapper around git operations
 
+import re
 from dataclasses import dataclass
 from typing import Generator, Optional
 from .shell import Shell, RunResult
@@ -59,3 +60,17 @@ class Git:
 
     def get_commit_hash(self, ref: str) -> str:
         return self.run(["rev-parse", ref]).unwrap().decode().strip()
+
+    def get_remote(self, remote_name: str = "origin") -> str:
+        return self.run(["remote", "get-url", remote_name]).unwrap().decode().strip()
+
+    def get_repo_from_remote(self, remote_name: str = "origin") -> str:
+        remote_url = self.get_remote(remote_name)
+        remote_match = re.match(
+            r"(?:git@github\.com:|https://github\.com/)(?P<org_name>[^/]+)/(?P<repo_name>[^/]+).git",
+            remote_url,
+            re.VERBOSE,
+        )
+        if remote_match is None:
+            raise Exception(f"Could not parse remote {remote_name}")
+        return f"{remote_match.group('org_name')}/{remote_match.group('repo_name')}"

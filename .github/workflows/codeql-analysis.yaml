@@ -1,9 +1,8 @@
 name: "CodeQL"
 
 on:
-  schedule:
-    # Every day at 10:15am UTC aka 3:15am PT
-    - cron: "15 10 * * *"
+  # Allow triggering manually
+  workflow_dispatch:
 
 jobs:
   analyze:

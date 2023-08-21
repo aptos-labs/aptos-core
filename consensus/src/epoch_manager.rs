@@ -11,7 +11,6 @@ use crate::{
     dkg::{
         dkg_handler::DKGNetworkHandler,
         dkg_manager::{DKGManager, DKGManagerWrapper},
-        DKGMessage,
     },
     error::{error_kind, DbError},
     experimental::{
@@ -38,7 +37,7 @@ use crate::{
     monitor,
     network::{
         IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingDKGRequest,
-        IncomingRpcRequest, NetworkReceivers, NetworkSender, NetworkSenderWrapper,
+        IncomingRpcRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::QuorumStoreClient,
@@ -75,8 +74,8 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     on_chain_config::{
-        LeaderReputationType, OnChainConfigPayload, OnChainConsensusConfig, OnChainExecutionConfig,
-        ProposerElectionType, ValidatorSet, DKGState,
+        LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+        OnChainExecutionConfig, ProposerElectionType, ValidatorSet, DKGState,
     },
     validator_verifier::ValidatorVerifier,
 };
@@ -122,7 +121,7 @@ pub enum LivenessStorageData {
 
 // Manager the components that shared across epoch and spawn per-epoch RoundManager with
 // epoch-specific input.
-pub struct EpochManager {
+pub struct EpochManager<P: OnChainConfigProvider> {
     author: Author,
     config: ConsensusConfig,
     time_service: Arc<dyn TimeService>,
@@ -134,7 +133,7 @@ pub struct EpochManager {
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
-    reconfig_events: ReconfigNotificationListener,
+    reconfig_events: ReconfigNotificationListener<P>,
     dkg_manager_wrapper: Arc<DKGManagerWrapper>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
@@ -158,7 +157,7 @@ pub struct EpochManager {
     recovery_mode: bool,
 }
 
-impl EpochManager {
+impl<P: OnChainConfigProvider> EpochManager<P> {
     pub(crate) fn new(
         node_config: &NodeConfig,
         time_service: Arc<dyn TimeService>,
@@ -169,7 +168,7 @@ impl EpochManager {
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
-        reconfig_events: ReconfigNotificationListener,
+        reconfig_events: ReconfigNotificationListener<P>,
         bounded_executor: BoundedExecutor,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
@@ -712,18 +711,16 @@ impl EpochManager {
             self.config.wait_for_full_blocks_above_pending_blocks,
         );
 
-        // dkg stuff
-        // dkg todo: connect the dkg_handler channel
+        // dkg todo: add feature flag to guard changes
         let (dkg_handler_tx, dkg_handler_rx) = aptos_channel::new(
             QueueStyle::FIFO,
             100,
-            None, // dkg todo: add counters
+            None,
         );
         self.dkg_handler_tx = Some(dkg_handler_tx.clone());
-        let dkg_network_sender = NetworkSenderWrapper::<DKGMessage>::new(network_sender.clone());
         let dkg_reliable_broadcast = Arc::new(ReliableBroadcast::new(
             epoch_state.verifier.get_ordered_account_addresses(),
-            Arc::new(dkg_network_sender),
+            Arc::new(network_sender.clone()),
             ExponentialBackoff::from_millis(5),
             aptos_time_service::TimeService::real(),
         ));
@@ -848,7 +845,7 @@ impl EpochManager {
         self.spawn_block_retrieval_task(epoch, block_store);
     }
 
-    async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
+    async fn start_new_epoch(&mut self, payload: OnChainConfigPayload<P>) {
         let maybe_dkg_state: Option<DKGState> = payload.get().ok();
         match maybe_dkg_state {
             None => {
@@ -872,7 +869,7 @@ impl EpochManager {
                 let (sk1, pk1) = trxs.trx_one_third.decrypt_own_share(&pvss_config.wc_1, &pvss_config.my_index, &dk);
                 let (sk2, pk2) = trxs.trx_two_third.decrypt_own_share(&pvss_config.wc_2, &pvss_config.my_index, &dk);
                 //dkg todo: start randgen with these keys.
-                debug!("[DKG] starting new epoch with sk1={:?}, pk1={:?}, sk2={:?}, pk2={:?}", sk1, pk1, sk2, pk2);
+                debug!("[DKG] starting new epoch with sk1={:?}, sk2={:?}", sk1, sk2);
             }
             _ => {
                 debug!("No trxs in epoch 1. This is expected.");
@@ -901,7 +898,8 @@ impl EpochManager {
         match self.storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
                 let consensus_config = onchain_consensus_config.unwrap_or_default();
-                let execution_config = onchain_execution_config.unwrap_or_default();
+                let execution_config = onchain_execution_config
+                    .unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
                 self.quorum_store_enabled = self.enable_quorum_store(&consensus_config);
                 self.recovery_mode = false;
                 self.start_round_manager(

@@ -1,0 +1,54 @@
+module 0xcafe.CastU8 {
+
+    public calibrate_castu8_impl(n: u64) {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        _ = to_u8(0u8);
+        _ = to_u8(0u64);
+        _ = to_u8(0u128);
+        _ = to_u8(0u16);
+        _ = to_u8(0u32);
+        _ = to_u8(0u256);
+
+        _ = to_u8(21u8);
+        _ = to_u8(21u64);
+        _ = to_u8(21u128);
+        _ = to_u8(21u16);
+        _ = to_u8(21u32);
+        _ = to_u8(21u256);
+
+        _ = to_u8(255u8);
+        _ = to_u8(255u64);
+        _ = to_u8(255u128);
+        _ = to_u8(255u16);
+        _ = to_u8(255u32);
+        _ = to_u8(255u256);
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_castu8_x100() {
+    label b0:
+        Self.calibrate_castu8_impl(10);
+        return;       
+    }
+
+    public entry calibrate_castu8_x500() {
+    label b0:
+        Self.calibrate_castu8_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_castu8_x1000() {
+    label b0:
+        Self.calibrate_castu8_impl(100);
+        return;       
+    }                
+}    

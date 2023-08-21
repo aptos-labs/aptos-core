@@ -34,9 +34,7 @@ use aptos_genesis::{
 use aptos_logger::info;
 use aptos_types::{
     account_address::{AccountAddress, AccountAddressWithChecks},
-    on_chain_config::{
-        ExecutionConfigV1, OnChainConsensusConfig, OnChainExecutionConfig, TransactionShufflerType,
-    },
+    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
 };
 use aptos_vm_genesis::{default_gas_schedule, AccountBalance, EmployeePool};
 use async_trait::async_trait;
@@ -257,7 +255,7 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
             employee_vesting_start: layout.employee_vesting_start,
             employee_vesting_period_duration: layout.employee_vesting_period_duration,
             consensus_config: OnChainConsensusConfig::default(),
-            execution_config: OnChainExecutionConfig::default(),
+            execution_config: OnChainExecutionConfig::default_for_genesis(),
             gas_schedule: default_gas_schedule(),
         },
     )?)
@@ -297,9 +295,7 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             employee_vesting_start: layout.employee_vesting_start,
             employee_vesting_period_duration: layout.employee_vesting_period_duration,
             consensus_config: OnChainConsensusConfig::default(),
-            execution_config: OnChainExecutionConfig::V1(ExecutionConfigV1 {
-                transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
-            }),
+            execution_config: OnChainExecutionConfig::default_for_genesis(),
             gas_schedule: default_gas_schedule(),
         },
     )?)

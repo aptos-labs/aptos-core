@@ -28,10 +28,6 @@ impl TStateView for MockStateView {
         Ok(None)
     }
 
-    fn is_genesis(&self) -> bool {
-        false
-    }
-
     fn get_usage(&self) -> Result<StateStorageUsage> {
         Ok(StateStorageUsage::new_untracked())
     }

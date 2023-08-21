@@ -1,6 +1,7 @@
 name: "Check SDK examples"
 on:
   pull_request:
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
       - devnet
@@ -15,6 +16,7 @@ jobs:
   # whereas we run the test-sdk-confirm-client-generated-publish against a node
   # built from the same commit and run as part of that CI job.
   run-examples:
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     runs-on: ubuntu-latest
     env:
       APTOS_NODE_URL: https://fullnode.devnet.aptoslabs.com
@@ -44,6 +46,7 @@ jobs:
           command: cd ./ecosystem/typescript/sdk/examples/javascript && pnpm install && pnpm test
 
   run-python-examples:
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     runs-on: ubuntu-latest
     env:
       APTOS_NODE_URL: https://fullnode.devnet.aptoslabs.com/v1

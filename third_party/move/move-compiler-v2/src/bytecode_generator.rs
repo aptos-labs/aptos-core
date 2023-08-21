@@ -285,7 +285,6 @@ impl<'env> Generator<'env> {
 // Dispatcher
 
 impl<'env> Generator<'env> {
-    /// Generate code, for the given expression, and store the result in the given temporary.
     fn gen(&mut self, targets: Vec<TempIndex>, exp: &Exp) {
         match exp.as_ref() {
             ExpData::Invalid(id) => self.internal_error(*id, "invalid expression"),
@@ -720,7 +719,25 @@ impl<'env> Generator<'env> {
             .env()
             .get_node_instantiation_opt(id)
             .unwrap_or_default();
-        let args = self.gen_arg_list(args);
+        // Function calls can have implicit conversion of &mut to &, need to compute implicit
+        // conversions.
+        let param_types: Vec<Type> = self
+            .env()
+            .get_function(fun)
+            .get_parameters()
+            .into_iter()
+            .map(|Parameter(_, ty)| ty.instantiate(&type_args))
+            .collect();
+        if args.len() != param_types.len() {
+            self.internal_error(id, "inconsistent type arity");
+            return;
+        }
+        let args = args
+            .iter()
+            .zip(param_types.into_iter())
+            .map(|(e, t)| self.maybe_convert(e, &t))
+            .collect::<Vec<_>>();
+        let args = self.gen_arg_list(&args);
         self.emit_with(id, |attr| {
             Bytecode::Call(
                 attr,
@@ -730,6 +747,27 @@ impl<'env> Generator<'env> {
                 None,
             )
         })
+    }
+
+    /// Convert the expression so it matches the expected type. This is currently only needed
+    /// for `&mut` to `&` conversion, in which case we need to to introduce a Freeze operation.
+    fn maybe_convert(&self, exp: &Exp, expected_ty: &Type) -> Exp {
+        let id = exp.node_id();
+        let exp_ty = self.env().get_node_type(id);
+        if let (
+            Type::Reference(ReferenceKind::Mutable, _),
+            Type::Reference(ReferenceKind::Immutable, et),
+        ) = (exp_ty, expected_ty)
+        {
+            let freeze_id = self
+                .env()
+                .new_node(self.env().get_node_loc(id), expected_ty.clone());
+            self.env()
+                .set_node_instantiation(freeze_id, vec![et.as_ref().clone()]);
+            ExpData::Call(freeze_id, Operation::Freeze, vec![exp.clone()]).into_exp()
+        } else {
+            exp.clone()
+        }
     }
 
     fn gen_arg_list(&mut self, exps: &[Exp]) -> Vec<TempIndex> {

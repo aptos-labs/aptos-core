@@ -67,6 +67,11 @@ on:
         default: forge
         description: A unique ID for Forge sticky comment on your PR. See
           https://github.com/marocchino/sticky-pull-request-comment#keep-more-than-one-comment
+      SKIP_JOB:
+        required: false
+        default: false
+        type: boolean
+        description: Set to true to skip this job. Useful for PRs that don't require this workflow.
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
@@ -96,32 +101,39 @@ env:
   VERBOSE: true
   COMMENT_ON_PR: ${{ inputs.COMMENT_ON_PR }}
 
+# TODO: should we migrate this to a composite action, so that we can skip it
+# at the call site, and don't need to wrap each step in an if statement?
 jobs:
   forge:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        if: ${{ !inputs.SKIP_JOB }}
         with:
           ref: ${{ inputs.GIT_SHA }}
           # get the last 10 commits if GIT_SHA is not specified
           fetch-depth: inputs.GIT_SHA != null && 0 || 10
 
       - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
+        if: ${{ !inputs.SKIP_JOB }}
 
       - name: Install python deps
         run: pip3 install click==8.1.3 psutil==5.9.1
+        if: ${{ !inputs.SKIP_JOB }}
 
       # Calculate the auth duration based on the test duration
       # If the test duration is less than the default 90 minutes, use the default
       # otherwise add 30 minutes to the length of the Forge test run
       - name: Calculate Forge Auth Duration
+        if: ${{ !inputs.SKIP_JOB }}
         id: calculate-auth-duration
         run: |
           auth_duration=$(( $FORGE_RUNNER_DURATION_SECS > 5400 ? $FORGE_RUNNER_DURATION_SECS + 30 * 60 : 5400 ))
           echo "auth_duration=${auth_duration}" >> $GITHUB_OUTPUT
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        if: ${{ !inputs.SKIP_JOB }}
         id: docker-setup
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -140,28 +152,32 @@ jobs:
           GCP_AUTH_DURATION: ${{ steps.calculate-auth-duration.outputs.auth_duration }}
 
       - name: "Install GCloud SDK"
+        if: ${{ !inputs.SKIP_JOB }}
         uses: "google-github-actions/setup-gcloud@62d4898025f6041e16b1068643bfc5a696863587" # pin@v1
         with:
           version: ">= 418.0.0"
           install_components: "kubectl,gke-gcloud-auth-plugin"
 
       - name: "Export GCloud auth token"
+        if: ${{ !inputs.SKIP_JOB }}
         id: gcloud-auth
         run: echo "CLOUDSDK_AUTH_ACCESS_TOKEN=${{ steps.docker-setup.outputs.CLOUDSDK_AUTH_ACCESS_TOKEN }}" >> $GITHUB_ENV
         shell: bash
 
       - name: "Setup GCloud project"
+        if: ${{ !inputs.SKIP_JOB }}
         shell: bash
         run: gcloud config set project aptos-forge-gcp-0
 
       - name: Run pre-Forge checks
+        if: ${{ !inputs.SKIP_JOB }}
         shell: bash
         env:
           FORGE_RUNNER_MODE: pre-forge
         run: testsuite/run_forge.sh
 
       - name: Post pre-Forge comment
-        if: env.COMMENT_ON_PR == 'true' && github.event.number != null
+        if: ${{ !inputs.SKIP_JOB && env.COMMENT_ON_PR == 'true' && github.event.number != null }}
         uses: marocchino/sticky-pull-request-comment@39c5b5dc7717447d0cba270cd115037d32d28443 # pin@39c5b5dc7717447d0cba270cd115037d32d2844
         with:
           header: ${{ env.COMMENT_HEADER }}
@@ -170,12 +186,13 @@ jobs:
           path: ${{ env.FORGE_PRE_COMMENT }}
 
       - name: Run Forge
+        if: ${{ !inputs.SKIP_JOB }}
         shell: bash
         run: testsuite/run_forge.sh
 
       - name: Post forge result comment
         # Post a Github comment if the run has not been cancelled and if we're running on a PR
-        if: env.COMMENT_ON_PR == 'true' && github.event.number != null && !cancelled()
+        if: ${{ !inputs.SKIP_JOB  && env.COMMENT_ON_PR == 'true' && github.event.number != null && !cancelled() }}
         uses: marocchino/sticky-pull-request-comment@39c5b5dc7717447d0cba270cd115037d32d28443 # pin@39c5b5dc7717447d0cba270cd115037d32d2844
         with:
           header: ${{ env.COMMENT_HEADER }}
@@ -185,7 +202,7 @@ jobs:
 
       - name: Post to a Slack channel on failure
         # Post a Slack comment if the run has not been cancelled and the envs are set
-        if: env.POST_TO_SLACK == 'true' && failure()
+        if: ${{ !inputs.SKIP_JOB && env.POST_TO_SLACK == 'true' && failure() }}
         id: slack
         uses: slackapi/slack-github-action@936158bbe252e9a6062e793ea4609642c966e302 # pin@v1.21.0
         with:
@@ -196,3 +213,7 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.FORGE_SLACK_WEBHOOK_URL }}
+
+      # Print out whether the job was skipped.
+      - run: echo "Skipping forge test!"
+        if: ${{ inputs.SKIP_JOB }}

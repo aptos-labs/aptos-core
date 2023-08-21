@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_framework::extended_checks;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
@@ -33,6 +34,7 @@ pub fn run_tests_for_pkg(
             test_mode: true,
             install_dir: Some(tempdir().unwrap().path().to_path_buf()),
             additional_named_addresses: named_addr,
+            known_attributes: extended_checks::get_all_attribute_names().clone(),
             ..Default::default()
         },
         UnitTestingConfig::default_with_bound(Some(100_000)),

@@ -86,4 +86,8 @@ impl DKGTranscriptWrapper {
         self.trx_two_third
             .aggregate_with(&dkg_pvss_config.wc_2, &other.trx_two_third);
     }
+
+    pub fn num_bytes(&self) -> usize {
+        self.trx_one_third.to_bytes().len() + self.trx_two_third.to_bytes().len()
+    }
 }

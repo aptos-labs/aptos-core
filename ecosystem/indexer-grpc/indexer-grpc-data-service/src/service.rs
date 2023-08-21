@@ -49,9 +49,8 @@ const AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS: u64 = 50;
 // TODO(larry): fix all errors treated as transient errors.
 const TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS: u64 = 1000;
 
-// Up to MAX_RESPONSE_CHANNEL_SIZE response can be buffered in the channel. If the channel is full,
-// the server will not fetch more data from the cache and file store until the channel is not full.
-const MAX_RESPONSE_CHANNEL_SIZE: usize = 80;
+// Default max response channel size.
+const DEFAULT_MAX_RESPONSE_CHANNEL_SIZE: usize = 3;
 
 // The server will retry to send the response to the client and give up after RESPONSE_CHANNEL_SEND_TIMEOUT.
 // This is to prevent the server from being occupied by a slow client.
@@ -62,16 +61,22 @@ const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
 pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
+    pub data_service_response_channel_size: Option<usize>,
 }
 
 impl RawDataServerWrapper {
-    pub fn new(redis_address: String, file_store_config: IndexerGrpcFileStoreConfig) -> Self {
+    pub fn new(
+        redis_address: String,
+        file_store_config: IndexerGrpcFileStoreConfig,
+        data_service_response_channel_size: Option<usize>,
+    ) -> Self {
         Self {
             redis_client: Arc::new(
                 redis::Client::open(format!("redis://{}", redis_address))
                     .expect("Create redis client failed."),
             ),
             file_store_config,
+            data_service_response_channel_size,
         }
     }
 }
@@ -114,7 +119,10 @@ impl RawData for RawDataServerWrapper {
         let transactions_count = request.transactions_count;
 
         // Response channel to stream the data to the client.
-        let (tx, rx) = channel(MAX_RESPONSE_CHANNEL_SIZE);
+        let (tx, rx) = channel(
+            self.data_service_response_channel_size
+                .unwrap_or(DEFAULT_MAX_RESPONSE_CHANNEL_SIZE),
+        );
         let mut current_version = match &request.starting_version {
             Some(version) => *version,
             None => {

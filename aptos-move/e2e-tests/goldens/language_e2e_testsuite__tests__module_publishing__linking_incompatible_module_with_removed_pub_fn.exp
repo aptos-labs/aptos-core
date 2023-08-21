@@ -10,7 +10,7 @@ Ok(
                                     AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 00f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1014d },
                                 ),
                                 hash: OnceCell(Uninit),
-                            }: Creation(a11ceb0b0600000006010002030205050701070804080c200c2c070000000100000000014d0166f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10001000000010200),
+                            }: CreationWithMetadata(a11ceb0b0600000006010002030205050701070804080c200c2c070000000100000000014d0166f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10001000000010200, metadata:V0 { deposit: 0, creation_time_usecs: 0 }),
                             StateKey {
                                 inner: AccessPath(
                                     AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 010000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e7400 },

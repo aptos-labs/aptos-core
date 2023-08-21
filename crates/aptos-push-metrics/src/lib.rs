@@ -22,7 +22,7 @@ use std::{
 use url::Url;
 
 const DEFAULT_PUSH_FREQUENCY_SECS: u64 = 15;
-const DEFAULT_DASHBOARD_BASE_URL: &str = "https://o11y.aptosdev.com/grafana/d/execution/execution";
+const DEFAULT_DASHBOARD_BASE_URL: &str = "https://aptoslabs.grafana.net/d/execution/execution";
 
 /// MetricsPusher provides a function to push a list of Metrics to a configurable
 /// pushgateway endpoint.
@@ -147,13 +147,13 @@ impl MetricsPusher {
         url.query_pairs_mut()
             .append_pair("from", &start_time)
             .append_pair("to", &end_time)
-            .append_pair("var-Datasource", "VictoriaMetrics Global")
+            .append_pair("var-Datasource", "fHo-R604z")
             .append_pair("var-metrics_source", "All")
             .append_pair("var-chain_name", chain_name)
             .append_pair("var-cluster", "All")
             .append_pair("var-namespace", namespace)
+            .append_pair("var-kubernetes_pod_name", "All")
             .append_pair("var-role", "All");
-
         url
     }
 

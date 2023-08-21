@@ -20,6 +20,7 @@ const FLAGS: &[&str] = &[
     "--dependency=../../move-stdlib/sources",
     "--named-addresses=std=0x1",
     "--docgen",
+    "--skip-attribute-checks",
 ];
 
 fn test_runner(path: &Path) -> datatest_stable::Result<()> {
@@ -74,6 +75,7 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
 fn test_docgen(path: &Path, mut options: Options, suffix: &str) -> anyhow::Result<()> {
     let mut temp_path = PathBuf::from(TempDir::new()?.path());
     options.docgen.output_directory = temp_path.to_string_lossy().to_string();
+    options.skip_attribute_checks = true;
     let base_name = format!(
         "{}.md",
         path.file_stem()

@@ -64,7 +64,7 @@ impl From<StartDKGEvent> for DKGRounding {
         let (validator_weights, weights_of_one_third_stake, weights_of_two_third_stake) =
             rounding_scheme(validator_stakes.clone(), MAX_NUM_SHARES);
 
-        // dkg todo: can different weights for two transcripts help?
+        // dkg todo: can different weights of two transcripts help to reduce rounding error?
         let weighted_config_1 =
             WeightedConfig::new(weights_of_one_third_stake, validator_weights.clone()).unwrap();
         let weighted_config_2 =

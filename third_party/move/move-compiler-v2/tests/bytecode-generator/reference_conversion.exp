@@ -1,0 +1,46 @@
+// ---- Model Dump
+module 0x42::reference_conversion {
+    private fun deref(r: &u64) {
+        Deref(r)
+    }
+    private fun use_it() {
+        {
+          let x: u64 = 42;
+          {
+            let r: &mut u64 = Borrow(Mutable)(x);
+            r = 43;
+            reference_conversion::deref(r)
+          }
+        }
+    }
+} // end 0x42::reference_conversion
+
+============ initial bytecode ================
+
+[variant baseline]
+fun reference_conversion::deref($t0: &u64): u64 {
+     var $t1: u64
+  0: $t1 := read_ref($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun reference_conversion::use_it(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: &mut u64
+     var $t5: u64
+     var $t6: &u64
+  0: $t2 := 42
+  1: $t1 := move($t2)
+  2: $t4 := borrow_local($t1)
+  3: $t3 := move($t4)
+  4: $t5 := 43
+  5: write_ref($t3, $t5)
+  6: $t6 := freeze_ref($t3)
+  7: $t0 := reference_conversion::deref($t6)
+  8: return $t0
+}

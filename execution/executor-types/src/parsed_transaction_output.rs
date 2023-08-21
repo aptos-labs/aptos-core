@@ -21,7 +21,6 @@ impl ParsedTransactionOutput {
     }
 
     pub fn parse_dkg_events(events: &[ContractEvent]) -> impl Iterator<Item = &ContractEvent> {
-        // dkg todo: using the new epoch event key for now, need to register for dkg event
         events
             .iter()
             .filter(|e: &&ContractEvent| *e.key() == *START_DKG_EVENT_KEY)

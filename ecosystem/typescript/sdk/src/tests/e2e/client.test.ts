@@ -3,25 +3,6 @@ import { VERSION } from "../../version";
 import { getTransaction, longTestTimeout, NODE_URL } from "../unit/test_helper.test";
 
 test(
-  "server response should include cookies",
-  async () => {
-    try {
-      const response = await aptosRequest({
-        // use devnet as localnet doesnt set cookies
-        url: "https://fullnode.devnet.aptoslabs.com/v1",
-        method: "GET",
-        originMethod: "test cookies",
-      });
-      expect(response.headers).toHaveProperty("set-cookie");
-    } catch (error: any) {
-      // should not get here
-      expect(true).toBe(false);
-    }
-  },
-  longTestTimeout,
-);
-
-test(
   "call should include x-aptos-client header",
   async () => {
     try {

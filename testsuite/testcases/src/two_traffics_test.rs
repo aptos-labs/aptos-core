@@ -70,6 +70,7 @@ impl NetworkLoadTest for TwoTrafficsTest {
             &self.inner_success_criteria,
             report,
             &rate,
+            None,
             Some("inner traffic".to_string()),
         )?;
         Ok(())

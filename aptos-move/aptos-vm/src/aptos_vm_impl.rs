@@ -17,7 +17,7 @@ use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     chain_id::ChainId,
@@ -90,25 +90,33 @@ impl AptosVMImpl {
                 let storage_gas_params =
                     StorageGasParameters::new(gas_feature_version, gas_params, &storage);
 
-                if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
-                    // Overwrite table io gas parameters with global io pricing.
-                    let g = &mut gas_params.natives.table;
-                    match gas_feature_version {
-                        0..=1 => (),
-                        2..=6 => {
+                // Overwrite table io gas parameters with global io pricing.
+                let g = &mut gas_params.natives.table;
+                match gas_feature_version {
+                    0..=1 => (),
+                    2..=6 => {
+                        if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
                             g.common_load_base_legacy = pricing.per_item_read * NumArgs::new(1);
                             g.common_load_base_new = 0.into();
                             g.common_load_per_byte = pricing.per_byte_read;
                             g.common_load_failure = 0.into();
-                        },
-                        7.. => {
+                        }
+                    }
+                    7..=9 => {
+                        if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
                             g.common_load_base_legacy = 0.into();
                             g.common_load_base_new = pricing.per_item_read * NumArgs::new(1);
                             g.common_load_per_byte = pricing.per_byte_read;
                             g.common_load_failure = 0.into();
-                        },
+                        }
                     }
-                }
+                    10.. => {
+                        g.common_load_base_legacy = 0.into();
+                        g.common_load_base_new = gas_params.vm.txn.storage_io_per_state_slot_read * NumArgs::new(1);
+                        g.common_load_per_byte = gas_params.vm.txn.storage_io_per_state_byte_read;
+                        g.common_load_failure = 0.into();
+                    }
+                };
                 Ok(storage_gas_params)
             },
             Err(err) => Err(format!("Failed to initialize storage gas params due to failure to load main gas parameters: {}", err)),
@@ -498,9 +506,11 @@ impl AptosVMImpl {
         gas_remaining: Gas,
         txn_data: &TransactionMetadata,
     ) -> VMResult<()> {
-        let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price();
         let txn_max_gas_units = txn_data.max_gas_amount();
+        // TODO(aldenhu): repurpose this to be the amount of the storage fee refund.
+        let unused = 0;
+
         // We can unconditionally do this as this condition can only be true if the prologue
         // accepted it, in which case the gas payer feature is enabled.
         if let Some(fee_payer) = txn_data.fee_payer() {
@@ -511,7 +521,7 @@ impl AptosVMImpl {
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::Address(fee_payer),
-                    MoveValue::U64(txn_sequence_number),
+                    MoveValue::U64(unused),
                     MoveValue::U64(txn_gas_price.into()),
                     MoveValue::U64(txn_max_gas_units.into()),
                     MoveValue::U64(gas_remaining.into()),
@@ -526,7 +536,7 @@ impl AptosVMImpl {
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
-                    MoveValue::U64(txn_sequence_number),
+                    MoveValue::U64(unused),
                     MoveValue::U64(txn_gas_price.into()),
                     MoveValue::U64(txn_max_gas_units.into()),
                     MoveValue::U64(gas_remaining.into()),
@@ -632,11 +642,9 @@ impl<'a> AptosVMInternals<'a> {
     }
 
     /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
-    pub fn gas_params(
-        self,
-        log_context: &AdapterLogSchema,
-    ) -> Result<&'a AptosGasParameters, VMStatus> {
-        self.0.get_gas_parameters(log_context)
+    pub fn gas_params(self) -> Result<&'a AptosGasParameters, VMStatus> {
+        let log_context = AdapterLogSchema::new(StateViewId::Miscellaneous, 0);
+        self.0.get_gas_parameters(&log_context)
     }
 
     /// Returns the version of Move Runtime.

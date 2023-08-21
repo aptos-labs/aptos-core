@@ -78,8 +78,6 @@ impl PayloadManager {
                         },
                         Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs,
                         Payload::DKG(_dkg_payload) => {
-                            // dkg todo: is it ok to skip here?
-                            // only for QS garbage collection?
                             unreachable!("DKG payload should be filtered out");
                         },
                     })

@@ -1,0 +1,52 @@
+# This workflow tests that the Aptos CLI can be compiled on Windows
+name: "Windows CLI Build"
+
+on:
+  # Allow triggering manually
+  workflow_dispatch:
+
+  # Run every day at 12pm UTC
+  schedule:
+    - cron: "0 12 * * 3" # This runs once a week at 12pm UTC.
+
+  # Run if a pull request touches this file
+  pull_request:
+    paths:
+      - ".github/workflows/windows-build.yaml"
+
+jobs:
+  windows-build:
+    runs-on: windows-latest-8-core
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install the developer tools
+        run: PowerShell -ExecutionPolicy Bypass -File scripts/windows_dev_setup.ps1
+
+      # This is required for the openssl-sys crate to build.
+      # See: https://github.com/sfackler/rust-openssl/issues/1542#issuecomment-1399358351
+      - name: Update the VCPKG root
+        run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Install OpenSSL
+        run: vcpkg install openssl:x64-windows-static-md --clean-after-build
+
+      - name: Build the Aptos CLI
+        run: cargo build -p aptos
+
+      - name: Run the Aptos CLI help command
+        run: cargo run -p aptos -- --help
+
+      - name: Post to a Slack channel on failure
+        if: failure()
+        id: slack
+        uses: slackapi/slack-github-action@936158bbe252e9a6062e793ea4609642c966e302 # pin@v1.21.0
+        with:
+          payload: |
+            {
+              "text": "${{ ':x:' }} `${{ inputs.TEST_NAME  }}`: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|link>"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.FORGE_SLACK_WEBHOOK_URL }}

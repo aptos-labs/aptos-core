@@ -14,7 +14,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
-    block_executor::partitioner::{ExecutableTransactions, SubBlocksForShard},
+    block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
@@ -24,9 +24,9 @@ use aptos_types::{
     },
     state_store::state_key::StateKey,
     transaction::{
-        analyzed_transaction::AnalyzedTransaction, ChangeSet, ExecutionStatus, RawTransaction,
-        Script, SignedTransaction, Transaction, TransactionArgument, TransactionOutput,
-        TransactionPayload, TransactionStatus, WriteSetPayload,
+        ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
+        WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -81,27 +81,6 @@ impl VMExecutor for MockVM {
         state_view: &impl StateView,
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        if state_view.is_genesis() {
-            assert_eq!(
-                transactions.len(),
-                1,
-                "Genesis block should have only one transaction."
-            );
-            let output = TransactionOutput::new(
-                gen_genesis_writeset(),
-                // mock the validator set event
-                vec![ContractEvent::new(
-                    new_epoch_event_key(),
-                    0,
-                    TypeTag::Bool,
-                    bcs::to_bytes(&0).unwrap(),
-                )],
-                0,
-                KEEP_STATUS.clone(),
-            );
-            return Ok(vec![output]);
-        }
-
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
         let mut output_cache = HashMap::new();
@@ -212,7 +191,7 @@ impl VMExecutor for MockVM {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
-        _block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
+        _transactions: PartitionedTransactions,
         _state_view: Arc<S>,
         _maybe_block_gas_limit: Option<u64>,
     ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {
