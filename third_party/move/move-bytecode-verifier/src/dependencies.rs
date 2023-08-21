@@ -252,7 +252,7 @@ fn verify_imported_structs(context: &Context) -> PartialVMResult<()> {
                     StatusCode::LOOKUP_FAILED,
                     IndexKind::StructHandle,
                     idx as TableIndex,
-                ));
+                ))
             },
         }
     }

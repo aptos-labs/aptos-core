@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig, data_cache::TransactionDataCache, loader::LoadedFunction, move_vm::MoveVM,
+    data_cache::TransactionDataCache, loader::LoadedFunction, move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
 };
 use move_binary_format::{
@@ -421,10 +421,6 @@ impl<'r, 'l> Session<'r, 'l> {
 
     pub fn get_move_vm(&self) -> &'l MoveVM {
         self.move_vm
-    }
-
-    pub fn get_vm_config(&self) -> &'l VMConfig {
-        self.move_vm.runtime.loader().vm_config()
     }
 }
 
