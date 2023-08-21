@@ -70,9 +70,8 @@ pub(crate) fn validate_emit_calls(
     for fun in module.function_defs() {
         if let Some(code_unit) = &fun.code {
             for bc in &code_unit.code {
-                if let Bytecode::CallGeneric(index) = bc {
-                    let func_instantiation = &module.function_instantiation_at(*index);
-                    let func_handle = module.function_handle_at(func_instantiation.handle);
+                if let Bytecode::Call(index) = bc {
+                    let func_handle = &module.function_handle_at(*index);
                     let module_handle = module.module_handle_at(func_handle.module);
                     let module_addr = module.address_identifier_at(module_handle.address);
                     let module_name = module.identifier_at(module_handle.name);
@@ -85,7 +84,7 @@ pub(crate) fn validate_emit_calls(
                         continue;
                     }
                     let param = module
-                        .signature_at(func_instantiation.type_parameters)
+                        .signature_at(func_handle.parameters)
                         .0
                         .first()
                         .ok_or_else(|| {
@@ -106,7 +105,7 @@ pub(crate) fn validate_emit_calls(
                             }
                         },
                         _ => metadata_validation_err(
-                            "Reference to non-struct parameter for 0x1::event::emit function",
+                            "Non-struct parameter for 0x1::event::emit function",
                         ),
                     }?;
                 }

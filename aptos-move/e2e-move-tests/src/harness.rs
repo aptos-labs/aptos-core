@@ -169,7 +169,6 @@ impl MoveHarness {
         let output = self.executor.execute_transaction(txn);
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
-            self.executor.append_events(output.events().to_vec());
         }
         output
     }
@@ -431,10 +430,6 @@ impl MoveHarness {
         self.fast_forward(1);
         self.executor
             .run_block_with_metadata(proposer, failed_proposer_indices, txns)
-    }
-
-    pub fn get_events(&self) -> &[ContractEvent] {
-        self.executor.get_events()
     }
 
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<StateValue> {

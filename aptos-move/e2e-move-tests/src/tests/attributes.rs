@@ -205,20 +205,20 @@ fn verify_resource_groups_fail_when_not_enabled() {
 }
 
 #[test]
-fn verify_module_events_fail_when_not_enabled() {
-    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::MODULE_EVENT]);
+fn verify_resource_groups_fail_when_not_enabled() {
+    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::RESOURCE_GROUPS]);
     let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
     let source = r#"
         module 0xf00d::M {
-            struct Event { }
+            struct ResourceGroup { }
         }
         "#;
     let fake_attribute = FakeKnownAttribute {
-        kind: 4,
-        args: vec![],
+        kind: 2,
+        args: vec!["address".to_string()],
     };
     let (code, metadata) =
-        build_package_and_insert_attribute(source, Some(("Event", fake_attribute)), None);
+        build_package_and_insert_attribute(source, Some(("ResourceGroup", fake_attribute)), None);
     let result = h.run_transaction_payload(
         &account,
         aptos_stdlib::code_publish_package_txn(metadata, code),
