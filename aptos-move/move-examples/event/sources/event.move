@@ -5,9 +5,7 @@ module event::event {
     #[test_only]
     use std::vector;
 
-    struct Field has store, drop {
-        field: bool,
-    }
+    struct Field has store, drop {}
 
     #[event]
     struct MyEvent has store, drop {
@@ -16,12 +14,12 @@ module event::event {
         bytes: vector<u64>
     }
 
-    public entry fun emit(num: u64) {
+    public fun emit(num: u64) {
         let i = 0;
         while (i < num) {
             let event = MyEvent {
                 seq: i,
-                field: Field { field: false },
+                field: Field {},
                 bytes: vector[]
             };
             event::emit(&event);
@@ -30,7 +28,7 @@ module event::event {
     }
 
     #[test]
-    public entry fun test_emitting() {
+    public fun test_emitting() {
         emit(20);
         let module_events = event::emitted_events<MyEvent>();
         assert!(vector::length(&module_events) == 20, 0);
@@ -38,7 +36,7 @@ module event::event {
         while (i < 20) {
             let event = MyEvent {
                 seq: i,
-                field: Field {field: false},
+                field: Field {},
                 bytes: vector[]
             };
             assert!(vector::borrow(&module_events, i) == &event, i);
@@ -46,7 +44,7 @@ module event::event {
         };
         let event = MyEvent {
             seq: 0,
-            field: Field {field: false},
+            field: Field {},
             bytes: vector[]
         };
         assert!(event::was_event_emitted(&event), i);

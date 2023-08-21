@@ -35,7 +35,6 @@ use aptos_types::{
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    contract_event::ContractEvent,
     on_chain_config::{
         Features, OnChainConfig, TimedFeatureOverride, TimedFeatures, ValidatorSet, Version,
     },
@@ -95,7 +94,6 @@ pub type TraceSeqMapping = (usize, Vec<usize>, Vec<usize>);
 /// This struct is a mock in-memory implementation of the Aptos executor.
 pub struct FakeExecutor {
     data_store: FakeDataStore,
-    event_store: Vec<ContractEvent>,
     executor_thread_pool: Arc<rayon::ThreadPool>,
     block_time: u64,
     executed_output: Option<GoldenOutputs>,
@@ -122,7 +120,6 @@ impl FakeExecutor {
         );
         let mut executor = FakeExecutor {
             data_store: FakeDataStore::default(),
-            event_store: Vec::new(),
             executor_thread_pool,
             block_time: 0,
             executed_output: None,
@@ -188,7 +185,6 @@ impl FakeExecutor {
         );
         FakeExecutor {
             data_store: FakeDataStore::default(),
-            event_store: Vec::new(),
             executor_thread_pool,
             block_time: 0,
             executed_output: None,
@@ -309,10 +305,6 @@ impl FakeExecutor {
     /// Applies a [`WriteSet`] to this executor's data store.
     pub fn apply_write_set(&mut self, write_set: &WriteSet) {
         self.data_store.add_write_set(write_set);
-    }
-
-    pub fn append_events(&mut self, events: Vec<ContractEvent>) {
-        self.event_store.extend(events);
     }
 
     /// Adds an account to this executor's data store.
@@ -566,10 +558,6 @@ impl FakeExecutor {
         seq
     }
 
-    pub fn get_events(&self) -> &[ContractEvent] {
-        self.event_store.as_slice()
-    }
-
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<StateValue> {
         TStateView::get_state_value(&self.data_store, state_key).unwrap()
     }
@@ -759,7 +747,7 @@ impl FakeExecutor {
         let a1 = Arc::new(Mutex::new(Vec::<DynamicExpression>::new()));
         let a2 = Arc::clone(&a1);
 
-        let (write_set, _events) = {
+        let write_set = {
             // FIXME: should probably read the timestamp from storage.
             let timed_features =
                 TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
@@ -812,10 +800,11 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            change_set
+            let (write_set, _events) = change_set
                 .try_into_storage_change_set()
                 .expect("Failed to convert to ChangeSet")
-                .into_inner()
+                .into_inner();
+            write_set
         };
         self.data_store.add_write_set(&write_set);
 
@@ -834,7 +823,7 @@ impl FakeExecutor {
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) {
-        let (write_set, events) = {
+        let write_set = {
             // FIXME: should probably read the timestamp from storage.
             let timed_features =
                 TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
@@ -872,13 +861,13 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            change_set
+            let (write_set, _events) = change_set
                 .try_into_storage_change_set()
                 .expect("Failed to convert to ChangeSet")
-                .into_inner()
+                .into_inner();
+            write_set
         };
         self.data_store.add_write_set(&write_set);
-        self.event_store.extend(events);
     }
 
     pub fn try_exec(
@@ -887,7 +876,7 @@ impl FakeExecutor {
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
-    ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
+    ) -> Result<WriteSet, VMStatus> {
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
@@ -918,11 +907,11 @@ impl FakeExecutor {
             )
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
-        let (write_set, events) = change_set
+        let (write_set, _events) = change_set
             .try_into_storage_change_set()
             .expect("Failed to convert to ChangeSet")
             .into_inner();
-        Ok((write_set, events))
+        Ok(write_set)
     }
 
     pub fn execute_view_function(
