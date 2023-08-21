@@ -995,7 +995,6 @@ impl AptosVM {
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
         verifier::resource_groups::validate_resource_groups(session, modules)?;
-        verifier::event_validation::validate_module_events(session, modules)?;
 
         if !expected_modules.is_empty() {
             return Err(Self::metadata_validation_error(
