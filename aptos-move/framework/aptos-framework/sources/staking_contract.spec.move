@@ -105,7 +105,7 @@ spec aptos_framework::staking_contract {
 
         // preconditions
         include PreconditionsInCreateContract;
-        
+
         let amount = coins.value;
         include CreateStakingContractWithCoinsAbortsif { amount };
 
@@ -140,7 +140,7 @@ spec aptos_framework::staking_contract {
         let post post_store = global<Store>(staker_address);
         let post post_staking_contract = simple_map::spec_get(post_store.staking_contracts, operator);
         aborts_if staking_contract.principal + amount > MAX_U64;
-        // property 3: Adding stake to the stake pool increases the principal value of the pool, reflecting the additional stake amount. 
+        // property 3: Adding stake to the stake pool increases the principal value of the pool, reflecting the additional stake amount.
         ensures post_staking_contract.principal == staking_contract.principal + amount;
     }
 
@@ -153,7 +153,7 @@ spec aptos_framework::staking_contract {
         let post staking_contract = simple_map::spec_get(store.staking_contracts, operator);
         let post pool_address = staking_contract.owner_cap.pool_address;
         let post new_delegated_voter = global<stake::StakePool>(pool_address).delegated_voter;
-        // property 4: The staker may update the voter of a staking contract, enabling them 
+        // property 4: The staker may update the voter of a staking contract, enabling them
         // to modify the assigned voter address and ensure it accurately reflects their desired choice.
         ensures new_delegated_voter == new_voter;
     }
@@ -305,7 +305,7 @@ spec aptos_framework::staking_contract {
         include stake::ResourceRequirement;
 
         let staker_address = signer::address_of(staker);
-        
+
         // verify account::create_resource_account()
         let seed_0 = bcs::to_bytes(staker_address);
         let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
@@ -449,7 +449,7 @@ spec aptos_framework::staking_contract {
         let config = global<staking_config::StakingConfig>(@aptos_framework);
         let min_stake_required = config.minimum_stake;
         aborts_if amount < min_stake_required;
-        
+
         // verify new_staking_contracts_holder()
         include !exists<Store>(staker_address) ==> NewStakingContractsHolderAbortsIf;
         let staker_address = signer::address_of(staker);
@@ -465,7 +465,7 @@ spec aptos_framework::staking_contract {
         let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
         let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
         include CreateStakePoolAbortsIf {resource_addr};
-        aborts_if staker_address == resource_addr && !exists<Store>(staker_address) 
+        aborts_if staker_address == resource_addr && !exists<Store>(staker_address)
             && global<account::Account>(resource_addr).guid_creation_num + 21 >= account::MAX_GUID_CREATION_NUM;
         ensures exists<account::Account>(resource_addr);
         ensures exists<stake::StakePool>(resource_addr);
