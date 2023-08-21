@@ -5,7 +5,7 @@ use super::{
     dag_driver::DagDriver,
     dag_fetcher::{DagFetcher, FetchRequestHandler},
     dag_handler::NetworkHandler,
-    dag_network::DAGNetworkSender,
+    dag_network::TDAGNetworkSender,
     dag_store::Dag,
     order_rule::OrderRule,
     rb_handler::NodeBroadcastHandler,
@@ -32,7 +32,7 @@ pub fn bootstrap_dag(
     latest_ledger_info: LedgerInfo,
     storage: Arc<dyn DAGStorage>,
     rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
-    dag_network_sender: Arc<dyn DAGNetworkSender>,
+    dag_network_sender: Arc<dyn TDAGNetworkSender>,
     time_service: aptos_time_service::TimeService,
     payload_client: Arc<dyn PayloadClient>,
 ) -> (

@@ -5,7 +5,7 @@ use crate::{
         anchor_election::RoundRobinAnchorElection,
         dag_driver::{DagDriver, DagDriverError},
         dag_fetcher::DagFetcher,
-        dag_network::{DAGNetworkSender, RpcWithFallback},
+        dag_network::{RpcWithFallback, TDAGNetworkSender},
         dag_store::Dag,
         order_rule::OrderRule,
         tests::{dag_test::MockStorage, helpers::new_certified_node},
@@ -41,7 +41,7 @@ impl RBNetworkSender<DAGMessage> for MockNetworkSender {
 }
 
 #[async_trait]
-impl DAGNetworkSender for MockNetworkSender {
+impl TDAGNetworkSender for MockNetworkSender {
     async fn send_rpc(
         &self,
         _receiver: Author,
