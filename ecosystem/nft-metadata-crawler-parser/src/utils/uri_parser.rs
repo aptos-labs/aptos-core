@@ -27,7 +27,7 @@ impl URIParser {
             let path = captures.name("path").map(|m| m.as_str().to_string());
 
             Ok(format!(
-                "{}/{}{}",
+                "{}{}{}",
                 ipfs_prefix,
                 cid,
                 path.unwrap_or_default()
