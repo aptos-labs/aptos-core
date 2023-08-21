@@ -7,7 +7,7 @@ use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGasPerAbstractMemoryUnit;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
+    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
     views::ValueView,
 };
 use smallvec::smallvec;
@@ -27,15 +27,23 @@ pub struct WriteToEventStoreGasParameters {
 #[inline]
 fn native_write_to_event_store(
     gas_params: &WriteToEventStoreGasParameters,
-    _context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    context: &mut NativeContext,
+    mut ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.len() == 3);
 
+    let ty = ty_args.pop().unwrap();
     let msg = arguments.pop_back().unwrap();
+    let seq_num = pop_arg!(arguments, u64);
+    let guid = pop_arg!(arguments, Vec<u8>);
+
     let cost = gas_params.unit_cost * std::cmp::max(msg.legacy_abstract_memory_size(), 1.into());
+
+    if !context.save_event(guid, seq_num, ty, msg)? {
+        return Ok(NativeResult::err(cost, 0));
+    }
 
     Ok(NativeResult::ok(cost, smallvec![]))
 }

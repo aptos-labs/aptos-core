@@ -20,7 +20,7 @@ use aptos_gas_schedule::{
 use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
-    contract_event::{ContractEvent, ContractEventV0},
+    contract_event::ContractEvent,
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         TimedFeatures, APTOS_MAX_KNOWN_VERSION,
@@ -630,26 +630,16 @@ fn emit_new_block_and_epoch_event(session: &mut SessionExt) {
 
 /// Verify the consistency of the genesis `WriteSet`
 fn verify_genesis_write_set(events: &[ContractEvent]) {
-    let new_epoch_events: Vec<&ContractEventV0> = events
+    let new_epoch_events: Vec<&ContractEvent> = events
         .iter()
-        .filter_map(|e| {
-            if let ContractEvent::V0(v0) = e {
-                if v0.key() == &NewEpochEvent::event_key() {
-                    Some(v0)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
+        .filter(|e| e.key() == &NewEpochEvent::event_key())
         .collect();
     assert_eq!(
         new_epoch_events.len(),
         1,
         "There should only be exactly one NewEpochEvent"
     );
-    assert_eq!(new_epoch_events[0].sequence_number(), 0);
+    assert_eq!(new_epoch_events[0].sequence_number(), 0,);
 }
 
 /// An enum specifying whether the compiled stdlib/scripts should be used or freshly built versions

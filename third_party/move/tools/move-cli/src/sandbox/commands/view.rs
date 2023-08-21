@@ -14,6 +14,15 @@ pub fn view(state: &OnDiskStateView, path: &Path) -> Result<()> {
             Some(resource) => println!("{}", resource),
             None => println!("Resource not found."),
         }
+    } else if state.is_event_path(path) {
+        let events = state.view_events(path)?;
+        if events.is_empty() {
+            println!("Events not found.")
+        } else {
+            for event in events {
+                println!("{}", event)
+            }
+        }
     } else if is_bytecode_file(path) {
         let bytecode_opt = if contains_module(path) {
             OnDiskStateView::view_module(path)?

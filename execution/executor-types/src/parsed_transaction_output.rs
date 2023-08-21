@@ -16,13 +16,7 @@ pub struct ParsedTransactionOutput {
 
 impl ParsedTransactionOutput {
     pub fn parse_reconfig_events(events: &[ContractEvent]) -> impl Iterator<Item = &ContractEvent> {
-        events.iter().filter(|e| {
-            if let ContractEvent::V0(v0) = e {
-                *v0.key() == *NEW_EPOCH_EVENT_KEY
-            } else {
-                false
-            }
-        })
+        events.iter().filter(|e| *e.key() == *NEW_EPOCH_EVENT_KEY)
     }
 }
 
