@@ -846,12 +846,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload<P>) {
-        let maybe_dkg_state: Option<DKGState> = payload.get().ok();
+        let maybe_dkg_state: anyhow::Result<DKGState> = payload.get();
         match maybe_dkg_state {
-            None => {
-                debug!("[DKG] No DKG agg transcript found for the new epoch.");
+            Err(_) => {
+                debug!("On-chain DKGState not initialized. Probably the DKG feature is not enabled.");
+                //dkg todo: when epoch starts with no dkg transcript, proceed epoch without randomness.
             }
-            Some(state) if state.target_epoch > 1 => {
+            Ok(state) if state.target_epoch > 1 => {
                 debug!("[DKG] start_new_epoch with dkg_state={:?}", state);
                 let trxs = bcs::from_bytes::<DKGTranscriptWrapper>(state.serialized_transcript.as_slice()).unwrap();
                 let st: Storage = (&self.config.safety_rules.backend).try_into().unwrap();
@@ -873,6 +874,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             }
             _ => {
                 debug!("No trxs in epoch 1. This is expected.");
+                //dkg todo: decide if we need to hardcode the dkg keys for epoch 1, for forge testing etc.
             }
         }
         let validator_set: ValidatorSet = payload
