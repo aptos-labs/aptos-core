@@ -439,7 +439,7 @@ mod tests {
     }
 
     fn create_contract_event() -> ContractEvent {
-        ContractEvent::new_v1(
+        ContractEvent::new_v0(
             EventKey::new(0, AccountAddress::random()),
             0,
             TypeTag::Bool,
