@@ -80,13 +80,6 @@ impl ContractEvent {
         ContractEvent::V2(ContractEventV2::new(type_tag, event_data))
     }
 
-    pub fn event_key(&self) -> Option<&EventKey> {
-        match self {
-            ContractEvent::V1(event) => Some(event.key()),
-            ContractEvent::V2(_event) => None,
-        }
-    }
-
     pub fn event_data(&self) -> &[u8] {
         match self {
             ContractEvent::V1(event) => event.event_data(),
@@ -145,6 +138,16 @@ pub struct ContractEventV1 {
     event_data: Vec<u8>,
 }
 
+/// Entry produced via a call to the `emit` builtin.
+#[derive(Hash, Clone, Eq, PartialEq, Serialize, Deserialize, CryptoHasher)]
+pub struct ContractEventV2 {
+    /// The type of the data
+    type_tag: TypeTag,
+    /// The data payload of the event
+    #[serde(with = "serde_bytes")]
+    event_data: Vec<u8>,
+}
+
 impl ContractEventV1 {
     pub fn new(
         key: EventKey,
@@ -194,16 +197,6 @@ impl std::fmt::Debug for ContractEventV1 {
     }
 }
 
-/// Entry produced via a call to the `emit` builtin.
-#[derive(Hash, Clone, Eq, PartialEq, Serialize, Deserialize, CryptoHasher)]
-pub struct ContractEventV2 {
-    /// The type of the data
-    type_tag: TypeTag,
-    /// The data payload of the event
-    #[serde(with = "serde_bytes")]
-    event_data: Vec<u8>,
-}
-
 impl ContractEventV2 {
     pub fn new(type_tag: TypeTag, event_data: Vec<u8>) -> Self {
         Self {
@@ -243,11 +236,11 @@ impl TryFrom<&ContractEvent> for NewBlockEvent {
         match event {
             ContractEvent::V1(event) => {
                 if event.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
-                    bail!("Expected NewBlockEvent")
+                    anyhow::bail!("Expected NewBlockEvent")
                 }
                 Self::try_from_bytes(&event.event_data)
             },
-            ContractEvent::V2(_) => bail!("This is a module event"),
+            ContractEvent::V2(_) => anyhow::bail!("This is a module event"),
         }
     }
 }
@@ -259,11 +252,11 @@ impl TryFrom<&ContractEvent> for NewEpochEvent {
         match event {
             ContractEvent::V1(event) => {
                 if event.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
-                    bail!("Expected NewEpochEvent")
+                    anyhow::bail!("Expected NewEpochEvent")
                 }
                 Self::try_from_bytes(&event.event_data)
             },
-            ContractEvent::V2(_) => bail!("This is a module event"),
+            ContractEvent::V2(_) => anyhow::bail!("This is a module event"),
         }
     }
 }
@@ -275,11 +268,11 @@ impl TryFrom<&ContractEvent> for WithdrawEvent {
         match event {
             ContractEvent::V1(event) => {
                 if event.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
-                    bail!("Expected Sent Payment")
+                    anyhow::bail!("Expected Sent Payment")
                 }
                 Self::try_from_bytes(&event.event_data)
             },
-            ContractEvent::V2(_) => bail!("This is a module event"),
+            ContractEvent::V2(_) => anyhow::bail!("This is a module event"),
         }
     }
 }
@@ -291,11 +284,11 @@ impl TryFrom<&ContractEvent> for DepositEvent {
         match event {
             ContractEvent::V1(event) => {
                 if event.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
-                    bail!("Expected Received Payment")
+                    anyhow::bail!("Expected Received Payment")
                 }
                 Self::try_from_bytes(&event.event_data)
             },
-            ContractEvent::V2(_) => bail!("This is a module event"),
+            ContractEvent::V2(_) => anyhow::bail!("This is a module event"),
         }
     }
 }
@@ -311,30 +304,30 @@ impl std::fmt::Debug for ContractEvent {
 
 impl std::fmt::Display for ContractEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Ok(payload) = WithdrawEvent::try_from(self) {
-            let v1 = self.v1().unwrap();
-            write!(
-                f,
-                "ContractEvent {{ key: {}, index: {:?}, type: {:?}, event_data: {:?} }}",
-                v1.key, v1.sequence_number, v1.type_tag, payload,
-            )
-        } else if let Ok(payload) = DepositEvent::try_from(self) {
-            let v1 = self.v1().unwrap();
-            write!(
-                f,
-                "ContractEvent {{ key: {}, index: {:?}, type: {:?}, event_data: {:?} }}",
-                v1.key, v1.sequence_number, v1.type_tag, payload,
-            )
-        } else {
-            write!(f, "{:?}", self)
+        if let ContractEvent::V1(v1) = self {
+            if let Ok(payload) = WithdrawEvent::try_from(self) {
+                return write!(
+                    f,
+                    "ContractEvent {{ key: {}, index: {:?}, type: {:?}, event_data: {:?} }}",
+                    v1.key, v1.sequence_number, v1.type_tag, payload,
+                );
+            } else if let Ok(payload) = DepositEvent::try_from(self) {
+                return write!(
+                    f,
+                    "ContractEvent {{ key: {}, index: {:?}, type: {:?}, event_data: {:?} }}",
+                    v1.key, v1.sequence_number, v1.type_tag, payload,
+                );
+            }
         }
+        write!(f, "{:?}", self)
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct EventWithVersion {
-    pub transaction_version: Version,
+    pub transaction_version: u64,
+    // Should be `Version`
     pub event: ContractEvent,
 }
 

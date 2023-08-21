@@ -24,21 +24,9 @@ module event::event {
                 field: Field { field: false },
                 bytes: vector[]
             };
-            event::emit(event);
+            event::emit(&event);
             i = i + 1;
         }
-    }
-
-    public entry fun call_inline() {
-        emit_one_event()
-    }
-
-    inline fun emit_one_event() {
-        event::emit(MyEvent {
-            seq: 1,
-            field: Field { field: false },
-            bytes: vector[]
-        });
     }
 
     #[test]
@@ -58,19 +46,9 @@ module event::event {
         };
         let event = MyEvent {
             seq: 0,
-            field: Field { field: false },
+            field: Field {field: false},
             bytes: vector[]
         };
         assert!(event::was_event_emitted(&event), i);
-    }
-
-    #[test]
-    public entry fun test_inline() {
-        call_inline();
-        assert!(event::was_event_emitted(&MyEvent {
-            seq: 1,
-            field: Field { field: false },
-            bytes: vector[]
-        }), 0);
     }
 }
