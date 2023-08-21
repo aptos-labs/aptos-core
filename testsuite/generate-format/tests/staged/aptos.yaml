@@ -49,23 +49,14 @@ ChangeSet:
 ContractEvent:
   ENUM:
     0:
-      V1:
+      V0:
         NEWTYPE:
-          TYPENAME: ContractEventV1
-    1:
-      V2:
-        NEWTYPE:
-          TYPENAME: ContractEventV2
-ContractEventV1:
+          TYPENAME: ContractEventV0
+ContractEventV0:
   STRUCT:
     - key:
         TYPENAME: EventKey
     - sequence_number: U64
-    - type_tag:
-        TYPENAME: TypeTag
-    - event_data: BYTES
-ContractEventV2:
-  STRUCT:
     - type_tag:
         TYPENAME: TypeTag
     - event_data: BYTES
