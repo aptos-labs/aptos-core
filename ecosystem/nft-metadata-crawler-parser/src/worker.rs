@@ -36,7 +36,7 @@ use tokio::{
     task::JoinHandle,
     time::sleep,
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// Structs to hold config from YAML
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -108,6 +108,7 @@ async fn consume_pubsub_entries_to_channel_loop(
                 error = ?e,
                 "[NFT Metadata Crawler] Failed to send PubSub entry to channel"
             );
+            panic!();
         });
     }
 
@@ -256,81 +257,91 @@ impl Worker {
     /// Main parsing flow
     pub async fn parse(&mut self) -> anyhow::Result<()> {
         info!(
+            token_data_id = self.token_data_id,
+            token_uri = self.token_uri,
             last_transaction_version = self.last_transaction_version,
+            force = self.force,
             "[NFT Metadata Crawler] Starting worker"
         );
 
         // Deduplicate token_uri
-        // Proceed if force or if token_uri has not been parsed
-        if self.force
-            || NFTMetadataCrawlerURIsQuery::get_by_token_uri(self.token_uri.clone(), &mut self.conn)
-                .map_or(true, |uri| match uri {
-                    Some(uris) => {
-                        self.model.set_cdn_json_uri(uris.cdn_json_uri);
-                        false
-                    },
-                    None => true,
-                })
+        // Exit if not force or if token_uri has already been parsed
+        if !self.force
+            && NFTMetadataCrawlerURIsQuery::get_by_token_uri(
+                self.token_uri.clone(),
+                &mut self.conn,
+            )?
+            .is_some()
         {
-            // Parse token_uri
-            self.model.set_token_uri(self.token_uri.clone());
-            let token_uri = self.model.get_token_uri();
-            let json_uri = URIParser::parse(self.config.ipfs_prefix.clone(), token_uri.clone())
-                .unwrap_or(token_uri);
+            return Ok(());
+        }
 
-            // Parse JSON for raw_image_uri and raw_animation_uri
-            let (raw_image_uri, raw_animation_uri, json) =
-                JSONParser::parse(json_uri, self.config.max_file_size_bytes)
-                    .await
-                    .unwrap_or_else(|e| {
-                        // Increment retry count if JSON parsing fails
-                        error!(
-                            last_transaction_version = self.last_transaction_version,
-                            error = ?e,
-                            "[NFT Metadata Crawler] JSON parse failed",
-                        );
-                        self.model.increment_json_parser_retry_count();
-                        (None, None, Value::Null)
-                    });
+        // Parse token_uri
+        let json_uri =
+            URIParser::parse(self.config.ipfs_prefix.clone(), self.model.get_token_uri())
+                .unwrap_or(self.model.get_token_uri());
 
-            self.model.set_raw_image_uri(raw_image_uri);
-            self.model.set_raw_animation_uri(raw_animation_uri);
-
-            // Save parsed JSON to GCS
-            if json != Value::Null {
-                let cdn_json_uri_result =
-                    write_json_to_gcs(self.config.bucket.clone(), self.token_data_id.clone(), json)
-                        .await;
-
-                if let Err(e) = cdn_json_uri_result.as_ref() {
-                    error!(
+        // Parse JSON for raw_image_uri and raw_animation_uri
+        let (raw_image_uri, raw_animation_uri, json) =
+            JSONParser::parse(json_uri, self.config.max_file_size_bytes)
+                .await
+                .unwrap_or_else(|e| {
+                    // Increment retry count if JSON parsing fails
+                    warn!(
                         token_data_id=self.token_data_id,
                         token_uri=self.token_uri,
                         last_transaction_version = self.last_transaction_version,
                         force = self.force,
                         error = ?e,
-                        "[NFT Metadata Crawler] Failed to write JSON to GCS"
+                        "[NFT Metadata Crawler] JSON parse failed",
                     );
-                }
+                    self.model.increment_json_parser_retry_count();
+                    (None, None, Value::Null)
+                });
 
-                let cdn_json_uri = cdn_json_uri_result
-                    .map(|value| format!("{}{}", self.config.cdn_prefix, value))
-                    .ok();
-                self.model.set_cdn_json_uri(cdn_json_uri);
+        self.model.set_raw_image_uri(raw_image_uri);
+        self.model.set_raw_animation_uri(raw_animation_uri);
+
+        // Save parsed JSON to GCS
+        if json != Value::Null {
+            let cdn_json_uri_result =
+                write_json_to_gcs(self.config.bucket.clone(), self.token_data_id.clone(), json)
+                    .await;
+
+            if let Err(e) = cdn_json_uri_result.as_ref() {
+                error!(
+                    token_data_id=self.token_data_id,
+                    token_uri=self.token_uri,
+                    last_transaction_version = self.last_transaction_version,
+                    force = self.force,
+                    error = ?e,
+                    "[NFT Metadata Crawler] Failed to write JSON to GCS"
+                );
+                panic!();
             }
+
+            let cdn_json_uri = cdn_json_uri_result
+                .map(|value| format!("{}{}", self.config.cdn_prefix, value))
+                .ok();
+            self.model.set_cdn_json_uri(cdn_json_uri);
         }
 
         // Commit model to Postgres
         if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
             error!(
+                token_data_id=self.token_data_id,
+                token_uri=self.token_uri,
                 last_transaction_version = self.last_transaction_version,
+                force = self.force,
                 error = ?e,
                 "[NFT Metadata Crawler] Commit to Postgres failed"
             );
+            panic!();
         }
 
         // Deduplicate raw_image_uri
         // Proceed with image optimization of force or if raw_image_uri has not been parsed
+        // Since we default to token_uri, this check works if raw_image_uri is null because deduplication for token_uri has already taken place
         if self.force
             || self.model.get_raw_image_uri().map_or(true, |uri_option| {
                 NFTMetadataCrawlerURIsQuery::get_by_raw_image_uri(
@@ -364,8 +375,11 @@ impl Worker {
             .await
             .unwrap_or_else(|e| {
                 // Increment retry count if image is None
-                error!(
+                warn!(
+                    token_data_id=self.token_data_id,
+                    token_uri=self.token_uri,
                     last_transaction_version = self.last_transaction_version,
+                    force = self.force,
                     error = ?e,
                     "[NFT Metadata Crawler] Image optimization failed"
                 );
@@ -392,6 +406,7 @@ impl Worker {
                         error = ?e,
                         "[NFT Metadata Crawler] Failed to write image to GCS"
                     );
+                    panic!();
                 }
 
                 let cdn_image_uri = cdn_image_uri_result
@@ -404,10 +419,14 @@ impl Worker {
         // Commit model to Postgres
         if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
             error!(
+                token_data_id=self.token_data_id,
+                token_uri=self.token_uri,
                 last_transaction_version = self.last_transaction_version,
+                force = self.force,
                 error = ?e,
                 "[NFT Metadata Crawler] Commit to Postgres failed"
             );
+            panic!();
         }
 
         // Deduplicate raw_animation_uri
@@ -447,8 +466,11 @@ impl Worker {
             .await
             .unwrap_or_else(|e| {
                 // Increment retry count if animation is None
-                error!(
+                warn!(
+                    token_data_id=self.token_data_id,
+                    token_uri=self.token_uri,
                     last_transaction_version = self.last_transaction_version,
+                    force = self.force,
                     error = ?e,
                     "[NFT Metadata Crawler] Animation optimization failed"
                 );
@@ -475,6 +497,7 @@ impl Worker {
                         error = ?e,
                         "[NFT Metadata Crawler] Failed to write animation to GCS"
                     );
+                    panic!();
                 }
 
                 let cdn_animation_uri = cdn_animation_uri_result
@@ -487,10 +510,14 @@ impl Worker {
         // Commit model to Postgres
         if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
             error!(
+                token_data_id=self.token_data_id,
+                token_uri=self.token_uri,
                 last_transaction_version = self.last_transaction_version,
+                force = self.force,
                 error = ?e,
                 "[NFT Metadata Crawler] Commit to Postgres failed"
             );
+            panic!();
         }
 
         Ok(())

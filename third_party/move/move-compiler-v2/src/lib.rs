@@ -13,6 +13,7 @@ use anyhow::anyhow;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
 pub use experiments::*;
 use move_binary_format::{file_format as FF, file_format::CompiledScript, CompiledModule};
+use move_compiler::shared::known_attributes::KnownAttribute;
 use move_model::{model::GlobalEnv, PackageInfo};
 use move_stackless_bytecode::function_target_pipeline::{
     FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant,
@@ -76,6 +77,8 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             sources: options.dependencies.clone(),
             address_map: addrs,
         }],
+        options.skip_attribute_checks,
+        KnownAttribute::get_all_attribute_names(),
     )?;
     // Store options in env, for later access
     env.set_extension(options);

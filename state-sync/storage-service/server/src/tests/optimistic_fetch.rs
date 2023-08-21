@@ -30,7 +30,7 @@ use dashmap::DashMap;
 use futures::channel::oneshot;
 use lru::LruCache;
 use rand::{rngs::OsRng, Rng};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Handle;
 
 #[tokio::test]
@@ -78,6 +78,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
         storage_service_config,
         time_service.clone(),
     ));
+    let subscriptions = Arc::new(Mutex::new(HashMap::new()));
 
     // Verify that there are no peers with ready optimistic fetches
     let peers_with_ready_optimistic_fetches =
@@ -89,6 +90,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
             lru_response_cache.clone(),
             request_moderator.clone(),
             storage_reader.clone(),
+            subscriptions.clone(),
             time_service.clone(),
         )
         .await
@@ -109,6 +111,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
             lru_response_cache.clone(),
             request_moderator.clone(),
             storage_reader.clone(),
+            subscriptions.clone(),
             time_service.clone(),
         )
         .await
@@ -135,6 +138,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
             lru_response_cache,
             request_moderator,
             storage_reader,
+            subscriptions,
             time_service,
         )
         .await
@@ -171,6 +175,7 @@ async fn test_remove_expired_optimistic_fetches() {
         storage_service_config,
         time_service.clone(),
     ));
+    let subscriptions = Arc::new(Mutex::new(HashMap::new()));
 
     // Create the first batch of test optimistic fetches
     let num_optimistic_fetches_in_batch = 10;
@@ -200,6 +205,7 @@ async fn test_remove_expired_optimistic_fetches() {
             lru_response_cache.clone(),
             request_moderator.clone(),
             storage.clone(),
+            subscriptions.clone(),
             time_service.clone(),
         )
         .await
@@ -233,6 +239,7 @@ async fn test_remove_expired_optimistic_fetches() {
             lru_response_cache.clone(),
             request_moderator.clone(),
             storage.clone(),
+            subscriptions.clone(),
             time_service.clone(),
         )
         .await
@@ -253,6 +260,7 @@ async fn test_remove_expired_optimistic_fetches() {
             lru_response_cache,
             request_moderator,
             storage.clone(),
+            subscriptions,
             time_service.clone(),
         )
         .await

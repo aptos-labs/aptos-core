@@ -4,7 +4,11 @@
 
 use anyhow::{bail, Result};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
-use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler as MoveCompiler};
+use move_compiler::{
+    compiled_unit::AnnotatedCompiledUnit,
+    shared::{known_attributes::KnownAttribute, Flags},
+    Compiler as MoveCompiler,
+};
 use std::{fs::File, io::Write, path::Path};
 use tempfile::tempdir;
 
@@ -21,6 +25,8 @@ pub fn compile_units(s: &str) -> Result<Vec<AnnotatedCompiledUnit>> {
         vec![file_path.to_str().unwrap().to_string()],
         vec![],
         move_stdlib::move_stdlib_named_addresses(),
+        Flags::empty().set_skip_attribute_checks(false),
+        KnownAttribute::get_all_attribute_names(),
     )
     .build_and_report()?;
 
@@ -42,6 +48,8 @@ pub fn compile_units_with_stdlib(s: &str) -> Result<Vec<AnnotatedCompiledUnit>> 
         vec![file_path.to_str().unwrap().to_string()],
         move_stdlib::move_stdlib_files(),
         move_stdlib::move_stdlib_named_addresses(),
+        Flags::empty().set_skip_attribute_checks(false),
+        KnownAttribute::get_all_attribute_names(),
     )
     .build_and_report()?;
 
@@ -64,6 +72,8 @@ pub fn compile_modules_in_file(path: &Path) -> Result<Vec<CompiledModule>> {
         vec![path.to_str().unwrap().to_string()],
         vec![],
         std::collections::BTreeMap::<String, _>::new(),
+        Flags::empty().set_skip_attribute_checks(false),
+        KnownAttribute::get_all_attribute_names(),
     )
     .build_and_report()?;
 
