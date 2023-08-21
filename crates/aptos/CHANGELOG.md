@@ -2,8 +2,12 @@
 
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## Unreleased
+## [2.1.0] - 2023/08/21
+### Updated
 - Updated CLI source compilation to use rust toolchain version 1.71.1 (from 1.71.0).
+### Added
+- Added basic ledger support for CLI
+  - Example: `aptos init --ledger` to create a new account from ledger
 
 ## [2.0.3] - 2023/08/04
 ### Fixed
