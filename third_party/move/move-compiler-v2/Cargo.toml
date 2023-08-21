@@ -15,7 +15,7 @@ move-binary-format = { path = "../move-binary-format" }
 move-compiler = { path = "../move-compiler" }
 move-core-types = { path = "../move-core/types" }
 move-model = { path = "../move-model" }
-move-stackless-bytecode = { path = "../move-prover/bytecode" }
+move-stackless-bytecode = { path = "../move-model/bytecode" }
 
 bcs = { workspace = true }
 clap = { version = "4.3.9", features = ["derive", "env"] }
