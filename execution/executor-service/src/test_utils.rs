@@ -118,7 +118,7 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
         .unwrap();
     let unsharded_txn_output = AptosVM::execute_block(
         transactions.into_iter().map(|t| t.into_txn()).collect(),
-        &executor.data_store(),
+        executor.data_store(),
         None,
     )
     .unwrap();

@@ -32,15 +32,29 @@ jobs:
           required-permission: write
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
-  # This is a required job for each pull request.
-  run-tests-main-branch:
+  # This job determines which files were changed
+  file_change_determinator:
     needs: [permission-check]
+    runs-on: ubuntu-latest
+    outputs:
+      only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run the file change determinator
+        id: determine_file_changes
+        uses: ./.github/actions/file-change-determinator
+
+  # This is a PR required job.
+  run-tests-main-branch:
+    needs: [permission-check, file_change_determinator]
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           ref: ${{ env.GIT_SHA }}
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
@@ -49,9 +63,12 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - uses: ./.github/actions/run-ts-sdk-e2e-tests
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           BRANCH: main
           GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+      - run: echo "Skipping the tests on the main branch! Unrelated changes detected."
+        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
   # Run the TS SDK indexer tests. Note: Unlike the above tests where everything is self
   # contained because we run a local testnet, these tests operate against the
@@ -59,7 +76,7 @@ jobs:
   # to be land blocking for any PR on the aptos repo. This is why we run those tests
   # separate from test-sdk-confirm-client-generated-publish.
   run-indexer-tests:
-    if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests'))
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]
     runs-on: ubuntu-latest
     steps:

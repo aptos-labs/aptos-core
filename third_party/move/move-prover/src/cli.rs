@@ -11,7 +11,7 @@ use clap::{builder::PossibleValuesParser, Arg, ArgAction, ArgAction::SetTrue, Co
 use codespan_reporting::diagnostic::Severity;
 use log::LevelFilter;
 use move_abigen::AbigenOptions;
-use move_compiler::shared::NumericalAddress;
+use move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddress};
 use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
 use move_model::{model::VerificationScope, options::ModelBuilderOptions};
@@ -63,6 +63,8 @@ pub struct Options {
     pub move_named_address_values: Vec<String>,
     /// Whether to run experimental pipeline
     pub experimental_pipeline: bool,
+    /// Whether to skip checking for unknown attributes
+    pub skip_attribute_checks: bool,
 
     /// BEGIN OF STRUCTURED OPTIONS. DO NOT ADD VALUE FIELDS AFTER THIS
     /// Options for the model builder.
@@ -100,6 +102,7 @@ impl Default for Options {
             abigen: AbigenOptions::default(),
             errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
+            skip_attribute_checks: false,
         }
     }
 }
@@ -469,6 +472,12 @@ impl Options {
                     .help("whether to run experimental pipeline")
             )
             .arg(
+                Arg::new(SKIP_ATTRIBUTE_CHECKS)
+                    .long(SKIP_ATTRIBUTE_CHECKS)
+                    .action(SetTrue)
+                    .help("whether to not complain about unknown attributes in Move code")
+            )
+            .arg(
                 Arg::new("weak-edges")
                     .long("weak-edges")
                     .help("whether to use exclusively weak edges in borrow analysis")
@@ -702,6 +711,9 @@ impl Options {
         }
         if matches.get_flag("experimental-pipeline") {
             options.experimental_pipeline = true;
+        }
+        if matches.contains_id(SKIP_ATTRIBUTE_CHECKS) {
+            options.skip_attribute_checks = true;
         }
         if matches.contains_id("timeout") {
             options.backend.vc_timeout = *matches.try_get_one("timeout")?.unwrap();

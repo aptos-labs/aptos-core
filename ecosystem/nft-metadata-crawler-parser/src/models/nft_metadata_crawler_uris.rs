@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::schema::nft_metadata_crawler_uris;
+use crate::schema::nft_metadata_crawler::parsed_token_uris;
 use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -8,7 +8,7 @@ use tracing::warn;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(token_uri))]
-#[diesel(table_name = nft_metadata_crawler_uris)]
+#[diesel(table_name = parsed_token_uris)]
 pub struct NFTMetadataCrawlerURIs {
     token_uri: String,
     raw_image_uri: Option<String>,

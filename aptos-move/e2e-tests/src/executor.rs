@@ -13,13 +13,17 @@ use crate::{
     golden_outputs::GoldenOutputs,
 };
 use anyhow::Error;
+use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
+use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas_schedule::{
+    InitialGasSchedule, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_state_view::TStateView;
@@ -50,7 +54,7 @@ use aptos_vm::{
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::storage::ChangeSetConfigs;
+use aptos_vm_types::storage::{ChangeSetConfigs, StorageGasParameters};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -64,7 +68,8 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
+    time::Instant,
 };
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
@@ -78,6 +83,8 @@ pub const TRACE_DIR_META: &str = "meta";
 pub const TRACE_DIR_DATA: &str = "data";
 pub const TRACE_DIR_INPUT: &str = "input";
 pub const TRACE_DIR_OUTPUT: &str = "output";
+
+const POSTFIX: &str = "_should_error";
 
 /// Maps block number N to the index of the input and output transactions
 pub type TraceSeqMapping = (usize, Vec<usize>, Vec<usize>);
@@ -95,6 +102,11 @@ pub struct FakeExecutor {
     no_parallel_exec: bool,
     features: Features,
     chain_id: u8,
+}
+
+pub enum GasMeterType {
+    RegularMeter(Vec<u128>),
+    AbstractMeter(Vec<DynamicExpression>),
 }
 
 impl FakeExecutor {
@@ -563,7 +575,7 @@ impl FakeExecutor {
 
     /// Verifies the given transaction by running it through the VM verifier.
     pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
-        let vm = AptosVM::new(self.get_state_view());
+        let vm = AptosVM::new_from_state_view(self.get_state_view());
         vm.validate_transaction(txn, &self.data_store)
     }
 
@@ -653,47 +665,132 @@ impl FakeExecutor {
         self.block_time / 1_000_000
     }
 
-    //// exec_module is like exec(), however, we can run a Module published under
-    //// the creator address instead of 0x1, as what is currently done in exec.
-    pub fn exec_module(
+    /// exec_func_record_running_time is like exec(), however, we can run a Module published under
+    /// the creator address instead of 0x1, as what is currently done in exec.
+    pub fn exec_func_record_running_time(
         &mut self,
         module: &ModuleId,
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
-    ) {
+        iterations: u64,
+    ) -> u128 {
+        // FIXME: should probably read the timestamp from storage.
+        let timed_features =
+            TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+        // TODO(Gas): we probably want to switch to non-zero costs in the future
+        let vm = MoveVmExt::new(
+            NativeGasParameters::zeros(),
+            MiscGasParameters::zeros(),
+            LATEST_GAS_FEATURE_VERSION,
+            self.chain_id,
+            self.features.clone(),
+            timed_features,
+        )
+        .unwrap();
+        let remote_view = StorageAdapter::new(&self.data_store);
+
+        // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
+        let mut i = 0;
+        let mut times = Vec::new();
+        while i < iterations {
+            let mut session = vm.new_session(&remote_view, SessionId::void());
+
+            // load function name into cache to ensure cache is hot
+            let _ = session.load_function(module, &Self::name(function_name), &type_params.clone());
+
+            let fun_name = Self::name(function_name);
+            let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
+            let ty = type_params.clone();
+            let arg = args.clone();
+            // TODO: consider using StandardGasMeter
+            let gas_meter = &mut UnmeteredGasMeter;
+
+            let start = Instant::now();
+            let result =
+                session.execute_function_bypass_visibility(module, &fun_name, ty, arg, gas_meter);
+            let elapsed = start.elapsed();
+            if let Err(err) = result {
+                if !should_error {
+                    println!("Should error, but ignoring for now... {}", err);
+                }
+            }
+            times.push(elapsed.as_micros());
+            i += 1;
+        }
+
+        // take median of all running time iterations as a more robust measurement
+        times.sort();
+        let length = times.len();
+        let mid = length / 2;
+        let mut running_time = times[mid];
+
+        if length % 2 == 0 {
+            running_time = (times[mid - 1] + times[mid]) / 2;
+        }
+
+        running_time
+    }
+
+    /// record abstract usage using a modified gas meter
+    pub fn exec_abstract_usage(
+        &mut self,
+        module: &ModuleId,
+        function_name: &str,
+        type_params: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) -> Vec<DynamicExpression> {
+        // Define the shared buffers
+        let a1 = Arc::new(Mutex::new(Vec::<DynamicExpression>::new()));
+        let a2 = Arc::clone(&a1);
+
         let write_set = {
             // FIXME: should probably read the timestamp from storage.
             let timed_features =
                 TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+
             // TODO(Gas): we probably want to switch to non-zero costs in the future
-            let vm = MoveVmExt::new(
+            let vm = MoveVmExt::new_with_gas_hook(
                 NativeGasParameters::zeros(),
                 MiscGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
                 self.chain_id,
                 self.features.clone(),
                 timed_features,
+                Some(move |expression| {
+                    a2.lock().unwrap().push(expression);
+                }),
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
             let mut session = vm.new_session(&remote_view, SessionId::void());
-            session
-                .execute_function_bypass_visibility(
-                    module,
-                    &Self::name(function_name),
-                    type_params,
-                    args,
-                    &mut UnmeteredGasMeter,
-                )
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "Error calling {}.{}: {}",
-                        module.to_string().as_str(),
-                        function_name,
-                        e.into_vm_status()
-                    )
-                });
+
+            let fun_name = Self::name(function_name);
+            let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
+
+            let result = session.execute_function_bypass_visibility(
+                module,
+                &fun_name,
+                type_params,
+                args,
+                &mut StandardGasMeter::new(CalibrationAlgebra {
+                    base: StandardGasAlgebra::new(
+                        //// TODO: fill in these with proper values
+                        LATEST_GAS_FEATURE_VERSION,
+                        InitialGasSchedule::initial(),
+                        StorageGasParameters::unlimited(0.into()),
+                        10000000000000,
+                    ),
+                    // coeff_buffer: BTreeMap::new(),
+                    shared_buffer: Arc::clone(&a1),
+                }),
+            );
+            if let Err(err) = result {
+                if !should_error {
+                    println!("Should error, but ignoring for now... {}", err);
+                }
+            }
+
             let change_set = session
                 .finish(
                     &mut (),
@@ -707,6 +804,13 @@ impl FakeExecutor {
             write_set
         };
         self.data_store.add_write_set(&write_set);
+
+        let a1_result = Arc::into_inner(a1);
+        a1_result
+            .expect("Failed to get a1 arc result")
+            .lock()
+            .unwrap()
+            .to_vec()
     }
 
     pub fn exec(

@@ -9,7 +9,7 @@ use crate::{
         layout::{SourcePackageLayout, REFERENCE_TEMPLATE_FILENAME},
         parsed_manifest::{FileName, PackageDigest, PackageName},
     },
-    BuildConfig,
+    Architecture, BuildConfig,
 };
 use anyhow::{ensure, Result};
 use colored::Colorize;
@@ -26,6 +26,7 @@ use move_command_line_common::{
     },
 };
 use move_compiler::{
+    attr_derivation,
     compiled_unit::{
         self, AnnotatedCompiledUnit, CompiledUnit, NamedCompiledModule, NamedCompiledScript,
     },
@@ -575,11 +576,30 @@ impl CompiledPackage {
             &resolved_package,
             transitive_dependencies,
         )?;
-        let flags = if resolution_graph.build_options.test_mode {
+        let mut flags = if resolution_graph.build_options.test_mode {
             Flags::testing()
         } else {
             Flags::empty()
         };
+        let skip_attribute_checks = resolution_graph.build_options.skip_attribute_checks;
+        flags = flags.set_skip_attribute_checks(skip_attribute_checks);
+        let mut known_attributes = resolution_graph.build_options.known_attributes.clone();
+        match &resolution_graph.build_options.architecture {
+            Some(x) => {
+                match x {
+                    Architecture::Move => (),
+                    Architecture::AsyncMove => {
+                        flags = flags.set_flavor("async");
+                    },
+                    Architecture::Ethereum => {
+                        flags = flags.set_flavor("evm");
+                    },
+                };
+            },
+            None => (),
+        };
+        attr_derivation::add_attributes_for_flavor(&flags, &mut known_attributes);
+
         // Partition deps_package according whether src is available
         let (src_deps, bytecode_deps): (Vec<_>, Vec<_>) = deps_package_paths
             .clone()
@@ -600,7 +620,7 @@ impl CompiledPackage {
         let mut paths = src_deps;
         paths.push(sources_package_paths.clone());
 
-        let compiler = Compiler::from_package_paths(paths, bytecode_deps).set_flags(flags);
+        let compiler = Compiler::from_package_paths(paths, bytecode_deps, flags, &known_attributes);
         let (file_map, all_compiled_units) = compiler_driver(compiler)?;
         let mut root_compiled_units = vec![];
         let mut deps_compiled_units = vec![];
@@ -631,6 +651,8 @@ impl CompiledPackage {
                 vec![sources_package_paths],
                 deps_package_paths.into_iter().map(|(p, _)| p).collect_vec(),
                 ModelBuilderOptions::default(),
+                skip_attribute_checks,
+                &known_attributes,
             )?;
 
             if resolution_graph.build_options.generate_docs {

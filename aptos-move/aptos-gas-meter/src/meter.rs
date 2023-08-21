@@ -495,8 +495,12 @@ where
             .map_err(|e| e.finish(Location::Undefined))
     }
 
-    fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee {
-        self.vm_gas_params().txn.storage_fee_per_write(key, op)
+    fn storage_fee_for_state_slot(&self, op: &WriteOp) -> Fee {
+        self.vm_gas_params().txn.storage_fee_for_slot(op)
+    }
+
+    fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee {
+        self.vm_gas_params().txn.storage_fee_for_bytes(key, op)
     }
 
     fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee {

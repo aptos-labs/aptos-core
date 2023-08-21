@@ -13,4 +13,5 @@ runs:
       continue-on-error: true # Avoid skipping any checks if this job fails (see: https://github.com/fkirc/skip-duplicate-actions/issues/301)
       uses: fkirc/skip-duplicate-actions@v5
       with:
+        skip_after_successful_duplicate: false # Don't skip if the action is a duplicate (this may cause false positives)
         paths_ignore: '["**/*.md", "developer-docs-site/**"]'

@@ -18,12 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Note on the job-level `if` conditions:
-  # This workflow is designed such that we run subsequent jobs only when a 'push'
-  # triggered the workflow or on 'pull_request's which have set auto_merge=true
-  # or have the label "CICD:run-e2e-tests".
   permission-check:
-    if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests'))
     runs-on: ubuntu-latest
     steps:
       - name: Check repository permission for user which triggered workflow
@@ -33,7 +28,7 @@ jobs:
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
   run-tests-local-testnet:
-    if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests'))
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]
     runs-on: high-perf-docker
     env:

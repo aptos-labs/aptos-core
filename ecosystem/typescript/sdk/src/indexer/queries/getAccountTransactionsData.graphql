@@ -1,11 +1,15 @@
-query getAccountTransactionsData($address: String, $limit: Int, $offset: Int) {
-  move_resources(
-    where: { address: { _eq: $address } }
-    order_by: { transaction_version: desc }
-    distinct_on: transaction_version
-    limit: $limit
-    offset: $offset
-  ) {
+#import "./TokenActivitiesFieldsFragment";
+query getAccountTransactionsData(
+  $where_condition: account_transactions_bool_exp!
+  $offset: Int
+  $limit: Int
+  $order_by: [account_transactions_order_by!]
+) {
+  account_transactions(where: $where_condition, order_by: $order_by, limit: $limit, offset: $offset) {
+    token_activities_v2 {
+      ...TokenActivitiesFields
+    }
     transaction_version
+    account_address
   }
 }

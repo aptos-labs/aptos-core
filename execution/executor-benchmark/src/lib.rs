@@ -101,6 +101,8 @@ pub fn run_benchmark<V>(
     num_blocks: usize,
     transaction_mix: Option<Vec<(TransactionType, usize)>>,
     mut transactions_per_sender: usize,
+    connected_tx_grps: usize,
+    shuffle_connected_txns: bool,
     num_main_signer_accounts: usize,
     num_additional_dst_pool_accounts: usize,
     source_dir: impl AsRef<Path>,
@@ -248,7 +250,13 @@ pub fn run_benchmark<V>(
             transactions_per_sender,
         );
     } else {
-        generator.run_transfer(block_size, num_blocks, transactions_per_sender);
+        generator.run_transfer(
+            block_size,
+            num_blocks,
+            transactions_per_sender,
+            connected_tx_grps,
+            shuffle_connected_txns,
+        );
     }
     if pipeline_config.delay_execution_start {
         start_time = Instant::now();
@@ -585,9 +593,11 @@ mod tests {
             6, /* block_size */
             5, /* num_blocks */
             transaction_type.map(|t| vec![(t.materialize(2, false), 1)]),
-            2,  /* transactions per sender */
-            25, /* num_main_signer_accounts */
-            30, /* num_dst_pool_accounts */
+            2,     /* transactions per sender */
+            0,     /* connected txn groups in a block */
+            false, /* shuffle the connected txns in a block */
+            25,    /* num_main_signer_accounts */
+            30,    /* num_dst_pool_accounts */
             storage_dir.as_ref(),
             checkpoint_dir,
             verify_sequence_numbers,

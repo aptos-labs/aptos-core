@@ -70,7 +70,7 @@ jobs:
   rust-cryptohasher-domain-separation-check:
     needs: file_change_determinator
     runs-on: high-perf-docker
-    if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests'))
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
       - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984
@@ -97,6 +97,14 @@ jobs:
   # Run all rust smoke tests. This is a PR required job.
   rust-smoke-tests:
     needs: file_change_determinator
+    if: | # Only run on each PR once an appropriate event occurs
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null) ||
+        contains(github.event.pull_request.body, '#e2e'
+      )
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
@@ -215,7 +223,3 @@ jobs:
             /tmp/.tmp*
             !/tmp/.tmp*/**/db/
           retention-days: 14
-
-  # TODO: remove this once the new jobs land
-  python-lint-test:
-    uses: ./.github/workflows/python-lint-test.yaml
