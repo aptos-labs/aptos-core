@@ -6,7 +6,7 @@ use derive_more::Display;
 #[derive(Display, PartialEq, Eq, Clone)]
 pub struct Player {
     /// A number from 0 to n-1.
-    pub(crate) id: usize,
+    pub id: usize,
 }
 
 impl Player {

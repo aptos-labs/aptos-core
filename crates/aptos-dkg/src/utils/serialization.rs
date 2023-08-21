@@ -48,7 +48,7 @@ pub(crate) fn scalar_from_bytes_le(bytes: &[u8]) -> Result<Scalar, CryptoMateria
 
     let s = Scalar::from_bytes_le(slice).unwrap_or_else(|| Scalar::ZERO);
 
-    if s.is_zero().unwrap_u8() == 1u8 {
+    if s.is_zero().unwrap_u8() == 0u8 {
         Ok(s)
     } else {
         Err(CryptoMaterialError::DeserializationError)

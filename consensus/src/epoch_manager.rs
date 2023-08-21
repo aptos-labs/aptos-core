@@ -100,6 +100,7 @@ use std::{
 };
 use tokio_retry::strategy::ExponentialBackoff;
 use aptos_crypto::bls12381;
+use aptos_dkg::pvss::{das, Player};
 use aptos_dkg::pvss::traits::Transcript;
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_secure_storage::Storage;
@@ -134,6 +135,7 @@ pub struct EpochManager {
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
     reconfig_events: ReconfigNotificationListener,
+    dkg_manager_wrapper: Arc<DKGManagerWrapper>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
@@ -201,6 +203,7 @@ impl EpochManager {
             dkg_handler_tx: None,
             bounded_executor,
             recovery_mode: false,
+            dkg_manager_wrapper: Arc::new(DKGManagerWrapper::NoDKG),
         }
     }
 
@@ -724,17 +727,20 @@ impl EpochManager {
             ExponentialBackoff::from_millis(5),
             aptos_time_service::TimeService::real(),
         ));
+
         let dkg_manager = Arc::new(Mutex::new(DKGManager::new(
             self.author,
             epoch_state.clone(),
             dkg_reliable_broadcast,
         )));
-        let dkg_manager_wrapper = Arc::new(DKGManagerWrapper::WithDKG(dkg_manager.clone()));
+        //dkg todo: old instance is silently dropped. Is it fine? any clean-up needed?
+        self.dkg_manager_wrapper = Arc::new(DKGManagerWrapper::WithDKG(dkg_manager.clone()));
+
         let dkg_handler: DKGNetworkHandler = DKGNetworkHandler::new(
             self.author,
             dkg_handler_rx,
             Arc::new(epoch_state.clone()),
-            dkg_manager,
+            dkg_manager.clone(),
         );
         // start the dkg handler
         tokio::spawn(dkg_handler.start());
@@ -742,7 +748,7 @@ impl EpochManager {
         self.commit_state_computer.new_epoch(
             &epoch_state,
             payload_manager.clone(),
-            dkg_manager_wrapper.clone(),
+            self.dkg_manager_wrapper.clone(),
             transaction_shuffler,
             block_gas_limit,
             transaction_deduper,
@@ -791,7 +797,7 @@ impl EpochManager {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
-            dkg_manager_wrapper.clone(),
+            self.dkg_manager_wrapper.clone(),
         );
 
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
@@ -830,7 +836,7 @@ impl EpochManager {
             onchain_consensus_config,
             round_manager_tx,
             self.config.clone(),
-            dkg_manager_wrapper,
+            self.dkg_manager_wrapper.clone(),
         );
 
         round_manager.init(last_vote).await;
@@ -848,10 +854,9 @@ impl EpochManager {
             None => {
                 debug!("[DKG] No DKG agg transcript found for the new epoch.");
             }
-            Some(state) => {
+            Some(state) if state.target_epoch > 1 => {
                 debug!("[DKG] start_new_epoch with dkg_state={:?}", state);
-                // let trxs = bcs::from_bytes::<DKGTranscriptWrapper>(state.serialized_transcript.as_slice()).unwrap();
-                // debug!("[DKG] trxs={trxs:?}");
+                let trxs = bcs::from_bytes::<DKGTranscriptWrapper>(state.serialized_transcript.as_slice()).unwrap();
                 let st: Storage = (&self.config.safety_rules.backend).try_into().unwrap();
                 if let Err(error) = st.available() {
                     panic!("Storage is not available: {:?}", error);
@@ -860,10 +865,17 @@ impl EpochManager {
                     .get(CONSENSUS_KEY)
                     .map(|v| v.value)
                     .expect("Unable to get private key");
-                debug!("[DKG] private_key={private_key}");
-
-                // let (sk, pk) = trxs.unwrap().trx_one_third.decrypt_own_share();
-                // debug!("[DKG] starting new epoch with sk={sk}, pk={pk}");
+                let mut dk_bytes = private_key.to_bytes(); //in big-endian
+                dk_bytes.reverse();// now in small-endian, needed by pvss API.
+                let dk = aptos_dkg::pvss::encryption_dlog::g1::DecryptPrivKey::try_from(dk_bytes.as_slice()).unwrap();
+                let pvss_config = self.dkg_manager_wrapper.get_pvss_config().unwrap();
+                let (sk1, pk1) = trxs.trx_one_third.decrypt_own_share(&pvss_config.wc_1, &pvss_config.my_index, &dk);
+                let (sk2, pk2) = trxs.trx_two_third.decrypt_own_share(&pvss_config.wc_2, &pvss_config.my_index, &dk);
+                //dkg todo: start randgen with these keys.
+                debug!("[DKG] starting new epoch with sk1={:?}, pk1={:?}, sk2={:?}, pk2={:?}", sk1, pk1, sk2, pk2);
+            }
+            _ => {
+                debug!("No trxs in epoch 1. This is expected.");
             }
         }
         let validator_set: ValidatorSet = payload

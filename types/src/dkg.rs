@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 use crate::validator_info::ValidatorInfo;
 use anyhow::Result;
 use byteorder::{LittleEndian, WriteBytesExt};
-use aptos_dkg::pvss::{das, traits::Transcript, WeightedTranscript};
+use aptos_dkg::pvss::{das, Player, traits::Transcript, WeightedTranscript};
 use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
 use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
@@ -33,6 +33,7 @@ pub struct DKGPvssConfig {
     pub wc_2: <WT as Transcript>::SecretSharingConfig,
     pub pp: <das::Transcript as Transcript>::PvssPublicParameters,
     pub eks: Vec<<das::Transcript as Transcript>::EncryptPubKey>,
+    pub my_index: Player,
     pub dst: &'static [u8],
 }
 
@@ -42,6 +43,7 @@ impl DKGPvssConfig {
         wc_2: <WT as Transcript>::SecretSharingConfig,
         pp: <das::Transcript as Transcript>::PvssPublicParameters,
         eks: Vec<<das::Transcript as Transcript>::EncryptPubKey>,
+        my_index: Player,
         dst: &'static [u8],
     ) -> Self {
         Self {
@@ -49,6 +51,7 @@ impl DKGPvssConfig {
             wc_2,
             pp,
             eks,
+            my_index,
             dst,
         }
     }
@@ -83,15 +86,4 @@ impl DKGTranscriptWrapper {
         self.trx_two_third
             .aggregate_with(&dkg_pvss_config.wc_2, &other.trx_two_third);
     }
-
-    // pub fn to_bytes(&self) -> Vec<u8> {
-    //     let trx1_bytes = self.trx_one_third.to_bytes();
-    //     let trx2_bytes = self.trx_two_third.to_bytes();
-    //     let mut buffer: Vec<u8> = Vec::with_capacity(8 + trx1_bytes.len() + 8 + trx2_bytes.len());
-    //     buffer.write_u64::<LittleEndian>(trx1_bytes.len() as u64).unwrap();
-    //     buffer.write_all(trx1_bytes.as_slice()).unwrap();
-    //     buffer.write_u64::<LittleEndian>(trx2_bytes.len() as u64).unwrap();
-    //     buffer.write_all(trx2_bytes.as_slice()).unwrap();
-    //     buffer
-    // }
 }
