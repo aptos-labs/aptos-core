@@ -21,17 +21,22 @@ use move_core_types::{
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Spanned;
-use move_resource_viewer::{AnnotatedMoveStruct, MoveValueAnnotator};
+use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
+    convert::{TryFrom, TryInto},
     fmt::Debug,
     fs,
     path::{Path, PathBuf},
 };
 
+type Event = (Vec<u8>, u64, TypeTag, Vec<u8>);
+
 /// subdirectory of `DEFAULT_STORAGE_DIR/<addr>` where resources are stored
 pub const RESOURCES_DIR: &str = "resources";
 /// subdirectory of `DEFAULT_STORAGE_DIR/<addr>` where modules are stored
 pub const MODULES_DIR: &str = "modules";
+/// subdirectory of `DEFAULT_STORAGE_DIR/<addr>` where events are stored
+pub const EVENTS_DIR: &str = "events";
 
 /// file under `DEFAULT_BUILD_DIR` where a registry of generated struct layouts are stored
 pub const STRUCT_LAYOUTS_FILE: &str = "struct_layouts.yaml";
@@ -87,6 +92,10 @@ impl OnDiskStateView {
         self.is_data_path(p, RESOURCES_DIR)
     }
 
+    pub fn is_event_path(&self, p: &Path) -> bool {
+        self.is_data_path(p, EVENTS_DIR)
+    }
+
     pub fn is_module_path(&self, p: &Path) -> bool {
         self.is_data_path(p, MODULES_DIR)
     }
@@ -101,6 +110,20 @@ impl OnDiskStateView {
         let mut path = self.get_addr_path(&addr);
         path.push(RESOURCES_DIR);
         path.push(StructID(tag).to_string());
+        path.with_extension(BCS_EXTENSION)
+    }
+
+    // Events are stored under address/handle creation number
+    fn get_event_path(&self, key: &[u8]) -> PathBuf {
+        // TODO: this is a hacky way to get the account address and creation number from the event key.
+        // The root problem here is that the move-cli is using the Diem-specific event format.
+        // We will deal this later when we make events more generic in the Move VM.
+        let account_addr = AccountAddress::try_from(&key[8..])
+            .expect("failed to get account address from event key");
+        let creation_number = u64::from_le_bytes(key[..8].try_into().unwrap());
+        let mut path = self.get_addr_path(&account_addr);
+        path.push(EVENTS_DIR);
+        path.push(creation_number.to_string());
         path.with_extension(BCS_EXTENSION)
     }
 
@@ -199,6 +222,25 @@ impl OnDiskStateView {
         }
     }
 
+    fn get_events(&self, events_path: &Path) -> Result<Vec<Event>> {
+        Ok(if events_path.exists() {
+            match Self::get_bytes(events_path)? {
+                Some(events_data) => bcs::from_bytes::<Vec<Event>>(&events_data)?,
+                None => vec![],
+            }
+        } else {
+            vec![]
+        })
+    }
+
+    pub fn view_events(&self, events_path: &Path) -> Result<Vec<AnnotatedMoveValue>> {
+        let annotator = MoveValueAnnotator::new(self);
+        self.get_events(events_path)?
+            .iter()
+            .map(|(_, _, event_type, event_data)| annotator.view_value(event_type, event_data))
+            .collect()
+    }
+
     fn view_bytecode(path: &Path, is_module: bool) -> Result<Option<String>> {
         if path.is_dir() {
             bail!("Bad bytecode path {:?}. Needed file, found directory", path)
@@ -260,6 +302,29 @@ impl OnDiskStateView {
         Ok(fs::write(path, bcs_bytes)?)
     }
 
+    pub fn save_event(
+        &self,
+        event_key: &[u8],
+        event_sequence_number: u64,
+        event_type: TypeTag,
+        event_data: Vec<u8>,
+    ) -> Result<()> {
+        // save event data in handle_address/EVENTS_DIR/handle_number
+        let path = self.get_event_path(event_key);
+        if !path.exists() {
+            fs::create_dir_all(path.parent().unwrap())?;
+        }
+        // grab the old event log (if any) and append this event to it
+        let mut event_log = self.get_events(&path)?;
+        event_log.push((
+            event_key.to_vec(),
+            event_sequence_number,
+            event_type,
+            event_data,
+        ));
+        Ok(fs::write(path, bcs::to_bytes(&event_log)?)?)
+    }
+
     /// Save `module` on disk under the path `module.address()`/`module.name()`
     pub fn save_module(&self, module_id: &ModuleId, module_bytes: &[u8]) -> Result<()> {
         let path = self.get_module_path(module_id);
@@ -319,6 +384,10 @@ impl OnDiskStateView {
 
     pub fn module_paths(&self) -> impl Iterator<Item = PathBuf> + '_ {
         self.iter_paths(move |p| self.is_module_path(p))
+    }
+
+    pub fn event_paths(&self) -> impl Iterator<Item = PathBuf> + '_ {
+        self.iter_paths(move |p| self.is_event_path(p))
     }
 
     /// Build all modules in the self.storage_dir.

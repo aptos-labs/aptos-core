@@ -6,7 +6,7 @@ use crate::loader::Loader;
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChanges, ChangeSet, Changes, Op},
+    effects::{AccountChanges, ChangeSet, Changes, Event, Op},
     gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
@@ -51,6 +51,7 @@ impl AccountDataCache {
 pub(crate) struct TransactionDataCache<'r> {
     remote: &'r dyn MoveResolver,
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
+    event_data: Vec<(Vec<u8>, u64, Type, MoveTypeLayout, Value)>,
 }
 
 impl<'r> TransactionDataCache<'r> {
@@ -60,6 +61,7 @@ impl<'r> TransactionDataCache<'r> {
         TransactionDataCache {
             remote,
             account_map: BTreeMap::new(),
+            event_data: vec![],
         }
     }
 
@@ -67,7 +69,7 @@ impl<'r> TransactionDataCache<'r> {
     /// published modules.
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
-    pub(crate) fn into_effects(self, loader: &Loader) -> PartialVMResult<ChangeSet> {
+    pub(crate) fn into_effects(self, loader: &Loader) -> PartialVMResult<(ChangeSet, Vec<Event>)> {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout| -> PartialVMResult<Vec<u8>> {
                 value.simple_serialize(&layout).ok_or_else(|| {
@@ -84,7 +86,7 @@ impl<'r> TransactionDataCache<'r> {
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<Resource>,
         loader: &Loader,
-    ) -> PartialVMResult<Changes<Vec<u8>, Resource>> {
+    ) -> PartialVMResult<(Changes<Vec<u8>, Resource>, Vec<Event>)> {
         let mut change_set = Changes::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();
@@ -120,7 +122,16 @@ impl<'r> TransactionDataCache<'r> {
             }
         }
 
-        Ok(change_set)
+        let mut events = vec![];
+        for (guid, seq_num, ty, ty_layout, val) in self.event_data {
+            let ty_tag = loader.type_to_type_tag(&ty)?;
+            let blob = val
+                .simple_serialize(&ty_layout)
+                .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?;
+            events.push((guid, seq_num, ty_tag, blob))
+        }
+
+        Ok((change_set, events))
     }
 
     pub(crate) fn num_mutated_accounts(&self, sender: &AccountAddress) -> u64 {
@@ -270,5 +281,28 @@ impl<'r> TransactionDataCache<'r> {
                 PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
             })?
             .is_some())
+    }
+
+    #[allow(clippy::unit_arg)]
+    pub(crate) fn emit_event(
+        &mut self,
+        loader: &Loader,
+        guid: Vec<u8>,
+        seq_num: u64,
+        ty: Type,
+        val: Value,
+    ) -> PartialVMResult<()> {
+        let ty_layout = loader.type_to_type_layout(&ty)?;
+        Ok(self.event_data.push((guid, seq_num, ty, ty_layout, val)))
+    }
+
+    pub(crate) fn emitted_events(&self, guid: Vec<u8>, ty: Type) -> PartialVMResult<Vec<Value>> {
+        let mut events = vec![];
+        for event in self.event_data.iter() {
+            if event.0 == guid && event.2 == ty {
+                events.push(event.4.copy_value()?);
+            }
+        }
+        Ok(events)
     }
 }

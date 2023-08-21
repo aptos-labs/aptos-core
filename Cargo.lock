@@ -430,7 +430,6 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "move-resource-viewer",
- "once_cell",
  "poem",
  "poem-openapi",
  "poem-openapi-derive",
