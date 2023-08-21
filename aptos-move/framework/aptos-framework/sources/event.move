@@ -19,15 +19,6 @@ module aptos_framework::event {
     /// Log `msg` with the event stream identified by `T`
     native fun write_to_module_event_store<T: drop + store>(msg: &T);
 
-    #[test_only]
-    public native fun emitted_events<T: drop + store>(): vector<T>;
-
-    #[test_only]
-    public fun was_event_emitted<T: drop + store>(msg: &T): bool {
-        use std::vector;
-        vector::contains(&emitted_events<T>(), msg)
-    }
-
     #[deprecated]
     /// A handle for an event such that:
     /// 1. Other modules can emit events to this handle.
@@ -80,11 +71,9 @@ module aptos_framework::event {
         EventHandle<T> { counter: _, guid: _ } = handle;
     }
 
-    #[deprecated]
     #[test_only]
     public native fun emitted_events_by_handle<T: drop + store>(handle: &EventHandle<T>): vector<T>;
 
-    #[deprecated]
     #[test_only]
     public fun was_event_emitted_by_handle<T: drop + store>(handle: &EventHandle<T>, msg: &T): bool {
         use std::vector;

@@ -102,7 +102,9 @@ Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s k
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: store + drop&gt;(msg: &T) { <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T&gt;(msg); }
+<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: drop + store&gt;(msg: &T) {
+    <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T&gt;(msg);
+}
 </code></pre>
 
 
