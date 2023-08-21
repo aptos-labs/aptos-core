@@ -2995,6 +2995,22 @@ impl<'a, 'b> serde::Serialize for AnnotatedValue<'a, 'b, MoveTypeLayout, ValueIm
                 })
                 .serialize(serializer)
             },
+            (
+                MoveTypeLayout::Struct(struct_layout),
+                ValueImpl::ContainerRef(ContainerRef::Local(Container::Struct(r))),
+            )
+            | (
+                MoveTypeLayout::Struct(struct_layout),
+                ValueImpl::ContainerRef(ContainerRef::Global {
+                    container: Container::Struct(r),
+                    ..
+                }),
+            ) => (AnnotatedValue {
+                layout: struct_layout,
+                val: &*r.borrow(),
+            })
+            .serialize(serializer),
+
             (MoveTypeLayout::Vector(layout), ValueImpl::Container(c)) => {
                 let layout = &**layout;
                 match (layout, c) {

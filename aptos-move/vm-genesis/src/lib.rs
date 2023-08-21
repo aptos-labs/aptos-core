@@ -633,8 +633,12 @@ fn verify_genesis_write_set(events: &[ContractEvent]) {
     let new_epoch_events: Vec<&ContractEventV1> = events
         .iter()
         .filter_map(|e| {
-            if e.event_key() == Some(&NewEpochEvent::event_key()) {
-                Some(e.v1().unwrap())
+            if let ContractEvent::V1(v1) = e {
+                if v1.key() == &NewEpochEvent::event_key() {
+                    Some(v1)
+                } else {
+                    None
+                }
             } else {
                 None
             }

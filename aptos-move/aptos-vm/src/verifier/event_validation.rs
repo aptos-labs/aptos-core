@@ -52,7 +52,7 @@ pub(crate) fn validate_module_events(
             extract_event_metadata_from_module(session, &module.self_id())?;
 
         for member in original_event_structs {
-            // Fail if we see a removal of an event attribute.
+            // We don't need to re-validate new_members above.
             if !new_event_structs.remove(&member) {
                 metadata_validation_err("Invalid change in event attributes")?;
             }
@@ -100,13 +100,13 @@ pub(crate) fn validate_emit_calls(
                             if struct_handle.module != module.self_handle_idx() {
                                 metadata_validation_err(format!("{} passed to 0x1::event::emit function is not defined in the same module", struct_name).as_str())
                             } else if !event_structs.contains(struct_name.as_str()) {
-                                metadata_validation_err(format!("Missing #[event] attribute on {}. The #[event] attribute is required for all structs passed into 0x1::event::emit.", struct_name).as_str())
+                                metadata_validation_err(format!("#[event] attribute is missing for {} passed to 0x1::event::emit function", struct_name).as_str())
                             } else {
                                 Ok(())
                             }
                         },
                         _ => metadata_validation_err(
-                            "Passed in a non-struct parameter into 0x1::event::emit.",
+                            "Reference to non-struct parameter for 0x1::event::emit function",
                         ),
                     }?;
                 }
