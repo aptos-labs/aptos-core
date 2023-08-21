@@ -939,9 +939,9 @@ impl PrivateKeyInputOptions {
     }
 }
 
-// Extract the public key by derivating private key, fall back to public key from profile
+// Extract the public key by deriving private key, fall back to public key from profile
 // Order of operations
-// 1. Get the private key (either from CLI input or profile), and derive the public key problem private key
+// 1. Get the private key (either from CLI input or profile), and derive the public key from it
 // 2. Else get the public key directly from the config profile
 // 3. Else error
 impl ExtractPublicKey for PrivateKeyInputOptions {

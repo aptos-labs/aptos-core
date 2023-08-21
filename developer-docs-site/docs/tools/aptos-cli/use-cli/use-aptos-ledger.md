@@ -7,7 +7,13 @@ id: "use-aptos-ledger"
 
 The `aptos` tool can be used with your Ledger device to sign any transaction. This is the most secure way to sign transactions, as your private key never leaves your device.
 
+## Blind Signing
+
+Before you begin, make sure you have `Blind Signing` enabled on your Ledger device. Otherwise you will not be able to sign transactions.
+`Blind Signing` - confirming a smart contract interaction you can’t verify through a human readable language.
+
 ## Create a new Ledger profile
+
 In order to interact with your Ledger device, you must first create a new profile. This profile will be used to store your Ledger public key, and will be used to sign transactions.
 
 ```bash
