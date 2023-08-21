@@ -16,10 +16,13 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
-aptos-gas-algebra-ext = { workspace = true }
+aptos-gas-algebra = { workspace = true }
+aptos-gas-schedule = { workspace = true } 
 aptos-move-stdlib = { workspace = true }
+aptos-native-interface = { workspace = true }
 aptos-sdk-builder = { workspace = true }
 aptos-state-view = { workspace = true }
+aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 ark-bls12-381 = { workspace = true }
 ark-ec = { workspace = true }
@@ -31,15 +34,22 @@ bcs = { workspace = true }
 better_any = { workspace = true }
 blake2-rfc = { workspace = true }
 blst = { workspace = true }
+bulletproofs = { workspace = true }
+byteorder = { workspace = true }
 clap = { workspace = true }
 codespan-reporting = { workspace = true }
-curve25519-dalek = { workspace = true }
+# We need `zkcrypto/curve25519-dalek-ng` here instead of the normal `dalek-cryptography/curve25519-dalek` package. This
+# is because the `dalek-cryptography/bulletproofs` works with version 2 of `dalek-cryptography/curve25519-dalek` and
+# we work with version 3. Instead, we use `zkcrypto/bulleproofs` which relies on `zkcrypto/curve25519-dalek-ng`.
+curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
+either = { workspace = true }
 flate2 = { workspace = true }
 hex = { workspace = true }
 include_dir = { workspace = true }
 itertools = { workspace = true }
 libsecp256k1 = { workspace = true }
 log = { workspace = true }
+merlin = { workspace = true }
 move-binary-format = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler = { workspace = true }
@@ -50,7 +60,6 @@ move-package = { workspace = true }
 move-prover = { workspace = true }
 move-prover-boogie-backend = { workspace = true }
 move-stackless-bytecode = { workspace = true }
-move-table-extension = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 num-traits = { workspace = true }
@@ -75,7 +84,7 @@ thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
 
 [dev-dependencies]
-aptos-gas = { workspace = true }
+aptos-gas-meter = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 claims = { workspace = true }

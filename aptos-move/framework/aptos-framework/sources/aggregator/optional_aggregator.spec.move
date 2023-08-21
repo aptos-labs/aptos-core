@@ -26,6 +26,18 @@ spec aptos_framework::optional_aggregator {
         ensures integer.value == old(integer.value) + value;
     }
 
+    spec limit {
+        aborts_if false;
+    }
+
+    spec read_integer {
+        aborts_if false;
+    }
+
+    spec destroy_integer {
+        aborts_if false;
+    }
+
     spec sub(optional_aggregator: &mut OptionalAggregator, value: u128) {
         aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
             < value);

@@ -1,5 +1,4 @@
 import { AptosAccount } from "../../account/aptos_account";
-import { AptosClient } from "../../providers/aptos_client";
 import { bcsSerializeBool } from "../../bcs";
 import { FaucetClient } from "../../plugins/faucet_client";
 import { IndexerClient } from "../../providers/indexer";
@@ -9,126 +8,172 @@ import { Network, NetworkToIndexerAPI, sleep } from "../../utils";
 import { Provider } from "../../providers";
 import { AptosToken } from "../../plugins";
 
-const provider = new Provider(Network.TESTNET);
+const provider = new Provider(Network.DEVNET);
 const aptosToken = new AptosToken(provider);
-const faucetClient = new FaucetClient(
-  "https://fullnode.testnet.aptoslabs.com",
-  "https://faucet.testnet.aptoslabs.com",
-  { TOKEN: FAUCET_AUTH_TOKEN },
-);
+const faucetClient = new FaucetClient("https://fullnode.devnet.aptoslabs.com", "https://faucet.devnet.aptoslabs.com", {
+  TOKEN: FAUCET_AUTH_TOKEN,
+});
 const tokenClient = new TokenClient(provider.aptosClient);
 const alice = new AptosAccount();
 const collectionName = "AliceCollection";
 const collectionNameV2 = "AliceCollection2";
 const tokenName = "Alice Token";
-const indexerClient = new IndexerClient(NetworkToIndexerAPI[Network.TESTNET]);
+const indexerClient = new IndexerClient(NetworkToIndexerAPI[Network.DEVNET]);
+
+let skipTest = false;
+let runTests = describe;
 
 describe("Indexer", () => {
   it("should throw an error when account address is not valid", async () => {
     const address1 = "702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc";
     expect(async () => {
-      await indexerClient.getAccountNFTs(address1);
+      await indexerClient.getOwnedTokens(address1);
     }).rejects.toThrow(`${address1} is less than 66 chars long.`);
 
     const address2 = "0x702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc";
     expect(async () => {
-      await indexerClient.getAccountNFTs(address2);
+      await indexerClient.getOwnedTokens(address2);
     }).rejects.toThrow(`${address2} is less than 66 chars long.`);
   });
 
   it("should not throw an error when account address is missing 0x", async () => {
     const address = "790a34c702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc";
     expect(async () => {
-      await indexerClient.getAccountNFTs(address);
+      await indexerClient.getOwnedTokens(address);
     }).not.toThrow();
   });
 
   beforeAll(async () => {
-    await faucetClient.fundAccount(alice.address(), 100000000);
-    // Create collection and token on Alice's account
-    await provider.waitForTransaction(
-      await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
-      { checkSuccess: true },
-    );
-    await provider.waitForTransaction(
-      await tokenClient.createTokenWithMutabilityConfig(
-        alice,
-        collectionName,
-        tokenName,
-        "Alice's simple token",
-        1,
-        "https://aptos.dev/img/nyan.jpeg",
-        1000,
-        alice.address(),
-        1,
-        0,
-        ["TOKEN_BURNABLE_BY_OWNER"],
-        [bcsSerializeBool(true)],
-        ["bool"],
-        [false, false, false, false, true],
-      ),
-      { checkSuccess: true },
+    const indexerLedgerInfo = await provider.getIndexerLedgerInfo();
+    const fullNodeChainId = await provider.getChainId();
+
+    console.log(
+      `\n devnet chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo.ledger_infos[0].chain_id}`,
     );
 
-    await provider.waitForTransaction(
-      await aptosToken.createCollection(alice, "Alice's simple collection", collectionNameV2, "https://aptos.dev", 5, {
-        royaltyNumerator: 10,
-        royaltyDenominator: 10,
-      }),
-      { checkSuccess: true },
-    );
+    if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
+      console.log(`\n devnet chain id and indexer chain id are not synced, skipping rest of tests`);
+      skipTest = true;
+      runTests = describe.skip;
+    } else {
+      console.log(`\n devnet chain id and indexer chain id are in synced, running tests`);
+    }
 
-    await provider.waitForTransactionWithResult(
-      await aptosToken.mint(
-        alice,
-        collectionNameV2,
-        "Alice's simple token",
-        tokenName,
-        "https://aptos.dev/img/nyan.jpeg",
-        ["key"],
-        ["bool"],
-        ["true"],
-      ),
-      { checkSuccess: true },
-    );
+    if (!skipTest) {
+      await faucetClient.fundAccount(alice.address(), 100000000);
+      // Create collection and token V1 on Alice's account
+      await provider.waitForTransaction(
+        await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
+        { checkSuccess: true },
+      );
+      await provider.waitForTransaction(
+        await tokenClient.createTokenWithMutabilityConfig(
+          alice,
+          collectionName,
+          tokenName,
+          "Alice's simple token",
+          1,
+          "https://aptos.dev/img/nyan.jpeg",
+          1000,
+          alice.address(),
+          1,
+          0,
+          ["TOKEN_BURNABLE_BY_OWNER"],
+          [bcsSerializeBool(true)],
+          ["bool"],
+          [false, false, false, false, true],
+        ),
+        { checkSuccess: true },
+      );
+
+      // Create collection and token V2 on Alice's account
+      await provider.waitForTransaction(
+        await aptosToken.createCollection(
+          alice,
+          "Alice's simple collection",
+          collectionNameV2,
+          "https://aptos.dev",
+          5,
+          {
+            royaltyNumerator: 10,
+            royaltyDenominator: 10,
+          },
+        ),
+        { checkSuccess: true },
+      );
+
+      await provider.waitForTransactionWithResult(
+        await aptosToken.mint(
+          alice,
+          collectionNameV2,
+          "Alice's simple token",
+          tokenName,
+          "https://aptos.dev/img/nyan.jpeg",
+          ["key"],
+          ["bool"],
+          ["true"],
+        ),
+        { checkSuccess: true },
+      );
+    }
   }, longTestTimeout);
 
-  describe("get data", () => {
+  runTests("get data", () => {
     jest.retryTimes(5);
     beforeEach(async () => {
       await sleep(1000);
     });
-    it(
-      "gets account NFTs",
-      async () => {
-        const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex());
-        expect(accountNFTs.current_token_ownerships).toHaveLength(1);
-        expect(accountNFTs.current_token_ownerships[0]).toHaveProperty("current_token_data");
-        expect(accountNFTs.current_token_ownerships[0]).toHaveProperty("current_collection_data");
-        expect(accountNFTs.current_token_ownerships[0].current_token_data?.name).toBe("Alice Token");
-      },
-      longTestTimeout,
-    );
+
+    it("gets indexer ledger info", async () => {
+      const ledgerInfo = await indexerClient.getIndexerLedgerInfo();
+      expect(ledgerInfo.ledger_infos[0].chain_id).toBeGreaterThan(1);
+    });
+
+    // TOKENS //
 
     it(
       "gets token activities",
       async () => {
-        const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex());
-        const tokenActivity = await indexerClient.getTokenActivities(
-          accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
+        const accountTokens = await indexerClient.getOwnedTokens(alice.address().hex());
+        expect(accountTokens.current_token_ownerships_v2).toHaveLength(2);
+        // V1
+        const tokenActivityV1 = await indexerClient.getTokenActivities(
+          accountTokens.current_token_ownerships_v2[0].current_token_data!.token_data_id,
         );
-        expect(tokenActivity.token_activities).toHaveLength(2);
-        expect(tokenActivity.token_activities[0]).toHaveProperty("from_address");
-        expect(tokenActivity.token_activities[0]).toHaveProperty("to_address");
+        expect(tokenActivityV1.token_activities_v2).toHaveLength(2);
+
+        expect(tokenActivityV1.token_activities_v2[0].token_standard).toEqual("v1");
+        expect(tokenActivityV1.token_activities_v2[0].from_address).toEqual(alice.address().hex());
+
+        expect(tokenActivityV1.token_activities_v2[1].token_standard).toEqual("v1");
+        expect(tokenActivityV1.token_activities_v2[1].to_address).toEqual(alice.address().hex());
+        // V2
+        const tokenActivityV2 = await indexerClient.getTokenActivities(
+          accountTokens.current_token_ownerships_v2[1].current_token_data!.token_data_id,
+        );
+        expect(tokenActivityV2.token_activities_v2).toHaveLength(1);
+        expect(tokenActivityV2.token_activities_v2[0].token_standard).toEqual("v2");
+        expect(tokenActivityV2.token_activities_v2[0].from_address).toEqual(alice.address().hex());
       },
       longTestTimeout,
     );
 
     it(
-      "gets account coin data",
+      "gets token activities count",
       async () => {
-        const accountCoinData = await indexerClient.getAccountCoinsData(alice.address().hex());
-        expect(accountCoinData.current_coin_balances[0].coin_type).toEqual("0x1::aptos_coin::AptosCoin");
+        const accountTokens = await indexerClient.getOwnedTokens(alice.address().hex(), {
+          orderBy: [{ last_transaction_version: "desc" }],
+        });
+        expect(accountTokens.current_token_ownerships_v2[0].token_standard).toBe("v2");
+        expect(accountTokens.current_token_ownerships_v2[1].token_standard).toBe("v1");
+        const tokenActivitiesV2Count = await indexerClient.getTokenActivitiesCount(
+          accountTokens.current_token_ownerships_v2[0].current_token_data!.token_data_id,
+        );
+        expect(tokenActivitiesV2Count.token_activities_v2_aggregate.aggregate?.count).toBe(1);
+        const tokenActivitiesV1Count = await indexerClient.getTokenActivitiesCount(
+          accountTokens.current_token_ownerships_v2[1].current_token_data!.token_data_id,
+        );
+        expect(tokenActivitiesV1Count.token_activities_v2_aggregate.aggregate?.count).toBe(2);
       },
       longTestTimeout,
     );
@@ -137,37 +182,7 @@ describe("Indexer", () => {
       "gets account token count",
       async () => {
         const accountTokenCount = await indexerClient.getAccountTokensCount(alice.address().hex());
-        expect(accountTokenCount.current_token_ownerships_aggregate.aggregate?.count).toEqual(1);
-      },
-      longTestTimeout,
-    );
-
-    it(
-      "gets account transactions count",
-      async () => {
-        const accountTransactionsCount = await indexerClient.getAccountTransactionsCount(alice.address().hex());
-        expect(accountTransactionsCount.move_resources_aggregate.aggregate?.count).toEqual(5);
-      },
-      longTestTimeout,
-    );
-
-    it(
-      "gets account transactions data",
-      async () => {
-        const accountTransactionsData = await indexerClient.getAccountTransactionsData(alice.address().hex());
-        expect(accountTransactionsData.move_resources[0]).toHaveProperty("transaction_version");
-      },
-      longTestTimeout,
-    );
-
-    it(
-      "gets token activities count",
-      async () => {
-        const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex());
-        const tokenActivitiesCount = await indexerClient.getTokenActivitiesCount(
-          accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
-        );
-        expect(tokenActivitiesCount.token_activities_aggregate.aggregate?.count).toBe(2);
+        expect(accountTokenCount.current_token_ownerships_v2_aggregate.aggregate?.count).toEqual(2);
       },
       longTestTimeout,
     );
@@ -175,11 +190,11 @@ describe("Indexer", () => {
     it(
       "gets token data",
       async () => {
-        const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex());
+        const accountTokens = await indexerClient.getOwnedTokens(alice.address().hex());
         const tokenData = await indexerClient.getTokenData(
-          accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
+          accountTokens.current_token_ownerships_v2[0].current_token_data!.token_data_id,
         );
-        expect(tokenData.current_token_datas[0].name).toEqual("Alice Token");
+        expect(tokenData.current_token_datas_v2[0].token_name).toEqual(tokenName);
       },
       longTestTimeout,
     );
@@ -187,84 +202,65 @@ describe("Indexer", () => {
     it(
       "gets token owners data",
       async () => {
-        const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex());
+        const accountTokens = await indexerClient.getOwnedTokens(alice.address().hex());
         const tokenOwnersData = await indexerClient.getTokenOwnersData(
-          accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
+          accountTokens.current_token_ownerships_v2[0].current_token_data!.token_data_id,
           0,
         );
-        expect(tokenOwnersData.current_token_ownerships[0].owner_address).toEqual(alice.address().hex());
+        expect(tokenOwnersData.current_token_ownerships_v2[0].owner_address).toEqual(alice.address().hex());
       },
       longTestTimeout,
     );
 
     it(
-      "gets top user transactions",
+      "gets token current owner data",
       async () => {
-        const topUserTransactions = await indexerClient.getTopUserTransactions(5);
-        expect(topUserTransactions.user_transactions.length).toEqual(5);
+        const accountTokens = await indexerClient.getOwnedTokens(alice.address().hex());
+        const tokenOwnersData = await indexerClient.getTokenCurrentOwnerData(
+          accountTokens.current_token_ownerships_v2[0].current_token_data!.token_data_id,
+          0,
+        );
+        expect(tokenOwnersData.current_token_ownerships_v2[0].owner_address).toEqual(alice.address().hex());
       },
       longTestTimeout,
     );
 
-    it(
-      "gets user transactions",
-      async () => {
-        const userTransactions = await indexerClient.getUserTransactions(482294669, { limit: 4 });
-        expect(userTransactions.user_transactions[0].version).toEqual(482294669);
-        expect(userTransactions.user_transactions.length).toEqual(4);
-      },
-      longTestTimeout,
-    );
-
-    it(
-      "gets number of delegators",
-      async () => {
-        const numberOfDelegators = await indexerClient.getNumberOfDelegators(alice.address().hex());
-        expect(numberOfDelegators.num_active_delegator_per_pool).toHaveLength(0);
-      },
-      longTestTimeout,
-    );
-
-    it("gets indexer ledger info", async () => {
-      const ledgerInfo = await indexerClient.getIndexerLedgerInfo();
-      expect(ledgerInfo.ledger_infos[0].chain_id).toBeGreaterThan(1);
-    });
-
-    it("gets account current tokens", async () => {
+    it("gets account owned tokens", async () => {
       const tokens = await indexerClient.getOwnedTokens(alice.address().hex());
-      expect(tokens.current_token_ownerships_v2).toHaveLength(2);
+      expect(tokens.current_token_ownerships_v2.length).toEqual(2);
     });
 
-    it("gets account current tokens from a specified token standard", async () => {
-      const tokens = await indexerClient.getOwnedTokens(alice.address().hex(), { tokenStandard: "v2" });
+    it("gets account owned tokens by token data id", async () => {
+      const accountTokens = await indexerClient.getOwnedTokens(alice.address().hex());
+
+      const tokens = await indexerClient.getOwnedTokensByTokenData(
+        accountTokens.current_token_ownerships_v2[0].current_token_data!.token_data_id,
+      );
       expect(tokens.current_token_ownerships_v2).toHaveLength(1);
+      expect(tokens.current_token_ownerships_v2[0].owner_address).toEqual(alice.address().hex());
     });
 
-    it("gets the collection data", async () => {
-      const collectionData = await indexerClient.getCollectionData(alice.address().hex(), collectionName);
-      expect(collectionData.current_collections_v2).toHaveLength(1);
-      expect(collectionData.current_collections_v2[0].collection_name).toEqual(collectionName);
-    });
-
-    it("gets the currect collection address", async () => {
-      const collectionData = await indexerClient.getCollectionData(alice.address().hex(), collectionNameV2);
+    it("gets account tokens owned from collection address", async () => {
       const collectionAddress = await indexerClient.getCollectionAddress(alice.address().hex(), collectionNameV2);
-      expect(collectionData.current_collections_v2[0].collection_id).toEqual(collectionAddress);
+      const tokensFromCollectionAddress = await indexerClient.getTokenOwnedFromCollectionAddress(
+        alice.address().hex(),
+        collectionAddress,
+      );
+      expect(tokensFromCollectionAddress.current_token_ownerships_v2[0].current_token_data!.token_name).toEqual(
+        tokenName,
+      );
     });
 
     it(
-      "gets account current tokens of a specific collection by the collection address with token standard specified",
+      "gets account current tokens by collection name and creator address",
       async () => {
         const tokens = await indexerClient.getTokenOwnedFromCollectionNameAndCreatorAddress(
           alice.address().hex(),
           collectionNameV2,
           alice.address().hex(),
-          {
-            tokenStandard: "v2",
-          },
         );
         expect(tokens.current_token_ownerships_v2).toHaveLength(1);
-        expect(tokens.current_token_ownerships_v2[0].token_standard).toEqual("v2");
+        expect(tokens.current_token_ownerships_v2[0].current_token_data?.token_name).toEqual(tokenName);
       },
       longTestTimeout,
     );
@@ -290,11 +286,104 @@ describe("Indexer", () => {
       longTestTimeout,
     );
 
+    it("gets the collection data", async () => {
+      const collectionData = await indexerClient.getCollectionData(alice.address().hex(), collectionName);
+      expect(collectionData.current_collections_v2).toHaveLength(1);
+      expect(collectionData.current_collections_v2[0].collection_name).toEqual(collectionName);
+    });
+
+    it("gets the currect collection address", async () => {
+      const collectionData = await indexerClient.getCollectionData(alice.address().hex(), collectionNameV2);
+      const collectionAddress = await indexerClient.getCollectionAddress(alice.address().hex(), collectionNameV2);
+      expect(collectionData.current_collections_v2[0].collection_id).toEqual(collectionAddress);
+    });
+
     it(
       "queries for all collections that an account has tokens for",
       async () => {
         const collections = await indexerClient.getCollectionsWithOwnedTokens(alice.address().hex());
         expect(collections.current_collection_ownership_v2_view.length).toEqual(2);
+      },
+      longTestTimeout,
+    );
+
+    // TRANSACTIONS //
+    it(
+      "gets account transactions count",
+      async () => {
+        const accountTransactionsCount = await indexerClient.getAccountTransactionsCount(alice.address().hex());
+        expect(accountTransactionsCount.account_transactions_aggregate.aggregate?.count).toEqual(5);
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets account transactions data",
+      async () => {
+        const accountTransactionsData = await indexerClient.getAccountTransactionsData(alice.address().hex());
+        expect(accountTransactionsData.account_transactions.length).toEqual(5);
+        expect(accountTransactionsData.account_transactions[0]).toHaveProperty("transaction_version");
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets top user transactions",
+      async () => {
+        const topUserTransactions = await indexerClient.getTopUserTransactions(5);
+        expect(topUserTransactions.user_transactions.length).toEqual(5);
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets user transactions",
+      async () => {
+        const userTransactions = await indexerClient.getUserTransactions({ options: { limit: 4 } });
+        expect(userTransactions.user_transactions.length).toEqual(4);
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets number of delegators",
+      async () => {
+        const numberOfDelegators = await indexerClient.getNumberOfDelegators(alice.address().hex());
+        expect(numberOfDelegators.num_active_delegator_per_pool).toHaveLength(0);
+      },
+      longTestTimeout,
+    );
+    // ACCOUNT //
+
+    it(
+      "gets account coin data",
+      async () => {
+        const accountCoinData = await indexerClient.getAccountCoinsData(alice.address().hex());
+        expect(accountCoinData.current_coin_balances[0].coin_type).toEqual("0x1::aptos_coin::AptosCoin");
+      },
+      longTestTimeout,
+    );
+
+    // TOKEN STANDARD FILTER //
+
+    it("gets account owned tokens with a specified token standard", async () => {
+      const tokens = await indexerClient.getOwnedTokens(alice.address().hex(), { tokenStandard: "v2" });
+      expect(tokens.current_token_ownerships_v2).toHaveLength(1);
+    });
+
+    it(
+      "gets account current tokens of a specific collection by the collection address with token standard specified",
+      async () => {
+        const tokens = await indexerClient.getTokenOwnedFromCollectionNameAndCreatorAddress(
+          alice.address().hex(),
+          collectionNameV2,
+          alice.address().hex(),
+          {
+            tokenStandard: "v2",
+          },
+        );
+        expect(tokens.current_token_ownerships_v2).toHaveLength(1);
+        expect(tokens.current_token_ownerships_v2[0].token_standard).toEqual("v2");
       },
       longTestTimeout,
     );
@@ -306,6 +395,51 @@ describe("Indexer", () => {
           tokenStandard: "v2",
         });
         expect(collections.current_collection_ownership_v2_view.length).toEqual(1);
+      },
+      longTestTimeout,
+    );
+
+    // ORDER BY //
+
+    it("gets account owned tokens sorted desc by token standard", async () => {
+      const tokens = await indexerClient.getOwnedTokens(alice.address().hex(), {
+        orderBy: [{ token_standard: "desc" }],
+      });
+      expect(tokens.current_token_ownerships_v2).toHaveLength(2);
+      expect(tokens.current_token_ownerships_v2[0].token_standard).toEqual("v2");
+    });
+
+    it("gets account owned tokens sorted desc by collection name", async () => {
+      const tokens = await indexerClient.getOwnedTokens(alice.address().hex(), {
+        orderBy: [{ current_token_data: { current_collection: { collection_name: "desc" } } }],
+      });
+      expect(tokens.current_token_ownerships_v2).toHaveLength(2);
+      expect(tokens.current_token_ownerships_v2[0].token_standard).toEqual("v2");
+    });
+
+    it("gets token activities sorted desc by collection name", async () => {
+      const accountTokens = await indexerClient.getOwnedTokens(alice.address().hex());
+      expect(accountTokens.current_token_ownerships_v2).toHaveLength(2);
+      expect(accountTokens.current_token_ownerships_v2[0].token_standard).toEqual("v1");
+
+      const tokens = await indexerClient.getTokenActivities(
+        accountTokens.current_token_ownerships_v2[0].current_token_data!.token_data_id,
+        {
+          orderBy: [{ transaction_version: "desc" }],
+        },
+      );
+      expect(tokens.token_activities_v2).toHaveLength(2);
+      expect(tokens.token_activities_v2[0].token_standard).toEqual("v1");
+    });
+
+    it(
+      "gets account transactions data",
+      async () => {
+        const accountTransactionsData = await indexerClient.getAccountTransactionsData(alice.address().hex(), {
+          orderBy: [{ transaction_version: "desc" }],
+        });
+        expect(accountTransactionsData.account_transactions.length).toEqual(5);
+        expect(accountTransactionsData.account_transactions[0]).toHaveProperty("transaction_version");
       },
       longTestTimeout,
     );

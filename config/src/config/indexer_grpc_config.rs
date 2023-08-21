@@ -8,10 +8,10 @@ use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 
 // Useful indexer defaults
-pub const DEFAULT_ADDRESS: &str = "0.0.0.0:50051";
-pub const DEFAULT_OUTPUT_BATCH_SIZE: u16 = 100;
-pub const DEFAULT_PROCESSOR_BATCH_SIZE: u16 = 1000;
-pub const DEFAULT_PROCESSOR_TASK_COUNT: u16 = 20;
+const DEFAULT_ADDRESS: &str = "0.0.0.0:50051";
+const DEFAULT_OUTPUT_BATCH_SIZE: u16 = 100;
+const DEFAULT_PROCESSOR_BATCH_SIZE: u16 = 1000;
+const DEFAULT_PROCESSOR_TASK_COUNT: u16 = 20;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]

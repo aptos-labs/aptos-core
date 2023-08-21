@@ -570,6 +570,8 @@ mod tests {
     #[test]
     fn test_network_api() {
         let runtime = consensus_runtime();
+        let _entered_runtime = runtime.enter();
+
         let num_nodes = 5;
         let mut receivers: Vec<NetworkReceivers> = Vec::new();
         let mut playground = NetworkPlayground::new(runtime.handle().clone());
@@ -617,7 +619,7 @@ mod tests {
                 validator_verifier.clone(),
             );
 
-            let network_events = NetworkEvents::new(consensus_rx, conn_status_rx);
+            let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None);
             let network_service_events =
                 NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
             let (task, receiver) = NetworkTask::new(network_service_events, self_receiver);
@@ -680,6 +682,8 @@ mod tests {
     #[test]
     fn test_rpc() {
         let runtime = consensus_runtime();
+        let _entered_runtime = runtime.enter();
+
         let num_nodes = 2;
         let mut senders = Vec::new();
         let mut receivers: Vec<NetworkReceivers> = Vec::new();
@@ -728,7 +732,7 @@ mod tests {
                 validator_verifier.clone(),
             );
 
-            let network_events = NetworkEvents::new(consensus_rx, conn_status_rx);
+            let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None);
             let network_service_events =
                 NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
             let (task, receiver) = NetworkTask::new(network_service_events, self_receiver);
@@ -793,11 +797,14 @@ mod tests {
 
     #[test]
     fn test_bad_message() {
+        let runtime = consensus_runtime();
+        let _entered_runtime = runtime.enter();
+
         let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) =
             aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_notifs_tx, connection_notifs_rx) =
             aptos_channel::new(QueueStyle::FIFO, 8, None);
-        let network_events = NetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
+        let network_events = NetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx, None);
         let network_service_events =
             NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
         let (self_sender, self_receiver) = aptos_channels::new_test(8);

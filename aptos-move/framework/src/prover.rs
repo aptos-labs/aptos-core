@@ -8,7 +8,11 @@ use codespan_reporting::{
 };
 use log::LevelFilter;
 use move_core_types::account_address::AccountAddress;
-use std::{collections::BTreeMap, path::Path, time::Instant};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+    time::Instant,
+};
 use tempfile::TempDir;
 
 #[derive(Debug, Clone, clap::Parser, serde::Serialize, serde::Deserialize)]
@@ -48,9 +52,19 @@ pub struct ProverOptions {
     #[clap(long, default_value_t = 40)]
     pub vc_timeout: usize,
 
+    /// Whether to disable global timeout overwrite
+    /// With this flag set to true, the value set by "--vc-timeout" will be used globally
+    #[clap(long, default_value_t = false)]
+    pub disallow_global_timeout_to_be_overwritten: bool,
+
     /// Whether to check consistency of specs by injecting impossible assertions.
     #[clap(long)]
     pub check_inconsistency: bool,
+
+    /// Whether to treat abort as inconsistency when checking consistency.
+    /// Need to work together with check-inconsistency
+    #[clap(long)]
+    pub unconditional_abort_as_inconsistency: bool,
 
     /// Whether to keep loops as they are and pass them on to the underlying solver.
     #[clap(long)]
@@ -84,7 +98,9 @@ impl Default for ProverOptions {
             random_seed: 0,
             proc_cores: 4,
             vc_timeout: 40,
+            disallow_global_timeout_to_be_overwritten: false,
             check_inconsistency: false,
+            unconditional_abort_as_inconsistency: false,
             keep_loops: false,
             loop_unroll: None,
             stable_test_output: false,
@@ -98,17 +114,23 @@ impl ProverOptions {
     /// Runs the move prover on the package.
     pub fn prove(
         self,
+        dev_mode: bool,
         package_path: &Path,
         named_addresses: BTreeMap<String, AccountAddress>,
         bytecode_version: Option<u32>,
+        skip_attribute_checks: bool,
+        known_attributes: &BTreeSet<String>,
     ) -> anyhow::Result<()> {
         let now = Instant::now();
         let for_test = self.for_test;
         let model = build_model(
+            dev_mode,
             package_path,
             named_addresses,
             self.filter.clone(),
             bytecode_version,
+            skip_attribute_checks,
+            known_attributes.clone(),
         )?;
         let mut options = self.convert_options();
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test
@@ -165,6 +187,7 @@ impl ProverOptions {
                 dump_bytecode: self.dump,
                 dump_cfg: false,
                 check_inconsistency: self.check_inconsistency,
+                unconditional_abort_as_inconsistency: self.unconditional_abort_as_inconsistency,
                 skip_loop_analysis: self.keep_loops,
                 ..Default::default()
             },
@@ -175,6 +198,7 @@ impl ProverOptions {
                 stratification_depth: self.stratification_depth,
                 proc_cores: self.proc_cores,
                 vc_timeout: self.vc_timeout,
+                global_timeout_overwrite: !self.disallow_global_timeout_to_be_overwritten,
                 keep_artifacts: self.dump,
                 stable_test_output: self.stable_test_output,
                 z3_trace_file: if self.dump {

@@ -1,15 +1,16 @@
 /// This module implements the knight token (non-fungible token) including the
 /// functions create the collection and the knight tokens, and the function to feed a
 /// knight token with food tokens to increase the knight's health point.
-module token_objects::knight {
-    use std::option;
-    use std::string::{Self, String};
+module knight::knight {
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object};
     use aptos_token_objects::collection;
     use aptos_token_objects::property_map;
     use aptos_token_objects::token;
-    use token_objects::food::{Self, FoodToken};
+    use std::option;
+    use std::signer;
+    use std::string::{Self, String};
+    use knight::food::{Self, FoodToken};
 
     /// The token does not exist
     const ETOKEN_DOES_NOT_EXIST: u64 = 1;
@@ -80,26 +81,7 @@ module token_objects::knight {
     #[view]
     /// Returns the knight token address by name
     public fun knight_token_address(knight_token_name: String): address {
-        token::create_token_address(&@token_objects, &string::utf8(KNIGHT_COLLECTION_NAME), &knight_token_name)
-    }
-
-    /// Creates the knight collection. This function creates a collection with unlimited supply using
-    /// the module constants for description, name, and URI, defined above. The royalty configuration
-    /// is skipped in this collection for simplicity.
-    fun create_knight_collection(creator: &signer) {
-        // Constructs the strings from the bytes.
-        let description = string::utf8(KNIGHT_COLLECTION_DESCRIPTION);
-        let name = string::utf8(KNIGHT_COLLECTION_NAME);
-        let uri = string::utf8(KNIGHT_COLLECTION_URI);
-
-        // Creates the collection with unlimited supply and without establishing any royalty configuration.
-        collection::create_unlimited_collection(
-            creator,
-            description,
-            name,
-            option::none(),
-            uri,
-        );
+        token::create_token_address(&@knight, &string::utf8(KNIGHT_COLLECTION_NAME), &knight_token_name)
     }
 
     /// Mints an knight token. This function mints a new knight token and transfers it to the
@@ -134,8 +116,10 @@ module token_objects::knight {
         let property_mutator_ref = property_map::generate_mutator_ref(&constructor_ref);
 
         // Transfers the token to the `soul_bound_to` address
-        let linear_transfer_ref = object::generate_linear_transfer_ref(&transfer_ref);
-        object::transfer_with_ref(linear_transfer_ref, receiver);
+        if (receiver != signer::address_of(creator)) {
+            let linear_transfer_ref = object::generate_linear_transfer_ref(&transfer_ref);
+            object::transfer_with_ref(linear_transfer_ref, receiver);
+        };
 
         // Initializes the knight health point as 0
         move_to(&object_signer, HealthPoint { value: 1 });
@@ -176,12 +160,12 @@ module token_objects::knight {
         feed_food(from, meat_token, to, amount);
     }
 
-    public entry fun feed_food(from: &signer, food_token: Object<FoodToken>, to: Object<KnightToken>, amount: u64) acquires HealthPoint, KnightToken {
-        let knight_token_address = object::object_address(&to);
-        food::burn_food(from, food_token, amount);
+    public entry fun feed_food(from: &signer, food: Object<FoodToken>, to: Object<KnightToken>, amount: u64) acquires HealthPoint, KnightToken {
+        food::burn_food(from, food, amount);
 
-        let restoration_amount = food::restoration_value(food_token) * amount;
-        let health_point = borrow_global_mut<HealthPoint>(object::object_address(&to));
+        let restoration_amount = food::restoration_value(food) * amount;
+        let knight_token_address = object::object_address(&to);
+        let health_point = borrow_global_mut<HealthPoint>(knight_token_address);
         let old_health_point = health_point.value;
         let new_health_point = old_health_point + restoration_amount;
         health_point.value = new_health_point;
@@ -215,13 +199,29 @@ module token_objects::knight {
         token::set_uri(&knight.mutator_ref, uri);
     }
 
-    #[test_only]
-    use std::signer;
+    /// Creates the knight collection. This function creates a collection with unlimited supply using
+    /// the module constants for description, name, and URI, defined above. The royalty configuration
+    /// is skipped in this collection for simplicity.
+    fun create_knight_collection(creator: &signer) {
+        // Constructs the strings from the bytes.
+        let description = string::utf8(KNIGHT_COLLECTION_DESCRIPTION);
+        let name = string::utf8(KNIGHT_COLLECTION_NAME);
+        let uri = string::utf8(KNIGHT_COLLECTION_URI);
 
-    #[test(creator = @token_objects, user1 = @0x456)]
+        // Creates the collection with unlimited supply and without establishing any royalty configuration.
+        collection::create_unlimited_collection(
+            creator,
+            description,
+            name,
+            option::none(),
+            uri,
+        );
+    }
+
+    #[test(creator = @knight, user1 = @0x456)]
     public fun test_knight(creator: &signer, user1: &signer) acquires HealthPoint, KnightToken {
-        // This test assumes that the creator's address is equal to @token_objects.
-        assert!(signer::address_of(creator) == @token_objects, 0);
+        // This test assumes that the creator's address is equal to @knight.
+        assert!(signer::address_of(creator) == @knight, 0);
 
         // ---------------------------------------------------------------------
         // Creator creates the collection, and mints corn and meat tokens in it.

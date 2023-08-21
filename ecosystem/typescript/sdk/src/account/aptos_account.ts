@@ -4,6 +4,7 @@
 import nacl from "tweetnacl";
 import * as bip39 from "@scure/bip39";
 import { bytesToHex } from "@noble/hashes/utils";
+import { sha256 } from "@noble/hashes/sha256";
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import { derivePath } from "../utils/hd-key";
 import { HexString, MaybeHexString, Memoize } from "../utils";
@@ -36,7 +37,7 @@ export class AptosAccount {
   }
 
   /**
-   * Test derive path
+   * Check's if the derive path is valid
    */
   static isValidPath(path: string): boolean {
     return /^m\/44'\/637'\/[0-9]+'\/[0-9]+'\/[0-9]+'+$/.test(path);
@@ -111,7 +112,6 @@ export class AptosAccount {
    * @param seed The seed bytes
    * @returns The resource account address
    */
-
   static getResourceAccountAddress(sourceAddress: MaybeHexString, seed: Uint8Array): HexString {
     const source = bcsToBytes(AccountAddress.fromHex(sourceAddress));
 
@@ -120,6 +120,21 @@ export class AptosAccount {
     const hash = sha3Hash.create();
     hash.update(bytes);
 
+    return HexString.fromUint8Array(hash.digest());
+  }
+
+  /**
+   * Takes creator address and collection name and returns the collection id hash.
+   * Collection id hash are generated as sha256 hash of (`creator_address::collection_name`)
+   *
+   * @param creatorAddress Collection creator address
+   * @param collectionName The collection name
+   * @returns The collection id hash
+   */
+  static getCollectionID(creatorAddress: MaybeHexString, collectionName: string): HexString {
+    const seed = new TextEncoder().encode(`${creatorAddress}::${collectionName}`);
+    const hash = sha256.create();
+    hash.update(seed);
     return HexString.fromUint8Array(hash.digest());
   }
 

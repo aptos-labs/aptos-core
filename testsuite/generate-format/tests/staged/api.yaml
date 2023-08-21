@@ -234,8 +234,6 @@ StateValueMetadata:
     0:
       V0:
         STRUCT:
-          - payer:
-              TYPENAME: AccountAddress
           - deposit: U64
           - creation_time_usecs: U64
 StructTag:
@@ -330,6 +328,21 @@ TransactionAuthenticator:
           - secondary_signers:
               SEQ:
                 TYPENAME: AccountAuthenticator
+    3:
+      FeePayer:
+        STRUCT:
+          - sender:
+              TYPENAME: AccountAuthenticator
+          - secondary_signer_addresses:
+              SEQ:
+                TYPENAME: AccountAddress
+          - secondary_signers:
+              SEQ:
+                TYPENAME: AccountAuthenticator
+          - fee_payer_address:
+              TYPENAME: AccountAddress
+          - fee_payer_signer:
+              TYPENAME: AccountAuthenticator
 TransactionData:
   ENUM:
     0:

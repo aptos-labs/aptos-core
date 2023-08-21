@@ -1,19 +1,29 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    natives::helpers::{
-        make_module_natives, make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult,
-    },
-    safely_pop_arg,
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
-use aptos_gas_algebra_ext::{AbstractValueSize, InternalGasPerAbstractValueUnit};
-use aptos_types::on_chain_config::{Features, TimedFeatures};
-use move_core_types::gas_algebra::InternalGas;
+#[cfg(feature = "testing")]
+use move_binary_format::errors::PartialVMError;
+use move_core_types::account_address::AccountAddress;
+#[cfg(feature = "testing")]
+use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::native_functions::NativeFunction;
+#[cfg(feature = "testing")]
+use move_vm_types::values::{Reference, Struct, StructRef};
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use serde::Serialize;
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, sync::Arc};
+use std::collections::VecDeque;
+
+#[derive(Serialize)]
+pub struct GUID {
+    creation_num: u64,
+    addr: AccountAddress,
+}
 
 /***************************************************************************************************
  * native fun write_to_event_store
@@ -21,16 +31,8 @@ use std::{collections::VecDeque, sync::Arc};
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct WriteToEventStoreGasParameters {
-    pub base: InternalGas,
-    pub per_abstract_value_unit: InternalGasPerAbstractValueUnit,
-}
-
 #[inline]
 fn native_write_to_event_store(
-    gas_params: &WriteToEventStoreGasParameters,
-    calc_abstract_val_size: impl FnOnce(&Value) -> AbstractValueSize,
     context: &mut SafeNativeContext,
     mut ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -45,7 +47,8 @@ fn native_write_to_event_store(
 
     // TODO(Gas): Get rid of abstract memory size
     context.charge(
-        gas_params.base + gas_params.per_abstract_value_unit * calc_abstract_val_size(&msg),
+        EVENT_WRITE_TO_EVENT_STORE_BASE
+            + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg),
     )?;
 
     if !context.save_event(guid, seq_num, ty, msg)? {
@@ -55,43 +58,61 @@ fn native_write_to_event_store(
     Ok(smallvec![])
 }
 
-pub fn make_native_write_to_event_store(
-    calc_abstract_val_size: impl Fn(&Value) -> AbstractValueSize + Send + Sync + 'static,
-) -> impl Fn(
-    &WriteToEventStoreGasParameters,
-    &mut SafeNativeContext,
-    Vec<Type>,
-    VecDeque<Value>,
+#[cfg(feature = "testing")]
+fn native_emitted_events_by_handle(
+    context: &mut SafeNativeContext,
+    mut ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    move |gas_params, context, ty_args, args| -> SafeNativeResult<SmallVec<[Value; 1]>> {
-        native_write_to_event_store(gas_params, &calc_abstract_val_size, context, ty_args, args)
-    }
+    debug_assert!(ty_args.len() == 1);
+    debug_assert!(arguments.len() == 1);
+
+    let ty = ty_args.pop().unwrap();
+    let mut guid = safely_pop_arg!(arguments, StructRef)
+        .borrow_field(1)?
+        .value_as::<StructRef>()?
+        .borrow_field(0)?
+        .value_as::<Reference>()?
+        .read_ref()?
+        .value_as::<Struct>()?
+        .unpack()?;
+
+    let creation_num = guid
+        .next()
+        .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?
+        .value_as::<u64>()?;
+    let addr = guid
+        .next()
+        .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?
+        .value_as::<AccountAddress>()?;
+    let guid = GUID { creation_num, addr };
+    let events = context.emitted_events(
+        bcs::to_bytes(&guid)
+            .map_err(|_| PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR))?,
+        ty,
+    )?;
+    Ok(smallvec![Value::vector_for_testing_only(events)])
 }
 
 /***************************************************************************************************
  * module
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub write_to_event_store: WriteToEventStoreGasParameters,
-}
-
 pub fn make_all(
-    gas_params: GasParameters,
-    calc_abstract_val_size: impl Fn(&Value) -> AbstractValueSize + Send + Sync + 'static,
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [(
-        "write_to_event_store",
-        make_safe_native(
-            gas_params.write_to_event_store,
-            timed_features,
-            features,
-            make_native_write_to_event_store(calc_abstract_val_size),
-        ),
-    )];
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
+    let mut natives = vec![];
 
-    make_module_natives(natives)
+    #[cfg(feature = "testing")]
+    natives.extend([(
+        "emitted_events_by_handle",
+        native_emitted_events_by_handle as RawSafeNative,
+    )]);
+
+    natives.extend([(
+        "write_to_event_store",
+        native_write_to_event_store as RawSafeNative,
+    )]);
+
+    builder.make_named_natives(natives)
 }

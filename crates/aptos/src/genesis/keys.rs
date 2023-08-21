@@ -37,7 +37,7 @@ const VFN_FILE: &str = "validator-full-node-identity.yaml";
 #[derive(Parser)]
 pub struct GenerateKeys {
     /// Output directory for the key files
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) output_dir: Option<PathBuf>,
 
     #[clap(flatten)]
@@ -139,15 +139,15 @@ pub struct SetValidatorConfiguration {
     pub(crate) join_during_genesis: bool,
 
     /// Path to private identity generated from GenerateKeys
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) owner_public_identity_file: Option<PathBuf>,
 
     /// Path to operator public identity, defaults to owner identity
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) operator_public_identity_file: Option<PathBuf>,
 
     /// Path to voter public identity, defaults to owner identity
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) voter_public_identity_file: Option<PathBuf>,
 
     #[clap(flatten)]
@@ -273,7 +273,7 @@ pub fn read_public_identity_file(public_identity_file: &Path) -> CliTypedResult<
 #[derive(Parser)]
 pub struct GenerateLayoutTemplate {
     /// Path of the output layout template
-    #[clap(long, parse(from_os_str), default_value = LAYOUT_FILE)]
+    #[clap(long, value_parser, default_value = LAYOUT_FILE)]
     pub(crate) output_file: PathBuf,
 
     #[clap(flatten)]
@@ -304,11 +304,11 @@ impl CliCommand<()> for GenerateLayoutTemplate {
 #[derive(Parser)]
 pub struct GenerateAdminWriteSet {
     /// Path of the output genesis file
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) output_file: PathBuf,
 
     /// Address of the account which execute this script.
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) execute_as: AccountAddress,
 
     #[clap(flatten)]

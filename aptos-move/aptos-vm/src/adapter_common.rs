@@ -25,7 +25,6 @@ pub(crate) trait VMAdapter {
         &self,
         remote: &'r impl MoveResolverExt,
         session_id: SessionId,
-        aggregator_enabled: bool,
     ) -> SessionExt<'r, '_>;
 
     /// Checks the signature of the given signed transaction and returns
@@ -80,7 +79,7 @@ pub(crate) trait VMAdapter {
 /// Transactions after signature checking:
 /// Waypoints and BlockPrologues are not signed and are unaffected by signature checking,
 /// but a user transaction or writeset transaction is transformed to a SignatureCheckedTransaction.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum PreprocessedTransaction {
     UserTransaction(Box<SignatureCheckedTransaction>),
     WaypointWriteSet(WriteSetPayload),

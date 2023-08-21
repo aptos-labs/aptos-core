@@ -6,7 +6,9 @@ use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::TStateView;
 use aptos_types::{
+    contract_event::ReadWriteEvent,
     executable::ModulePath,
+    fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
 use std::{fmt::Debug, hash::Hash};
@@ -26,9 +28,10 @@ pub enum ExecutionStatus<T, E> {
 
 /// Trait that defines a transaction type that can be executed by the block executor. A transaction
 /// transaction will write to a key value storage as their side effect.
-pub trait Transaction: Sync + Send + 'static {
+pub trait Transaction: Sync + Send + Clone + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
-    type Value: Send + Sync + TransactionWrite;
+    type Value: Send + Sync + Clone + TransactionWrite;
+    type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }
 
 /// Inference result of a transaction.
@@ -79,8 +82,11 @@ pub trait TransactionOutput: Send + Sync + Debug {
         <Self::Txn as Transaction>::Value,
     )>;
 
-    /// Get the deltas of a transaction from its output.
+    /// Get the aggregator deltas of a transaction from its output.
     fn get_deltas(&self) -> Vec<(<Self::Txn as Transaction>::Key, DeltaOp)>;
+
+    /// Get the events of a transaction from its output.
+    fn get_events(&self) -> Vec<<Self::Txn as Transaction>::Event>;
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
@@ -93,6 +99,6 @@ pub trait TransactionOutput: Send + Sync + Debug {
         delta_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
     );
 
-    /// Return the amount of gas consumed by the transaction.
-    fn gas_used(&self) -> u64;
+    /// Return the fee statement of the transaction.
+    fn fee_statement(&self) -> FeeStatement;
 }

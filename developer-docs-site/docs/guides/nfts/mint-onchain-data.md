@@ -9,14 +9,14 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 You, as a developer, maybe also a game fancier, recently starts to develop a game and hope to
 integrate it with some web3 experience. You spontaneously think Aptos supports fungible tokens
 with abundant APIs in the token standard. So you wanna give a try to issue an in-game currency
-called *silver coin* by using the [Aptos command line interface (CLI)](../../tools/install-cli/index.md). There is only two requirements:
+called *silver coin* by using the [Aptos command line interface (CLI)](../../tools/aptos-cli/install-cli/index.md). There is only two requirements:
 - The token is fungible
 - The token is associated with a URL that points to the coin image.
 
 ## Create a collection
 Token must belong to a collection. First, you can create a collection by running Aptos CLI:
 ```bash
-aptos move run --function-id 0x3::token::create_collection_script --args string:"Game Coins" string:"The collection of all in-game coins" string:"" u64:0 vector\<bool\>:false,false,false
+aptos move run --function-id 0x3::token::create_collection_script --args string:"Game Coins" string:"The collection of all in-game coins" string:"" u64:0 'bool:[false,false,false]'
 ```
 Parameters:
 - collection name: "Game Coins".
@@ -35,7 +35,7 @@ All the parameters could be adjusted as appropriate.
 The fungible token in Aptos has an unique `TokenId`, a set of creator, collection name, token name and property version.
 For fungible tokens, the property version is always 0. To create a token named "Silver Coin", you run:
 ```bash
-aptos move run --function-id 0x3::token::create_token_script --args string:"Game Coins" string:"Silver Coin" string:"The currency in my game" u64:100 u64:0 string:$TOKEN_URL address:$YOUR_ADDRESS u64:0 u64:0 vector\<bool\>:false,false,false,false,false raw:00 raw:00 raw:00
+aptos move run --function-id 0x3::token::create_token_script --args string:"Game Coins" string:"Silver Coin" string:"The currency in my game" u64:100 u64:0 string:$TOKEN_URL address:$YOUR_ADDRESS u64:0 u64:0 'bool:[false,false,false,false,false]' raw:00 raw:00 raw:00
 ```
 Parameters:
 - collection name: "Game Coins", same as the previous step.

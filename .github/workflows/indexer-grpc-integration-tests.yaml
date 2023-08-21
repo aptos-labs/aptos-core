@@ -1,19 +1,36 @@
 name: "Indexer gRPC Integration Tests"
 on:
-  pull_request:
+  pull_request_target:
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write  # Required for GCP Workload Identity federation which we use to login into Google Artifact Registry
 
 # cancel redundant builds
 concurrency:
-  # cancel redundant builds on PRs (only on PR, not on branches)
-  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
+  # for push events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
+  # for pull_request events newer jobs cancel earlier jobs to save on CI etc.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'push' && github.sha || github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  permission-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check repository permission for user which triggered workflow
+        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
+        with:
+          required-permission: write
+          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
+
   run-tests-local-testnet:
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
+    needs: [permission-check]
     runs-on: high-perf-docker
-    permissions:
-      contents: read
-      id-token: write
     env:
       # spin up the local testnet using the latest devnet image
       VALIDATOR_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/validator

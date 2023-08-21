@@ -4,18 +4,23 @@
 
 use super::*;
 use crate::{
+    jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     new_sharded_kv_schema_batch,
     state_restore::StateSnapshotRestore,
     test_helper::{arb_state_kv_sets, update_store},
     AptosDB,
 };
-use aptos_jellyfish_merkle::TreeReader;
+use aptos_jellyfish_merkle::{
+    node_type::{Node, NodeKey},
+    TreeReader,
+};
 use aptos_storage_interface::{
     jmt_update_refs, jmt_updates, DbReader, DbWriter, StateSnapshotReceiver,
 };
 use aptos_temppath::TempPath;
 use aptos_types::{
-    access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKeyTag,
+    access_path::AccessPath, account_address::AccountAddress, nibble::nibble_path::NibblePath,
+    state_store::state_key::StateKeyTag,
 };
 use proptest::{collection::hash_map, prelude::*};
 use std::collections::HashMap;
@@ -37,10 +42,11 @@ fn put_value_set(
     let jmt_updates = jmt_updates(&value_set);
 
     let root = state_store
-        .merklize_value_set(jmt_update_refs(&jmt_updates), None, version, base_version)
+        .merklize_value_set(jmt_update_refs(&jmt_updates), version, base_version)
         .unwrap();
     let ledger_batch = SchemaBatch::new();
     let sharded_state_kv_batches = new_sharded_kv_schema_batch();
+    let state_kv_metadata_batch = SchemaBatch::new();
     state_store
         .put_value_sets(
             vec![&sharded_value_set],
@@ -49,6 +55,9 @@ fn put_value_set(
             None,
             &ledger_batch,
             &sharded_state_kv_batches,
+            &state_kv_metadata_batch,
+            /*put_state_value_indices=*/ false,
+            /*skip_usage=*/ false,
         )
         .unwrap();
     state_store
@@ -58,7 +67,7 @@ fn put_value_set(
         .unwrap();
     state_store
         .state_kv_db
-        .commit(version, sharded_state_kv_batches)
+        .commit(version, state_kv_metadata_batch, sharded_state_kv_batches)
         .unwrap();
     root
 }
@@ -287,7 +296,46 @@ pub fn test_get_state_snapshot_before() {
     assert_eq!(store.get_state_snapshot_before(3).unwrap(), Some((2, hash)));
     assert_eq!(store.get_state_snapshot_before(2).unwrap(), Some((0, hash)));
     assert_eq!(store.get_state_snapshot_before(1).unwrap(), Some((0, hash)));
-    assert_eq!(store.get_state_snapshot_before(0).unwrap(), None,);
+    assert_eq!(store.get_state_snapshot_before(0).unwrap(), None);
+
+    // Only consider a version as available when the root node is there.
+    // Here we are adding another non-root node, and removing the root node, to verify if there is
+    // a node at version X but the root node at version X doesn't exist, we shouldn't return
+    // version X.
+    let batch = SchemaBatch::new();
+    batch
+        .put::<JellyfishMerkleNodeSchema>(
+            &NodeKey::new(2, NibblePath::new_odd(vec![0])),
+            &Node::Null,
+        )
+        .unwrap();
+    db.state_merkle_db
+        .metadata_db()
+        .write_schemas(batch)
+        .unwrap();
+
+    assert_eq!(
+        db.state_merkle_db
+            .get_state_snapshot_version_before(4)
+            .unwrap(),
+        Some(2)
+    );
+
+    let batch = SchemaBatch::new();
+    batch
+        .delete::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(2))
+        .unwrap();
+    db.state_merkle_db
+        .metadata_db()
+        .write_schemas(batch)
+        .unwrap();
+
+    assert_eq!(
+        db.state_merkle_db
+            .get_state_snapshot_version_before(4)
+            .unwrap(),
+        Some(0)
+    );
 }
 
 proptest! {
@@ -444,7 +492,7 @@ proptest! {
             StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */ StateSnapshotRestoreMode::Default).unwrap();
 
         let dummy_state_key = StateKey::raw(vec![]);
-        let (top_levels_batch, sharded_batches, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], None, 0, None, None).unwrap();
+        let (top_levels_batch, sharded_batches, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], 0, None, None).unwrap();
         store2.state_merkle_db.commit(version, top_levels_batch, sharded_batches).unwrap();
         assert!(store2.state_merkle_db.get_rightmost_leaf(version).unwrap().is_none());
 

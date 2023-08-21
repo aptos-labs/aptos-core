@@ -28,7 +28,7 @@ impl Test for StateSyncFullnodePerformance {
 }
 
 impl NetworkTest for StateSyncFullnodePerformance {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let all_fullnodes = get_fullnodes_and_check_setup(ctx, self.name())?;
 
         // Emit a lot of traffic and ensure the fullnodes can all sync
@@ -54,7 +54,7 @@ impl Test for StateSyncFullnodeFastSyncPerformance {
 }
 
 impl NetworkTest for StateSyncFullnodeFastSyncPerformance {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let all_fullnodes = get_fullnodes_and_check_setup(ctx, self.name())?;
 
         // Emit a lot of traffic and ensure the fullnodes can all sync
@@ -130,7 +130,7 @@ impl Test for StateSyncValidatorPerformance {
 }
 
 impl NetworkTest for StateSyncValidatorPerformance {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         // Verify we have at least 7 validators (i.e., 3f+1, where f is 2)
         // so we can kill 2 validators but still make progress.
         let all_validators = ctx

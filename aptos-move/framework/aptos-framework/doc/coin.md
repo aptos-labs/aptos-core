@@ -29,6 +29,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `coin_address`](#0x1_coin_coin_address)
 -  [Function `balance`](#0x1_coin_balance)
 -  [Function `is_coin_initialized`](#0x1_coin_is_coin_initialized)
+-  [Function `is_coin_store_frozen`](#0x1_coin_is_coin_store_frozen)
 -  [Function `is_account_registered`](#0x1_coin_is_account_registered)
 -  [Function `name`](#0x1_coin_name)
 -  [Function `symbol`](#0x1_coin_symbol)
@@ -68,6 +69,7 @@ This module provides the foundation for typesafe Coins.
     -  [Function `coin_address`](#@Specification_1_coin_address)
     -  [Function `balance`](#@Specification_1_balance)
     -  [Function `is_coin_initialized`](#@Specification_1_is_coin_initialized)
+    -  [Function `is_account_registered`](#@Specification_1_is_account_registered)
     -  [Function `name`](#@Specification_1_name)
     -  [Function `symbol`](#@Specification_1_symbol)
     -  [Function `decimals`](#@Specification_1_decimals)
@@ -688,6 +690,7 @@ Publishes supply configuration. Initially, upgrading is not allowed.
 ## Function `allow_supply_upgrades`
 
 This should be called by on-chain governance to update the config and allow
+or disallow upgradability of total supply.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_allow_supply_upgrades">allow_supply_upgrades</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allowed: bool)
@@ -907,7 +910,8 @@ A helper function that returns the address of CoinType.
 Returns the balance of <code>owner</code> for provided <code>CoinType</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_balance">balance</a>&lt;CoinType&gt;(owner: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_balance">balance</a>&lt;CoinType&gt;(owner: <b>address</b>): u64
 </code></pre>
 
 
@@ -936,7 +940,8 @@ Returns the balance of <code>owner</code> for provided <code>CoinType</code>.
 Returns <code><b>true</b></code> if the type <code>CoinType</code> is an initialized coin.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_coin_initialized">is_coin_initialized</a>&lt;CoinType&gt;(): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_coin_initialized">is_coin_initialized</a>&lt;CoinType&gt;(): bool
 </code></pre>
 
 
@@ -954,6 +959,37 @@ Returns <code><b>true</b></code> if the type <code>CoinType</code> is an initial
 
 </details>
 
+<a name="0x1_coin_is_coin_store_frozen"></a>
+
+## Function `is_coin_store_frozen`
+
+Returns <code><b>true</b></code> is account_addr has frozen the CoinStore or if it's not registered at all
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_coin_store_frozen">is_coin_store_frozen</a>&lt;CoinType&gt;(account_addr: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_coin_store_frozen">is_coin_store_frozen</a>&lt;CoinType&gt;(account_addr: <b>address</b>): bool <b>acquires</b> <a href="coin.md#0x1_coin_CoinStore">CoinStore</a> {
+    <b>if</b>(!<a href="coin.md#0x1_coin_is_account_registered">is_account_registered</a>&lt;CoinType&gt;(account_addr)) {
+      <b>return</b> <b>true</b>
+    };
+
+    <b>let</b> coin_store = <b>borrow_global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
+    coin_store.frozen
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_coin_is_account_registered"></a>
 
 ## Function `is_account_registered`
@@ -961,7 +997,8 @@ Returns <code><b>true</b></code> if the type <code>CoinType</code> is an initial
 Returns <code><b>true</b></code> if <code>account_addr</code> is registered to receive <code>CoinType</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_account_registered">is_account_registered</a>&lt;CoinType&gt;(account_addr: <b>address</b>): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_account_registered">is_account_registered</a>&lt;CoinType&gt;(account_addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -986,7 +1023,8 @@ Returns <code><b>true</b></code> if <code>account_addr</code> is registered to r
 Returns the name of the coin.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_name">name</a>&lt;CoinType&gt;(): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_name">name</a>&lt;CoinType&gt;(): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -1011,7 +1049,8 @@ Returns the name of the coin.
 Returns the symbol of the coin, usually a shorter version of the name.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_symbol">symbol</a>&lt;CoinType&gt;(): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_symbol">symbol</a>&lt;CoinType&gt;(): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -1038,7 +1077,8 @@ For example, if <code>decimals</code> equals <code>2</code>, a balance of <code>
 be displayed to a user as <code>5.05</code> (<code>505 / 10 ** 2</code>).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_decimals">decimals</a>&lt;CoinType&gt;(): u8
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_decimals">decimals</a>&lt;CoinType&gt;(): u8
 </code></pre>
 
 
@@ -1063,7 +1103,8 @@ be displayed to a user as <code>5.05</code> (<code>505 / 10 ** 2</code>).
 Returns the amount of coin in existence.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt;(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt;(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;
 </code></pre>
 
 
@@ -1313,7 +1354,8 @@ Extracts the entire amount from the passed-in <code><a href="coin.md#0x1_coin">c
 Freeze a CoinStore to prevent transfers
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_freeze_coin_store">freeze_coin_store</a>&lt;CoinType&gt;(account_addr: <b>address</b>, _freeze_cap: &<a href="coin.md#0x1_coin_FreezeCapability">coin::FreezeCapability</a>&lt;CoinType&gt;)
+<pre><code>#[legacy_entry_fun]
+<b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_freeze_coin_store">freeze_coin_store</a>&lt;CoinType&gt;(account_addr: <b>address</b>, _freeze_cap: &<a href="coin.md#0x1_coin_FreezeCapability">coin::FreezeCapability</a>&lt;CoinType&gt;)
 </code></pre>
 
 
@@ -1342,7 +1384,8 @@ Freeze a CoinStore to prevent transfers
 Unfreeze a CoinStore to allow transfers
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_unfreeze_coin_store">unfreeze_coin_store</a>&lt;CoinType&gt;(account_addr: <b>address</b>, _freeze_cap: &<a href="coin.md#0x1_coin_FreezeCapability">coin::FreezeCapability</a>&lt;CoinType&gt;)
+<pre><code>#[legacy_entry_fun]
+<b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_unfreeze_coin_store">unfreeze_coin_store</a>&lt;CoinType&gt;(account_addr: <b>address</b>, _freeze_cap: &<a href="coin.md#0x1_coin_FreezeCapability">coin::FreezeCapability</a>&lt;CoinType&gt;)
 </code></pre>
 
 
@@ -2113,7 +2156,8 @@ Get address by reflection.
 ### Function `balance`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_balance">balance</a>&lt;CoinType&gt;(owner: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_balance">balance</a>&lt;CoinType&gt;(owner: <b>address</b>): u64
 </code></pre>
 
 
@@ -2130,13 +2174,31 @@ Get address by reflection.
 ### Function `is_coin_initialized`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_coin_initialized">is_coin_initialized</a>&lt;CoinType&gt;(): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_coin_initialized">is_coin_initialized</a>&lt;CoinType&gt;(): bool
 </code></pre>
 
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_is_account_registered"></a>
+
+### Function `is_account_registered`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_account_registered">is_account_registered</a>&lt;CoinType&gt;(account_addr: <b>address</b>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -2188,7 +2250,8 @@ Get address by reflection.
 ### Function `name`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_name">name</a>&lt;CoinType&gt;(): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_name">name</a>&lt;CoinType&gt;(): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -2204,7 +2267,8 @@ Get address by reflection.
 ### Function `symbol`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_symbol">symbol</a>&lt;CoinType&gt;(): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_symbol">symbol</a>&lt;CoinType&gt;(): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -2220,7 +2284,8 @@ Get address by reflection.
 ### Function `decimals`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_decimals">decimals</a>&lt;CoinType&gt;(): u8
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_decimals">decimals</a>&lt;CoinType&gt;(): u8
 </code></pre>
 
 
@@ -2236,7 +2301,8 @@ Get address by reflection.
 ### Function `supply`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt;(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt;(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;
 </code></pre>
 
 
@@ -2326,6 +2392,7 @@ Get address by reflection.
 
 
 <pre><code><b>modifies</b> <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(account_addr);
+<b>include</b> <a href="coin.md#0x1_coin_DepositAbortsIf">DepositAbortsIf</a>&lt;CoinType&gt;;
 <b>ensures</b> <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr).<a href="coin.md#0x1_coin">coin</a>.value == <b>old</b>(<b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr)).<a href="coin.md#0x1_coin">coin</a>.value + <a href="coin.md#0x1_coin">coin</a>.value;
 </code></pre>
 
@@ -2403,7 +2470,8 @@ The value of <code>zero_coin</code> must be 0.
 ### Function `freeze_coin_store`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_freeze_coin_store">freeze_coin_store</a>&lt;CoinType&gt;(account_addr: <b>address</b>, _freeze_cap: &<a href="coin.md#0x1_coin_FreezeCapability">coin::FreezeCapability</a>&lt;CoinType&gt;)
+<pre><code>#[legacy_entry_fun]
+<b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_freeze_coin_store">freeze_coin_store</a>&lt;CoinType&gt;(account_addr: <b>address</b>, _freeze_cap: &<a href="coin.md#0x1_coin_FreezeCapability">coin::FreezeCapability</a>&lt;CoinType&gt;)
 </code></pre>
 
 
@@ -2423,7 +2491,8 @@ The value of <code>zero_coin</code> must be 0.
 ### Function `unfreeze_coin_store`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_unfreeze_coin_store">unfreeze_coin_store</a>&lt;CoinType&gt;(account_addr: <b>address</b>, _freeze_cap: &<a href="coin.md#0x1_coin_FreezeCapability">coin::FreezeCapability</a>&lt;CoinType&gt;)
+<pre><code>#[legacy_entry_fun]
+<b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_unfreeze_coin_store">unfreeze_coin_store</a>&lt;CoinType&gt;(account_addr: <b>address</b>, _freeze_cap: &<a href="coin.md#0x1_coin_FreezeCapability">coin::FreezeCapability</a>&lt;CoinType&gt;)
 </code></pre>
 
 
@@ -2710,4 +2779,4 @@ Account is not frozen and sufficient balance.
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

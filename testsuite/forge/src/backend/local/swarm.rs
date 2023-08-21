@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    interface::system_metrics::SystemMetricsThreshold, ChainInfo, FullNode, HealthCheckError,
-    LocalNode, LocalVersion, Node, Swarm, SwarmChaos, SwarmExt, Validator, Version,
+    ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, Swarm, SwarmChaos,
+    SwarmExt, Validator, Version,
 };
 use anyhow::{anyhow, bail, Result};
 use aptos::common::types::EncodingType;
@@ -24,7 +24,7 @@ use aptos_sdk::{
         PeerId,
     },
 };
-use prometheus_http_query::response::PromqlResult;
+use prometheus_http_query::response::{PromqlResult, Sample};
 use std::{
     collections::HashMap,
     fs,
@@ -512,15 +512,23 @@ impl Swarm for LocalSwarm {
     }
 
     fn full_nodes<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn FullNode> + 'a> {
-        Box::new(self.fullnodes.values().map(|v| v as &'a dyn FullNode))
+        let mut full_nodes: Vec<_> = self
+            .fullnodes
+            .values()
+            .map(|v| v as &'a dyn FullNode)
+            .collect();
+        full_nodes.sort_by_key(|n| n.index());
+        Box::new(full_nodes.into_iter())
     }
 
     fn full_nodes_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut dyn FullNode> + 'a> {
-        Box::new(
-            self.fullnodes
-                .values_mut()
-                .map(|v| v as &'a mut dyn FullNode),
-        )
+        let mut full_nodes: Vec<_> = self
+            .fullnodes
+            .values_mut()
+            .map(|v| v as &'a mut dyn FullNode)
+            .collect();
+        full_nodes.sort_by_key(|n| n.index());
+        Box::new(full_nodes.into_iter())
     }
 
     fn full_node(&self, id: PeerId) -> Option<&dyn FullNode> {
@@ -620,12 +628,13 @@ impl Swarm for LocalSwarm {
         todo!()
     }
 
-    async fn ensure_healthy_system_metrics(
-        &mut self,
+    async fn query_range_metrics(
+        &self,
+        _query: &str,
         _start_time: i64,
         _end_time: i64,
-        _threshold: SystemMetricsThreshold,
-    ) -> Result<()> {
+        _timeout: Option<i64>,
+    ) -> Result<Vec<Sample>> {
         todo!()
     }
 

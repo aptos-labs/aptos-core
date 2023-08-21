@@ -21,8 +21,8 @@ pub struct FundWithFaucet {
     /// Address to fund
     ///
     /// If the account wasn't previously created, it will be created when being funded
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
-    pub(crate) account: AccountAddress,
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
+    pub(crate) account: Option<AccountAddress>,
 
     /// Number of Octas to fund the account from the faucet
     ///
@@ -46,17 +46,22 @@ impl CliCommand<String> for FundWithFaucet {
     }
 
     async fn execute(self) -> CliTypedResult<String> {
+        let address = if let Some(account) = self.account {
+            account
+        } else {
+            self.profile_options.account_address()?
+        };
         let hashes = fund_account(
             self.faucet_options.faucet_url(&self.profile_options)?,
             self.amount,
-            self.account,
+            address,
         )
         .await?;
         let client = self.rest_options.client(&self.profile_options)?;
         wait_for_transactions(&client, hashes).await?;
         return Ok(format!(
             "Added {} Octas to account {}",
-            self.amount, self.account
+            self.amount, address
         ));
     }
 }

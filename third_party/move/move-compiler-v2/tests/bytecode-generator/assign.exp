@@ -1,0 +1,71 @@
+// ---- Model Dump
+module 0x42::assign {
+    struct T {
+        h: u64,
+    }
+    struct S {
+        f: u64,
+        g: assign::T,
+    }
+    private fun assign_field(s: &mut assign::S,f: u64) {
+        select assign::S.f(s) = f;
+        Tuple()
+    }
+    private fun assign_int(x: &mut u64) {
+        x = 42;
+        Tuple()
+    }
+    private fun assign_pattern(s: assign::S,f: u64,h: u64) {
+        assign::S{ f: f: u64, g: assign::T{ h: h: u64 } } = s;
+        Add(f, h)
+    }
+    private fun assign_struct(s: &mut assign::S) {
+        s = pack assign::S(42, pack assign::T(42));
+        Tuple()
+    }
+} // end 0x42::assign
+
+============ initial bytecode ================
+
+[variant baseline]
+fun assign::assign_field($t0: &mut assign::S, $t1: u64) {
+     var $t2: &mut u64
+  0: $t2 := borrow_field<assign::S>.f($t0)
+  1: write_ref($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun assign::assign_int($t0: &mut u64) {
+     var $t1: u64
+  0: $t1 := 42
+  1: write_ref($t0, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun assign::assign_pattern($t0: assign::S, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: assign::T
+  0: ($t1, $t4) := unpack assign::S($t0)
+  1: $t2 := unpack assign::T($t4)
+  2: $t3 := +($t1, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+fun assign::assign_struct($t0: &mut assign::S) {
+     var $t1: assign::S
+     var $t2: u64
+     var $t3: assign::T
+     var $t4: u64
+  0: $t2 := 42
+  1: $t4 := 42
+  2: $t3 := pack assign::T($t4)
+  3: $t1 := pack assign::S($t2, $t3)
+  4: write_ref($t0, $t1)
+  5: return ()
+}

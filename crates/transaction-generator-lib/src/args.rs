@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{EntryPoints, TransactionType};
-use clap::{ArgEnum, Parser};
+use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
 /// Utility class for specifying transaction type with predefined configurations through CLI
-#[derive(Debug, Copy, Clone, ArgEnum, Deserialize, Parser, Serialize)]
+#[derive(Debug, Copy, Clone, ValueEnum, Default, Deserialize, Parser, Serialize)]
 pub enum TransactionTypeArg {
     NoOp,
     NoOp2Signers,
     NoOp5Signers,
+    #[default]
     CoinTransfer,
     CoinTransferWithInvalid,
     NonConflictingCoinTransfer,
@@ -29,12 +30,6 @@ pub enum TransactionTypeArg {
     TokenV1FTMintAndStore,
     TokenV1FTMintAndTransfer,
     TokenV2AmbassadorMint,
-}
-
-impl Default for TransactionTypeArg {
-    fn default() -> Self {
-        TransactionTypeArg::CoinTransfer
-    }
 }
 
 impl TransactionTypeArg {
@@ -163,5 +158,61 @@ impl TransactionTypeArg {
                 use_account_pool: sender_use_account_pool,
             },
         }
+    }
+
+    pub fn args_to_transaction_mix_per_phase(
+        transaction_types: &[TransactionTypeArg],
+        transaction_weights: &[usize],
+        transaction_phases: &[usize],
+        module_working_set_size: usize,
+        sender_use_account_pool: bool,
+    ) -> Vec<Vec<(TransactionType, usize)>> {
+        let arg_transaction_types = transaction_types
+            .iter()
+            .map(|t| t.materialize(module_working_set_size, sender_use_account_pool))
+            .collect::<Vec<_>>();
+
+        let arg_transaction_weights = if transaction_weights.is_empty() {
+            vec![1; arg_transaction_types.len()]
+        } else {
+            assert_eq!(
+                transaction_weights.len(),
+                arg_transaction_types.len(),
+                "Transaction types and weights need to be the same length"
+            );
+            transaction_weights.to_vec()
+        };
+        let arg_transaction_phases = if transaction_phases.is_empty() {
+            vec![0; arg_transaction_types.len()]
+        } else {
+            assert_eq!(
+                transaction_phases.len(),
+                arg_transaction_types.len(),
+                "Transaction types and phases need to be the same length"
+            );
+            transaction_phases.to_vec()
+        };
+
+        let mut transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>> = Vec::new();
+        for (transaction_type, (weight, phase)) in arg_transaction_types.into_iter().zip(
+            arg_transaction_weights
+                .into_iter()
+                .zip(arg_transaction_phases.into_iter()),
+        ) {
+            assert!(
+                phase <= transaction_mix_per_phase.len(),
+                "cannot skip phases ({})",
+                transaction_mix_per_phase.len()
+            );
+            if phase == transaction_mix_per_phase.len() {
+                transaction_mix_per_phase.push(Vec::new());
+            }
+            transaction_mix_per_phase
+                .get_mut(phase)
+                .unwrap()
+                .push((transaction_type, weight));
+        }
+
+        transaction_mix_per_phase
     }
 }

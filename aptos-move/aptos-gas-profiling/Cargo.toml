@@ -15,11 +15,14 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 inferno = { workspace = true }
 regex = { workspace = true }
+smallvec = { workspace = true }
 
 aptos-framework = { workspace = true }
-aptos-gas = { workspace = true }
+aptos-gas-algebra = { workspace = true }
+aptos-gas-meter = { workspace = true }
 aptos-package-builder = { workspace = true }
 aptos-types = { workspace = true }
+aptos-vm-types = { workspace = true }
 
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }

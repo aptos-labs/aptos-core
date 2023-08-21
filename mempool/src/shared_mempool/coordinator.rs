@@ -24,15 +24,18 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::{MempoolCommitNotification, MempoolNotificationListener};
 use aptos_network::{
-    application::interface::{NetworkClientInterface, NetworkServiceEvents},
+    application::{
+        interface::{NetworkClientInterface, NetworkServiceEvents},
+        storage::PeersAndMetadata,
+    },
     protocols::network::Event,
 };
-use aptos_types::on_chain_config::OnChainConfigPayload;
+use aptos_types::on_chain_config::{OnChainConfigPayload, OnChainConfigProvider};
 use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{
     channel::mpsc,
     stream::{select_all, FuturesUnordered},
-    StreamExt,
+    FutureExt, StreamExt,
 };
 use std::{
     sync::Arc,
@@ -42,17 +45,20 @@ use tokio::{runtime::Handle, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 
 /// Coordinator that handles inbound network events and outbound txn broadcasts.
-pub(crate) async fn coordinator<NetworkClient, TransactionValidator>(
+pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvider>(
     mut smp: SharedMempool<NetworkClient, TransactionValidator>,
     executor: Handle,
     network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
     mut client_events: MempoolEventsReceiver,
     mut quorum_store_requests: mpsc::Receiver<QuorumStoreRequest>,
     mut mempool_listener: MempoolNotificationListener,
-    mut mempool_reconfig_events: ReconfigNotificationListener,
+    mut mempool_reconfig_events: ReconfigNotificationListener<ConfigProvider>,
+    peer_update_interval_ms: u64,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
     TransactionValidator: TransactionValidation + 'static,
+    ConfigProvider: OnChainConfigProvider,
 {
     info!(LogSchema::event_log(
         LogEntry::CoordinatorRuntime,
@@ -67,6 +73,8 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator>(
         .collect();
     let mut events = select_all(network_events).fuse();
     let mut scheduled_broadcasts = FuturesUnordered::new();
+    let mut update_peers_interval =
+        tokio::time::interval(Duration::from_millis(peer_update_interval_ms));
 
     // Use a BoundedExecutor to restrict only `workers_available` concurrent
     // worker tasks that can process incoming transactions.
@@ -103,7 +111,10 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator>(
                 tasks::execute_broadcast(peer, backoff, &mut smp, &mut scheduled_broadcasts, executor.clone()).await;
             },
             (network_id, event) = events.select_next_some() => {
-                handle_network_event(&executor, &bounded_executor, &mut scheduled_broadcasts, &mut smp, network_id, event).await;
+                handle_network_event(&bounded_executor, &mut smp, network_id, event).await;
+            },
+            _ = update_peers_interval.tick().fuse() => {
+                handle_update_peers(peers_and_metadata.clone(), &mut smp, &mut scheduled_broadcasts, executor.clone()).await;
             },
             complete => break,
         }
@@ -217,13 +228,14 @@ fn handle_commit_notification<NetworkClient, TransactionValidator>(
 }
 
 /// Spawn a task to restart the transaction validator with the new reconfig data.
-async fn handle_mempool_reconfig_event<NetworkClient, TransactionValidator>(
+async fn handle_mempool_reconfig_event<NetworkClient, TransactionValidator, ConfigProvider>(
     smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     bounded_executor: &BoundedExecutor,
-    config_update: OnChainConfigPayload,
+    config_update: OnChainConfigPayload<ConfigProvider>,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
     TransactionValidator: TransactionValidation + 'static,
+    ConfigProvider: OnChainConfigProvider,
 {
     info!(LogSchema::event_log(
         LogEntry::ReconfigUpdate,
@@ -247,9 +259,7 @@ async fn handle_mempool_reconfig_event<NetworkClient, TransactionValidator>(
 /// - Network messages follow a simple Request/Response framework to accept new transactions
 /// TODO: Move to RPC off of DirectSend
 async fn handle_network_event<NetworkClient, TransactionValidator>(
-    executor: &Handle,
     bounded_executor: &BoundedExecutor,
-    scheduled_broadcasts: &mut FuturesUnordered<ScheduledBroadcast>,
     smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     network_id: NetworkId,
     event: Event<MempoolSyncMsg>,
@@ -258,33 +268,11 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
     TransactionValidator: TransactionValidation + 'static,
 {
     match event {
-        Event::NewPeer(metadata) => {
-            counters::shared_mempool_event_inc("new_peer");
-            let peer = PeerNetworkId::new(network_id, metadata.remote_peer_id);
-            let is_new_peer = smp.network_interface.add_peer(peer, metadata.clone());
-            let is_upstream_peer = smp
-                .network_interface
-                .is_upstream_peer(&peer, Some(&metadata));
-            debug!(LogSchema::new(LogEntry::NewPeer)
-                .peer(&peer)
-                .is_upstream_peer(is_upstream_peer));
-            notify_subscribers(SharedMempoolNotification::PeerStateChange, &smp.subscribers);
-            if is_new_peer && is_upstream_peer {
-                tasks::execute_broadcast(peer, false, smp, scheduled_broadcasts, executor.clone())
-                    .await;
-            }
+        Event::NewPeer(_) => {
+            // TODO: remove Event
         },
-        Event::LostPeer(metadata) => {
-            counters::shared_mempool_event_inc("lost_peer");
-            let peer = PeerNetworkId::new(network_id, metadata.remote_peer_id);
-            debug!(LogSchema::new(LogEntry::LostPeer)
-                .peer(&peer)
-                .is_upstream_peer(
-                    smp.network_interface
-                        .is_upstream_peer(&peer, Some(&metadata))
-                ));
-            smp.network_interface.disable_peer(peer);
-            notify_subscribers(SharedMempoolNotification::PeerStateChange, &smp.subscribers);
+        Event::LostPeer(_) => {
+            // TODO: remove Event
         },
         Event::Message(peer_id, msg) => {
             counters::shared_mempool_event_inc("message");
@@ -350,6 +338,32 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                     .peer(&PeerNetworkId::new(network_id, peer_id)))
             );
         },
+    }
+}
+
+async fn handle_update_peers<NetworkClient, TransactionValidator>(
+    peers_and_metadata: Arc<PeersAndMetadata>,
+    smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
+    scheduled_broadcasts: &mut FuturesUnordered<ScheduledBroadcast>,
+    executor: Handle,
+) where
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
+    TransactionValidator: TransactionValidation + 'static,
+{
+    if let Ok(connected_peers) = peers_and_metadata.get_connected_peers_and_metadata() {
+        let (newly_added_upstream, disabled) = smp.network_interface.update_peers(&connected_peers);
+        if !newly_added_upstream.is_empty() || !disabled.is_empty() {
+            counters::shared_mempool_event_inc("peer_update");
+            notify_subscribers(SharedMempoolNotification::PeerStateChange, &smp.subscribers);
+        }
+        for peer in &newly_added_upstream {
+            debug!(LogSchema::new(LogEntry::NewPeer).peer(peer));
+            tasks::execute_broadcast(*peer, false, smp, scheduled_broadcasts, executor.clone())
+                .await;
+        }
+        for peer in &disabled {
+            debug!(LogSchema::new(LogEntry::LostPeer).peer(peer));
+        }
     }
 }
 

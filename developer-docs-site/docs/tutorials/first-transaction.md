@@ -56,7 +56,7 @@ git clone https://github.com/aptos-labs/aptos-core.git
   Install the necessary dependencies:
   ```bash
   curl -sSL https://install.python-poetry.org | python3
-  poetry update
+  poetry install
   ```
 
   Run the [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer-coin.py) example:
@@ -346,7 +346,7 @@ Breaking the above down into pieces:
 
 Behind the scenes the Python SDK generates, signs, and submits a transaction:
 ```python
-:!: static/sdks/python/aptos_sdk/client.py bcs_transfer
+:!: static/sdks/python/aptos_sdk/async_client.py bcs_transfer
 ```
 
 Breaking the above down into pieces:

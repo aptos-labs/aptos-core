@@ -176,6 +176,26 @@ module std::vector {
         pragma intrinsic = true;
     }
 
+    /// Return `(true, i)` if there's an element that matches the predicate. If there are multiple elements that match
+    /// the predicate, only the index of the first one is returned.
+    /// Otherwise, returns `(false, 0)`.
+    public inline fun find<Element>(v: &vector<Element>, f: |&Element|bool): (bool, u64) {
+        let find = false;
+        let found_index = 0;
+        let i = 0;
+        let len = length(v);
+        while (i < len) {
+            // Cannot call return in an inline function so we need to resort to break here.
+            if (f(borrow(v, i))) {
+                find = true;
+                found_index = i;
+                break
+            };
+            i = i + 1;
+        };
+        (find, found_index)
+    }
+
     /// Insert a new element at position 0 <= i <= length, using O(length - i) time.
     /// Aborts if out of bounds.
     public fun insert<Element>(v: &mut vector<Element>, i: u64, e: Element) {

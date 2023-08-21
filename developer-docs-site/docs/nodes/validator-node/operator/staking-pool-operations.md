@@ -33,7 +33,7 @@ The below CLI command examples use mainnet. Change the `--network` value for tes
 
 ## Perform pool owner operations
 
-This document describes how to [use the Aptos CLI](../../../tools/aptos-cli-tool/use-aptos-cli.md) to perform owner operations during validation.
+This document describes how to [use the Aptos CLI](../../../tools/aptos-cli/use-cli/use-aptos-cli.md) to perform owner operations during validation.
 
 ### Owner operations with CLI
 

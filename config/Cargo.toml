@@ -28,6 +28,7 @@ cfg-if = { workspace = true }
 cfg_block = { workspace = true }
 get_if_addrs = { workspace = true }
 mirai-annotations = { workspace = true }
+num_cpus = { workspace = true }
 poem-openapi = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
@@ -42,6 +43,8 @@ aptos-types = { workspace = true, features = ["fuzzing"] }
 
 [features]
 default = []
+failpoints = []
 fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]
 network-perf-test = []
 testing = []
+tokio-console = []

@@ -8,7 +8,7 @@ use clap::*;
 use move_command_line_common::files::verify_and_create_named_address_mapping;
 use move_compiler::{
     command_line::{self as cli},
-    shared::{self, Flags, NumericalAddress},
+    shared::{self, known_attributes::KnownAttribute, Flags, NumericalAddress},
 };
 
 #[derive(Debug, Parser)]
@@ -22,9 +22,7 @@ pub struct Options {
     /// The source files to check
     #[clap(
         name = "PATH_TO_SOURCE_FILE",
-        takes_value(true),
-        multiple_values(true),
-        multiple_occurrences(true)
+        num_args = 0..
     )]
     pub source_files: Vec<String>,
 
@@ -50,7 +48,7 @@ pub struct Options {
         name = "NAMED_ADDRESSES",
         short = 'a',
         long = "addresses",
-        parse(try_from_str = shared::parse_named_address)
+        value_parser = shared::parse_named_address
     )]
     pub named_addresses: Vec<(String, NumericalAddress)>,
 
@@ -67,9 +65,21 @@ pub fn main() -> anyhow::Result<()> {
         named_addresses,
     } = Options::parse();
     let named_addr_map = verify_and_create_named_address_mapping(named_addresses)?;
-    let _files = move_compiler::Compiler::from_files(source_files, dependencies, named_addr_map)
-        .set_interface_files_dir_opt(out_dir)
-        .set_flags(flags)
-        .check_and_report()?;
+
+    let _files = move_compiler::Compiler::from_files(
+        source_files,
+        dependencies,
+        named_addr_map,
+        flags,
+        KnownAttribute::get_all_attribute_names(),
+    )
+    .set_interface_files_dir_opt(out_dir)
+    .check_and_report()?;
     Ok(())
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Options::command().debug_assert()
 }

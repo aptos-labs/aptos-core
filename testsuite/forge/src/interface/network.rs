@@ -4,6 +4,7 @@
 
 use super::Test;
 use crate::{
+    prometheus_metrics::LatencyBreakdown,
     success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
     CoreContext, Result, Swarm, TestReport,
 };
@@ -16,7 +17,7 @@ use tokio::runtime::Runtime;
 /// nodes which comprise the network.
 pub trait NetworkTest: Test {
     /// Executes the test against the given context.
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()>;
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()>;
 }
 
 pub struct NetworkContext<'t> {
@@ -61,6 +62,7 @@ impl<'t> NetworkContext<'t> {
         &mut self,
         stats: &TxnStats,
         window: Duration,
+        latency_breakdown: &LatencyBreakdown,
         start_time: i64,
         end_time: i64,
         start_version: u64,
@@ -73,6 +75,7 @@ impl<'t> NetworkContext<'t> {
                 self.report,
                 stats,
                 window,
+                latency_breakdown,
                 start_time,
                 end_time,
                 start_version,

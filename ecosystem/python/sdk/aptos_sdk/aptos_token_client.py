@@ -27,7 +27,7 @@ class Object:
     def parse(resource: dict[str, Any]) -> Object:
         return Object(
             resource["allow_ungated_transfer"],
-            AccountAddress.from_hex(resource["owner"]),
+            AccountAddress.from_str(resource["owner"]),
         )
 
     def __str__(self) -> str:
@@ -54,7 +54,7 @@ class Collection:
     @staticmethod
     def parse(resource: dict[str, Any]) -> Collection:
         return Collection(
-            AccountAddress.from_hex(resource["creator"]),
+            AccountAddress.from_str(resource["creator"]),
             resource["description"],
             resource["name"],
             resource["uri"],
@@ -81,7 +81,7 @@ class Royalty:
         return Royalty(
             resource["numerator"],
             resource["denominator"],
-            AccountAddress.from_hex(resource["payee_address"]),
+            AccountAddress.from_str(resource["payee_address"]),
         )
 
 
@@ -114,7 +114,7 @@ class Token:
     @staticmethod
     def parse(resource: dict[str, Any]):
         return Token(
-            AccountAddress.from_hex(resource["collection"]["inner"]),
+            AccountAddress.from_str(resource["collection"]["inner"]),
             int(resource["index"]),
             resource["description"],
             resource["name"],
@@ -314,7 +314,7 @@ class ReadObject:
 
     def __str__(self) -> str:
         response = "ReadObject"
-        for (resource_obj, value) in self.resources.items():
+        for resource_obj, value in self.resources.items():
             response += f"\n\t{resource_obj.struct_tag}: {value}"
 
         return response
@@ -338,6 +338,7 @@ class AptosTokenClient:
                 resources[resource_obj] = resource_obj.parse(resource["data"])
         return ReadObject(resources)
 
+    @staticmethod
     def create_collection_payload(
         description: str,
         max_supply: int,
@@ -382,6 +383,7 @@ class AptosTokenClient:
 
         return TransactionPayload(payload)
 
+    # :!:>create_collection
     async def create_collection(
         self,
         creator: Account,
@@ -400,8 +402,8 @@ class AptosTokenClient:
         tokens_freezable_by_creator: bool,
         royalty_numerator: int,
         royalty_denominator: int,
-    ) -> str:
-        payload = create_collection_payload(
+    ) -> str:  # <:!:create_collection
+        payload = AptosTokenClient.create_collection_payload(
             description,
             max_supply,
             name,
@@ -423,6 +425,7 @@ class AptosTokenClient:
         )
         return await self.client.submit_bcs_transaction(signed_transaction)
 
+    @staticmethod
     def mint_token_payload(
         collection: str,
         description: str,
@@ -456,6 +459,7 @@ class AptosTokenClient:
 
         return TransactionPayload(payload)
 
+    # :!:>mint_token
     async def mint_token(
         self,
         creator: Account,
@@ -464,8 +468,10 @@ class AptosTokenClient:
         name: str,
         uri: str,
         properties: PropertyMap,
-    ) -> str:
-        payload = mint_token_payload(collection, description, name, uri, properties)
+    ) -> str:  # <:!:mint_token
+        payload = AptosTokenClient.mint_token_payload(
+            collection, description, name, uri, properties
+        )
         signed_transaction = await self.client.create_bcs_signed_transaction(
             creator, payload
         )
@@ -510,6 +516,12 @@ class AptosTokenClient:
             creator, TransactionPayload(payload)
         )
         return await self.client.submit_bcs_transaction(signed_transaction)
+
+    # :!:>transfer_token
+    async def transfer_token(
+        self, owner: Account, token: AccountAddress, to: AccountAddress
+    ) -> str:
+        return await self.client.transfer_object(owner, token, to)  # <:!:transfer_token
 
     async def burn_token(self, creator: Account, token: AccountAddress) -> str:
         payload = EntryFunction.natural(
@@ -605,3 +617,14 @@ class AptosTokenClient:
             creator, TransactionPayload(payload)
         )
         return await self.client.submit_bcs_transaction(signed_transaction)
+
+    async def tokens_minted_from_transaction(
+        self, txn_hash: str
+    ) -> List[AccountAddress]:
+        output = await self.client.transaction_by_hash(txn_hash)
+        mints = []
+        for event in output["events"]:
+            if event["type"] != "0x4::collection::MintEvent":
+                continue
+            mints.append(AccountAddress.from_str(event["data"]["token"]))
+        return mints

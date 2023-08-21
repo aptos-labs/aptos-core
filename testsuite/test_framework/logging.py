@@ -12,7 +12,7 @@ def init_logging(
     level: int = logging.INFO,
     print_metadata: bool = True,
 ) -> None:
-    """Initialize logging."""
+    """Initialize logging for an application"""
     logger.setLevel(level)
     sh = logging.StreamHandler(sys.stderr)
     if print_metadata:

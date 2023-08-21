@@ -20,7 +20,7 @@ use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{
         AbstractMemorySize, GasQuantity, InternalGas, InternalGasPerAbstractMemoryUnit,
-        InternalGasUnit, NumArgs, NumBytes, ToUnit, ToUnitFractional,
+        InternalGasUnit, NumArgs, NumBytes, ToUnit,
     },
     language_storage::ModuleId,
     u256,
@@ -43,11 +43,6 @@ pub type Gas = GasQuantity<GasUnit>;
 
 impl ToUnit<InternalGasUnit> for GasUnit {
     const MULTIPLIER: u64 = 1000;
-}
-
-impl ToUnitFractional<GasUnit> for InternalGasUnit {
-    const DENOMINATOR: u64 = 1000;
-    const NOMINATOR: u64 = 1;
 }
 
 /// The size in bytes for a non-string or address constant on the stack

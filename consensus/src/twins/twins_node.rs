@@ -38,7 +38,8 @@ use aptos_network::{
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
-        ConsensusConfigV1, OnChainConfig, OnChainConfigPayload, OnChainConsensusConfig,
+        ConsensusConfigV1, InMemoryOnChainConfig, OnChainConfig, OnChainConfigPayload,
+        OnChainConsensusConfig,
         ProposerElectionType::{self, RoundProposer},
         ValidatorSet,
     },
@@ -73,6 +74,12 @@ impl SMRNode {
         storage: Arc<MockStorage>,
         twin_id: TwinId,
     ) -> Self {
+        // Create a runtime for the twin
+        let thread_name = format!("twin-{}", twin_id.id);
+        let runtime = aptos_runtimes::spawn_named_runtime(thread_name, None);
+        let _entered_runtime = runtime.enter();
+
+        // Setup the network and SMR node
         let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
@@ -89,7 +96,7 @@ impl SMRNode {
             playground.peer_protocols(),
         );
         let consensus_network_client = ConsensusNetworkClient::new(network_client);
-        let network_events = NetworkEvents::new(consensus_rx, conn_notifs_channel);
+        let network_events = NetworkEvents::new(consensus_rx, conn_notifs_channel, None);
         let network_service_events =
             NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
 
@@ -119,7 +126,7 @@ impl SMRNode {
             // Requires double serialization, check deserialize_into_config for more details
             bcs::to_bytes(&bcs::to_bytes(&consensus_config).unwrap()).unwrap(),
         );
-        let payload = OnChainConfigPayload::new(1, Arc::new(configs));
+        let payload = OnChainConfigPayload::new(1, InMemoryOnChainConfig::new(configs));
 
         reconfig_sender
             .push((), ReconfigNotification {
@@ -127,9 +134,6 @@ impl SMRNode {
                 on_chain_configs: payload,
             })
             .unwrap();
-
-        let thread_name = format!("twin-{}", twin_id.id,);
-        let runtime = aptos_runtimes::spawn_named_runtime(thread_name, None);
 
         let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 

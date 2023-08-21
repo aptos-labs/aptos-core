@@ -1,0 +1,25 @@
+// ---- Model Dump
+module 0x8675309::M {
+    private fun bar() {
+        break;
+        Tuple()
+    }
+    private fun baz(x: u64) {
+        if Ge(x, 5) {
+          break
+        } else {
+          Tuple()
+        };
+        0
+    }
+    private fun foo() {
+        loop {
+          if true {
+            break
+          } else {
+            break
+          }
+        };
+        break
+    }
+} // end 0x8675309::M

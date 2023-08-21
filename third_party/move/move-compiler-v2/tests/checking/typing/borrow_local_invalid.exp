@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: cannot borrow from a reference
+  ┌─ tests/checking/typing/borrow_local_invalid.move:3:9
+  │
+3 │         &r;
+  │         ^^
+
+error: cannot borrow from a reference
+  ┌─ tests/checking/typing/borrow_local_invalid.move:4:9
+  │
+4 │         &r_mut;
+  │         ^^^^^^
+
+error: cannot borrow from a reference
+  ┌─ tests/checking/typing/borrow_local_invalid.move:5:9
+  │
+5 │         &mut r;
+  │         ^^^^^^
+
+error: cannot borrow from a reference
+  ┌─ tests/checking/typing/borrow_local_invalid.move:6:9
+  │
+6 │         &mut r_mut;
+  │         ^^^^^^^^^^

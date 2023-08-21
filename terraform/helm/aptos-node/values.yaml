@@ -17,7 +17,7 @@ numFullnodeGroups: 1
 # -- Options for multicluster mode. This is *experimental only*.
 multicluster:
   enabled: false
-  targetClusters: ["cluster1", "cluster2", "cluster3"]
+  targetClusters: ["forge-multiregion-1", "forge-multiregion-2", "forge-multiregion-3"]
 
 # -- Specify validator and fullnode NodeConfigs via named ConfigMaps, rather than the generated ones from this chart.
 overrideNodeConfig: false

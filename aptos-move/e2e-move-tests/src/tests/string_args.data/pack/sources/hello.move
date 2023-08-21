@@ -115,6 +115,9 @@ module 0xCAFE::test {
         };
     }
 
+    entry fun nothing() {
+    }
+
     fun find_hello_in_msgs_of_msgs(msgs: &vector<vector<String>>) {
         let outer_len = vector::length(msgs);
         while (outer_len > 0) {

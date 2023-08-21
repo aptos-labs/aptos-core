@@ -14,9 +14,10 @@ pub use move_core_types::abi::{
 use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, move_resource::MoveStructType,
 };
+use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AnalyzedTransaction {
     transaction: Transaction,
     /// Set of storage locations that are read by the transaction - this doesn't include location
@@ -32,7 +33,7 @@ pub struct AnalyzedTransaction {
     hash: HashValue,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 // TODO(skedia): Evaluate if we need to cache the HashValue for efficiency reasons.
 pub enum StorageLocation {
     // A specific storage location denoted by an address and a struct tag.
@@ -42,6 +43,22 @@ pub enum StorageLocation {
     WildCardStruct(StructTag),
     // Storage location denoted by a table handle and any arbitrary item in the table.
     WildCardTable(TableHandle),
+}
+
+impl StorageLocation {
+    pub fn into_state_key(self) -> StateKey {
+        match self {
+            StorageLocation::Specific(state_key) => state_key,
+            _ => panic!("Cannot convert wildcard storage location to state key"),
+        }
+    }
+
+    pub fn state_key(&self) -> &StateKey {
+        match self {
+            StorageLocation::Specific(state_key) => state_key,
+            _ => panic!("Cannot convert wildcard storage location to state key"),
+        }
+    }
 }
 
 impl AnalyzedTransaction {
@@ -68,7 +85,7 @@ impl AnalyzedTransaction {
         AnalyzedTransaction::new(transaction, vec![], vec![])
     }
 
-    pub fn into_inner(self) -> Transaction {
+    pub fn into_txn(self) -> Transaction {
         self.transaction
     }
 

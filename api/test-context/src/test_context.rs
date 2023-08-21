@@ -93,6 +93,9 @@ pub fn new_test_context(
     node_config: NodeConfig,
     use_db_with_indexer: bool,
 ) -> TestContext {
+    // Speculative logging uses a global variable and when many instances use it together, they
+    // panic, so we disable this to run tests.
+    aptos_vm_logging::disable_speculative_logging();
     let tmp_dir = TempPath::new();
     tmp_dir.create_as_dir().unwrap();
 

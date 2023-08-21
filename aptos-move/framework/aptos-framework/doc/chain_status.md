@@ -114,7 +114,8 @@ Marks that genesis has finished.
 Helper function to determine if Aptos is in genesis state.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>(): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>(): bool
 </code></pre>
 
 
@@ -141,7 +142,8 @@ the same as <code>!<a href="chain_status.md#0x1_chain_status_is_genesis">is_gene
 Testing <code><a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>()</code> is more frequent than <code><a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>()</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>(): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>(): bool
 </code></pre>
 
 
@@ -279,4 +281,4 @@ Helper function to assert genesis state.
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

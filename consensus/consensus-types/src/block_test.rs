@@ -108,9 +108,6 @@ fn test_block_relation() {
         genesis_block.id()
     );
     assert_eq!(next_block.payload(), Some(&payload));
-
-    let cloned_block = next_block.clone();
-    assert_eq!(cloned_block.round(), next_block.round());
 }
 
 // Ensure that blocks that extend from the same QuorumCertificate but with different signatures

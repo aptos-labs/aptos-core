@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-///! This module provides reusable helpers in tests.
+//! This module provides reusable helpers in tests.
 use super::*;
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, schema::state_value::StateValueSchema,
@@ -60,13 +60,13 @@ pub(crate) fn update_store(
         root_hash = store
             .merklize_value_set(
                 jmt_update_refs(&jmt_updates),
-                None,
                 version,
                 version.checked_sub(1),
             )
             .unwrap();
         let ledger_batch = SchemaBatch::new();
         let sharded_state_kv_batches = new_sharded_kv_schema_batch();
+        let state_kv_metadata_batch = SchemaBatch::new();
         store
             .put_value_sets(
                 vec![&sharded_value_state_set],
@@ -75,6 +75,9 @@ pub(crate) fn update_store(
                 None,
                 &ledger_batch,
                 &sharded_state_kv_batches,
+                &state_kv_metadata_batch,
+                /*put_state_value_indices=*/ false,
+                /*skip_usage=*/ false,
             )
             .unwrap();
         store
@@ -84,7 +87,7 @@ pub(crate) fn update_store(
             .unwrap();
         store
             .state_kv_db
-            .commit(version, sharded_state_kv_batches)
+            .commit(version, state_kv_metadata_batch, sharded_state_kv_batches)
             .unwrap();
     }
     root_hash

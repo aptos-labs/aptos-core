@@ -1,0 +1,42 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct R {
+        dummy_field: bool,
+    }
+    private fun t0(a: &signer) {
+        {
+          let _ = exists<M::R>(0x0);
+          {
+            let () = MoveTo<M::R>(a, pack M::R(false));
+            {
+              let _ = BorrowGlobal(Immutable)<M::R>(0x0);
+              {
+                let _ = BorrowGlobal(Mutable)<M::R>(0x0);
+                {
+                  let M::R{ dummy_field: _ } = MoveFrom<M::R>(0x0);
+                  Tuple()
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun t1(a: &signer) {
+        {
+          let _ = exists<M::R>(0x0);
+          {
+            let () = MoveTo<M::R>(a, pack M::R(false));
+            {
+              let _ = BorrowGlobal(Immutable)<M::R>(0x0);
+              {
+                let _ = BorrowGlobal(Mutable)<M::R>(0x0);
+                {
+                  let M::R{ dummy_field: _ } = MoveFrom<M::R>(0x0);
+                  Tuple()
+                }
+              }
+            }
+          }
+        }
+    }
+} // end 0x8675309::M

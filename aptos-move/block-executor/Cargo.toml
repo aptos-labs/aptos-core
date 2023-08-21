@@ -24,10 +24,12 @@ aptos-types = { workspace = true }
 aptos-vm-logging = { workspace = true }
 arc-swap = { workspace = true }
 bcs = { workspace = true }
+claims = { workspace = true }
 criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
 move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
@@ -36,8 +38,8 @@ proptest-derive = { workspace = true, optional = true }
 rayon = { workspace = true }
 
 [dev-dependencies]
-claims = { workspace = true }
 criterion = { workspace = true }
+itertools = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }

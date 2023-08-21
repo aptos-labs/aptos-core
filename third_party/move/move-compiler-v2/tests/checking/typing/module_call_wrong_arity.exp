@@ -1,0 +1,85 @@
+
+Diagnostics:
+error: invalid call of `X::foo`: argument count mismatch (expected 0 but found 1)
+   ┌─ tests/checking/typing/module_call_wrong_arity.move:27:9
+   │
+27 │         X::foo(1);
+   │         ^^^^^^^^^
+
+error: invalid call of `X::foo`: argument count mismatch (expected 0 but found 2)
+   ┌─ tests/checking/typing/module_call_wrong_arity.move:28:9
+   │
+28 │         X::foo(1, 2);
+   │         ^^^^^^^^^^^^
+
+error: invalid call of `X::bar`: argument count mismatch (expected 1 but found 0)
+   ┌─ tests/checking/typing/module_call_wrong_arity.move:29:9
+   │
+29 │         X::bar();
+   │         ^^^^^^^^
+
+error: invalid call of `X::bar`: argument count mismatch (expected 1 but found 2)
+   ┌─ tests/checking/typing/module_call_wrong_arity.move:30:9
+   │
+30 │         X::bar(1, 2);
+   │         ^^^^^^^^^^^^
+
+error: invalid call of `X::baz`: argument count mismatch (expected 2 but found 0)
+   ┌─ tests/checking/typing/module_call_wrong_arity.move:31:9
+   │
+31 │         X::baz<u64, u64>();
+   │         ^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `X::baz`: argument count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/typing/module_call_wrong_arity.move:32:9
+   │
+32 │         X::baz<u64, u64>(1);
+   │         ^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `X::baz`: argument count mismatch (expected 2 but found 3)
+   ┌─ tests/checking/typing/module_call_wrong_arity.move:33:9
+   │
+33 │         X::baz(1, 2, 3);
+   │         ^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: argument count mismatch (expected 0 but found 1)
+   ┌─ tests/checking/typing/module_call_wrong_arity.move:37:9
+   │
+37 │         foo(1);
+   │         ^^^^^^
+
+error: invalid call of `M::foo`: argument count mismatch (expected 0 but found 2)
+   ┌─ tests/checking/typing/module_call_wrong_arity.move:38:9
+   │
+38 │         foo(1, 2);
+   │         ^^^^^^^^^
+
+error: invalid call of `M::bar`: argument count mismatch (expected 1 but found 0)
+   ┌─ tests/checking/typing/module_call_wrong_arity.move:39:9
+   │
+39 │         bar();
+   │         ^^^^^
+
+error: invalid call of `M::bar`: argument count mismatch (expected 1 but found 2)
+   ┌─ tests/checking/typing/module_call_wrong_arity.move:40:9
+   │
+40 │         bar(1, 2);
+   │         ^^^^^^^^^
+
+error: invalid call of `M::baz`: argument count mismatch (expected 2 but found 0)
+   ┌─ tests/checking/typing/module_call_wrong_arity.move:41:9
+   │
+41 │         baz<u64, u64>();
+   │         ^^^^^^^^^^^^^^^
+
+error: invalid call of `M::baz`: argument count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/typing/module_call_wrong_arity.move:42:9
+   │
+42 │         baz<u64, u64>(1);
+   │         ^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::baz`: argument count mismatch (expected 2 but found 3)
+   ┌─ tests/checking/typing/module_call_wrong_arity.move:43:9
+   │
+43 │         baz(1, 2, 3);
+   │         ^^^^^^^^^^^^

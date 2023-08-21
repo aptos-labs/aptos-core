@@ -1,0 +1,138 @@
+module 0xcafe.Exists {
+    struct S1 has key, drop { x1: u64 }
+    struct S2 has key, drop { x1: u64, x2: u64, x3: u64, x4: u64, x5: u64, x6: u64, x7: u64, x8: u64 }
+    struct S3 has key, drop { x1: u64, x2: u64, x3: u64, x4: u64, x5: u64, x6: u64, x7: u64, x8: u64, x9: u64, x10: u64, x11: u64, x12: u64, x13: u64, x14: u64, x15: u64, x16: u64, x17: u64, x18: u64, x19: u64, x20: u64, x21: u64, x22: u64, x23: u64, x24: u64, x25: u64, x26: u64, x27: u64, x28: u64, x29: u64, x30: u64, x31: u64, x32: u64}
+    struct S4 has key, drop { x1: u64, x2: u64, x3: u64, x4: u64, x5: u64, x6: u64, x7: u64, x8: u64, x9: u64, x10: u64, x11: u64, x12: u64, x13: u64, x14: u64, x15: u64, x16: u64, x17: u64, x18: u64, x19: u64, x20: u64, x21: u64, x22: u64, x23: u64, x24: u64, x25: u64, x26: u64, x27: u64, x28: u64, x29: u64, x30: u64, x31: u64, x32: u64, x33: u64, x34: u64, x35: u64, x36: u64, x37: u64, x38: u64, x39: u64, x40: u64, x41: u64, x42: u64, x43: u64, x44: u64, x45: u64, x46: u64, x47: u64, x48: u64, x49: u64, x50: u64, x51: u64, x52: u64, x53: u64, x54: u64, x55: u64, x56: u64, x57: u64, x58: u64, x59: u64, x60: u64, x61: u64, x62: u64, x63: u64, x64: u64 }
+
+    public calibrate_exists_s1_impl(n: u64) {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        _, _, _, _, _, _, _, _, _, _ = (exists<S1>(0xcafe), exists<S1>(0xcafe), exists<S1>(0xcafe), exists<S1>(0xcafe), exists<S1>(0xcafe), exists<S1>(0xcafe), exists<S1>(0xcafe), exists<S1>(0xcafe), exists<S1>(0xcafe), exists<S1>(0xcafe));
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_exists_s1_x100() {
+    label b0:
+        Self.calibrate_exists_s1_impl(10);
+        return;       
+    }
+
+    public entry calibrate_exists_s1_x1000() {
+    label b0:
+        Self.calibrate_exists_s1_impl(100);
+        return;       
+    } 
+
+    public entry calibrate_exists_s1_x5000() {
+    label b0:
+        Self.calibrate_exists_s1_impl(500);
+        return;       
+    }  
+
+    public calibrate_exists_s2_impl(n: u64) {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        _, _, _, _, _, _, _, _, _, _ = (exists<S2>(0xcafe), exists<S2>(0xcafe), exists<S2>(0xcafe), exists<S2>(0xcafe), exists<S2>(0xcafe), exists<S2>(0xcafe), exists<S2>(0xcafe), exists<S2>(0xcafe), exists<S2>(0xcafe), exists<S2>(0xcafe));
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_exists_s2_x100() {
+    label b0:
+        Self.calibrate_exists_s2_impl(10);
+        return;       
+    }
+
+    public entry calibrate_exists_s2_x1000() {
+    label b0:
+        Self.calibrate_exists_s2_impl(100);
+        return;       
+    } 
+
+    public entry calibrate_exists_s2_x5000() {
+    label b0:
+        Self.calibrate_exists_s2_impl(500);
+        return;       
+    } 
+
+    public calibrate_exists_s3_impl(n: u64) {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        _, _, _, _, _, _, _, _, _, _ = (exists<S3>(0xcafe), exists<S3>(0xcafe), exists<S3>(0xcafe), exists<S3>(0xcafe), exists<S3>(0xcafe), exists<S3>(0xcafe), exists<S3>(0xcafe), exists<S3>(0xcafe), exists<S3>(0xcafe), exists<S3>(0xcafe));
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_exists_s3_x100() {
+    label b0:
+        Self.calibrate_exists_s3_impl(10);
+        return;       
+    }
+
+    public entry calibrate_exists_s3_x1000() {
+    label b0:
+        Self.calibrate_exists_s3_impl(100);
+        return;       
+    } 
+
+    public entry calibrate_exists_s3_x5000() {
+    label b0:
+        Self.calibrate_exists_s3_impl(500);
+        return;       
+    } 
+
+    public calibrate_exists_s4_impl(n: u64) {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        _, _, _, _, _, _, _, _, _, _ = (exists<S4>(0xcafe), exists<S4>(0xcafe), exists<S4>(0xcafe), exists<S4>(0xcafe), exists<S4>(0xcafe), exists<S4>(0xcafe), exists<S4>(0xcafe), exists<S4>(0xcafe), exists<S4>(0xcafe), exists<S4>(0xcafe));
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_exists_s4_x100() {
+    label b0:
+        Self.calibrate_exists_s4_impl(10);
+        return;       
+    }
+
+    public entry calibrate_exists_s4_x1000() {
+    label b0:
+        Self.calibrate_exists_s4_impl(100);
+        return;       
+    } 
+
+    public entry calibrate_exists_s4_x5000() {
+    label b0:
+        Self.calibrate_exists_s4_impl(500);
+        return;       
+    }                     
+}

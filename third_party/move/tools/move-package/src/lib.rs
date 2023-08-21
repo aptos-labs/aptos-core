@@ -19,12 +19,15 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use clap::*;
+use move_compiler::{
+    command_line::SKIP_ATTRIBUTE_CHECKS, shared::known_attributes::KnownAttribute,
+};
 use move_core_types::account_address::AccountAddress;
 use move_model::model::GlobalEnv;
 use serde::{Deserialize, Serialize};
 use source_package::layout::SourcePackageLayout;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fmt,
     io::Write,
     path::{Path, PathBuf},
@@ -112,7 +115,7 @@ pub struct BuildConfig {
     pub generate_abis: bool,
 
     /// Installation directory for compiled artifacts. Defaults to current directory.
-    #[clap(long = "install-dir", parse(from_os_str), global = true)]
+    #[clap(long = "install-dir", value_parser, global = true)]
     pub install_dir: Option<PathBuf>,
 
     /// Force recompilation of all packages
@@ -123,7 +126,7 @@ pub struct BuildConfig {
     #[clap(skip)]
     pub additional_named_addresses: BTreeMap<String, AccountAddress>,
 
-    #[clap(long = "arch", global = true, parse(try_from_str = Architecture::try_parse_from_str))]
+    #[clap(long = "arch", global = true, value_parser = Architecture::try_parse_from_str)]
     pub architecture: Option<Architecture>,
 
     /// Only fetch dependency repos to MOVE_HOME
@@ -137,6 +140,14 @@ pub struct BuildConfig {
     /// Bytecode version to compile move code
     #[clap(long = "bytecode-version", global = true)]
     pub bytecode_version: Option<u32>,
+
+    // Known attribute names.  Depends on compilation context (Move variant)
+    #[clap(skip = KnownAttribute::get_all_attribute_names().clone())]
+    pub known_attributes: BTreeSet<String>,
+
+    /// Do not complain about an unknown attribute in Move code.
+    #[clap(long = SKIP_ATTRIBUTE_CHECKS, default_value = "false")]
+    pub skip_attribute_checks: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]

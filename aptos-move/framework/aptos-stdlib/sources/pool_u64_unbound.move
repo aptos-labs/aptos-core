@@ -46,9 +46,16 @@ module aptos_std::pool_u64_unbound {
     }
 
     /// Create a new pool.
-    public fun create(): Pool {
+    public fun new(): Pool {
         // Default to a scaling factor of 1 (effectively no scaling).
         create_with_scaling_factor(1)
+    }
+
+    #[deprecated]
+    /// Deprecated. Use `new` instead.
+    /// Create a new pool.
+    public fun create(): Pool {
+        new()
     }
 
     /// Create a new pool with custom `scaling_factor`.

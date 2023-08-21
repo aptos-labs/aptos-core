@@ -100,7 +100,8 @@ impl IncrementalProofState {
 
     fn ready(&self, validator_verifier: &ValidatorVerifier) -> bool {
         if self.aggregated_voting_power >= validator_verifier.quorum_voting_power() {
-            let recheck = validator_verifier.check_voting_power(self.aggregated_signature.keys());
+            let recheck =
+                validator_verifier.check_voting_power(self.aggregated_signature.keys(), true);
             if recheck.is_err() {
                 error!("Unexpected discrepancy: aggregated_voting_power is {}, while rechecking we get {:?}", self.aggregated_voting_power, recheck);
             }
@@ -116,13 +117,12 @@ impl IncrementalProofState {
         }
         self.completed = true;
 
-        let proof = match validator_verifier
+        match validator_verifier
             .aggregate_signatures(&PartialSignatures::new(self.aggregated_signature.clone()))
         {
             Ok(sig) => ProofOfStore::new(self.info.clone(), sig),
             Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
-        };
-        proof
+        }
     }
 }
 

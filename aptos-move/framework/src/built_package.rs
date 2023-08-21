@@ -39,18 +39,26 @@ pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";
 /// Represents a set of options for building artifacts from Move.
 #[derive(Debug, Clone, Parser, Serialize, Deserialize)]
 pub struct BuildOptions {
+    /// Enables dev mode, which uses all dev-addresses and dev-dependencies
+    ///
+    /// Dev mode allows for changing dependencies and addresses to the preset [dev-addresses] and
+    /// [dev-dependencies] fields.  This works both inside and out of tests for using preset values.
+    ///
+    /// Currently, it also additionally pulls in all test compilation artifacts
+    #[clap(long)]
+    pub dev: bool,
     #[clap(long)]
     pub with_srcs: bool,
     #[clap(long)]
     pub with_abis: bool,
     #[clap(long)]
     pub with_source_maps: bool,
-    #[clap(long, default_value = "true")]
+    #[clap(long, default_value_t = true)]
     pub with_error_map: bool,
     #[clap(long)]
     pub with_docs: bool,
     /// Installation directory for compiled artifacts. Defaults to `<package>/build`.
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub install_dir: Option<PathBuf>,
     #[clap(skip)] // TODO: have a parser for this; there is one in the CLI buts its  downstream
     pub named_addresses: BTreeMap<String, AccountAddress>,
@@ -60,6 +68,10 @@ pub struct BuildOptions {
     pub skip_fetch_latest_git_deps: bool,
     #[clap(long)]
     pub bytecode_version: Option<u32>,
+    #[clap(long)]
+    pub skip_attribute_checks: bool,
+    #[clap(skip)]
+    pub known_attributes: BTreeSet<String>,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -67,6 +79,7 @@ pub struct BuildOptions {
 impl Default for BuildOptions {
     fn default() -> Self {
         Self {
+            dev: false,
             with_srcs: false,
             with_abis: false,
             with_source_maps: false,
@@ -79,6 +92,8 @@ impl Default for BuildOptions {
             // while in a test (and cause some havoc)
             skip_fetch_latest_git_deps: false,
             bytecode_version: None,
+            skip_attribute_checks: false,
+            known_attributes: extended_checks::get_all_attribute_names().clone(),
         }
     }
 }
@@ -92,13 +107,16 @@ pub struct BuiltPackage {
 }
 
 pub fn build_model(
+    dev_mode: bool,
     package_path: &Path,
     additional_named_addresses: BTreeMap<String, AccountAddress>,
     target_filter: Option<String>,
     bytecode_version: Option<u32>,
+    skip_attribute_checks: bool,
+    known_attributes: BTreeSet<String>,
 ) -> anyhow::Result<GlobalEnv> {
     let build_config = BuildConfig {
-        dev_mode: false,
+        dev_mode,
         additional_named_addresses,
         architecture: None,
         generate_abis: false,
@@ -109,6 +127,8 @@ pub fn build_model(
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: true,
         bytecode_version,
+        skip_attribute_checks,
+        known_attributes,
     };
     build_config.move_model_for_package(package_path, ModelConfig {
         target_filter,
@@ -123,8 +143,9 @@ impl BuiltPackage {
     /// and is not `Ok` if there was an error among those.
     pub fn build(package_path: PathBuf, options: BuildOptions) -> anyhow::Result<Self> {
         let bytecode_version = options.bytecode_version;
+        let skip_attribute_checks = options.skip_attribute_checks;
         let build_config = BuildConfig {
-            dev_mode: false,
+            dev_mode: options.dev,
             additional_named_addresses: options.named_addresses.clone(),
             architecture: None,
             generate_abis: options.with_abis,
@@ -135,17 +156,23 @@ impl BuiltPackage {
             fetch_deps_only: false,
             skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
             bytecode_version,
+            skip_attribute_checks,
+            known_attributes: options.known_attributes.clone(),
         };
+
         eprintln!("Compiling, may take a little while to download git dependencies...");
         let mut package = build_config.compile_package_no_exit(&package_path, &mut stderr())?;
 
         // Build the Move model for extra processing and run extended checks as well derive
         // runtime metadata
         let model = &build_model(
+            options.dev,
             package_path.as_path(),
             options.named_addresses.clone(),
             None,
             bytecode_version,
+            skip_attribute_checks,
+            options.known_attributes.clone(),
         )?;
         let runtime_metadata = extended_checks::run_extended_checks(model);
         if model.diag_count(Severity::Warning) > 0 {
@@ -236,6 +263,17 @@ impl BuiltPackage {
     pub fn modules(&self) -> impl Iterator<Item = &CompiledModule> {
         self.package
             .root_modules()
+            .filter_map(|unit| match &unit.unit {
+                CompiledUnit::Module(NamedCompiledModule { module, .. }) => Some(module),
+                CompiledUnit::Script(_) => None,
+            })
+    }
+
+    /// Returns an iterator for all compiled proper (non-script) modules, including
+    /// modules that are dependencies of the root modules.
+    pub fn all_modules(&self) -> impl Iterator<Item = &CompiledModule> {
+        self.package
+            .all_modules()
             .filter_map(|unit| match &unit.unit {
                 CompiledUnit::Module(NamedCompiledModule { module, .. }) => Some(module),
                 CompiledUnit::Script(_) => None,

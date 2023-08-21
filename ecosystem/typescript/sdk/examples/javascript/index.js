@@ -44,7 +44,9 @@ const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
   const indexerLedgerInfo = await provider.getIndexerLedgerInfo();
   const fullNodeChainId = await provider.getChainId();
 
-  console.log(`\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo}`);
+  console.log(
+    `\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo.ledger_infos[0].chain_id}`,
+  );
   if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
     console.log(`\n fullnode chain id and indexer chain id are not synced, skipping rest of tests`);
     return;

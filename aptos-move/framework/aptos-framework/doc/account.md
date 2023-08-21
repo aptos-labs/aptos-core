@@ -30,6 +30,8 @@
 -  [Function `rotate_authentication_key`](#0x1_account_rotate_authentication_key)
 -  [Function `rotate_authentication_key_with_rotation_capability`](#0x1_account_rotate_authentication_key_with_rotation_capability)
 -  [Function `offer_rotation_capability`](#0x1_account_offer_rotation_capability)
+-  [Function `is_rotation_capability_offered`](#0x1_account_is_rotation_capability_offered)
+-  [Function `get_rotation_capability_offer_for`](#0x1_account_get_rotation_capability_offer_for)
 -  [Function `revoke_rotation_capability`](#0x1_account_revoke_rotation_capability)
 -  [Function `revoke_any_rotation_capability`](#0x1_account_revoke_any_rotation_capability)
 -  [Function `offer_signer_capability`](#0x1_account_offer_signer_capability)
@@ -53,6 +55,7 @@
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `create_account`](#@Specification_1_create_account)
     -  [Function `create_account_unchecked`](#@Specification_1_create_account_unchecked)
+    -  [Function `exists_at`](#@Specification_1_exists_at)
     -  [Function `get_guid_next_creation_num`](#@Specification_1_get_guid_next_creation_num)
     -  [Function `get_sequence_number`](#@Specification_1_get_sequence_number)
     -  [Function `increment_sequence_number`](#@Specification_1_increment_sequence_number)
@@ -61,6 +64,8 @@
     -  [Function `rotate_authentication_key`](#@Specification_1_rotate_authentication_key)
     -  [Function `rotate_authentication_key_with_rotation_capability`](#@Specification_1_rotate_authentication_key_with_rotation_capability)
     -  [Function `offer_rotation_capability`](#@Specification_1_offer_rotation_capability)
+    -  [Function `is_rotation_capability_offered`](#@Specification_1_is_rotation_capability_offered)
+    -  [Function `get_rotation_capability_offer_for`](#@Specification_1_get_rotation_capability_offer_for)
     -  [Function `revoke_rotation_capability`](#@Specification_1_revoke_rotation_capability)
     -  [Function `revoke_any_rotation_capability`](#@Specification_1_revoke_any_rotation_capability)
     -  [Function `offer_signer_capability`](#@Specification_1_offer_signer_capability)
@@ -936,7 +941,8 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_exists_at">exists_at</a>(addr: <b>address</b>): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_exists_at">exists_at</a>(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -960,7 +966,8 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_guid_next_creation_num">get_guid_next_creation_num</a>(addr: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_guid_next_creation_num">get_guid_next_creation_num</a>(addr: <b>address</b>): u64
 </code></pre>
 
 
@@ -984,7 +991,8 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_sequence_number">get_sequence_number</a>(addr: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_sequence_number">get_sequence_number</a>(addr: <b>address</b>): u64
 </code></pre>
 
 
@@ -1039,7 +1047,8 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_authentication_key">get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_authentication_key">get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -1310,6 +1319,64 @@ offer, calling this function will replace the previous <code>recipient_address</
 
 </details>
 
+<a name="0x1_account_is_rotation_capability_offered"></a>
+
+## Function `is_rotation_capability_offered`
+
+Returns true if the account at <code>account_addr</code> has a rotation capability offer.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_rotation_capability_offered">is_rotation_capability_offered</a>(account_addr: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_rotation_capability_offered">is_rotation_capability_offered</a>(account_addr: <b>address</b>): bool <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+    <b>let</b> account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&account_resource.rotation_capability_offer.for)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_account_get_rotation_capability_offer_for"></a>
+
+## Function `get_rotation_capability_offer_for`
+
+Returns the address of the account that has a rotation capability offer from the account at <code>account_addr</code>.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_rotation_capability_offer_for">get_rotation_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_rotation_capability_offer_for">get_rotation_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b> <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+    <b>let</b> account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&account_resource.rotation_capability_offer.for),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SIGNER_CAPABILITY_OFFERED">ENO_SIGNER_CAPABILITY_OFFERED</a>),
+    );
+    *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&account_resource.rotation_capability_offer.for)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_account_revoke_rotation_capability"></a>
 
 ## Function `revoke_rotation_capability`
@@ -1425,7 +1492,8 @@ to the account owner's signer capability).
 Returns true if the account at <code>account_addr</code> has a signer capability offer.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_signer_capability_offered">is_signer_capability_offered</a>(account_addr: <b>address</b>): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_signer_capability_offered">is_signer_capability_offered</a>(account_addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -1451,7 +1519,8 @@ Returns true if the account at <code>account_addr</code> has a signer capability
 Returns the address of the account that has a signer capability offer from the account at <code>account_addr</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_offer_for">get_signer_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_offer_for">get_signer_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -1462,7 +1531,10 @@ Returns the address of the account that has a signer capability offer from the a
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_offer_for">get_signer_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b> <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <b>let</b> account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&account_resource.signer_capability_offer.for), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SIGNER_CAPABILITY_OFFERED">ENO_SIGNER_CAPABILITY_OFFERED</a>));
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&account_resource.signer_capability_offer.for),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SIGNER_CAPABILITY_OFFERED">ENO_SIGNER_CAPABILITY_OFFERED</a>),
+    );
     *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&account_resource.signer_capability_offer.for)
 }
 </code></pre>
@@ -2034,6 +2106,7 @@ Limit the new account address is not @vm_reserved / @aptos_framework / @aptos_to
 <pre><code><b>include</b> <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {addr: new_address};
 <b>aborts_if</b> new_address == @vm_reserved || new_address == @aptos_framework || new_address == @aptos_token;
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result) == new_address;
+<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(new_address);
 </code></pre>
 
 
@@ -2053,6 +2126,24 @@ The Account does not exist under the new address before creating the account.
 
 <pre><code><b>include</b> <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {addr: new_address};
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result) == new_address;
+<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(new_address);
+</code></pre>
+
+
+
+<a name="@Specification_1_exists_at"></a>
+
+### Function `exists_at`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_exists_at">exists_at</a>(addr: <b>address</b>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -2066,6 +2157,7 @@ The Account does not exist under the new address before creating the account.
     <b>let</b> authentication_key = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(addr);
     <b>aborts_if</b> len(authentication_key) != 32;
     <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+    <b>ensures</b> len(authentication_key) == 32;
 }
 </code></pre>
 
@@ -2076,7 +2168,8 @@ The Account does not exist under the new address before creating the account.
 ### Function `get_guid_next_creation_num`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_guid_next_creation_num">get_guid_next_creation_num</a>(addr: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_guid_next_creation_num">get_guid_next_creation_num</a>(addr: <b>address</b>): u64
 </code></pre>
 
 
@@ -2093,7 +2186,8 @@ The Account does not exist under the new address before creating the account.
 ### Function `get_sequence_number`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_sequence_number">get_sequence_number</a>(addr: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_sequence_number">get_sequence_number</a>(addr: <b>address</b>): u64
 </code></pre>
 
 
@@ -2133,7 +2227,8 @@ The sequence_number of the Account is up to MAX_U64.
 ### Function `get_authentication_key`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_authentication_key">get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_authentication_key">get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -2222,7 +2317,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
     scheme: to_scheme,
     public_key_bytes: to_public_key_bytes,
     signature: cap_update_table,
-    challenge: challenge,
+    challenge,
 };
 <b>let</b> originating_addr = addr;
 <b>let</b> new_auth_key_vector = <a href="account.md#0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key">spec_assert_valid_rotation_proof_signature_and_get_auth_key</a>(to_scheme, to_public_key_bytes, cap_update_table, challenge);
@@ -2331,6 +2426,42 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
+<a name="@Specification_1_is_rotation_capability_offered"></a>
+
+### Function `is_rotation_capability_offered`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_rotation_capability_offered">is_rotation_capability_offered</a>(account_addr: <b>address</b>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
+</code></pre>
+
+
+
+<a name="@Specification_1_get_rotation_capability_offer_for"></a>
+
+### Function `get_rotation_capability_offer_for`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_rotation_capability_offer_for">get_rotation_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
+<b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
+<b>aborts_if</b> len(account_resource.rotation_capability_offer.for.vec) == 0;
+</code></pre>
+
+
+
 <a name="@Specification_1_revoke_rotation_capability"></a>
 
 ### Function `revoke_rotation_capability`
@@ -2427,7 +2558,8 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 ### Function `is_signer_capability_offered`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_signer_capability_offered">is_signer_capability_offered</a>(account_addr: <b>address</b>): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_signer_capability_offered">is_signer_capability_offered</a>(account_addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -2443,7 +2575,8 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 ### Function `get_signer_capability_offer_for`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_offer_for">get_signer_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_offer_for">get_signer_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -2581,6 +2714,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
         challenge
     );
     <b>aborts_if</b> scheme != <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> && scheme != <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>;
+    <b>ensures</b> scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> || scheme == <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>;
 }
 </code></pre>
 
@@ -2620,6 +2754,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
         <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(address_map, curr_auth_key) != originating_addr;
     <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;<b>address</b>&gt;(new_auth_key_vector);
     <b>aborts_if</b> curr_auth_key != new_auth_key && <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(address_map, new_auth_key);
+    <b>ensures</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(<b>global</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(@aptos_framework).address_map, <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;<b>address</b>&gt;(new_auth_key_vector));
 }
 </code></pre>
 
@@ -2671,6 +2806,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 <b>aborts_if</b> len(<a href="account.md#0x1_account_ZERO_AUTH_KEY">ZERO_AUTH_KEY</a>) != 32;
 <b>include</b> <a href="account.md#0x1_account_exists_at">exists_at</a>(resource_addr) ==&gt; <a href="account.md#0x1_account_CreateResourceAccountAbortsIf">CreateResourceAccountAbortsIf</a>;
 <b>include</b> !<a href="account.md#0x1_account_exists_at">exists_at</a>(resource_addr) ==&gt; <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {addr: resource_addr};
+<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result_1) == resource_addr;
 </code></pre>
 
 
@@ -2735,6 +2871,7 @@ The guid_creation_num of the ccount resource is up to MAX_U64.
     <a href="account.md#0x1_account">account</a>: account_signer,
 };
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+<b>ensures</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).guid_creation_num == <b>old</b>(<b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).guid_creation_num) + 1;
 </code></pre>
 
 
@@ -2833,9 +2970,24 @@ The guid_creation_num of the Account is up to MAX_U64.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="account.md#0x1_account">account</a>);
+<b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="account.md#0x1_account">account</a>);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="account.md#0x1_account">account</a>);
+<b>include</b> account_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> ==&gt; <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_NewUnvalidatedPublicKeyFromBytesAbortsIf">ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf</a> { bytes: account_public_key };
+<b>aborts_if</b> account_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> && ({
+    <b>let</b> expected_auth_key = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_spec_public_key_bytes_to_authentication_key">ed25519::spec_public_key_bytes_to_authentication_key</a>(account_public_key);
+    account_resource.authentication_key != expected_auth_key
+});
+<b>include</b> account_scheme == <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a> ==&gt; <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_NewUnvalidatedPublicKeyFromBytesAbortsIf">multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf</a> { bytes: account_public_key };
+<b>aborts_if</b> account_scheme == <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a> && ({
+    <b>let</b> expected_auth_key = <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_spec_public_key_bytes_to_authentication_key">multi_ed25519::spec_public_key_bytes_to_authentication_key</a>(account_public_key);
+    account_resource.authentication_key != expected_auth_key
+});
+<b>include</b> account_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> ==&gt; <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_NewSignatureFromBytesAbortsIf">ed25519::NewSignatureFromBytesAbortsIf</a> { bytes: signed_message_bytes };
+<b>include</b> account_scheme == <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a> ==&gt; <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_NewSignatureFromBytesAbortsIf">multi_ed25519::NewSignatureFromBytesAbortsIf</a> { bytes: signed_message_bytes };
+<b>aborts_if</b> account_scheme != <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> && account_scheme != <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>;
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

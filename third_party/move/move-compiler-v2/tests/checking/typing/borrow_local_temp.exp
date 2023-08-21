@@ -1,0 +1,18 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct R {
+        dummy_field: bool,
+    }
+    struct S {
+        dummy_field: bool,
+    }
+    private fun t0() {
+        Borrow(Immutable)(true);
+        Borrow(Mutable)(false);
+        Borrow(Immutable)(0);
+        Borrow(Mutable)(1);
+        Borrow(Immutable)(pack M::S(false));
+        Borrow(Mutable)(pack M::S(false));
+        Tuple()
+    }
+} // end 0x8675309::M

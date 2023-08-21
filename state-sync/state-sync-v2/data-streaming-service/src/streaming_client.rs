@@ -468,7 +468,7 @@ impl DataStreamingClient for StreamingServiceClient {
             notification_and_feedback,
         });
         // We can ignore the receiver as no data will be sent.
-        let _ = self.send_stream_request(client_request).await?;
+        let _receiver = self.send_stream_request(client_request).await?;
         Ok(())
     }
 }

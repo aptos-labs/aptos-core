@@ -27,6 +27,14 @@ from aptos_sdk.transactions import (
 from .common import FAUCET_URL, NODE_URL
 
 
+def generate_rest_client(node_url: str) -> RestClient:
+    client_config = ClientConfig()
+    client_config.http2 = True
+    client_config.max_gas_amount = 100
+    client_config.transaction_wait_in_seconds = 60
+    return RestClient(NODE_URL, client_config)
+
+
 class TransactionGenerator:
     """
     Demonstrate how one might make a harness for submitting transactions. This class just keeps
@@ -123,7 +131,7 @@ class Worker:
         recipient: AccountAddress,
     ):
         self._conn = conn
-        self._rest_client = RestClient(node_url)
+        self._rest_client = generate_rest_client(node_url)
         self._account = account
         self._recipient = recipient
         self._txn_generator = TransactionGenerator(self._rest_client, self._recipient)
@@ -316,7 +324,7 @@ async def distribute(
     txns = []
     txn_hashes = []
 
-    for (account, fund) in all_accounts:
+    for account, fund in all_accounts:
         sequence_number = await account_sequence_number.next_sequence_number(
             block=False
         )
@@ -337,9 +345,7 @@ async def distribute(
 
 
 async def main():
-    client_config = ClientConfig()
-    client_config.http2 = True
-    rest_client = RestClient(NODE_URL, client_config)
+    rest_client = generate_rest_client(NODE_URL)
 
     num_accounts = 64
     transactions = 100000
@@ -382,7 +388,7 @@ async def main():
     last = time.time()
 
     workers = []
-    for (account, recipient) in zip(accounts, receivers):
+    for account, recipient in zip(accounts, receivers):
         workers.append(WorkerContainer(NODE_URL, account, recipient.address()))
         workers[-1].start()
 

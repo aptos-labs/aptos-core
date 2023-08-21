@@ -18,12 +18,14 @@ Standard math utilities missing in the Move Language.
 -  [Function `log2_64`](#0x1_math128_log2_64)
 -  [Function `sqrt`](#0x1_math128_sqrt)
 -  [Function `ceil_div`](#0x1_math128_ceil_div)
--  [Function `assert_approx_the_same`](#0x1_math128_assert_approx_the_same)
 -  [Specification](#@Specification_1)
     -  [Function `max`](#@Specification_1_max)
     -  [Function `min`](#@Specification_1_min)
     -  [Function `average`](#@Specification_1_average)
+    -  [Function `clamp`](#@Specification_1_clamp)
     -  [Function `pow`](#@Specification_1_pow)
+    -  [Function `floor_log2`](#@Specification_1_floor_log2)
+    -  [Function `sqrt`](#@Specification_1_sqrt)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -413,38 +415,6 @@ Returns square root of x, precisely floor(sqrt(x))
 
 </details>
 
-<a name="0x1_math128_assert_approx_the_same"></a>
-
-## Function `assert_approx_the_same`
-
-For functions that approximate a value it's useful to test a value is close
-to the most correct value up to last digit
-
-
-<pre><code><b>fun</b> <a href="math128.md#0x1_math128_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128, precission: u128)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="math128.md#0x1_math128_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128, precission: u128) {
-    <b>if</b> (x &lt; y) {
-        <b>let</b> tmp = x;
-        x = y;
-        y = tmp;
-    };
-    <b>let</b> mult = <a href="math128.md#0x1_math128_pow">pow</a>(10, precission);
-    <b>assert</b>!((x - y) * mult &lt; x, 0);
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="@Specification_1"></a>
 
 ## Specification
@@ -504,6 +474,26 @@ to the most correct value up to last digit
 
 
 
+<a name="@Specification_1_clamp"></a>
+
+### Function `clamp`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_clamp">clamp</a>(x: u128, lower: u128, upper: u128): u128
+</code></pre>
+
+
+
+
+<pre><code><b>requires</b> (lower &lt;= upper);
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> (lower &lt;=x && x &lt;= upper) ==&gt; result == x;
+<b>ensures</b> (x &lt; lower) ==&gt; result == lower;
+<b>ensures</b> (upper &lt; x) ==&gt; result == upper;
+</code></pre>
+
+
+
 <a name="@Specification_1_pow"></a>
 
 ### Function `pow`
@@ -518,6 +508,44 @@ to the most correct value up to last digit
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(n, e) &gt; MAX_U128;
 <b>ensures</b> [abstract] result == <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(n, e);
+</code></pre>
+
+
+
+<a name="@Specification_1_floor_log2"></a>
+
+### Function `floor_log2`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_floor_log2">floor_log2</a>(x: u128): u8
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] x == 0;
+<b>ensures</b> [abstract] <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(2, result) &lt;= x;
+<b>ensures</b> [abstract] x &lt; <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(2, result+1);
+</code></pre>
+
+
+
+<a name="@Specification_1_sqrt"></a>
+
+### Function `sqrt`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_sqrt">sqrt</a>(x: u128): u128
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] x &gt; 0 ==&gt; result * result &lt;= x;
+<b>ensures</b> [abstract] x &gt; 0 ==&gt; x &lt; (result+1) * (result+1);
 </code></pre>
 
 
@@ -537,4 +565,4 @@ to the most correct value up to last digit
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

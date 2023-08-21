@@ -24,7 +24,7 @@ impl Test for ForgeSetupTest {
 }
 
 impl NetworkTest for ForgeSetupTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let mut rng = StdRng::from_seed(OsRng.gen());
         let runtime = Runtime::new().unwrap();
 

@@ -42,7 +42,7 @@ Aptos checks compatibility at the time a Move package is published via an Aptos 
 To upgrade already published Move code, simply attempt to republish the code at
 the same address that it was previously published. This can be done by following the
 instructions for code compilation and publishing using the
-[Aptos CLI](../../tools/aptos-cli-tool/use-aptos-cli.md). For an example,
+[Aptos CLI](../../tools/aptos-cli/use-cli/use-aptos-cli.md). For an example,
 see the [Your First Move Module](../../tutorials/first-move-module.md) tutorial.
 
 ## Upgrade policies
@@ -78,7 +78,7 @@ published previously need to be compatible and follow the rules below:
 modified. Struct abilities also cannot be changed (no new ones added or existing removed).
 - All public and entry functions cannot change their signature (argument types, type argument, return types). However,
 argument names can change.
-- Public(friend) functions are treated as private and thus their signature can arbitrarily change. This is safe as
+- `public(friend)` functions are treated as private and thus their signature can arbitrarily change. This is safe as
 only modules in the same package can call friend functions anyway and they need to be updated if the signature changes.
 
 When updating your modules, if you see an incompatible error, make sure to check the above rules and fix any violations.
