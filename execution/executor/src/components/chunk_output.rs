@@ -202,7 +202,7 @@ impl ChunkOutput {
     ) -> Result<Vec<TransactionOutput>> {
         Ok(V::execute_block(
             transactions,
-            &state_view,
+            state_view,
             maybe_block_gas_limit,
         )?)
     }
@@ -223,7 +223,7 @@ impl ChunkOutput {
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
             StateViewId::Miscellaneous => {
-                V::execute_block(transactions, &state_view, maybe_block_gas_limit)?
+                V::execute_block(transactions, state_view, maybe_block_gas_limit)?
             },
             _ => transactions
                 .iter()

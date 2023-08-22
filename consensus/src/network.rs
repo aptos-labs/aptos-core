@@ -5,7 +5,7 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
-    dag::DAGNetworkMessage,
+    dag::{DAGMessage, DAGNetworkMessage, RpcWithFallback, TDAGNetworkSender},
     logging::LogEvent,
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
@@ -29,10 +29,12 @@ use aptos_network::{
     protocols::{network::Event, rpc::error::RpcError},
     ProtocolId,
 };
+use aptos_reliable_broadcast::{RBMessage, RBNetworkSender};
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
 };
+use async_trait::async_trait;
 use bytes::Bytes;
 use fail::fail_point;
 use futures::{
@@ -43,6 +45,7 @@ use futures::{
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     mem::{discriminant, Discriminant},
+    sync::Arc,
     time::Duration,
 };
 
@@ -401,6 +404,79 @@ impl QuorumStoreSender for NetworkSender {
         fail_point!("consensus::send::proof_of_store", |_| ());
         let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
         self.broadcast(msg).await
+    }
+}
+
+// TODO: this can be improved
+#[derive(Clone)]
+pub struct DAGNetworkSenderImpl {
+    sender: Arc<NetworkSender>,
+    time_service: aptos_time_service::TimeService,
+}
+
+impl DAGNetworkSenderImpl {
+    pub fn new(sender: Arc<NetworkSender>) -> Self {
+        Self {
+            sender,
+            time_service: aptos_time_service::TimeService::real(),
+        }
+    }
+}
+
+#[async_trait]
+impl TDAGNetworkSender for DAGNetworkSenderImpl {
+    async fn send_rpc(
+        &self,
+        receiver: Author,
+        message: DAGMessage,
+        timeout: Duration,
+    ) -> anyhow::Result<DAGMessage> {
+        self.sender
+            .consensus_network_client
+            .send_rpc(receiver, message.into_network_message(), timeout)
+            .await
+            .map_err(|e| anyhow!("invalid rpc response: {}", e))
+            .and_then(TConsensusMsg::from_network_message)
+    }
+
+    /// Given a list of potential responders, sending rpc to get response from any of them and could
+    /// fallback to more in case of failures.
+    async fn send_rpc_with_fallbacks(
+        &self,
+        responders: Vec<Author>,
+        message: DAGMessage,
+        retry_interval: Duration,
+        rpc_timeout: Duration,
+    ) -> RpcWithFallback {
+        let sender = Arc::new(self.clone());
+        RpcWithFallback::new(
+            responders,
+            message,
+            retry_interval,
+            rpc_timeout,
+            sender,
+            self.time_service.clone(),
+        )
+    }
+}
+
+#[async_trait]
+impl<M> RBNetworkSender<M> for DAGNetworkSenderImpl
+where
+    M: RBMessage + TConsensusMsg + 'static,
+{
+    async fn send_rb_rpc(
+        &self,
+        receiver: Author,
+        message: M,
+        timeout: Duration,
+    ) -> anyhow::Result<M> {
+        self.sender
+            .consensus_network_client
+            .send_rpc(receiver, message.into_network_message(), timeout)
+            .await
+            .map_err(|e| anyhow!("invalid rpc response: {}", e))
+            .and_then(|msg| TConsensusMsg::from_network_message(msg))
     }
 }
 
