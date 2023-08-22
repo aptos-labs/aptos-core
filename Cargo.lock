@@ -211,7 +211,6 @@ dependencies = [
  "aptos-cli-common",
  "aptos-config",
  "aptos-crypto",
- "aptos-db-tool",
  "aptos-debugger",
  "aptos-faucet-core",
  "aptos-framework",
@@ -253,11 +252,8 @@ dependencies = [
  "move-core-types",
  "move-coverage",
  "move-disassembler",
- "move-ir-compiler",
  "move-ir-types",
  "move-package",
- "move-prover",
- "move-prover-boogie-backend",
  "move-symbol-pool",
  "move-unit-test",
  "move-vm-runtime",
@@ -274,7 +270,6 @@ dependencies = [
  "termcolor",
  "thiserror",
  "tokio",
- "tokio-util 0.7.3",
  "toml 0.7.4",
  "walkdir",
 ]
@@ -344,6 +339,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-storage-interface",
  "aptos-types",
+ "aptos-utils",
  "aptos-vm",
  "async-trait",
  "bcs 0.1.4",
@@ -1173,6 +1169,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-node-resource-metrics",
+ "aptos-profiler",
  "aptos-push-metrics",
  "aptos-sdk",
  "aptos-state-view",
@@ -1498,6 +1495,7 @@ dependencies = [
  "move-package",
  "move-prover",
  "move-prover-boogie-backend",
+ "move-prover-bytecode-pipeline",
  "move-stackless-bytecode",
  "move-unit-test",
  "move-vm-runtime",
@@ -1634,6 +1632,7 @@ dependencies = [
  "aptos-gas-meter",
  "aptos-package-builder",
  "aptos-types",
+ "aptos-vm-types",
  "inferno",
  "move-binary-format",
  "move-core-types",
@@ -2300,6 +2299,7 @@ dependencies = [
 name = "aptos-move-examples"
 version = "0.1.0"
 dependencies = [
+ "aptos-framework",
  "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm",
@@ -8990,6 +8990,7 @@ dependencies = [
  "itertools",
  "move-binary-format",
  "move-command-line-common",
+ "move-compiler",
  "move-core-types",
  "move-disassembler",
  "move-ir-types",
@@ -9030,6 +9031,7 @@ dependencies = [
  "serde 1.0.149",
  "serde_bytes",
  "serde_json",
+ "thiserror",
  "uint",
 ]
 
@@ -9291,6 +9293,7 @@ dependencies = [
  "move-ir-types",
  "move-model",
  "move-prover-boogie-backend",
+ "move-prover-bytecode-pipeline",
  "move-prover-test-utils",
  "move-stackless-bytecode",
  "num 0.4.0",
@@ -9323,6 +9326,7 @@ dependencies = [
  "move-compiler",
  "move-core-types",
  "move-model",
+ "move-prover-bytecode-pipeline",
  "move-stackless-bytecode",
  "num 0.4.0",
  "once_cell",
@@ -9333,6 +9337,40 @@ dependencies = [
  "serde_json",
  "tera",
  "tokio",
+]
+
+[[package]]
+name = "move-prover-bytecode-pipeline"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "atty",
+ "clap 4.3.21",
+ "codespan",
+ "codespan-reporting",
+ "datatest-stable",
+ "futures",
+ "hex",
+ "itertools",
+ "log",
+ "move-binary-format",
+ "move-core-types",
+ "move-model",
+ "move-stackless-bytecode",
+ "move-stackless-bytecode-test-utils",
+ "num 0.4.0",
+ "once_cell",
+ "pretty",
+ "rand 0.8.5",
+ "serde 1.0.149",
+ "serde_json",
+ "shell-words",
+ "simplelog",
+ "tempfile",
+ "tokio",
+ "toml 0.5.9",
+ "walkdir",
 ]
 
 [[package]]
@@ -9379,13 +9417,26 @@ dependencies = [
  "move-core-types",
  "move-ir-to-bytecode",
  "move-model",
- "move-prover-test-utils",
- "move-stdlib",
+ "move-stackless-bytecode-test-utils",
  "num 0.4.0",
  "once_cell",
  "paste",
  "petgraph 0.5.1",
  "serde 1.0.149",
+]
+
+[[package]]
+name = "move-stackless-bytecode-test-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "codespan-reporting",
+ "move-command-line-common",
+ "move-compiler",
+ "move-model",
+ "move-prover-test-utils",
+ "move-stackless-bytecode",
+ "move-stdlib",
 ]
 
 [[package]]
@@ -11101,6 +11152,7 @@ dependencies = [
  "move-model",
  "move-prover",
  "move-prover-boogie-backend",
+ "move-prover-bytecode-pipeline",
  "move-stackless-bytecode",
  "num 0.4.0",
  "plotters",
@@ -13013,22 +13065,22 @@ checksum = "222a222a5bfe1bba4a77b45ec488a741b3cb8872e5e499451fd7d0129c9c7c3d"
 
 [[package]]
 name = "thiserror"
-version = "1.0.37"
+version = "1.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10deb33631e3c9018b9baf9dcbbc4f737320d2b576bac10f6aefa048fa407e3e"
+checksum = "dedd246497092a89beedfe2c9f176d44c1b672ea6090edc20544ade01fbb7ea0"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.37"
+version = "1.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "982d17546b47146b28f7c22e3d08465f6b8903d0ea13c1660d9d84a6e7adcdbb"
+checksum = "7d7b1fadccbbc7e19ea64708629f9d8dccd007c260d66485f20a6d41bc1cf4b3"
 dependencies = [
  "proc-macro2 1.0.64",
  "quote 1.0.29",
- "syn 1.0.105",
+ "syn 2.0.25",
 ]
 
 [[package]]

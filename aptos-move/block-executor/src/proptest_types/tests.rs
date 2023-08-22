@@ -339,7 +339,7 @@ fn module_publishing_fallback_with_block_gas_limit(
         vec![],
         vec![],
         2,
-        (false, true),
+        (true, false),
         maybe_block_gas_limit,
     );
     run_transactions::<[u8; 32], [u8; 32], MockEvent>(

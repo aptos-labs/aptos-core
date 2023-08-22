@@ -1,87 +1,78 @@
 // Copyright © Aptos Foundation
 
 use super::{
-    dag_driver::DagDriver, dag_fetcher::FetchRequestHandler, dag_network::DAGNetworkSender,
-    storage::DAGStorage, types::TDAGMessage,
+    dag_driver::DagDriver,
+    dag_fetcher::{FetchRequestHandler, FetchWaiter},
+    types::TDAGMessage,
+    CertifiedNode, Node,
 };
 use crate::{
-    dag::{
-        dag_network::RpcHandler, dag_store::Dag, reliable_broadcast::NodeBroadcastHandler,
-        types::DAGMessage,
-    },
+    dag::{dag_network::RpcHandler, rb_handler::NodeBroadcastHandler, types::DAGMessage},
     network::{IncomingDAGRequest, TConsensusMsg},
-    state_replication::PayloadClient,
 };
 use anyhow::bail;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
-use aptos_infallible::RwLock;
 use aptos_logger::{error, warn};
 use aptos_network::protocols::network::RpcError;
-use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
-use aptos_time_service::TimeService;
-use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
+use aptos_types::epoch_state::EpochState;
 use bytes::Bytes;
 use futures::StreamExt;
 use std::sync::Arc;
-use tokio_retry::strategy::ExponentialBackoff;
+use tokio::select;
 
-struct NetworkHandler {
+pub(crate) struct NetworkHandler {
+    epoch_state: Arc<EpochState>,
     dag_rpc_rx: aptos_channel::Receiver<Author, IncomingDAGRequest>,
     node_receiver: NodeBroadcastHandler,
     dag_driver: DagDriver,
     fetch_receiver: FetchRequestHandler,
-    epoch_state: Arc<EpochState>,
+    node_fetch_waiter: FetchWaiter<Node>,
+    certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
 }
 
 impl NetworkHandler {
-    fn new(
-        dag: Arc<RwLock<Dag>>,
-        dag_rpc_rx: aptos_channel::Receiver<Author, IncomingDAGRequest>,
-        signer: ValidatorSigner,
+    pub fn new(
         epoch_state: Arc<EpochState>,
-        storage: Arc<dyn DAGStorage>,
-        payload_client: Arc<dyn PayloadClient>,
-        _dag_network_sender: Arc<dyn DAGNetworkSender>,
-        rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
-        time_service: TimeService,
+        dag_rpc_rx: aptos_channel::Receiver<Author, IncomingDAGRequest>,
+        node_receiver: NodeBroadcastHandler,
+        dag_driver: DagDriver,
+        fetch_receiver: FetchRequestHandler,
+        node_fetch_waiter: FetchWaiter<Node>,
+        certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
     ) -> Self {
-        let rb = Arc::new(ReliableBroadcast::new(
-            epoch_state.verifier.get_ordered_account_addresses().clone(),
-            rb_network_sender,
-            ExponentialBackoff::from_millis(10),
-            time_service.clone(),
-        ));
         Self {
+            epoch_state,
             dag_rpc_rx,
-            node_receiver: NodeBroadcastHandler::new(
-                dag.clone(),
-                signer.clone(),
-                epoch_state.clone(),
-                storage.clone(),
-            ),
-            dag_driver: DagDriver::new(
-                signer.author(),
-                epoch_state.clone(),
-                dag.clone(),
-                payload_client,
-                rb,
-                1,
-                time_service,
-                storage,
-            ),
-            epoch_state: epoch_state.clone(),
-            fetch_receiver: FetchRequestHandler::new(dag, epoch_state),
+            node_receiver,
+            dag_driver,
+            fetch_receiver,
+            node_fetch_waiter,
+            certified_node_fetch_waiter,
         }
     }
 
-    async fn start(mut self) {
+    pub async fn start(mut self) {
         self.dag_driver.try_enter_new_round();
 
         // TODO(ibalajiarun): clean up Reliable Broadcast storage periodically.
-        while let Some(msg) = self.dag_rpc_rx.next().await {
-            if let Err(e) = self.process_rpc(msg).await {
-                warn!(error = ?e, "error processing rpc");
+        loop {
+            select! {
+                Some(msg) = self.dag_rpc_rx.next() => {
+                    if let Err(e) = self.process_rpc(msg).await {
+                        warn!(error = ?e, "error processing rpc");
+                    }
+                },
+                Some(res) = self.node_fetch_waiter.next() => {
+                    if let Err(e) = res.map_err(|e| anyhow::anyhow!("recv error: {}", e)).and_then(|node| self.node_receiver.process(node)) {
+                        warn!(error = ?e, "error processing node fetch notification");
+                    }
+                },
+                Some(res) = self.certified_node_fetch_waiter.next() => {
+                    if let Err(e) = res.map_err(|e| anyhow::anyhow!("recv error: {}", e)).and_then(|certified_node| self.dag_driver.process(certified_node)) {
+                        warn!(error = ?e, "error processing certified node fetch notification");
+                    }
+                }
             }
         }
     }

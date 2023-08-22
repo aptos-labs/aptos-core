@@ -30,6 +30,7 @@ use aptos_types::{
         TransactionPayload, TransactionStatus,
     },
 };
+use aptos_vm::AptosVM;
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
     move_resource::MoveStructType,
@@ -601,6 +602,10 @@ impl MoveHarness {
                 entries: gas_params.to_on_chain_gas_schedule(feature_version),
             },
         );
+    }
+
+    pub fn new_vm(&self) -> AptosVM {
+        AptosVM::new_from_state_view(self.executor.data_store())
     }
 
     pub fn set_default_gas_unit_price(&mut self, gas_unit_price: u64) {

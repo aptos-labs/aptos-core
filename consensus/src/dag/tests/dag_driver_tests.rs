@@ -2,9 +2,12 @@
 
 use crate::{
     dag::{
+        anchor_election::RoundRobinAnchorElection,
         dag_driver::{DagDriver, DagDriverError},
-        dag_network::{DAGNetworkSender, RpcWithFallback},
+        dag_fetcher::DagFetcher,
+        dag_network::{RpcWithFallback, TDAGNetworkSender},
         dag_store::Dag,
+        order_rule::OrderRule,
         tests::{dag_test::MockStorage, helpers::new_certified_node},
         types::{CertifiedAck, DAGMessage},
         RpcHandler,
@@ -15,7 +18,9 @@ use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_time_service::TimeService;
-use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
+use aptos_types::{
+    epoch_state::EpochState, ledger_info::LedgerInfo, validator_verifier::random_validator_verifier,
+};
 use async_trait::async_trait;
 use claims::{assert_ok, assert_ok_eq};
 use std::{sync::Arc, time::Duration};
@@ -36,7 +41,7 @@ impl RBNetworkSender<DAGMessage> for MockNetworkSender {
 }
 
 #[async_trait]
-impl DAGNetworkSender for MockNetworkSender {
+impl TDAGNetworkSender for MockNetworkSender {
     async fn send_rpc(
         &self,
         _receiver: Author,
@@ -71,13 +76,32 @@ fn test_certified_node_handler() {
 
     let zeroth_round_node = new_certified_node(0, signers[0].author(), vec![]);
 
+    let network_sender = Arc::new(MockNetworkSender {});
     let rb = Arc::new(ReliableBroadcast::new(
         signers.iter().map(|s| s.author()).collect(),
-        Arc::new(MockNetworkSender {}),
+        network_sender.clone(),
         ExponentialBackoff::from_millis(10),
         aptos_time_service::TimeService::mock(),
     ));
     let time_service = TimeService::mock();
+    let (ordered_nodes_sender, _) = futures_channel::mpsc::unbounded();
+    let validators = signers.iter().map(|vs| vs.author()).collect();
+    let order_rule = OrderRule::new(
+        epoch_state.clone(),
+        LedgerInfo::mock_genesis(None),
+        dag.clone(),
+        Box::new(RoundRobinAnchorElection::new(validators)),
+        ordered_nodes_sender,
+    );
+
+    let (_, fetch_requester, _, _) = DagFetcher::new(
+        epoch_state.clone(),
+        network_sender,
+        dag.clone(),
+        aptos_time_service::TimeService::mock(),
+    );
+    let fetch_requester = Arc::new(fetch_requester);
+
     let mut driver = DagDriver::new(
         signers[0].author(),
         epoch_state,
@@ -87,6 +111,8 @@ fn test_certified_node_handler() {
         1,
         time_service,
         storage,
+        order_rule,
+        fetch_requester,
     );
 
     // expect an ack for a valid message

@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::dag::types::{CertifiedNode, Node, NodeCertificate};
+use crate::dag::types::{CertifiedNode, Extensions, Node, NodeCertificate};
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_types::aggregate_signature::AggregateSignature;
 
@@ -9,7 +9,15 @@ pub(crate) fn new_certified_node(
     author: Author,
     parents: Vec<NodeCertificate>,
 ) -> CertifiedNode {
-    let node = Node::new(1, round, author, 0, Payload::empty(false), parents);
+    let node = Node::new(
+        1,
+        round,
+        author,
+        0,
+        Payload::empty(false),
+        parents,
+        Extensions::empty(),
+    );
     CertifiedNode::new(node, AggregateSignature::empty())
 }
 
@@ -19,5 +27,13 @@ pub(crate) fn new_node(
     author: Author,
     parents: Vec<NodeCertificate>,
 ) -> Node {
-    Node::new(0, round, author, timestamp, Payload::empty(false), parents)
+    Node::new(
+        0,
+        round,
+        author,
+        timestamp,
+        Payload::empty(false),
+        parents,
+        Extensions::empty(),
+    )
 }

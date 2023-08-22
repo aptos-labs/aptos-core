@@ -17,6 +17,8 @@ pub const DEFAULT_OUTPUT_DIR: &str = "build";
 pub const SHADOW: &str = "shadow";
 pub const SHADOW_SHORT: char = 'S';
 
+pub const SKIP_ATTRIBUTE_CHECKS: &str = "skip-attribute-checks";
+
 pub const SOURCE_MAP: &str = "source-map";
 pub const SOURCE_MAP_SHORT: char = 'm';
 

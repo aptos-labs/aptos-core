@@ -66,6 +66,8 @@ return true.
 -  [Function `auids_enabled`](#0x1_features_auids_enabled)
 -  [Function `get_bulletproofs_feature`](#0x1_features_get_bulletproofs_feature)
 -  [Function `bulletproofs_enabled`](#0x1_features_bulletproofs_enabled)
+-  [Function `get_signer_native_format_fix_feature`](#0x1_features_get_signer_native_format_fix_feature)
+-  [Function `signer_native_format_fix_enabled`](#0x1_features_signer_native_format_fix_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -341,6 +343,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SHA_512_AND_RIPEMD_160_NATIVES">SHA_512_AND_RIPEMD_160_NATIVES</a>: u64 = 3;
+</code></pre>
+
+
+
+<a name="0x1_features_SIGNER_NATIVE_FORMAT_FIX"></a>
+
+Fix the native formatter for signer.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SIGNER_NATIVE_FORMAT_FIX">SIGNER_NATIVE_FORMAT_FIX</a>: u64 = 25;
 </code></pre>
 
 
@@ -1181,6 +1194,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bulletproofs_enabled">bulletproofs_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BULLETPROOFS_NATIVES">BULLETPROOFS_NATIVES</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_signer_native_format_fix_feature"></a>
+
+## Function `get_signer_native_format_fix_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_signer_native_format_fix_feature">get_signer_native_format_fix_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_signer_native_format_fix_feature">get_signer_native_format_fix_feature</a>(): u64 { <a href="features.md#0x1_features_SIGNER_NATIVE_FORMAT_FIX">SIGNER_NATIVE_FORMAT_FIX</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_signer_native_format_fix_enabled"></a>
+
+## Function `signer_native_format_fix_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_signer_native_format_fix_enabled">signer_native_format_fix_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_signer_native_format_fix_enabled">signer_native_format_fix_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SIGNER_NATIVE_FORMAT_FIX">SIGNER_NATIVE_FORMAT_FIX</a>)
 }
 </code></pre>
 

@@ -575,7 +575,7 @@ impl FakeExecutor {
 
     /// Verifies the given transaction by running it through the VM verifier.
     pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
-        let vm = AptosVM::new(self.get_state_view());
+        let vm = AptosVM::new_from_state_view(self.get_state_view());
         vm.validate_transaction(txn, &self.data_store)
     }
 

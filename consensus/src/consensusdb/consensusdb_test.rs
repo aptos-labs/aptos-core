@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use crate::dag::{CertifiedNode, Node, Vote};
+use crate::dag::{CertifiedNode, Extensions, Node, Vote};
 use aptos_consensus_types::{
     block::block_test_utils::certificate_for_genesis,
     common::{Author, Payload},
@@ -93,7 +93,15 @@ fn test_dag() {
     let tmp_dir = TempPath::new();
     let db = ConsensusDB::new(&tmp_dir);
 
-    let node = Node::new(1, 1, Author::random(), 123, Payload::empty(false), vec![]);
+    let node = Node::new(
+        1,
+        1,
+        Author::random(),
+        123,
+        Payload::empty(false),
+        vec![],
+        Extensions::empty(),
+    );
     test_dag_type::<NodeSchema, <NodeSchema as Schema>::Key>(node.digest(), node.clone(), &db);
 
     let certified_node = CertifiedNode::new(node.clone(), AggregateSignature::empty());

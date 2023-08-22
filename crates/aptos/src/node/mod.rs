@@ -853,27 +853,36 @@ pub struct ValidatorSetSummary {
     pub total_joining_power: u128,
 }
 
+impl ValidatorSetSummary {
+    fn convert_to_summary_vec(
+        validator_info: Vec<ValidatorInfo>,
+    ) -> Result<Vec<ValidatorInfoSummary>, bcs::Error> {
+        let mut validators: Vec<ValidatorInfoSummary> = vec![];
+        for validator in validator_info.iter() {
+            match validator.try_into() {
+                Ok(validator) => validators.push(validator),
+                Err(err) => return Err(err),
+            }
+        }
+        Ok(validators)
+    }
+}
+
 impl TryFrom<&ValidatorSet> for ValidatorSetSummary {
     type Error = bcs::Error;
 
     fn try_from(set: &ValidatorSet) -> Result<Self, Self::Error> {
+        let active_validators: Vec<ValidatorInfoSummary> =
+            Self::convert_to_summary_vec(set.active_validators.clone())?;
+        let pending_inactive: Vec<ValidatorInfoSummary> =
+            Self::convert_to_summary_vec(set.pending_inactive.clone())?;
+        let pending_active: Vec<ValidatorInfoSummary> =
+            Self::convert_to_summary_vec(set.pending_active.clone())?;
         Ok(ValidatorSetSummary {
             scheme: set.scheme,
-            active_validators: set
-                .active_validators
-                .iter()
-                .filter_map(|validator| validator.try_into().ok())
-                .collect(),
-            pending_inactive: set
-                .pending_inactive
-                .iter()
-                .filter_map(|validator| validator.try_into().ok())
-                .collect(),
-            pending_active: set
-                .pending_active
-                .iter()
-                .filter_map(|validator| validator.try_into().ok())
-                .collect(),
+            active_validators,
+            pending_inactive,
+            pending_active,
             total_voting_power: set.total_voting_power,
             total_joining_power: set.total_joining_power,
         })
@@ -976,11 +985,17 @@ impl ValidatorConfig {
     }
 
     pub fn fullnode_network_addresses(&self) -> Result<Vec<NetworkAddress>, bcs::Error> {
-        bcs::from_bytes(&self.fullnode_network_addresses)
+        match &self.validator_network_addresses.is_empty() {
+            true => Ok(vec![]),
+            false => bcs::from_bytes(&self.fullnode_network_addresses),
+        }
     }
 
     pub fn validator_network_addresses(&self) -> Result<Vec<NetworkAddress>, bcs::Error> {
-        bcs::from_bytes(&self.validator_network_addresses)
+        match &self.validator_network_addresses.is_empty() {
+            true => Ok(vec![]),
+            false => bcs::from_bytes(&self.validator_network_addresses),
+        }
     }
 }
 
@@ -1008,7 +1023,6 @@ impl TryFrom<&ValidatorConfig> for ValidatorConfigSummary {
         };
         Ok(ValidatorConfigSummary {
             consensus_public_key,
-            // TODO: We should handle if some of these are not parsable
             validator_network_addresses: config.validator_network_addresses()?,
             fullnode_network_addresses: config.fullnode_network_addresses()?,
             validator_index: config.validator_index,
