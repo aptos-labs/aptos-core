@@ -12,7 +12,7 @@ move-compiler = { path = "../../move-compiler" }
 move-model = { path = "../../move-model" }
 move-prover = { path = ".." }
 move-prover-boogie-backend = { path = "../boogie-backend" }
-move-stackless-bytecode = { path = "../bytecode" }
+move-stackless-bytecode = { path = "../../move-model/bytecode" }
 
 # FB external dependencies
 z3tracer = "0.8.0"

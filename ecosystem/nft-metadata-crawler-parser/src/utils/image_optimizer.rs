@@ -59,7 +59,10 @@ impl ImageOptimizer {
                     _ => {
                         let img = image::load_from_memory(&img_bytes)
                             .context(format!("Failed to load image from memory: {} bytes", size))?;
-                        let resized_image = resize(&img.to_rgb8(), 400, 400, FilterType::Gaussian);
+                        let (nwidth, nheight) =
+                            Self::calculate_dimensions_with_ration(512, img.width(), img.height());
+                        let resized_image =
+                            resize(&img.to_rgb8(), nwidth, nheight, FilterType::Gaussian);
                         Ok((Self::to_jpeg_bytes(resized_image, image_quality)?, format))
                     },
                 }
@@ -82,6 +85,23 @@ impl ImageOptimizer {
                 );
                 Err(e)
             },
+        }
+    }
+
+    /// Calculate new dimensions given a goal size while maintaining original aspect ratio
+    fn calculate_dimensions_with_ration(goal: u32, width: u32, height: u32) -> (u32, u32) {
+        if width == 0 || height == 0 {
+            return (0, 0);
+        }
+
+        if width > height {
+            let new_width = goal;
+            let new_height = (goal as f64 * (height as f64 / width as f64)).round() as u32;
+            (new_width, new_height)
+        } else {
+            let new_height = goal;
+            let new_width = (goal as f64 * (width as f64 / height as f64)).round() as u32;
+            (new_width, new_height)
         }
     }
 
