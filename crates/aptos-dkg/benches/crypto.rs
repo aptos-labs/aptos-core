@@ -12,12 +12,12 @@ use std::ops::Mul;
 use aptos_dkg::algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain};
 use aptos_dkg::algebra::fft::fft_assign;
 use aptos_dkg::algebra::polynomials;
-use aptos_dkg::constants::{LARGE_SIZES, OUR_THRESHOLD, SMALL_SIZES};
-use aptos_dkg::utils::hash_to_scalar;
+use aptos_dkg::constants::{BEST_CASE_THRESHOLD, LARGE_SIZES, OUR_THRESHOLD, SMALL_SIZES};
 use aptos_dkg::utils::random::{
     random_g1_point, random_g1_points, random_g2_point, random_g2_points, random_gt_point_insecure,
     random_gt_points_insecure, random_scalar, random_scalars,
 };
+use aptos_dkg::utils::{g1_multi_exp, g2_multi_exp, hash_to_scalar, multi_pairing};
 
 /// FFT sizes for the benchmarks.
 pub const FFT_SIZES: [usize; 6] = [32, 64, 128, 256, 512, 1024];
@@ -66,7 +66,53 @@ pub fn crypto_group(c: &mut Criterion) {
         poly_mul_fft_with_dom(n, &mut group);
     }
 
+    for t in [10, BEST_CASE_THRESHOLD] {
+        unoptimized_threshold_vuf_share_verification(t, &mut group);
+    }
+
     group.finish();
+}
+
+fn unoptimized_threshold_vuf_share_verification<M: Measurement>(
+    t: usize,
+    g: &mut BenchmarkGroup<M>,
+) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(1u64));
+
+    g.bench_function(
+        BenchmarkId::new("unoptimized_threshold_vuf_share_verification", t),
+        move |b| {
+            b.iter_with_setup(
+                || {
+                    let g1 = random_g1_points(t + 3, &mut rng);
+                    let g2 = random_g2_points(t + 3, &mut rng);
+                    let a = random_scalars(t + 3, &mut rng);
+                    let b = random_scalars(t + 3, &mut rng);
+                    let c = random_scalars(t + 3, &mut rng);
+
+                    (g1, g2, a, b, c)
+                },
+                |(g1, g2, a, b, c)| {
+                    // size-3 multipairing
+                    multi_pairing(g1.iter().take(3), g2.iter().take(3));
+                    // size-4 multipairing
+                    multi_pairing(g1.iter().take(4), g2.iter().take(4));
+                    // 3 size-2 G_1 multiexps
+                    g1_multi_exp(&g1[0..2], &a[0..2]);
+                    g1_multi_exp(&g1[0..2], &b[0..2]);
+                    g1_multi_exp(&g1[0..2], &c[0..2]);
+                    // 3 size-t G_1 multiexp
+                    g1_multi_exp(&g1[0..t], &a[0..t]);
+                    g1_multi_exp(&g1[0..t], &b[0..t]);
+                    g1_multi_exp(&g1[0..t], &c[0..t]);
+                    // size-t G_2 multiexp
+                    g2_multi_exp(&g2[0..t], &a[0..t]);
+                },
+            )
+        },
+    );
 }
 
 fn random_scalars_and_points_benches<M: Measurement>(g: &mut BenchmarkGroup<M>) {
@@ -85,6 +131,8 @@ fn random_scalars_and_points_benches<M: Measurement>(g: &mut BenchmarkGroup<M>) 
 
 fn hash_to_scalar_bench<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
     let mut rng = thread_rng();
+
+    g.throughput(Throughput::Bytes(n as u64));
 
     g.bench_function(BenchmarkId::new("hash_to_scalar", n), move |b| {
         b.iter_with_setup(
@@ -108,6 +156,8 @@ fn hash_to_scalar_bench<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
 
 fn hash_to_g1_bench<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
     let mut rng = thread_rng();
+
+    g.throughput(Throughput::Bytes(n as u64));
 
     g.bench_function(BenchmarkId::new("hash_to_g1", n), move |b| {
         b.iter_with_setup(
@@ -133,6 +183,8 @@ fn hash_to_g1_bench<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
 fn hash_to_g2_bench<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
     let mut rng = thread_rng();
 
+    g.throughput(Throughput::Bytes(n as u64));
+
     g.bench_function(BenchmarkId::new("hash_to_g2", n), move |b| {
         b.iter_with_setup(
             || {
@@ -155,6 +207,8 @@ fn hash_to_g2_bench<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
 }
 
 fn batch_evaluation_domain_new<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
+    g.throughput(Throughput::Elements(n as u64));
+
     g.bench_function(
         BenchmarkId::new("batch_evaluation_domain::new", n),
         move |b| b.iter(|| BatchEvaluationDomain::new(n)),
@@ -183,6 +237,8 @@ fn batch_evaluation_domain_get_subdomain<M: Measurement>(N: usize, g: &mut Bench
 }
 
 fn evaluation_domain_new<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
+    g.throughput(Throughput::Elements(n as u64));
+
     g.bench_function(BenchmarkId::new("evaluation_domain::new", n), move |b| {
         b.iter(|| EvaluationDomain::new(n))
     });

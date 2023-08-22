@@ -166,7 +166,8 @@ fn pvss_deal_verify_aggr_and_reconstruct<T: Transcript>(
 
     // Test aggregation
     trx1.aggregate_with(sc, &trx2);
-    trx1.verify(sc, &pp, &eks, &DST_PVSS_TESTING_APP[..]).expect("aggregated PVSS transcript failed verification");
+    trx1.verify(sc, &pp, &eks, &DST_PVSS_TESTING_APP[..])
+        .expect("aggregated PVSS transcript failed verification");
 }
 
 fn actual_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(
