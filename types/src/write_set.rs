@@ -287,6 +287,7 @@ impl WriteSetV0 {
 /// This is separate because it goes through validation before becoming an immutable `WriteSet`.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct WriteSetMut {
+    // TODO: Change to HashMap with a stable iterator for serialization.
     write_set: BTreeMap<StateKey, WriteOp>,
 }
 

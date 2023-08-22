@@ -35,7 +35,7 @@ use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::BorrowMut,
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -316,10 +316,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             new_slot_metadata,
         };
 
-        let mut resource_write_set = BTreeMap::new();
-        let mut module_write_set = BTreeMap::new();
-        let mut aggregator_write_set = BTreeMap::new();
-        let mut aggregator_delta_set = BTreeMap::new();
+        let mut resource_write_set = HashMap::new();
+        let mut module_write_set = HashMap::new();
+        let mut aggregator_write_set = HashMap::new();
+        let mut aggregator_delta_set = HashMap::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
