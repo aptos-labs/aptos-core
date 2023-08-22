@@ -125,10 +125,10 @@ move run` must be applied to a module inside `storage/`",
             txn_args,
         )
     } else {
-        let changeset = session.finish().map_err(|e| e.into_vm_status())?;
+        let (changeset, events) = session.finish().map_err(|e| e.into_vm_status())?;
         if verbose {
-            explain_execution_effects(&changeset, state)?
+            explain_execution_effects(&changeset, &events, state)?
         }
-        maybe_commit_effects(!dry_run, changeset, state)
+        maybe_commit_effects(!dry_run, changeset, events, state)
     }
 }

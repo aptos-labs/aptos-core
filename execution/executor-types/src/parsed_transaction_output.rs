@@ -16,9 +16,7 @@ pub struct ParsedTransactionOutput {
 
 impl ParsedTransactionOutput {
     pub fn parse_reconfig_events(events: &[ContractEvent]) -> impl Iterator<Item = &ContractEvent> {
-        events
-            .iter()
-            .filter(|e| e.event_key().cloned() == Some(*NEW_EPOCH_EVENT_KEY))
+        events.iter().filter(|e| *e.key() == *NEW_EPOCH_EVENT_KEY)
     }
 }
 

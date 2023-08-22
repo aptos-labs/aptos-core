@@ -3,7 +3,7 @@
 
 use super::{dag_network::RpcWithFallback, types::NodeMetadata, RpcHandler};
 use crate::dag::{
-    dag_network::DAGNetworkSender,
+    dag_network::TDAGNetworkSender,
     dag_store::Dag,
     types::{CertifiedNode, FetchResponse, Node, RemoteFetchRequest},
 };
@@ -121,7 +121,7 @@ impl LocalFetchRequest {
 
 pub struct DagFetcher {
     epoch_state: Arc<EpochState>,
-    network: Arc<dyn DAGNetworkSender>,
+    network: Arc<dyn TDAGNetworkSender>,
     dag: Arc<RwLock<Dag>>,
     request_rx: Receiver<LocalFetchRequest>,
     time_service: TimeService,
@@ -130,7 +130,7 @@ pub struct DagFetcher {
 impl DagFetcher {
     pub fn new(
         epoch_state: Arc<EpochState>,
-        network: Arc<dyn DAGNetworkSender>,
+        network: Arc<dyn TDAGNetworkSender>,
         dag: Arc<RwLock<Dag>>,
         time_service: TimeService,
     ) -> (

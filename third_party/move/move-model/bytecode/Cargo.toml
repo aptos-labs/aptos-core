@@ -17,7 +17,7 @@ move-command-line-common = { path = "../../move-command-line-common" }
 move-compiler = { path = "../../move-compiler" }
 move-core-types = { path = "../../move-core/types" }
 move-ir-to-bytecode = { path = "../../move-ir-compiler/move-ir-to-bytecode" }
-move-model = { path = "../../move-model" }
+move-model = { path = ".." }
 
 codespan = "0.11.1"
 codespan-reporting = { version = "0.11.1", features = ["serde", "serialization"] }
@@ -34,7 +34,7 @@ serde = { version = "1.0.124", features = ["derive"] }
 [dev-dependencies]
 anyhow = "1.0.52"
 datatest-stable = "0.1.1"
-move-prover-test-utils = { path = "../test-utils" }
+move-prover-test-utils = { path = "../../move-prover/test-utils" }
 move-stdlib = { path = "../../move-stdlib" }
 
 [[test]]

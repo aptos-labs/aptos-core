@@ -4,8 +4,6 @@
 
 #[cfg(feature = "testing")]
 use aptos_framework::natives::cryptography::algebra::AlgebraContext;
-#[cfg(feature = "testing")]
-use aptos_framework::natives::event::NativeEventContext;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
 #[cfg(feature = "testing")]
@@ -115,5 +113,4 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeAggregatorContext::new([0; 32], &*DUMMY_RESOLVER));
     exts.add(NativeRistrettoPointContext::new());
     exts.add(AlgebraContext::new());
-    exts.add(NativeEventContext::default());
 }

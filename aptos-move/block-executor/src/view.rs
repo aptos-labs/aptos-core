@@ -8,7 +8,7 @@ use crate::{
     txn_last_input_output::ReadDescriptor,
 };
 use anyhow::Result;
-use aptos_aggregator::delta_change_set::{deserialize, serialize};
+use aptos_aggregator::delta_change_set::serialize;
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, MVModulesError, MVModulesOutput, TxnIndex},
@@ -249,11 +249,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
                     let mut mv_value = map.fetch_data(state_key, self.txn_idx);
 
                     if matches!(mv_value, ReadResult::Unresolved) {
-                        let from_storage =
-                            self.base_view.get_state_value_bytes(state_key)?.map_or(
-                                Err(VMStatus::error(StatusCode::STORAGE_ERROR, None)),
-                                |bytes| Ok(deserialize(&bytes)),
-                            )?;
+                        let from_storage = self
+                            .base_view
+                            .get_state_value_u128(state_key)?
+                            .ok_or(VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
 
                         // Store base value in the versioned data-structure directly, so subsequent
                         // reads can be resolved to U128 directly without storage calls.
