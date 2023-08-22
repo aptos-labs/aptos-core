@@ -8,6 +8,7 @@ All notable changes to the Aptos Python SDK will be captured in this file. This 
 - Update many dependencies and set Python 3.8.1 as the minimum requirement
 - Add support for an experimental chunked uploader
 - Add experimental support for the Aptos CLI enabling local end-to-end testing, package building, and package integration tests
+- **[Breaking Change]**: Rewrote the large package publisher to support large modules too
 - **[Breaking Change]**: Delete sync client
 - **[Breaking Change]**: Removed the `hex` function from `AccountAddress`. Instead of `addr.hex()` use `str(addr)`.
 - **[Breaking Change]**: The string representation of `AccountAddress` now conforms to [AIP-40](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md).

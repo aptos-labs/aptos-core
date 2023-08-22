@@ -37,6 +37,20 @@ class Test(unittest.IsolatedAsyncioTestCase):
         contract_address = await hello_blockchain.publish_contract(hello_blockchain_dir)
         await hello_blockchain.main(contract_address)
 
+    async def test_large_package_publisher(self):
+        from . import large_package_publisher
+
+        large_packages_dir = os.path.join(
+            "..", "..", "..", "aptos-move", "move-examples", "large_packages"
+        )
+        module_addr = await large_package_publisher.publish_large_packages(
+            large_packages_dir
+        )
+        large_package_example_dir = os.path.join(
+            large_packages_dir, "large_package_example"
+        )
+        await large_package_publisher.main(large_package_example_dir, module_addr)
+
     async def test_read_aggreagtor(self):
         from . import read_aggregator
 

@@ -14,7 +14,7 @@ MAX_TRANSACTION_SIZE: int = 62000
 
 # The location of the large package publisher
 MODULE_ADDRESS: AccountAddress = AccountAddress.from_str(
-    "0xd20f305e3090a24c00524604dc2a42925a75c67aa6020d33033d516cf0878c4a"
+    "0xfa3911d7715238b2e3bd5b26b6a35e11ffa16cff318bc11471e84eccee8bd291"
 )
 
 
@@ -48,9 +48,32 @@ class PackagePublisher:
         )
         return await self.client.submit_bcs_transaction(signed_transaction)
 
+    @staticmethod
+    def create_chunks(data: bytes) -> List[bytes]:
+        chunks: List[bytes] = []
+        read_data = 0
+        while read_data < len(data):
+            start_read_data = read_data
+            read_data = min(read_data + MAX_TRANSACTION_SIZE, len(data))
+            taken_data = data[start_read_data:read_data]
+            chunks.append(taken_data)
+        return chunks
+
     async def publish_package_experimental(
-        self, sender: Account, package_metadata: bytes, modules: List[bytes]
+        self,
+        sender: Account,
+        package_metadata: bytes,
+        modules: List[bytes],
+        large_package_address: AccountAddress = MODULE_ADDRESS,
     ) -> List[str]:
+        """
+        Chunks the package_metadata and modules across as many transactions as necessary.
+        Each transaction has a base cost and the maximum size is currently 64K, so this chunks
+        them into 62K + the base transaction size. This should be sufficient for reasonably
+        optimistic transaction batching. The batching tries to place as much data in a transaction
+        before moving to the chunk to the next transaction.
+        """
+        # If this can fit into a single transaction, use the normal package publisher
         total_size = len(package_metadata)
         for module in modules:
             total_size += len(module)
@@ -58,45 +81,59 @@ class PackagePublisher:
             txn_hash = await self.publish_package(sender, package_metadata, modules)
             return [txn_hash]
 
+        # Chunk the metadata and insert it into payloads. The last chunk may be small enough
+        # to be placed with other data. This may also be the only chunk.
         payloads = []
-        read_metadata = 0
-        taken_size = 0
-        while read_metadata < len(package_metadata):
-            start_read_data = read_metadata
-            read_metadata = min(
-                read_metadata + MAX_TRANSACTION_SIZE, len(package_metadata)
+        metadata_chunks = PackagePublisher.create_chunks(package_metadata)
+        for metadata_chunk in metadata_chunks[:-1]:
+            payloads.append(
+                PackagePublisher.create_large_package_publishing_payload(
+                    large_package_address, metadata_chunk, [], [], False
+                )
             )
-            chunked_package_metadata = package_metadata[start_read_data:read_metadata]
-            taken_size = len(chunked_package_metadata)
-            if taken_size == MAX_TRANSACTION_SIZE:
-                payloads.append(
-                    PackagePublisher.create_large_package_publishing_payload(
-                        MODULE_ADDRESS, chunked_package_metadata, [], False
-                    )
-                )
-                chunked_package_metadata = b""
 
-        chunked_modules: List[bytes] = []
-        for module in modules:
-            assert len(module) <= MAX_TRANSACTION_SIZE, "Module exceeds maximum size"
-            if len(module) + taken_size > MAX_TRANSACTION_SIZE:
-                taken_size = 0
-                payloads.append(
-                    PackagePublisher.create_large_package_publishing_payload(
-                        MODULE_ADDRESS, chunked_package_metadata, chunked_modules, False
-                    )
-                )
-                chunked_package_metadata = b""
-                chunked_modules = []
-            taken_size += len(module)
-            chunked_modules.append(module)
+        metadata_chunk = metadata_chunks[-1]
+        taken_size = len(metadata_chunk)
+        modules_indices: List[int] = []
+        data_chunks: List[bytes] = []
 
+        # Chunk each module and place them into a payload when adding more would exceed the
+        # maximum transaction size.
+        for idx, module in enumerate(modules):
+            chunked_module = PackagePublisher.create_chunks(module)
+            for chunk in chunked_module:
+                if taken_size + len(chunk) > MAX_TRANSACTION_SIZE:
+                    payloads.append(
+                        PackagePublisher.create_large_package_publishing_payload(
+                            large_package_address,
+                            metadata_chunk,
+                            modules_indices,
+                            data_chunks,
+                            False,
+                        )
+                    )
+                    metadata_chunk = b""
+                    modules_indices = []
+                    data_chunks = []
+                    taken_size = 0
+                if idx not in modules_indices:
+                    modules_indices.append(idx)
+                data_chunks.append(chunk)
+                taken_size += len(chunk)
+
+        # There will almost certainly be left over data from the chunking, so pass the last
+        # chunk for the sake of publishing.
         payloads.append(
             PackagePublisher.create_large_package_publishing_payload(
-                MODULE_ADDRESS, chunked_package_metadata, chunked_modules, True
+                large_package_address,
+                metadata_chunk,
+                modules_indices,
+                data_chunks,
+                True,
             )
         )
 
+        # Submit and wait for each transaction, including publishing.
         txn_hashes = []
         for payload in payloads:
             print("Submitting transaction...")
@@ -112,11 +149,15 @@ class PackagePublisher:
     def create_large_package_publishing_payload(
         module_address: AccountAddress,
         chunked_package_metadata: bytes,
+        modules_indices: List[int],
         chunked_modules: List[bytes],
         publish: bool,
     ) -> TransactionPayload:
         transaction_arguments = [
             TransactionArgument(chunked_package_metadata, Serializer.to_bytes),
+            TransactionArgument(
+                modules_indices, Serializer.sequence_serializer(Serializer.u16)
+            ),
             TransactionArgument(
                 chunked_modules, Serializer.sequence_serializer(Serializer.to_bytes)
             ),
