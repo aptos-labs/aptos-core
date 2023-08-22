@@ -86,27 +86,23 @@ fn unoptimized_threshold_vuf_share_verification<M: Measurement>(
         move |b| {
             b.iter_with_setup(
                 || {
-                    // for the size-3 and size-4 multipairings
-                    let lhs = random_g1_points(4, &mut rng);
-                    let rhs = random_g2_points(4, &mut rng);
+                    let g1 = random_g1_points(t + 3, &mut rng);
+                    let g2 = random_g2_points(t + 3, &mut rng);
+                    let a = random_scalars(t + 3, &mut rng);
+                    let b = random_scalars(t + 3, &mut rng);
+                    let c = random_scalars(t + 3, &mut rng);
 
-                    let g1 = random_g1_points(t + 2, &mut rng);
-                    let g2 = random_g2_points(t + 2, &mut rng);
-                    let a = random_scalars(t + 2, &mut rng);
-                    let b = random_scalars(t + 2, &mut rng);
-                    let c = random_scalars(t + 2, &mut rng);
-
-                    (lhs, rhs, g1, g2, a, b, c)
+                    (g1, g2, a, b, c)
                 },
-                |(lhs, rhs, g1, g2, a, b, c)| {
+                |(g1, g2, a, b, c)| {
                     // size-3 multipairing
-                    multi_pairing(lhs.iter().take(3), rhs.iter().take(3));
+                    multi_pairing(g1.iter().take(3), g2.iter().take(3));
                     // size-4 multipairing
-                    multi_pairing(lhs.iter().take(4), rhs.iter().take(4));
+                    multi_pairing(g1.iter().take(4), g2.iter().take(4));
                     // 3 size-2 G_1 multiexps
-                    g1_multi_exp(&g1[0..3], &a[0..3]);
-                    g1_multi_exp(&g1[0..3], &b[0..3]);
-                    g1_multi_exp(&g1[0..3], &c[0..3]);
+                    g1_multi_exp(&g1[0..2], &a[0..2]);
+                    g1_multi_exp(&g1[0..2], &b[0..2]);
+                    g1_multi_exp(&g1[0..2], &c[0..2]);
                     // 3 size-t G_1 multiexp
                     g1_multi_exp(&g1[0..t], &a[0..t]);
                     g1_multi_exp(&g1[0..t], &b[0..t]);
