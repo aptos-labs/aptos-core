@@ -2,7 +2,13 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
+use move_binary_format::file_format::CodeOffset;
+use move_core_types::language_storage::{StructTag, TypeTag};
+use move_model::{
+    model::{FunctionEnv, GlobalEnv},
+    ty::Type,
+};
+use move_stackless_bytecode::{
     compositional_analysis::{CompositionalAnalysis, SummaryCache},
     dataflow_analysis::{DataflowAnalysis, TransferFunctions},
     dataflow_domains::{AbstractDomain, JoinResult, SetDomain},
@@ -10,12 +16,6 @@ use crate::{
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
     stackless_bytecode::{Bytecode, Operation},
     COMPILED_MODULE_AVAILABLE,
-};
-use move_binary_format::file_format::CodeOffset;
-use move_core_types::language_storage::{StructTag, TypeTag};
-use move_model::{
-    model::{FunctionEnv, GlobalEnv},
-    ty::Type,
 };
 use std::collections::BTreeSet;
 

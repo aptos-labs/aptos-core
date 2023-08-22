@@ -1,26 +1,19 @@
 [package]
-name = "move-prover"
+name = "move-prover-bytecode-pipeline"
 version = "0.1.0"
-authors = ["Diem Association <opensource@diem.com>"]
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 publish = false
 edition = "2021"
 license = "Apache-2.0"
 
 [dependencies]
 anyhow = "1.0.52"
-move-abigen = { path = "move-abigen" }
-move-binary-format = { path = "../move-binary-format" }
-move-command-line-common = { path = "../move-command-line-common" }
-move-compiler = { path = "../move-compiler" }
-move-core-types = { path = "../move-core/types" }
-move-docgen = { path = "move-docgen" }
-move-errmapgen = { path = "move-errmapgen" }
-move-ir-types = { path = "../move-ir/types" }
-move-model = { path = "../move-model" }
+move-binary-format = { path = "../../move-binary-format" }
+move-core-types = { path = "../../move-core/types" }
+move-model = { path = "../../move-model" }
+
 # move dependencies
-move-prover-boogie-backend = { path = "boogie-backend" }
-move-prover-bytecode-pipeline = { path = "bytecode-pipeline" }
-move-stackless-bytecode = { path = "../move-model/bytecode" }
+move-stackless-bytecode = { path = "../../move-model/bytecode" }
 
 # external dependencies
 async-trait = "0.1.42"
@@ -44,7 +37,7 @@ toml = "0.5.8"
 
 [dev-dependencies]
 datatest-stable = "0.1.1"
-move-prover-test-utils = { path = "test-utils" }
+move-stackless-bytecode-test-utils = { path = "../../move-model/bytecode-test-utils" }
 shell-words = "1.0.0"
 tempfile = "3.2.0"
 walkdir = "2.3.1"

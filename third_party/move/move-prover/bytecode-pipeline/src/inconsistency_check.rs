@@ -20,16 +20,16 @@
 //! any post-condition can be proved. Checking of this behavior is turned-off by default, and can
 //! be enabled with the `unconditional-abort-as-inconsistency` flag.
 
-use crate::{
+use crate::options::ProverOptions;
+use move_model::{exp_generator::ExpGenerator, model::FunctionEnv};
+use move_stackless_bytecode::{
     function_data_builder::FunctionDataBuilder,
     function_target::FunctionData,
     function_target_pipeline::{
         FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant, VerificationFlavor,
     },
-    options::ProverOptions,
     stackless_bytecode::{Bytecode, PropKind},
 };
-use move_model::{exp_generator::ExpGenerator, model::FunctionEnv};
 
 // This message is for the boogie wrapper, and not shown to the users.
 const EXPECTED_TO_FAIL: &str = "expected to fail";

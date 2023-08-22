@@ -17,7 +17,7 @@ anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-gas-algebra = { workspace = true }
-aptos-gas-schedule = { workspace = true } 
+aptos-gas-schedule = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-native-interface = { workspace = true }
 aptos-sdk-builder = { workspace = true }
@@ -59,6 +59,7 @@ move-model = { workspace = true }
 move-package = { workspace = true }
 move-prover = { workspace = true }
 move-prover-boogie-backend = { workspace = true }
+move-prover-bytecode-pipeline = { workspace = true }
 move-stackless-bytecode = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }

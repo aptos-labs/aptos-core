@@ -4,17 +4,7 @@
 
 // Transformation which injects global invariants into the bytecode.
 
-use crate::{
-    function_data_builder::FunctionDataBuilder,
-    function_target::{FunctionData, FunctionTarget},
-    function_target_pipeline::{
-        FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant, VerificationFlavor,
-    },
-    options::ProverOptions,
-    stackless_bytecode::{BorrowNode, Bytecode, Operation, PropKind},
-    usage_analysis,
-    verification_analysis_v2::InvariantAnalysisData,
-};
+use crate::{options::ProverOptions, verification_analysis_v2::InvariantAnalysisData};
 use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, log, warn};
@@ -27,6 +17,15 @@ use move_model::{
     pragmas::CONDITION_ISOLATED_PROP,
     spec_translator::{SpecTranslator, TranslatedSpec},
     ty::{Type, TypeUnificationAdapter, Variance},
+};
+use move_stackless_bytecode::{
+    function_data_builder::FunctionDataBuilder,
+    function_target::{FunctionData, FunctionTarget},
+    function_target_pipeline::{
+        FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant, VerificationFlavor,
+    },
+    stackless_bytecode::{BorrowNode, Bytecode, Operation, PropKind},
+    usage_analysis,
 };
 use std::collections::{BTreeMap, BTreeSet};
 

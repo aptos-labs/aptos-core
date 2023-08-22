@@ -14,19 +14,19 @@
 //! Because data invariants cannot refer to global memory, they are not relevant for memory
 //! usage, and their injection therefore can happen after this phase.
 
-use crate::{
-    function_data_builder::FunctionDataBuilder,
-    function_target::FunctionData,
-    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::PropKind,
-    usage_analysis::UsageProcessor,
-};
 use move_core_types::account_address::AccountAddress;
 use move_model::{
     ast::{Operation, QuantKind},
     exp_generator::ExpGenerator,
     model::FunctionEnv,
     ty::BOOL_TYPE,
+};
+use move_stackless_bytecode::{
+    function_data_builder::FunctionDataBuilder,
+    function_target::FunctionData,
+    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
+    stackless_bytecode::PropKind,
+    usage_analysis::UsageProcessor,
 };
 
 pub struct WellFormedInstrumentationProcessor {}

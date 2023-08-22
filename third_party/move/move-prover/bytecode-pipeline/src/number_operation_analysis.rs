@@ -7,19 +7,11 @@
 // The result of this analysis will be used when generating the boogie code
 
 use crate::{
-    dataflow_analysis::{DataflowAnalysis, TransferFunctions},
-    dataflow_domains::{AbstractDomain, JoinResult},
-    function_target::FunctionTarget,
-    function_target_pipeline::{
-        FunctionTargetPipeline, FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant,
-    },
     number_operation::{
-        GlobalNumberOperationState,
-        NumOperation::{self, Arithmetic, Bitwise, Bottom},
+        GlobalNumberOperationState, NumOperation,
+        NumOperation::{Arithmetic, Bitwise, Bottom},
     },
     options::ProverOptions,
-    stackless_bytecode::{AttrId, Bytecode, Operation},
-    stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use itertools::Either;
 use move_binary_format::file_format::CodeOffset;
@@ -27,6 +19,16 @@ use move_model::{
     ast::{Exp, ExpData, TempIndex},
     model::{FunId, GlobalEnv, ModuleId, Parameter},
     ty::{PrimitiveType, Type},
+};
+use move_stackless_bytecode::{
+    dataflow_analysis::{DataflowAnalysis, TransferFunctions},
+    dataflow_domains::{AbstractDomain, JoinResult},
+    function_target::FunctionTarget,
+    function_target_pipeline::{
+        FunctionTargetPipeline, FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant,
+    },
+    stackless_bytecode::{AttrId, Bytecode, Operation},
+    stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},

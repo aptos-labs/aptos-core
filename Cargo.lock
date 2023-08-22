@@ -1495,6 +1495,7 @@ dependencies = [
  "move-package",
  "move-prover",
  "move-prover-boogie-backend",
+ "move-prover-bytecode-pipeline",
  "move-stackless-bytecode",
  "move-unit-test",
  "move-vm-runtime",
@@ -9271,6 +9272,7 @@ dependencies = [
  "move-ir-types",
  "move-model",
  "move-prover-boogie-backend",
+ "move-prover-bytecode-pipeline",
  "move-prover-test-utils",
  "move-stackless-bytecode",
  "num 0.4.0",
@@ -9303,6 +9305,7 @@ dependencies = [
  "move-compiler",
  "move-core-types",
  "move-model",
+ "move-prover-bytecode-pipeline",
  "move-stackless-bytecode",
  "num 0.4.0",
  "once_cell",
@@ -9313,6 +9316,40 @@ dependencies = [
  "serde_json",
  "tera",
  "tokio",
+]
+
+[[package]]
+name = "move-prover-bytecode-pipeline"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "atty",
+ "clap 4.3.21",
+ "codespan",
+ "codespan-reporting",
+ "datatest-stable",
+ "futures",
+ "hex",
+ "itertools",
+ "log",
+ "move-binary-format",
+ "move-core-types",
+ "move-model",
+ "move-stackless-bytecode",
+ "move-stackless-bytecode-test-utils",
+ "num 0.4.0",
+ "once_cell",
+ "pretty",
+ "rand 0.8.5",
+ "serde 1.0.149",
+ "serde_json",
+ "shell-words",
+ "simplelog",
+ "tempfile",
+ "tokio",
+ "toml 0.5.9",
+ "walkdir",
 ]
 
 [[package]]
@@ -9359,13 +9396,26 @@ dependencies = [
  "move-core-types",
  "move-ir-to-bytecode",
  "move-model",
- "move-prover-test-utils",
- "move-stdlib",
+ "move-stackless-bytecode-test-utils",
  "num 0.4.0",
  "once_cell",
  "paste",
  "petgraph 0.5.1",
  "serde 1.0.149",
+]
+
+[[package]]
+name = "move-stackless-bytecode-test-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "codespan-reporting",
+ "move-command-line-common",
+ "move-compiler",
+ "move-model",
+ "move-prover-test-utils",
+ "move-stackless-bytecode",
+ "move-stdlib",
 ]
 
 [[package]]
@@ -11081,6 +11131,7 @@ dependencies = [
  "move-model",
  "move-prover",
  "move-prover-boogie-backend",
+ "move-prover-bytecode-pipeline",
  "move-stackless-bytecode",
  "num 0.4.0",
  "plotters",

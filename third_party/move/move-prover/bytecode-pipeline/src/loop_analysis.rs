@@ -2,15 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    function_data_builder::{FunctionDataBuilder, FunctionDataBuilderOptions},
-    function_target::{FunctionData, FunctionTarget},
-    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    graph::{Graph, NaturalLoop},
-    options::ProverOptions,
-    stackless_bytecode::{AttrId, Bytecode, HavocKind, Label, Operation, PropKind},
-    stackless_control_flow_graph::{BlockContent, BlockId, StacklessControlFlowGraph},
-};
+use crate::options::ProverOptions;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast::{self, TempIndex},
@@ -18,6 +10,14 @@ use move_model::{
     model::FunctionEnv,
     pragmas::UNROLL_PRAGMA,
     ty::{PrimitiveType, Type},
+};
+use move_stackless_bytecode::{
+    function_data_builder::{FunctionDataBuilder, FunctionDataBuilderOptions},
+    function_target::{FunctionData, FunctionTarget},
+    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
+    graph::{Graph, NaturalLoop},
+    stackless_bytecode::{AttrId, Bytecode, HavocKind, Label, Operation, PropKind},
+    stackless_control_flow_graph::{BlockContent, BlockId, StacklessControlFlowGraph},
 };
 use std::collections::{BTreeMap, BTreeSet};
 

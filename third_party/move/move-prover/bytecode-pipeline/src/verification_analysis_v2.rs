@@ -4,13 +4,7 @@
 
 //! Analysis which computes an annotation for each function whether
 
-use crate::{
-    dataflow_domains::SetDomain,
-    function_target::{FunctionData, FunctionTarget},
-    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
-    options::ProverOptions,
-    usage_analysis, COMPILED_MODULE_AVAILABLE,
-};
+use crate::options::ProverOptions;
 use itertools::Itertools;
 use log::debug;
 use move_model::{
@@ -19,6 +13,12 @@ use move_model::{
         CONDITION_SUSPENDABLE_PROP, DELEGATE_INVARIANTS_TO_CALLER_PRAGMA,
         DISABLE_INVARIANTS_IN_BODY_PRAGMA, VERIFY_PRAGMA,
     },
+};
+use move_stackless_bytecode::{
+    dataflow_domains::SetDomain,
+    function_target::{FunctionData, FunctionTarget},
+    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
+    usage_analysis, COMPILED_MODULE_AVAILABLE,
 };
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 

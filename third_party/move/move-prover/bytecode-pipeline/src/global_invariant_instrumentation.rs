@@ -5,14 +5,8 @@
 // Instrumentation pass which injects global invariants into the bytecode.
 
 use crate::{
-    function_data_builder::FunctionDataBuilder,
-    function_target::{FunctionData, FunctionTarget},
-    function_target_pipeline::{
-        FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant, VerificationFlavor,
-    },
-    global_invariant_analysis::{self, PerFunctionRelevance},
+    global_invariant_analysis, global_invariant_analysis::PerFunctionRelevance,
     options::ProverOptions,
-    stackless_bytecode::{Bytecode, Operation, PropKind},
 };
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
@@ -21,6 +15,14 @@ use move_model::{
     model::{FunctionEnv, GlobalId, Loc},
     spec_translator::{SpecTranslator, TranslatedSpec},
     ty::Type,
+};
+use move_stackless_bytecode::{
+    function_data_builder::FunctionDataBuilder,
+    function_target::{FunctionData, FunctionTarget},
+    function_target_pipeline::{
+        FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant, VerificationFlavor,
+    },
+    stackless_bytecode::{Bytecode, Operation, PropKind},
 };
 use std::collections::{BTreeMap, BTreeSet};
 

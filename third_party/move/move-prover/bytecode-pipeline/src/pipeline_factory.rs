@@ -3,28 +3,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    borrow_analysis::BorrowAnalysisProcessor,
     clean_and_optimize::CleanAndOptimizeProcessor,
     data_invariant_instrumentation::DataInvariantInstrumentationProcessor,
-    debug_instrumentation::DebugInstrumenter,
     eliminate_imm_refs::EliminateImmRefsProcessor,
-    function_target_pipeline::{FunctionTargetPipeline, FunctionTargetProcessor},
     global_invariant_analysis::GlobalInvariantAnalysisProcessor,
     global_invariant_instrumentation::GlobalInvariantInstrumentationProcessor,
-    inconsistency_check::InconsistencyCheckInstrumenter,
-    livevar_analysis::LiveVarAnalysisProcessor,
-    loop_analysis::LoopAnalysisProcessor,
-    memory_instrumentation::MemoryInstrumentationProcessor,
-    mono_analysis::MonoAnalysisProcessor,
-    mut_ref_instrumentation::MutRefInstrumenter,
-    mutation_tester::MutationTester,
-    number_operation_analysis::NumberOperationProcessor,
-    options::ProverOptions,
-    reaching_def_analysis::ReachingDefProcessor,
+    inconsistency_check::InconsistencyCheckInstrumenter, loop_analysis::LoopAnalysisProcessor,
+    memory_instrumentation::MemoryInstrumentationProcessor, mono_analysis::MonoAnalysisProcessor,
+    mut_ref_instrumentation::MutRefInstrumenter, mutation_tester::MutationTester,
+    number_operation_analysis::NumberOperationProcessor, options::ProverOptions,
     spec_instrumentation::SpecInstrumentationProcessor,
-    usage_analysis::UsageProcessor,
     verification_analysis::VerificationAnalysisProcessor,
     well_formed_instrumentation::WellFormedInstrumentationProcessor,
+};
+use move_stackless_bytecode::{
+    borrow_analysis::BorrowAnalysisProcessor,
+    debug_instrumentation::DebugInstrumenter,
+    function_target_pipeline::{FunctionTargetPipeline, FunctionTargetProcessor},
+    livevar_analysis::LiveVarAnalysisProcessor,
+    reaching_def_analysis::ReachingDefProcessor,
+    usage_analysis::UsageProcessor,
 };
 
 pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetPipeline {
@@ -79,6 +77,7 @@ pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetP
     res
 }
 
+#[allow(unused)]
 pub fn default_pipeline() -> FunctionTargetPipeline {
     default_pipeline_with_options(&ProverOptions::default())
 }

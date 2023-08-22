@@ -4,21 +4,7 @@
 
 // Transformation which injects specifications (Move function spec blocks) into the bytecode.
 
-use crate::{
-    function_data_builder::FunctionDataBuilder,
-    function_target::{FunctionData, FunctionTarget},
-    function_target_pipeline::{
-        FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant, VerificationFlavor,
-    },
-    livevar_analysis::LiveVarAnalysisProcessor,
-    options::ProverOptions,
-    reaching_def_analysis::ReachingDefProcessor,
-    stackless_bytecode::{
-        AbortAction, AssignKind, AttrId, BorrowEdge, BorrowNode, Bytecode, HavocKind, Label,
-        Operation, PropKind,
-    },
-    usage_analysis, verification_analysis, COMPILED_MODULE_AVAILABLE,
-};
+use crate::{options::ProverOptions, verification_analysis};
 use itertools::Itertools;
 use move_model::{
     ast,
@@ -28,6 +14,20 @@ use move_model::{
     pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA},
     spec_translator::{SpecTranslator, TranslatedSpec},
     ty::{ReferenceKind, Type, TypeDisplayContext, BOOL_TYPE, NUM_TYPE},
+};
+use move_stackless_bytecode::{
+    function_data_builder::FunctionDataBuilder,
+    function_target::{FunctionData, FunctionTarget},
+    function_target_pipeline::{
+        FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant, VerificationFlavor,
+    },
+    livevar_analysis::LiveVarAnalysisProcessor,
+    reaching_def_analysis::ReachingDefProcessor,
+    stackless_bytecode::{
+        AbortAction, AssignKind, AttrId, BorrowEdge, BorrowNode, Bytecode, HavocKind, Label,
+        Operation, PropKind,
+    },
+    usage_analysis, COMPILED_MODULE_AVAILABLE,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},

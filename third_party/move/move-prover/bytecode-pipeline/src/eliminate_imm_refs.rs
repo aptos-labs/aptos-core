@@ -2,16 +2,16 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    function_data_builder::FunctionDataBuilder,
-    function_target::FunctionData,
-    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AssignKind, Bytecode, Operation},
-};
 use move_model::{
     ast::TempIndex,
     model::FunctionEnv,
     ty::{ReferenceKind, Type},
+};
+use move_stackless_bytecode::{
+    function_data_builder::FunctionDataBuilder,
+    function_target::FunctionData,
+    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
+    stackless_bytecode::{AssignKind, Bytecode, Operation},
 };
 
 pub struct EliminateImmRefsProcessor {}
