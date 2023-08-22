@@ -15,7 +15,7 @@ pub mod transaction_executor;
 pub mod transaction_generator;
 
 use crate::{
-    pipeline::Pipeline, transaction_committer::TransactionCommitter,
+    db_access::DbAccessUtil, pipeline::Pipeline, transaction_committer::TransactionCommitter,
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
 use aptos_block_executor::counters as block_executor_counters;
@@ -34,7 +34,7 @@ use aptos_jellyfish_merkle::metrics::{
 use aptos_logger::{info, warn};
 use aptos_metrics_core::Histogram;
 use aptos_sdk::types::LocalAccount;
-use aptos_storage_interface::DbReaderWriter;
+use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_transaction_generator_lib::{
     create_txn_generator_creator, TransactionGeneratorCreator, TransactionType,
     TransactionType::NonConflictingCoinTransfer,
@@ -323,8 +323,9 @@ pub fn run_benchmark<V>(
     );
 
     if verify_sequence_numbers {
-        generator.verify_sequence_numbers(db.reader);
+        generator.verify_sequence_numbers(db.reader.clone());
     }
+    log_total_supply(&db.reader);
 }
 
 fn init_workload<V>(
@@ -473,7 +474,7 @@ fn add_accounts_impl<V>(
     if verify_sequence_numbers {
         println!("Verifying sequence numbers...");
         // Do a sanity check on the sequence number to make sure all transactions are committed.
-        generator.verify_sequence_numbers(db.reader);
+        generator.verify_sequence_numbers(db.reader.clone());
     }
 
     println!(
@@ -482,6 +483,8 @@ fn add_accounts_impl<V>(
         generator.version(),
         generator.num_existing_accounts() + num_new_accounts,
     );
+
+    log_total_supply(&db.reader);
 
     // Write metadata
     generator.write_meta(&output_dir, num_new_accounts);
@@ -630,4 +633,10 @@ mod tests {
         // correct execution not yet implemented, so cannot be checked for validity
         test_generic_benchmark::<NativeExecutor>(None, false);
     }
+}
+
+fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
+    let total_supply =
+        DbAccessUtil::get_total_supply(&db_reader.latest_state_checkpoint_view().unwrap()).unwrap();
+    info!("total supply is {:?} octas", total_supply)
 }

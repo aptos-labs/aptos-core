@@ -10,6 +10,7 @@ use crate::{
     finalizer::PtxFinalizerClient,
     state_view::OverlayedStateView,
 };
+use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -231,6 +232,7 @@ impl WorkerManager {
 
     fn take_pending_txn(&mut self, txn_idx: TxnIdx) -> PendingTransaction {
         self.num_pending_txns -= 1;
+        trace!("pending txns: {}", self.num_pending_txns);
         self.transactions[txn_idx]
             .take()
             .expect("Transaction is not Pending.")
@@ -239,6 +241,7 @@ impl WorkerManager {
     // Top level API
     fn add_transaction(&mut self, transaction: Transaction, dependencies: HashSet<VersionedKey>) {
         let txn_idx = self.transactions.len();
+        trace!("seen txn {}", txn_idx);
         self.transactions
             .push(Some(PendingTransaction::new(transaction)));
         self.num_pending_txns += 1;
@@ -309,10 +312,12 @@ impl WorkerManager {
             }
             // Wait for all works to quit.
             while self.worker_ready_rx.recv().is_ok() {}
+            trace!("workers all gone.");
 
             // Inform the finalizer the that block is finished, after all work surely finishes.
             self.finalizer.finish_block();
             self.executor.exit();
+            trace!("manager exit");
         }
     }
 }
@@ -377,6 +382,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     transaction,
                     met_dependencies,
                 } => {
+                    trace!("worker {} gonna run txn {}", self.worker_index, txn_idx);
                     let state_view =
                         OverlayedStateView::new_with_overlay(self.base_view, met_dependencies);
                     let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
@@ -403,8 +409,11 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     self.worker_ready_tx
                         .send(self.worker_index)
                         .expect("Manager died.");
+
+                    trace!("worker {} finished txn {}", self.worker_index, txn_idx);
                 },
                 WorkerCommand::Finish => {
+                    trace!("worker {} exit.", self.worker_index);
                     break;
                 },
             }

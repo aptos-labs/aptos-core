@@ -1,5 +1,5 @@
 [package]
-name = "aptos-ptx-executor"
+name = "aptos-experimental-ptx-executor"
 description = "Aptos P-Transaction Executor"
 version = "0.1.0"
 
@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+aptos-executor = { workspace = true }
 aptos-framework =  { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
