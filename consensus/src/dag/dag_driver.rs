@@ -5,7 +5,7 @@ use super::{
     dag_fetcher::FetchRequester,
     order_rule::OrderRule,
     storage::DAGStorage,
-    types::{CertifiedAck, DAGMessage},
+    types::{CertifiedAck, DAGMessage, Extensions},
     RpcHandler,
 };
 use crate::{
@@ -124,6 +124,7 @@ impl DagDriver {
             timestamp.as_micros() as u64,
             payload,
             strong_links,
+            Extensions::empty(),
         );
         self.storage
             .save_node(&new_node)

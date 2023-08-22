@@ -17,4 +17,4 @@ mod tests;
 mod types;
 
 pub use dag_network::{RpcHandler, RpcWithFallback, TDAGNetworkSender};
-pub use types::{CertifiedNode, DAGMessage, DAGNetworkMessage, Node, NodeId, Vote};
+pub use types::{CertifiedNode, DAGMessage, DAGNetworkMessage, Extensions, Node, NodeId, Vote};
