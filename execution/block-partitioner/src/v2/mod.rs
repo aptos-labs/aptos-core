@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use crate::{
     pre_partition::{uniform_partitioner::UniformPartitioner, PrePartitioner},
     v2::counters::MISC_TIMERS_SECONDS,
@@ -13,6 +13,7 @@ use aptos_types::{
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use state::PartitionState;
 use std::sync::{Arc, RwLock};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::v2::load_balance::assign_tasks_to_workers;
 use crate::v2::types::{TxnIdx0, TxnIdx1};
 use crate::v2::union_find::UnionFind;
@@ -85,40 +86,51 @@ impl PartitionerV2 {
             }
         }
 
-        let mut set_sizes: HashMap<usize, usize> = HashMap::new();
+        let mut txns_by_set: Vec<VecDeque<TxnIdx0>> = Vec::new();
+        let mut set_idx_registry: HashMap<usize, usize> = HashMap::new();
+        let set_idx_counter = AtomicUsize::new(0);
         for txn_idx0 in 0..state.num_txns() {
             let sender_idx = state.sender_idx(txn_idx0);
-            let set_idx = uf.find(sender_idx);
-            let set_size_entry = set_sizes.entry(set_idx).or_insert_with(||0);
-            *set_size_entry += 1;
-        }
-
-
-        // Create groups following the size limit.
-        let group_size_limit = ((state.num_txns() as f32) * state.load_imbalance_tolerance / (state.num_executor_shards as f32)) as usize;
-        let mut route_table: HashMap<usize, usize> = HashMap::new(); // Keep track of the idx of the group that members of a set should go to.
-        let mut groups: Vec<Vec<TxnIdx0>> = vec![];
-        for txn_idx0 in 0..state.num_txns() {
-            let sender_idx = state.sender_idx(txn_idx0);
-            let set_idx = uf.find(sender_idx);
-            let group_idx_entry = route_table.entry(set_idx).or_insert_with(||{
-                groups.push(vec![]);
-                groups.len() - 1
+            let uf_set_idx = uf.find(sender_idx);
+            let set_idx = set_idx_registry.entry(uf_set_idx).or_insert_with(||{
+                txns_by_set.push(VecDeque::new());
+                set_idx_counter.fetch_add(1, Ordering::SeqCst)
             });
-            if groups[*group_idx_entry].len() >= group_size_limit {
-                groups.push(vec![]);
-                *group_idx_entry = groups.len() - 1;
-            }
-            groups[*group_idx_entry].push(txn_idx0);
+            txns_by_set[*set_idx].push_back(txn_idx0);
         }
+
+        let group_size_limit = ((state.num_txns() as f32) * state.load_imbalance_tolerance / (state.num_executor_shards as f32)).ceil() as usize;
+
+        // Prepare groups.
+        let mut groups: Vec<(usize,usize)> = txns_by_set.iter().enumerate().flat_map(|(set_idx, txns)|{
+            let num_big_chunks = txns.len() / group_size_limit;
+            let reminder_chunk_size = txns.len() % group_size_limit;
+            let mut ret = vec![(set_idx, group_size_limit); num_big_chunks];
+            if reminder_chunk_size >= 1 {
+                ret.push((set_idx, reminder_chunk_size));
+            }
+            ret
+        }).collect();
 
         // Assign groups to shards in a way that minimize the longest pole.
-        let tasks: Vec<u64> = groups.iter().map(|g|g.len() as u64).collect();
+        let tasks: Vec<u64> = groups.iter().map(|(_, size)|(*size) as u64).collect();
         let (_longest_pole, group_destinations) = assign_tasks_to_workers(&tasks, state.num_executor_shards);
+
+        let mut groups_by_shard: Vec<Vec<usize>> = vec![vec![]; state.num_executor_shards];
+        for (group_id, group_dest) in group_destinations.iter().enumerate() {
+            let shard_id = group_destinations[group_id];
+            groups_by_shard[shard_id].push(group_id);
+        }
+
         state.pre_partitioned_idx0s = vec![vec![]; state.num_executor_shards];
-        for (group_idx, group) in groups.into_iter().enumerate() {
-            let shard_id = group_destinations[group_idx];
-            state.pre_partitioned_idx0s[shard_id].extend(group);
+        for shard_id in (0..state.num_executor_shards) {
+            for &group_id in groups_by_shard[shard_id].iter() {
+                let (set_id, amount) = groups[group_id];
+                for _ in 0..amount {
+                    let txn_idx0 = txns_by_set[set_id].pop_front().unwrap();
+                    state.pre_partitioned_idx0s[shard_id].push(txn_idx0);
+                }
+            }
         }
 
         // Prepare `state.i1_to_i0` and `state.start_txn_idxs_by_shard`.
