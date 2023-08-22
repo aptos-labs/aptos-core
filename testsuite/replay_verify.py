@@ -73,16 +73,16 @@ def replay_verify_partition(
             backup_config_template_path,
         ],
         stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
     if process.stdout is None:
         raise Exception(f"[partition {n}] stdout is None")
     for line in iter(process.stdout.readline, b""):
         print(f"[partition {n}] {line}", flush=True)
-
     # set the returncode
-    process.communicate()
+    stdout_output, stderr_output = process.communicate()
 
-    return (n, process.returncode)
+    return (n, process.returncode, stdout_output, stderr_output)
 
 
 def main():
@@ -157,10 +157,10 @@ def main():
     print("[main process] finished")
 
     err = False
-    for partition_num, return_code in all_partitions:
+    for partition_num, return_code, stdout, stderr in all_partitions:
         if return_code != 0:
             print("======== ERROR ========")
-            print(f"ERROR: partition {partition_num} failed (exit {return_code})")
+            print(f"ERROR: partition {partition_num} failed (exit {return_code}, {stderr})")
             err = True
 
     if err:
