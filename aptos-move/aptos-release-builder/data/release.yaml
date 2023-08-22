@@ -1,12 +1,12 @@
 ---
 remote_endpoint: ~
-name: "v1.6.1"
+name: "enable_periodical_reward_rate_reduction"
 proposals:
   - name: enable_periodical_reward_rate_reduction
     metadata:
       title: "Enable periodical reward rate decrease"
       description: "AIP-30: Implement decrease in staking rewards"
-      source_code_url: "https://github.com/aptos-foundation/mainnet-proposals/tree/main/sources/v1.6.1"
+      source_code_url: "https://github.com/aptos-foundation/mainnet-proposals/tree/main/sources/enable_periodical_reward_rate_reduction"
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/119"
     execution_mode: SingleStep
     update_sequence:
