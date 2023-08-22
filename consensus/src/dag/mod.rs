@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 
 mod anchor_election;
+mod bootstrap;
 mod dag_driver;
 mod dag_fetcher;
 mod dag_handler;
@@ -15,5 +16,5 @@ mod storage;
 mod tests;
 mod types;
 
-pub use dag_network::RpcHandler;
-pub use types::{CertifiedNode, DAGNetworkMessage, Node, NodeId, Vote};
+pub use dag_network::{RpcHandler, RpcWithFallback, TDAGNetworkSender};
+pub use types::{CertifiedNode, DAGMessage, DAGNetworkMessage, Node, NodeId, Vote};

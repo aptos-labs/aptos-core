@@ -6,6 +6,7 @@ use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
+    data_cache::StorageAdapter,
 };
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
@@ -30,7 +31,12 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     type Txn = PreprocessedTransaction;
 
     fn init(argument: &'a S) -> Self {
-        let vm = AptosVM::new(argument);
+        // AptosVM has to be initialized using configs from storage.
+        // Using adapter allows us to fetch those.
+        // TODO: with new adapter we can relax trait bounds on S and avoid
+        // creating `StorageAdapter` here.
+        let config_storage = StorageAdapter::new(argument);
+        let vm = AptosVM::new(&config_storage);
 
         // Loading `0x1::account` and its transitive dependency into the code cache.
         //
@@ -69,7 +75,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         {
             Ok((vm_status, mut vm_output, sender)) => {
                 if materialize_deltas {
-                    // TODO: Integrate delta application failure.
+                    // TODO: Integrate aggregator v2.
                     vm_output = vm_output
                         .try_materialize(view)
                         .expect("Delta materialization failed");

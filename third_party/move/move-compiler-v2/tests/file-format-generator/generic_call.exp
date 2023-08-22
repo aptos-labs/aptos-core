@@ -1,0 +1,58 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun Test::foo($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := Test::identity<u64>($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun Test::identity<#0>($t0: #0): #0 {
+     var $t1: #0
+  0: $t1 := move($t0)
+  1: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun Test::foo($t0: u64): u64 {
+     var $t1: u64
+     # live vars: $t0
+  0: $t1 := Test::identity<u64>($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun Test::identity<#0>($t0: #0): #0 {
+     var $t1: #0
+     # live vars: $t0
+  0: $t1 := move($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v6
+module 42.Test {
+
+
+foo(Arg0: u64): u64 {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: Call identity<u64>(u64): u64
+	2: Ret
+}
+identity<Ty0>(Arg0: Ty0): Ty0 {
+B0:
+	0: MoveLoc[0](Arg0: Ty0)
+	1: StLoc[1](loc0: Ty0)
+	2: MoveLoc[1](loc0: Ty0)
+	3: Ret
+}
+}

@@ -1,10 +1,10 @@
 ---
-title: "Aptos Move CLI"
+title: "Aptos CLI"
 ---
 
 import CodeBlock from '@theme/CodeBlock';
 
-# Use the Aptos Move CLI
+# Use the Aptos CLI
 
 The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging, and for node operations. This document describes how to use the `aptos` CLI tool. To download or build the CLI, follow [Install Aptos CLI](../../tools/aptos-cli/install-cli/index.md).
 

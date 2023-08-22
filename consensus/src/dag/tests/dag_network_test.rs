@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::dag::{
-    dag_network::{DAGNetworkSender, RpcWithFallback},
+    dag_network::{RpcWithFallback, TDAGNetworkSender},
     types::{DAGMessage, TestAck, TestMessage},
 };
 use anyhow::{anyhow, bail};
@@ -41,7 +41,7 @@ impl RBNetworkSender<DAGMessage> for MockDAGNetworkSender {
 }
 
 #[async_trait]
-impl DAGNetworkSender for MockDAGNetworkSender {
+impl TDAGNetworkSender for MockDAGNetworkSender {
     async fn send_rpc(
         &self,
         receiver: Author,
