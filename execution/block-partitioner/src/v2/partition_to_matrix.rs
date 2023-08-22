@@ -4,7 +4,7 @@ use crate::v2::{
     counters::MISC_TIMERS_SECONDS,
     extract_and_sort,
     state::PartitionState,
-    types::{PrePartitionedTxnIdx, SenderIdx},
+    types::{SenderIdx},
     PartitionerV2,
 };
 use aptos_logger::trace;
@@ -21,6 +21,7 @@ use std::{
         RwLock,
     },
 };
+use crate::v2::types::TxnIdx1;
 
 impl PartitionerV2 {
     /// Populate `state.finalized_txn_matrix` with txns flattened into a matrix (num_rounds by num_shards),
@@ -53,7 +54,7 @@ impl PartitionerV2 {
 
         if !state.partition_last_round {
             trace!("Merging txns after discarding stopped.");
-            let last_round_txns: Vec<PrePartitionedTxnIdx> =
+            let last_round_txns: Vec<TxnIdx1> =
                 remaining_txns.into_iter().flatten().collect();
             remaining_txns = vec![vec![]; state.num_executor_shards];
             remaining_txns[state.num_executor_shards - 1] = last_round_txns;
@@ -66,9 +67,9 @@ impl PartitionerV2 {
                 .for_each(|shard_id| {
                     remaining_txns[shard_id]
                         .par_iter()
-                        .for_each(|&ori_txn_idx| {
+                        .for_each(|&txn_idx1| {
                             state.update_trackers_on_accepting(
-                                ori_txn_idx,
+                                txn_idx1,
                                 last_round_id,
                                 shard_id,
                             );
@@ -83,10 +84,10 @@ impl PartitionerV2 {
     pub(crate) fn discarding_round(
         state: &mut PartitionState,
         round_id: RoundId,
-        remaining_txns: Vec<Vec<PrePartitionedTxnIdx>>,
+        remaining_txns: Vec<Vec<TxnIdx1>>,
     ) -> (
-        Vec<Vec<PrePartitionedTxnIdx>>,
-        Vec<Vec<PrePartitionedTxnIdx>>,
+        Vec<Vec<TxnIdx1>>,
+        Vec<Vec<TxnIdx1>>,
     ) {
         let _timer = MISC_TIMERS_SECONDS
             .with_label_values(&[format!("round_{round_id}").as_str()])
@@ -97,10 +98,10 @@ impl PartitionerV2 {
         // Overview of the logic:
         // 1. Key conflicts are analyzed and a txn from `remaining_txns` either goes to `discarded` or `tentatively_accepted`.
         // 2. Relative orders of txns from the same sender are analyzed and a txn from `tentatively_accepted` either goes to `finally_accepted` or `discarded`.
-        let mut discarded: Vec<RwLock<Vec<PrePartitionedTxnIdx>>> = Vec::with_capacity(num_shards);
-        let mut tentatively_accepted: Vec<RwLock<Vec<PrePartitionedTxnIdx>>> =
+        let mut discarded: Vec<RwLock<Vec<TxnIdx1>>> = Vec::with_capacity(num_shards);
+        let mut tentatively_accepted: Vec<RwLock<Vec<TxnIdx1>>> =
             Vec::with_capacity(num_shards);
-        let mut finally_accepted: Vec<RwLock<Vec<PrePartitionedTxnIdx>>> =
+        let mut finally_accepted: Vec<RwLock<Vec<TxnIdx1>>> =
             Vec::with_capacity(num_shards);
 
         for txns in remaining_txns.iter() {
@@ -109,6 +110,7 @@ impl PartitionerV2 {
             discarded.push(RwLock::new(Vec::with_capacity(txns.len())));
         }
 
+        // Initialize a table to keep track of the minimum discarded TxnIdx1.
         let min_discard_table: DashMap<SenderIdx, AtomicUsize> =
             DashMap::with_shard_amount(state.dashmap_num_shards);
 
@@ -121,11 +123,12 @@ impl PartitionerV2 {
                 .enumerate()
                 .collect::<Vec<_>>()
                 .into_par_iter()
-                .for_each(|(shard_id, txn_idxs)| {
-                    txn_idxs.into_par_iter().for_each(|txn_idx| {
+                .for_each(|(shard_id, txn_idx1s)| {
+                    txn_idx1s.into_par_iter().for_each(|txn_idx1| {
+                        let txn_idx0 = state.i1_to_i0[txn_idx1];
                         let mut in_round_conflict_detected = false;
-                        let write_set = state.write_sets[txn_idx].read().unwrap();
-                        let read_set = state.read_sets[txn_idx].read().unwrap();
+                        let write_set = state.write_sets[txn_idx0].read().unwrap();
+                        let read_set = state.read_sets[txn_idx0].read().unwrap();
                         for &key_idx in write_set.iter().chain(read_set.iter()) {
                             if state.key_owned_by_another_shard(shard_id, key_idx) {
                                 in_round_conflict_detected = true;
@@ -134,17 +137,17 @@ impl PartitionerV2 {
                         }
 
                         if in_round_conflict_detected {
-                            let sender = state.sender_idx(txn_idx);
+                            let sender = state.sender_idx(txn_idx0);
                             min_discard_table
                                 .entry(sender)
                                 .or_insert_with(|| AtomicUsize::new(usize::MAX))
-                                .fetch_min(txn_idx, Ordering::SeqCst);
-                            discarded[shard_id].write().unwrap().push(txn_idx);
+                                .fetch_min(txn_idx1, Ordering::SeqCst);
+                            discarded[shard_id].write().unwrap().push(txn_idx1);
                         } else {
                             tentatively_accepted[shard_id]
                                 .write()
                                 .unwrap()
-                                .push(txn_idx);
+                                .push(txn_idx1);
                         }
                     });
                 });
@@ -155,22 +158,23 @@ impl PartitionerV2 {
                 .enumerate()
                 .collect::<Vec<_>>()
                 .into_par_iter()
-                .for_each(|(shard_id, txn_idxs)| {
-                    let txn_idxs = mem::take(&mut *txn_idxs.write().unwrap());
-                    txn_idxs.into_par_iter().for_each(|ori_txn_idx| {
-                        let sender_idx = state.sender_idx(ori_txn_idx);
+                .for_each(|(shard_id, txn_idx1s)| {
+                    let txn_idxs = mem::take(&mut *txn_idx1s.write().unwrap());
+                    txn_idxs.into_par_iter().for_each(|txn_idx1| {
+                        let txn_idx0 = state.i1_to_i0[txn_idx1];
+                        let sender_idx = state.sender_idx(txn_idx0);
                         let min_discarded = min_discard_table
                             .get(&sender_idx)
                             .map(|kv| kv.load(Ordering::SeqCst))
                             .unwrap_or(usize::MAX);
-                        if ori_txn_idx < min_discarded {
-                            state.update_trackers_on_accepting(ori_txn_idx, round_id, shard_id);
+                        if txn_idx1 < min_discarded {
+                            state.update_trackers_on_accepting(txn_idx1, round_id, shard_id);
                             finally_accepted[shard_id]
                                 .write()
                                 .unwrap()
-                                .push(ori_txn_idx);
+                                .push(txn_idx1);
                         } else {
-                            discarded[shard_id].write().unwrap().push(ori_txn_idx);
+                            discarded[shard_id].write().unwrap().push(txn_idx1);
                         }
                     });
                 });
@@ -201,7 +205,7 @@ impl PartitionerV2 {
             }
         }
 
-        state.new_txn_idxs = (0..state.num_txns()).map(|_tid| RwLock::new(0)).collect();
+        state.i1_to_t2 = (0..state.num_txns()).map(|_tid| RwLock::new(0)).collect();
 
         state.thread_pool.install(|| {
             (0..num_rounds).into_par_iter().for_each(|round_id| {
@@ -212,9 +216,9 @@ impl PartitionerV2 {
                         (0..sub_block_size)
                             .into_par_iter()
                             .for_each(|pos_in_sub_block| {
-                                let txn_idx = state.finalized_txn_matrix[round_id][shard_id]
+                                let txn_idx1 = state.finalized_txn_matrix[round_id][shard_id]
                                     [pos_in_sub_block];
-                                *state.new_txn_idxs[txn_idx].write().unwrap() =
+                                *state.i1_to_t2[txn_idx1].write().unwrap() =
                                     state.start_index_matrix[round_id][shard_id] + pos_in_sub_block;
                             });
                     });

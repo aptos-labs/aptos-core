@@ -9,6 +9,7 @@ pub struct PartitionerV2Config {
     pub cross_shard_dep_avoid_threshold: f32,
     pub dashmap_num_shards: usize,
     pub partition_last_round: bool,
+    pub load_imbalance_tolerance: f32,
 }
 
 impl PartitionerV2Config {
@@ -19,6 +20,7 @@ impl PartitionerV2Config {
             self.cross_shard_dep_avoid_threshold,
             self.dashmap_num_shards,
             self.partition_last_round,
+            self.load_imbalance_tolerance,
         ))
     }
 
@@ -46,6 +48,11 @@ impl PartitionerV2Config {
         self.partition_last_round = val;
         self
     }
+
+    pub fn load_imbalance_tolerance(mut self, val: f32) -> Self {
+        self.load_imbalance_tolerance = val;
+        self
+    }
 }
 
 impl Default for PartitionerV2Config {
@@ -56,6 +63,7 @@ impl Default for PartitionerV2Config {
             cross_shard_dep_avoid_threshold: 0.9,
             dashmap_num_shards: 64,
             partition_last_round: false,
+            load_imbalance_tolerance: 2.0,
         }
     }
 }

@@ -2,10 +2,11 @@
 
 #[cfg(test)]
 use crate::test_utils::P2PBlockGenerator;
-use crate::{pre_partition::PrePartitioner, v2::types::PrePartitionedTxnIdx};
+use crate::{pre_partition::PrePartitioner};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 #[cfg(test)]
 use rand::thread_rng;
+use crate::v2::types::TxnIdx1;
 
 /// Evenly divide txns. Example: processing txns 0..11 results in [[0,1,2,3],[4,5,6,7],[8,9,10]].
 pub struct UniformPartitioner {}
@@ -15,7 +16,7 @@ impl PrePartitioner for UniformPartitioner {
         &self,
         transactions: &[AnalyzedTransaction],
         num_shards: usize,
-    ) -> Vec<Vec<PrePartitionedTxnIdx>> {
+    ) -> Vec<Vec<TxnIdx1>> {
         let num_items = transactions.len();
         let num_chunks = num_shards;
         let num_big_chunks = num_items % num_chunks;
