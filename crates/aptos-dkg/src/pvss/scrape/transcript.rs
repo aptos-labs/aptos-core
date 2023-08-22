@@ -7,14 +7,13 @@ use crate::pvss::scrape::{LowDegreeTest, SCRAPE_SK_IN_G2};
 use crate::pvss::threshold_config::ThresholdConfig;
 use crate::pvss::traits;
 use crate::pvss::{encryption_dlog, fiat_shamir};
-use crate::utils::g2_multi_exp;
 use crate::utils::random::{random_g1_point, random_g2_point};
+use crate::utils::{g2_multi_exp, multi_pairing};
 use anyhow::bail;
 use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
-use blstrs::{Bls12, G1Affine, G1Projective, G2Prepared, G2Projective, Gt, Scalar};
+use blstrs::{G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
-use group::{Curve, Group};
-use pairing::{MillerLoopResult, MultiMillerLoop};
+use group::Group;
 use serde::{Deserialize, Serialize};
 use std::ops::{Mul, Neg};
 
@@ -163,30 +162,26 @@ impl traits::Transcript for Transcript {
 
         // The vector of left-hand-side inputs to each pairing in the multi-pairing.
         let lhs = (0..sc.n)
-            .map(|i| self.A[i].mul(r_i[i]).to_affine())
-            .chain([pp.get_commitment_base().to_affine()].into_iter())
-            .chain([self.A[sc.n].mul(r_i[sc.n]).to_affine()].into_iter())
-            .chain([g1_inverse.mul(r_i[sc.n]).to_affine()].into_iter());
+            .map(|i| self.A[i].mul(r_i[i]))
+            .chain(
+                [
+                    *pp.get_commitment_base(),
+                    self.A[sc.n].mul(r_i[sc.n]),
+                    g1_inverse.mul(r_i[sc.n]),
+                ]
+                .into_iter(),
+            )
+            .collect::<Vec<G1Projective>>();
 
         // The vector of right-hand-side inputs to each pairing in the multi-pairing.
         let mexp = g2_multi_exp(self.Y_hat.as_slice(), r_i_negated.as_slice());
         let rhs = eks
             .iter()
-            .map(|ek| G2Prepared::from(Into::<G2Projective>::into(ek).to_affine()))
-            .chain([G2Prepared::from(mexp.to_affine())].into_iter())
-            .chain([G2Prepared::from(pp.get_public_key_base().to_affine())].into_iter())
-            .chain([G2Prepared::from(self.u2_hat.to_affine())].into_iter());
+            .map(|ek| Into::<G2Projective>::into(ek))
+            .chain([mexp, *pp.get_public_key_base(), self.u2_hat].into_iter())
+            .collect::<Vec<G2Projective>>();
 
-        let res = <Bls12 as MultiMillerLoop>::multi_miller_loop(
-            lhs.zip(rhs)
-                .collect::<Vec<(G1Affine, G2Prepared)>>()
-                .iter()
-                .map(|(g1, g2)| (g1, g2))
-                .collect::<Vec<(&G1Affine, &G2Prepared)>>()
-                .as_slice(),
-        );
-
-        let res = res.final_exponentiation();
+        let res = multi_pairing(lhs.iter(), rhs.iter());
         if res != Gt::identity() {
             bail!("Expected zero, but got {} during multi-pairing check", {
                 res

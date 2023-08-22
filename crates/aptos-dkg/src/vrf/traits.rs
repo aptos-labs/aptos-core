@@ -33,13 +33,9 @@
 //!      (If the share is "augmented", and the PK is or isn't, verification can still happen.
 //!       But if the share is not augmented and the PK is not augmented either, verification will fail.)
 
-pub trait PublicParameters {
+pub trait PublicParameters {}
 
-}
-
-pub trait SignatureShare : Clone {
-
-}
+pub trait SignatureShare: Clone {}
 
 pub trait Signature {
     type Evaluation: Evaluation;

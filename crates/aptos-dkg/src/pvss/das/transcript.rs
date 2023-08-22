@@ -6,13 +6,12 @@ use crate::pvss::scrape::LowDegreeTest;
 use crate::pvss::traits::HasEncryptionPublicParams;
 use crate::pvss::{das, encryption_dlog, fiat_shamir, traits, Player, ThresholdConfig};
 use crate::utils::random::{random_g1_point, random_g2_point, random_scalar};
-use crate::utils::{g1_multi_exp, g2_multi_exp};
+use crate::utils::{g1_multi_exp, g2_multi_exp, multi_pairing};
 use anyhow::bail;
 use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
-use blstrs::{Bls12, G1Affine, G1Projective, G2Prepared, G2Projective, Gt, Scalar};
+use blstrs::{G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
-use group::{Curve, Group};
-use pairing::{MillerLoopResult, MultiMillerLoop};
+use group::Group;
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Mul, Neg, Sub};
 
@@ -199,18 +198,7 @@ impl traits::Transcript for Transcript {
         // The vector of right-hand-side ($\mathbb{G}_2$) inputs to each pairing in the multi-pairing.
         let rhs = vec![v, self.hat_w.mul(alpha), g_2.mul(alpha)];
 
-        let res = <Bls12 as MultiMillerLoop>::multi_miller_loop(
-            lhs.iter()
-                .zip(rhs.iter())
-                .map(|(g1, g2)| (g1.to_affine(), G2Prepared::from(g2.to_affine())))
-                .collect::<Vec<(G1Affine, G2Prepared)>>()
-                .iter()
-                .map(|(g1, g2)| (g1, g2))
-                .collect::<Vec<(&G1Affine, &G2Prepared)>>()
-                .as_slice(),
-        );
-
-        let res = res.final_exponentiation();
+        let res = multi_pairing(lhs.iter(), rhs.iter());
         if res != Gt::identity() {
             bail!("Expected zero, but got {} during multi-pairing check", {
                 res
@@ -232,7 +220,6 @@ impl traits::Transcript for Transcript {
             self.V[i] += other.V[i];
         }
         self.V[sc.n] += other.V[sc.n];
-
 
         debug_assert_eq!(self.C.len(), other.C.len());
         debug_assert_eq!(self.V.len(), other.V.len());

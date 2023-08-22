@@ -79,7 +79,7 @@ impl<T: Transcript> FiatShamirProtocol<T> for merlin::Transcript {
             match chunk.try_into() {
                 Ok(chunk) => {
                     f.push(random_scalar_from_uniform_bytes(chunk));
-                }
+                },
                 Err(_) => panic!("Expected a slice of size 64, but got a different size"),
             }
         }
@@ -99,7 +99,7 @@ impl<T: Transcript> FiatShamirProtocol<T> for merlin::Transcript {
             match chunk.try_into() {
                 Ok(chunk) => {
                     v.push(random_scalar_from_uniform_bytes(chunk));
-                }
+                },
                 Err(_) => panic!("Expected a slice of size 64, but got a different size"),
             }
         }

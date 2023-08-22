@@ -1,9 +1,11 @@
 // Copyright © Aptos Foundation
 
 use crate::SCALAR_FIELD_ORDER;
-use blstrs::{G1Projective, G2Projective, Scalar};
+use blstrs::{Bls12, G1Affine, G1Projective, G2Prepared, G2Projective, Gt, Scalar};
+use group::Curve;
 use num_bigint::BigUint;
 use num_integer::Integer;
+use pairing::{MillerLoopResult, MultiMillerLoop};
 use sha3::Digest;
 use std::ops::Mul;
 
@@ -57,4 +59,22 @@ pub fn g2_multi_exp(bases: &[G2Projective], scalars: &[Scalar]) -> G2Projective 
     } else {
         G2Projective::multi_exp(bases, scalars)
     }
+}
+
+pub fn multi_pairing<'a, I1, I2>(lhs: I1, rhs: I2) -> Gt
+where
+    I1: Iterator<Item = &'a G1Projective>,
+    I2: Iterator<Item = &'a G2Projective>,
+{
+    let res = <Bls12 as MultiMillerLoop>::multi_miller_loop(
+        lhs.zip(rhs)
+            .map(|(g1, g2)| (g1.to_affine(), G2Prepared::from(g2.to_affine())))
+            .collect::<Vec<(G1Affine, G2Prepared)>>()
+            .iter()
+            .map(|(g1, g2)| (g1, g2))
+            .collect::<Vec<(&G1Affine, &G2Prepared)>>()
+            .as_slice(),
+    );
+
+    res.final_exponentiation()
 }

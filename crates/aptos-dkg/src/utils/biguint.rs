@@ -46,7 +46,7 @@ pub fn biguint_to_scalar(big_uint: &BigUint) -> Scalar {
                 bytes.as_slice().len(),
                 big_uint.to_string()
             );
-        }
+        },
     };
 
     let opt = Scalar::from_bytes_le(slice);
