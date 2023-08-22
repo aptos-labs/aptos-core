@@ -144,6 +144,7 @@ impl PipelineOpt {
                 cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
                 dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
                 partition_last_round: self.use_global_executor,
+                load_imbalance_tolerance: 2.0,
             }),
             _ => panic!("Unknown partitioner version: {}", self.partitioner_version),
         }
