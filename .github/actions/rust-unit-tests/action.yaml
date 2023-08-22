@@ -36,9 +36,21 @@ runs:
       run: docker run --detach -p 5432:5432 cimg/postgres:14.2
       shell: bash
 
-    # Run the rust unit tests
+    # Run the rust unit tests. Note: this does not include expensive
+    # or long-running tests. These are run in a different workflow.
     - name: Run all unit tests
-      run: cargo nextest run --profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast
+      run: |
+        cargo nextest run --profile ci --locked --workspace --retries 3 --no-fail-fast \
+        --exclude aptos-testcases \
+        --exclude smoke-test \
+        --exclude e2e-move-tests \
+        --exclude move-cli \
+        --exclude aptos-framework \
+        --exclude aptos-move-examples \
+        --exclude aptos-gas-schedule-updator \
+        --exclude aptos-move-examples \
+        --exclude move-stdlib \
+        --exclude move-package
       shell: bash
       env:
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
