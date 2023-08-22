@@ -22,6 +22,7 @@ fn bench_group(c: &mut Criterion) {
     let avoid_pct = 0.9;
     let dashmap_num_shards = 64;
     let merge_discards = true;
+    let load_imbalance_tolerance = 2.0;
 
     let mut rng = thread_rng();
     let block_gen = P2PBlockGenerator::new(num_accounts);
@@ -31,6 +32,7 @@ fn bench_group(c: &mut Criterion) {
         avoid_pct,
         dashmap_num_shards,
         merge_discards,
+        load_imbalance_tolerance,
     );
     group.bench_function(format!("acc={num_accounts},blk={block_size},shd={num_shards}/thr={num_threads},rnd={num_rounds_limit},avd={avoid_pct},mds={merge_discards}"), move |b| {
         b.iter_with_setup(

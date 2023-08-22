@@ -201,7 +201,7 @@ impl BlockPartitioner for PartitionerV2 {
         // As a result, we get a txn matrix of no more than `self.max_partitioning_rounds` rows and exactly `num_executor_shards` columns.
         // It's guaranteed that inside every round other than the last round, there's no cross-shard dependency. (But cross-round dependencies are always possible.)
         Self::remove_cross_shard_dependencies(&mut state);
-        println!("matrix={:?}", state.finalized_txn_matrix);
+
         // Step 3: build some additional indices of the resulting txn matrix from Step 2.
         Self::build_index_from_txn_matrix(&mut state);
 
