@@ -114,10 +114,11 @@ use arr_macro::arr;
 use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
+#[cfg(any(test, feature = "fuzzing"))]
+use std::default::Default;
 use std::{
     borrow::Borrow,
     collections::HashMap,
-    default::Default,
     fmt::{Debug, Formatter},
     iter::Iterator,
     path::Path,

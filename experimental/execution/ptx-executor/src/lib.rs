@@ -18,10 +18,14 @@ use crate::{
     analyzer::PtxAnalyzer, executor::PtxExecutor, finalizer::PtxFinalizer, scheduler::PtxScheduler,
     state_reader::PtxStateReader,
 };
+use aptos_executor::{
+    block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput,
+};
 use aptos_infallible::Mutex;
 use aptos_state_view::StateView;
+use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
-    block_executor::partitioner::PartitionedTransactions,
+    block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
     transaction::{Transaction, TransactionOutput},
 };
 use aptos_vm::{
@@ -32,7 +36,7 @@ use aptos_vm::{
 use move_core_types::vm_status::VMStatus;
 use std::sync::{mpsc::channel, Arc};
 
-struct PtxBlockExecutor;
+pub struct PtxBlockExecutor;
 
 impl VMExecutor for PtxBlockExecutor {
     fn execute_block(
@@ -86,5 +90,19 @@ impl VMExecutor for PtxBlockExecutor {
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         unimplemented!()
+    }
+}
+
+impl TransactionBlockExecutor for PtxBlockExecutor {
+    fn execute_transaction_block(
+        transactions: ExecutableTransactions,
+        state_view: CachedStateView,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> anyhow::Result<ChunkOutput> {
+        ChunkOutput::by_transaction_execution::<PtxBlockExecutor>(
+            transactions,
+            state_view,
+            maybe_block_gas_limit,
+        )
     }
 }

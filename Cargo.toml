@@ -302,6 +302,7 @@ aptos-enum-conversion-derive = { path = "crates/aptos-enum-conversion-derive" }
 aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
+aptos-experimental-ptx-executor = {path = "experimental/execution/ptx-executor"}
 aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
 aptos-faucet-core = { path = "crates/aptos-faucet/core" }
 aptos-faucet-service = { path = "crates/aptos-faucet/service" }

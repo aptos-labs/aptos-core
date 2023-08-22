@@ -1199,6 +1199,7 @@ dependencies = [
  "aptos-db",
  "aptos-executor",
  "aptos-executor-types",
+ "aptos-experimental-ptx-executor",
  "aptos-genesis",
  "aptos-jellyfish-merkle",
  "aptos-logger",
@@ -1300,6 +1301,47 @@ dependencies = [
  "once_cell",
  "serde 1.0.149",
  "thiserror",
+]
+
+[[package]]
+name = "aptos-experimental-ptx-executor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-executor",
+ "aptos-framework",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-state-view",
+ "aptos-storage-interface",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-vm-logging",
+ "aptos-vm-types",
+ "bcs 0.1.4",
+ "dashmap",
+ "fail 0.5.0",
+ "move-binary-format",
+ "move-bytecode-utils",
+ "move-bytecode-verifier",
+ "move-core-types",
+ "move-table-extension",
+ "move-unit-test",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "move-vm-types",
+ "num_cpus",
+ "once_cell",
+ "ouroboros 0.15.6",
+ "rand 0.7.3",
+ "rayon",
+ "serde 1.0.149",
+ "serde_json",
+ "smallvec",
+ "tracing",
 ]
 
 [[package]]
@@ -2860,46 +2902,6 @@ name = "aptos-proxy"
 version = "0.1.0"
 dependencies = [
  "ipnet",
-]
-
-[[package]]
-name = "aptos-ptx-executor"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-crypto-derive",
- "aptos-framework",
- "aptos-infallible",
- "aptos-logger",
- "aptos-metrics-core",
- "aptos-state-view",
- "aptos-storage-interface",
- "aptos-types",
- "aptos-vm",
- "aptos-vm-logging",
- "aptos-vm-types",
- "bcs 0.1.4",
- "dashmap",
- "fail 0.5.0",
- "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier",
- "move-core-types",
- "move-table-extension",
- "move-unit-test",
- "move-vm-runtime",
- "move-vm-test-utils",
- "move-vm-types",
- "num_cpus",
- "once_cell",
- "ouroboros 0.15.6",
- "rand 0.7.3",
- "rayon",
- "serde 1.0.149",
- "serde_json",
- "smallvec",
- "tracing",
 ]
 
 [[package]]
