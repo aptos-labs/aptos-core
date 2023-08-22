@@ -6,7 +6,6 @@
 //! mark the operation (arithmetic or bitwise) that a variable or a field involves,
 //! which will be used later when the correct number type (`int` or `bv<N>`) in the boogie program
 
-use crate::COMPILED_MODULE_AVAILABLE;
 use itertools::Itertools;
 use move_model::{
     ast::{PropertyValue, TempIndex, Value},
@@ -14,6 +13,7 @@ use move_model::{
     pragmas::{BV_PARAM_PROP, BV_RET_PROP},
     ty::Type,
 };
+use move_stackless_bytecode::COMPILED_MODULE_AVAILABLE;
 use std::{collections::BTreeMap, ops::Deref, str};
 
 static PARSING_ERROR: &str = "error happened when parsing the bv pragma";

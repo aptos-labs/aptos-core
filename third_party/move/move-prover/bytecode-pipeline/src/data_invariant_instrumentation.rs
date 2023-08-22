@@ -11,13 +11,7 @@
 //! (which depends on the compilation scheme). It also handles PackRef/PackRefDeep
 //! instructions introduced by memory instrumentation, as well as the Pack instructions.
 
-use crate::{
-    function_data_builder::FunctionDataBuilder,
-    function_target::FunctionData,
-    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    options::ProverOptions,
-    stackless_bytecode::{Bytecode, Operation, PropKind},
-};
+use crate::options::ProverOptions;
 use move_model::{
     ast,
     ast::{ConditionKind, Exp, ExpData, QuantKind, TempIndex},
@@ -25,6 +19,12 @@ use move_model::{
     model::{FunctionEnv, Loc, NodeId, StructEnv},
     pragmas::{INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_TYPE_MAP},
     ty::Type,
+};
+use move_stackless_bytecode::{
+    function_data_builder::FunctionDataBuilder,
+    function_target::FunctionData,
+    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
+    stackless_bytecode::{Bytecode, Operation, PropKind},
 };
 
 const INVARIANT_FAILS_MESSAGE: &str = "data invariant does not hold";

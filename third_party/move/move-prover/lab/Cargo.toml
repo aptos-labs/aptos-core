@@ -12,6 +12,7 @@ move-compiler = { path = "../../move-compiler" }
 move-model = { path = "../../move-model" }
 move-prover = { path = ".." }
 move-prover-boogie-backend = { path = "../boogie-backend" }
+move-prover-bytecode-pipeline = { path = "../bytecode-pipeline" }
 move-stackless-bytecode = { path = "../../move-model/bytecode" }
 
 # FB external dependencies

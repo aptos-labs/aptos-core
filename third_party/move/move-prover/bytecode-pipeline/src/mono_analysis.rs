@@ -5,12 +5,6 @@
 //! Analysis which computes information needed in backends for monomorphization. This
 //! computes the distinct type instantiations in the model for structs and inlined functions.
 
-use crate::{
-    function_target::FunctionTarget,
-    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
-    stackless_bytecode::{BorrowEdge, Bytecode, Operation},
-    usage_analysis::UsageProcessor,
-};
 use itertools::Itertools;
 use move_model::{
     ast,
@@ -25,6 +19,12 @@ use move_model::{
         TYPE_INFO_MOVE, TYPE_INFO_SPEC, TYPE_NAME_GET_MOVE, TYPE_NAME_GET_SPEC, TYPE_NAME_MOVE,
         TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT,
     },
+};
+use move_stackless_bytecode::{
+    function_target::FunctionTarget,
+    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
+    stackless_bytecode::{BorrowEdge, Bytecode, Operation},
+    usage_analysis::UsageProcessor,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},

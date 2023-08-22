@@ -35,7 +35,7 @@ use move_model::{
     ty::{PrimitiveType, Type},
     well_known::{TYPE_INFO_SPEC, TYPE_NAME_GET_SPEC, TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT},
 };
-use move_stackless_bytecode::{
+use move_prover_bytecode_pipeline::{
     mono_analysis::MonoInfo,
     number_operation::{GlobalNumberOperationState, NumOperation::Bitwise},
 };

@@ -4,20 +4,20 @@
 
 // Analysis pass which analyzes how to injects global invariants into the bytecode.
 
-use crate::{
+use crate::verification_analysis::{is_invariant_suspendable, InvariantAnalysisData};
+use move_binary_format::file_format::CodeOffset;
+use move_model::{
+    ast::ConditionKind,
+    model::{FunId, FunctionEnv, GlobalEnv, GlobalId, QualifiedId, QualifiedInstId, StructId},
+    ty::{Type, TypeDisplayContext, TypeInstantiationDerivation, TypeUnificationAdapter, Variance},
+};
+use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{
         FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant, VerificationFlavor,
     },
     stackless_bytecode::{BorrowNode, Bytecode, Operation, PropKind},
     usage_analysis,
-    verification_analysis::{is_invariant_suspendable, InvariantAnalysisData},
-};
-use move_binary_format::file_format::CodeOffset;
-use move_model::{
-    ast::ConditionKind,
-    model::{FunId, FunctionEnv, GlobalEnv, GlobalId, QualifiedId, QualifiedInstId, StructId},
-    ty::{Type, TypeDisplayContext, TypeInstantiationDerivation, TypeUnificationAdapter, Variance},
 };
 use std::{
     collections::{BTreeMap, BTreeSet},

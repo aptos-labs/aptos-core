@@ -4,20 +4,20 @@
 
 // Final phase of cleanup and optimization.
 
-use crate::{
-    dataflow_analysis::{DataflowAnalysis, TransferFunctions},
-    dataflow_domains::{AbstractDomain, JoinResult},
-    function_target::{FunctionData, FunctionTarget},
-    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    options::ProverOptions,
-    stackless_bytecode::{BorrowNode, Bytecode, Operation},
-    stackless_control_flow_graph::StacklessControlFlowGraph,
-};
+use crate::options::ProverOptions;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
     model::FunctionEnv,
     pragmas::INTRINSIC_FUN_MAP_BORROW_MUT,
     well_known::{EVENT_EMIT_EVENT, VECTOR_BORROW_MUT},
+};
+use move_stackless_bytecode::{
+    dataflow_analysis::{DataflowAnalysis, TransferFunctions},
+    dataflow_domains::{AbstractDomain, JoinResult},
+    function_target::{FunctionData, FunctionTarget},
+    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
+    stackless_bytecode::{BorrowNode, Bytecode, Operation},
+    stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::collections::BTreeSet;
 

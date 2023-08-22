@@ -7,12 +7,7 @@
 //! each function as well as collect information on how these invariants should be handled (i.e.,
 //! checked after bytecode, checked at function exit, or deferred to caller).
 
-use crate::{
-    function_target::{FunctionData, FunctionTarget},
-    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
-    options::ProverOptions,
-    usage_analysis, COMPILED_MODULE_AVAILABLE,
-};
+use crate::options::ProverOptions;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_model::{
@@ -23,6 +18,11 @@ use move_model::{
         DISABLE_INVARIANTS_IN_BODY_PRAGMA, VERIFY_PRAGMA,
     },
     ty::{TypeUnificationAdapter, Variance},
+};
+use move_stackless_bytecode::{
+    function_target::{FunctionData, FunctionTarget},
+    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
+    usage_analysis, COMPILED_MODULE_AVAILABLE,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
