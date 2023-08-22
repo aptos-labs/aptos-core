@@ -57,13 +57,17 @@ where
     NW: Copy + Default,
     EW: Copy + Default,
 {
+    type Error = S::Error;
+
     /// Reconstructs an undirected graph from a `GraphStream`.
-    fn from_graph_stream(mut graph_stream: S) -> Self {
+    fn from_graph_stream(mut graph_stream: S) -> Result<Self, S::Error> {
         let mut node_weights: Vec<NW> = Vec::new();
         let mut node_data: Vec<Option<Data>> = Vec::new();
         let mut graph_edges: Vec<Vec<_>> = Vec::new();
 
-        while let Some((batch, _)) = graph_stream.next_batch() {
+        while let Some(batch_res) = graph_stream.next_batch() {
+            let (batch, _batch_info) = batch_res?;
+
             for (node, edges) in batch {
                 if node.index as usize >= node_weights.len() {
                     node_weights.resize(node.index as usize + 1, NW::default());
@@ -83,14 +87,14 @@ where
             }
         }
 
-        Self {
+        Ok(Self {
             node_weights,
             node_data: node_data
                 .into_iter()
                 .map(|opt_data| opt_data.expect("Missing node in a graph stream"))
                 .collect(),
             edges: graph_edges,
-        }
+        })
     }
 }
 

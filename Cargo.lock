@@ -3447,12 +3447,15 @@ dependencies = [
  "anyhow",
  "aptos-block-executor",
  "aptos-block-partitioner",
+ "aptos-graphs",
  "aptos-transaction-orderer",
  "aptos-types",
  "itertools",
+ "namable_closures",
  "nonmax",
  "rand 0.7.3",
  "smallvec",
+ "thiserror",
 ]
 
 [[package]]

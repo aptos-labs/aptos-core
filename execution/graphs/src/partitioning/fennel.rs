@@ -64,7 +64,7 @@ pub enum AlphaComputationMode {
     Global,
 }
 
-#[derive(Debug, thiserror::Error, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Failed to satisfy the balancing constraint")]
     BalancingConstraint,
@@ -86,6 +86,9 @@ pub enum Error {
 
     #[error("Cannot compute max load. Total batch node weight is unknown")]
     MaxLoadUnknownBatchNodeWeight,
+
+    #[error("Error in the input to the partitioner: {0}")]
+    InputError(anyhow::Error),
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -136,11 +139,12 @@ where
     S: GraphStream,
     S::NodeWeight: Into<f64> + Copy,
     S::EdgeWeight: Into<f64> + Copy,
+    S::Error: Into<anyhow::Error>,
 {
     type Error = Error;
     type ResultStream = FennelStream<S>;
 
-    fn partition_stream(&self, graph_stream: S, n_partitions: usize) -> FennelStream<S> {
+    fn partition_stream(&self, graph_stream: S, n_partitions: usize) -> Result<FennelStream<S>> {
         FennelStream::new(graph_stream, self.clone(), n_partitions)
     }
 }
@@ -167,12 +171,9 @@ impl FennelGraphPartitioner {
 }
 
 pub struct FennelStream<S> {
-    /// The `GraphStream` to be partitioned.
-    ///
-    /// `Err` indicates that the partitioning has failed and shouldn't be continued.
-    /// The inner `Option` is used to temporarily take ownership of `graph_stream`
-    /// to avoid borrowing `self` mutably (see the `next_batch` implementation).
-    graph_stream: Result<Option<S>>,
+    /// The `GraphStream` to be partitioned, or [`None`] if the stream has
+    /// ended or partitioning cannot be continued due to an error.
+    graph_stream: Option<S>,
 
     /// The partitioning parameters.
     params: FennelGraphPartitioner,
@@ -208,34 +209,18 @@ where
     S::NodeWeight: Into<f64> + Copy,
     S::EdgeWeight: Into<f64> + Copy,
 {
-    fn new(graph_stream: S, params: FennelGraphPartitioner, n_partitions: usize) -> Self {
+    fn new(graph_stream: S, params: FennelGraphPartitioner, n_partitions: usize) -> Result<Self> {
         assert!(params.gamma >= 1.);
         assert!(params.balance_constraint > 0.);
-
-        let opt_total_node_count = graph_stream.opt_total_node_count();
-
-        let build_res = |graph_stream, alpha, max_load| Self {
-            graph_stream,
-            params,
-            n_partitions,
-            load: vec![0.; n_partitions],
-            partition: opt_total_node_count
-                .map(|node_count| vec![None; node_count])
-                .unwrap_or(Vec::new()),
-            partitioned_node_weight: 0.,
-            partitioned_edge_weight: 0.,
-            alpha,
-            max_load,
-        };
 
         let alpha = match params.alpha_computation_mode {
             AlphaComputationMode::Global => {
                 let Some(total_edge_weight) = graph_stream.opt_total_edge_weight() else {
-                    return build_res(Err(Error::AlphaUnknownTotalEdgeWeight), None, None);
+                    return Err(Error::AlphaUnknownTotalEdgeWeight);
                 };
 
                 let Some(total_node_weight) = graph_stream.opt_total_node_weight() else {
-                    return build_res(Err(Error::AlphaUnknownTotalNodeWeight), None, None);
+                    return Err(Error::AlphaUnknownTotalNodeWeight);
                 };
 
                 Some(params.alpha(total_node_weight, total_edge_weight, n_partitions))
@@ -247,7 +232,7 @@ where
         let max_load = match params.balance_constraint_mode {
             BalanceConstraintMode::Global => {
                 let Some(total_node_weight) = graph_stream.opt_total_node_weight() else {
-                    return build_res(Err(Error::MaxLoadUnknownNodeWeight), None, None);
+                    return Err(Error::MaxLoadUnknownNodeWeight);
                 };
 
                 Some(params.max_load(total_node_weight, n_partitions))
@@ -256,7 +241,21 @@ where
             _ => None,
         };
 
-        build_res(Ok(Some(graph_stream)), alpha, max_load)
+        let opt_total_node_count = graph_stream.opt_total_node_count();
+
+        Ok(Self {
+            graph_stream: Some(graph_stream),
+            params,
+            n_partitions,
+            load: vec![0.; n_partitions],
+            partition: opt_total_node_count
+                .map(|node_count| vec![None; node_count])
+                .unwrap_or(Vec::new()),
+            partitioned_node_weight: 0.,
+            partitioned_edge_weight: 0.,
+            alpha,
+            max_load,
+        })
     }
 
     /// Returns the partition of the given node, if it has been assigned one.
@@ -392,47 +391,51 @@ where
     S: GraphStream,
     S::NodeWeight: Into<f64> + Copy,
     S::EdgeWeight: Into<f64> + Copy,
+    S::Error: Into<anyhow::Error>,
 {
     type StreamItem = (StreamNode<S>, PartitionId);
     type Batch = Vec<Self::StreamItem>;
     type Error = Error;
 
     fn next_batch(&mut self) -> Option<Result<Vec<(StreamNode<S>, PartitionId)>>> {
-        let mut graph_stream = match &mut self.graph_stream {
-            Ok(graph_stream) => {
-                // Temporarily take ownership of `graph_stream` to avoid borrowing `self` mutably.
-                graph_stream.take().unwrap()
-            },
-            Err(err) => return Some(Err(err.clone())),
+        // Take ownership of `self.graph_stream` to avoid borrowing it mutably.
+        let mut graph_stream = self.graph_stream.take()?;
+
+        // In case of `None` or an error, `self.graph_stream` remains `None`,
+        // indicating the end of the stream.
+        let (batch, batch_info) = match graph_stream.next_batch()? {
+            Ok(ret) => ret,
+            Err(err) => return Some(Err(Error::InputError(err.into()))),
         };
 
-        // Get the next batch and partition it.
-        let (batch, batch_info) = graph_stream.next_batch()?;
         match self.partition_batch(batch, batch_info) {
-            Ok(partitioned_batch) => {
+            Ok(res) => {
                 // Return the ownership of `graph_stream` back to `self`.
-                self.graph_stream = Ok(Some(graph_stream));
-                Some(Ok(partitioned_batch))
-            },
+                self.graph_stream = Some(graph_stream);
+                Some(Ok(res))
+            }
             Err(err) => {
-                self.graph_stream = Err(err);
-                Some(Err(err.clone()))
+                // `self.graph_stream` stays `None`, indicating that partitioning
+                // cannot be continued.
+                Some(Err(err))
             },
         }
     }
 
     fn opt_items_count(&self) -> Option<usize> {
-        let Ok(graph_stream) = &self.graph_stream else {
-            return None;
+        let Some(graph_stream) = &self.graph_stream else {
+            // `None` indicates the end of the stream.
+            return Some(0);
         };
-        graph_stream.as_ref().unwrap().opt_remaining_node_count()
+        graph_stream.opt_remaining_node_count()
     }
 
     fn opt_batch_count(&self) -> Option<usize> {
-        let Ok(graph_stream) = &self.graph_stream else {
+        let Some(graph_stream) = &self.graph_stream else {
+            // `None` indicates the end of the stream.
             return None;
         };
-        graph_stream.as_ref().unwrap().opt_remaining_node_count()
+        graph_stream.opt_remaining_node_count()
     }
 }
 
@@ -453,7 +456,7 @@ mod tests {
         let mut partitioner = FennelGraphPartitioner::default();
         partitioner.balance_constraint = 0.2;
 
-        let partition_stream = partitioner.partition_stream(graph_stream, 2);
+        let partition_stream = partitioner.partition_stream(graph_stream, 2).unwrap();
 
         let mut partition_iter = partition_stream.into_items_iter();
 
@@ -478,6 +481,6 @@ mod tests {
         assert_eq!(node.index, 3);
         assert_eq!(partition, 1 - first_partition);
 
-        assert_eq!(partition_iter.next(), None);
+        assert!(partition_iter.next().is_none());
     }
 }

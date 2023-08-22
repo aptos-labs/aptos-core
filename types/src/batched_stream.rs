@@ -33,6 +33,8 @@ pub trait BatchedStream: Sized {
     /// Use `no_error::NoError` if the stream cannot fail.
     type Error;
 
+    // Required method:
+
     /// Advances the stream and returns the next batch.
     ///
     /// Returns [`None`] when stream is finished.
@@ -41,11 +43,7 @@ pub trait BatchedStream: Sized {
     /// [`None`], or new batches, depending on the implementation.
     fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>>;
 
-    /// Returns a batched stream with batches collected into `Vec`.
-    /// This method is usually zero-cost if the stream already has `Vec` batch type.
-    fn materialize(self) -> Materialize<Self> {
-        Materialize::new(self)
-    }
+    // Optional methods:
 
     /// Returns the total number of items in all remaining batches of the stream combined,
     /// if available.
@@ -58,6 +56,14 @@ pub trait BatchedStream: Sized {
     /// However, the stream may end prematurely if an error occurs.
     fn opt_batch_count(&self) -> Option<usize> {
         None
+    }
+
+    // Provided methods:
+
+    /// Returns a batched stream with batches collected into `Vec`.
+    /// This method is usually zero-cost if the stream already has `Vec` batch type.
+    fn materialize(self) -> Materialize<Self> {
+        Materialize::new(self)
     }
 
     /// Returns an iterator over `Result<Self::Batch, Self::Error>`.
@@ -76,6 +82,59 @@ pub trait BatchedStream: Sized {
     /// Returns an iterator over the items in the stream.
     fn into_items_iter(self) -> ItemsIterator<Self> {
         ItemsIterator::new(self)
+    }
+
+    /// Applies [`Result::and_then`] to the result of computation of each batch of the stream.
+    fn and_then<B, F>(self, op: F) -> AndThen<Self, F>
+    where
+        B: IntoIterator,
+        F: FnMut(Self::Batch) -> Result<B, Self::Error>,
+    {
+        AndThen::new(self, op)
+    }
+
+    /// Takes a closure and creates a batched stream that calls that closure
+    /// on the result of computation of each batch.
+    fn map_results<B, E, F>(self, f: F) -> MapResults<Self, F>
+    where
+        B: IntoIterator,
+        F: FnMut(Result<Self::Batch, Self::Error>) -> Result<B, E>
+    {
+        MapResults::new(self, f)
+    }
+
+    /// Takes a closure and creates a batched stream that calls that closure on each batch.
+    fn map_batches<R, F>(self, f: F) -> MapBatches<Self, F>
+    where
+        R: IntoIterator,
+        F: FnMut(Self::Batch) -> R,
+    {
+        MapBatches::new(self, f)
+    }
+
+    /// Takes a closure and creates a batched stream that calls that closure on each item.
+    ///
+    /// The closure cannot be mutable and must implement `Clone` as batches cannot borrow `self`.
+    /// The latter can be easily achieved by passing an immutable reference to the closure.
+    /// Lifting these requirements would require using the `LendingIterator` pattern,
+    /// which is not yet fully supported by stable Rust and would significantly
+    /// complicate the API.
+    ///
+    /// Consider using `map_batches` if you need to pass a mutable closure.
+    fn map_items<R, F>(self, f: F) -> MapItems<Self, F>
+    where
+        F: Clone + Fn(Self::StreamItem) -> R,
+    {
+        MapItems::new(self, f)
+    }
+
+    /// Takes a closure and creates a batched stream that calls that closure
+    /// on the returned errors, if any.
+    fn map_errors<E, F>(self, f: F) -> MapErrors<Self, F>
+    where
+        F: Fn(Self::Error) -> E,
+    {
+        MapErrors::new(self, f)
     }
 }
 
@@ -428,7 +487,6 @@ where
 {
     fn len(&self) -> usize {
         match &self.current_batch_iter {
-            // `unwrap` is justified because `S::Error = NoError`.
             Some(Ok(iter)) => iter.len() + self.stream.items_count(),
             Some(Err(err)) => {
                 let _: &NoError = err; // type assertion, to make the code fool-proof.
@@ -487,25 +545,25 @@ where
 }
 
 /// A batched stream that returns a single batch or a single error.
-pub struct Once<Batch, Error> {
-    result: Option<Result<Batch, Error>>,
+pub struct Once<B, E> {
+    result: Option<Result<B, E>>,
 }
 
-impl<Batch, Error> Once<Batch, Error> {
-    pub fn new(result: Result<Batch, Error>) -> Self {
+impl<B, E> Once<B, E> {
+    pub fn new(result: Result<B, E>) -> Self {
         Self {
             result: Some(result),
         }
     }
 }
 
-impl<Batch, Error> BatchedStream for Once<Batch, Error>
+impl<B, E> BatchedStream for Once<B, E>
 where
-    Batch: IntoIterator,
+    B: IntoIterator,
 {
-    type StreamItem = Batch::Item;
-    type Batch = Batch;
-    type Error = Error;
+    type StreamItem = B::Item;
+    type Batch = B;
+    type Error = E;
 
     fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
         self.result.take()
@@ -513,5 +571,189 @@ where
 
     fn opt_batch_count(&self) -> Option<usize> {
         Some(if self.result.is_some() { 1 } else { 0 })
+    }
+}
+
+/// A batched stream adapter that applies [`Result::and_then`] to the result of computation
+/// of each batch of the stream.
+pub struct AndThen<S, F> {
+    stream: S,
+    op: F,
+}
+
+impl<S, F> AndThen<S, F> {
+    pub fn new(stream: S, op: F) -> Self {
+        Self { stream, op }
+    }
+}
+
+impl<S, F, B> BatchedStream for AndThen<S, F>
+where
+    S: BatchedStream,
+    F: FnMut(S::Batch) -> Result<B, S::Error>,
+    B: IntoIterator,
+{
+    type StreamItem = B::Item;
+    type Batch = B;
+    type Error = S::Error;
+
+    fn next_batch(&mut self) -> Option<Result<B, S::Error>> {
+        self.stream
+            .next_batch()
+            .map(|batch_or_err| batch_or_err.and_then(|batch| (self.op)(batch)))
+    }
+
+    fn opt_items_count(&self) -> Option<usize> {
+        self.stream.opt_items_count()
+    }
+
+    fn opt_batch_count(&self) -> Option<usize> {
+        self.stream.opt_batch_count()
+    }
+}
+
+/// A batched stream adapter that maps results with the given function.
+pub struct MapResults<S, F> {
+    stream: S,
+    f: F,
+}
+
+impl<S, F> MapResults<S, F> {
+    pub fn new(stream: S, f: F) -> Self {
+        Self { stream, f }
+    }
+}
+
+impl<S, F, B, E> BatchedStream for MapResults<S, F>
+    where
+        S: BatchedStream,
+        F: FnMut(Result<S::Batch, S::Error>) -> Result<B, E>,
+        B: IntoIterator,
+{
+    type StreamItem = B::Item;
+    type Batch = B;
+    type Error = E;
+
+    fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
+        self.stream
+            .next_batch()
+            .map(|batch_or_err| (self.f)(batch_or_err))
+    }
+
+    fn opt_items_count(&self) -> Option<usize> {
+        self.stream.opt_items_count()
+    }
+
+    fn opt_batch_count(&self) -> Option<usize> {
+        self.stream.opt_batch_count()
+    }
+}
+
+/// A batched stream that maps batches with the given function.
+pub struct MapBatches<S, F> {
+    stream: S,
+    f: F,
+}
+
+impl<S, F> MapBatches<S, F> {
+    pub fn new(stream: S, f: F) -> Self {
+        Self { stream, f }
+    }
+}
+
+impl<S, F, R> BatchedStream for MapBatches<S, F>
+where
+    S: BatchedStream,
+    F: FnMut(S::Batch) -> R,
+    R: IntoIterator,
+{
+    type StreamItem = R::Item;
+    type Batch = R;
+    type Error = S::Error;
+
+    fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
+        self.stream
+            .next_batch()
+            .map(|batch_or_err| batch_or_err.map(|batch| (self.f)(batch)))
+    }
+
+    fn opt_items_count(&self) -> Option<usize> {
+        self.stream.opt_items_count()
+    }
+
+    fn opt_batch_count(&self) -> Option<usize> {
+        self.stream.opt_batch_count()
+    }
+}
+
+/// A batched stream adapter that maps items with the given function.
+pub struct MapItems<S, F> {
+    stream: S,
+    f: F,
+}
+
+impl<S, F> MapItems<S, F> {
+    pub fn new(stream: S, f: F) -> Self {
+        Self { stream, f }
+    }
+}
+
+impl<S, F, R> BatchedStream for MapItems<S, F>
+where
+    S: BatchedStream,
+    F: Clone + Fn(S::StreamItem) -> R,
+{
+    type StreamItem = R;
+    type Batch = std::iter::Map<<S::Batch as IntoIterator>::IntoIter, F>;
+    type Error = S::Error;
+
+    fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
+        self.stream
+            .next_batch()
+            .map(|batch_or_err| batch_or_err.map(|batch| batch.into_iter().map(self.f.clone())))
+    }
+
+    fn opt_items_count(&self) -> Option<usize> {
+        self.stream.opt_items_count()
+    }
+
+    fn opt_batch_count(&self) -> Option<usize> {
+        self.stream.opt_batch_count()
+    }
+}
+
+/// A batched stream adapter that maps errors with the given function.
+pub struct MapErrors<S, F> {
+    stream: S,
+    f: F,
+}
+
+impl<S, F> MapErrors<S, F> {
+    pub fn new(stream: S, f: F) -> Self {
+        Self { stream, f }
+    }
+}
+
+impl<S, F, E> BatchedStream for MapErrors<S, F>
+where
+    S: BatchedStream,
+    F: Fn(S::Error) -> E,
+{
+    type StreamItem = S::StreamItem;
+    type Batch = S::Batch;
+    type Error = E;
+
+    fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
+        self.stream
+            .next_batch()
+            .map(|batch_or_err| batch_or_err.map_err(|err| (self.f)(err)))
+    }
+
+    fn opt_items_count(&self) -> Option<usize> {
+        self.stream.opt_items_count()
+    }
+
+    fn opt_batch_count(&self) -> Option<usize> {
+        self.stream.opt_batch_count()
     }
 }

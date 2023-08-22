@@ -3,6 +3,8 @@
 use crate::graph::NodeIndex;
 use crate::{graph, WeightedGraph};
 use aptos_types::closuretools::{ClosureTools, MapClosure};
+use aptos_types::no_error;
+use aptos_types::no_error::NoError;
 use namable_closures::{closure, Closure};
 use rand::seq::SliceRandom;
 
@@ -24,8 +26,11 @@ pub trait GraphStream: Sized {
     /// The weight of an edge.
     type EdgeWeight;
 
+    /// The error type that can occur when advancing the stream.
+    type Error;
+
     /// An iterator over the neighbours of a node in the graph.
-    type NodeEdgesIter<'a>: Iterator<Item = (NodeIndex, Self::EdgeWeight)>
+    type NodeEdgesIter<'a>: IntoIterator<Item = (NodeIndex, Self::EdgeWeight)>
     where
         Self: 'a;
 
@@ -37,7 +42,9 @@ pub trait GraphStream: Sized {
     /// Advances the stream and returns the next value.
     ///
     /// Returns [`None`] when stream is finished.
-    fn next_batch(&mut self) -> Option<(Self::Batch<'_>, StreamBatchInfo<Self>)>;
+    fn next_batch(
+        &mut self,
+    ) -> Option<Result<(Self::Batch<'_>, StreamBatchInfo<Self>), Self::Error>>;
 
     /// Borrows a stream, rather than consuming it.
     ///
@@ -83,11 +90,24 @@ pub trait GraphStream: Sized {
     }
 
     /// Collects the stream into a graph or any other container implementing `FromGraphStream`.
-    fn collect<B>(self) -> B
+    fn collect<B>(self) -> Result<B, B::Error>
     where
         B: FromGraphStream<Self>,
     {
         B::from_graph_stream(self)
+    }
+
+    /// Returns a graph stream with batches collected into `Vec`.
+    fn materialize(self) -> Materialize<Self> {
+        Materialize::new(self)
+    }
+
+    /// Returns a graph stream with shuffled batches.
+    fn shuffle<R>(self, rng: &mut R) -> Shuffle<'_, Self, R>
+    where
+        R: rand::Rng,
+    {
+        Shuffle::new(self, rng)
     }
 }
 
@@ -109,8 +129,10 @@ pub trait FromGraphStream<S>: Sized
 where
     S: GraphStream,
 {
+    type Error;
+
     /// Reconstructs a graph from a `GraphStream`.
-    fn from_graph_stream(graph_stream: S) -> Self;
+    fn from_graph_stream(graph_stream: S) -> Result<Self, Self::Error>;
 }
 
 /// A trait for graph streams with known exact node count.
@@ -132,6 +154,7 @@ where
     type NodeData = S::NodeData;
     type NodeWeight = S::NodeWeight;
     type EdgeWeight = S::EdgeWeight;
+    type Error = S::Error;
 
     type NodeEdgesIter<'b> = S::NodeEdgesIter<'b>
     where
@@ -141,7 +164,9 @@ where
     where
         Self: 'b;
 
-    fn next_batch(&mut self) -> Option<(Self::Batch<'_>, StreamBatchInfo<Self>)> {
+    fn next_batch(
+        &mut self,
+    ) -> Option<Result<(Self::Batch<'_>, StreamBatchInfo<Self>), Self::Error>> {
         (**self).next_batch()
     }
 
@@ -207,6 +232,7 @@ impl<'graph, G: WeightedGraph> GraphStream for InputOrderGraphStream<'graph, G> 
     type NodeData = &'graph G::NodeData;
     type NodeWeight = G::NodeWeight;
     type EdgeWeight = G::EdgeWeight;
+    type Error = NoError;
 
     type NodeEdgesIter<'a> = G::WeightedNodeEdgesIter<'a>
     where
@@ -219,7 +245,7 @@ impl<'graph, G: WeightedGraph> GraphStream for InputOrderGraphStream<'graph, G> 
     where
         Self: 'a;
 
-    fn next_batch(&mut self) -> Option<(Self::Batch<'_>, StreamBatchInfo<Self>)> {
+    fn next_batch(&mut self) -> Option<no_error::Result<(Self::Batch<'_>, StreamBatchInfo<Self>)>> {
         if self.current_node == self.graph.node_count() as NodeIndex {
             return None;
         }
@@ -228,7 +254,7 @@ impl<'graph, G: WeightedGraph> GraphStream for InputOrderGraphStream<'graph, G> 
         self.current_node = (self.current_node + self.batch_size as NodeIndex)
             .min(self.graph.node_count() as NodeIndex);
 
-        Some((
+        Some(Ok((
             (batch_start..self.current_node).map_closure(closure!(self_ = self => |idx| {
                 let node_ref = self_.graph.get_node(idx);
                 let neighbours = self_.graph.weighted_edges(idx);
@@ -244,7 +270,7 @@ impl<'graph, G: WeightedGraph> GraphStream for InputOrderGraphStream<'graph, G> 
                 opt_total_batch_node_weight: None,
                 opt_total_batch_edge_weight: None,
             },
-        ))
+        )))
     }
 
     fn opt_remaining_batch_count(&self) -> Option<usize> {
@@ -300,6 +326,7 @@ impl<'graph, G: WeightedGraph> GraphStream for RandomOrderGraphStream<'graph, G>
     type NodeData = &'graph G::NodeData;
     type NodeWeight = G::NodeWeight;
     type EdgeWeight = G::EdgeWeight;
+    type Error = NoError;
 
     type NodeEdgesIter<'a> = G::WeightedNodeEdgesIter<'a>
     where
@@ -312,7 +339,7 @@ impl<'graph, G: WeightedGraph> GraphStream for RandomOrderGraphStream<'graph, G>
     where
         Self: 'a;
 
-    fn next_batch(&mut self) -> Option<(Self::Batch<'_>, StreamBatchInfo<Self>)> {
+    fn next_batch(&mut self) -> Option<no_error::Result<(Self::Batch<'_>, StreamBatchInfo<Self>)>> {
         if self.current_node == self.order.len() as NodeIndex {
             return None;
         }
@@ -321,7 +348,7 @@ impl<'graph, G: WeightedGraph> GraphStream for RandomOrderGraphStream<'graph, G>
         self.current_node =
             (self.current_node + self.batch_size as NodeIndex).min(self.order.len() as NodeIndex);
 
-        Some((
+        Some(Ok((
             (&self.order[batch_start as usize..self.current_node as usize])
                 .into_iter()
                 .copied()
@@ -340,7 +367,7 @@ impl<'graph, G: WeightedGraph> GraphStream for RandomOrderGraphStream<'graph, G>
                 opt_total_batch_node_weight: None,
                 opt_total_batch_edge_weight: None,
             },
-        ))
+        )))
     }
 
     fn opt_remaining_batch_count(&self) -> Option<usize> {
@@ -366,5 +393,134 @@ impl<'graph, G: WeightedGraph> GraphStream for RandomOrderGraphStream<'graph, G>
 
     fn opt_total_edge_weight(&self) -> Option<Self::EdgeWeight> {
         Some(self.graph.total_edge_weight())
+    }
+}
+
+/// A batched stream with batches collected into `Vec`.
+pub struct Materialize<S> {
+    inner: S,
+}
+
+impl<S> Materialize<S> {
+    pub fn new(stream: S) -> Self {
+        Self { inner: stream }
+    }
+}
+
+impl<S> GraphStream for Materialize<S>
+where
+    S: GraphStream,
+{
+    type NodeData = S::NodeData;
+    type NodeWeight = S::NodeWeight;
+    type EdgeWeight = S::EdgeWeight;
+    type Error = S::Error;
+
+    type NodeEdgesIter<'a> = S::NodeEdgesIter<'a>
+    where Self: 'a;
+
+    type Batch<'a> = Vec<(StreamNode<S>, Self::NodeEdgesIter<'a>)>
+    where Self: 'a;
+
+    fn next_batch(
+        &mut self,
+    ) -> Option<Result<(Self::Batch<'_>, StreamBatchInfo<Self>), Self::Error>> {
+        self.inner
+            .next_batch()
+            .map(|res| res.map(|(batch, info)| (batch.into_iter().collect(), info)))
+    }
+
+    fn opt_remaining_batch_count(&self) -> Option<usize> {
+        self.inner.opt_remaining_batch_count()
+    }
+
+    fn opt_remaining_node_count(&self) -> Option<usize> {
+        self.inner.opt_remaining_node_count()
+    }
+
+    fn opt_total_node_count(&self) -> Option<usize> {
+        self.inner.opt_total_node_count()
+    }
+
+    fn opt_total_edge_count(&self) -> Option<usize> {
+        self.inner.opt_total_edge_count()
+    }
+
+    fn opt_total_node_weight(&self) -> Option<Self::NodeWeight> {
+        self.inner.opt_total_node_weight()
+    }
+
+    fn opt_total_edge_weight(&self) -> Option<Self::EdgeWeight> {
+        self.inner.opt_total_edge_weight()
+    }
+}
+
+/// A batched stream with shuffled batches.
+pub struct Shuffle<'rng, S, R> {
+    inner: Materialize<S>,
+    rng: &'rng mut R,
+}
+
+impl<'rng, S, R> Shuffle<'rng, S, R>
+where
+    S: GraphStream,
+{
+    pub fn new(stream: S, rng: &'rng mut R) -> Self {
+        Self {
+            inner: stream.materialize(),
+            rng,
+        }
+    }
+}
+
+impl<'rng, S, R> GraphStream for Shuffle<'rng, S, R>
+where
+    S: GraphStream,
+    R: rand::Rng,
+{
+    type NodeData = S::NodeData;
+    type NodeWeight = S::NodeWeight;
+    type EdgeWeight = S::EdgeWeight;
+    type Error = S::Error;
+
+    type NodeEdgesIter<'a> = S::NodeEdgesIter<'a>
+    where Self: 'a;
+
+    type Batch<'a> = Vec<(StreamNode<S>, Self::NodeEdgesIter<'a>)>
+    where Self: 'a;
+
+    fn next_batch(
+        &mut self,
+    ) -> Option<Result<(Self::Batch<'_>, StreamBatchInfo<Self>), Self::Error>> {
+        self.inner.next_batch().map(|res| {
+            res.map(|(mut batch, info)| {
+                batch.shuffle(self.rng);
+                (batch, info)
+            })
+        })
+    }
+
+    fn opt_remaining_batch_count(&self) -> Option<usize> {
+        self.inner.opt_remaining_batch_count()
+    }
+
+    fn opt_remaining_node_count(&self) -> Option<usize> {
+        self.inner.opt_remaining_node_count()
+    }
+
+    fn opt_total_node_count(&self) -> Option<usize> {
+        self.inner.opt_total_node_count()
+    }
+
+    fn opt_total_edge_count(&self) -> Option<usize> {
+        self.inner.opt_total_edge_count()
+    }
+
+    fn opt_total_node_weight(&self) -> Option<Self::NodeWeight> {
+        self.inner.opt_total_node_weight()
+    }
+
+    fn opt_total_edge_weight(&self) -> Option<Self::EdgeWeight> {
+        self.inner.opt_total_edge_weight()
     }
 }
