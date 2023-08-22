@@ -437,6 +437,7 @@ pub fn sign_message(path: &str, raw_message: &[u8]) -> Result<Ed25519Signature, 
     });
 
     if let Err(err) = sign_start {
+        println!("Error: {:?}", err);
         return Err(AptosLedgerError::UnexpectedError(err.to_string(), None));
     }
 
@@ -460,16 +461,21 @@ pub fn sign_message(path: &str, raw_message: &[u8]) -> Result<Ed25519Signature, 
 
                         let signature_len: usize = response_buffer[0] as usize;
                         let signature_buffer = &response_buffer[1..1 + signature_len];
+                        println!("Success signature buffer: {:?}", signature_buffer);
                         return Ed25519Signature::try_from(signature_buffer).map_err(|err| {
                             AptosLedgerError::UnexpectedError(err.to_string(), None)
                         });
                     }
                 } else {
                     let error_code = AptosLedgerStatusCode::map_status_code(response.retcode());
+                    println!("Non Code Success Error: {:?}", error_code);
                     return Err(AptosLedgerError::AptosError(error_code));
                 }
             },
-            Err(err) => return Err(AptosLedgerError::from(err)),
+            Err(err) => return {
+                println!("Transport Error: {:?}", err);
+                Err(AptosLedgerError::from(err))
+            }
         };
     }
     Err(AptosLedgerError::UnexpectedError(
