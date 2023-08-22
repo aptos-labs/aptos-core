@@ -38,6 +38,18 @@ impl TDAGMessage for CertifiedAck {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
+pub enum Extensions {
+    Empty,
+    // Reserved for future extensions such as randomness shares
+}
+
+impl Extensions {
+    pub fn empty() -> Self {
+        Self::Empty
+    }
+}
+
 #[derive(Serialize)]
 struct NodeWithoutDigest<'a> {
     epoch: u64,
@@ -46,7 +58,7 @@ struct NodeWithoutDigest<'a> {
     timestamp: u64,
     payload: &'a Payload,
     parents: &'a Vec<NodeCertificate>,
-    shares: &'a Vec<u8>, // serialized bytes of randomness shares
+    extensions: &'a Extensions,
 }
 
 impl<'a> CryptoHash for NodeWithoutDigest<'a> {
@@ -69,7 +81,7 @@ impl<'a> From<&'a Node> for NodeWithoutDigest<'a> {
             timestamp: node.metadata.timestamp,
             payload: &node.payload,
             parents: &node.parents,
-            shares: &node.shares,
+            extensions: &node.extensions,
         }
     }
 }
@@ -133,7 +145,7 @@ pub struct Node {
     metadata: NodeMetadata,
     payload: Payload,
     parents: Vec<NodeCertificate>,
-    shares: Vec<u8>, // serialized bytes of randomness shares
+    extensions: Extensions,
 }
 
 impl Node {
@@ -144,10 +156,16 @@ impl Node {
         timestamp: u64,
         payload: Payload,
         parents: Vec<NodeCertificate>,
-        shares: Vec<u8>,
+        extensions: Extensions,
     ) -> Self {
         let digest = Self::calculate_digest_internal(
-            epoch, round, author, timestamp, &payload, &parents, &shares,
+            epoch,
+            round,
+            author,
+            timestamp,
+            &payload,
+            &parents,
+            &extensions,
         );
 
         Self {
@@ -162,7 +180,7 @@ impl Node {
             },
             payload,
             parents,
-            shares,
+            extensions,
         }
     }
 
@@ -171,13 +189,13 @@ impl Node {
         metadata: NodeMetadata,
         payload: Payload,
         parents: Vec<NodeCertificate>,
-        shares: Vec<u8>,
+        extensions: Extensions,
     ) -> Self {
         Self {
             metadata,
             payload,
             parents,
-            shares,
+            extensions,
         }
     }
 
@@ -189,7 +207,7 @@ impl Node {
         timestamp: u64,
         payload: &Payload,
         parents: &Vec<NodeCertificate>,
-        shares: &Vec<u8>,
+        extensions: &Extensions,
     ) -> HashValue {
         let node_with_out_digest = NodeWithoutDigest {
             epoch,
@@ -198,7 +216,7 @@ impl Node {
             timestamp,
             payload,
             parents,
-            shares,
+            extensions,
         };
         node_with_out_digest.hash()
     }
@@ -211,7 +229,7 @@ impl Node {
             self.metadata.timestamp,
             &self.payload,
             &self.parents,
-            &self.shares,
+            &self.extensions,
         )
     }
 
