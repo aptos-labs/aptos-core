@@ -487,11 +487,6 @@ where
             gas_unit_price: FeePerGasUnit,
         ) -> PartialVMResult<()>;
 
-        fn refund_storage_fee(
-            &mut self,
-            amount: Fee,
-        ) -> PartialVMResult<()>;
-
         fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
     }
 }

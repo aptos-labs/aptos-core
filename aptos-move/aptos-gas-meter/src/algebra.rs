@@ -29,7 +29,6 @@ pub struct StandardGasAlgebra {
     storage_fee_in_internal_units: InternalGas,
     // The storage fee consumed by the storage operations.
     storage_fee_used: Fee,
-    storage_fee_refunded: Fee,
 }
 
 impl StandardGasAlgebra {
@@ -50,7 +49,6 @@ impl StandardGasAlgebra {
             io_gas_used: 0.into(),
             storage_fee_in_internal_units: 0.into(),
             storage_fee_used: 0.into(),
-            storage_fee_refunded: 0.into(),
         }
     }
 }
@@ -171,16 +169,6 @@ impl GasAlgebra for StandardGasAlgebra {
         Ok(())
     }
 
-    fn refund_storage_fee(
-        &mut self,
-        abstract_amount: impl GasExpression<VMGasParameters, Unit = Octa>,
-    ) -> PartialVMResult<()> {
-        let amount = abstract_amount.evaluate(self.feature_version, &self.vm_gas_params);
-        self.storage_fee_refunded += amount;
-
-        Ok(())
-    }
-
     fn execution_gas_used(&self) -> InternalGas {
         self.execution_gas_used
     }
@@ -195,9 +183,5 @@ impl GasAlgebra for StandardGasAlgebra {
 
     fn storage_fee_used(&self) -> Fee {
         self.storage_fee_used
-    }
-
-    fn storage_fee_refunded(&self) -> Fee {
-        self.storage_fee_refunded
     }
 }
