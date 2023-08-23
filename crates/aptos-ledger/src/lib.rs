@@ -66,7 +66,8 @@ impl From<LedgerHIDError> for AptosLedgerError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
+#[repr(u16)]
 /// Status code returned when communicating with ledger
 /// Most Aptos ones defined here https://github.com/aptos-labs/ledger-app-aptos/blob/main/doc/COMMANDS.md#status-words
 /// Some of the ledger status code defined here - https://www.eftlab.com/knowledge-base/complete-list-of-apdu-responses
@@ -184,7 +185,7 @@ impl AptosLedgerStatusCode {
 
 impl Display for AptosLedgerStatusCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.description())
+        write!(f, "{} (0x{:x})", self.description(), *self as u16)
     }
 }
 
