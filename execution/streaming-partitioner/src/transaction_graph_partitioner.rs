@@ -262,6 +262,7 @@ mod tests {
     use aptos_types::batched_stream::{
         BatchedStream, IntoNoErrorBatchedStream, NoErrorBatchedStream,
     };
+    use rand::Rng;
     use std::fmt::Debug;
 
     use crate::transaction_graph_partitioner::{EdgeWeight, NodeWeight};
@@ -271,6 +272,7 @@ mod tests {
     fn test_fennel_11_transactions_over_4_batches() {
         let input_stream = input_11_transactions_over_4_batches();
 
+        // Fennel is likely to perform poorly on such a small input.
         let mut fennel = FennelGraphPartitioner::new(2);
         fennel.balance_constraint_mode = BalanceConstraintMode::Batched;
         fennel.alpha_computation_mode = AlphaComputationMode::Batched;
@@ -286,7 +288,7 @@ mod tests {
 
         let res = partitioner.partition_transactions(input_stream).unwrap();
 
-        print_output("Fennel partitioning", 2, 11, res, true);
+        print_output("Fennel partitioning (11 txns)", 2, 11, res, true);
     }
 
     #[test]
@@ -307,7 +309,7 @@ mod tests {
 
         let res = partitioner.partition_transactions(input_stream).unwrap();
 
-        print_output("Metis partitioning", 2, 11, res, true);
+        print_output("Metis partitioning (11 txns)", 2, 11, res, true);
     }
 
     #[test]
@@ -327,7 +329,70 @@ mod tests {
 
         let res = partitioner.partition_transactions(input_stream).unwrap();
 
-        print_output("Random partitioning", 2, 11, res, true);
+        print_output("Random partitioning (11 txns)", 2, 11, res, true);
+    }
+
+    #[test]
+    fn test_fennel_100k_transactions_over_100_batches_into_60_partitions() {
+        let input_stream = input_random_p2p_transactions(100, 1000, 1000);
+
+        let mut fennel = FennelGraphPartitioner::new(60);
+        fennel.balance_constraint_mode = BalanceConstraintMode::Batched;
+        fennel.alpha_computation_mode = AlphaComputationMode::Batched;
+
+        let mut partitioner = super::TransactionGraphPartitioner {
+            graph_partitioner: fennel,
+            params: super::Params {
+                node_weight_function,
+                edge_weight_function,
+                shuffle_batches: false,
+            },
+        };
+
+        let res = partitioner.partition_transactions(input_stream).unwrap();
+
+        print_output("Fennel partitioning (100k)", 60, 100_000, res, false);
+    }
+
+    #[test]
+    fn test_metis_100k_transactions_over_100_batches_into_60_partitions() {
+        let input_stream = input_random_p2p_transactions(100, 1000, 1000);
+
+        let metis = MetisGraphPartitioner::new(60);
+        let streaming_partitioner = WholeGraphStreamingPartitioner::new(metis);
+
+        let mut partitioner = super::TransactionGraphPartitioner {
+            graph_partitioner: streaming_partitioner,
+            params: super::Params {
+                node_weight_function,
+                edge_weight_function,
+                shuffle_batches: false,
+            },
+        };
+
+        let res = partitioner.partition_transactions(input_stream).unwrap();
+
+        print_output("Metis partitioning (100k)", 60, 100_000, res, false);
+    }
+
+    #[test]
+    fn test_pseudorandom_100k_transactions_over_100_batches_into_60_partitions() {
+        let input_stream = input_random_p2p_transactions(100, 1000, 1000);
+
+        let streaming_partitioner = RandomPartitioner::new(60);
+
+        let mut partitioner = super::TransactionGraphPartitioner {
+            graph_partitioner: streaming_partitioner,
+            params: super::Params {
+                node_weight_function,
+                edge_weight_function,
+                shuffle_batches: false,
+            },
+        };
+
+        let res = partitioner.partition_transactions(input_stream).unwrap();
+
+        print_output("Random partitioning (100k)", 60, 100_000, res, false);
     }
 
     fn node_weight_function<K>(tx: &MockPTransaction<K>) -> NodeWeight {
@@ -373,6 +438,16 @@ mod tests {
             ],
         ]
         .into_no_error_batched_stream()
+    }
+
+    fn input_random_p2p_transactions(
+        n_batches: usize,
+        txns_per_batch: usize,
+        n_accounts: usize,
+    ) -> impl NoErrorBatchedStream<StreamItem = MockPTransaction<u32>> {
+        (0..n_batches)
+            .map(move |_| (0..txns_per_batch).map(move |_| random_p2p_transaction(n_accounts)))
+            .into_no_error_batched_stream()
     }
 
     // Use `cargo test -p aptos-streaming-partitioner -- --nocapture --test-threads 1`
@@ -443,6 +518,25 @@ mod tests {
         );
         println!("-------------------------------------");
         println!();
+    }
+
+    fn random_p2p_transaction(n_accounts: usize) -> MockPTransaction<u32> {
+        let mut rng = rand::thread_rng();
+        let estimated_gas = rng.gen_range(1, 100);
+
+        let sender = rng.gen_range(0, n_accounts as u32);
+        let receiver = loop {
+            let receiver = rng.gen_range(0, n_accounts as u32);
+            if receiver != sender {
+                break receiver;
+            }
+        };
+
+        MockPTransaction::new(
+            estimated_gas,
+            vec![sender, receiver],
+            vec![sender, receiver],
+        )
     }
 
     #[derive(Clone, Debug)]
