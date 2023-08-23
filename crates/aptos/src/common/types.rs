@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::utils::fund_account;
 use crate::{
     common::{
         init::Network,
@@ -1268,14 +1269,22 @@ pub struct FaucetOptions {
     /// URL for the faucet endpoint e.g. `https://faucet.devnet.aptoslabs.com`
     #[clap(long)]
     faucet_url: Option<reqwest::Url>,
+
+    /// Auth token to bypass faucet ratelimits. You can also set this as an environment
+    /// variable with FAUCET_AUTH_TOKEN.
+    #[clap(long, env)]
+    faucet_auth_token: Option<String>,
 }
 
 impl FaucetOptions {
-    pub fn new(faucet_url: Option<reqwest::Url>) -> Self {
-        FaucetOptions { faucet_url }
+    pub fn new(faucet_url: Option<reqwest::Url>, faucet_auth_token: Option<String>) -> Self {
+        FaucetOptions {
+            faucet_url,
+            faucet_auth_token,
+        }
     }
 
-    pub fn faucet_url(&self, profile: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
+    fn faucet_url(&self, profile: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
         if let Some(ref faucet_url) = self.faucet_url {
             Ok(faucet_url.clone())
         } else if let Some(Some(url)) = CliConfig::load_profile(
@@ -1289,6 +1298,22 @@ impl FaucetOptions {
         } else {
             Err(CliError::CommandArgumentError("No faucet given.  Please add --faucet-url or add a faucet URL to the .aptos/config.yaml for the current profile".to_string()))
         }
+    }
+
+    /// Fund an account with the faucet.
+    pub async fn fund_account(
+        &self,
+        profile: &ProfileOptions,
+        num_octas: u64,
+        address: &AccountAddress,
+    ) -> CliTypedResult<Vec<HashValue>> {
+        fund_account(
+            &self.faucet_url(profile)?,
+            self.faucet_auth_token.as_deref(),
+            num_octas,
+            address,
+        )
+        .await
     }
 }
 

@@ -13,7 +13,7 @@ use aptos_build_info::build_information;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_keygen::KeyGen;
 use aptos_logger::{debug, Level};
-use aptos_rest_client::{aptos_api_types::HashValue, Account, Client, State};
+use aptos_rest_client::{aptos_api_types::HashValue, Account, Client, State, Client as RestClient, FaucetClient};
 use aptos_telemetry::service::telemetry_is_disabled;
 use aptos_types::{
     account_address::create_multisig_account_address,
@@ -416,23 +416,30 @@ pub fn read_line(input_name: &'static str) -> CliTypedResult<String> {
     Ok(input_buf)
 }
 
-/// Fund account (and possibly create it) from a faucet
+/// Fund account (and possibly create it) from a faucet. This returns txn hashes that
+/// you must wait for before the account is funded.
 pub async fn fund_account(
-    faucet_url: Url,
+    rest_url: &Url,
+    faucet_url: &Url,
+    faucet_auth_token: Option<&str>,
     num_octas: u64,
-    address: AccountAddress,
+    address: &AccountAddress,
 ) -> CliTypedResult<Vec<HashValue>> {
-    let response = reqwest::Client::new()
+    FaucetClient::new(faucet_url.clone(), rest_url.clone(), faucet_auth_token)
+        .fund(*address, num_octas)
+        .await
+    let mut builder = reqwest::Client::new()
         .post(format!(
             "{}mint?amount={}&auth_key={}",
             faucet_url, num_octas, address
         ))
-        .body("{}")
-        .send()
-        .await
-        .map_err(|err| {
-            CliError::ApiError(format!("Failed to fund account with faucet: {:#}", err))
-        })?;
+        .body("{}");
+    if let Some(ref faucet_auth_token) = faucet_auth_token {
+        builder = builder.header("Authorization", format!("Bearer {}", faucet_auth_token))
+    }
+    let response = builder.send().await.map_err(|err| {
+        CliError::ApiError(format!("Failed to fund account with faucet: {:#}", err))
+    })?;
     if response.status() == 200 {
         let hashes: Vec<HashValue> = response
             .json()

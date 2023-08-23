@@ -45,6 +45,11 @@ pub struct InitTool {
     #[clap(long)]
     pub faucet_url: Option<Url>,
 
+    /// Auth token, if we're using the faucet. This is only used this time, we don't
+    /// store it.
+    #[clap(long, env)]
+    pub faucet_auth_token: Option<String>,
+
     /// Whether to skip the faucet for a non-faucet endpoint
     #[clap(long)]
     pub skip_faucet: bool,
@@ -226,10 +231,11 @@ impl CliCommand<()> for InitTool {
                     address, NUM_DEFAULT_OCTAS
                 );
                 let hashes = fund_account(
-                    Url::parse(faucet_url)
+                    &Url::parse(faucet_url)
                         .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?,
+                    self.faucet_auth_token.as_deref(),
                     NUM_DEFAULT_OCTAS,
-                    address,
+                    &address,
                 )
                 .await?;
                 wait_for_transactions(&client, hashes).await?;

@@ -5,7 +5,7 @@ use crate::{
     account::create::DEFAULT_FUNDED_COINS,
     common::{
         types::{CliCommand, CliTypedResult, FaucetOptions, ProfileOptions, RestOptions},
-        utils::{fund_account, wait_for_transactions},
+        utils::wait_for_transactions,
     },
 };
 use aptos_types::account_address::AccountAddress;
@@ -51,12 +51,10 @@ impl CliCommand<String> for FundWithFaucet {
         } else {
             self.profile_options.account_address()?
         };
-        let hashes = fund_account(
-            self.faucet_options.faucet_url(&self.profile_options)?,
-            self.amount,
-            address,
-        )
-        .await?;
+        let hashes = self
+            .faucet_options
+            .fund_account(&self.profile_options, self.amount, &address)
+            .await?;
         let client = self.rest_options.client(&self.profile_options)?;
         wait_for_transactions(&client, hashes).await?;
         return Ok(format!(
