@@ -25,21 +25,20 @@ use aptos_protos::{
 use futures::Stream;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use std::{pin::Pin, sync::Arc, time::Duration};
+use std::{collections::HashMap, pin::Pin, sync::Arc, time::Duration};
 use tokio::sync::mpsc::{channel, error::SendTimeoutError};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn, Instrument};
-use uuid::Uuid;
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 struct RequestMetadata {
-    pub request_id: String,
-    pub request_remote_addr: String,
     pub request_token: String,
     pub request_name: String,
-    pub request_source: String,
+    pub request_email: String,
+    pub request_user_classification: String,
+    pub request_api_key_name: String,
 }
 
 const MOVING_AVERAGE_WINDOW_SIZE: u64 = 10_000;
@@ -57,6 +56,10 @@ const DEFAULT_MAX_RESPONSE_CHANNEL_SIZE: usize = 3;
 const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
 
 const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
+
+const REQUEST_HEADER_APTOS_EMAIL_HEADER: &str = "x-aptos-email";
+const REQUEST_HEADER_APTOS_USER_CLASSIFICATION_HEADER: &str = "x-aptos-user-classification";
+const REQUEST_HEADER_APTOS_API_KEY_NAME: &str = "x-aptos-api-key-name";
 
 pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
@@ -148,11 +151,11 @@ impl RawData for RawDataServerWrapper {
         let serving_span = tracing::span!(
             tracing::Level::INFO,
             "Data Serving",
-            request_id = request_metadata.request_id.as_str(),
-            request_remote_addr = request_metadata.request_remote_addr.as_str(),
-            request_token = request_metadata.request_token.as_str(),
             request_name = request_metadata.request_name.as_str(),
-            request_source = request_metadata.request_source.as_str(),
+            request_email = request_metadata.request_email.as_str(),
+            request_api_key_name = request_metadata.request_api_key_name.as_str(),
+            request_token = request_metadata.request_token.as_str(),
+            request_user_classification = request_metadata.request_user_classification.as_str(),
         );
 
         let redis_client = self.redis_client.clone();
@@ -278,35 +281,35 @@ impl RawData for RawDataServerWrapper {
                         Ok(_) => {
                             PROCESSED_BATCH_SIZE
                                 .with_label_values(&[
-                                    request_metadata.request_token.as_str(),
+                                    request_metadata.request_user_classification.as_str(),
                                     request_metadata.request_name.as_str(),
                                 ])
                                 .set(current_batch_size as i64);
                             LATEST_PROCESSED_VERSION
                                 .with_label_values(&[
-                                    request_metadata.request_token.as_str(),
+                                    request_metadata.request_user_classification.as_str(),
                                     request_metadata.request_name.as_str(),
                                 ])
                                 .set(end_of_batch_version as i64);
                             PROCESSED_VERSIONS_COUNT
                                 .with_label_values(&[
-                                    request_metadata.request_token.as_str(),
+                                    request_metadata.request_user_classification.as_str(),
                                     request_metadata.request_name.as_str(),
                                 ])
                                 .inc_by(current_batch_size as u64);
                             if let Some(data_latency_in_secs) = data_latency_in_secs {
-                                // If it's a partial batch, we record the latency because it usually means
+                                // HACK: If it's a partial batch, we record the latency because it usually means
                                 // the data is the latest.
                                 if current_batch_size % BLOB_STORAGE_SIZE != 0 {
                                     PROCESSED_LATENCY_IN_SECS
                                         .with_label_values(&[
-                                            request_metadata.request_token.as_str(),
+                                            request_metadata.request_user_classification.as_str(),
                                             request_metadata.request_name.as_str(),
                                         ])
                                         .set(data_latency_in_secs);
                                     PROCESSED_LATENCY_IN_SECS_ALL
                                         .with_label_values(&[request_metadata
-                                            .request_source
+                                            .request_user_classification
                                             .as_str()])
                                         .observe(data_latency_in_secs);
                                 }
@@ -445,40 +448,32 @@ async fn data_fetch_error_handling(err: anyhow::Error, current_version: u64, cha
 
 /// Gets the request metadata. Useful for logging.
 fn get_request_metadata(req: &Request<GetTransactionsRequest>) -> tonic::Result<RequestMetadata> {
-    // Request id.
-    let request_id = Uuid::new_v4().to_string();
-
-    let request_token = match req
-        .metadata()
-        .get(GRPC_AUTH_TOKEN_HEADER)
-        .map(|token| token.to_str())
-    {
-        Some(Ok(token)) => token.to_string(),
-        // It's required to have a valid request token.
-        _ => return Result::Err(Status::aborted("Invalid request token")),
-    };
-
-    let request_remote_addr = match req.remote_addr() {
-        Some(addr) => addr.to_string(),
-        None => return Result::Err(Status::aborted("Invalid remote address")),
-    };
-    let request_name = match req
-        .metadata()
-        .get(GRPC_REQUEST_NAME_HEADER)
-        .map(|desc| desc.to_str())
-    {
-        Some(Ok(desc)) => desc.to_string(),
-        // If the request description is not provided, use "unknown".
-        _ => "unknown".to_string(),
-    };
-    Ok(RequestMetadata {
-        request_id,
-        request_remote_addr,
-        request_token,
-        request_name,
-        // TODO: after launch, support 'core', 'partner', 'community' and remove 'testing_v1'.
-        request_source: "testing_v1".to_string(),
-    })
+    let request_metadata_pairs = vec![
+        ("request_api_key_name", REQUEST_HEADER_APTOS_API_KEY_NAME),
+        ("request_email", REQUEST_HEADER_APTOS_EMAIL_HEADER),
+        (
+            "request_user_classification",
+            REQUEST_HEADER_APTOS_USER_CLASSIFICATION_HEADER,
+        ),
+        ("request_token", GRPC_AUTH_TOKEN_HEADER),
+        ("request_name", GRPC_REQUEST_NAME_HEADER),
+    ];
+    let request_metadata_map: HashMap<String, String> = request_metadata_pairs
+        .into_iter()
+        .map(|(key, value)| {
+            (
+                key.to_string(),
+                req.metadata()
+                    .get(value)
+                    .map(|value| value.to_str().unwrap_or("unspecified").to_string())
+                    .unwrap_or("unspecified".to_string()),
+            )
+        })
+        .collect();
+    let request_metadata: RequestMetadata =
+        serde_json::from_str(&serde_json::to_string(&request_metadata_map).unwrap()).unwrap();
+    // TODO: update the request name if these are internal requests.
+    Ok(request_metadata)
 }
 
 async fn channel_send_multiple_with_timeout(
