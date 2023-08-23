@@ -67,7 +67,8 @@ export class CoinClient {
       createReceiverIfMissing?: boolean;
     },
   ): Promise<string> {
-    if (extraArgs?.coinType && AccountAddress.isValid(extraArgs.coinType)) {
+    const isTypeTag = (extraArgs?.coinType ?? "").toString().includes("::");
+    if (extraArgs?.coinType && !isTypeTag && AccountAddress.isValid(extraArgs.coinType)) {
       /* eslint-disable no-console */
       console.warn("to transfer a fungible asset, use `FungibleAssetClient()` class for better support");
       const provider = new Provider({
@@ -129,10 +130,11 @@ export class CoinClient {
       // The coin type to use, defaults to 0x1::aptos_coin::AptosCoin.
       // If you want to check the balance of a fungible asset, set this param to be the
       // fungible asset address
-      coinType?: string;
+      coinType?: string | MaybeHexString;
     },
   ): Promise<bigint> {
-    if (extraArgs?.coinType && AccountAddress.isValid(extraArgs.coinType)) {
+    const isTypeTag = (extraArgs?.coinType ?? "").toString().includes("::");
+    if (extraArgs?.coinType && !isTypeTag && AccountAddress.isValid(extraArgs.coinType)) {
       /* eslint-disable no-console */
       console.warn("to check balance of a fungible asset, use `FungibleAssetClient()` class for better support");
       const provider = new Provider({
