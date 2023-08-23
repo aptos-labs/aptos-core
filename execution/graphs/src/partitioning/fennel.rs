@@ -94,6 +94,9 @@ type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Clone, Copy)]
 pub struct FennelGraphPartitioner {
+    /// The number of partitions.
+    pub n_partitions: usize,
+
     /// The maximum allowed load imbalance.
     /// The load of each partition must be at most `(1 + balance_constraint) * (n / k)`,
     /// where n is the number of nodes in the graph and k is the number of partitions.
@@ -122,9 +125,10 @@ pub struct FennelGraphPartitioner {
     pub alpha_computation_mode: AlphaComputationMode,
 }
 
-impl Default for FennelGraphPartitioner {
-    fn default() -> Self {
+impl FennelGraphPartitioner {
+    pub fn new(n_partitions: usize) -> Self {
         Self {
+            n_partitions,
             balance_constraint: 0.1,
             gamma: 1.5,
             balance_constraint_mode: BalanceConstraintMode::Prefix,
@@ -143,8 +147,8 @@ where
     type Error = Error;
     type ResultStream = FennelStream<S>;
 
-    fn partition_stream(&self, graph_stream: S, n_partitions: usize) -> Result<FennelStream<S>> {
-        FennelStream::new(graph_stream, self.clone(), n_partitions)
+    fn partition_stream(&self, graph_stream: S) -> Result<FennelStream<S>> {
+        FennelStream::new(graph_stream, self.clone())
     }
 }
 
@@ -177,9 +181,6 @@ pub struct FennelStream<S> {
     /// The partitioning parameters.
     params: FennelGraphPartitioner,
 
-    /// The number of partitions.
-    n_partitions: usize,
-
     /// The load of each partition.
     load: Vec<f64>,
 
@@ -208,9 +209,10 @@ where
     S::NodeWeight: Into<f64> + Copy,
     S::EdgeWeight: Into<f64> + Copy,
 {
-    fn new(graph_stream: S, params: FennelGraphPartitioner, n_partitions: usize) -> Result<Self> {
+    fn new(graph_stream: S, params: FennelGraphPartitioner) -> Result<Self> {
         assert!(params.gamma >= 1.);
         assert!(params.balance_constraint > 0.);
+        assert!(params.n_partitions > 0);
 
         let alpha = match params.alpha_computation_mode {
             AlphaComputationMode::Global => {
@@ -222,7 +224,7 @@ where
                     return Err(Error::AlphaUnknownTotalNodeWeight);
                 };
 
-                Some(params.alpha(total_node_weight, total_edge_weight, n_partitions))
+                Some(params.alpha(total_node_weight, total_edge_weight, params.n_partitions))
             },
             AlphaComputationMode::Fixed(alpha) => Some(alpha),
             _ => None,
@@ -234,7 +236,7 @@ where
                     return Err(Error::MaxLoadUnknownNodeWeight);
                 };
 
-                Some(params.max_load(total_node_weight, n_partitions))
+                Some(params.max_load(total_node_weight, params.n_partitions))
             },
             BalanceConstraintMode::FixedMaxLoad(max_load) => Some(max_load),
             _ => None,
@@ -244,9 +246,8 @@ where
 
         Ok(Self {
             graph_stream: Some(graph_stream),
+            load: vec![0.; params.n_partitions],
             params,
-            n_partitions,
-            load: vec![0.; n_partitions],
             partition: opt_total_node_count
                 .map(|node_count| vec![None; node_count])
                 .unwrap_or(Vec::new()),
@@ -288,7 +289,7 @@ where
             alpha = Some(self.params.alpha(
                 total_node_weight,
                 total_edge_weight,
-                self.n_partitions,
+                self.params.n_partitions,
             ));
         }
 
@@ -298,7 +299,10 @@ where
             };
             let total_node_weight = self.partitioned_node_weight + batch_node_weight.into();
 
-            max_load = Some(self.params.max_load(total_node_weight, self.n_partitions));
+            max_load = Some(
+                self.params
+                    .max_load(total_node_weight, self.params.n_partitions),
+            );
         }
 
         batch
@@ -319,7 +323,7 @@ where
                 // to compute `max_load` and `alpha`.
                 self.partitioned_node_weight += node_weight;
 
-                let mut edges_to = vec![0.; self.n_partitions];
+                let mut edges_to = vec![0.; self.params.n_partitions];
                 for (v, w) in edges {
                     if let Some(partition) = self.partition_of(v) {
                         let w = w.into();
@@ -335,7 +339,7 @@ where
                 // (see: `BalanceConstraintMode`).
                 let max_load = max_load.unwrap_or_else(|| {
                     self.params
-                        .max_load(self.partitioned_node_weight, self.n_partitions)
+                        .max_load(self.partitioned_node_weight, self.params.n_partitions)
                 });
 
                 // Compute the alpha parameter if it hasn't been computed yet.
@@ -344,7 +348,7 @@ where
                     self.params.alpha(
                         self.partitioned_node_weight,
                         self.partitioned_edge_weight,
-                        self.n_partitions,
+                        self.params.n_partitions,
                     )
                 });
 
@@ -454,10 +458,10 @@ mod tests {
 
         let graph_stream = input_order_stream(&graph, 1);
 
-        let mut partitioner = FennelGraphPartitioner::default();
+        let mut partitioner = FennelGraphPartitioner::new(2);
         partitioner.balance_constraint = 0.2;
 
-        let partition_stream = partitioner.partition_stream(graph_stream, 2).unwrap();
+        let partition_stream = partitioner.partition_stream(graph_stream).unwrap();
 
         let mut partition_iter = partition_stream.into_items_iter();
 

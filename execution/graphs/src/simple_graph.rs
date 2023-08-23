@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 
+use std::iter::Sum;
+
 use crate::graph::{GraphNode, GraphNodeRef, Node, NodeIndex, NodeRef};
 use crate::graph_stream::{FromGraphStream, GraphStream};
 use crate::WeightedGraph;
-use std::iter::Sum;
 
 /// A weighted undirected graph represented in a simple format, where for each node
 /// we store its weight and a list of its neighbours with the corresponding edge weights.
@@ -47,7 +48,11 @@ where
         self.nodes()
             .zip(self.node_data)
             .zip(self.node_weights)
-            .map(|((index, data), weight)| Node {index, data, weight})
+            .map(|((index, data), weight)| Node {
+                index,
+                data,
+                weight,
+            })
     }
 }
 
@@ -165,12 +170,10 @@ impl<'a, Data, NW: Copy, EW> Iterator for NodesIter<'a, Data, NW, EW> {
     type Item = NodeRef<'a, Data, NW>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.node_indices.next().map(|idx| {
-            NodeRef {
-                index: idx,
-                data: &self.graph.node_data[idx as usize],
-                weight: self.graph.node_weights[idx as usize],
-            }
+        self.node_indices.next().map(|idx| NodeRef {
+            index: idx,
+            data: &self.graph.node_data[idx as usize],
+            weight: self.graph.node_weights[idx as usize],
         })
     }
 }

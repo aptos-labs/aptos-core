@@ -213,12 +213,12 @@ where
     }
 }
 
-/// Adds method `as_batched_stream` for all types
-/// implementing `Iterator<Item = Result<impl IntoIterator, _>`.
+/// A trait for types that can be converted to a batched stream.
+/// Notably, any type implementing `Iterator<Item = Result<impl IntoIterator, _>`.
 pub trait IntoBatchedStream: IntoIterator + Sized {
-    fn into_batched_stream(self) -> IterIntoBatchedStream<Self> {
-        IterIntoBatchedStream { iter: self.into_iter() }
-    }
+    type Stream: BatchedStream;
+
+    fn into_batched_stream(self) -> Self::Stream;
 }
 
 impl<I, II, E> IntoBatchedStream for I
@@ -226,14 +226,19 @@ where
     I: IntoIterator<Item = Result<II, E>>,
     II: IntoIterator,
 {
+    type Stream = IterIntoBatchedStream<Self>;
+
+    fn into_batched_stream(self) -> Self::Stream {
+        IterIntoBatchedStream { iter: self.into_iter() }
+    }
 }
 
-/// Adds method `as_no_error_batched_stream` for all types
-/// implementing `Iterator<Item = impl IntoIterator>`.
+/// A trait for types that can be converted to a batched stream with no errors.
+/// Notably, any type implementing `Iterator<Item = impl IntoIterator>`.
 pub trait IntoNoErrorBatchedStream: IntoIterator + Sized {
-    fn into_no_error_batched_stream(self) -> IterIntoNoErrorBatchedStream<Self> {
-        IterIntoNoErrorBatchedStream { iter: self.into_iter() }
-    }
+    type Stream;
+
+    fn into_no_error_batched_stream(self) -> Self::Stream;
 }
 
 impl<I> IntoNoErrorBatchedStream for I
@@ -241,6 +246,11 @@ where
     I: IntoIterator,
     I::Item: IntoIterator,
 {
+    type Stream = IterIntoNoErrorBatchedStream<Self>;
+
+    fn into_no_error_batched_stream(self) -> Self::Stream {
+        IterIntoNoErrorBatchedStream { iter: self.into_iter() }
+    }
 }
 
 /// Adds a method `batched` to all iterators.

@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 
+use std::iter::Sum;
+
+use aptos_types::batched_stream;
+
 use crate::graph_stream::StreamNode;
 use crate::partitioning::{GraphPartitioner, PartitionId, StreamingGraphPartitioner};
 use crate::{GraphStream, SimpleUndirectedGraph};
-use aptos_types::batched_stream;
-use std::iter::Sum;
 
 /// Converts a `GraphPartitioner` to a `StreamingGraphPartitioner` by reading the whole
 /// graph from the stream, reconstructing it in memory and then partitioning it.
@@ -34,18 +36,14 @@ where
     // Outputs a single batch with the whole partitioning result.
     type ResultStream = batched_stream::Once<Vec<(StreamNode<S>, PartitionId)>, Self::Error>;
 
-    fn partition_stream(
-        &self,
-        graph_stream: S,
-        n_partitions: usize,
-    ) -> Result<Self::ResultStream, Self::Error> {
+    fn partition_stream(&self, graph_stream: S) -> Result<Self::ResultStream, Self::Error> {
         let graph = graph_stream
             .collect()
             .map_err(|err: S::Error| Error::GraphStreamError(err))?;
 
         let partitioning = self
             .graph_partitioner
-            .partition(&graph, n_partitions)
+            .partition(&graph)
             .map_err(|err| Error::GraphPartitionerError(err))?;
 
         let nodes = graph.into_nodes();

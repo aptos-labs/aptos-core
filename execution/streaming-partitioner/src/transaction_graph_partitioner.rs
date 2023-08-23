@@ -43,9 +43,6 @@ pub struct Params<NF, EF> {
     /// The function that maps pairs of serialization indices of transactions to edge weights.
     pub edge_weight_function: EF,
 
-    /// The number of partitions.
-    pub n_partitions: usize,
-
     /// Whether to shuffle batches before passing them to the graph partitioner.
     pub shuffle_batches: bool,
 }
@@ -80,9 +77,7 @@ where
         let graph_stream = TransactionGraphStream::new(transactions, self.params.clone());
 
         // partitioned_graph_stream: BatchedStream<StreamItem = (SerializationIdx, PartitionId)>
-        let partitioned_graph_stream = self
-            .graph_partitioner
-            .partition_stream(graph_stream, self.params.n_partitions)?;
+        let partitioned_graph_stream = self.graph_partitioner.partition_stream(graph_stream)?;
 
         Ok(
             partitioned_graph_stream.map_items(|(node, partition)| PartitionedTransaction {
@@ -257,16 +252,17 @@ pub struct TxnWithDeps<T: PTransaction> {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Debug;
     use aptos_graphs::partitioning::fennel::{
         AlphaComputationMode, BalanceConstraintMode, FennelGraphPartitioner,
     };
     use aptos_graphs::partitioning::metis::MetisGraphPartitioner;
+    use aptos_graphs::partitioning::random::RandomPartitioner;
     use aptos_graphs::partitioning::{PartitionId, WholeGraphStreamingPartitioner};
     use aptos_transaction_orderer::common::PTransaction;
     use aptos_types::batched_stream::{
         BatchedStream, IntoNoErrorBatchedStream, NoErrorBatchedStream,
     };
+    use std::fmt::Debug;
 
     use crate::transaction_graph_partitioner::{EdgeWeight, NodeWeight};
     use crate::{PartitionedTransaction, SerializationIdx, StreamingTransactionPartitioner};
@@ -275,45 +271,67 @@ mod tests {
     fn test_fennel_11_transactions_over_4_batches() {
         let input_stream = input_11_transactions_over_4_batches();
 
-        let mut fennel = FennelGraphPartitioner::default();
+        let mut fennel = FennelGraphPartitioner::new(2);
         fennel.balance_constraint_mode = BalanceConstraintMode::Batched;
         fennel.alpha_computation_mode = AlphaComputationMode::Batched;
 
         let mut partitioner = super::TransactionGraphPartitioner {
             graph_partitioner: fennel,
             params: super::Params {
-                node_weight_function: |tx: &MockPTransaction| tx.estimated_gas as NodeWeight,
+                node_weight_function,
                 edge_weight_function,
-                n_partitions: 2,
                 shuffle_batches: false,
             },
         };
 
         let res = partitioner.partition_transactions(input_stream).unwrap();
 
-        print_output(2, 11, res)
+        print_output("Fennel partitioning", 2, 11, res, true);
     }
 
     #[test]
     fn test_metis_11_transactions_over_4_batches() {
         let input_stream = input_11_transactions_over_4_batches();
 
-        let metis = MetisGraphPartitioner::default();
+        let metis = MetisGraphPartitioner::new(2);
         let streaming_partitioner = WholeGraphStreamingPartitioner::new(metis);
 
         let mut partitioner = super::TransactionGraphPartitioner {
             graph_partitioner: streaming_partitioner,
             params: super::Params {
-                node_weight_function: |tx: &MockPTransaction| tx.estimated_gas as NodeWeight,
+                node_weight_function,
                 edge_weight_function,
-                n_partitions: 2,
                 shuffle_batches: false,
             },
         };
 
         let res = partitioner.partition_transactions(input_stream).unwrap();
 
-        print_output(2, 11, res)
+        print_output("Metis partitioning", 2, 11, res, true);
+    }
+
+    #[test]
+    fn test_pseudorandom_11_transactions_over_4_batches() {
+        let input_stream = input_11_transactions_over_4_batches();
+
+        let streaming_partitioner = RandomPartitioner::new(2);
+
+        let mut partitioner = super::TransactionGraphPartitioner {
+            graph_partitioner: streaming_partitioner,
+            params: super::Params {
+                node_weight_function,
+                edge_weight_function,
+                shuffle_batches: false,
+            },
+        };
+
+        let res = partitioner.partition_transactions(input_stream).unwrap();
+
+        print_output("Random partitioning", 2, 11, res, true);
+    }
+
+    fn node_weight_function<K>(tx: &MockPTransaction<K>) -> NodeWeight {
+        tx.estimated_gas as NodeWeight
     }
 
     fn edge_weight_function(idx1: SerializationIdx, idx2: SerializationIdx) -> EdgeWeight {
@@ -321,7 +339,7 @@ mod tests {
     }
 
     fn input_11_transactions_over_4_batches(
-    ) -> impl NoErrorBatchedStream<StreamItem = MockPTransaction> {
+    ) -> impl NoErrorBatchedStream<StreamItem = MockPTransaction<String>> {
         let [w, x, y, z] = [
             String::from("w"),
             String::from("x"),
@@ -357,12 +375,23 @@ mod tests {
         .into_no_error_batched_stream()
     }
 
-    // Use `cargo test -p aptos-streaming-partitioner -- --nocapture` to see the output.
-    fn print_output<S>(n_partitions: usize, n_txns: usize, res: S)
-    where
-        S: BatchedStream<StreamItem = PartitionedTransaction<MockPTransaction>>,
+    // Use `cargo test -p aptos-streaming-partitioner -- --nocapture --test-threads 1`
+    // to see the output. Otherwise, the output is hidden by the test harness.
+    fn print_output<S, K>(
+        name: &str,
+        n_partitions: usize,
+        n_txns: usize,
+        res: S,
+        print_partitioning: bool,
+    ) where
+        S: BatchedStream<StreamItem = PartitionedTransaction<MockPTransaction<K>>>,
         S::Error: Debug,
+        K: Clone + Debug,
     {
+        println!();
+        println!("-------------------------------------");
+        println!("--- {}", name);
+        println!("-------------------------------------");
         let mut txns_by_partition = vec![vec![]; n_partitions];
         let mut partition_by_txn = vec![0; n_txns];
 
@@ -395,28 +424,36 @@ mod tests {
             }
         }
 
-        // Print out the partitioning.
-        for (partition_idx, partition) in txns_by_partition.iter().enumerate() {
-            println!("Partition {}:", partition_idx);
-            for tx in partition {
-                println!("  Txn {}: {:?}", tx.serialization_idx, tx);
+        if print_partitioning {
+            // Print out the partitioning.
+            for (partition_idx, partition) in txns_by_partition.iter().enumerate() {
+                println!("Partition {}:", partition_idx);
+                for tx in partition {
+                    println!("  Txn {}: {:?}", tx.serialization_idx, tx);
+                }
             }
         }
 
         // Print the cut edges weight.
-        println!("Cut edges weight: {} / {} ({:.2})", cut_edges_weight, total_edges_weight,
-                 cut_edges_weight as f64 / total_edges_weight as f64);
+        println!(
+            "Cut edges weight: {} / {} ({:.2})",
+            cut_edges_weight,
+            total_edges_weight,
+            cut_edges_weight as f64 / total_edges_weight as f64
+        );
+        println!("-------------------------------------");
+        println!();
     }
 
     #[derive(Clone, Debug)]
-    struct MockPTransaction {
+    struct MockPTransaction<K> {
         estimated_gas: u32,
-        read_set: Vec<String>,
-        write_set: Vec<String>,
+        read_set: Vec<K>,
+        write_set: Vec<K>,
     }
 
-    impl MockPTransaction {
-        fn new(estimated_gas: u32, read_set: Vec<String>, write_set: Vec<String>) -> Self {
+    impl<K> MockPTransaction<K> {
+        fn new(estimated_gas: u32, read_set: Vec<K>, write_set: Vec<K>) -> Self {
             Self {
                 estimated_gas,
                 read_set,
@@ -425,8 +462,8 @@ mod tests {
         }
     }
 
-    impl PTransaction for MockPTransaction {
-        type Key = String;
+    impl<K> PTransaction for MockPTransaction<K> {
+        type Key = K;
 
         type ReadSetIter<'a> = std::slice::Iter<'a, Self::Key>
         where Self: 'a;

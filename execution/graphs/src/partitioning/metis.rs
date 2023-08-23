@@ -51,6 +51,9 @@ pub enum PartitioningType {
 ///  - Metis manual: http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/manual.pdf
 #[derive(Copy, Clone, Debug)]
 pub struct MetisGraphPartitioner {
+    /// The number of partitions.
+    pub n_partitions: usize,
+
     /// The maximum allowed load imbalance.
     /// The load of each partition must be at most `(1 + balance_constraint) * (n / k)`,
     /// where n is the number of nodes in the graph and k is the number of partitions.
@@ -66,9 +69,10 @@ pub struct MetisGraphPartitioner {
     pub partitioning_type: PartitioningType,
 }
 
-impl Default for MetisGraphPartitioner {
-    fn default() -> Self {
+impl MetisGraphPartitioner {
+    pub fn new(n_partitions: usize) -> Self {
         Self {
+            n_partitions,
             balance_constraint: 0.1,
             partitioning_type: PartitioningType::KWayPartitioning,
         }
@@ -113,7 +117,12 @@ impl MetisGraph {
     {
         let mut res = Self::unweighted(graph);
 
-        res.vwgt = Some(graph.weighted_nodes().map(|node| node.weight.into()).collect());
+        res.vwgt = Some(
+            graph
+                .weighted_nodes()
+                .map(|node| node.weight.into())
+                .collect(),
+        );
 
         res.adjwgt = Some(
             graph
@@ -132,16 +141,12 @@ impl MetisGraph {
 }
 
 impl MetisGraphPartitioner {
-    fn partition_impl(
-        &self,
-        metis_graph: &mut MetisGraph,
-        n_partitions: usize,
-    ) -> anyhow::Result<Vec<PartitionId>> {
+    fn partition_impl(&self, metis_graph: &mut MetisGraph) -> anyhow::Result<Vec<PartitionId>> {
         let node_count = metis_graph.node_count();
 
         let mut handle = metis::Graph::new(
             1, // number of balancing constraints.
-            n_partitions as metis::Idx,
+            self.n_partitions as metis::Idx,
             &mut metis_graph.xadj,
             &mut metis_graph.adjncy,
         );
@@ -184,9 +189,9 @@ where
     /// The partitioning may return an error if it fails to satisfy the balancing constraint
     /// or if the Metis library is not properly installed.
     /// See the description of the `metis` crate for details: https://crates.io/crates/metis
-    fn partition(&self, graph: &G, n_partitions: usize) -> anyhow::Result<Vec<PartitionId>> {
+    fn partition(&self, graph: &G) -> anyhow::Result<Vec<PartitionId>> {
         let mut metis_graph = MetisGraph::weighted(graph);
-        self.partition_impl(&mut metis_graph, n_partitions)
+        self.partition_impl(&mut metis_graph)
     }
 }
 
@@ -203,12 +208,12 @@ mod tests {
     fn simple_four_nodes_two_partitions_test() {
         let graph = simple_four_nodes_two_partitions_graph();
 
-        let mut partitioner = MetisGraphPartitioner::default();
+        let mut partitioner = MetisGraphPartitioner::new(2);
         // NB: Setting `balance_constraint` to 0.2 or higher causes Metis to
         // put everything in one partition, even though it's clearly not a valid solution.
         partitioner.balance_constraint = 0.1;
 
-        let partitioning = partitioner.partition(&graph, 2).unwrap();
+        let partitioning = partitioner.partition(&graph).unwrap();
 
         // The first node may be sent to any partition, depending on the implementation.
         let first_node_partition = partitioning[0];

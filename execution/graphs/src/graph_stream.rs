@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 
-use crate::graph::NodeIndex;
-use crate::{graph, WeightedGraph};
+use namable_closures::{closure, Closure};
+use rand::seq::SliceRandom;
+
 use aptos_types::closuretools::{ClosureTools, MapClosure};
 use aptos_types::no_error;
 use aptos_types::no_error::NoError;
-use namable_closures::{closure, Closure};
-use rand::seq::SliceRandom;
+
+use crate::{graph, WeightedGraph};
+use crate::graph::NodeIndex;
 
 /// Convenience type alias for a node in a graph stream.
 pub type StreamNode<S> = graph::Node<<S as GraphStream>::NodeData, <S as GraphStream>::NodeWeight>;
