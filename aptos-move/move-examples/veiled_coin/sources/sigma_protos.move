@@ -831,7 +831,7 @@ module veiled_coin::sigma_protos {
         );
     }
 
-    /*#[test]
+    #[test]
     fun verify_transfer_subproof_succeeds_test() {
         verify_transfer_subproof_test(false);
     }
@@ -945,5 +945,5 @@ module veiled_coin::sigma_protos {
         assert!(ristretto255::scalar_equals(&sigma_proof.alpha3, &deserialized_proof.alpha3), 1);
         assert!(ristretto255::scalar_equals(&sigma_proof.alpha4, &deserialized_proof.alpha4), 1);
         assert!(ristretto255::scalar_equals(&sigma_proof.alpha5, &deserialized_proof.alpha5), 1);
-    }*/
+    }
 }

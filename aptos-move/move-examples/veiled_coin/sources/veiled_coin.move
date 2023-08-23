@@ -108,7 +108,7 @@ module veiled_coin::veiled_coin {
     use std::error;
     use std::option::Option;
     use std::signer;
-    use std::vector;
+    //use std::vector;
 
     use aptos_std::ristretto255;
     use aptos_std::ristretto255_bulletproofs as bulletproofs;

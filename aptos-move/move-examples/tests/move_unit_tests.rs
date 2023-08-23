@@ -83,7 +83,7 @@ fn test_veiled_coin() {
     let named_address = BTreeMap::from([(
         String::from("source_addr"),
         source_addr,
-    )/*,(String::from("veiled_coin"), resource)*/]);
+    ),(String::from("veiled_coin"), resource)]);
     run_tests_for_pkg("veiled_coin", named_address);
 }
 

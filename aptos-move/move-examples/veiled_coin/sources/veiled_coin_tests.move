@@ -117,7 +117,7 @@ module veiled_coin::veiled_coin_tests {
     // Tests
     //
 
-/*    #[test(veiled_coin = @veiled_coin, aptos_fx = @aptos_framework, sender = @0xc0ffee, recipient = @0x1337)]
+    #[test(veiled_coin = @veiled_coin, aptos_fx = @aptos_framework, sender = @0xc0ffee, recipient = @0x1337)]
     fun veil_test(
         veiled_coin: signer,
         aptos_fx: signer,
@@ -411,5 +411,5 @@ module veiled_coin::veiled_coin_tests {
         // Sanity check veiled balances
         assert!(veiled_coin::verify_opened_balance<coin::FakeMoney>(signer::address_of(&sender), 0, &balance_rand, &sender_pk), 1);
         assert!(veiled_coin::verify_opened_balance<coin::FakeMoney>(signer::address_of(&recipient), 50, &amount_rand, &recipient_pk), 1);
-    }*/
+    }
 }
