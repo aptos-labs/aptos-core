@@ -4,12 +4,13 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
-## [2.1.0] - 2023/08/22
+## [2.1.0] - 2023/08/23
 ### Updated
 - Updated CLI source compilation to use rust toolchain version 1.71.1 (from 1.71.0).
 ### Added
 - Added basic ledger support for CLI
   - Example: `aptos init --ledger` to create a new profile from ledger. After this, you can use it the same way as other profiles.
+  - Note: `Ledger Nano s Plus` or `Ledger Nano X` is highly recommended.
 
 ## [2.0.3] - 2023/08/04
 ### Fixed
