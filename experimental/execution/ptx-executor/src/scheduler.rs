@@ -6,14 +6,15 @@
 //! TODO(aldenhu): doc
 
 use crate::{
-    common::{TxnIdx, VersionedKey, BASE_VERSION, EXPECTANT_BLOCK_KEYS},
-    executor::PtxExecutorClient,
+    common::{TxnIdx, VersionedKey, EXPECTANT_BLOCK_KEYS, EXPECTANT_BLOCK_SIZE},
     metrics::TIMER,
-    state_reader::PtxStateReaderClient,
+    runner::PtxRunnerClient,
 };
+use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
-    state_store::state_key::StateKey, transaction::analyzed_transaction::AnalyzedTransaction,
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::Transaction,
 };
 use rayon::Scope;
 use std::{
@@ -21,47 +22,70 @@ use std::{
     sync::mpsc::{channel, Sender},
 };
 
-#[derive(Clone)]
 pub(crate) struct PtxScheduler;
 
 impl PtxScheduler {
-    pub fn spawn(
-        scope: &Scope<'_>,
-        executor: PtxExecutorClient,
-        state_reader: PtxStateReaderClient,
-    ) -> PtxSchedulerClient {
+    pub fn spawn(scope: &Scope, runner: PtxRunnerClient) -> PtxSchedulerClient {
         let (work_tx, work_rx) = channel();
-        let mut worker = Worker::new(executor, state_reader);
+        let client = PtxSchedulerClient { work_tx };
+        let client_clone = client.clone();
         scope.spawn(move |_scope| {
             let _timer = TIMER.timer_with(&["scheduler_block_total"]);
+            let mut worker = Worker::new(runner, client_clone);
             loop {
-                match work_rx.recv().expect("Channel closed.") {
-                    Command::AddAnalyzedTransaction(txn) => {
-                        worker.add_analyzed_transaction(txn);
+                match work_rx.recv().expect("Work thread died.") {
+                    Command::InformStateValue { key, value } => {
+                        worker.inform_state_value(key, value);
+                    },
+                    Command::AddTransaction {
+                        txn_idx,
+                        transaction,
+                        dependencies,
+                    } => {
+                        worker.add_transaction(txn_idx, transaction, dependencies);
                     },
                     Command::FinishBlock => {
                         worker.finish_block();
+                    },
+                    Command::Exit => {
                         break;
                     },
                 }
             }
         });
-
-        PtxSchedulerClient { work_tx }
+        client
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct PtxSchedulerClient {
     work_tx: Sender<Command>,
 }
 
 impl PtxSchedulerClient {
-    pub fn add_analyzed_transaction(&self, txn: AnalyzedTransaction) {
-        self.send_to_worker(Command::AddAnalyzedTransaction(txn))
+    pub fn inform_state_value(&self, key: VersionedKey, value: Option<StateValue>) {
+        self.send_to_worker(Command::InformStateValue { key, value });
+    }
+
+    pub fn add_transaction(
+        &self,
+        txn_idx: TxnIdx,
+        transaction: Transaction,
+        dependencies: HashSet<(StateKey, TxnIdx)>,
+    ) {
+        self.send_to_worker(Command::AddTransaction {
+            txn_idx,
+            transaction,
+            dependencies,
+        });
     }
 
     pub fn finish_block(&self) {
-        self.send_to_worker(Command::FinishBlock)
+        self.send_to_worker(Command::FinishBlock);
+    }
+
+    fn exit(&self) {
+        self.send_to_worker(Command::Exit);
     }
 
     fn send_to_worker(&self, command: Command) {
@@ -70,83 +94,182 @@ impl PtxSchedulerClient {
 }
 
 enum Command {
-    AddAnalyzedTransaction(AnalyzedTransaction),
+    InformStateValue {
+        key: VersionedKey,
+        value: Option<StateValue>,
+    },
+    AddTransaction {
+        txn_idx: TxnIdx,
+        transaction: Transaction,
+        dependencies: HashSet<(StateKey, TxnIdx)>,
+    },
     FinishBlock,
+    Exit,
+}
+
+enum StateValueState {
+    Pending { subscribers: Vec<TxnIdx> },
+    Ready { value: Option<StateValue> },
+}
+
+struct PendingTransaction {
+    transaction: Transaction,
+    pending_dependencies: HashSet<VersionedKey>,
+    met_dependencies: HashMap<StateKey, Option<StateValue>>,
+}
+
+impl PendingTransaction {
+    fn new(transaction: Transaction) -> Self {
+        Self {
+            transaction,
+            pending_dependencies: HashSet::new(),
+            met_dependencies: HashMap::new(),
+        }
+    }
 }
 
 struct Worker {
-    executor: PtxExecutorClient,
-    state_reader: PtxStateReaderClient,
-    latest_writes: HashMap<StateKey, TxnIdx>,
-    num_txns: usize,
+    transactions: Vec<Option<PendingTransaction>>,
+    state_values: HashMap<VersionedKey, StateValueState>,
+    num_pending_txns: usize,
+    block_finished: bool,
+    runner: PtxRunnerClient,
+    scheduler: PtxSchedulerClient,
 }
 
 impl Worker {
-    fn new(executor: PtxExecutorClient, state_reader: PtxStateReaderClient) -> Self {
+    fn new(runner: PtxRunnerClient, scheduler: PtxSchedulerClient) -> Self {
         Self {
-            executor,
-            state_reader,
-            latest_writes: HashMap::with_capacity(EXPECTANT_BLOCK_KEYS),
-            num_txns: 0,
+            transactions: Vec::with_capacity(EXPECTANT_BLOCK_SIZE),
+            state_values: HashMap::with_capacity(EXPECTANT_BLOCK_KEYS),
+            num_pending_txns: 0,
+            block_finished: false,
+            runner,
+            scheduler,
         }
     }
 
-    fn add_analyzed_transaction(&mut self, txn: AnalyzedTransaction) {
-        let txn_index = self.num_txns;
-        self.num_txns += 1;
-
-        // TODO(ptx): Reorder Non-P-Transactions. (Now we assume all are P-Txns.)
-        let (txn, reads, read_writes) = txn.expect_p_txn();
-        let mut dependencies = HashSet::new();
-        self.process_txn_dependencies(
-            txn_index,
-            reads,
-            false, /* is_write_set */
-            &mut dependencies,
-        );
-        self.process_txn_dependencies(
-            txn_index,
-            read_writes,
-            true, /* is_write_set */
-            &mut dependencies,
-        );
-
-        self.executor.add_transaction(txn, dependencies);
+    pub fn inform_state_value(&mut self, key: VersionedKey, value: Option<StateValue>) {
+        let _timer = TIMER.timer_with(&["scheduler_inform_state_value"]);
+        match self.state_values.entry(key.clone()) {
+            Entry::Occupied(mut existing) => {
+                let old_state = existing.insert(StateValueState::Ready {
+                    value: value.clone(),
+                });
+                match old_state {
+                    StateValueState::Pending { subscribers } => {
+                        for subscriber in subscribers {
+                            // TODO(ptx): reduce clone / memcpy
+                            self.inform_state_value_to_txn(subscriber, key.clone(), value.clone());
+                        }
+                    },
+                    StateValueState::Ready { .. } => {
+                        unreachable!("StateValue pushed twice.")
+                    },
+                }
+            },
+            Entry::Vacant(vacant) => {
+                vacant.insert(StateValueState::Ready { value });
+            },
+        }
     }
 
-    fn process_txn_dependencies(
+    fn inform_state_value_to_txn(
         &mut self,
-        txn_index: TxnIdx,
-        keys: Vec<StateKey>,
-        is_write_set: bool,
-        dependencies: &mut HashSet<VersionedKey>,
+        txn_idx: TxnIdx,
+        versioned_key: VersionedKey,
+        value: Option<StateValue>,
     ) {
-        for key in keys {
-            match self.latest_writes.entry(key.clone()) {
-                Entry::Occupied(mut entry) => {
-                    dependencies.insert((key.clone(), *entry.get()));
-                    if is_write_set {
-                        *entry.get_mut() = txn_index;
-                    }
-                },
-                Entry::Vacant(entry) => {
-                    dependencies.insert((key.clone(), BASE_VERSION));
+        let pending_txn = self.borrow_pending_txn(txn_idx);
+        let found_dependency = pending_txn.pending_dependencies.remove(&versioned_key);
+        assert!(found_dependency, "Pending dependency not found.");
+        let (key, _txn_idx) = versioned_key;
+        pending_txn.met_dependencies.insert(key, value);
 
-                    // TODO(ptx): maybe prioritize reads that unblocks execution immediately.
-                    self.state_reader.schedule_read(key);
-
-                    if is_write_set {
-                        entry.insert(txn_index);
-                    } else {
-                        entry.insert(BASE_VERSION);
-                    }
-                }, // end Entry::Vacant
-            } // end match
-        } // end for
+        if pending_txn.pending_dependencies.is_empty() {
+            self.run_transaction(txn_idx);
+        }
     }
 
-    fn finish_block(&self) {
-        self.executor.finish_block();
-        self.state_reader.finish_block();
+    fn borrow_pending_txn(&mut self, txn_idx: TxnIdx) -> &mut PendingTransaction {
+        self.transactions[txn_idx]
+            .as_mut()
+            .expect("Transaction is not Pending.")
+    }
+
+    fn take_pending_txn(&mut self, txn_idx: TxnIdx) -> PendingTransaction {
+        self.num_pending_txns -= 1;
+        trace!("pending txns: {}", self.num_pending_txns);
+        self.transactions[txn_idx]
+            .take()
+            .expect("Transaction is not Pending.")
+    }
+
+    pub fn add_transaction(
+        &mut self,
+        txn_idx: TxnIdx,
+        transaction: Transaction,
+        dependencies: HashSet<VersionedKey>,
+    ) {
+        let _timer = TIMER.timer_with(&["scheduler_add_txn"]);
+        self.transactions
+            .push(Some(PendingTransaction::new(transaction)));
+        self.num_pending_txns += 1;
+        let pending_txn = self.transactions[txn_idx].as_mut().unwrap();
+
+        for versioned_key in dependencies {
+            match self.state_values.entry(versioned_key.clone()) {
+                Entry::Occupied(mut existing) => match existing.get_mut() {
+                    StateValueState::Pending { subscribers } => {
+                        pending_txn.pending_dependencies.insert(versioned_key);
+                        subscribers.push(txn_idx);
+                    },
+                    StateValueState::Ready { value } => {
+                        let (key, _txn_idx) = versioned_key;
+                        pending_txn.met_dependencies.insert(key, value.clone());
+                    },
+                },
+                Entry::Vacant(vacant) => {
+                    pending_txn.pending_dependencies.insert(versioned_key);
+                    vacant.insert(StateValueState::Pending {
+                        subscribers: vec![txn_idx],
+                    });
+                },
+            }
+        }
+
+        if pending_txn.pending_dependencies.is_empty() {
+            self.run_transaction(txn_idx);
+        }
+    }
+
+    pub fn finish_block(&mut self) {
+        let _timer = TIMER.timer_with(&["scheduler_finish_block"]);
+        self.block_finished = true;
+        self.maybe_exit();
+    }
+
+    fn maybe_exit(&self) {
+        if self.block_finished && self.num_pending_txns == 0 {
+            self.runner.finish_block();
+            trace!("scheduler exit");
+            self.scheduler.exit();
+        }
+    }
+
+    fn run_transaction(&mut self, txn_idx: TxnIdx) {
+        let PendingTransaction {
+            transaction,
+            pending_dependencies,
+            met_dependencies,
+        } = self.take_pending_txn(txn_idx);
+        assert!(
+            pending_dependencies.is_empty(),
+            "Transaction has pending dependencies."
+        );
+
+        self.runner
+            .add_transaction(txn_idx, transaction, met_dependencies);
+        self.maybe_exit();
     }
 }
