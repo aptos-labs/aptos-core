@@ -47,6 +47,10 @@ name = "crypto"
 harness = false
 
 [[bench]]
+name = "vrf"
+harness = false
+
+[[bench]]
 name = "lagrange"
 harness = false
 
