@@ -13,7 +13,6 @@ use aptos_framework::natives::{
     code::{NativeCodeContext, PublishRequest},
     event::NativeEventContext,
 };
-use aptos_mvhashmap::types::TxnIndex;
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
     block_metadata::BlockMetadata,
@@ -126,7 +125,6 @@ impl SessionId {
 }
 
 pub struct SessionExt<'r, 'l> {
-    pub txn_idx: TxnIndex,
     inner: Session<'r, 'l>,
     remote: &'r dyn AptosMoveResolver,
     features: Arc<Features>,
@@ -134,13 +132,11 @@ pub struct SessionExt<'r, 'l> {
 
 impl<'r, 'l> SessionExt<'r, 'l> {
     pub fn new(
-        txn_idx: TxnIndex,
         inner: Session<'r, 'l>,
         remote: &'r dyn AptosMoveResolver,
         features: Arc<Features>,
     ) -> Self {
         Self {
-            txn_idx,
             inner,
             remote,
             features,

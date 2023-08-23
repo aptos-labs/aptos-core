@@ -140,12 +140,7 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
         vec![1],
         ChainId::test().id(),
     )); // We use the testing environment chain ID here
-    exts.add(NativeAggregatorContext::new(
-        0,
-        1,
-        [0; 32],
-        &*DUMMY_RESOLVER,
-    ));
+    exts.add(NativeAggregatorContext::new([0; 32], &*DUMMY_RESOLVER));
     exts.add(NativeRistrettoPointContext::new());
     exts.add(AlgebraContext::new());
     exts.add(NativeEventContext::default());

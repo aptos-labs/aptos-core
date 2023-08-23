@@ -69,12 +69,10 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
 
-        match self.vm.execute_single_transaction(
-            txn_idx,
-            txn,
-            &self.vm.as_move_resolver(view),
-            &log_context,
-        ) {
+        match self
+            .vm
+            .execute_single_transaction(txn, &self.vm.as_move_resolver(view), &log_context)
+        {
             Ok((vm_status, mut vm_output, sender)) => {
                 if materialize_deltas {
                     // TODO: Integrate aggregator v2.

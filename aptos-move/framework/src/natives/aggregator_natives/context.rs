@@ -47,18 +47,11 @@ pub struct NativeAggregatorContext<'a> {
 impl<'a> NativeAggregatorContext<'a> {
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
-    pub fn new(
-        txn_idx: TxnIndex,
-        session_type: u8,
-        txn_hash: [u8; 32],
-        resolver: &'a dyn AggregatorResolver,
-    ) -> Self {
-        let mut id_counter = ((txn_idx + 1) as u64) << 32;
-        id_counter += (session_type as u64) << 29;
+    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn AggregatorResolver) -> Self {
         Self {
             txn_hash,
             resolver,
-            aggregator_data: RefCell::new(AggregatorData::new(id_counter)),
+            aggregator_data: Default::default(),
         }
     }
 
@@ -228,7 +221,7 @@ mod test {
     fn test_into_change_set() {
         let resolver = get_test_resolver();
 
-        let context = NativeAggregatorContext::new(30, 1, [0; 32], &resolver);
+        let context = NativeAggregatorContext::new([0; 32], &resolver);
 
         test_set_up(&context);
         let AggregatorChangeSet { changes } = context.into_change_set();

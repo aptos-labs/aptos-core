@@ -4,7 +4,6 @@
 
 use crate::move_vm_ext::{AptosMoveResolver, MoveResolverExt, SessionExt, SessionId};
 use anyhow::Result;
-use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_metadata::BlockMetadata,
     transaction::{
@@ -24,7 +23,6 @@ pub(crate) trait VMAdapter {
     /// this after redesigning cache ownership model.
     fn new_session<'r>(
         &self,
-        txn_idx: TxnIndex,
         remote: &'r impl MoveResolverExt,
         session_id: SessionId,
     ) -> SessionExt<'r, '_>;
@@ -51,7 +49,6 @@ pub(crate) trait VMAdapter {
     /// Execute a single transaction.
     fn execute_single_transaction(
         &self,
-        txn_indx: TxnIndex,
         txn: &PreprocessedTransaction,
         data_cache: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
