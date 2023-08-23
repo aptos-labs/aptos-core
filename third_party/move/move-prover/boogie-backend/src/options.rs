@@ -21,8 +21,8 @@ const DEFAULT_BOOGIE_FLAGS: &[&str] = &[
 /// Versions for boogie, z3, and cvc5. The upgrade of boogie and z3 is mostly backward compatible,
 /// but not always. Setting the max version allows Prover to warn users for the higher version of
 /// boogie and z3 because those may be incompatible.
-const MIN_BOOGIE_VERSION: Option<&str> = Some("2.16.9.0");
-const MAX_BOOGIE_VERSION: Option<&str> = Some("2.16.9.0");
+const MIN_BOOGIE_VERSION: Option<&str> = Some("3.0.1.0");
+const MAX_BOOGIE_VERSION: Option<&str> = Some("3.0.1.0");
 
 const MIN_Z3_VERSION: Option<&str> = Some("4.11.2");
 const MAX_Z3_VERSION: Option<&str> = Some("4.11.2");

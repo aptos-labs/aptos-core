@@ -5,7 +5,19 @@ STDLIB="../../../../move-stdlib/sources"
 NURSERY="../../../../move-stdlib/nursery/sources"
 
 # Benchmark per function
-cargo run --release -p prover-lab -- bench -f -c new_boogie.toml $FRAMEWORK/*.move
+cargo run --release -p prover-lab -- bench -f -c new_boogie_1.toml $FRAMEWORK/*.move
 
 # Benchmark per module
-cargo run --release -p prover-lab -- bench -c new_boogie.toml $FRAMEWORK/*.move
+cargo run --release -p prover-lab -- bench -c new_boogie_1.toml $FRAMEWORK/*.move
+
+# Benchmark per function
+cargo run --release -p prover-lab -- bench -f -c new_boogie_2.toml $FRAMEWORK/*.move
+
+# Benchmark per module
+cargo run --release -p prover-lab -- bench -c new_boogie_2.toml $FRAMEWORK/*.move
+
+# Benchmark per function
+cargo run --release -p prover-lab -- bench -f -c new_boogie_3.toml $FRAMEWORK/*.move
+
+# Benchmark per module
+cargo run --release -p prover-lab -- bench -c new_boogie_3.toml $FRAMEWORK/*.move
