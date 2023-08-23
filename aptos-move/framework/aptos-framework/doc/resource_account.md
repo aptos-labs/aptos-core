@@ -13,25 +13,27 @@ This contains several utilities to make using resource accounts more effective.
 
 
 A dev wishing to use resource accounts for a liquidity pool, would likely do the following:
+
 1. Create a new account using <code><a href="resource_account.md#0x1_resource_account_create_resource_account">resource_account::create_resource_account</a></code>. This creates the
 account, stores the <code>signer_cap</code> within a <code><a href="resource_account.md#0x1_resource_account_Container">resource_account::Container</a></code>, and rotates the key to
-the current accounts authentication key or a provided authentication key.
-2. Define the LiquidityPool module's address to be the same as the resource account.
-3. Construct a transaction package publishing transaction for the resource account using the
+the current account's authentication key or a provided authentication key.
+2. Define the liquidity pool module's address to be the same as the resource account.
+3. Construct a package-publishing transaction for the resource account using the
 authentication key used in step 1.
-4. In the LiquidityPool module's <code>init_module</code> function, call <code>retrieve_resource_account_cap</code>
-which will retrive the <code>signer_cap</code> and rotate the resource account's authentication key to
+4. In the liquidity pool module's <code>init_module</code> function, call <code>retrieve_resource_account_cap</code>
+which will retrieve the <code>signer_cap</code> and rotate the resource account's authentication key to
 <code>0x0</code>, effectively locking it off.
-5. When adding a new coin, the liquidity pool will load the capability and hence the signer to
-register and store new LiquidityCoin resources.
+5. When adding a new coin, the liquidity pool will load the capability and hence the <code><a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a></code> to
+register and store new <code>LiquidityCoin</code> resources.
 
 Code snippets to help:
+
 ```
-fun init_module(resource: &signer) {
+fun init_module(resource_account: &signer) {
 let dev_address = @DEV_ADDR;
-let signer_cap = retrieve_resource_account_cap(resource, dev_address);
+let signer_cap = retrieve_resource_account_cap(resource_account, dev_address);
 let lp = LiquidityPoolInfo { signer_cap: signer_cap, ... };
-move_to(resource, lp);
+move_to(resource_account, lp);
 }
 ```
 
@@ -478,6 +480,8 @@ the SignerCapability.
     <b>aborts_if</b> <b>exists</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr) && <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(container.store, resource_addr);
     <b>aborts_if</b> get && !(<b>exists</b>&lt;Account&gt;(resource_addr) && len(<b>global</b>&lt;Account&gt;(source_addr).authentication_key) == 32);
     <b>aborts_if</b> !get && !(<b>exists</b>&lt;Account&gt;(resource_addr) && len(optional_auth_key) == 32);
+    <b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(<b>global</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr).store, resource_addr);
+    <b>ensures</b> <b>exists</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr);
 }
 </code></pre>
 
@@ -502,6 +506,8 @@ the SignerCapability.
     <b>aborts_if</b> <b>exists</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr) && <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(container.store, resource_addr);
     <b>aborts_if</b> get && len(<b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(source_addr).authentication_key) != 32;
     <b>aborts_if</b> !get && len(optional_auth_key) != 32;
+    <b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(<b>global</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr).store, resource_addr);
+    <b>ensures</b> <b>exists</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr);
 }
 </code></pre>
 
@@ -524,7 +530,8 @@ the SignerCapability.
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(container.store, resource_addr);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(resource_addr);
 <b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(<b>old</b>(<b>global</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr)).store, resource_addr) &&
-<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_len">simple_map::spec_len</a>(<b>old</b>(<b>global</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr)).store) == 1 ==&gt; !<b>exists</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr);
+    <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_len">simple_map::spec_len</a>(<b>old</b>(<b>global</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr)).store) == 1 ==&gt; !<b>exists</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr);
+<b>ensures</b> <b>exists</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr) ==&gt; !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(<b>global</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr).store, resource_addr);
 </code></pre>
 
 

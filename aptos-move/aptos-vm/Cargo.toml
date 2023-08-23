@@ -61,11 +61,11 @@ tracing = { workspace = true }
 [dev-dependencies]
 aptos-language-e2e-tests = { workspace = true }
 aptos-types = { workspace = true }
+claims = { workspace = true }
 proptest = { workspace = true }
 
 [features]
 default = []
-mirai-contracts = []
 fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "aptos-framework/fuzzing"]
 failpoints = ["fail/failpoints", "move-vm-runtime/failpoints"]
 testing = ["move-unit-test", "aptos-framework/testing"]

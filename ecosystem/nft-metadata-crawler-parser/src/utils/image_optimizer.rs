@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::{get_uri_metadata, utils::constants::MAX_RETRY_TIME_SECONDS};
+use crate::{
+    get_uri_metadata,
+    utils::constants::{MAX_IMAGE_REQUEST_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
+};
 use anyhow::Context;
 use backoff::{future::retry, ExponentialBackoff};
 use futures::FutureExt;
@@ -10,7 +13,7 @@ use image::{
 };
 use reqwest::Client;
 use std::{io::Cursor, time::Duration};
-use tracing::error;
+use tracing::warn;
 
 pub struct ImageOptimizer;
 
@@ -24,18 +27,16 @@ impl ImageOptimizer {
     ) -> anyhow::Result<(Vec<u8>, ImageFormat)> {
         let (_, size) = get_uri_metadata(uri.clone()).await?;
         if size > max_file_size_bytes {
-            let error_msg = format!(
+            return Err(anyhow::anyhow!(format!(
                 "Image optimizer received file too large: {} bytes, skipping",
                 size
-            );
-            error!(uri = uri, "[NFT Metadata Crawler] {}", error_msg);
-            return Err(anyhow::anyhow!(error_msg));
+            )));
         }
 
         let op = || {
             async {
                 let client = Client::builder()
-                    .timeout(Duration::from_secs(MAX_RETRY_TIME_SECONDS / 3))
+                    .timeout(Duration::from_secs(MAX_IMAGE_REQUEST_RETRY_SECONDS))
                     .build()
                     .context("Failed to build reqwest client")?;
 
@@ -58,8 +59,11 @@ impl ImageOptimizer {
                     _ => {
                         let img = image::load_from_memory(&img_bytes)
                             .context(format!("Failed to load image from memory: {} bytes", size))?;
-                        let resized_image = resize(&img.to_rgb8(), 400, 400, FilterType::Gaussian);
-                        Ok((Self::to_json_bytes(resized_image, image_quality)?, format))
+                        let (nwidth, nheight) =
+                            Self::calculate_dimensions_with_ration(512, img.width(), img.height());
+                        let resized_image =
+                            resize(&img.to_rgb8(), nwidth, nheight, FilterType::Gaussian);
+                        Ok((Self::to_jpeg_bytes(resized_image, image_quality)?, format))
                     },
                 }
             }
@@ -74,8 +78,9 @@ impl ImageOptimizer {
         match retry(backoff, op).await {
             Ok(result) => Ok(result),
             Err(e) => {
-                error!(
+                warn!(
                     uri = uri,
+                    error = ?e,
                     "[NFT Metadata Crawler] Exponential backoff timed out, skipping image"
                 );
                 Err(e)
@@ -83,8 +88,25 @@ impl ImageOptimizer {
         }
     }
 
+    /// Calculate new dimensions given a goal size while maintaining original aspect ratio
+    fn calculate_dimensions_with_ration(goal: u32, width: u32, height: u32) -> (u32, u32) {
+        if width == 0 || height == 0 {
+            return (0, 0);
+        }
+
+        if width > height {
+            let new_width = goal;
+            let new_height = (goal as f64 * (height as f64 / width as f64)).round() as u32;
+            (new_width, new_height)
+        } else {
+            let new_height = goal;
+            let new_width = (goal as f64 * (width as f64 / height as f64)).round() as u32;
+            (new_width, new_height)
+        }
+    }
+
     /// Converts image to JPEG bytes vector
-    fn to_json_bytes(
+    fn to_jpeg_bytes(
         image_buffer: ImageBuffer<image::Rgb<u8>, Vec<u8>>,
         image_quality: u8,
     ) -> anyhow::Result<Vec<u8>> {
@@ -93,7 +115,7 @@ impl ImageOptimizer {
         match dynamic_image.write_to(&mut byte_store, ImageOutputFormat::Jpeg(image_quality)) {
             Ok(_) => Ok(byte_store.into_inner()),
             Err(e) => {
-                error!(error = ?e, "[NFT Metadata Crawler] Error converting image to bytes:: {} bytes", dynamic_image.as_bytes().len());
+                warn!(error = ?e, "[NFT Metadata Crawler] Error converting image to bytes: {} bytes", dynamic_image.as_bytes().len());
                 Err(anyhow::anyhow!(e))
             },
         }

@@ -8,6 +8,8 @@ use anyhow::Error;
 use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::AggregatorResolver};
 #[cfg(feature = "testing")]
 use aptos_framework::natives::cryptography::algebra::AlgebraContext;
+#[cfg(feature = "testing")]
+use aptos_framework::natives::event::NativeEventContext;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
 #[cfg(feature = "testing")]
@@ -56,7 +58,7 @@ impl AggregatorResolver for AptosBlankStorage {
 
 #[cfg(feature = "testing")]
 impl TableResolver for AptosBlankStorage {
-    fn resolve_table_entry(
+    fn resolve_table_entry_bytes(
         &self,
         _handle: &TableHandle,
         _key: &[u8],
@@ -158,4 +160,5 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     ));
     exts.add(NativeRistrettoPointContext::new());
     exts.add(AlgebraContext::new());
+    exts.add(NativeEventContext::default());
 }

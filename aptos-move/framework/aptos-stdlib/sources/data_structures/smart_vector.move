@@ -74,6 +74,19 @@ module aptos_std::smart_vector {
         option::destroy_none(big_vec);
     }
 
+    /// Destroy a table completely when T has `drop`.
+    public fun destroy<T: drop>(v: SmartVector<T>) {
+        clear(&mut v);
+        destroy_empty(v);
+    }
+
+    public fun clear<T: drop>(v: &mut SmartVector<T>) {
+        v.inline_vec = vector[];
+        if (option::is_some(&v.big_vec)) {
+            big_vector::destroy(option::extract(&mut v.big_vec));
+        }
+    }
+
     /// Acquire an immutable reference to the `i`th element of the vector `v`.
     /// Aborts if `i` is out of bounds.
     public fun borrow<T>(v: &SmartVector<T>, i: u64): &T {
@@ -326,14 +339,6 @@ module aptos_std::smart_vector {
     /// Return `true` if the vector `v` has no elements and `false` otherwise.
     public fun is_empty<T>(v: &SmartVector<T>): bool {
         length(v) == 0
-    }
-
-    #[test_only]
-    fun destroy<T: drop>(v: SmartVector<T>) {
-        while (!is_empty(&mut v)) {
-            let _ = pop_back(&mut v);
-        };
-        destroy_empty(v)
     }
 
     #[test]
