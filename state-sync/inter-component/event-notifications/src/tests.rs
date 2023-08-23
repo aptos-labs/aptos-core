@@ -492,7 +492,7 @@ fn notify_events(
 }
 
 fn create_test_event(event_key: EventKey) -> ContractEvent {
-    ContractEvent::new(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap())
+    ContractEvent::new_v1(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap())
 }
 
 fn create_random_event_key() -> EventKey {

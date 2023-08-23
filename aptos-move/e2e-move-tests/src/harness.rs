@@ -30,6 +30,7 @@ use aptos_types::{
         TransactionPayload, TransactionStatus,
     },
 };
+use aptos_vm::AptosVM;
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
     move_resource::MoveStructType,
@@ -168,6 +169,7 @@ impl MoveHarness {
         let output = self.executor.execute_transaction(txn);
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
+            self.executor.append_events(output.events().to_vec());
         }
         output
     }
@@ -431,6 +433,10 @@ impl MoveHarness {
             .run_block_with_metadata(proposer, failed_proposer_indices, txns)
     }
 
+    pub fn get_events(&self) -> &[ContractEvent] {
+        self.executor.get_events()
+    }
+
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<StateValue> {
         self.executor.read_state_value(state_key)
     }
@@ -601,6 +607,10 @@ impl MoveHarness {
                 entries: gas_params.to_on_chain_gas_schedule(feature_version),
             },
         );
+    }
+
+    pub fn new_vm(&self) -> AptosVM {
+        AptosVM::new_from_state_view(self.executor.data_store())
     }
 
     pub fn set_default_gas_unit_price(&mut self, gas_unit_price: u64) {

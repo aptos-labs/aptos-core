@@ -48,6 +48,7 @@ members = [
     "consensus/consensus-types",
     "consensus/safety-rules",
     "crates/aptos",
+    "crates/aptos-api-tester",
     "crates/aptos-bitvec",
     "crates/aptos-build-info",
     "crates/aptos-compression",
@@ -71,6 +72,7 @@ members = [
     "crates/aptos-network-checker",
     "crates/aptos-node-identity",
     "crates/aptos-openapi",
+    "crates/aptos-profiler",
     "crates/aptos-proptest-helpers",
     "crates/aptos-push-metrics",
     "crates/aptos-rate-limiter",
@@ -193,9 +195,11 @@ members = [
     "third_party/move/move-ir-compiler/transactional-tests",
     "third_party/move/move-ir/types",
     "third_party/move/move-model",
+    "third_party/move/move-model/bytecode",
+    "third_party/move/move-model/bytecode-test-utils",
     "third_party/move/move-prover",
     "third_party/move/move-prover/boogie-backend",
-    "third_party/move/move-prover/bytecode",
+    "third_party/move/move-prover/bytecode-pipeline",
     "third_party/move/move-prover/lab",
     "third_party/move/move-prover/move-abigen",
     "third_party/move/move-prover/move-docgen",
@@ -358,6 +362,7 @@ aptos-openapi = { path = "crates/aptos-openapi" }
 aptos-package-builder = { path = "aptos-move/package-builder" }
 aptos-peer-monitoring-service-client = { path = "network/peer-monitoring-service/client" }
 aptos-peer-monitoring-service-server = { path = "network/peer-monitoring-service/server" }
+aptos-profiler = { path = "crates/aptos-profiler" }
 aptos-peer-monitoring-service-types = { path = "network/peer-monitoring-service/types" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "crates/aptos-protos" }
@@ -446,7 +451,7 @@ chrono = { version = "0.4.19", features = ["clock", "serde"] }
 cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 claims = "0.7"
-clap = { version = "4.3.5", features = ["derive", "unstable-styles"] }
+clap = { version = "4.3.9", features = ["derive", "unstable-styles"] }
 clap_complete = "4.3.1"
 cloud-storage = { version = "0.11.1", features = ["global-client"] }
 codespan-reporting = "0.11.1"
@@ -500,7 +505,7 @@ heck = "0.3.2"
 hex = "0.4.3"
 hkdf = "0.10.0"
 hostname = "0.3.1"
-httpmock = "0.6"
+httpmock = "0.6.8"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-tls = "0.5.0"
 image = "0.24.5"
@@ -561,7 +566,7 @@ random_word = "0.3.0"
 rayon = "1.5.2"
 redis = { version = "0.22.3", features = ["tokio-comp", "script", "connection-manager"] }
 redis-test = { version = "0.1.1", features = ["aio"] }
-regex = "1.5.5"
+regex = "1.9.3"
 reqwest = { version = "0.11.11", features = [
     "blocking",
     "cookies",
@@ -600,6 +605,7 @@ syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = "0.28.4"
 tempfile = "3.3.0"
 termcolor = "1.1.2"
+test-case = "3.1.0"
 textwrap = "0.15.0"
 thiserror = "1.0.37"
 time = { version = "0.3.24", features = ["serde"] }
@@ -656,7 +662,9 @@ move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }
 move-prover = { path = "third_party/move/move-prover" }
 move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backend" }
-move-stackless-bytecode = { path = "third_party/move/move-prover/bytecode" }
+move-prover-bytecode-pipeline = { path = "third_party/move/move-prover/bytecode-pipeline" }
+move-stackless-bytecode = { path = "third_party/move/move-model/bytecode" }
+move-stackless-bytecode-test-utils = { path = "third_party/move/move-model/bytecode-test-utils" }
 aptos-move-stdlib = { path = "aptos-move/framework/move-stdlib" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 move-prover-test-utils = { path = "third_party/move/move-prover/test-utils" }

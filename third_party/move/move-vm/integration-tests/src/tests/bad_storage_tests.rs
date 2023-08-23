@@ -103,7 +103,7 @@ fn test_malformed_resource() {
     )
     .map(|_| ())
     .unwrap();
-    let (changeset, _) = sess.finish().unwrap();
+    let changeset = sess.finish().unwrap();
     storage.apply(changeset).unwrap();
 
     // Execute the second script and make sure it succeeds. This script simply checks
@@ -521,7 +521,7 @@ impl ModuleResolver for BogusStorage {
 }
 
 impl ResourceResolver for BogusStorage {
-    fn get_resource_with_metadata(
+    fn get_resource_bytes_with_metadata(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,

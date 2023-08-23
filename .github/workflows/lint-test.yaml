@@ -97,6 +97,14 @@ jobs:
   # Run all rust smoke tests. This is a PR required job.
   rust-smoke-tests:
     needs: file_change_determinator
+    if: | # Only run on each PR once an appropriate event occurs
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null) ||
+        contains(github.event.pull_request.body, '#e2e'
+      )
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3

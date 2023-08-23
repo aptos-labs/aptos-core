@@ -566,6 +566,7 @@ impl Client {
         F: Fn(HashValue) -> Fut,
         Fut: Future<Output = AptosResult<WaitForTransactionResult<T>>>,
     {
+        // TODO: make this configurable
         const DEFAULT_DELAY: Duration = Duration::from_millis(500);
         let mut reached_mempool = false;
         let start = std::time::Instant::now();
@@ -1196,10 +1197,11 @@ impl Client {
                 .into_iter()
                 .map(|event| {
                     let version = event.transaction_version;
-                    let sequence_number = event.event.sequence_number();
+                    let event = event.event.v1()?;
+                    let sequence_number = event.sequence_number();
 
                     Ok(VersionedNewBlockEvent {
-                        event: bcs::from_bytes(event.event.event_data())?,
+                        event: bcs::from_bytes(event.event_data())?,
                         version,
                         sequence_number,
                     })
