@@ -101,13 +101,13 @@
 //!             +-----------------------------+
 //! ```
 
+#[cfg(test)]
+mod tests;
+
 mod access_path_cache;
 #[macro_use]
 pub mod counters;
 pub mod data_cache;
-
-#[cfg(feature = "mirai-contracts")]
-pub mod foreign_contracts;
 
 mod adapter_common;
 pub mod aptos_vm;

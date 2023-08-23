@@ -23,7 +23,7 @@ async fn test_get_account_resource() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_resource_by_invalid_address() {
     let mut context = new_test_context(current_function_name!());
-    let invalid_addresses = vec!["1", "0xzz", "01"];
+    let invalid_addresses = vec!["00x1", "0xzz"];
     for invalid_address in &invalid_addresses {
         let resp = context
             .expect_status_code(400)
@@ -107,7 +107,7 @@ async fn test_get_account_module_by_invalid_address() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
         .expect_status_code(400)
-        .get(&get_account_module("1", "guid"))
+        .get(&get_account_module("xyz", "guid"))
         .await;
     context.check_golden_output(resp);
 }

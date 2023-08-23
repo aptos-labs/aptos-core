@@ -1,0 +1,12 @@
+warning[W02016]: unknown attribute
+  ┌─ tests/move_check/parser/testonly.move:5:7
+  │
+5 │     #[testonly]
+  │       ^^^^^^^^ Attribute name 'testonly' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+
+warning[W02016]: unknown attribute
+   ┌─ tests/move_check/parser/testonly.move:15:7
+   │
+15 │     #[view]
+   │       ^^^^ Attribute name 'view' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+

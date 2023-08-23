@@ -78,7 +78,7 @@ fi
 
 
 CRATES="\
-  $BASE/language/move-prover/bytecode \
+  $BASE/language/move-model/bytecode \
   $BASE/language/move-prover/boogie-backend \
   $BASE/language/move-prover\
   $BASE/language/move-model\

@@ -12,7 +12,7 @@ use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use petgraph::{algo::astar as petgraph_astar, graphmap::DiGraphMap};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fmt,
     hash::Hash,
     sync::atomic::{AtomicUsize, Ordering as AtomicOrdering},
@@ -51,7 +51,6 @@ pub fn parse_named_address(s: &str) -> anyhow::Result<(String, NumericalAddress)
     let name = before_after[0].parse()?;
     let addr = NumericalAddress::parse_str(before_after[1])
         .map_err(|err| anyhow::format_err!("{}", err))?;
-
     Ok((name, addr))
 }
 
@@ -175,15 +174,19 @@ pub type AttributeDeriver = dyn Fn(&mut CompilationEnv, &mut ModuleDefinition);
 pub struct CompilationEnv {
     flags: Flags,
     diags: Diagnostics,
+    /// Internal table used to pass known attributes to the parser for purposes of
+    /// checking for unknown attributes.
+    known_attributes: BTreeSet<String>,
     // TODO(tzakian): Remove the global counter and use this counter instead
     // pub counter: u64,
 }
 
 impl CompilationEnv {
-    pub fn new(flags: Flags) -> Self {
+    pub fn new(flags: Flags, known_attributes: BTreeSet<String>) -> Self {
         Self {
             flags,
             diags: Diagnostics::new(),
+            known_attributes,
         }
     }
 
@@ -238,6 +241,10 @@ impl CompilationEnv {
 
     pub fn flags(&self) -> &Flags {
         &self.flags
+    }
+
+    pub fn get_known_attributes(&self) -> &BTreeSet<String> {
+        &self.known_attributes
     }
 }
 
@@ -317,6 +324,12 @@ pub struct Flags {
     /// included only in tests, without creating the unit test code regular tests do.
     #[clap(skip)]
     keep_testing_functions: bool,
+
+    /// Do not complain about unknown attributes.
+    #[clap(
+	long = cli::SKIP_ATTRIBUTE_CHECKS,
+    )]
+    pub skip_attribute_checks: bool,
 }
 
 impl Flags {
@@ -328,6 +341,7 @@ impl Flags {
             flavor: "".to_string(),
             bytecode_version: None,
             keep_testing_functions: false,
+            skip_attribute_checks: false,
         }
     }
 
@@ -339,6 +353,7 @@ impl Flags {
             flavor: "".to_string(),
             bytecode_version: None,
             keep_testing_functions: false,
+            skip_attribute_checks: false,
         }
     }
 
@@ -350,6 +365,7 @@ impl Flags {
             flavor: "".to_string(),
             bytecode_version: None,
             keep_testing_functions: false,
+            skip_attribute_checks: false,
         }
     }
 
@@ -361,6 +377,7 @@ impl Flags {
             flavor: "".to_string(),
             bytecode_version: None,
             keep_testing_functions: true,
+            skip_attribute_checks: false,
         }
     }
 
@@ -412,6 +429,17 @@ impl Flags {
     pub fn bytecode_version(&self) -> Option<u32> {
         self.bytecode_version
     }
+
+    pub fn skip_attribute_checks(&self) -> bool {
+        self.skip_attribute_checks
+    }
+
+    pub fn set_skip_attribute_checks(self, new_value: bool) -> Self {
+        Self {
+            skip_attribute_checks: new_value,
+            ..self
+        }
+    }
 }
 
 //**************************************************************************************************
@@ -435,11 +463,21 @@ pub mod known_attributes {
         Spec,
     }
 
+    pub trait AttributeKind
+    where
+        Self: Sized,
+    {
+        fn add_attribute_names(table: &mut BTreeSet<String>);
+        fn name(&self) -> &str;
+        fn expected_positions(&self) -> &'static BTreeSet<AttributePosition>;
+    }
+
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     pub enum KnownAttribute {
         Testing(TestingAttribute),
         Verification(VerificationAttribute),
         Native(NativeAttribute),
+        Deprecation(DeprecationAttribute),
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -462,6 +500,13 @@ pub mod known_attributes {
     pub enum NativeAttribute {
         // It is a fake native function that actually compiles to a bytecode instruction
         BytecodeInstruction,
+        NativeInterface,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub enum DeprecationAttribute {
+        // Marks deprecated funcitons whose use causes warnings
+        Deprecated,
     }
 
     impl fmt::Display for AttributePosition {
@@ -494,29 +539,55 @@ pub mod known_attributes {
                 NativeAttribute::BYTECODE_INSTRUCTION => {
                     Self::Native(NativeAttribute::BytecodeInstruction)
                 },
+                NativeAttribute::NATIVE_INTERFACE => Self::Native(NativeAttribute::NativeInterface),
+                DeprecationAttribute::DEPRECATED_NAME => {
+                    Self::Deprecation(DeprecationAttribute::Deprecated)
+                },
                 _ => return None,
             })
         }
 
-        pub const fn name(&self) -> &str {
+        pub fn get_all_attribute_names() -> &'static BTreeSet<String> {
+            static KNOWN_ATTRIBUTES_SET: Lazy<BTreeSet<String>> = Lazy::new(|| {
+                let mut known_attributes = BTreeSet::new();
+                KnownAttribute::add_attribute_names(&mut known_attributes);
+                known_attributes
+            });
+            &KNOWN_ATTRIBUTES_SET
+        }
+    }
+
+    impl AttributeKind for KnownAttribute {
+        fn add_attribute_names(table: &mut BTreeSet<String>) {
+            TestingAttribute::add_attribute_names(table);
+            VerificationAttribute::add_attribute_names(table);
+            NativeAttribute::add_attribute_names(table);
+            DeprecationAttribute::add_attribute_names(table);
+        }
+
+        fn name(&self) -> &str {
             match self {
                 Self::Testing(a) => a.name(),
                 Self::Verification(a) => a.name(),
                 Self::Native(a) => a.name(),
+                Self::Deprecation(a) => a.name(),
             }
         }
 
-        pub fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
+        fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
             match self {
                 Self::Testing(a) => a.expected_positions(),
                 Self::Verification(a) => a.expected_positions(),
                 Self::Native(a) => a.expected_positions(),
+                Self::Deprecation(a) => a.expected_positions(),
             }
         }
     }
 
     impl TestingAttribute {
         pub const ABORT_CODE_NAME: &'static str = "abort_code";
+        const ALL_ATTRIBUTE_NAMES: [&'static str; 3] =
+            [Self::TEST, Self::TEST_ONLY, Self::EXPECTED_FAILURE];
         pub const ARITHMETIC_ERROR_NAME: &'static str = "arithmetic_error";
         pub const ERROR_LOCATION: &'static str = "location";
         pub const EXPECTED_FAILURE: &'static str = "expected_failure";
@@ -527,7 +598,24 @@ pub mod known_attributes {
         pub const TEST_ONLY: &'static str = "test_only";
         pub const VECTOR_ERROR_NAME: &'static str = "vector_error";
 
-        pub const fn name(&self) -> &str {
+        pub fn expected_failure_cases() -> &'static [&'static str] {
+            &[
+                Self::ABORT_CODE_NAME,
+                Self::ARITHMETIC_ERROR_NAME,
+                Self::VECTOR_ERROR_NAME,
+                Self::OUT_OF_GAS_NAME,
+                Self::MAJOR_STATUS_NAME,
+            ]
+        }
+    }
+    impl AttributeKind for TestingAttribute {
+        fn add_attribute_names(table: &mut BTreeSet<String>) {
+            for str in Self::ALL_ATTRIBUTE_NAMES {
+                table.insert(str.to_string());
+            }
+        }
+
+        fn name(&self) -> &str {
             match self {
                 Self::Test => Self::TEST,
                 Self::TestOnly => Self::TEST_ONLY,
@@ -535,7 +623,7 @@ pub mod known_attributes {
             }
         }
 
-        pub fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
+        fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
             static TEST_ONLY_POSITIONS: Lazy<BTreeSet<AttributePosition>> = Lazy::new(|| {
                 IntoIterator::into_iter([
                     AttributePosition::AddressBlock,
@@ -558,28 +646,26 @@ pub mod known_attributes {
                 TestingAttribute::ExpectedFailure => &EXPECTED_FAILURE_POSITIONS,
             }
         }
-
-        pub fn expected_failure_cases() -> &'static [&'static str] {
-            &[
-                Self::ABORT_CODE_NAME,
-                Self::ARITHMETIC_ERROR_NAME,
-                Self::VECTOR_ERROR_NAME,
-                Self::OUT_OF_GAS_NAME,
-                Self::MAJOR_STATUS_NAME,
-            ]
-        }
     }
 
     impl VerificationAttribute {
+        const ALL_ATTRIBUTE_NAMES: [&'static str; 1] = [Self::VERIFY_ONLY];
         pub const VERIFY_ONLY: &'static str = "verify_only";
+    }
+    impl AttributeKind for VerificationAttribute {
+        fn add_attribute_names(table: &mut BTreeSet<String>) {
+            for str in Self::ALL_ATTRIBUTE_NAMES {
+                table.insert(str.to_string());
+            }
+        }
 
-        pub const fn name(&self) -> &str {
+        fn name(&self) -> &str {
             match self {
                 Self::VerifyOnly => Self::VERIFY_ONLY,
             }
         }
 
-        pub fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
+        fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
             static VERIFY_ONLY_POSITIONS: Lazy<BTreeSet<AttributePosition>> = Lazy::new(|| {
                 IntoIterator::into_iter([
                     AttributePosition::AddressBlock,
@@ -599,19 +685,68 @@ pub mod known_attributes {
     }
 
     impl NativeAttribute {
+        const ALL_ATTRIBUTE_NAMES: [&'static str; 2] =
+            [Self::BYTECODE_INSTRUCTION, Self::NATIVE_INTERFACE];
         pub const BYTECODE_INSTRUCTION: &'static str = "bytecode_instruction";
-
-        pub const fn name(&self) -> &str {
-            match self {
-                NativeAttribute::BytecodeInstruction => Self::BYTECODE_INSTRUCTION,
+        pub const NATIVE_INTERFACE: &'static str = "native_interface";
+    }
+    impl AttributeKind for NativeAttribute {
+        fn add_attribute_names(table: &mut BTreeSet<String>) {
+            for str in Self::ALL_ATTRIBUTE_NAMES {
+                table.insert(str.to_string());
             }
         }
 
-        pub fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
+        fn name(&self) -> &str {
+            match self {
+                NativeAttribute::BytecodeInstruction => Self::BYTECODE_INSTRUCTION,
+                NativeAttribute::NativeInterface => Self::NATIVE_INTERFACE,
+            }
+        }
+
+        fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
             static BYTECODE_INSTRUCTION_POSITIONS: Lazy<BTreeSet<AttributePosition>> =
+                Lazy::new(|| IntoIterator::into_iter([AttributePosition::Function]).collect());
+            static NATIVE_INTERFACE_POSITIONS: Lazy<BTreeSet<AttributePosition>> =
                 Lazy::new(|| IntoIterator::into_iter([AttributePosition::Function]).collect());
             match self {
                 NativeAttribute::BytecodeInstruction => &BYTECODE_INSTRUCTION_POSITIONS,
+                NativeAttribute::NativeInterface => &NATIVE_INTERFACE_POSITIONS,
+            }
+        }
+    }
+
+    impl DeprecationAttribute {
+        const ALL_ATTRIBUTE_NAMES: [&'static str; 1] = [Self::DEPRECATED_NAME];
+        pub const DEPRECATED_NAME: &'static str = "deprecated";
+    }
+
+    impl AttributeKind for DeprecationAttribute {
+        fn add_attribute_names(table: &mut BTreeSet<String>) {
+            for str in Self::ALL_ATTRIBUTE_NAMES {
+                table.insert(str.to_string());
+            }
+        }
+
+        fn name(&self) -> &str {
+            match self {
+                Self::Deprecated => Self::DEPRECATED_NAME,
+            }
+        }
+
+        fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
+            static DEPRECATED_POSITIONS: Lazy<BTreeSet<AttributePosition>> = Lazy::new(|| {
+                IntoIterator::into_iter([
+                    AttributePosition::AddressBlock,
+                    AttributePosition::Module,
+                    AttributePosition::Constant,
+                    AttributePosition::Struct,
+                    AttributePosition::Function,
+                ])
+                .collect()
+            });
+            match self {
+                Self::Deprecated => &DEPRECATED_POSITIONS,
             }
         }
     }

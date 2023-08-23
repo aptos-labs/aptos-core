@@ -32,6 +32,8 @@ pub enum FeatureFlag {
     GAS_PAYER_ENABLED = 22,
     APTOS_UNIQUE_IDENTIFIERS = 23,
     BULLETPROOFS_NATIVES = 24,
+    SIGNER_NATIVE_FORMAT_FIX = 25,
+    MODULE_EVENT = 26,
 }
 
 /// Representation of features on chain as a bitset.
@@ -44,7 +46,7 @@ pub struct Features {
 impl Default for Features {
     fn default() -> Self {
         Features {
-            features: vec![0b00100000, 0b00100000, 0b00000100],
+            features: vec![0b00100000, 0b00100000, 0b00001100],
         }
     }
 }
@@ -68,6 +70,10 @@ impl Features {
 
     pub fn is_storage_slot_metadata_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
+    }
+
+    pub fn is_module_event_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::MODULE_EVENT)
     }
 }
 

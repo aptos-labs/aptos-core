@@ -47,6 +47,7 @@ testnet.add_command(testnet_commands.get)
 testnet.add_command(testnet_commands.healthcheck)
 testnet.add_command(testnet_commands.update)
 testnet.add_command(testnet_commands.restart)
+testnet.add_command(testnet_commands.transaction_emitter)
 
 
 @cli.group()
