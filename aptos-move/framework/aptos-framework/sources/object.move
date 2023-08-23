@@ -555,7 +555,14 @@ module aptos_framework::object {
         let current_address = object.owner;
 
         let count = 0;
-        while (owner != current_address) {
+        while ({
+            spec {
+                invariant count < MAXIMUM_OBJECT_NESTING;
+                invariant forall i in 0..count: 
+                    owner != current_address && exists<ObjectCore>(current_address);
+            };
+            owner != current_address
+        }) {
             let count = count + 1;
             assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
             if (!exists<ObjectCore>(current_address)) {
