@@ -7,6 +7,8 @@ id: "use-aptos-ledger"
 
 The `aptos` tool can be used with your Ledger device to sign any transaction. This is the most secure way to sign transactions, as your private key never leaves your device.
 
+NOTE: It is highly recommended to use `Ledger Nano S Plus` or `Ledger Nano X` devices. The `Ledger Nano S` device has very limited memory and may not be able to sign most of the transactions. If you are trying to sign a transaction that is too big for your device to handle, you will get an error `Wrong raw transaction length`.
+
 ## Blind Signing
 
 Before you begin, make sure you have `Blind Signing` enabled on your Ledger device. Otherwise you will not be able to sign transactions.
@@ -85,7 +87,7 @@ After the above command, you will be prompted to confirm the transaction on your
 ## Common Errors
 
 ### Error: Wrong raw transaction length
-Your raw transaction or package size is too big. Currently the Aptos ledger app can only support up to 20kb transaction.
+Your raw transaction or package size is too big. Currently the Aptos ledger app can only support up to 20kb transaction. If you are using a `Ledger Nano S`, the supported transaction size will be even smaller.
 ```bash
 {
   "Error": "Unexpected error: Error - Wrong raw transaction length"

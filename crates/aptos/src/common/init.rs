@@ -52,8 +52,8 @@ pub struct InitTool {
 
     /// Whether you want to create a profile from your ledger account
     ///
-    /// Make sure that you have Ledger device connected, unlocked, and have Aptos app installed
-    /// and opened. Otherwise CLI would not be able to open the connection to your account
+    /// Make sure that you have your Ledger device connected and unlocked, with the Aptos app installed and opened.
+    /// You must also enable "Blind Signing" on your device to sign transactions from the CLI.
     #[clap(long)]
     pub ledger: bool,
 
