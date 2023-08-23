@@ -388,7 +388,7 @@ pub fn verify_module_metadata(
                     continue;
                 }
             }
-            if features.is_module_event_enabled() && attr.is_event() {
+            if attr.is_event() {
                 continue;
             }
             return Err(AttributeValidationError {
