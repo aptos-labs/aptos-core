@@ -218,6 +218,10 @@ pub fn validate_derivation_path(input: &str) -> bool {
         }
 
         for section in sections {
+            if !section.ends_with(suffix) {
+                return false;
+            }
+
             let section_value = &section.trim_end_matches('\'');
             if section_value.parse::<u32>().is_ok() {
                 continue;
