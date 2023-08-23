@@ -121,6 +121,7 @@ module veiled_coin::veiled_coin {
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::resource_account;
 
     use veiled_coin::helpers;
     use veiled_coin::sigma_protos;
@@ -178,7 +179,7 @@ module veiled_coin::veiled_coin {
     const VEILED_COIN_BULLETPROOFS_DST: vector<u8> = b"AptosVeiledCoin/BulletproofRangeProof";
 
     // TODO: Describe what this is
-    const DEVELOPER_ADDRESS: address = @0x42beef
+    const DEVELOPER_ADDRESS: address = @0xb0b377c434cfb4660dd7d986542fe3b0f9daa3e09a1ea62aa1c5ea8d035017a9;//@0x42beef;
 
     //
     // Structs
@@ -257,7 +258,7 @@ module veiled_coin::veiled_coin {
 
         coin::register<CoinType>(resource_account);
 
-        move_to(resource_account, Credentials { signer_cap } );
+        move_to(resource_account, VeiledCoinMinter { signer_cap } );
 
         // Create the resource account. This will allow this module to later obtain a `signer` for this account and
         // transfer `Coin<T>`'s into its `CoinStore<T>` before minting a `VeiledCoin<T>`.
