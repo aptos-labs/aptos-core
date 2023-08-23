@@ -1296,22 +1296,24 @@ impl FaucetOptions {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
         } else {
-            Err(CliError::CommandArgumentError("No faucet given.  Please add --faucet-url or add a faucet URL to the .aptos/config.yaml for the current profile".to_string()))
+            Err(CliError::CommandArgumentError("No faucet given. Please add --faucet-url or add a faucet URL to the .aptos/config.yaml for the current profile".to_string()))
         }
     }
 
     /// Fund an account with the faucet.
     pub async fn fund_account(
         &self,
+        rest_client: Client,
         profile: &ProfileOptions,
         num_octas: u64,
-        address: &AccountAddress,
-    ) -> CliTypedResult<Vec<HashValue>> {
+        address: AccountAddress,
+    ) -> CliTypedResult<()> {
         fund_account(
-            &self.faucet_url(profile)?,
+            rest_client,
+            self.faucet_url(profile)?,
             self.faucet_auth_token.as_deref(),
-            num_octas,
             address,
+            num_octas,
         )
         .await
     }
