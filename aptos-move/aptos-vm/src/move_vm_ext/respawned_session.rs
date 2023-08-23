@@ -100,7 +100,7 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
 
     fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>> {
         // TODO: `get_state_value` should differentiate between different write types.
-        match self.change_set.aggregator_delta_set().get(state_key) {
+        match self.change_set.aggregator_v1_delta_set().get(state_key) {
             Some(delta_op) => Ok(delta_op
                 .try_into_write_op(self.base, state_key)?
                 .as_state_value()),
@@ -118,10 +118,6 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
         }
     }
 
-    fn is_genesis(&self) -> bool {
-        unreachable!("Unexpected access to is_genesis()")
-    }
-
     fn get_usage(&self) -> Result<StateStorageUsage> {
         bail!("Unexpected access to get_usage()")
     }
@@ -134,7 +130,7 @@ mod test {
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::write_set::WriteOp;
     use aptos_vm_types::check_change_set::CheckChangeSet;
-    use std::collections::BTreeMap;
+    use std::collections::HashMap;
 
     /// A mock for testing. Always succeeds on checking a change set.
     struct NoOpChangeSetChecker;
@@ -171,23 +167,23 @@ mod test {
         base_view.set_legacy(key("aggregator_both"), serialize(&60));
         base_view.set_legacy(key("aggregator_delta_set"), serialize(&70));
 
-        let resource_write_set = BTreeMap::from([
+        let resource_write_set = HashMap::from([
             (key("resource_both"), write(80)),
             (key("resource_write_set"), write(90)),
         ]);
 
-        let module_write_set = BTreeMap::from([
+        let module_write_set = HashMap::from([
             (key("module_both"), write(100)),
             (key("module_write_set"), write(110)),
         ]);
 
-        let aggregator_write_set = BTreeMap::from([
+        let aggregator_write_set = HashMap::from([
             (key("aggregator_both"), write(120)),
             (key("aggregator_write_set"), write(130)),
         ]);
 
         let aggregator_delta_set =
-            BTreeMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
+            HashMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
         let change_set = VMChangeSet::new(
             resource_write_set,

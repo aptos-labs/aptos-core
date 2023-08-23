@@ -78,16 +78,18 @@ enum BaselineStatus {
 ///
 /// For both read_values and resolved_deltas the keys are not included because they are
 /// in the same order as the reads and deltas in the Transaction::Write.
-pub(crate) struct BaselineOutput<V> {
+pub(crate) struct BaselineOutput<K, V> {
     status: BaselineStatus,
     read_values: Vec<Result<Vec<BaselineValue<V>>, ()>>,
-    resolved_deltas: Vec<Result<Vec<u128>, ()>>,
+    resolved_deltas: Vec<Result<HashMap<K, u128>, ()>>,
 }
 
-impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
+impl<K: Debug + Hash + Clone + Eq, V: Debug + Clone + PartialEq + Eq + TransactionWrite>
+    BaselineOutput<K, V>
+{
     /// Must be invoked after parallel execution to have incarnation information set and
     /// work with dynamic read/writes.
-    pub(crate) fn generate<K: Hash + Clone + Eq, E: Debug + Clone + ReadWriteEvent>(
+    pub(crate) fn generate<E: Debug + Clone + ReadWriteEvent>(
         txns: &[MockTransaction<K, V, E>],
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {
@@ -107,7 +109,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
                     // In executor, SkipRest skips from the next index. Test assumes it's an empty
                     // transaction, so create a successful empty reads and deltas.
                     read_values.push(Ok(vec![]));
-                    resolved_deltas.push(Ok(vec![]));
+                    resolved_deltas.push(Ok(HashMap::new()));
 
                     status = BaselineStatus::SkipRest;
                     break;
@@ -167,8 +169,8 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
                                 .map(|(k, v)| {
                                     // In this case transaction did not fail due to delta application
                                     // errors, and thus we should update written_ and resolved_ worlds.
-                                    current_world.insert(k, BaselineValue::Aggregator(v));
-                                    v
+                                    current_world.insert(k.clone(), BaselineValue::Aggregator(v));
+                                    (k, v)
                                 })
                                 .collect()));
 
@@ -207,7 +209,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
 
     // Used for testing, hence the function asserts the correctness conditions within
     // itself to be easily traceable in case of an error.
-    pub(crate) fn assert_output<K: Debug, E: Debug>(
+    pub(crate) fn assert_output<E: Debug>(
         &self,
         results: &BlockExecutorResult<Vec<MockOutput<K, V, E>>, usize>,
     ) {
@@ -232,20 +234,17 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
                             baseline_read.assert_read_result(result_read)
                         });
 
-                    resolved_deltas
+                    let baseline_deltas = resolved_deltas
                         .as_ref()
-                        .expect("Aggregator failures not yet tested")
+                        .expect("Aggregator failures not yet tested");
+                    output
+                        .materialized_delta_writes
+                        .get()
+                        .expect("Delta writes must be set")
                         .iter()
-                        .zip(
-                            output
-                                .materialized_delta_writes
-                                .get()
-                                .expect("Delta writes must be set")
-                                .iter(),
-                        )
-                        .for_each(|(baseline_delta_write, (_, result_delta_write))| {
+                        .for_each(|(k, result_delta_write)| {
                             assert_eq!(
-                                *baseline_delta_write,
+                                *baseline_deltas.get(k).expect("Baseline must contain delta"),
                                 AggregatorValue::from_write(result_delta_write)
                                     .expect("Delta to a non-existent aggregator")
                                     .into()

@@ -38,6 +38,18 @@ impl TDAGMessage for CertifiedAck {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
+pub enum Extensions {
+    Empty,
+    // Reserved for future extensions such as randomness shares
+}
+
+impl Extensions {
+    pub fn empty() -> Self {
+        Self::Empty
+    }
+}
+
 #[derive(Serialize)]
 struct NodeWithoutDigest<'a> {
     epoch: u64,
@@ -46,6 +58,7 @@ struct NodeWithoutDigest<'a> {
     timestamp: u64,
     payload: &'a Payload,
     parents: &'a Vec<NodeCertificate>,
+    extensions: &'a Extensions,
 }
 
 impl<'a> CryptoHash for NodeWithoutDigest<'a> {
@@ -68,6 +81,7 @@ impl<'a> From<&'a Node> for NodeWithoutDigest<'a> {
             timestamp: node.metadata.timestamp,
             payload: &node.payload,
             parents: &node.parents,
+            extensions: &node.extensions,
         }
     }
 }
@@ -131,6 +145,7 @@ pub struct Node {
     metadata: NodeMetadata,
     payload: Payload,
     parents: Vec<NodeCertificate>,
+    extensions: Extensions,
 }
 
 impl Node {
@@ -141,9 +156,17 @@ impl Node {
         timestamp: u64,
         payload: Payload,
         parents: Vec<NodeCertificate>,
+        extensions: Extensions,
     ) -> Self {
-        let digest =
-            Self::calculate_digest_internal(epoch, round, author, timestamp, &payload, &parents);
+        let digest = Self::calculate_digest_internal(
+            epoch,
+            round,
+            author,
+            timestamp,
+            &payload,
+            &parents,
+            &extensions,
+        );
 
         Self {
             metadata: NodeMetadata {
@@ -157,6 +180,7 @@ impl Node {
             },
             payload,
             parents,
+            extensions,
         }
     }
 
@@ -165,11 +189,13 @@ impl Node {
         metadata: NodeMetadata,
         payload: Payload,
         parents: Vec<NodeCertificate>,
+        extensions: Extensions,
     ) -> Self {
         Self {
             metadata,
             payload,
             parents,
+            extensions,
         }
     }
 
@@ -181,6 +207,7 @@ impl Node {
         timestamp: u64,
         payload: &Payload,
         parents: &Vec<NodeCertificate>,
+        extensions: &Extensions,
     ) -> HashValue {
         let node_with_out_digest = NodeWithoutDigest {
             epoch,
@@ -189,6 +216,7 @@ impl Node {
             timestamp,
             payload,
             parents,
+            extensions,
         };
         node_with_out_digest.hash()
     }
@@ -201,6 +229,7 @@ impl Node {
             self.metadata.timestamp,
             &self.payload,
             &self.parents,
+            &self.extensions,
         )
     }
 
@@ -248,8 +277,10 @@ impl TDAGMessage for Node {
 
         let current_round = self.metadata().round();
 
-        if current_round == 0 {
-            ensure!(self.parents().is_empty(), "invalid parents for round 0");
+        ensure!(current_round > 0, "current round cannot be zero");
+
+        if current_round == 1 {
+            ensure!(self.parents().is_empty(), "invalid parents for round 1");
             return Ok(());
         }
 

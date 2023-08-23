@@ -1,5 +1,5 @@
 {
-  "message": "failed to parse path `address`: failed to parse \"string(Address)\": invalid account address \"1\"",
+  "message": "failed to parse path `address`: failed to parse \"string(Address)\": Invalid account address: Hex characters are invalid: Invalid character 'x' at position 61",
   "error_code": "web_framework_error",
   "vm_error_code": null
 }

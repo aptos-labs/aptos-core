@@ -2,6 +2,7 @@
 
 use super::types::DAGMessage;
 use aptos_consensus_types::common::Author;
+use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_time_service::{Interval, TimeService, TimeServiceTrait};
 use async_trait::async_trait;
 use futures::{
@@ -24,7 +25,7 @@ pub trait RpcHandler {
 }
 
 #[async_trait]
-pub trait DAGNetworkSender: Send + Sync {
+pub trait TDAGNetworkSender: Send + Sync + RBNetworkSender<DAGMessage> {
     async fn send_rpc(
         &self,
         receiver: Author,
@@ -79,7 +80,7 @@ pub struct RpcWithFallback {
     futures: Pin<
         Box<FuturesUnordered<Pin<Box<dyn Future<Output = anyhow::Result<DAGMessage>> + Send>>>>,
     >,
-    sender: Arc<dyn DAGNetworkSender>,
+    sender: Arc<dyn TDAGNetworkSender>,
     interval: Pin<Box<Interval>>,
 }
 
@@ -89,7 +90,7 @@ impl RpcWithFallback {
         message: DAGMessage,
         retry_interval: Duration,
         rpc_timeout: Duration,
-        sender: Arc<dyn DAGNetworkSender>,
+        sender: Arc<dyn TDAGNetworkSender>,
         time_service: TimeService,
     ) -> Self {
         Self {
@@ -106,7 +107,7 @@ impl RpcWithFallback {
 }
 
 async fn send_rpc(
-    sender: Arc<dyn DAGNetworkSender>,
+    sender: Arc<dyn TDAGNetworkSender>,
     peer: Author,
     message: DAGMessage,
     timeout: Duration,

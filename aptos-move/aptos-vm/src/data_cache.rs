@@ -5,7 +5,7 @@
 
 use crate::{
     aptos_vm_impl::gas_config,
-    move_vm_ext::{get_max_binary_format_version, MoveResolverExt},
+    move_vm_ext::{get_max_binary_format_version, AptosMoveResolver, StateValueMetadataResolver},
 };
 #[allow(unused_imports)]
 use anyhow::{bail, Error};
@@ -13,12 +13,16 @@ use aptos_aggregator::{
     aggregator_extension::AggregatorID, delta_change_set::deserialize, resolver::AggregatorResolver,
 };
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, TStateView};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
-    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
+    state_store::{
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::{StateValue, StateValueMetadata},
+    },
 };
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
@@ -29,7 +33,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
-use std::{cell::RefCell, collections::BTreeMap, ops::Deref};
+use std::{cell::RefCell, collections::BTreeMap};
 
 pub(crate) fn get_resource_group_from_metadata(
     struct_tag: &StructTag,
@@ -52,7 +56,7 @@ pub struct StorageAdapter<'a, S> {
         RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
 }
 
-impl<'a, S: StateView> StorageAdapter<'a, S> {
+impl<'a, S> StorageAdapter<'a, S> {
     pub fn new_with_cached_config(
         state_store: &'a S,
         gas_feature_version: u64,
@@ -70,7 +74,9 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         s.max_binary_format_version = get_max_binary_format_version(features, gas_feature_version);
         s
     }
+}
 
+impl<'a, S: StateView> StorageAdapter<'a, S> {
     pub fn new(state_store: &'a S) -> Self {
         let mut s = Self {
             state_store,
@@ -138,7 +144,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
+impl<'a, S: StateView> AptosMoveResolver for StorageAdapter<'a, S> {
     fn get_resource_group_data(
         &self,
         address: &AccountAddress,
@@ -259,15 +265,7 @@ impl<'a, S: StateView> ConfigStorage for StorageAdapter<'a, S> {
 
 impl<'a, S: StateView> StateStorageUsageResolver for StorageAdapter<'a, S> {
     fn get_state_storage_usage(&self) -> Result<StateStorageUsage, Error> {
-        self.get_usage()
-    }
-}
-
-impl<'a, S> Deref for StorageAdapter<'a, S> {
-    type Target = S;
-
-    fn deref(&self) -> &Self::Target {
-        self.state_store
+        self.state_store.get_usage()
     }
 }
 
@@ -278,5 +276,32 @@ pub trait AsMoveResolver<S> {
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
         StorageAdapter::new(self)
+    }
+}
+
+impl<'a, S: StateView> StateValueMetadataResolver for StorageAdapter<'a, S> {
+    fn get_state_value_metadata(
+        &self,
+        state_key: &StateKey,
+    ) -> anyhow::Result<Option<Option<StateValueMetadata>>> {
+        let maybe_state_value = self.state_store.get_state_value(state_key)?;
+        Ok(maybe_state_value.map(StateValue::into_metadata))
+    }
+}
+
+// We need to implement StateView for adapter because:
+//   1. When processing write set payload, storage is accessed
+//      directly.
+//   2. When stacking Storage adapters on top of each other, e.g.
+//      in epilogue.
+impl<'a, S: StateView> TStateView for StorageAdapter<'a, S> {
+    type Key = StateKey;
+
+    fn get_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        self.state_store.get_state_value(state_key)
+    }
+
+    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        self.state_store.get_usage()
     }
 }

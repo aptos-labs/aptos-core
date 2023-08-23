@@ -25,7 +25,10 @@
     "_build:cjs": "tsup src/index.ts --format cjs --dts --out-dir dist/cjs",
     "_build:types": "tsup src/types/index.ts --dts --out-dir dist/types",
     "generate-openapi-response-types": "openapi -i ../../../../api/doc/spec.yaml -o ./src/types/generated --exportCore=false --exportServices=false",
-    "lint": "eslint \"**/*.ts\""
+    "_fmt": "prettier 'src/**/*.ts' 'tests/**/*.ts' '.eslintrc.js'",
+    "fmt": "pnpm _fmt --write",
+    "lint": "eslint \"**/*.ts\"",
+    "test": "pnpm jest"
   },
   "dependencies": {
     "@aptos-labs/aptos-client": "^0.0.2",

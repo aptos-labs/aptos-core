@@ -103,7 +103,7 @@ fn test_malformed_resource() {
     )
     .map(|_| ())
     .unwrap();
-    let (changeset, _) = sess.finish().unwrap();
+    let changeset = sess.finish().unwrap();
     storage.apply(changeset).unwrap();
 
     // Execute the second script and make sure it succeeds. This script simply checks
