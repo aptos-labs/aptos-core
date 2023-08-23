@@ -5,7 +5,7 @@
 
 //! TODO(aldenhu): doc
 
-use crate::{metrics::TIMER, scheduler::PtxSchedulerClient};
+use crate::{metrics::TIMER, sorter::PtxSorterClient};
 use aptos_metrics_core::TimerHelper;
 use aptos_types::transaction::Transaction;
 use rayon::Scope;
@@ -14,7 +14,7 @@ use std::sync::mpsc::{channel, Sender};
 pub(crate) struct PtxAnalyzer;
 
 impl PtxAnalyzer {
-    pub fn spawn(scope: &Scope, scheduler: PtxSchedulerClient) -> PtxAnalyzerClient {
+    pub fn spawn(scope: &Scope, sorter: PtxSorterClient) -> PtxAnalyzerClient {
         let (work_tx, work_rx) = channel();
         scope.spawn(move |_scope| {
             let _timer = TIMER.timer_with(&["analyzer_block_total"]);
@@ -22,10 +22,10 @@ impl PtxAnalyzer {
                 match work_rx.recv().expect("Channel closed.") {
                     Command::AnalyzeTransaction(txn) => {
                         let analyzed_txn = txn.into();
-                        scheduler.add_analyzed_transaction(analyzed_txn)
+                        sorter.add_analyzed_transaction(analyzed_txn)
                     },
                     Command::Finish => {
-                        scheduler.finish_block();
+                        sorter.finish_block();
                         break;
                     },
                 }

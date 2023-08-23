@@ -5,7 +5,7 @@
 
 //! TODO(aldenhu): doc
 
-use crate::{common::BASE_VERSION, executor::PtxExecutorClient, metrics::TIMER};
+use crate::{common::BASE_VERSION, metrics::TIMER, scheduler::PtxSchedulerClient};
 use aptos_metrics_core::TimerHelper;
 use aptos_state_view::StateView;
 use aptos_types::state_store::state_key::StateKey;
@@ -28,28 +28,28 @@ pub(crate) struct PtxStateReader;
 impl PtxStateReader {
     pub fn spawn<'scope, 'view: 'scope>(
         scope: &Scope<'scope>,
-        executor: PtxExecutorClient,
+        scheduler: PtxSchedulerClient,
         state_view: &'view (impl StateView + Sync),
     ) -> PtxStateReaderClient {
         let (work_tx, work_rx) = channel();
         scope.spawn(|_scope| {
             let _timer = TIMER.timer_with(&["state_reader_block_total"]);
-            Self::work(work_rx, executor, state_view)
+            Self::work(work_rx, scheduler, state_view)
         });
         PtxStateReaderClient { work_tx }
     }
 
     fn work(
         work_rx: Receiver<Command>,
-        executor: PtxExecutorClient,
+        scheduler: PtxSchedulerClient,
         state_view: &(impl StateView + Sync),
     ) {
         IO_POOL.scope(move |io_scope| loop {
-            let executor = executor.clone();
+            let scheduler = scheduler.clone();
             match work_rx.recv().expect("Channel closed.") {
                 Command::Read { state_key } => io_scope.spawn(move |_scope| {
                     let value = state_view.get_state_value(&state_key).unwrap();
-                    executor.inform_state_value((state_key, BASE_VERSION), value);
+                    scheduler.inform_state_value((state_key, BASE_VERSION), value);
                 }),
                 Command::FinishBlock => {
                     break;
