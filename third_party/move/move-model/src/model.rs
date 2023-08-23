@@ -163,9 +163,9 @@ impl Default for Loc {
     }
 }
 
-/// Alias for the Loc variant of MoveIR. This uses a `&static str` instead of `FileId` for the
-/// file name.
+/// Alias for the Loc variant of MoveIR.
 pub type MoveIrLoc = move_ir_types::location::Loc;
+pub type MoveIrByteIndex = move_ir_types::location::ByteIndex;
 
 // =================================================================================================
 /// # Identifiers
@@ -471,9 +471,10 @@ pub struct GlobalEnv {
     /// The comments are represented as map from ByteIndex into string, where the index is the
     /// start position of the associated language item in the source.
     pub(crate) doc_comments: BTreeMap<FileId, BTreeMap<ByteIndex, String>>,
-    /// A mapping from file hash to file name and associated FileId. Though this information is
-    /// already in `source_files`, we can't get it out of there so need to book keep here.
+    /// A mapping from file hash to file name and associated FileId.
     pub(crate) file_hash_map: BTreeMap<FileHash, (String, FileId)>,
+    /// Reverse of the above mapping, mapping FileId to hash.
+    pub(crate) reverse_file_hash_map: BTreeMap<FileId, FileHash>,
     /// A mapping from file id to associated alias map.
     pub(crate) file_alias_map: BTreeMap<FileId, Rc<BTreeMap<Symbol, NumericalAddress>>>,
     /// Bijective mapping between FileId and a plain int. FileId's are themselves wrappers around
@@ -534,12 +535,14 @@ impl GlobalEnv {
     pub fn new() -> Self {
         let mut source_files = Files::new();
         let mut file_hash_map = BTreeMap::new();
+        let mut reverse_file_hash_map = BTreeMap::new();
         let mut file_id_to_idx = BTreeMap::new();
         let mut file_idx_to_id = BTreeMap::new();
         let mut fake_loc = |content: &str| {
             let file_id = source_files.add(content, content.to_string());
             let file_hash = FileHash::new(content);
             file_hash_map.insert(file_hash, (content.to_string(), file_id));
+            reverse_file_hash_map.insert(file_id, file_hash);
             let file_idx = file_id_to_idx.len() as u16;
             file_id_to_idx.insert(file_id, file_idx);
             file_idx_to_id.insert(file_idx, file_id);
@@ -558,6 +561,7 @@ impl GlobalEnv {
             unknown_move_ir_loc,
             internal_loc,
             file_hash_map,
+            reverse_file_hash_map,
             file_alias_map: BTreeMap::new(),
             file_id_to_idx,
             file_idx_to_id,
@@ -688,6 +692,7 @@ impl GlobalEnv {
         self.file_alias_map.insert(file_id, address_aliases);
         self.file_hash_map
             .insert(file_hash, (file_name.to_string(), file_id));
+        self.reverse_file_hash_map.insert(file_id, file_hash);
         let file_idx = self.file_id_to_idx.len() as u16;
         self.file_id_to_idx.insert(file_id, file_idx);
         self.file_idx_to_id.insert(file_idx, file_id);
@@ -821,8 +826,6 @@ impl GlobalEnv {
     }
 
     /// Converts a Loc as used by the move-compiler compiler to the one we are using here.
-    /// TODO: move-compiler should use FileId as well so we don't need this here. There is already
-    /// a todo in their code to remove the current use of `&'static str` for file names in Loc.
     pub fn to_loc(&self, loc: &MoveIrLoc) -> Loc {
         let file_id = self.get_file_id(loc.file_hash()).unwrap_or_else(|| {
             panic!(
@@ -836,9 +839,24 @@ impl GlobalEnv {
         }
     }
 
-    /// Returns the file id for a file name, if defined.
+    /// Converts a location back into a MoveIrLoc. If the location is not convertible, unknown
+    /// location will be returned.
+    pub fn to_ir_loc(&self, loc: &Loc) -> MoveIrLoc {
+        if let Some(file_hash) = self.get_file_hash(loc.file_id()) {
+            MoveIrLoc::new(file_hash, loc.span().start().0, loc.span().end().0)
+        } else {
+            self.unknown_move_ir_loc()
+        }
+    }
+
+    /// Returns the file id for a file hash, if defined.
     pub fn get_file_id(&self, fhash: FileHash) -> Option<FileId> {
         self.file_hash_map.get(&fhash).map(|(_, id)| id).cloned()
+    }
+
+    /// Returns the file hash for the file id, if defined.
+    pub fn get_file_hash(&self, file_id: FileId) -> Option<FileHash> {
+        self.reverse_file_hash_map.get(&file_id).cloned()
     }
 
     /// Maps a FileId to an index which can be mapped back to a FileId.
@@ -880,6 +898,11 @@ impl GlobalEnv {
     /// Return the source text for the given location.
     pub fn get_source(&self, loc: &Loc) -> Result<&str, codespan_reporting::files::Error> {
         self.source_files.source_slice(loc.file_id, loc.span)
+    }
+
+    /// Return the source text for the given file.
+    pub fn get_file_source(&self, id: FileId) -> &str {
+        self.source_files.source(id)
     }
 
     /// Return the source file name for `file_id`

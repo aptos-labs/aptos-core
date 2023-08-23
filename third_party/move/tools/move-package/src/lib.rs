@@ -137,6 +137,12 @@ pub struct BuildConfig {
     #[clap(long = "skip-fetch-latest-git-deps", global = true)]
     pub skip_fetch_latest_git_deps: bool,
 
+    #[clap(flatten)]
+    pub compiler_config: CompilerConfig,
+}
+
+#[derive(Parser, Clone, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Default, Debug)]
+pub struct CompilerConfig {
     /// Bytecode version to compile move code
     #[clap(long = "bytecode-version", global = true)]
     pub bytecode_version: Option<u32>,
@@ -148,6 +154,22 @@ pub struct BuildConfig {
     /// Do not complain about an unknown attribute in Move code.
     #[clap(long = SKIP_ATTRIBUTE_CHECKS, default_value = "false")]
     pub skip_attribute_checks: bool,
+
+    /// Compiler version to use
+    #[clap(long = "compiler-version", global = true)]
+    pub compiler_version: Option<CompilerVersion>,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd)]
+pub enum CompilerVersion {
+    V1,
+    V2,
+}
+
+impl Default for CompilerVersion {
+    fn default() -> Self {
+        Self::V1
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
@@ -163,10 +185,10 @@ impl BuildConfig {
     /// Compile the package at `path` or the containing Move package. Exit process on warning or
     /// failure.
     pub fn compile_package<W: Write>(self, path: &Path, writer: &mut W) -> Result<CompiledPackage> {
-        let bytecode_version = self.bytecode_version;
+        let config = self.compiler_config.clone(); // Need clone because of mut self
         let resolved_graph = self.resolution_graph_for_package(path, writer)?;
         let mutx = PackageLock::lock();
-        let ret = BuildPlan::create(resolved_graph)?.compile(bytecode_version, writer);
+        let ret = BuildPlan::create(resolved_graph)?.compile(&config, writer);
         mutx.unlock();
         ret
     }
@@ -178,10 +200,10 @@ impl BuildConfig {
         path: &Path,
         writer: &mut W,
     ) -> Result<CompiledPackage> {
-        let bytecode_version = self.bytecode_version;
+        let config = self.compiler_config.clone(); // Need clone because of mut self
         let resolved_graph = self.resolution_graph_for_package(path, writer)?;
         let mutx = PackageLock::lock();
-        let ret = BuildPlan::create(resolved_graph)?.compile_no_exit(bytecode_version, writer);
+        let ret = BuildPlan::create(resolved_graph)?.compile_no_exit(&config, writer);
         mutx.unlock();
         ret
     }

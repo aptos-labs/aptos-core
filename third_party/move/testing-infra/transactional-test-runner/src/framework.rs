@@ -680,18 +680,15 @@ fn compile_source_unit_v2(
     let mut error_writer = termcolor::Buffer::no_color();
     let result = move_compiler_v2::run_move_compiler(&mut error_writer, options);
     let error_str = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
-    let (mut modules, mut scripts) =
+    let (_, mut units) =
         result.map_err(|_| anyhow::anyhow!("compilation errors:\n {}", error_str))?;
-    let unit = if modules.is_empty() && scripts.len() == 1 {
-        (None, scripts.pop())
-    } else if scripts.is_empty() && modules.len() == 1 {
-        (modules.pop(), None)
+    let unit = if units.len() != 1 {
+        anyhow::bail!("expected either one script or one module")
     } else {
-        anyhow::bail!(
-            "expected either one script or one module: {} - {}",
-            modules.len(),
-            scripts.len()
-        )
+        match units.pop().unwrap() {
+            AnnotatedCompiledUnit::Module(m) => (Some(m.named_module.module), None),
+            AnnotatedCompiledUnit::Script(s) => (None, Some(s.named_script.script)),
+        }
     };
     if error_str.is_empty() {
         Ok((unit, None))
