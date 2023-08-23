@@ -17,15 +17,7 @@ pub struct FaucetClient {
 
 impl FaucetClient {
     pub fn new(faucet_url: Url, rest_url: Url) -> Self {
-        Self {
-            faucet_url,
-            inner: ReqwestClient::builder()
-                .timeout(Duration::from_secs(10))
-                .build()
-                .unwrap(),
-            rest_client: Client::new(rest_url),
-            token: None,
-        }
+        Self::new_from_rest_client(faucet_url, Client::new(rest_url))
     }
 
     pub fn new_for_testing(faucet_url: Url, rest_url: Url) -> Self {
@@ -41,6 +33,18 @@ impl FaucetClient {
                 // versioned API however, so we just set it to `/`.
                 .version_path_base("/".to_string())
                 .unwrap(),
+            token: None,
+        }
+    }
+
+    pub fn new_from_rest_client(faucet_url: Url, rest_client: Client) -> Self {
+        Self {
+            faucet_url,
+            inner: ReqwestClient::builder()
+                .timeout(Duration::from_secs(10))
+                .build()
+                .unwrap(),
+            rest_client,
             token: None,
         }
     }
