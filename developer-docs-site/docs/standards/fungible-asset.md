@@ -1,13 +1,13 @@
 ---
-title: "Fungible Asset"
+title: "Aptos Fungible Asset Standard"
 id: "fungible-asset"
 ---
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Fungible Asset
+# Aptos Fungible Asset Standard
 
-Fungible Assets (FAs) is a core framework component within Aptos that enables the tokenization of various assets, including commodities, real estate, and financial instruments, and facilitate the creation of decentralized financial applications.
+Fungible Asset (FA) is a core framework component within Aptos that enables the tokenization of various assets, including commodities, real estate, and financial instruments, and facilitate the creation of decentralized financial applications.
 
 Tokenization of securities and commodities provides fractional ownership, making these markets more accessible to a broader range of investors.
 Fungible tokens can also represent ownership of real estate, enabling fractional ownership and providing liquidity to the traditionally illiquid market.
