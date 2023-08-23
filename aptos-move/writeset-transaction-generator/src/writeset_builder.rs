@@ -4,7 +4,6 @@
 
 use anyhow::format_err;
 use aptos_crypto::HashValue;
-use aptos_framework::natives::aggregator_natives::context::TxnIndex;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -106,12 +105,7 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
     }
 }
 
-pub fn build_changeset<S: StateView, F>(
-    txn_idx: TxnIndex,
-    state_view: &S,
-    procedure: F,
-    chain_id: u8,
-) -> ChangeSet
+pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F, chain_id: u8) -> ChangeSet
 where
     F: FnOnce(&mut GenesisSession),
 {
@@ -128,11 +122,9 @@ where
     let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
-        let mut session = GenesisSession(move_vm.new_session(
-            txn_idx,
-            &state_view_storage,
-            SessionId::genesis(genesis_id),
-        ));
+        let mut session = GenesisSession(
+            move_vm.new_session(&state_view_storage, SessionId::genesis(genesis_id)),
+        );
         session.disable_reconfiguration();
         procedure(&mut session);
         session.enable_reconfiguration();
