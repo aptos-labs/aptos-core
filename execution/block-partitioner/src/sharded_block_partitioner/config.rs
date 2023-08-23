@@ -3,6 +3,8 @@
 use crate::{sharded_block_partitioner::ShardedBlockPartitioner, BlockPartitioner};
 use aptos_types::block_executor::partitioner::RoundId;
 
+/// The configuration for `aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner`,
+/// which is also referred to as `V1` after `aptos_block_partitioner::v2` is added.
 #[derive(Clone, Copy, Debug)]
 pub struct PartitionerV1Config {
     pub num_shards: usize,
