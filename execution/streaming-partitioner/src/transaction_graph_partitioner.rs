@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 
 use std::collections::HashMap;
+
 use rand::seq::SliceRandom;
 
+use aptos_graphs::{GraphStream, NodeIndex};
 use aptos_graphs::graph::Node;
 use aptos_graphs::graph_stream::{BatchInfo, StreamBatchInfo, StreamNode};
 use aptos_graphs::partitioning::{PartitionId, StreamingGraphPartitioner};
-use aptos_graphs::{GraphStream, NodeIndex};
 use aptos_transaction_orderer::common::PTransaction;
 use aptos_types::batched_stream::{BatchedStream, MapItems};
 
@@ -76,10 +77,7 @@ where
         &mut self,
         transactions: S,
     ) -> Result<Self::ResultStream, Self::Error> {
-        let graph_stream = TransactionGraphStream::new(
-            transactions,
-            self.params.clone(),
-        );
+        let graph_stream = TransactionGraphStream::new(transactions, self.params.clone());
 
         // partitioned_graph_stream: BatchedStream<StreamItem = (SerializationIdx, PartitionId)>
         let partitioned_graph_stream = self
@@ -130,7 +128,7 @@ where
             partitioned_node_weight: 0.,
             partitioned_edge_weight: 0.,
             edges: Vec::new(),
-            rng: rand::thread_rng(),  // TODO: allow using a custom RNG.
+            rng: rand::thread_rng(), // TODO: allow using a custom RNG.
         }
     }
 
@@ -255,4 +253,117 @@ where
 pub struct TxnWithDeps<T: PTransaction> {
     transaction: T,
     dependencies: Vec<SerializationIdx>,
+}
+
+#[cfg(test)]
+mod tests {
+    use aptos_graphs::partitioning::fennel::{AlphaComputationMode, BalanceConstraintMode, FennelGraphPartitioner};
+    use aptos_transaction_orderer::common::PTransaction;
+    use aptos_types::batched_stream::{BatchedStream, IntoNoErrorBatchedStream, NoErrorBatchedStream};
+
+    use crate::{SerializationIdx, StreamingTransactionPartitioner};
+    use crate::transaction_graph_partitioner::NodeWeight;
+
+    #[test]
+    fn test_fennel_11_transactions_over_4_batches() {
+        let input_stream = input_11_transactions_over_4_batches();
+
+        let mut fennel = FennelGraphPartitioner::default();
+        fennel.balance_constraint_mode = BalanceConstraintMode::Batched;
+        fennel.alpha_computation_mode = AlphaComputationMode::Batched;
+
+
+        let mut partitioner = super::TransactionGraphPartitioner {
+            graph_partitioner: fennel,
+            params: super::Params {
+                node_weight_function: |tx: &MockPTransaction| tx.estimated_gas as NodeWeight,
+                edge_weight_function: |idx1: SerializationIdx, idx2: SerializationIdx| {
+                    1. / (idx1 as f64 - idx2 as f64)
+                },
+                n_partitions: 2,
+                shuffle_batches: false,
+            },
+        };
+
+        let mut res = partitioner.partition_transactions(input_stream).unwrap();
+
+        let batch1 = res.next_batch().unwrap().unwrap();
+        assert_eq!(batch1.len(), 4);
+
+        let batch2 = res.next_batch().unwrap().unwrap();
+        assert_eq!(batch2.len(), 2);
+
+        let batch3 = res.next_batch().unwrap().unwrap();
+        assert_eq!(batch3.len(), 2);
+
+        let batch4 = res.next_batch().unwrap().unwrap();
+        assert_eq!(batch4.len(), 3);
+
+        assert!(res.next_batch().is_none());
+    }
+
+    fn input_11_transactions_over_4_batches() -> impl NoErrorBatchedStream<StreamItem = MockPTransaction> {
+        let [w, x, y, z] = [1, 2, 3, 4];
+
+        // transactions with their read and write sets.
+        // read and write sets are more-or-less arbitrary,
+        // but the write set always contains all keys from the read set.
+        // Key `w` is read by almost all transactions and is written by just 1 transaction.
+        vec![
+            vec![
+                MockPTransaction::new(1, vec![w, x], vec![x]),
+                MockPTransaction::new(2, vec![w, x, y], vec![y]),
+                MockPTransaction::new(1, vec![y, z], vec![z]),
+                MockPTransaction::new(1, vec![w, y], vec![y]),
+            ],
+            vec![
+                MockPTransaction::new(3, vec![w], vec![w]),
+                MockPTransaction::new(1, vec![w, x], vec![x]),
+            ],
+            vec![
+                MockPTransaction::new(2, vec![w, x], vec![x]),
+                MockPTransaction::new(1, vec![y, z], vec![z]),
+            ],
+            vec![
+                MockPTransaction::new(1, vec![y, z], vec![y]),
+                MockPTransaction::new(1, vec![w, y], vec![y]),
+                MockPTransaction::new(2, vec![w, x, y], vec![x]),
+            ],
+        ]
+            .into_no_error_batched_stream()
+    }
+
+    struct MockPTransaction {
+        estimated_gas: u32,
+        read_set: Vec<u32>,
+        write_set: Vec<u32>,
+    }
+
+    impl MockPTransaction {
+        fn new(estimated_gas: u32, read_set: Vec<u32>, write_set: Vec<u32>) -> Self {
+            Self {
+                estimated_gas,
+                read_set,
+                write_set,
+            }
+        }
+    }
+
+    impl PTransaction for MockPTransaction {
+        type Key = u32;
+
+        type ReadSetIter<'a> = std::slice::Iter<'a, Self::Key>
+        where Self: 'a;
+
+        type WriteSetIter<'a> = std::slice::Iter<'a, Self::Key>
+        where Self: 'a;
+
+        fn read_set(&self) -> std::slice::Iter<Self::Key> {
+            self.read_set.iter()
+        }
+
+        fn write_set(&self) -> std::slice::Iter<Self::Key> {
+            self.write_set.iter()
+        }
+    }
 }

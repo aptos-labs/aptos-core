@@ -206,30 +206,30 @@ where
 
 /// Adds method `as_batched_stream` for all types
 /// implementing `Iterator<Item = Result<impl IntoIterator, _>`.
-pub trait IntoBatchedStream: Sized {
+pub trait IntoBatchedStream: IntoIterator + Sized {
     fn into_batched_stream(self) -> IterIntoBatchedStream<Self> {
-        IterIntoBatchedStream { iter: self }
+        IterIntoBatchedStream { iter: self.into_iter() }
     }
 }
 
 impl<I, II, E> IntoBatchedStream for I
 where
-    I: Iterator<Item = Result<II, E>>,
+    I: IntoIterator<Item = Result<II, E>>,
     II: IntoIterator,
 {
 }
 
 /// Adds method `as_no_error_batched_stream` for all types
 /// implementing `Iterator<Item = impl IntoIterator>`.
-pub trait IntoNoErrorBatchedStream: Sized {
+pub trait IntoNoErrorBatchedStream: IntoIterator + Sized {
     fn into_no_error_batched_stream(self) -> IterIntoNoErrorBatchedStream<Self> {
-        IterIntoNoErrorBatchedStream { iter: self }
+        IterIntoNoErrorBatchedStream { iter: self.into_iter() }
     }
 }
 
 impl<I> IntoNoErrorBatchedStream for I
 where
-    I: Iterator,
+    I: IntoIterator,
     I::Item: IntoIterator,
 {
 }
@@ -257,13 +257,13 @@ where
 // Wrapper types:
 
 /// A batched stream that wraps an iterator over `Result`s of batches.
-pub struct IterIntoBatchedStream<I> {
-    iter: I,
+pub struct IterIntoBatchedStream<I: IntoIterator> {
+    iter: I::IntoIter,
 }
 
 impl<I, II, E> BatchedStream for IterIntoBatchedStream<I>
 where
-    I: Iterator<Item = Result<II, E>>,
+    I: IntoIterator<Item = Result<II, E>>,
     II: IntoIterator,
 {
     type StreamItem = II::Item;
@@ -285,17 +285,17 @@ where
 }
 
 /// A batched stream that wraps an iterator over batches of items, with no errors.
-pub struct IterIntoNoErrorBatchedStream<I> {
-    iter: I,
+pub struct IterIntoNoErrorBatchedStream<I: IntoIterator> {
+    iter: I::IntoIter,
 }
 
-impl<I> BatchedStream for IterIntoNoErrorBatchedStream<I>
+impl<I, B> BatchedStream for IterIntoNoErrorBatchedStream<I>
 where
-    I: Iterator,
-    I::Item: IntoIterator,
+    I: IntoIterator<Item =B>,
+    B: IntoIterator,
 {
-    type StreamItem = <I::Item as IntoIterator>::Item;
-    type Batch = I::Item;
+    type StreamItem = B::Item;
+    type Batch = B;
     type Error = NoError;
 
     fn next_batch(&mut self) -> Option<no_error::Result<Self::Batch>> {
