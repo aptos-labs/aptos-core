@@ -509,12 +509,40 @@ mod tests {
             }
         }
 
+        let total_node_weight = txns_by_partition
+            .iter()
+            .flat_map(|partition| {
+                partition
+                    .iter()
+                    .map(|tx| node_weight_function(&tx.transaction))
+            })
+            .sum::<NodeWeight>();
+
+        let max_partition_weight = txns_by_partition
+            .iter()
+            .map(|partition| {
+                partition
+                    .iter()
+                    .map(|tx| node_weight_function(&tx.transaction))
+                    .sum::<NodeWeight>()
+            })
+            .max()
+            .unwrap();
+
         // Print the cut edges weight.
         println!(
             "Cut edges weight: {} / {} ({:.2})",
             cut_edges_weight,
             total_edges_weight,
             cut_edges_weight as f64 / total_edges_weight as f64
+        );
+        println!(
+            "Max partition weight: {} / {} ({:.2}, ideal: {:.4}, imbalance: {:.4})",
+            max_partition_weight,
+            total_node_weight,
+            max_partition_weight as f64 / total_node_weight as f64,
+            1. / n_partitions as f64,
+            (max_partition_weight as f64 / (total_node_weight as f64 / n_partitions as f64)) - 1.
         );
         println!("-------------------------------------");
         println!();
