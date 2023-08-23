@@ -7,7 +7,8 @@ use crate::{
         GetNewTransactionsOrOutputsWithProof, GetNewTransactionsWithProof,
         GetNumberOfStatesAtVersion, GetServerProtocolVersion, GetStateValuesWithProof,
         GetStorageServerSummary, GetTransactionOutputsWithProof, GetTransactionsOrOutputsWithProof,
-        GetTransactionsWithProof,
+        GetTransactionsWithProof, SubscribeTransactionOutputsWithProof,
+        SubscribeTransactionsOrOutputsWithProof, SubscribeTransactionsWithProof,
     },
     responses::Error::DegenerateRangeError,
     Epoch, StorageServiceRequest, COMPRESSION_SUFFIX_LABEL,
@@ -535,6 +536,24 @@ impl DataSummary {
 
                 can_serve_txns && can_serve_outputs && can_create_proof
             },
+            SubscribeTransactionOutputsWithProof(request) => {
+                let known_version = request
+                    .subscription_stream_metadata
+                    .known_version_at_stream_start;
+                self.can_service_subscription_request(aptos_data_client_config, known_version)
+            },
+            SubscribeTransactionsOrOutputsWithProof(request) => {
+                let known_version = request
+                    .subscription_stream_metadata
+                    .known_version_at_stream_start;
+                self.can_service_subscription_request(aptos_data_client_config, known_version)
+            },
+            SubscribeTransactionsWithProof(request) => {
+                let known_version = request
+                    .subscription_stream_metadata
+                    .known_version_at_stream_start;
+                self.can_service_subscription_request(aptos_data_client_config, known_version)
+            },
         }
     }
 
@@ -545,6 +564,21 @@ impl DataSummary {
         known_version: u64,
     ) -> bool {
         let max_version_lag = aptos_data_client_config.max_optimistic_fetch_version_lag;
+        self.check_synced_version_lag(known_version, max_version_lag)
+    }
+
+    /// Returns true iff the subscription data request can be serviced
+    fn can_service_subscription_request(
+        &self,
+        aptos_data_client_config: &AptosDataClientConfig,
+        known_version: u64,
+    ) -> bool {
+        let max_version_lag = aptos_data_client_config.max_subscription_version_lag;
+        self.check_synced_version_lag(known_version, max_version_lag)
+    }
+
+    /// Returns true iff the synced version is within the given lag range
+    fn check_synced_version_lag(&self, known_version: u64, max_version_lag: u64) -> bool {
         self.synced_ledger_info
             .as_ref()
             .map(|li| (li.ledger_info().version() + max_version_lag) > known_version)

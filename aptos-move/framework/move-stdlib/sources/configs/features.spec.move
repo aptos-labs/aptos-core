@@ -49,6 +49,10 @@ spec std::features {
         spec_is_enabled(COLLECT_AND_DISTRIBUTE_GAS_FEES)
     }
 
+    spec fun spec_module_event_enabled(): bool {
+        spec_is_enabled(MODULE_EVENT)
+    }
+
     spec periodical_reward_rate_decrease_enabled {
         pragma opaque;
         aborts_if [abstract] false;

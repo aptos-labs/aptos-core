@@ -3020,7 +3020,6 @@ impl<'t, 'l, 'v> serde::Serialize for AnnotatedValue<'t, 'l, 'v, MoveTypeLayout,
                 })
                 .serialize(serializer)
             },
-
             (L::Vector(layout), ValueImpl::Container(c)) => {
                 let layout = layout.as_ref();
                 match (layout, c) {

@@ -8,6 +8,7 @@ from pangu_lib.util import strfdelta
 import json
 import sys
 from pangu_lib.util import NodeType
+from pangu_lib.util import TX_EMITTER_TYPE
 
 
 class PanguTestnet:
@@ -177,6 +178,8 @@ def get_singular_testnet(testnet_name: str, kubernetes: Kubernetes) -> PanguTest
             pangu_testnet.num_validator_fullnodes += 1
         elif type == NodeType.PFN.value:
             pangu_testnet.num_public_fullnodes += 1
+        elif type == TX_EMITTER_TYPE:
+            pass
         else:
             raise Exception(f"Unknown type: {type}")
     pangu_testnet.node_statefulsets = sts_objects
@@ -195,6 +198,8 @@ def get_singular_testnet(testnet_name: str, kubernetes: Kubernetes) -> PanguTest
             pangu_testnet.num_validator_fullnodes_active += 1
         elif type == NodeType.PFN.value:
             pangu_testnet.num_public_fullnodes_active += 1
+        elif type == TX_EMITTER_TYPE:
+            pass
         else:
             raise Exception(f"Unknown type: {type}")
     pangu_testnet.node_pods = pod_objects

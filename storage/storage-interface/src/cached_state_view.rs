@@ -222,10 +222,6 @@ impl TStateView for CachedStateView {
         Ok(value_opt.clone())
     }
 
-    fn is_genesis(&self) -> bool {
-        self.snapshot.is_none()
-    }
-
     fn get_usage(&self) -> Result<StateStorageUsage> {
         Ok(self.speculative_state.usage())
     }
@@ -265,10 +261,6 @@ impl TStateView for CachedDbStateView {
             .entry(state_key.clone())
             .or_insert_with(|| state_value_option);
         Ok(new_value.clone())
-    }
-
-    fn is_genesis(&self) -> bool {
-        self.db_state_view.is_genesis()
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {

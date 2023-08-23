@@ -208,14 +208,14 @@ impl AnalyzeValidators {
             )?;
             let end = raw_events.len() < batch;
             for raw_event in raw_events {
-                if cursor <= raw_event.event.sequence_number() {
+                if cursor <= raw_event.event.v1()?.sequence_number() {
                     println!(
                         "Duplicate event found for {} : {:?}",
                         cursor,
-                        raw_event.event.sequence_number()
+                        raw_event.event.v1()?.sequence_number()
                     );
                 } else {
-                    cursor = raw_event.event.sequence_number();
+                    cursor = raw_event.event.v1()?.sequence_number();
                     let event = bcs::from_bytes::<NewBlockEvent>(raw_event.event.event_data())?;
 
                     match epoch.cmp(&event.epoch()) {
@@ -223,7 +223,7 @@ impl AnalyzeValidators {
                             result.push(VersionedNewBlockEvent {
                                 event,
                                 version: raw_event.transaction_version,
-                                sequence_number: raw_event.event.sequence_number(),
+                                sequence_number: raw_event.event.v1()?.sequence_number(),
                             });
                         },
                         Ordering::Greater => {

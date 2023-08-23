@@ -527,6 +527,7 @@ fn single_test_suite(
         // Rest of the tests:
         "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
+        "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
         "epoch_changer_performance" => epoch_changer_performance(),
@@ -797,31 +798,19 @@ fn consensus_stress_test() -> ForgeConfig {
     })
 }
 
-fn realistic_env_load_sweep_test() -> ForgeConfig {
+fn realistic_env_sweep_wrap(
+    num_validators: usize,
+    num_fullnodes: usize,
+    test: LoadVsPerfBenchmark,
+) -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
-        .add_network_test(wrap_with_realistic_env(LoadVsPerfBenchmark {
-            test: Box::new(PerformanceBenchmark),
-            workloads: Workloads::TPS(&[10, 100, 1000, 3000, 5000]),
-            criteria: [
-                (9, 1.5, 3., 4.),
-                (95, 1.5, 3., 4.),
-                (950, 2., 3., 4.),
-                (2750, 2.5, 3.5, 4.5),
-                (4600, 3., 4., 5.),
-            ]
-            .into_iter()
-            .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
-                SuccessCriteria::new(min_tps)
-                    .add_max_expired_tps(0)
-                    .add_max_failed_submission_tps(0)
-                    .add_latency_threshold(max_lat_p50, LatencyType::P50)
-                    .add_latency_threshold(max_lat_p90, LatencyType::P90)
-                    .add_latency_threshold(max_lat_p99, LatencyType::P99)
-            })
-            .collect(),
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_fullnodes)
+        .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["validator"]["config"]["execution"]
+                ["processed_transactions_detailed_counters"] = true.into();
         }))
+        .add_network_test(wrap_with_realistic_env(test))
         // Test inherits the main EmitJobRequest, so update here for more precise latency measurements
         .with_emit_job(
             EmitJobRequest::default().latency_polling_interval(Duration::from_millis(100)),
@@ -839,6 +828,98 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
                     max_round_gap: 10,
                 }),
         )
+}
+
+fn realistic_env_load_sweep_test() -> ForgeConfig {
+    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
+        test: Box::new(PerformanceBenchmark),
+        workloads: Workloads::TPS(&[10, 100, 1000, 3000, 5000]),
+        criteria: [
+            (9, 1.5, 3., 4.),
+            (95, 1.5, 3., 4.),
+            (950, 2., 3., 4.),
+            (2750, 2.5, 3.5, 4.5),
+            (4600, 3., 4., 5.),
+        ]
+        .into_iter()
+        .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
+            SuccessCriteria::new(min_tps)
+                .add_max_expired_tps(0)
+                .add_max_failed_submission_tps(0)
+                .add_latency_threshold(max_lat_p50, LatencyType::P50)
+                .add_latency_threshold(max_lat_p90, LatencyType::P90)
+                .add_latency_threshold(max_lat_p99, LatencyType::P99)
+        })
+        .collect(),
+    })
+}
+
+fn realistic_env_workload_sweep_test() -> ForgeConfig {
+    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+        test: Box::new(PerformanceBenchmark),
+        workloads: Workloads::TRANSACTIONS(&[
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::CoinTransfer,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 20000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::NoOp,
+                num_modules: 100,
+                unique_senders: false,
+                mempool_backlog: 20000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::ModifyGlobalResource,
+                num_modules: 1,
+                unique_senders: true,
+                mempool_backlog: 20000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
+                num_modules: 1,
+                unique_senders: true,
+                mempool_backlog: 10000,
+            },
+            // transactions get rejected, to fix.
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::PublishPackage,
+            //     num_modules: 1,
+            //     unique_senders: true,
+            //     mempool_backlog: 1000,
+            // },
+        ]),
+        // Investigate/improve to make latency more predictable on different workloads
+        criteria: [
+            (3700, 0.35, 0.5, 0.8, 0.65),
+            (2800, 0.35, 0.5, 1.2, 1.2),
+            (1800, 0.35, 0.5, 1.5, 2.7),
+            (950, 0.35, 0.65, 1.5, 2.7),
+            // (150, 0.5, 1.0, 1.5, 0.65),
+        ]
+        .into_iter()
+        .map(
+            |(min_tps, batch_to_pos, pos_to_proposal, proposal_to_ordered, ordered_to_commit)| {
+                SuccessCriteria::new(min_tps)
+                    .add_max_expired_tps(200)
+                    .add_max_failed_submission_tps(200)
+                    .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
+                        (LatencyBreakdownSlice::QsBatchToPos, batch_to_pos),
+                        (LatencyBreakdownSlice::QsPosToProposal, pos_to_proposal),
+                        (
+                            LatencyBreakdownSlice::ConsensusProposalToOrdered,
+                            proposal_to_ordered,
+                        ),
+                        (
+                            LatencyBreakdownSlice::ConsensusOrderedToCommit,
+                            ordered_to_commit,
+                        ),
+                    ]))
+            },
+        )
+        .collect(),
+    })
 }
 
 fn load_vs_perf_benchmark() -> ForgeConfig {
@@ -875,9 +956,6 @@ fn workload_vs_perf_benchmark() -> ForgeConfig {
             helm_values["validator"]["config"]["execution"]
                 ["processed_transactions_detailed_counters"] = true.into();
         }))
-        // .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-        //     mempool_backlog: 10000,
-        // }))
         .add_network_test(LoadVsPerfBenchmark {
             test: Box::new(PerformanceBenchmark),
             workloads: Workloads::TRANSACTIONS(&[
@@ -885,41 +963,49 @@ fn workload_vs_perf_benchmark() -> ForgeConfig {
                     transaction_type: TransactionTypeArg::NoOp,
                     num_modules: 1,
                     unique_senders: false,
+                    mempool_backlog: 20000,
                 },
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::NoOp,
                     num_modules: 1,
                     unique_senders: true,
+                    mempool_backlog: 20000,
                 },
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::NoOp,
                     num_modules: 1000,
                     unique_senders: false,
+                    mempool_backlog: 20000,
                 },
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::CoinTransfer,
                     num_modules: 1,
                     unique_senders: true,
+                    mempool_backlog: 20000,
                 },
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::CoinTransfer,
                     num_modules: 1,
                     unique_senders: true,
+                    mempool_backlog: 20000,
                 },
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::AccountResource32B,
                     num_modules: 1,
                     unique_senders: true,
+                    mempool_backlog: 20000,
                 },
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::AccountResource1KB,
                     num_modules: 1,
                     unique_senders: true,
+                    mempool_backlog: 20000,
                 },
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::PublishPackage,
                     num_modules: 1,
                     unique_senders: true,
+                    mempool_backlog: 20000,
                 },
             ]),
             criteria: Vec::new(),
@@ -1533,9 +1619,15 @@ fn realistic_env_max_load_test(
                 .add_latency_threshold(4.5, LatencyType::P90)
                 .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
                     (LatencyBreakdownSlice::QsBatchToPos, 0.35),
-                    (LatencyBreakdownSlice::QsPosToProposal, 0.5),
+                    (
+                        LatencyBreakdownSlice::QsPosToProposal,
+                        if ha_proxy { 0.6 } else { 0.5 },
+                    ),
                     (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.8),
-                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 0.65),
+                    (
+                        LatencyBreakdownSlice::ConsensusOrderedToCommit,
+                        if ha_proxy { 1.2 } else { 0.65 },
+                    ),
                 ]))
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
