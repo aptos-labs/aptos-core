@@ -9,7 +9,7 @@ import {
   Transaction,
   HexInput,
 } from "../types";
-import { getData, getModule, getModules, getResource, getResources, getTransactions } from "../internal/account";
+import { getInfo, getModule, getModules, getResource, getResources, getTransactions } from "../internal/account";
 
 export class Account {
   readonly config: AptosConfig;
@@ -33,8 +33,8 @@ export class Account {
    * }
    * ```
    */
-  async getData(args: { accountAddress: HexInput }): Promise<AccountData> {
-    const data = await getData({ aptosConfig: this.config, ...args });
+  async getInfo(args: { accountAddress: HexInput }): Promise<AccountData> {
+    const data = await getInfo({ aptosConfig: this.config, ...args });
     return data;
   }
 

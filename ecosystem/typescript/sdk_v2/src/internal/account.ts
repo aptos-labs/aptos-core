@@ -21,12 +21,12 @@ import { AptosApiType } from "../utils/const";
  * account namespace and without having a dependency cycle error.
  */
 
-export async function getData(args: { aptosConfig: AptosConfig; accountAddress: HexInput }): Promise<AccountData> {
+export async function getInfo(args: { aptosConfig: AptosConfig; accountAddress: HexInput }): Promise<AccountData> {
   const { aptosConfig, accountAddress } = args;
   const { data } = await get<{}, AccountData>({
     url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
     endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}`,
-    originMethod: "getData",
+    originMethod: "getInfo",
     overrides: { ...aptosConfig.clientConfig },
   });
   return data;
