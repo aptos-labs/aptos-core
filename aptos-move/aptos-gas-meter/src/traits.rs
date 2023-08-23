@@ -55,15 +55,6 @@ pub trait GasAlgebra {
         gas_unit_price: FeePerGasUnit,
     ) -> PartialVMResult<()>;
 
-    /// Refunds storage fee.
-    ///
-    /// The amount refunded can be a quantity or an abstract expression containing
-    /// gas parameters.
-    fn refund_storage_fee(
-        &mut self,
-        abstract_amount: impl GasExpression<VMGasParameters, Unit = Octa>,
-    ) -> PartialVMResult<()>;
-
     /// Returns the amount of gas used under the execution category.
     fn execution_gas_used(&self) -> InternalGas;
 
@@ -75,9 +66,6 @@ pub trait GasAlgebra {
 
     /// Returns the amount of storage fee used.
     fn storage_fee_used(&self) -> Fee;
-
-    /// Returns the amount of storage fee refunded.
-    fn storage_fee_refunded(&self) -> Fee;
 }
 
 /// Trait representing a gas meter used inside the Aptos VM.
@@ -102,12 +90,6 @@ pub trait AptosGasMeter: MoveGasMeter {
         amount: Fee,
         gas_unit_price: FeePerGasUnit,
     ) -> PartialVMResult<()>;
-
-    /// Refunds storage fee.
-    ///
-    /// Amount is in APT/Octa. Refund is not deducted from the gas meter balance hence no need to
-    /// convert the amount to gas units.
-    fn refund_storage_fee(&mut self, amount: Fee) -> PartialVMResult<()>;
 
     /// Charges an intrinsic cost for executing the transaction.
     ///
@@ -152,32 +134,29 @@ pub trait AptosGasMeter: MoveGasMeter {
         change_set: &mut VMChangeSet,
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
-        is_storage_deletion_refund_enabled: bool,
-    ) -> VMResult<()> {
+    ) -> VMResult<Fee> {
         // The new storage fee are only active since version 7.
         if self.feature_version() < 7 {
-            return Ok(());
+            return Ok(0.into());
         }
 
         // TODO(Gas): right now, some of our tests use a unit price of 0 and this is a hack
         // to avoid causing them issues. We should revisit the problem and figure out a
         // better way to handle this.
         if gas_unit_price.is_zero() {
-            return Ok(());
+            return Ok(0.into());
         }
 
         // Calculate the storage fees.
         let mut write_fee = Fee::new(0);
+        let mut total_refund = Fee::new(0);
         for (key, op) in change_set.write_set_iter_mut() {
             let slot_fee = self.storage_fee_for_state_slot(op);
             let refund = self.storage_fee_refund_for_state_slot(op);
             let bytes_fee = self.storage_fee_for_state_bytes(key, op);
 
             Self::maybe_record_storage_deposit(op, slot_fee);
-            if is_storage_deletion_refund_enabled {
-                self.refund_storage_fee(refund)
-                    .map_err(|err| err.finish(Location::Undefined))?;
-            }
+            total_refund += refund;
 
             write_fee += slot_fee + bytes_fee
         }
@@ -194,7 +173,7 @@ pub trait AptosGasMeter: MoveGasMeter {
         self.charge_storage_fee(fee, gas_unit_price)
             .map_err(|err| err.finish(Location::Undefined))?;
 
-        Ok(())
+        Ok(total_refund)
     }
 
     // The slot fee is refundable, we record it on the WriteOp itself and it'll end up in
@@ -268,10 +247,5 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// Return the total fee used for storage.
     fn storage_fee_used(&self) -> Fee {
         self.algebra().storage_fee_used()
-    }
-
-    /// Return the total storage fee refund.
-    fn storage_fee_refunded(&self) -> Fee {
-        self.algebra().storage_fee_refunded()
     }
 }

@@ -501,11 +501,6 @@ where
             amount: Fee,
             gas_unit_price: FeePerGasUnit,
         ) -> PartialVMResult<()>;
-
-        fn refund_storage_fee(
-            &mut self,
-            amount: Fee,
-        ) -> PartialVMResult<()>;
     }
 
     fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOp) -> VMResult<()> {
@@ -526,33 +521,30 @@ where
         change_set: &mut VMChangeSet,
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
-        is_storage_deletion_refund_enabled: bool,
-    ) -> VMResult<()> {
+    ) -> VMResult<Fee> {
         // The new storage fee are only active since version 7.
         if self.feature_version() < 7 {
-            return Ok(());
+            return Ok(0.into());
         }
 
         // TODO(Gas): right now, some of our tests use a unit price of 0 and this is a hack
         // to avoid causing them issues. We should revisit the problem and figure out a
         // better way to handle this.
         if gas_unit_price.is_zero() {
-            return Ok(());
+            return Ok(0.into());
         }
 
         // Writes
         let mut write_fee = Fee::new(0);
         let mut write_set_storage = vec![];
+        let mut total_refund = Fee::new(0);
         for (key, op) in change_set.write_set_iter_mut() {
             let slot_fee = self.storage_fee_for_state_slot(op);
             let slot_refund = self.storage_fee_refund_for_state_slot(op);
             let bytes_fee = self.storage_fee_for_state_bytes(key, op);
 
             Self::maybe_record_storage_deposit(op, slot_fee);
-            if is_storage_deletion_refund_enabled {
-                self.refund_storage_fee(slot_refund)
-                    .map_err(|err| err.finish(Location::Undefined))?;
-            }
+            total_refund += slot_refund;
 
             let fee = slot_fee + bytes_fee;
             write_set_storage.push(WriteStorage {
@@ -597,7 +589,7 @@ where
         )
         .map_err(|err| err.finish(Location::Undefined))?;
 
-        Ok(())
+        Ok(total_refund)
     }
 
     fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {

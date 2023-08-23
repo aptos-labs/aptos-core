@@ -72,13 +72,6 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
             .charge_storage_fee(abstract_amount, gas_unit_price)
     }
 
-    fn refund_storage_fee(
-        &mut self,
-        abstract_amount: impl GasExpression<VMGasParameters, Unit = Octa>,
-    ) -> PartialVMResult<()> {
-        self.base.refund_storage_fee(abstract_amount)
-    }
-
     fn execution_gas_used(&self) -> InternalGas {
         self.base.execution_gas_used()
     }
@@ -93,9 +86,5 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
 
     fn storage_fee_used(&self) -> Fee {
         self.base.storage_fee_used()
-    }
-
-    fn storage_fee_refunded(&self) -> Fee {
-        self.base.storage_fee_refunded()
     }
 }

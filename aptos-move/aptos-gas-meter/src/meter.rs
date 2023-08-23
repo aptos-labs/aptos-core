@@ -488,11 +488,6 @@ where
         self.algebra.charge_storage_fee(amount, gas_unit_price)
     }
 
-    #[inline]
-    fn refund_storage_fee(&mut self, amount: Fee) -> PartialVMResult<()> {
-        self.algebra.refund_storage_fee(amount)
-    }
-
     fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOp) -> VMResult<()> {
         let cost = self.storage_gas_params().pricing.io_gas_per_write(key, op);
         self.algebra
