@@ -178,9 +178,6 @@ module veiled_coin::veiled_coin {
     /// The domain separation tag (DST) used for the Bulletproofs prover.
     const VEILED_COIN_BULLETPROOFS_DST: vector<u8> = b"AptosVeiledCoin/BulletproofRangeProof";
 
-    // TODO: Describe what this is
-    const DEVELOPER_ADDRESS: address = @0xb0b377c434cfb4660dd7d986542fe3b0f9daa3e09a1ea62aa1c5ea8d035017a9;//@0x42beef;
-
     //
     // Structs
     //
@@ -253,7 +250,7 @@ module veiled_coin::veiled_coin {
         );
 
         let signer_cap = resource_account::retrieve_resource_account_cap(
-            resource_account, DEVELOPER_ADDRESS
+            resource_account, @source_addr
         );
 
         coin::register<CoinType>(resource_account);
@@ -721,7 +718,7 @@ module veiled_coin::veiled_coin {
 
     /// Returns a signer for the resource account storing all the normal coins that have been veiled.
     fun get_resource_account_signer(): signer acquires VeiledCoinMinter {
-        account::create_signer_with_capability(&borrow_global<VeiledCoinMinter>(@veiled_coin).signer_cap)
+        account::create_signer_with_capability(&borrow_global<VeiledCoinMinter>(@source_addr).signer_cap)
     }
 
     /// Mints a veiled coin from a normal coin, shelving the normal coin into the resource account's coin store.
@@ -776,8 +773,8 @@ module veiled_coin::veiled_coin {
 
     #[test_only]
     /// So we can call this from `veiled_coin_tests.move`.
-    public fun init_module_for_testing(deployer: &signer) {
-        init_module(deployer)
+    public fun init_module_for_testing<CoinType>(deployer: &signer) {
+        init_module<CoinType>(deployer)
     }
 
     //

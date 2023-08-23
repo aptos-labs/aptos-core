@@ -9,4 +9,5 @@ AptosFramework = { local = "../../framework/aptos-framework" }
 std = "0x1"
 aptos_std = "0x1"
 aptos_framework = "0x1"
-veiled_coin = "0x0ba4302023ca66094c7ae9fd2baeb675538f54fe00f66f4e8fa381d059e98b8e"#"0xcafe"
+veiled_coin = "0x7"#"_"
+source_addr = "_"
