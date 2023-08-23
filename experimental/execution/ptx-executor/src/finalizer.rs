@@ -1,8 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{common::TxnIdx, state_view::OverlayedStateView};
+#![forbid(unsafe_code)]
+
+use crate::{common::TxnIdx, metrics::TIMER, state_view::OverlayedStateView};
 use aptos_logger::trace;
+use aptos_metrics_core::TimerHelper;
 use aptos_state_view::StateView;
 use aptos_types::{transaction::TransactionOutput, write_set::TransactionWrite};
 use aptos_vm_types::output::VMOutput;
@@ -22,6 +25,7 @@ impl PtxFinalizer {
     ) -> PtxFinalizerClient {
         let (work_tx, work_rx) = channel();
         scope.spawn(move |_scope| {
+            let _timer = TIMER.timer_with(&["finalizer_block_total"]);
             let mut worker = Worker::new(base_view, result_tx);
             loop {
                 match work_rx.recv().expect("Channel closed.") {

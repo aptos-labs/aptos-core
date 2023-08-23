@@ -8,9 +8,11 @@
 use crate::{
     common::{TxnIdx, VersionedKey, EXPECTANT_BLOCK_KEYS, EXPECTANT_BLOCK_SIZE},
     finalizer::PtxFinalizerClient,
+    metrics::{PER_WORKER_TIMER, TIMER},
     state_view::OverlayedStateView,
 };
 use aptos_logger::trace;
+use aptos_metrics_core::TimerHelper;
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -40,25 +42,29 @@ impl PtxExecutor {
     ) -> PtxExecutorClient {
         let (work_tx, work_rx) = channel();
         let client = PtxExecutorClient { work_tx };
-        let mut manager =
-            WorkerManager::new(scope, num_workers, finalizer, base_view, client.clone());
-        scope.spawn(move |_scope| loop {
-            match work_rx.recv().expect("Work thread died.") {
-                Command::InformStateValue { key, value } => {
-                    manager.inform_state_value(key, value);
-                },
-                Command::AddTransaction {
-                    transaction,
-                    dependencies,
-                } => {
-                    manager.add_transaction(transaction, dependencies);
-                },
-                Command::FinishBlock => {
-                    manager.finish_block();
-                },
-                Command::Exit => {
-                    break;
-                },
+        let client_clone = client.clone();
+        scope.spawn(move |scope| {
+            let _timer = TIMER.timer_with(&["executor_block_total"]);
+            let mut manager =
+                WorkerManager::new(scope, num_workers, finalizer, base_view, client_clone);
+            loop {
+                match work_rx.recv().expect("Work thread died.") {
+                    Command::InformStateValue { key, value } => {
+                        manager.inform_state_value(key, value);
+                    },
+                    Command::AddTransaction {
+                        transaction,
+                        dependencies,
+                    } => {
+                        manager.add_transaction(transaction, dependencies);
+                    },
+                    Command::FinishBlock => {
+                        manager.finish_block();
+                    },
+                    Command::Exit => {
+                        break;
+                    },
+                }
             }
         });
         client
@@ -184,6 +190,7 @@ impl WorkerManager {
 
     // Top level API
     fn inform_state_value(&mut self, key: VersionedKey, value: Option<StateValue>) {
+        let _timer = TIMER.timer_with(&["executor_mgr_inform_state_value"]);
         match self.state_values.entry(key.clone()) {
             Entry::Occupied(mut existing) => {
                 let old_state = existing.insert(StateValueState::Ready {
@@ -240,6 +247,7 @@ impl WorkerManager {
 
     // Top level API
     fn add_transaction(&mut self, transaction: Transaction, dependencies: HashSet<VersionedKey>) {
+        let _timer = TIMER.timer_with(&["executor_mgr_add_txn"]);
         let txn_idx = self.transactions.len();
         trace!("seen txn {}", txn_idx);
         self.transactions
@@ -285,7 +293,10 @@ impl WorkerManager {
         );
 
         // wait for next available worker
-        let worker_index = self.worker_ready_rx.recv().expect("Channel closed.");
+        let worker_index = {
+            let _timer = TIMER.timer_with(&["wait_ready_worker"]);
+            self.worker_ready_rx.recv().expect("Channel closed.")
+        };
         // send transaction to worker for execution
         self.work_txs[worker_index]
             .send(WorkerCommand::ExecuteTransaction {
@@ -300,6 +311,7 @@ impl WorkerManager {
     }
 
     fn finish_block(&mut self) {
+        let _timer = TIMER.timer_with(&["executor_manager_finish_block"]);
         self.block_finished = true;
         self.maybe_exit();
     }
@@ -368,6 +380,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
         // Share a VM in the same thread.
         // TODO(ptx): maybe warm up vm like done in AptosExecutorTask
         let vm = AptosVM::new(&self.base_view.as_move_resolver());
+        let idx = format!("{}", self.worker_index);
 
         // Inform the manger worker is up.
         self.worker_ready_tx
@@ -382,18 +395,23 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     transaction,
                     met_dependencies,
                 } => {
+                    let _total = PER_WORKER_TIMER.timer_with(&[&idx, "execute_txn_total"]);
+                    let _pre = PER_WORKER_TIMER.timer_with(&[&idx, "execute_txn_pre_vm"]);
                     trace!("worker {} gonna run txn {}", self.worker_index, txn_idx);
                     let state_view =
                         OverlayedStateView::new_with_overlay(self.base_view, met_dependencies);
                     let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
-                    // TODO(ptx): avoid cloning
                     let preprocessed_txn = preprocess_transaction::<AptosVM>(transaction);
-
-                    let vm_output = vm.execute_single_transaction(
-                        &preprocessed_txn,
-                        &vm.as_move_resolver(&state_view),
-                        &log_context,
-                    );
+                    drop(_pre);
+                    let vm_output = {
+                        let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "per_worker_vm"]);
+                        vm.execute_single_transaction(
+                            &preprocessed_txn,
+                            &vm.as_move_resolver(&state_view),
+                            &log_context,
+                        )
+                    };
+                    let _post = PER_WORKER_TIMER.timer_with(&[&idx, "per_worker_post_vm"]);
                     // TODO(ptx): error handling
                     let (_vm_status, vm_output, _msg) = vm_output.expect("VM execution failed.");
 

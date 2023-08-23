@@ -10,18 +10,20 @@ mod analyzer;
 mod common;
 mod executor;
 mod finalizer;
+mod metrics;
 mod scheduler;
 mod state_reader;
 mod state_view;
 
 use crate::{
-    analyzer::PtxAnalyzer, executor::PtxExecutor, finalizer::PtxFinalizer, scheduler::PtxScheduler,
-    state_reader::PtxStateReader,
+    analyzer::PtxAnalyzer, executor::PtxExecutor, finalizer::PtxFinalizer, metrics::TIMER,
+    scheduler::PtxScheduler, state_reader::PtxStateReader,
 };
 use aptos_executor::{
     block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput,
 };
 use aptos_infallible::Mutex;
+use aptos_metrics_core::TimerHelper;
 use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
@@ -44,6 +46,7 @@ impl VMExecutor for PtxBlockExecutor {
         state_view: &(impl StateView + Sync),
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let _timer = TIMER.timer_with(&["block_total"]);
         // 1. Analyze: annotate read / write sets.
         // 2. Schedule: build dependency graph by remembering the latests writes for each key.
         // 3. Execute: start executing a transaction once its dependencies are met.
