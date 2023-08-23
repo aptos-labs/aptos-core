@@ -600,6 +600,7 @@ syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = "0.28.4"
 tempfile = "3.3.0"
 termcolor = "1.1.2"
+test-case = "3.1.0"
 textwrap = "0.15.0"
 thiserror = "1.0.37"
 time = { version = "0.3.24", features = ["serde"] }
