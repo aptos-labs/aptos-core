@@ -18,13 +18,13 @@ impl PrePartitioner for UniformPartitioner {
     ) -> Vec<Vec<PrePartitionedTxnIdx>> {
         let num_items = transactions.len();
         let num_chunks = num_shards;
-        let num_big_chunks = num_items % num_chunks;
-        let small_chunk_size = num_items / num_chunks;
+        let num_chunks_with_overflow = num_items % num_chunks;
+        let chunk_size = num_items / num_chunks;
         let mut ret = Vec::with_capacity(num_chunks);
         let mut next_chunk_start = 0;
         for chunk_id in 0..num_chunks {
-            let extra = if chunk_id < num_big_chunks { 1 } else { 0 };
-            let next_chunk_end = next_chunk_start + small_chunk_size + extra;
+            let extra = if chunk_id < num_chunks_with_overflow { 1 } else { 0 };
+            let next_chunk_end = next_chunk_start + chunk_size + extra;
             let chunk: Vec<usize> = (next_chunk_start..next_chunk_end).collect();
             next_chunk_start = next_chunk_end;
             ret.push(chunk);
