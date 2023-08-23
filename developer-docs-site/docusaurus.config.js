@@ -192,16 +192,40 @@ const config = {
               to: "nodes/full-node/public-fullnode",
             },
             {
-              label: "Run an Indexer",
-              to: "nodes/indexer-fullnode",
-            },
-            {
               label: "Monitor a Node",
               to: "nodes/measure/measure-index",
             },
             {
               label: "Configure a Node",
               to: "nodes/identity-and-configuration",
+            },
+          ],
+        },
+        {
+          type: "dropdown",
+          label: "Indexer",
+          to: "indexer/indexer-landing",
+          position: "left",
+          items: [
+            {
+              label: "Learn about Indexing",
+              to: "indexer/indexer-landing",
+            },
+            {
+              label: "Indexer API",
+              to: "indexer/api",
+            },
+            {
+              label: "Custom Processors",
+              to: "indexer/custom-processors",
+            },
+            {
+              label: "Transaction Stream Service",
+              to: "indexer/txn-stream",
+            },
+            {
+              label: "Legacy Indexer",
+              to: "indexer/legacy",
             },
           ],
         },
