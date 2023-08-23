@@ -197,16 +197,15 @@ spec aptos_framework::stake {
         // This function should never abort.
         aborts_if false;
 
-        // Something wrong maybe a bug.
-        //
-        // let validator_perf = global<ValidatorPerformance>(@aptos_framework);
-        // let post post_validator_perf = global<ValidatorPerformance>(@aptos_framework);
-        // let validator_len = len(validator_perf.validators);
-        // let cur_proposer_index = option::spec_borrow(proposer_index);
-        // ensures option::spec_is_some(proposer_index) && cur_proposer_index < validator_len ==>
-        //     post_validator_perf.validators[cur_proposer_index].successful_proposals == validator_perf.validators[cur_proposer_index].successful_proposals + 1;
-        // ensures forall i in 0..len(failed_proposer_indices): failed_proposer_indices[i] < validator_len ==>
-        //     post_validator_perf.validators[failed_proposer_indices[i]].failed_proposals == validator_perf.validators[failed_proposer_indices[i]].failed_proposals + 1;
+        let validator_perf = global<ValidatorPerformance>(@aptos_framework);
+        let post post_validator_perf = global<ValidatorPerformance>(@aptos_framework);
+        let validator_len = len(validator_perf.validators);
+        let cur_proposer_index = option::spec_borrow(proposer_index);
+        let post p_cur_proposer_index = option::spec_borrow(proposer_index);
+        ensures option::spec_is_some(proposer_index) && cur_proposer_index < validator_len ==>
+           post_validator_perf.validators[p_cur_proposer_index].successful_proposals == validator_perf.validators[cur_proposer_index].successful_proposals + 1;
+        ensures forall i in 0..len(failed_proposer_indices): failed_proposer_indices[i] < validator_len ==>
+            post_validator_perf.validators[failed_proposer_indices[i]].failed_proposals == validator_perf.validators[failed_proposer_indices[i]].failed_proposals + 1;
     }
 
     spec update_stake_pool {
