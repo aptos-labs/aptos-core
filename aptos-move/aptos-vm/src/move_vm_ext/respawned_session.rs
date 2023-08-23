@@ -7,7 +7,6 @@ use crate::{
     move_vm_ext::{SessionExt, SessionId},
 };
 use anyhow::{bail, Result};
-use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::{StateView, StateViewId, TStateView};
 use aptos_types::{
     state_store::{
@@ -35,7 +34,6 @@ pub struct RespawnedSession<'r, 'l> {
 
 impl<'r, 'l> RespawnedSession<'r, 'l> {
     pub fn spawn(
-        txn_idx: TxnIndex,
         vm: &'l AptosVMImpl,
         session_id: SessionId,
         base_state_view: &'r dyn StateView,
@@ -52,7 +50,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
                     vm.get_features(),
                 )
             },
-            session_builder: |resolver| Some(vm.new_session(txn_idx, resolver, session_id)),
+            session_builder: |resolver| Some(vm.new_session(resolver, session_id)),
         }
         .build())
     }

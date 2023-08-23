@@ -98,10 +98,6 @@ pub mod test_utils {
             Ok(self.0.get(state_key).cloned())
         }
 
-        fn is_genesis(&self) -> bool {
-            self.0.is_empty()
-        }
-
         fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
             let mut usage = StateStorageUsage::new_untracked();
             for (k, v) in self.0.iter() {
