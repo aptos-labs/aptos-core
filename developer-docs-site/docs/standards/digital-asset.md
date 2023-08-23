@@ -85,7 +85,7 @@ See [Aptos Token](#aptos-token) for examples on how Royalty's `MutatorRef` can b
 Royalty can also be set directly on a token if it has a different royalty config than the collection's.
 
 ## Token lifecycle
-All Digital Asset modules are deployed at `0x4`.
+All Digital Asset modules are deployed at the reserved framework address `0x4`.
 
 ### Collection creation
 Every token belongs to a collection. The developer first needs to create a collection with:
