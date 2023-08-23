@@ -59,12 +59,6 @@ impl DataServiceChecker {
                     current_version == transaction.transactions.first().unwrap().version,
                     "Version mismatch"
                 );
-                tracing::info!(
-                    current_version = current_version,
-                    batch_start_version = transaction.transactions.first().unwrap().version,
-                    batch_size = num_res,
-                    "New batch received from data service."
-                );
                 current_version += num_res as u64;
             }
         }

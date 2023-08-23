@@ -160,6 +160,7 @@ impl RawData for RawDataServerWrapper {
             async move {
                 let mut connection_start_time = Some(std::time::Instant::now());
                 let mut transactions_count = transactions_count;
+                let mut last_logging_time = std::time::Instant::now();
                 let conn = match redis_client.get_tokio_connection_manager().await {
                     Ok(conn) => conn,
                     Err(e) => {
@@ -325,13 +326,17 @@ impl RawData for RawDataServerWrapper {
                     // 3. Update the current version and record current tps.
                     tps_calculator.tick_now(current_batch_size as u64);
                     current_version = end_of_batch_version + 1;
-                    info!(
-                        current_version = current_version,
-                        end_version = end_of_batch_version,
-                        batch_size = current_batch_size,
-                        tps = (tps_calculator.avg() * 1000.0) as u64,
-                        "[Indexer Data] Sending batch."
-                    );
+                    if last_logging_time.elapsed().as_secs() > 60 {
+                        last_logging_time = std::time::Instant::now();
+                        info!(
+                            current_version = current_version,
+                            end_version = end_of_batch_version,
+                            batch_size = current_batch_size,
+                            tps = (tps_calculator.avg() * 1000.0) as u64,
+                            "[Indexer Data] Sending batch."
+                        );
+                        last_logging_time = std::time::Instant::now();
+                    }
                 }
                 info!("[Indexer Data] Client disconnected.");
                 if let Some(start_time) = connection_start_time {
@@ -488,16 +493,11 @@ async fn channel_send_multiple_with_timeout(
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
 ) -> Result<(), SendTimeoutError<Result<TransactionsResponse, Status>>> {
     for resp_item in resp_items {
-        let current_instant = std::time::Instant::now();
         tx.send_timeout(
             Result::<TransactionsResponse, Status>::Ok(resp_item),
             RESPONSE_CHANNEL_SEND_TIMEOUT,
         )
         .await?;
-        info!(
-            "[data service] response waiting time in seconds: {}",
-            current_instant.elapsed().as_secs_f64()
-        );
     }
     Ok(())
 }
