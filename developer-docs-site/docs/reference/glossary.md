@@ -199,7 +199,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 ### Fungible Token
 
 - For Aptos Token Standard (aptos_token::token), a **fungible token** is a token that is interchangeable with other identical tokens (i.e., tokens that share the same `TokenId`). This means the tokens have the same `creator address`, `collection name`, `token name`, and `property version`.
-- For Aptos Digital Asset Standard (aptos_token_objects::token), a **fungible token** is a fungible asset with metadata object that includes a Digital Asset resource.
+- For the Aptos Digital Asset Standard (aptos_token_objects::token), a **fungible token** is a fungible asset with metadata object that includes a Digital Asset resource.
 
 ### Fungible Unit
 
