@@ -4,14 +4,14 @@
 use aptos_aggregator::{
     aggregator_extension::{AggregatorData, AggregatorID},
     // delta_change_set::DeltaOp,
-    resolver::AggregatorResolver, delta_change_set::AggregatorChange,
+    resolver::AggregatorResolver, aggregator_change_set::AggregatorChange,
 };
 // use aptos_types::vm_status::VMStatus;
 use better_any::{Tid, TidAble};
 // use move_binary_format::errors::Location;
 use std::{
     cell::RefCell,
-    collections::BTreeMap,
+    collections::HashMap,
 };
 
 pub type TxnIndex = u32;
@@ -20,7 +20,7 @@ pub type TxnIndex = u32;
 /// set can be converted into appropriate `WriteSet` and `DeltaChangeSet` by the
 /// user, e.g. VM session.
 pub struct AggregatorChangeSet {
-    pub changes: BTreeMap<AggregatorID, AggregatorChange>,
+    pub changes: HashMap<AggregatorID, AggregatorChange>,
 }
 
 /// Native context that can be attached to VM `NativeContextExtensions`.
@@ -56,8 +56,7 @@ impl<'a> NativeAggregatorContext<'a> {
             aggregator_data, ..
         } = self;
         let (_, destroyed_aggregators, aggregators) = aggregator_data.into_inner().into();
-
-        let mut changes = BTreeMap::new();
+        let mut changes = HashMap::new();
 
         // First, process all writes and deltas.
         for (id, aggregator) in aggregators {

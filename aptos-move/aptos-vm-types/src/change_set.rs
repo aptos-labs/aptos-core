@@ -25,8 +25,9 @@ use std::collections::{
 pub struct VMChangeSet {
     resource_write_set: HashMap<StateKey, WriteOp>,
     module_write_set: HashMap<StateKey, WriteOp>,
-    aggregator_write_set: HashMap<StateKey, WriteOp>,
-    aggregator_delta_set: HashMap<StateKey, DeltaOp>,
+    aggregator_v1_write_set: HashMap<StateKey, WriteOp>,
+    aggregator_v1_delta_set: HashMap<StateKey, DeltaOp>,
+    aggregator_v2_change_set: HashMap<AggregatorID, AggregatorChange>,
     events: Vec<ContractEvent>,
 }
 
@@ -51,8 +52,9 @@ impl VMChangeSet {
         Self {
             resource_write_set: HashMap::new(),
             module_write_set: HashMap::new(),
-            aggregator_write_set: HashMap::new(),
-            aggregator_delta_set: HashMap::new(),
+            aggregator_v1_write_set: HashMap::new(),
+            aggregator_v1_delta_set: HashMap::new(),
+            aggregator_v2_change_set: HashMap::new(),
             events: vec![],
         }
     }
@@ -60,8 +62,9 @@ impl VMChangeSet {
     pub fn new(
         resource_write_set: HashMap<StateKey, WriteOp>,
         module_write_set: HashMap<StateKey, WriteOp>,
-        aggregator_write_set: HashMap<StateKey, WriteOp>,
-        aggregator_delta_set: HashMap<StateKey, DeltaOp>,
+        aggregator_v1_write_set: HashMap<StateKey, WriteOp>,
+        aggregator_v1_delta_set: HashMap<StateKey, DeltaOp>,
+        aggregator_v2_change_set: HashMap<AggregatorID, AggregatorChange>,
         events: Vec<ContractEvent>,
         checker: &dyn CheckChangeSet,
     ) -> anyhow::Result<Self, VMStatus> {
@@ -110,8 +113,9 @@ impl VMChangeSet {
         let change_set = Self {
             resource_write_set,
             module_write_set,
-            aggregator_write_set: HashMap::new(),
-            aggregator_delta_set: HashMap::new(),
+            aggregator_v1_write_set: HashMap::new(),
+            aggregator_v1_delta_set: HashMap::new(),
+            aggregator_v2_change_set: HashMap::new(),
             events,
         };
         checker.check_change_set(&change_set)?;
@@ -165,7 +169,7 @@ impl VMChangeSet {
         self.resource_write_set
             .iter_mut()
             .chain(self.module_write_set.iter_mut())
-            .chain(self.aggregator_write_set.iter_mut())
+            .chain(self.aggregator_v1_write_set.iter_mut())
     }
 
     pub fn resource_write_set(&self) -> &HashMap<StateKey, WriteOp> {
@@ -186,11 +190,11 @@ impl VMChangeSet {
     }
 
     pub fn aggregator_v1_write_set(&self) -> &HashMap<StateKey, WriteOp> {
-        &self.aggregator_write_set
+        &self.aggregator_v1_write_set
     }
 
     pub fn aggregator_v1_delta_set(&self) -> &HashMap<StateKey, DeltaOp> {
-        &self.aggregator_delta_set
+        &self.aggregator_v1_delta_set
     }
 
     pub fn events(&self) -> &[ContractEvent] {
@@ -220,13 +224,14 @@ impl VMChangeSet {
                 .into_iter()
                 .map(into_write)
                 .collect::<anyhow::Result<HashMap<StateKey, WriteOp>, VMStatus>>()?;
-        aggregator_write_set.extend(materialized_aggregator_delta_set.into_iter());
+        aggregator_v1_write_set.extend(materialized_aggregator_delta_set.into_iter());
 
         Ok(Self {
             resource_write_set,
             module_write_set,
-            aggregator_write_set,
-            aggregator_delta_set: HashMap::new(),
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set: HashMap::new(),
+            aggregator_v2_change_set,
             events,
         })
     }

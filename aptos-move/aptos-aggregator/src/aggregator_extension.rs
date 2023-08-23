@@ -51,11 +51,11 @@ pub enum AggregatorState {
     },
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AggregatorHandle(pub AccountAddress);
 
 /// Uniquely identifies each aggregator instance in storage.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AggregatorID {
     // Aggregator V1 is implemented as a Table item, and so can be queried by the
     // state key.
