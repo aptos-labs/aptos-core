@@ -345,7 +345,7 @@ type of armor and is a token in a collection with metadata (e.g. durability, def
 However, there are multiple instances of the same armor type. For example, a player can have 3 wooden armors, where wooden armor
 is a token in the Armor collection.
 
-This can be easily built by combining Digital Asset (DA) and Fungible Asset (FA) to create Digital and Fungible Asset (DFA). After the creator creates the Armor collection and the
+This can be easily built by creating an asset that is both a Digital Asset (DA) and a Fungible Asset (FA), resulting in a Digital and Fungible Asset (DFA). After the creator creates the Armor collection and the
 Wooden Armor token, they can make the Wooden Armor token "fungible":
 
 ```rust
