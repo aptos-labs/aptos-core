@@ -5,11 +5,19 @@ slug: "cryptography"
 
 # Cryptography in Move
 
-The Aptos adapter for Move has introduced many useful cryptographic primitives.
+The Aptos adapter for Move has introduced many useful cryptographic primitives:
+
+1. Cryptographic hash functions (e.g., SHA2-256, SHA3-256, Keccak256, Blake2b-256)
+2. Digital signature verification (e.g., Ed25519, ECDSA, BLS)
+3. Elliptic curve arithmetic (e.g., Ristretto255, BLS12-381)
+4. Groth16 zero-knowledge proof (ZKP) verification
+5. Bulletproofs zero-knowledge range proof (ZKRP) verification
+
 The **key guiding principles** behind these cryptographic extensions are:
 
-1. **Minimize gas costs** for Move developers by implementing key primitives as [Move native functions](./move/book/functions#native-functions) (e.g., see the [`aptos_std::bls12381`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move) module for BLS signatures over BLS12-381 elliptic curves) 
-2. When native functions are not available, **empower developers** to implement their own cryptographic primitives on top of abstract cryptographic building blocks such as _finite fields_ and _Abelian groups_ (e.g., via the [`aptos_std::crypto_algebra`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/crypto_algebra.move) module).
+1. **Minimize gas costs** for Move developers by implementing key primitives as [Move native functions](./move/book/functions#native-functions) (e.g., see the [BLS signatures over BLS12-381 elliptic curves](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move) module)
+2. Type-safe APIs (e.g., see the [Ed25519 signature module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ed25519.move))
+3. When native functions are not available, **empower developers** to implement their own cryptographic primitives on top of abstract cryptographic building blocks such as _finite fields_ and _Abelian groups_ (e.g., via the [`aptos_std::crypto_algebra`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/crypto_algebra.move) module).
 
 An overview of these features and (some of) the applications they enable follows below. 
 For a detailed view, see the [cryptography Move modules code](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/framework/aptos-stdlib/sources/cryptography).
@@ -18,11 +26,16 @@ For a detailed view, see the [cryptography Move modules code](https://github.com
 
 Developers can now use more cryptographic hash functions in Move via the [`aptos_std::aptos_hash`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/hash.move) module:
 
- 1. Keccak256
- 2. SHA2-512
- 3. SHA3-512
- 4. RIPEMD160
- 5. Blake2b-256
+| Hash function | Hash size (bits) | Collision-resistance security (bits) |
+|---------------|------------------|--------------------------------------|
+| Keccak256     | 256              | 128                                  |
+| SHA2-512      | 512              | 256                                  |
+| SHA3-512      | 512              | 256                                  |
+| RIPEMD160     | 160              | 80 (**weak**)                        |
+| Blake2b-256   | 256              | 128                                  |
+
+All hash functions have the same security properties (e.g., one-wayness, collision resistance, etc.), but their security levels are different.
+In particular, RIPEMD160 should be used **with caution** as a collision-resistant function due to its 80-bit security level. 
 
 Some of these functions can be used for interoperability with other chains (e.g., verifying Ethereum Merkle proofs via [`aptos_std::aptos_hash::keccak256`](https://github.com/aptos-labs/aptos-core/blob/137acee4c6dddb1c86398dce25b041d78a3028d3/aptos-move/framework/aptos-stdlib/sources/hash.move#L35)).
 Others, have lower gas costs, such as [`aptos_std::aptos_hash::blake2b_256`](https://github.com/aptos-labs/aptos-core/blob/137acee4c6dddb1c86398dce25b041d78a3028d3/aptos-move/framework/aptos-stdlib/sources/hash.move#L69).
@@ -32,12 +45,31 @@ In general, a wider variety of hash functions give developers additional freedom
 
 Developers can now use a *type-safe* API for verifying many types of digital signatures in Move:
 
- 1. **Ed25519** signatures in [`aptos_std::ed25519`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ed25519.move)
- 2. “Naive” $t$-out-of-$n$ **Ed25519** **multi**-signatures in [`aptos_std::multi_ed25519`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/multi_ed25519.move) (via simple concatentation of Ed25519 signatures)
- 3. **ECDSA** signatures over secp256k1 in [`aptos_std::secp256k1`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/secp256k1.move)
- 4. **BLS** signatures, **multi**-signatures, **aggregate** signatures and **threshold** signatures over BLS12-381 in [`aptos_std::bls12831`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move)
+| Signature scheme                                                                                                                                           | Curve         | Sig. size (bytes) | PK size (bytes) | Malleability | Assumptions | Pros          | Cons              |
+|------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------|-----------------|--------------|-------------|---------------|-------------------|
+| [ECDSA](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/secp256k1.move)                          | secp256k1     | 64                | 64              | Yes          | GGM         | Wide adoption | Security proof    |
+| [Ed25519](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ed25519.move)                          | Edwards 25519 | 64                | 32              | No           | DLA, ROM    | Fast          |                   |
+| [MultiEd25519](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/multi_ed25519.move)               | Edwards 25519 | $4 + t \cdot 64$  | $n \cdot 32$    | No           | DLA, ROM    | Easy-to-adopt | Large sig. size   |
+| MinPK [BLS](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move)                       | BLS12-381     | 96                | 48              | No           | CDH, ROM    | Versatile     | Slow verification |
+| MinSig [BLS](https://github.com/aptos-labs/aptos-core/blob/7d4fb98c6604c67e526a96f55668e7add7aaebf6/aptos-move/move-examples/drand/sources/drand.move#L57) | BLS12-381     | 48                | 96              | No           | CDH, ROM    | Versatile     | Slow verification |
 
-The signature modules above can be used to build smart contract-based wallets, secure claiming mechanisms for airdrops, or any digital-signature-based access-control mechanism for dapps.  
+**Note:** The [`aptos_std::bls12381`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move) module for [MinPK BLS](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-05#name-variants) signatures is rather **versatile**: it supports verification of individual signatures, **multi**-signatures, **aggregate** signatures and **threshold** signatures.
+
+The digital signature modules above can be used to build smart contract-based wallets, secure claiming mechanisms for airdrops, or any digital-signature-based access-control mechanism for dapps.
+
+The right choice of a signature scheme in your dapp could depend on many factors:
+1. **Backwards-compatibility** 
+   - e.g., perhaps the dapp's users only sign using Ed25519
+2. **Ease-of-implementation**
+   - e.g., while there exist $t$-out-of-$n$ threshold protocols for Ed25519, they are complex to implement on the signer side. As a result, MultiEd25519 could be adopted due to how easily signing can be implemented.
+3. **Efficiency** 
+   - e.g., some applications are more sensitive to signature size, while others to PK size
+   - e.g., some applications are more sensitive to signing time, while others to signature verification time
+4. **Security analysis**
+   - e.g., ECDSA's security is proven under strong assumptions such as the Generic Group Model (GGM)
+   - e.g., some signature schemes have malleability issues: a valid signature $\sigma$ can be mauled into a _different_ yet-still-valid signature $\sigma'$ on the same message $m$
+5. **Versatility**
+   - e.g., $t$-out-of-$n$ threshold BLS is very simple to implement 
 
 ## Elliptic curve arithmetic in Move
 
@@ -154,14 +186,14 @@ Specifically, users can **veil** their balance, keeping it hidden from everyone,
 Furthermore, a user can send a **veiled transaction** that hides the transaction amount from everybody, including validators.
 An important caveat is that veiled transactions do NOT hide the identities of the sender or the recipient.
 
-**WARNING:** This module is educational. It is **NOT** production-ready. Using it could likely lead to loss of funds.
+**WARNING:** This module is educational. It is **NOT** production-ready. Using it could lead to loss of funds.
 
 ### Groth16 zkSNARK verifier
 
 The [`groth16` example](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/groth16_example/sources) demonstrates how to verify Groth16 zkSNARK proofs[^groth16], which are the shortest and fastest-to-verify zero-knowledge proofs for arbitrary computations.
 Importantly, as explained [above](#generic-elliptic-curve-arithmetic-in-move), this implementation is *generic* over **any** curve, making it very easy for Move developers to use it with their favorite (supported) curves.
 
-**WARNING:** This code has not been audited. If using it in a production system, proceed at your own risk.
+**WARNING:** This code has not been audited by a third-party organization. If using it in a production system, proceed at your own risk.
 
 ### Verifying randomness from the `drand` beacon
 
@@ -169,7 +201,7 @@ The [`drand` example](https://github.com/aptos-labs/aptos-core/tree/main/aptos-m
 This randomness can be used in games or any other chance-based smart contract.
 We give a simple example of a lottery implemented on top of `drand` randomness in [`lottery.move`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/drand/sources/lottery.move).
 
-**WARNING:** This code has not been audited. If using it in a production system, proceed at your own risk.
+**WARNING:** This code has not been audited by a third-party organization. If using it in a production system, proceed at your own risk.
 
 Another application that can be built on top of `drand` is time-lock encryption[^tlock], which allows users to encrypt information such that it can only be decrypted in a future block.
 We do not currently have an implementation but the reader is encouraged to write one!

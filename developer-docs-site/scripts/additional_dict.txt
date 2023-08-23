@@ -44,6 +44,7 @@ Bootle
 Bundlr
 Bünz
 CANCELLED
+CDH
 CDN
 CLI
 CMake
@@ -65,6 +66,7 @@ DAOs
 DApps
 DDoS
 DECL
+DLA
 DM
 DNS
 Dapps
@@ -83,6 +85,7 @@ EACCOUNT
 EALREADY
 EBS
 ECANNOT
+ECDSA
 ECOIN
 ECOLLECTION
 ECOLLECTIONS
@@ -135,6 +138,7 @@ GB
 GBs
 GCP
 GCS
+GGM
 GKE
 GLB
 GLTF
@@ -167,6 +171,7 @@ JSON
 Jens
 Jetbrains
 Jolteon
+Keccak
 Kubernetes
 LLVM
 Labs's
@@ -184,6 +189,8 @@ ManagedCoin
 Melissaris
 Merkle
 MiB
+MinPK
+MinSig
 Modularity
 Monterey
 MoonCoin
@@ -234,6 +241,7 @@ README
 READMEs
 rgba
 RESTful
+RIPEMD
 RPC
 RTT
 RawTransaction
@@ -253,6 +261,7 @@ SYNACK
 Samundra
 Scalable
 SeaLevel
+Sig
 SignMessagePayload
 SignedTransaction
 SignerCap
@@ -310,6 +319,8 @@ Xeon
 YAML
 YAMLs
 Yolan
+ZKP
+ZKRP
 Zxing
 accessors
 accountHasList
@@ -348,6 +359,7 @@ bytecode
 cAdvisor
 callee
 cancelled
+cdot
 cfg
 changeset
 cli
@@ -534,6 +546,7 @@ schema
 schemas
 sdk
 sdks
+secp
 serde
 serializable
 setAccountHasList
@@ -541,6 +554,7 @@ sft
 sha
 sharded
 sharding
+sig
 signAndSubmitTransaction
 signMessage
 snackbar
@@ -604,6 +618,7 @@ verifier
 visibilities
 vm
 walkthrough
+wayness
 waypoint
 webapp
 whitepaper
