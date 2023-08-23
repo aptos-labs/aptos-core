@@ -21,11 +21,12 @@ module aptos_framework::object {
     use std::signer;
     use std::vector;
 
+    use aptos_std::from_bcs;
+
     use aptos_framework::account;
     use aptos_framework::transaction_context;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event;
-    use aptos_framework::from_bcs;
     use aptos_framework::guid;
 
     friend aptos_framework::primary_fungible_store;
@@ -220,6 +221,12 @@ module aptos_framework::object {
     public fun create_object(owner_address: address): ConstructorRef {
         let unique_address = transaction_context::generate_auid_address();
         create_object_internal(owner_address, unique_address, true)
+    }
+
+    /// Same as `create_object` except the object to be created will be undeletable.
+    public fun create_sticky_object(owner_address: address): ConstructorRef {
+        let unique_address = transaction_context::generate_auid_address();
+        create_object_internal(owner_address, unique_address, false)
     }
 
     #[deprecated]
@@ -548,7 +555,14 @@ module aptos_framework::object {
         let current_address = object.owner;
 
         let count = 0;
-        while (owner != current_address) {
+        while ({
+            spec {
+                invariant count < MAXIMUM_OBJECT_NESTING;
+                invariant forall i in 0..count: 
+                    owner != current_address && exists<ObjectCore>(current_address);
+            };
+            owner != current_address
+        }) {
             let count = count + 1;
             assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
             if (!exists<ObjectCore>(current_address)) {

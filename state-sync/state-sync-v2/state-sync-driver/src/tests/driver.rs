@@ -5,9 +5,9 @@
 use crate::{
     driver_factory::DriverFactory,
     metadata_storage::PersistentMetadataStorage,
+    notification_handlers::CommitNotification,
     tests::utils::{
-        create_event, create_ledger_info_at_version, create_transaction,
-        verify_mempool_and_event_notification,
+        create_event, create_ledger_info_at_version, create_transaction, verify_commit_notification,
     },
 };
 use aptos_config::config::{NodeConfig, RoleType, StateSyncDriverConfig};
@@ -16,7 +16,8 @@ use aptos_data_client::client::AptosDataClient;
 use aptos_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
 use aptos_db::AptosDB;
 use aptos_event_notifications::{
-    EventNotificationListener, EventSubscriptionService, ReconfigNotificationListener,
+    DbBackedOnChainConfig, EventNotificationListener, EventSubscriptionService,
+    ReconfigNotificationListener,
 };
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_executor_test_helpers::bootstrap_genesis;
@@ -25,16 +26,17 @@ use aptos_mempool_notifications::MempoolNotificationListener;
 use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_client::StorageServiceClient;
+use aptos_storage_service_notifications::StorageServiceNotificationListener;
 use aptos_time_service::TimeService;
 use aptos_types::{
     event::EventKey,
-    on_chain_config::{new_epoch_event_key, ON_CHAIN_CONFIG_REGISTRY},
+    on_chain_config::new_epoch_event_key,
     transaction::{Transaction, WriteSetPayload},
     waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
 use claims::{assert_err, assert_none};
-use futures::{FutureExt, StreamExt};
+use futures::{channel::mpsc::UnboundedSender, FutureExt, SinkExt, StreamExt};
 use ntest::timeout;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::sleep;
@@ -43,7 +45,7 @@ use tokio::time::sleep;
 #[timeout(120_000)]
 async fn test_auto_bootstrapping() {
     // Create a driver for a validator with a waypoint at version 0
-    let (validator_driver, consensus_notifier, _, _, _, time_service) =
+    let (validator_driver, _, consensus_notifier, _, _, _, _, time_service) =
         create_validator_driver(None).await;
 
     // Verify auto-bootstrapping hasn't happened yet
@@ -60,7 +62,8 @@ async fn test_auto_bootstrapping() {
 #[timeout(120_000)]
 async fn test_consensus_commit_notification() {
     // Create a driver for a full node
-    let (_full_node_driver, consensus_notifier, _, _, _, _) = create_full_node_driver(None).await;
+    let (_full_node_driver, _, consensus_notifier, _, _, _, _, _) =
+        create_full_node_driver(None).await;
 
     // Verify that full nodes can't process commit notifications
     let result = consensus_notifier
@@ -69,7 +72,8 @@ async fn test_consensus_commit_notification() {
     assert_err!(result);
 
     // Create a driver for a validator with a waypoint at version 0
-    let (_validator_driver, consensus_notifier, _, _, _, _) = create_validator_driver(None).await;
+    let (_validator_driver, _, consensus_notifier, _, _, _, _, _) =
+        create_validator_driver(None).await;
 
     // Send a new commit notification and verify the node isn't bootstrapped
     let result = consensus_notifier
@@ -80,15 +84,67 @@ async fn test_consensus_commit_notification() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[timeout(120_000)]
-async fn test_mempool_commit_notifications() {
+async fn test_snapshot_commit_notifications() {
     // Create a driver for a validator with a waypoint at version 0
     let subscription_event_key = EventKey::random();
     let (
         validator_driver,
+        mut commit_notification_sender,
+        _,
+        mut mempool_listener,
+        _,
+        mut event_listener,
+        mut storage_service_listener,
+        time_service,
+    ) = create_validator_driver(Some(vec![subscription_event_key])).await;
+
+    // Wait for validator auto bootstrapping
+    wait_for_auto_bootstrapping(validator_driver, time_service).await;
+
+    // Create commit data for testing
+    let transactions = vec![create_transaction(), create_transaction()];
+    let events = vec![
+        create_event(Some(subscription_event_key)),
+        create_event(Some(subscription_event_key)),
+    ];
+
+    // Send a new commit notification to the driver (from the snapshot receiver)
+    let commit_notification = CommitNotification::new_committed_state_snapshot(
+        events.clone(),
+        transactions.clone(),
+        10_000,
+        0,
+    );
+    commit_notification_sender
+        .send(commit_notification)
+        .await
+        .unwrap();
+
+    // Verify that all components are notified
+    verify_commit_notification(
+        Some(&mut event_listener),
+        &mut mempool_listener,
+        &mut storage_service_listener,
+        transactions,
+        events,
+        0,
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[timeout(120_000)]
+async fn test_consensus_commit_notifications() {
+    // Create a driver for a validator with a waypoint at version 0
+    let subscription_event_key = EventKey::random();
+    let (
+        validator_driver,
+        _,
         consensus_notifier,
         mut mempool_listener,
         _,
         mut event_listener,
+        mut storage_service_listener,
         time_service,
     ) = create_validator_driver(Some(vec![subscription_event_key])).await;
 
@@ -112,12 +168,14 @@ async fn test_mempool_commit_notifications() {
             .unwrap();
     });
 
-    // Verify mempool is notified and that the event listener is notified
-    verify_mempool_and_event_notification(
+    // Verify that all components are notified
+    verify_commit_notification(
         Some(&mut event_listener),
         &mut mempool_listener,
+        &mut storage_service_listener,
         transactions,
         events,
+        0,
     )
     .await;
 
@@ -131,10 +189,12 @@ async fn test_reconfiguration_notifications() {
     // Create a driver for a validator with a waypoint at version 0
     let (
         validator_driver,
+        _,
         consensus_notifier,
         mut mempool_listener,
         mut reconfig_listener,
         _,
+        mut storage_service_listener,
         time_service,
     ) = create_validator_driver(None).await;
 
@@ -164,9 +224,16 @@ async fn test_reconfiguration_notifications() {
                 .unwrap();
         });
 
-        // Verify mempool is notified
-        verify_mempool_and_event_notification(None, &mut mempool_listener, transactions, events)
-            .await;
+        // Verify that mempool and the storage service are notified
+        verify_commit_notification(
+            None,
+            &mut mempool_listener,
+            &mut storage_service_listener,
+            transactions,
+            events,
+            0,
+        )
+        .await;
 
         // Verify the reconfiguration listener is notified if a reconfiguration occurred
         if event_key == reconfiguration_event {
@@ -185,7 +252,8 @@ async fn test_reconfiguration_notifications() {
 #[timeout(120_000)]
 async fn test_consensus_sync_request() {
     // Create a driver for a full node
-    let (_full_node_driver, consensus_notifier, _, _, _, _) = create_full_node_driver(None).await;
+    let (_full_node_driver, _, consensus_notifier, _, _, _, _, _) =
+        create_full_node_driver(None).await;
 
     // Verify that full nodes can't process sync requests
     let result = consensus_notifier
@@ -194,7 +262,8 @@ async fn test_consensus_sync_request() {
     assert_err!(result);
 
     // Create a driver for a validator with a waypoint at version 0
-    let (_validator_driver, consensus_notifier, _, _, _, _) = create_validator_driver(None).await;
+    let (_validator_driver, _, consensus_notifier, _, _, _, _, _) =
+        create_validator_driver(None).await;
 
     // Send a new sync request and verify the node isn't bootstrapped
     let result = consensus_notifier
@@ -208,10 +277,12 @@ async fn create_validator_driver(
     event_key_subscriptions: Option<Vec<EventKey>>,
 ) -> (
     DriverFactory,
+    UnboundedSender<CommitNotification>,
     ConsensusNotifier,
     MempoolNotificationListener,
-    ReconfigNotificationListener,
+    ReconfigNotificationListener<DbBackedOnChainConfig>,
     EventNotificationListener,
+    StorageServiceNotificationListener,
     TimeService,
 ) {
     let mut node_config = NodeConfig::default();
@@ -229,10 +300,12 @@ async fn create_full_node_driver(
     event_key_subscriptions: Option<Vec<EventKey>>,
 ) -> (
     DriverFactory,
+    UnboundedSender<CommitNotification>,
     ConsensusNotifier,
     MempoolNotificationListener,
-    ReconfigNotificationListener,
+    ReconfigNotificationListener<DbBackedOnChainConfig>,
     EventNotificationListener,
+    StorageServiceNotificationListener,
     TimeService,
 ) {
     let mut node_config = NodeConfig::default();
@@ -248,10 +321,12 @@ async fn create_driver_for_tests(
     event_key_subscriptions: Option<Vec<EventKey>>,
 ) -> (
     DriverFactory,
+    UnboundedSender<CommitNotification>,
     ConsensusNotifier,
     MempoolNotificationListener,
-    ReconfigNotificationListener,
+    ReconfigNotificationListener<DbBackedOnChainConfig>,
     EventNotificationListener,
+    StorageServiceNotificationListener,
     TimeService,
 ) {
     // Initialize the logger for tests
@@ -268,10 +343,8 @@ async fn create_driver_for_tests(
     bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn).unwrap();
 
     // Create the event subscription service and subscribe to events and reconfigurations
-    let mut event_subscription_service = EventSubscriptionService::new(
-        ON_CHAIN_CONFIG_REGISTRY,
-        Arc::new(RwLock::new(db_rw.clone())),
-    );
+    let mut event_subscription_service =
+        EventSubscriptionService::new(Arc::new(RwLock::new(db_rw.clone())));
     let mut reconfiguration_subscriber = event_subscription_service
         .subscribe_to_reconfigurations()
         .unwrap();
@@ -286,6 +359,10 @@ async fn create_driver_for_tests(
         aptos_consensus_notifications::new_consensus_notifier_listener_pair(5000);
     let (mempool_notifier, mempool_listener) =
         aptos_mempool_notifications::new_mempool_notifier_listener_pair();
+
+    // Create the storage service notifier and listener
+    let (storage_service_notifier, storage_service_listener) =
+        aptos_storage_service_notifications::new_storage_service_notifier_listener_pair();
 
     // Create the chunk executor
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
@@ -314,20 +391,22 @@ async fn create_driver_for_tests(
     let metadata_storage = PersistentMetadataStorage::new(db_path.path());
 
     // Create and spawn the driver
-    let driver_factory = DriverFactory::create_and_spawn_driver(
-        false,
-        &node_config,
-        waypoint,
-        db_rw,
-        chunk_executor,
-        mempool_notifier,
-        metadata_storage,
-        consensus_listener,
-        event_subscription_service,
-        aptos_data_client,
-        streaming_service_client,
-        time_service.clone(),
-    );
+    let (driver_factory, commit_notification_sender) =
+        DriverFactory::create_and_spawn_driver_internal(
+            false,
+            &node_config,
+            waypoint,
+            db_rw,
+            chunk_executor,
+            mempool_notifier,
+            storage_service_notifier,
+            metadata_storage,
+            consensus_listener,
+            event_subscription_service,
+            aptos_data_client,
+            streaming_service_client,
+            time_service.clone(),
+        );
 
     // The driver will notify reconfiguration subscribers of the initial configs.
     // Verify we've received this notification.
@@ -335,10 +414,12 @@ async fn create_driver_for_tests(
 
     (
         driver_factory,
+        commit_notification_sender,
         consensus_notifier,
         mempool_listener,
         reconfiguration_subscriber,
         event_subscriber,
+        storage_service_listener,
         time_service,
     )
 }

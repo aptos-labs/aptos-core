@@ -41,7 +41,7 @@ See [Aptos Blockchain Deployments](../nodes/deployments.md) for full details on 
 
 There are two options for running a local testnet:
 * Directly [run a local testnet](../nodes/local-testnet/run-a-local-testnet.md) using either the [Aptos-core source code](../nodes/local-testnet/run-a-local-testnet.md#using-the-aptos-core-source-code) or a [Docker image](../nodes/local-testnet/run-a-local-testnet.md#using-docker). These paths are useful for testing changes to the Aptos-core codebase or framework, or for building services on top of the Aptos blockchain, respectively.
-* [Install the Aptos CLI](../tools/install-cli/index.md) and 2) start a [local node with a faucet](../nodes/local-testnet/using-cli-to-run-a-local-testnet.md#starting-a-local-testnet-with-a-faucet). This path is useful for developing on the Aptos blockchain, debugging Move contracts, and testing node operations.
+* [Install the Aptos CLI](../tools/aptos-cli/install-cli/index.md) and 2) start a [local node with a faucet](../nodes/local-testnet/using-cli-to-run-a-local-testnet.md#starting-a-local-testnet-with-a-faucet). This path is useful for developing on the Aptos blockchain, debugging Move contracts, and testing node operations.
 
 Either of these methods will expose a [REST API service](../integration/aptos-apis.md) at `http://127.0.0.1:8080` and a Faucet API service at `http://127.0.0.1:8000` for option 1 run a local testnet or `http://127.0.0.1:8081` for option 2 install the Aptos CLI. The applications will output the location of the services.
 
@@ -84,7 +84,7 @@ Aptos currently provides three SDKs:
 2. [Python](../sdks/python-sdk.md)
 3. [Rust](../sdks/rust-sdk.md)
 
-Almost all developers will benefit from exploring the CLI. [Using the CLI](../tools/aptos-cli-tool/use-aptos-cli.md) demonstrates how the CLI can be used to which includes creating accounts, transferring coins, and publishing modules.
+Almost all developers will benefit from exploring the CLI. [Using the CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md) demonstrates how the CLI can be used to which includes creating accounts, transferring coins, and publishing modules.
 
 ## Accounts on Aptos
 
@@ -98,7 +98,7 @@ At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/88
 * An [event handle](../concepts/events.md) for all new types of coins added to the account.
 * An event handle for all key rotations for the account.
 
-Read more about [Accounts](../concepts/accounts.md) and [set one up](../tools/aptos-cli-tool/use-aptos-cli#initialize-local-configuration-and-create-an-account).
+Read more about [Accounts](../concepts/accounts.md) and [set one up](../tools/aptos-cli/use-cli/use-aptos-cli.md#initialize-local-configuration-and-create-an-account).
 
 ## Transactions
 
@@ -185,7 +185,7 @@ Coins are stored within an account under the resource `CoinStore<T>`. At account
 
 ### Transferring coins between users
 
-Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`aptos_account::transfer`](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/aptos_account.move#L18) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist.
+Coins, including APT, can be transferred between users via the [`aptos_account::transfer_coins`](https://github.com/aptos-labs/aptos-core/blob/d1610e1bb5214689a37a9cab59cf9254e8eb2be1/aptos-move/framework/aptos-framework/sources/aptos_account.move#L92) function for all coins and [`aptos_account::transfer`](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/aptos_account.move#L18) for Aptos coins.
 
 :::caution
 It is important to note that if an account has not registered a `CoinStore<T>` for a given `T`, then any transfer of type `T` to that account will fail.
@@ -269,10 +269,7 @@ A transfer transaction would appear as follows:
   "gas_unit_price": "1",
   "expiration_timestamp_secs": "1660616127",
   "payload": {
-    "function": "0x1::coin::transfer",
-    "type_arguments": [
-      "0x1::aptos_coin::AptosCoin"
-    ],
+    "function": "0x1::aptos_account::transfer",
     "arguments": [
       "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
       "1000"
@@ -413,7 +410,7 @@ Consider the transaction from the earlier section, but now with an arbitrary coi
   "gas_unit_price": "110",
   "expiration_timestamp_secs": "1660616127",
   "payload": {
-    "function": "0x1::coin::transfer",
+    "function": "0x1::aptos_account::transfer_coins",
     "type_arguments": [
       "0x1337::my_coin::MyCoin"
     ],
@@ -502,7 +499,7 @@ To learn more about coin creation, make ["Your First Coin"](../tutorials/first-c
 
 ## Integrating with the faucet
 
-This tutorial is for SDK and wallet developers who want to integrate with the [Aptos Faucet](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet). If you are a dapp developer, you should access the faucet through an existing [SDK](../tutorials/first-transaction.md) or [CLI](../tools/aptos-cli-tool/use-aptos-cli#initialize-local-configuration-and-create-an-account) instead.
+This tutorial is for SDK and wallet developers who want to integrate with the [Aptos Faucet](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet). If you are a dapp developer, you should access the faucet through an existing [SDK](../tutorials/first-transaction.md) or [CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) instead.
 
 ### Differences between devnet and testnet
 What are the differences between devnet and testnet? Effectively none. In the past, the testnet faucet had a Captcha in front of it, making it unqueryable by normal means. This is no longer true.

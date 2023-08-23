@@ -17,9 +17,3 @@ error: invalid call of `M::foo`: generic count mismatch (expected 1 but found 2)
    │
 14 │         let r = foo<&mut u64, bool>(&mut 0);
    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: expression construct not yet implemented: Mutate(Name(Name("r"), None), Value(InferredNum(U256(1))))
-   ┌─ tests/checking/typing/bad_type_argument_arity_fun.move:15:9
-   │
-15 │         *r = 1;
-   │         ^^^^^^

@@ -297,6 +297,16 @@ the generated unique address wrapped in the AUID class.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>ensures</b> [abstract] result == <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">spec_generate_unique_address</a>();
+</code></pre>
+
+
+
+
+<a name="0x1_transaction_context_spec_generate_unique_address"></a>
+
+
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">spec_generate_unique_address</a>(): <b>address</b>;
 </code></pre>
 
 
@@ -327,4 +337,4 @@ the generated unique address wrapped in the AUID class.
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

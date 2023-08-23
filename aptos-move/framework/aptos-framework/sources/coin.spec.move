@@ -80,7 +80,11 @@ spec aptos_framework::coin {
     }
 
     spec is_coin_initialized<CoinType>(): bool {
-        pragma verify = false;
+        aborts_if false;
+    }
+
+    spec is_account_registered<CoinType>(account_addr: address): bool {
+        aborts_if false;
     }
 
     spec fun get_coin_supply_opt<CoinType>(): Option<OptionalAggregator> {
@@ -181,6 +185,7 @@ spec aptos_framework::coin {
     /// `account_addr` is not frozen.
     spec deposit<CoinType>(account_addr: address, coin: Coin<CoinType>) {
         modifies global<CoinInfo<CoinType>>(account_addr);
+        include DepositAbortsIf<CoinType>;
         ensures global<CoinStore<CoinType>>(account_addr).coin.value == old(global<CoinStore<CoinType>>(account_addr)).coin.value + coin.value;
     }
     spec schema DepositAbortsIf<CoinType> {

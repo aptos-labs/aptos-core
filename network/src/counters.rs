@@ -6,7 +6,7 @@ use crate::protocols::wire::handshake::v1::ProtocolId;
 use aptos_config::network_id::NetworkContext;
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
-    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_short_hex_str::AsShortHexStr;
@@ -24,6 +24,10 @@ pub const RECEIVED_LABEL: &str = "received";
 pub const SENT_LABEL: &str = "sent";
 pub const SUCCEEDED_LABEL: &str = "succeeded";
 pub const FAILED_LABEL: &str = "failed";
+
+// Serialization labels
+pub const SERIALIZATION_LABEL: &str = "serialization";
+pub const DESERIALIZATION_LABEL: &str = "deserialization";
 
 pub static APTOS_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -556,4 +560,21 @@ pub fn network_application_outbound_traffic(
             "size",
         ])
         .observe(size as f64);
+}
+
+/// Time it takes to perform message serialization and deserialization
+pub static NETWORK_APPLICATION_SERIALIZATION_METRIC: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_serialization_metric",
+        "Time it takes to perform message serialization and deserialization",
+        &["protocol_id", "operation"]
+    )
+    .unwrap()
+});
+
+/// Starts and returns the timer for serialization/deserialization
+pub fn start_serialization_timer(protocol_id: ProtocolId, operation: &str) -> HistogramTimer {
+    NETWORK_APPLICATION_SERIALIZATION_METRIC
+        .with_label_values(&[protocol_id.as_str(), operation])
+        .start_timer()
 }

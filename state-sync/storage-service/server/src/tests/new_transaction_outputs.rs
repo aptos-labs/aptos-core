@@ -6,14 +6,10 @@ use aptos_config::{
     config::StorageServiceConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_storage_service_types::{
-    requests::{DataRequest, NewTransactionOutputsWithProofRequest, StorageServiceRequest},
-    responses::DataResponse,
+use aptos_storage_service_types::requests::{
+    DataRequest, NewTransactionOutputsWithProofRequest, StorageServiceRequest,
 };
-use aptos_types::{
-    epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
-    transaction::TransactionOutputListWithProof, PeerId,
-};
+use aptos_types::{epoch_change::EpochChangeProof, PeerId};
 use claims::assert_none;
 use futures::channel::oneshot::Receiver;
 
@@ -37,7 +33,7 @@ async fn test_get_new_transaction_outputs() {
 
         // Create the mock db reader
         let mut db_reader =
-            mock::create_mock_db_for_optimistic_fetch(highest_ledger_info.clone(), lowest_version);
+            mock::create_mock_db_with_summary_updates(highest_ledger_info.clone(), lowest_version);
         utils::expect_get_transaction_outputs(
             &mut db_reader,
             peer_version + 1,
@@ -47,7 +43,8 @@ async fn test_get_new_transaction_outputs() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, service, storage_service_notifier, mock_time, _) =
+            MockClient::new(Some(db_reader), None);
         let active_optimistic_fetches = service.get_optimistic_fetches();
         tokio::spawn(service.start());
 
@@ -61,11 +58,16 @@ async fn test_get_new_transaction_outputs() {
         // Verify no optimistic fetch response has been received yet
         assert_none!(response_receiver.try_recv().unwrap());
 
-        // Elapse enough time to force the optimistic fetch thread to work
-        utils::wait_for_optimistic_fetch_service_to_refresh(&mut mock_client, &mock_time).await;
+        // Force the optimistic fetch handler to work
+        utils::force_optimistic_fetch_handler_to_run(
+            &mut mock_client,
+            &mock_time,
+            &storage_service_notifier,
+        )
+        .await;
 
         // Verify a response is received and that it contains the correct data
-        verify_new_transaction_outputs_with_proof(
+        utils::verify_new_transaction_outputs_with_proof(
             &mut mock_client,
             response_receiver,
             output_list_with_proof,
@@ -101,7 +103,7 @@ async fn test_get_new_transaction_outputs_different_networks() {
 
         // Create the mock db reader
         let mut db_reader =
-            mock::create_mock_db_for_optimistic_fetch(highest_ledger_info.clone(), lowest_version);
+            mock::create_mock_db_with_summary_updates(highest_ledger_info.clone(), lowest_version);
         utils::expect_get_transaction_outputs(
             &mut db_reader,
             peer_version_1 + 1,
@@ -118,7 +120,8 @@ async fn test_get_new_transaction_outputs_different_networks() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, service, storage_service_notifier, mock_time, _) =
+            MockClient::new(Some(db_reader), None);
         let active_optimistic_fetches = service.get_optimistic_fetches();
         tokio::spawn(service.start());
 
@@ -150,18 +153,23 @@ async fn test_get_new_transaction_outputs_different_networks() {
         assert_none!(response_receiver_1.try_recv().unwrap());
         assert_none!(response_receiver_2.try_recv().unwrap());
 
-        // Elapse enough time to force the optimistic fetch thread to work
-        utils::wait_for_optimistic_fetch_service_to_refresh(&mut mock_client, &mock_time).await;
+        // Force the optimistic fetch handler to work
+        utils::force_optimistic_fetch_handler_to_run(
+            &mut mock_client,
+            &mock_time,
+            &storage_service_notifier,
+        )
+        .await;
 
         // Verify a response is received and that it contains the correct data
-        verify_new_transaction_outputs_with_proof(
+        utils::verify_new_transaction_outputs_with_proof(
             &mut mock_client,
             response_receiver_1,
             output_list_with_proof_1,
             highest_ledger_info.clone(),
         )
         .await;
-        verify_new_transaction_outputs_with_proof(
+        utils::verify_new_transaction_outputs_with_proof(
             &mut mock_client,
             response_receiver_2,
             output_list_with_proof_2,
@@ -194,7 +202,7 @@ async fn test_get_new_transaction_outputs_epoch_change() {
     );
 
     // Create the mock db reader
-    let mut db_reader = mock::create_mock_db_for_optimistic_fetch(
+    let mut db_reader = mock::create_mock_db_with_summary_updates(
         utils::create_test_ledger_info_with_sigs(highest_epoch, highest_version),
         lowest_version,
     );
@@ -213,7 +221,8 @@ async fn test_get_new_transaction_outputs_epoch_change() {
     );
 
     // Create the storage client and server
-    let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, service, storage_service_notifier, mock_time, _) =
+        MockClient::new(Some(db_reader), None);
     let active_optimistic_fetches = service.get_optimistic_fetches();
     tokio::spawn(service.start());
 
@@ -224,11 +233,16 @@ async fn test_get_new_transaction_outputs_epoch_change() {
     // Wait until the optimistic fetch is active
     utils::wait_for_active_optimistic_fetches(active_optimistic_fetches.clone(), 1).await;
 
-    // Elapse enough time to force the optimistic fetch thread to work
-    utils::wait_for_optimistic_fetch_service_to_refresh(&mut mock_client, &mock_time).await;
+    // Force the optimistic fetch handler to work
+    utils::force_optimistic_fetch_handler_to_run(
+        &mut mock_client,
+        &mock_time,
+        &storage_service_notifier,
+    )
+    .await;
 
     // Verify a response is received and that it contains the correct data
-    verify_new_transaction_outputs_with_proof(
+    utils::verify_new_transaction_outputs_with_proof(
         &mut mock_client,
         response_receiver,
         output_list_with_proof,
@@ -239,34 +253,41 @@ async fn test_get_new_transaction_outputs_epoch_change() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_get_new_transaction_outputs_max_chunk() {
+    // Create a storage service config with a configured max chunk size
+    let max_transaction_output_chunk_size = 400;
+    let storage_service_config = StorageServiceConfig {
+        max_transaction_output_chunk_size,
+        ..StorageServiceConfig::default()
+    };
+
     // Create test data
     let highest_version = 65660;
     let highest_epoch = 30;
     let lowest_version = 101;
-    let max_chunk_size = StorageServiceConfig::default().max_transaction_output_chunk_size;
-    let requested_chunk_size = max_chunk_size + 1;
+    let requested_chunk_size = max_transaction_output_chunk_size + 100;
     let peer_version = highest_version - requested_chunk_size;
     let highest_ledger_info =
         utils::create_test_ledger_info_with_sigs(highest_epoch, highest_version);
     let output_list_with_proof = utils::create_output_list_with_proof(
         peer_version + 1,
-        peer_version + requested_chunk_size,
+        peer_version + max_transaction_output_chunk_size,
         highest_version,
     );
 
     // Create the mock db reader
     let mut db_reader =
-        mock::create_mock_db_for_optimistic_fetch(highest_ledger_info.clone(), lowest_version);
+        mock::create_mock_db_with_summary_updates(highest_ledger_info.clone(), lowest_version);
     utils::expect_get_transaction_outputs(
         &mut db_reader,
         peer_version + 1,
-        max_chunk_size,
+        max_transaction_output_chunk_size,
         highest_version,
         output_list_with_proof.clone(),
     );
 
     // Create the storage client and server
-    let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, service, storage_service_notifier, mock_time, _) =
+        MockClient::new(Some(db_reader), Some(storage_service_config));
     let active_optimistic_fetches = service.get_optimistic_fetches();
     tokio::spawn(service.start());
 
@@ -277,11 +298,16 @@ async fn test_get_new_transaction_outputs_max_chunk() {
     // Wait until the optimistic fetch is active
     utils::wait_for_active_optimistic_fetches(active_optimistic_fetches.clone(), 1).await;
 
-    // Elapse enough time to force the optimistic fetch thread to work
-    utils::wait_for_optimistic_fetch_service_to_refresh(&mut mock_client, &mock_time).await;
+    // Force the optimistic fetch handler to work
+    utils::force_optimistic_fetch_handler_to_run(
+        &mut mock_client,
+        &mock_time,
+        &storage_service_notifier,
+    )
+    .await;
 
     // Verify a response is received and that it contains the correct data
-    verify_new_transaction_outputs_with_proof(
+    utils::verify_new_transaction_outputs_with_proof(
         &mut mock_client,
         response_receiver,
         output_list_with_proof,
@@ -319,30 +345,4 @@ async fn get_new_outputs_with_proof_for_peer(
     mock_client
         .send_request(storage_request, peer_id, network_id)
         .await
-}
-
-/// Verifies that a new transaction outputs with proof response is received
-/// and that the response contains the correct data.
-async fn verify_new_transaction_outputs_with_proof(
-    mock_client: &mut MockClient,
-    receiver: Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>>,
-    output_list_with_proof: TransactionOutputListWithProof,
-    expected_ledger_info: LedgerInfoWithSignatures,
-) {
-    match mock_client
-        .wait_for_response(receiver)
-        .await
-        .unwrap()
-        .get_data_response()
-        .unwrap()
-    {
-        DataResponse::NewTransactionOutputsWithProof((outputs_with_proof, ledger_info)) => {
-            assert_eq!(outputs_with_proof, output_list_with_proof);
-            assert_eq!(ledger_info, expected_ledger_info);
-        },
-        response => panic!(
-            "Expected new transaction outputs with proof but got: {:?}",
-            response
-        ),
-    };
 }

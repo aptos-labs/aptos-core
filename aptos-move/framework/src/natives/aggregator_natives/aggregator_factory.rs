@@ -1,27 +1,21 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    natives::{
-        aggregator_natives::{helpers::get_handle, NativeAggregatorContext},
-        helpers::{make_safe_native, SafeNativeContext, SafeNativeResult},
-    },
-    safely_pop_arg,
-};
+use crate::natives::aggregator_natives::{helpers::get_handle, NativeAggregatorContext};
 use aptos_aggregator::aggregator_extension::{extension_error, AggregatorHandle, AggregatorID};
 use aptos_crypto::hash::DefaultHasher;
-use aptos_types::{
-    account_address::AccountAddress,
-    on_chain_config::{Features, TimedFeatures},
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
-use move_core_types::gas_algebra::InternalGas;
+use aptos_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, StructRef, Value},
 };
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, sync::Arc};
+use std::collections::VecDeque;
 
 /***************************************************************************************************
  * native fun new_aggregator(aggregator_factory: &mut AggregatorFactory, limit: u128): Aggregator;
@@ -29,20 +23,14 @@ use std::{collections::VecDeque, sync::Arc};
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct NewAggregatorGasParameters {
-    pub base: InternalGas,
-}
-
 fn native_new_aggregator(
-    gas_params: &NewAggregatorGasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);
 
-    context.charge(gas_params.base)?;
+    context.charge(AGGREGATOR_FACTORY_NEW_AGGREGATOR_BASE)?;
 
     // Extract fields: `limit` of the new aggregator and a `phantom_handle` of
     // the parent factory.
@@ -81,25 +69,10 @@ fn native_new_aggregator(
  * module
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub new_aggregator: NewAggregatorGasParameters,
-}
-
 pub fn make_all(
-    gas_params: GasParameters,
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [(
-        "new_aggregator",
-        make_safe_native(
-            gas_params.new_aggregator,
-            timed_features,
-            features,
-            native_new_aggregator,
-        ),
-    )];
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
+    let natives = [("new_aggregator", native_new_aggregator as RawSafeNative)];
 
-    crate::natives::helpers::make_module_natives(natives)
+    builder.make_named_natives(natives)
 }

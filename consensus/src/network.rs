@@ -5,7 +5,7 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
-    dag::DAGNetworkMessage,
+    dag::{DAGMessage, DAGNetworkMessage, RpcWithFallback, TDAGNetworkSender},
     logging::LogEvent,
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
@@ -29,10 +29,12 @@ use aptos_network::{
     protocols::{network::Event, rpc::error::RpcError},
     ProtocolId,
 };
+use aptos_reliable_broadcast::{RBMessage, RBNetworkSender};
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
 };
+use async_trait::async_trait;
 use bytes::Bytes;
 use fail::fail_point;
 use futures::{
@@ -43,6 +45,7 @@ use futures::{
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     mem::{discriminant, Discriminant},
+    sync::Arc,
     time::Duration,
 };
 
@@ -56,12 +59,7 @@ pub trait TConsensusMsg: Sized + Clone + Serialize + DeserializeOwned {
         }
     }
 
-    fn into_network_message(self) -> ConsensusMsg {
-        ConsensusMsg::DAGMessage(DAGNetworkMessage {
-            epoch: self.epoch(),
-            data: bcs::to_bytes(&self).unwrap(),
-        })
-    }
+    fn into_network_message(self) -> ConsensusMsg;
 }
 
 /// The block retrieval request is used internally for implementing RPC: the callback is executed
@@ -82,7 +80,8 @@ pub struct IncomingBatchRetrievalRequest {
 
 #[derive(Debug)]
 pub struct IncomingDAGRequest {
-    pub req: ConsensusMsg,
+    pub req: DAGNetworkMessage,
+    pub sender: Author,
     pub protocol: ProtocolId,
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
 }
@@ -91,6 +90,7 @@ pub struct IncomingDAGRequest {
 pub enum IncomingRpcRequest {
     BlockRetrieval(IncomingBlockRetrievalRequest),
     BatchRetrieval(IncomingBatchRetrievalRequest),
+    DAGRequest(IncomingDAGRequest),
 }
 
 /// Just a convenience struct to keep all the network proxy receiving queues in one place.
@@ -407,6 +407,79 @@ impl QuorumStoreSender for NetworkSender {
     }
 }
 
+// TODO: this can be improved
+#[derive(Clone)]
+pub struct DAGNetworkSenderImpl {
+    sender: Arc<NetworkSender>,
+    time_service: aptos_time_service::TimeService,
+}
+
+impl DAGNetworkSenderImpl {
+    pub fn new(sender: Arc<NetworkSender>) -> Self {
+        Self {
+            sender,
+            time_service: aptos_time_service::TimeService::real(),
+        }
+    }
+}
+
+#[async_trait]
+impl TDAGNetworkSender for DAGNetworkSenderImpl {
+    async fn send_rpc(
+        &self,
+        receiver: Author,
+        message: DAGMessage,
+        timeout: Duration,
+    ) -> anyhow::Result<DAGMessage> {
+        self.sender
+            .consensus_network_client
+            .send_rpc(receiver, message.into_network_message(), timeout)
+            .await
+            .map_err(|e| anyhow!("invalid rpc response: {}", e))
+            .and_then(TConsensusMsg::from_network_message)
+    }
+
+    /// Given a list of potential responders, sending rpc to get response from any of them and could
+    /// fallback to more in case of failures.
+    async fn send_rpc_with_fallbacks(
+        &self,
+        responders: Vec<Author>,
+        message: DAGMessage,
+        retry_interval: Duration,
+        rpc_timeout: Duration,
+    ) -> RpcWithFallback {
+        let sender = Arc::new(self.clone());
+        RpcWithFallback::new(
+            responders,
+            message,
+            retry_interval,
+            rpc_timeout,
+            sender,
+            self.time_service.clone(),
+        )
+    }
+}
+
+#[async_trait]
+impl<M> RBNetworkSender<M> for DAGNetworkSenderImpl
+where
+    M: RBMessage + TConsensusMsg + 'static,
+{
+    async fn send_rb_rpc(
+        &self,
+        receiver: Author,
+        message: M,
+        timeout: Duration,
+    ) -> anyhow::Result<M> {
+        self.sender
+            .consensus_network_client
+            .send_rpc(receiver, message.into_network_message(), timeout)
+            .await
+            .map_err(|e| anyhow!("invalid rpc response: {}", e))
+            .and_then(|msg| TConsensusMsg::from_network_message(msg))
+    }
+}
+
 pub struct NetworkTask {
     consensus_messages_tx: aptos_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
@@ -576,6 +649,18 @@ impl NetworkTask {
                         let req_with_callback =
                             IncomingRpcRequest::BatchRetrieval(IncomingBatchRetrievalRequest {
                                 req: *request,
+                                protocol,
+                                response_sender: callback,
+                            });
+                        if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
+                            warn!(error = ?e, "aptos channel closed");
+                        }
+                    },
+                    ConsensusMsg::DAGMessage(request) => {
+                        let req_with_callback =
+                            IncomingRpcRequest::DAGRequest(IncomingDAGRequest {
+                                req: request,
+                                sender: peer_id,
                                 protocol,
                                 response_sender: callback,
                             });

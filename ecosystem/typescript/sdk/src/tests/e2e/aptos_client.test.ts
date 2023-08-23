@@ -16,6 +16,7 @@ import { bcsSerializeUint64, bcsToBytes } from "../../bcs";
 import { AccountAddress, Ed25519PublicKey, stringStructTag, TypeTagStruct } from "../../aptos_types";
 import { Provider } from "../../providers";
 import { BCS } from "../..";
+import { WriteSetChange_WriteResource } from "../../generated/index";
 
 const account = "0x1::account::Account";
 
@@ -47,6 +48,37 @@ test("gets genesis resources", async () => {
   const accountResource = resources.find((r) => r.type === account);
   expect(accountResource).toBeDefined();
 });
+
+test(
+  "gets object",
+  async () => {
+    const alice = new AptosAccount();
+    const faucetClient = getFaucetClient();
+    await faucetClient.fundAccount(alice.address(), 100000000);
+
+    const provider = new Provider({
+      fullnodeUrl: NODE_URL,
+      indexerUrl: NODE_URL,
+    });
+    const aptosToken = new AptosToken(provider);
+
+    const txn = await provider.waitForTransactionWithResult(
+      await aptosToken.createCollection(alice, "Alice's simple collection", "AliceCollection", "https://aptos.dev"),
+      { checkSuccess: true },
+    );
+
+    const objectCore = (txn as Gen.UserTransaction).changes.find(
+      (change) => (change as Gen.WriteResource).data.type === "0x1::object::ObjectCore",
+    );
+    const objectAddress = (objectCore as WriteSetChange_WriteResource).address;
+
+    const object = await provider.getAccountResource(objectAddress, "0x4::aptos_token::AptosCollection");
+
+    expect(object.type).toBeDefined();
+    expect(object.data).toBeDefined();
+  },
+  longTestTimeout,
+);
 
 test("gets the Account resource", async () => {
   const client = new AptosClient(NODE_URL);
@@ -330,6 +362,59 @@ test(
 );
 
 test(
+  "it returns succeed transaction data",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = getFaucetClient();
+    const sender = new AptosAccount();
+    const receiver = new AptosAccount();
+    await faucetClient.fundAccount(sender.address(), 100_000_000);
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
+        "0x1::aptos_account",
+        "transfer",
+        [],
+        [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(receiver.address())), bcsSerializeUint64(1000)],
+      ),
+    );
+    const txn = await client.generateSignSubmitWaitForTransaction(sender, entryFunctionPayload, { checkSuccess: true });
+    expect((txn as any).success).toBeTruthy();
+    expect(txn as any).toHaveProperty("changes");
+    expect((txn as any).vm_status).toEqual("Executed successfully");
+  },
+  longTestTimeout,
+);
+
+test(
+  "it returns failed transaction reason",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = getFaucetClient();
+    const sender = new AptosAccount();
+    const receiver = new AptosAccount();
+    await faucetClient.fundAccount(sender.address(), 100_000_000);
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
+        "0x1::aptos_account",
+        "transfer",
+        [],
+        [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(receiver.address()))],
+      ),
+    );
+
+    const rawTxn = await client.generateRawTransaction(sender.address(), entryFunctionPayload);
+    const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTxn);
+    const txn = await client.submitSignedBCSTransaction(bcsTxn);
+    expect(async () => {
+      await client.waitForTransactionWithResult(txn.hash, { checkSuccess: true });
+    }).rejects.toThrow(
+      `Transaction ${txn.hash} failed with an error: Transaction Executed and Committed with Error NUMBER_OF_ARGUMENTS_MISMATCH`,
+    );
+  },
+  longTestTimeout,
+);
+
+test(
   "submits bcs transaction simulation",
   async () => {
     const client = new AptosClient(NODE_URL);
@@ -463,6 +548,165 @@ test(
 );
 
 test(
+  "submits fee payer transaction with no secondary signers",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = getFaucetClient();
+
+    const alice = new AptosAccount();
+    const bob = new AptosAccount();
+    const feePayer = new AptosAccount();
+
+    // Fund Alice's and feePayer's Accounts
+    await faucetClient.fundAccount(alice.address(), 100000000);
+    await faucetClient.fundAccount(feePayer.address(), 100000000);
+
+    const getBalance = async (account: AptosAccount) => {
+      const resources = await client.getAccountResources(account.address().hex());
+      let accountResource = resources.find((r) => r.type === aptosCoin);
+      return BigInt((accountResource!.data as any).coin.value);
+    };
+
+    const aliceBefore = await getBalance(alice);
+    const feePayerBefore = await getBalance(feePayer);
+
+    // Alice transfers 100000 coins to Bob's Account with feePayer paying the fee
+
+    const payload: Gen.EntryFunctionPayload = {
+      function: "0x1::aptos_account::transfer",
+      type_arguments: [],
+      arguments: [bob.address().hex(), 100000],
+    };
+
+    // Create a fee payer transaction with the sender, transaction payload, and fee payer account
+    const feePayerTxn = await client.generateFeePayerTransaction(alice.address().hex(), payload, feePayer.address());
+
+    // sender and fee payer need to sign the transaction
+    const senderAuthenticator = await client.signMultiTransaction(alice, feePayerTxn);
+    const feePayerAuthenticator = await client.signMultiTransaction(feePayer, feePayerTxn);
+
+    // submit gas fee payer transaction
+    const txn = await client.submitFeePayerTransaction(feePayerTxn, senderAuthenticator, feePayerAuthenticator);
+    await client.waitForTransaction(txn.hash, { checkSuccess: true });
+
+    // Check that Alice and Bob did not pay the fee
+    // Alice final balance is -100000 coins transfered to Bob
+    expect(await getBalance(alice)).toBe(aliceBefore - BigInt(100000));
+    // Bob final balance is 100000 coins transfered from Alice
+    expect(await getBalance(bob)).toBe(BigInt(100000));
+    // Check that feePayer paid the fee
+    expect(await getBalance(feePayer)).toBeLessThan(feePayerBefore);
+  },
+  longTestTimeout,
+);
+
+test(
+  "submits fee payer transaction with secondary signers",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = getFaucetClient();
+    const tokenClient = new TokenClient(client);
+
+    const alice = new AptosAccount();
+    const bob = new AptosAccount();
+    const feePayer = new AptosAccount();
+
+    // Fund both Alice's and Bob's Account
+    await faucetClient.fundAccount(alice.address(), 100000000);
+    await faucetClient.fundAccount(bob.address(), 100000000);
+    await faucetClient.fundAccount(feePayer.address(), 100000000);
+
+    const collectionName = "AliceCollection";
+    const tokenName = "Alice Token";
+
+    async function ensureTxnSuccess(txnHashPromise: Promise<string>) {
+      const txnHash = await txnHashPromise;
+      const txn = await client.waitForTransactionWithResult(txnHash);
+      expect((txn as any)?.success).toBe(true);
+    }
+
+    // Create collection and token on Alice's account
+    await ensureTxnSuccess(
+      tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
+    );
+
+    await ensureTxnSuccess(
+      tokenClient.createToken(
+        alice,
+        collectionName,
+        tokenName,
+        "Alice's simple token",
+        1,
+        "https://aptos.dev/img/nyan.jpeg",
+        1000,
+        alice.address(),
+        0,
+        0,
+        ["key"],
+        ["2"],
+        ["u64"],
+      ),
+    );
+
+    const propertyVersion = 0;
+    const tokenId = {
+      token_data_id: {
+        creator: alice.address().hex(),
+        collection: collectionName,
+        name: tokenName,
+      },
+      property_version: `${propertyVersion}`,
+    };
+
+    // Transfer Token from Alice's Account to Bob's Account with bob paying the fee
+    await tokenClient.getCollectionData(alice.address().hex(), collectionName);
+    let aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
+    expect(aliceBalance.amount).toBe("1");
+
+    const getBalance = async (account: AptosAccount) => {
+      const resources = await client.getAccountResources(account.address().hex());
+      let accountResource = resources.find((r) => r.type === aptosCoin);
+      return BigInt((accountResource!.data as any).coin.value);
+    };
+
+    const aliceBefore = await getBalance(alice);
+    const bobBefore = await getBalance(bob);
+    const feePayerBefore = await getBalance(feePayer);
+
+    const payload: Gen.EntryFunctionPayload = {
+      function: "0x3::token::direct_transfer_script",
+      type_arguments: [],
+      arguments: [alice.address(), collectionName, tokenName, propertyVersion, 1],
+    };
+
+    // Create a fee payer transaction with the sender, transaction payload, fee payer account and secondary signers
+    const feePayerTxn = await client.generateFeePayerTransaction(alice.address().hex(), payload, feePayer.address(), [
+      bob.address(),
+    ]);
+
+    // sender and fee payer need to sign the transaction
+    const senderAuthenticator = await client.signMultiTransaction(alice, feePayerTxn);
+    const seconderySignerAuthenticator = await client.signMultiTransaction(bob, feePayerTxn);
+    const feePayerAuthenticator = await client.signMultiTransaction(feePayer, feePayerTxn);
+
+    // submit gas fee payer transaction
+    const txn = await client.submitFeePayerTransaction(feePayerTxn, senderAuthenticator, feePayerAuthenticator, [
+      seconderySignerAuthenticator,
+    ]);
+    await client.waitForTransaction(txn.hash, { checkSuccess: true });
+
+    // Check that Alice and Bob did not pay the fee
+    // Alice final balance is -100000 coins transfered to Bob
+    expect(await getBalance(alice)).toBe(aliceBefore);
+    // Bob final balance is 100000 coins transfered from Alice
+    expect(await getBalance(bob)).toBe(bobBefore);
+    // Check that feePayer paid the fee
+    expect(await getBalance(feePayer)).toBeLessThan(feePayerBefore);
+  },
+  longTestTimeout,
+);
+
+test(
   "publishes a package",
   async () => {
     const client = new AptosClient(NODE_URL);
@@ -496,43 +740,6 @@ test(
   },
   longTestTimeout,
 );
-
-/*
-TODO(gnazario): Skip test for now, as it's blocking CI
-test(
-  "create resource account and publish a package",
-  async () => {
-    const client = new AptosClient(NODE_URL);
-    const faucetClient = getFaucetClient();
-
-    const account1 = new AptosAccount(
-      new HexString("0x883fdd67576e5fdceb370ba665b8af8856d0cae63fd808b8d16077c6b008ea8c").toUint8Array(),
-    );
-    await faucetClient.fundAccount(account1.address(), 100_000_000);
-    const seed = "3030";
-
-    const txnHash = await client.createResourceAccountAndPublishPackage(
-      account1,
-      new TextEncoder().encode(seed),
-      new HexString(
-        // eslint-disable-next-line max-len
-        "084578616d706c657301000000000000000040314137344146383742383132393043323533323938383036373846304137444637393737373637383734334431434345443230413446354345334238464446388f011f8b08000000000002ff3dccc10ac2300c06e07b9ea2f46ee70b78f0a02f31c6886d74a55d5b1a51417c7713c1915c927cf9c7863ee18d2628b89239187b7ae1da32b18507758eb5e872efa42cc088217462269e60a19ceb7cc9d527bf60fcb9594da0462550f151d9b1dd2b9fbba43f6b4f82de465e302b776e90befe8f03aadd6db3351ff802f2294cdfa100000001076d6573736167658f051f8b08000000000002ff95555d6bdb30147dcfafb8ed20d8c52c1d8c3194a6ec83b0be747be8dec6108a7d9d983a5226c94dc3f07f9f2cd98e6cc769e787884857e79e73bfb4154991236c30cf055de5227e8c372ce3846c5129b646f83b01f3150a41e984109452c879774f656b8e834d2d33be3e6eb29d168aa6926d712fe423212c8e45c175dfc27979c2ea64329b910b722b518942c6682d0d6e116bb877f4ee449ea0840d53f088879a6cf5d5f409381e843cd835ea1b5023979bc57a5404ec4ac8b25aee184f72bca95d7db586f6e0d6c19486df8d21d8f23b41d0bb65592652ec226323247a6c5329b6f445ca5a9cb7291d81d96c063f37681c640ab86894c2cef03434ac4d2cb8d2b0fcfe83de2f1f1e3e7f5b12283ebc87055ccf1dc8ae58e5590c69c1618dbaf11bb0249104aa5fb311f669008bff149939eaa5e728942985525f04f89c29ad6e3a66b7163d8cc0d618215c689a9a1249028f6718ce5bb0abe94a18d33d5de762c5f293686f6be67e806a6d2616f260152a5fa12b4b23cd5675345649a1857a51708e1a6a485a11322176c0a6015c14a94883696de289cb52082e46c2e4e185a1e7ccd6b57842aa450b198d52eb75423476d06f91264284e3de6dd2cd68a71ca575f1cbb0fd5b02e60a7bc4aab819c24d5ae8c6b15f4027e5745be8b3d1990f40fd56337057d3a197a666ba97ebc980db4c3bd5c1d47887f1ebddb845a726c230193ebd6146fc09108bdde174eeca9eec718a260003ada5df2a6f7e6954ba89a931ff74fdfc2efc3dd646dc60d398717aa6a3c25736cdff34cbd8e342482c9169a44d51a44252a7a85b1d27f846d0767ca1d38fc1eaf2ae7a2423f8d2be9297d5341acc362ff6fdd119c262f10a543f9ddeec6b776be2e5a49cfc0325c63f11c007000000000300000000000000000000000000000000000000000000000000000000000000010e4170746f734672616d65776f726b00000000000000000000000000000000000000000000000000000000000000010b4170746f735374646c696200000000000000000000000000000000000000000000000000000000000000010a4d6f76655374646c696200",
-      ).toUint8Array(),
-      [
-        new TxnBuilderTypes.Module(
-          new HexString(
-            // eslint-disable-next-line max-len
-            "a11ceb0b050000000c01000c020c12031e20043e04054228076ad50108bf024006ff020a108903450ace03150ce3035f0dc20404000001010102010301040105000606000007080005080700030e040106010009000100000a020300020f0404000410060000011106080106031209030106040705070105010802020c08020001030305080207080101060c010800010b0301090002070b030109000900076d657373616765076163636f756e74056572726f72056576656e74067369676e657206737472696e67124d6573736167654368616e67654576656e740d4d657373616765486f6c64657206537472696e670b6765745f6d6573736167650b7365745f6d6573736167650c66726f6d5f6d6573736167650a746f5f6d657373616765156d6573736167655f6368616e67655f6576656e74730b4576656e7448616e646c65096e6f745f666f756e640a616464726573735f6f66106e65775f6576656e745f68616e646c650a656d69745f6576656e746766284c3984add58e00d20ba272a40d33d5b4ea33c08a904254e28fdff97b9f000000000000000000000000000000000000000000000000000000000000000103080000000000000000126170746f733a3a6d657461646174615f7630310100000000000000000b454e4f5f4d4553534147451b5468657265206973206e6f206d6573736167652070726573656e740002020b08020c08020102020008020d0b030108000001000101030b0a002901030607001102270b002b0110001402010104010105210e0011030c020a022901200308050f0e000b010e00380012012d0105200b022a010c040a041000140c030a040f010b030a01120038010b010b040f0015020100010100",
-          ).toUint8Array(),
-        ),
-      ],
-    );
-
-    await client.waitForTransaction(txnHash, { checkSuccess: true });
-  },
-  longTestTimeout,
-);
- */
 
 test(
   "rotates auth key ed25519",

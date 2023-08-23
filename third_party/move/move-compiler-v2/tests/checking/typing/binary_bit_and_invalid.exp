@@ -149,12 +149,12 @@ error: no matching declaration of `&`
 18 │         (0, 1) & (0, 1, 2);
    │         ^^^^^^^^^^^^^^^^^^
    │
-   = outruled candidate `&(u8, u8): u8` (expected `u8` but found `(?41, ?42)` for argument 1)
-   = outruled candidate `&(u16, u16): u16` (expected `u16` but found `(?41, ?42)` for argument 1)
-   = outruled candidate `&(u32, u32): u32` (expected `u32` but found `(?41, ?42)` for argument 1)
-   = outruled candidate `&(u64, u64): u64` (expected `u64` but found `(?41, ?42)` for argument 1)
-   = outruled candidate `&(u128, u128): u128` (expected `u128` but found `(?41, ?42)` for argument 1)
-   = outruled candidate `&(u256, u256): u256` (expected `u256` but found `(?41, ?42)` for argument 1)
+   = outruled candidate `&(u8, u8): u8` (expected `u8` but found `(integer, integer)` for argument 1)
+   = outruled candidate `&(u16, u16): u16` (expected `u16` but found `(integer, integer)` for argument 1)
+   = outruled candidate `&(u32, u32): u32` (expected `u32` but found `(integer, integer)` for argument 1)
+   = outruled candidate `&(u64, u64): u64` (expected `u64` but found `(integer, integer)` for argument 1)
+   = outruled candidate `&(u128, u128): u128` (expected `u128` but found `(integer, integer)` for argument 1)
+   = outruled candidate `&(u256, u256): u256` (expected `u256` but found `(integer, integer)` for argument 1)
 
 error: no matching declaration of `&`
    ┌─ tests/checking/typing/binary_bit_and_invalid.move:19:9
@@ -162,9 +162,9 @@ error: no matching declaration of `&`
 19 │         (1, 2) & (0, 1);
    │         ^^^^^^^^^^^^^^^
    │
-   = outruled candidate `&(u8, u8): u8` (expected `u8` but found `(?54, ?55)` for argument 1)
-   = outruled candidate `&(u16, u16): u16` (expected `u16` but found `(?54, ?55)` for argument 1)
-   = outruled candidate `&(u32, u32): u32` (expected `u32` but found `(?54, ?55)` for argument 1)
-   = outruled candidate `&(u64, u64): u64` (expected `u64` but found `(?54, ?55)` for argument 1)
-   = outruled candidate `&(u128, u128): u128` (expected `u128` but found `(?54, ?55)` for argument 1)
-   = outruled candidate `&(u256, u256): u256` (expected `u256` but found `(?54, ?55)` for argument 1)
+   = outruled candidate `&(u8, u8): u8` (expected `u8` but found `(integer, integer)` for argument 1)
+   = outruled candidate `&(u16, u16): u16` (expected `u16` but found `(integer, integer)` for argument 1)
+   = outruled candidate `&(u32, u32): u32` (expected `u32` but found `(integer, integer)` for argument 1)
+   = outruled candidate `&(u64, u64): u64` (expected `u64` but found `(integer, integer)` for argument 1)
+   = outruled candidate `&(u128, u128): u128` (expected `u128` but found `(integer, integer)` for argument 1)
+   = outruled candidate `&(u256, u256): u256` (expected `u256` but found `(integer, integer)` for argument 1)

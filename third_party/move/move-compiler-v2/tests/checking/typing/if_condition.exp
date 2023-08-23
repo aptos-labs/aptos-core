@@ -1,0 +1,33 @@
+// ---- Model Dump
+module 0x8675309::M {
+    private fun t0() {
+        if true {
+          Tuple()
+        } else {
+          Tuple()
+        };
+        if false {
+          Tuple()
+        } else {
+          Tuple()
+        }
+    }
+    private fun t1() {
+        if {
+          let x: bool = true;
+          x
+        } {
+          Tuple()
+        } else {
+          Tuple()
+        };
+        if {
+          let x: bool = false;
+          x
+        } {
+          Tuple()
+        } else {
+          Tuple()
+        }
+    }
+} // end 0x8675309::M

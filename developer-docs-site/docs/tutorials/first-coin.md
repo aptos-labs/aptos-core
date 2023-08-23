@@ -22,7 +22,7 @@ Install your preferred SDK from the below list:
 
 ## Step 2: Install the CLI
 
-[Install the precompiled binary for the Aptos CLI](../tools/install-cli/index.md).
+[Install the precompiled binary for the Aptos CLI](../tools/aptos-cli/install-cli/index.md).
 
 ---
 
@@ -69,7 +69,7 @@ Install the necessary dependencies:
 
 ```bash
 curl -sSL https://install.python-poetry.org | python3
-poetry update
+poetry install
 ```
 
 Run the Python [`your-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/your-coin.py) example:
@@ -282,7 +282,7 @@ public fun mint<CoinType>(
 }
 ```
 
-`ManagedCoin` makes this easier by providing a entry function `managed_coin::mint`.
+`ManagedCoin` makes this easier by providing an entry function `managed_coin::mint`.
 
 ---
 
@@ -299,7 +299,7 @@ There are two separate withdraw and deposit events instead of a single transfer 
 :::
 
 ## Supporting documentation
-* [Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md)
+* [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md)
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)

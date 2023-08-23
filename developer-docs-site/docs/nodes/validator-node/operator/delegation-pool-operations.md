@@ -16,8 +16,8 @@ The operator address will receive the pool commission that was set at the initia
 
 ## Prerequisites
 
-1. [Install](../../../tools/install-cli/index.md) and [configure](../../../tools/aptos-cli-tool/use-aptos-cli.md#configuration-examples) the Aptos CLI. If you are looking to develop on the Aptos blockchain, debug apps, or perform node operations, the Aptos tool offers a command line interface for these purposes.
-2. [Initialize local configuration and create an account](../../../tools/aptos-cli-tool/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) on the Aptos blockchain.
+1. [Install](../../../tools/aptos-cli/install-cli/index.md) and [configure](../../../tools/aptos-cli/use-cli/use-aptos-cli.md#configuration-examples) the Aptos CLI. If you are looking to develop on the Aptos blockchain, debug apps, or perform node operations, the Aptos tool offers a command line interface for these purposes.
+2. [Initialize local configuration and create an account](../../../tools/aptos-cli/use-cli/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) on the Aptos blockchain.
 
 ## Connect to Aptos network
 
@@ -27,7 +27,8 @@ You can use the following CLI commands to obtain the delegation pool address dep
 - Before you create the delegation pool:  
     ```bash
     aptos account derive-resource-account-address --address <owner_address> --seed "aptos_framework::delegation_pool<SEED>" --seed-encoding utf8
-    ```  
+    ```
+  - The `<SEED>` is a number chosen by you to create the resource account address to host the delegation pool resource.  Once you choose a seed, you should use the same value for all following usages.
 - After you create the delegation pool: 
     ```bash
     aptos account derive-resource-account-address

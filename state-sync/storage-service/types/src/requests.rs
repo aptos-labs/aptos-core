@@ -44,6 +44,9 @@ pub enum DataRequest {
     GetTransactionsWithProof(TransactionsWithProofRequest), // Fetches a list of transactions with a proof
     GetNewTransactionsOrOutputsWithProof(NewTransactionsOrOutputsWithProofRequest), // Optimistically fetches new transactions or outputs
     GetTransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest), // Fetches a list of transactions or outputs with a proof
+    SubscribeTransactionOutputsWithProof(SubscribeTransactionOutputsWithProofRequest), // Subscribes to transaction outputs with a proof
+    SubscribeTransactionsOrOutputsWithProof(SubscribeTransactionsOrOutputsWithProofRequest), // Subscribes to transactions or outputs with a proof
+    SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest), // Subscribes to transactions with a proof
 }
 
 impl DataRequest {
@@ -63,11 +66,14 @@ impl DataRequest {
                 "get_new_transactions_or_outputs_with_proof"
             },
             Self::GetTransactionsOrOutputsWithProof(_) => "get_transactions_or_outputs_with_proof",
+            Self::SubscribeTransactionOutputsWithProof(_) => {
+                "subscribe_transaction_outputs_with_proof"
+            },
+            Self::SubscribeTransactionsOrOutputsWithProof(_) => {
+                "subscribe_transactions_or_outputs_with_proof"
+            },
+            Self::SubscribeTransactionsWithProof(_) => "subscribe_transactions_with_proof",
         }
-    }
-
-    pub fn is_storage_summary_request(&self) -> bool {
-        matches!(self, &Self::GetStorageServerSummary)
     }
 
     pub fn is_optimistic_fetch(&self) -> bool {
@@ -78,6 +84,16 @@ impl DataRequest {
 
     pub fn is_protocol_version_request(&self) -> bool {
         matches!(self, &Self::GetServerProtocolVersion)
+    }
+
+    pub fn is_storage_summary_request(&self) -> bool {
+        matches!(self, &Self::GetStorageServerSummary)
+    }
+
+    pub fn is_subscription_request(&self) -> bool {
+        matches!(self, &Self::SubscribeTransactionOutputsWithProof(_))
+            || matches!(self, &Self::SubscribeTransactionsWithProof(_))
+            || matches!(self, Self::SubscribeTransactionsOrOutputsWithProof(_))
     }
 }
 
@@ -152,4 +168,38 @@ pub struct TransactionsOrOutputsWithProofRequest {
     pub end_version: u64,     // The ending version of the transaction/output list (inclusive)
     pub include_events: bool, // Whether or not to include events (if transactions are returned)
     pub max_num_output_reductions: u64, // The max num of output reductions before transactions are returned
+}
+
+/// A storage service request for subscribing to transaction
+/// outputs with a corresponding proof.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct SubscribeTransactionOutputsWithProofRequest {
+    pub subscription_stream_metadata: SubscriptionStreamMetadata, // The metadata for the subscription stream request
+    pub subscription_stream_index: u64, // The request index of the subscription stream
+}
+
+/// A storage service request for subscribing to transactions
+/// or outputs with a corresponding proof.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct SubscribeTransactionsOrOutputsWithProofRequest {
+    pub subscription_stream_metadata: SubscriptionStreamMetadata, // The metadata for the subscription stream request
+    pub subscription_stream_index: u64, // The request index of the subscription stream
+    pub include_events: bool,           // Whether or not to include events in the response
+    pub max_num_output_reductions: u64, // The max num of output reductions before transactions are returned
+}
+
+/// A storage service request for subscribing to transactions
+/// with a corresponding proof.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct SubscribeTransactionsWithProofRequest {
+    pub subscription_stream_metadata: SubscriptionStreamMetadata, // The metadata for the subscription stream request
+    pub subscription_stream_index: u64, // The request index of the subscription stream
+    pub include_events: bool,           // Whether or not to include events in the response
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct SubscriptionStreamMetadata {
+    pub known_version_at_stream_start: u64, // The highest known transaction version at stream start
+    pub known_epoch_at_stream_start: u64,   // The highest known epoch at stream start
+    pub subscription_stream_id: u64,        // The unique id of the subscription stream
 }

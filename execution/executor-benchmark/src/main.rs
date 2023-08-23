@@ -8,6 +8,7 @@ use aptos_config::config::{
 use aptos_executor::block_executor::TransactionBlockExecutor;
 use aptos_executor_benchmark::{native_executor::NativeExecutor, pipeline::PipelineConfig};
 use aptos_metrics_core::{register_int_gauge, IntGauge};
+use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::args::TransactionTypeArg;
 use aptos_vm::AptosVM;
@@ -96,6 +97,8 @@ pub struct PipelineOpt {
     num_executor_shards: usize,
     #[clap(long)]
     async_partitioning: bool,
+    #[clap(long)]
+    use_global_executor: bool,
 }
 
 impl PipelineOpt {
@@ -108,8 +111,18 @@ impl PipelineOpt {
             allow_aborts: self.allow_aborts,
             num_executor_shards: self.num_executor_shards,
             async_partitioning: self.async_partitioning,
+            use_global_executor: self.use_global_executor,
         }
     }
+}
+
+#[derive(Parser, Debug)]
+struct ProfilerOpt {
+    #[clap(long)]
+    cpu_profiling: bool,
+
+    #[clap(long)]
+    memory_profiling: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -119,6 +132,14 @@ struct Opt {
 
     #[clap(long, default_value_t = 5)]
     transactions_per_sender: usize,
+
+    /// 0 implies random TX generation; if non-zero, then 'transactions_per_sender is ignored
+    /// 'connected_tx_grps' should be less than 'block_size'
+    #[clap(long, default_value_t = 0)]
+    connected_tx_grps: usize,
+
+    #[clap(long)]
+    shuffle_connected_txns: bool,
 
     #[clap(long)]
     concurrency_level: Option<usize>,
@@ -147,6 +168,9 @@ struct Opt {
 
     #[clap(long)]
     use_native_executor: bool,
+
+    #[clap(flatten)]
+    profiler_opt: ProfilerOpt,
 }
 
 impl Opt {
@@ -191,8 +215,16 @@ enum Command {
 
         /// Workload (transaction type). Uses raw coin transfer if not set,
         /// and if set uses transaction-generator-lib to generate it
-        #[clap(long, value_enum, ignore_case = true)]
-        transaction_type: Option<TransactionTypeArg>,
+        #[clap(
+            long,
+            value_enum,
+            num_args = 0..,
+            ignore_case = true
+        )]
+        transaction_type: Vec<TransactionTypeArg>,
+
+        #[clap(long, num_args = 0..)]
+        transaction_weights: Vec<usize>,
 
         #[clap(long, default_value_t = 1)]
         module_working_set_size: usize,
@@ -246,15 +278,32 @@ where
             main_signer_accounts,
             additional_dst_pool_accounts,
             transaction_type,
+            transaction_weights,
             module_working_set_size,
             data_dir,
             checkpoint_dir,
         } => {
+            let transaction_mix = if transaction_type.is_empty() {
+                None
+            } else {
+                let mix_per_phase = TransactionTypeArg::args_to_transaction_mix_per_phase(
+                    &transaction_type,
+                    &transaction_weights,
+                    &[],
+                    module_working_set_size,
+                    false,
+                );
+                assert!(mix_per_phase.len() == 1);
+                Some(mix_per_phase[0].clone())
+            };
+
             aptos_executor_benchmark::run_benchmark::<E>(
                 opt.block_size,
                 blocks,
-                transaction_type.map(|t| t.materialize(module_working_set_size, false)),
+                transaction_mix,
                 opt.transactions_per_sender,
+                opt.connected_tx_grps,
+                opt.shuffle_connected_txns,
                 main_signer_accounts,
                 additional_dst_pool_accounts,
                 data_dir,
@@ -299,20 +348,45 @@ fn main() {
             .unwrap()
             .as_millis() as i64,
     );
-    let _mp = MetricsPusher::start_for_local_run("executor-benchmark");
-
     rayon::ThreadPoolBuilder::new()
         .thread_name(|index| format!("rayon-global-{}", index))
         .build_global()
         .expect("Failed to build rayon global thread pool.");
+
+    aptos_node_resource_metrics::register_node_metrics_collector();
+    let _mp = MetricsPusher::start_for_local_run("executor-benchmark");
+
     AptosVM::set_concurrency_level_once(opt.concurrency_level());
     AptosVM::set_num_shards_once(opt.pipeline_opt.num_executor_shards);
     NativeExecutor::set_concurrency_level_once(opt.concurrency_level());
+
+    let config = ProfilerConfig::new_with_defaults();
+    let handler = ProfilerHandler::new(config);
+
+    let cpu_profiling = opt.profiler_opt.cpu_profiling;
+    let memory_profiling = opt.profiler_opt.memory_profiling;
+
+    let mut cpu_profiler = handler.get_cpu_profiler();
+    let mut memory_profiler = handler.get_mem_profiler();
+
+    if cpu_profiling {
+        let _cpu_start = cpu_profiler.start_profiling();
+    }
+    if memory_profiling {
+        let _mem_start = memory_profiler.start_profiling();
+    }
 
     if opt.use_native_executor {
         run::<NativeExecutor>(opt);
     } else {
         run::<AptosVM>(opt);
+    }
+
+    if cpu_profiling {
+        let _cpu_end = cpu_profiler.end_profiling("");
+    }
+    if memory_profiling {
+        let _mem_end = memory_profiler.end_profiling("./target/release/aptos-executor-benchmark");
     }
 }
 

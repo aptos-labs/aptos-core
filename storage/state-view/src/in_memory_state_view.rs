@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // A State view backed by in-memory hashmap.
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct InMemoryStateView {
     state_data: HashMap<StateKey, StateValue>,
 }
@@ -27,10 +27,6 @@ impl TStateView for InMemoryStateView {
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
         Ok(self.state_data.get(state_key).cloned())
-    }
-
-    fn is_genesis(&self) -> bool {
-        unimplemented!("is_genesis is not implemented for InMemoryStateView")
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {

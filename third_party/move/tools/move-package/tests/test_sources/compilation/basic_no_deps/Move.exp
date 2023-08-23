@@ -18,5 +18,7 @@ CompiledPackageInfo {
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: false,
         bytecode_version: None,
+        known_attributes: {},
+        skip_attribute_checks: false,
     },
 }
