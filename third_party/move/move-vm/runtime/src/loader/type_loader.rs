@@ -4,7 +4,6 @@
 use move_binary_format::{
     binary_views::BinaryIndexedView, errors::PartialVMResult, file_format::SignatureToken,
 };
-use move_core_types::language_storage::ModuleId;
 use move_vm_types::loaded_data::runtime_types::{StructName, Type};
 use std::sync::Arc;
 
@@ -13,6 +12,7 @@ use std::sync::Arc;
 pub fn make_type_internal(
     module: BinaryIndexedView,
     tok: &SignatureToken,
+    struct_name_table: &[Arc<StructName>],
 ) -> PartialVMResult<Type> {
     let res = match tok {
         SignatureToken::Bool => Type::Bool,
@@ -26,50 +26,32 @@ pub fn make_type_internal(
         SignatureToken::Signer => Type::Signer,
         SignatureToken::TypeParameter(idx) => Type::TyParam(*idx),
         SignatureToken::Vector(inner_tok) => {
-            let inner_type = make_type_internal(module, inner_tok)?;
+            let inner_type = make_type_internal(module, inner_tok, struct_name_table)?;
             Type::Vector(Box::new(inner_type))
         },
         SignatureToken::Reference(inner_tok) => {
-            let inner_type = make_type_internal(module, inner_tok)?;
+            let inner_type = make_type_internal(module, inner_tok, struct_name_table)?;
             Type::Reference(Box::new(inner_type))
         },
         SignatureToken::MutableReference(inner_tok) => {
-            let inner_type = make_type_internal(module, inner_tok)?;
+            let inner_type = make_type_internal(module, inner_tok, struct_name_table)?;
             Type::MutableReference(Box::new(inner_type))
         },
         SignatureToken::Struct(sh_idx) => {
             let struct_handle = module.struct_handle_at(*sh_idx);
-            let struct_name = module.identifier_at(struct_handle.name);
-            let module_handle = module.module_handle_at(struct_handle.module);
-            let module_id = ModuleId::new(
-                *module.address_identifier_at(module_handle.address),
-                module.identifier_at(module_handle.name).to_owned(),
-            );
             Type::Struct {
-                name: Arc::new(StructName {
-                    name: struct_name.to_owned(),
-                    module: module_id,
-                }),
+                name: struct_name_table[sh_idx.0 as usize].clone(),
                 ability: struct_handle.abilities,
             }
         },
         SignatureToken::StructInstantiation(sh_idx, tys) => {
             let type_parameters: Vec<_> = tys
                 .iter()
-                .map(|tok| make_type_internal(module, tok))
+                .map(|tok| make_type_internal(module, tok, struct_name_table))
                 .collect::<PartialVMResult<_>>()?;
             let struct_handle = module.struct_handle_at(*sh_idx);
-            let struct_name = module.identifier_at(struct_handle.name);
-            let module_handle = module.module_handle_at(struct_handle.module);
-            let module_id = ModuleId::new(
-                *module.address_identifier_at(module_handle.address),
-                module.identifier_at(module_handle.name).to_owned(),
-            );
             Type::StructInstantiation {
-                name: Arc::new(StructName {
-                    name: struct_name.to_owned(),
-                    module: module_id,
-                }),
+                name: struct_name_table[sh_idx.0 as usize].clone(),
                 base_ability_set: struct_handle.abilities,
                 ty_args: type_parameters,
                 phantom_ty_args_mask: struct_handle
