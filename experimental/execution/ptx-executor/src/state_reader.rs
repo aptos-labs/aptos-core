@@ -5,7 +5,8 @@
 
 //! TODO(aldenhu): doc
 
-use crate::{common::BASE_VERSION, executor::PtxExecutorClient};
+use crate::{common::BASE_VERSION, executor::PtxExecutorClient, metrics::TIMER};
+use aptos_metrics_core::TimerHelper;
 use aptos_state_view::StateView;
 use aptos_types::state_store::state_key::StateKey;
 use once_cell::sync::Lazy;
@@ -31,7 +32,10 @@ impl PtxStateReader {
         state_view: &'view (impl StateView + Sync),
     ) -> PtxStateReaderClient {
         let (work_tx, work_rx) = channel();
-        scope.spawn(|_scope| Self::work(work_rx, executor, state_view));
+        scope.spawn(|_scope| {
+            let _timer = TIMER.timer_with(&["state_reader_block_total"]);
+            Self::work(work_rx, executor, state_view)
+        });
         PtxStateReaderClient { work_tx }
     }
 

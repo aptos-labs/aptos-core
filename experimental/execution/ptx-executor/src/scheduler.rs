@@ -8,8 +8,10 @@
 use crate::{
     common::{TxnIdx, VersionedKey, BASE_VERSION, EXPECTANT_BLOCK_KEYS},
     executor::PtxExecutorClient,
+    metrics::TIMER,
     state_reader::PtxStateReaderClient,
 };
+use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::state_key::StateKey, transaction::analyzed_transaction::AnalyzedTransaction,
 };
@@ -30,15 +32,18 @@ impl PtxScheduler {
     ) -> PtxSchedulerClient {
         let (work_tx, work_rx) = channel();
         let mut worker = Worker::new(executor, state_reader);
-        scope.spawn(move |_scope| loop {
-            match work_rx.recv().expect("Channel closed.") {
-                Command::AddAnalyzedTransaction(txn) => {
-                    worker.add_analyzed_transaction(txn);
-                },
-                Command::FinishBlock => {
-                    worker.finish_block();
-                    break;
-                },
+        scope.spawn(move |_scope| {
+            let _timer = TIMER.timer_with(&["scheduler_block_total"]);
+            loop {
+                match work_rx.recv().expect("Channel closed.") {
+                    Command::AddAnalyzedTransaction(txn) => {
+                        worker.add_analyzed_transaction(txn);
+                    },
+                    Command::FinishBlock => {
+                        worker.finish_block();
+                        break;
+                    },
+                }
             }
         });
 
