@@ -4,8 +4,7 @@
 
 use base::{
     build::Build, coverage::Coverage, disassemble::Disassemble, docgen::Docgen, errmap::Errmap,
-    movey_login::MoveyLogin, movey_upload::MoveyUpload, new::New, prove::Prove,
-    test::Test,
+    movey_login::MoveyLogin, movey_upload::MoveyUpload, new::New, prove::Prove, test::Test,
 };
 use move_package::BuildConfig;
 
