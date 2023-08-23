@@ -90,7 +90,7 @@ pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
-            .thread_name(|index| format!("par_exec_{}", index))
+            .thread_name(|index| format!("par_exec-{}", index))
             .build()
             .unwrap(),
     )

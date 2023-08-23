@@ -505,7 +505,7 @@ heck = "0.3.2"
 hex = "0.4.3"
 hkdf = "0.10.0"
 hostname = "0.3.1"
-httpmock = "0.6"
+httpmock = "0.6.8"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-tls = "0.5.0"
 image = "0.24.5"
@@ -566,7 +566,7 @@ random_word = "0.3.0"
 rayon = "1.5.2"
 redis = { version = "0.22.3", features = ["tokio-comp", "script", "connection-manager"] }
 redis-test = { version = "0.1.1", features = ["aio"] }
-regex = "1.5.5"
+regex = "1.9.3"
 reqwest = { version = "0.11.11", features = [
     "blocking",
     "cookies",
