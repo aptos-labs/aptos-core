@@ -24,7 +24,7 @@ pub trait BlockPartitioner: Send {
     fn partition(
         &self,
         transactions: Vec<AnalyzedTransaction>,
-        num_shards: usize,
+        num_shards: usize,//TODO: rethink about whether this is needed as part of `BlockPartitioner` API.
     ) -> PartitionedTransactions;
 }
 
