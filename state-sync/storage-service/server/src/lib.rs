@@ -458,6 +458,14 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
     ) -> Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>> {
         self.optimistic_fetches.clone()
     }
+
+    #[cfg(test)]
+    /// Returns a copy of the active subscriptions for test purposes
+    pub(crate) fn get_subscriptions(
+        &self,
+    ) -> Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>> {
+        self.subscriptions.clone()
+    }
 }
 
 /// Handles the active optimistic fetches and logs any

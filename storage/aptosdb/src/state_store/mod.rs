@@ -83,7 +83,7 @@ const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 100000;
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
         .num_threads(32)
-        .thread_name(|index| format!("kv_reader_{}", index))
+        .thread_name(|index| format!("kv_reader-{}", index))
         .build()
         .unwrap()
 });

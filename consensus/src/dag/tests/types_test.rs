@@ -4,8 +4,8 @@ use super::helpers::new_node;
 use crate::dag::{
     tests::helpers::new_certified_node,
     types::{
-        CertifiedNode, DagSnapshotBitmask, Node, NodeCertificate, NodeMetadata, RemoteFetchRequest,
-        TDAGMessage,
+        CertifiedNode, DagSnapshotBitmask, Extensions, Node, NodeCertificate, NodeMetadata,
+        RemoteFetchRequest, TDAGMessage,
     },
 };
 use aptos_consensus_types::common::Payload;
@@ -24,6 +24,7 @@ fn test_node_verify() {
         NodeMetadata::new_for_test(0, 0, signers[0].author(), 0, HashValue::random()),
         Payload::empty(false),
         vec![],
+        Extensions::empty(),
     );
     assert_eq!(
         invalid_node
@@ -64,6 +65,7 @@ fn test_certified_node_verify() {
         NodeMetadata::new_for_test(0, 0, signers[0].author(), 0, HashValue::random()),
         Payload::empty(false),
         vec![],
+        Extensions::empty(),
     );
     let invalid_certified_node = CertifiedNode::new(invalid_node, AggregateSignature::empty());
     assert_eq!(

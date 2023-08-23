@@ -52,36 +52,6 @@ impl BatchCoordinator {
         }
     }
 
-    async fn handle_batch(&mut self, batch: Batch) -> Option<PersistedValue> {
-        let author = batch.author();
-        let batch_id = batch.batch_id();
-        trace!(
-            "QS: got batch message from {} batch_id {}",
-            author,
-            batch_id,
-        );
-        counters::RECEIVED_BATCH_COUNT.inc();
-        if batch.num_txns() > self.max_batch_txns {
-            warn!(
-                "Batch from {} exceeds txn limit {}, actual txns: {}",
-                author,
-                self.max_batch_txns,
-                batch.num_txns(),
-            );
-            return None;
-        }
-        if batch.num_bytes() > self.max_batch_bytes {
-            warn!(
-                "Batch from {} exceeds size limit {}, actual size: {}",
-                author,
-                self.max_batch_bytes,
-                batch.num_bytes(),
-            );
-            return None;
-        }
-        Some(batch.into())
-    }
-
     fn persist_and_send_digests(&self, persist_requests: Vec<PersistedValue>) {
         if persist_requests.is_empty() {
             return;
@@ -148,9 +118,7 @@ impl BatchCoordinator {
 
         let mut persist_requests = vec![];
         for batch in batches.into_iter() {
-            if let Some(persist_request) = self.handle_batch(batch).await {
-                persist_requests.push(persist_request);
-            }
+            persist_requests.push(batch.into());
         }
         self.persist_and_send_digests(persist_requests);
     }

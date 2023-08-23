@@ -87,7 +87,7 @@ fn mutated_accounts() {
     .unwrap();
     assert_eq!(sess.num_mutated_accounts(&TEST_ADDR), 2);
 
-    let (changes, _) = sess.finish().unwrap();
+    let changes = sess.finish().unwrap();
     storage.apply(changes).unwrap();
 
     let mut sess = vm.new_session(&storage);

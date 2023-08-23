@@ -176,12 +176,12 @@ impl ProverOptions {
         let opts = move_prover::cli::Options {
             output_path: "".to_string(),
             verbosity_level,
-            prover: move_stackless_bytecode::options::ProverOptions {
+            prover: move_prover_bytecode_pipeline::options::ProverOptions {
                 stable_test_output: self.stable_test_output,
                 auto_trace_level: if self.trace {
-                    move_stackless_bytecode::options::AutoTraceLevel::VerifiedFunction
+                    move_prover_bytecode_pipeline::options::AutoTraceLevel::VerifiedFunction
                 } else {
-                    move_stackless_bytecode::options::AutoTraceLevel::Off
+                    move_prover_bytecode_pipeline::options::AutoTraceLevel::Off
                 },
                 report_severity: Severity::Warning,
                 dump_bytecode: self.dump,
