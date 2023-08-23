@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::{MoveResolverExt, SessionExt, SessionId};
+use crate::move_vm_ext::{AptosMoveResolver, MoveResolverExt, SessionExt, SessionId};
 use anyhow::Result;
 use aptos_types::{
     block_metadata::BlockMetadata,
@@ -38,7 +38,7 @@ pub(crate) trait VMAdapter {
     fn run_prologue(
         &self,
         session: &mut SessionExt,
-        storage: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         transaction: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus>;
@@ -57,14 +57,14 @@ pub(crate) trait VMAdapter {
     fn validate_signature_checked_transaction(
         &self,
         session: &mut SessionExt,
-        storage: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         transaction: &SignatureCheckedTransaction,
         allow_too_new: bool,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         self.check_transaction_format(transaction)?;
 
-        let prologue_status = self.run_prologue(session, storage, transaction, log_context);
+        let prologue_status = self.run_prologue(session, resolver, transaction, log_context);
         match prologue_status {
             Err(err)
                 if !allow_too_new || err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW =>

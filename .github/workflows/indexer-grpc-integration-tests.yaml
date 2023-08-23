@@ -19,7 +19,6 @@ concurrency:
 
 jobs:
   permission-check:
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests'))
     runs-on: ubuntu-latest
     steps:
       - name: Check repository permission for user which triggered workflow

@@ -50,6 +50,7 @@ toml = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }
+aptos-profiler = { workspace = true }
 
 [dev-dependencies]
 aptos-temppath = { workspace = true }

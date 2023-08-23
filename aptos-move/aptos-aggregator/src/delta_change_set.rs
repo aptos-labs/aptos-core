@@ -187,13 +187,12 @@ impl DeltaOp {
     ) -> anyhow::Result<WriteOp, VMStatus> {
         // In case storage fails to fetch the value, return immediately.
         let maybe_value = state_view
-            .get_state_value_bytes(state_key)
+            .get_state_value_u128(state_key)
             .map_err(|e| VMStatus::error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?;
 
         // Otherwise we have to apply delta to the storage value.
         match maybe_value {
-            Some(bytes) => {
-                let base = deserialize(&bytes);
+            Some(base) => {
                 self.apply_to(base)
                     .map_err(|partial_error| {
                         // If delta application fails, transform partial VM
@@ -565,10 +564,6 @@ mod test {
                 StatusCode::STORAGE_ERROR,
                 Some("Error message from BadStorage.".to_string()),
             )))
-        }
-
-        fn is_genesis(&self) -> bool {
-            unreachable!()
         }
 
         fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {

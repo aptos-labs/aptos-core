@@ -8,7 +8,11 @@ use codespan_reporting::{
 };
 use log::LevelFilter;
 use move_core_types::account_address::AccountAddress;
-use std::{collections::BTreeMap, path::Path, time::Instant};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+    time::Instant,
+};
 use tempfile::TempDir;
 
 #[derive(Debug, Clone, clap::Parser, serde::Serialize, serde::Deserialize)]
@@ -114,6 +118,8 @@ impl ProverOptions {
         package_path: &Path,
         named_addresses: BTreeMap<String, AccountAddress>,
         bytecode_version: Option<u32>,
+        skip_attribute_checks: bool,
+        known_attributes: &BTreeSet<String>,
     ) -> anyhow::Result<()> {
         let now = Instant::now();
         let for_test = self.for_test;
@@ -123,6 +129,8 @@ impl ProverOptions {
             named_addresses,
             self.filter.clone(),
             bytecode_version,
+            skip_attribute_checks,
+            known_attributes.clone(),
         )?;
         let mut options = self.convert_options();
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test
@@ -168,12 +176,12 @@ impl ProverOptions {
         let opts = move_prover::cli::Options {
             output_path: "".to_string(),
             verbosity_level,
-            prover: move_stackless_bytecode::options::ProverOptions {
+            prover: move_prover_bytecode_pipeline::options::ProverOptions {
                 stable_test_output: self.stable_test_output,
                 auto_trace_level: if self.trace {
-                    move_stackless_bytecode::options::AutoTraceLevel::VerifiedFunction
+                    move_prover_bytecode_pipeline::options::AutoTraceLevel::VerifiedFunction
                 } else {
-                    move_stackless_bytecode::options::AutoTraceLevel::Off
+                    move_prover_bytecode_pipeline::options::AutoTraceLevel::Off
                 },
                 report_severity: Severity::Warning,
                 dump_bytecode: self.dump,

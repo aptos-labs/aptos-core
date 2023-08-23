@@ -71,6 +71,8 @@ STATE_MERKLE_DB_NAME: str = "state_merkle_db"
 STATE_SYNC_DB_NAME: str = "state_sync_db"
 
 DEFAULT_PERSISTENT_VOLUME_CLAIM_SIZE: str = "10Gi"
+DEFAULT_TRANSACTION_EMITTER_IMAGE: str = "aptoslabs/tools:devnet"
+TX_EMITTER_TYPE: str = "tx_emitter"
 
 
 def generate_labels(

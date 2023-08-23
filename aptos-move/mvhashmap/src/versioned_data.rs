@@ -223,7 +223,9 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
             .insert(txn_idx, CachePadded::new(Entry::new_delta_from(delta)));
     }
 
-    pub(crate) fn mark_estimate(&self, key: &K, txn_idx: TxnIndex) {
+    /// Mark an entry from transaction 'txn_idx' at access path 'key' as an estimated write
+    /// (for future incarnation). Will panic if the entry is not in the data-structure.
+    pub fn mark_estimate(&self, key: &K, txn_idx: TxnIndex) {
         let mut v = self.values.get_mut(key).expect("Path must exist");
         v.versioned_map
             .get_mut(&txn_idx)
@@ -231,7 +233,9 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
             .mark_estimate();
     }
 
-    pub(crate) fn delete(&self, key: &K, txn_idx: TxnIndex) {
+    /// Delete an entry from transaction 'txn_idx' at access path 'key'. Will panic
+    /// if the corresponding entry does not exist.
+    pub fn delete(&self, key: &K, txn_idx: TxnIndex) {
         // TODO: investigate logical deletion.
         let mut v = self.values.get_mut(key).expect("Path must exist");
         assert!(
@@ -251,7 +255,8 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
             .unwrap_or(Err(MVDataError::NotFound))
     }
 
-    pub(crate) fn write(&self, key: K, version: Version, data: V) {
+    /// Versioned write of data at a given key (and version).
+    pub fn write(&self, key: K, version: Version, data: V) {
         let (txn_idx, incarnation) = version;
 
         let mut v = self.values.entry(key).or_default();

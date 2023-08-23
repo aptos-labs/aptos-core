@@ -86,5 +86,5 @@
     "typedoc": "^0.23.20",
     "typescript": "4.8.2"
   },
-  "version": "1.17.0"
+  "version": "1.18.0"
 }
