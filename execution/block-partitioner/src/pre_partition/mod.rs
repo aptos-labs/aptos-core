@@ -28,6 +28,6 @@ pub fn start_txn_idxs(
 
 #[test]
 fn test_start_txn_idxs() {
-    let pre_partitioned = vec![vec![0,1], vec![2,3,4], vec![5,6,7,8]];
+    let pre_partitioned = vec![vec![0, 1], vec![2, 3, 4], vec![5, 6, 7, 8]];
     assert_eq!(vec![0, 2, 5], start_txn_idxs(&pre_partitioned));
 }

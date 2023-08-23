@@ -23,7 +23,11 @@ impl PrePartitioner for UniformPartitioner {
         let mut ret = Vec::with_capacity(num_chunks);
         let mut next_chunk_start = 0;
         for chunk_id in 0..num_chunks {
-            let extra = if chunk_id < num_chunks_with_overflow { 1 } else { 0 };
+            let extra = if chunk_id < num_chunks_with_overflow {
+                1
+            } else {
+                0
+            };
             let next_chunk_end = next_chunk_start + chunk_size + extra;
             let chunk: Vec<usize> = (next_chunk_start..next_chunk_end).collect();
             next_chunk_start = next_chunk_end;
