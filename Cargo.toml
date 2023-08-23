@@ -121,6 +121,7 @@ members = [
     "execution/executor-test-helpers",
     "execution/executor-types",
     "experimental/execution/ptx-executor",
+    "experimental/runtimes",
     "mempool",
     "network",
     "network/builder",
@@ -459,6 +460,7 @@ cloud-storage = { version = "0.11.1", features = ["global-client"] }
 codespan-reporting = "0.11.1"
 console-subscriber = "0.1.8"
 const_format = "0.2.26"
+core_affinity = "0.8.1"
 criterion = "0.3.5"
 criterion-cpu-time = "0.1.0"
 crossbeam = "0.8.1"
@@ -523,6 +525,7 @@ jemallocator = { version = "0.3.2", features = [
 ] }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
+libc = "0.2.147"
 libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
 log = "0.4.17"
