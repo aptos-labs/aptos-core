@@ -10,6 +10,7 @@ use aptos_types::batched_stream::BatchedStream;
 pub type SerializationIdx = u64;
 
 /// A transaction with its dependencies, serialization index, and partition.
+#[derive(Clone, Debug)]
 pub struct PartitionedTransaction<T> {
     pub transaction: T,
     pub serialization_idx: SerializationIdx,

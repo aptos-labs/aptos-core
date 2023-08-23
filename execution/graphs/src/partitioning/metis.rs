@@ -31,6 +31,7 @@ struct MetisGraph {
 /// The partitioning algorithm.
 /// See tye Metis manual or whitepaper for details:
 /// http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/manual.pdf
+#[derive(Copy, Clone, Debug)]
 pub enum PartitioningType {
     /// Recursively bi-partitions the graph until the desired number of partitions is reached.
     RecursiveBisection,
@@ -48,6 +49,7 @@ pub enum PartitioningType {
 /// Useful links:
 ///  - Metis homepage: http://glaros.dtc.umn.edu/gkhome/metis/metis/overview
 ///  - Metis manual: http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/manual.pdf
+#[derive(Copy, Clone, Debug)]
 pub struct MetisGraphPartitioner {
     /// The maximum allowed load imbalance.
     /// The load of each partition must be at most `(1 + balance_constraint) * (n / k)`,

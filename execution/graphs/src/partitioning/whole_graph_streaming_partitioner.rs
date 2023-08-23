@@ -10,6 +10,7 @@ use std::iter::Sum;
 /// graph from the stream, reconstructing it in memory and then partitioning it.
 /// This is inefficient and is useful mostly for comparing the quality of true
 /// streaming algorithms against non-streaming baselines.
+#[derive(Copy, Clone, Debug)]
 pub struct WholeGraphStreamingPartitioner<P> {
     graph_partitioner: P,
 }

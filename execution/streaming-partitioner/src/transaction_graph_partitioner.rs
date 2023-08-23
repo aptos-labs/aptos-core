@@ -4,10 +4,10 @@ use std::collections::HashMap;
 
 use rand::seq::SliceRandom;
 
-use aptos_graphs::{GraphStream, NodeIndex};
 use aptos_graphs::graph::Node;
 use aptos_graphs::graph_stream::{BatchInfo, StreamBatchInfo, StreamNode};
 use aptos_graphs::partitioning::{PartitionId, StreamingGraphPartitioner};
+use aptos_graphs::{GraphStream, NodeIndex};
 use aptos_transaction_orderer::common::PTransaction;
 use aptos_types::batched_stream::{BatchedStream, MapItems};
 
@@ -16,12 +16,12 @@ use crate::{PartitionedTransaction, SerializationIdx, StreamingTransactionPartit
 /// The weight of a node in the transaction graph.
 ///
 /// For simplicity, it is a fixed type and not a generic parameter.
-type NodeWeight = f64;
+type NodeWeight = i32;
 
 /// The weight of an edge in the transaction graph.
 ///
 /// For simplicity, it is a fixed type and not a generic parameter.
-type EdgeWeight = f64;
+type EdgeWeight = i32;
 
 /// Partitions transactions using a streaming graph partitioner on a graph
 /// where the nodes are transactions and the edges are dependencies with
@@ -125,8 +125,8 @@ where
             params,
             next_serialization_idx: 0,
             last_write: HashMap::new(),
-            partitioned_node_weight: 0.,
-            partitioned_edge_weight: 0.,
+            partitioned_node_weight: 0 as NodeWeight,
+            partitioned_edge_weight: 0 as EdgeWeight,
             edges: Vec::new(),
             rng: rand::thread_rng(), // TODO: allow using a custom RNG.
         }
@@ -144,7 +144,7 @@ where
             .filter_map(|key| self.last_write.get(&key).copied())
             .collect();
 
-        let mut new_edges_weight = 0.;
+        let mut new_edges_weight = 0 as EdgeWeight;
 
         // Add edges to the dependency graph based on the dependencies.
         for &dep in deps.iter() {
@@ -257,12 +257,19 @@ pub struct TxnWithDeps<T: PTransaction> {
 
 #[cfg(test)]
 mod tests {
-    use aptos_graphs::partitioning::fennel::{AlphaComputationMode, BalanceConstraintMode, FennelGraphPartitioner};
+    use std::fmt::Debug;
+    use aptos_graphs::partitioning::fennel::{
+        AlphaComputationMode, BalanceConstraintMode, FennelGraphPartitioner,
+    };
+    use aptos_graphs::partitioning::metis::MetisGraphPartitioner;
+    use aptos_graphs::partitioning::{PartitionId, WholeGraphStreamingPartitioner};
     use aptos_transaction_orderer::common::PTransaction;
-    use aptos_types::batched_stream::{BatchedStream, IntoNoErrorBatchedStream, NoErrorBatchedStream};
+    use aptos_types::batched_stream::{
+        BatchedStream, IntoNoErrorBatchedStream, NoErrorBatchedStream,
+    };
 
-    use crate::{SerializationIdx, StreamingTransactionPartitioner};
-    use crate::transaction_graph_partitioner::NodeWeight;
+    use crate::transaction_graph_partitioner::{EdgeWeight, NodeWeight};
+    use crate::{PartitionedTransaction, SerializationIdx, StreamingTransactionPartitioner};
 
     #[test]
     fn test_fennel_11_transactions_over_4_batches() {
@@ -272,38 +279,55 @@ mod tests {
         fennel.balance_constraint_mode = BalanceConstraintMode::Batched;
         fennel.alpha_computation_mode = AlphaComputationMode::Batched;
 
-
         let mut partitioner = super::TransactionGraphPartitioner {
             graph_partitioner: fennel,
             params: super::Params {
                 node_weight_function: |tx: &MockPTransaction| tx.estimated_gas as NodeWeight,
-                edge_weight_function: |idx1: SerializationIdx, idx2: SerializationIdx| {
-                    1. / (idx1 as f64 - idx2 as f64)
-                },
+                edge_weight_function,
                 n_partitions: 2,
                 shuffle_batches: false,
             },
         };
 
-        let mut res = partitioner.partition_transactions(input_stream).unwrap();
+        let res = partitioner.partition_transactions(input_stream).unwrap();
 
-        let batch1 = res.next_batch().unwrap().unwrap();
-        assert_eq!(batch1.len(), 4);
-
-        let batch2 = res.next_batch().unwrap().unwrap();
-        assert_eq!(batch2.len(), 2);
-
-        let batch3 = res.next_batch().unwrap().unwrap();
-        assert_eq!(batch3.len(), 2);
-
-        let batch4 = res.next_batch().unwrap().unwrap();
-        assert_eq!(batch4.len(), 3);
-
-        assert!(res.next_batch().is_none());
+        print_output(2, 11, res)
     }
 
-    fn input_11_transactions_over_4_batches() -> impl NoErrorBatchedStream<StreamItem = MockPTransaction> {
-        let [w, x, y, z] = [1, 2, 3, 4];
+    #[test]
+    fn test_metis_11_transactions_over_4_batches() {
+        let input_stream = input_11_transactions_over_4_batches();
+
+        let metis = MetisGraphPartitioner::default();
+        let streaming_partitioner = WholeGraphStreamingPartitioner::new(metis);
+
+        let mut partitioner = super::TransactionGraphPartitioner {
+            graph_partitioner: streaming_partitioner,
+            params: super::Params {
+                node_weight_function: |tx: &MockPTransaction| tx.estimated_gas as NodeWeight,
+                edge_weight_function,
+                n_partitions: 2,
+                shuffle_batches: false,
+            },
+        };
+
+        let res = partitioner.partition_transactions(input_stream).unwrap();
+
+        print_output(2, 11, res)
+    }
+
+    fn edge_weight_function(idx1: SerializationIdx, idx2: SerializationIdx) -> EdgeWeight {
+        ((1. / (1. + idx1 as f64 - idx2 as f64)) * 1000000.) as EdgeWeight
+    }
+
+    fn input_11_transactions_over_4_batches(
+    ) -> impl NoErrorBatchedStream<StreamItem = MockPTransaction> {
+        let [w, x, y, z] = [
+            String::from("w"),
+            String::from("x"),
+            String::from("y"),
+            String::from("z"),
+        ];
 
         // transactions with their read and write sets.
         // read and write sets are more-or-less arbitrary,
@@ -311,36 +335,88 @@ mod tests {
         // Key `w` is read by almost all transactions and is written by just 1 transaction.
         vec![
             vec![
-                MockPTransaction::new(1, vec![w, x], vec![x]),
-                MockPTransaction::new(2, vec![w, x, y], vec![y]),
-                MockPTransaction::new(1, vec![y, z], vec![z]),
-                MockPTransaction::new(1, vec![w, y], vec![y]),
+                MockPTransaction::new(1, vec![w.clone(), x.clone()], vec![x.clone()]),
+                MockPTransaction::new(2, vec![w.clone(), x.clone(), y.clone()], vec![y.clone()]),
+                MockPTransaction::new(1, vec![y.clone(), z.clone()], vec![z.clone()]),
+                MockPTransaction::new(1, vec![w.clone(), y.clone()], vec![y.clone()]),
             ],
             vec![
-                MockPTransaction::new(3, vec![w], vec![w]),
-                MockPTransaction::new(1, vec![w, x], vec![x]),
+                MockPTransaction::new(3, vec![w.clone()], vec![w.clone()]),
+                MockPTransaction::new(1, vec![w.clone(), x.clone()], vec![x.clone()]),
             ],
             vec![
-                MockPTransaction::new(2, vec![w, x], vec![x]),
-                MockPTransaction::new(1, vec![y, z], vec![z]),
+                MockPTransaction::new(2, vec![w.clone(), x.clone()], vec![x.clone()]),
+                MockPTransaction::new(1, vec![y.clone(), z.clone()], vec![z.clone()]),
             ],
             vec![
-                MockPTransaction::new(1, vec![y, z], vec![y]),
-                MockPTransaction::new(1, vec![w, y], vec![y]),
-                MockPTransaction::new(2, vec![w, x, y], vec![x]),
+                MockPTransaction::new(1, vec![y.clone(), z.clone()], vec![y.clone()]),
+                MockPTransaction::new(1, vec![w.clone(), y.clone()], vec![y.clone()]),
+                MockPTransaction::new(2, vec![w.clone(), x.clone(), y.clone()], vec![x.clone()]),
             ],
         ]
-            .into_no_error_batched_stream()
+        .into_no_error_batched_stream()
     }
 
+    // Use `cargo test -p aptos-streaming-partitioner -- --nocapture` to see the output.
+    fn print_output<S>(n_partitions: usize, n_txns: usize, res: S)
+    where
+        S: BatchedStream<StreamItem = PartitionedTransaction<MockPTransaction>>,
+        S::Error: Debug,
+    {
+        let mut txns_by_partition = vec![vec![]; n_partitions];
+        let mut partition_by_txn = vec![0; n_txns];
+
+        // Read the output.
+        for batch in res.unwrap_batches().into_no_error_batch_iter() {
+            for tx in batch {
+                partition_by_txn[tx.serialization_idx as usize] = tx.partition;
+                txns_by_partition[tx.partition as usize].push(tx);
+            }
+        }
+
+        // Sort the transactions by their serialization index.
+        for partition in txns_by_partition.iter_mut() {
+            partition.sort_by_key(|tx| tx.serialization_idx);
+        }
+
+        let mut cut_edges_weight = 0 as EdgeWeight;
+        let mut total_edges_weight = 0 as EdgeWeight;
+
+        // Compute the cut edges weight and the total edges weight.
+        for (partition_idx, partition) in txns_by_partition.iter().enumerate() {
+            for tx in partition {
+                for &dep in tx.dependencies.iter() {
+                    let edge_weight = edge_weight_function(tx.serialization_idx, dep);
+                    total_edges_weight += edge_weight;
+                    if partition_by_txn[dep as usize] != partition_idx as PartitionId {
+                        cut_edges_weight += edge_weight;
+                    }
+                }
+            }
+        }
+
+        // Print out the partitioning.
+        for (partition_idx, partition) in txns_by_partition.iter().enumerate() {
+            println!("Partition {}:", partition_idx);
+            for tx in partition {
+                println!("  Txn {}: {:?}", tx.serialization_idx, tx);
+            }
+        }
+
+        // Print the cut edges weight.
+        println!("Cut edges weight: {} / {} ({:.2})", cut_edges_weight, total_edges_weight,
+                 cut_edges_weight as f64 / total_edges_weight as f64);
+    }
+
+    #[derive(Clone, Debug)]
     struct MockPTransaction {
         estimated_gas: u32,
-        read_set: Vec<u32>,
-        write_set: Vec<u32>,
+        read_set: Vec<String>,
+        write_set: Vec<String>,
     }
 
     impl MockPTransaction {
-        fn new(estimated_gas: u32, read_set: Vec<u32>, write_set: Vec<u32>) -> Self {
+        fn new(estimated_gas: u32, read_set: Vec<String>, write_set: Vec<String>) -> Self {
             Self {
                 estimated_gas,
                 read_set,
@@ -350,7 +426,7 @@ mod tests {
     }
 
     impl PTransaction for MockPTransaction {
-        type Key = u32;
+        type Key = String;
 
         type ReadSetIter<'a> = std::slice::Iter<'a, Self::Key>
         where Self: 'a;

@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use std::fmt::Debug;
 use crate::no_error;
 use crate::no_error::NoError;
 
@@ -101,6 +102,14 @@ pub trait BatchedStream: Sized {
         F: FnMut(Result<Self::Batch, Self::Error>) -> Result<B, E>
     {
         MapResults::new(self, f)
+    }
+
+    /// Returns a `NoErrorBatchedStream` that unwraps the batches of the original stream.
+    fn unwrap_batches(self) -> UnwrapBatches<Self>
+    where
+        Self::Error: Debug,
+    {
+        UnwrapBatches::new(self)
     }
 
     /// Takes a closure and creates a batched stream that calls that closure on each batch.
@@ -747,6 +756,42 @@ where
         self.stream
             .next_batch()
             .map(|batch_or_err| batch_or_err.map_err(|err| (self.f)(err)))
+    }
+
+    fn opt_items_count(&self) -> Option<usize> {
+        self.stream.opt_items_count()
+    }
+
+    fn opt_batch_count(&self) -> Option<usize> {
+        self.stream.opt_batch_count()
+    }
+}
+
+/// A `NoErrorBatchedStream` that unwraps the batches of the original stream.
+pub struct UnwrapBatches<S> {
+    stream: S,
+}
+
+impl<S> UnwrapBatches<S> {
+    pub fn new(stream: S) -> Self {
+        Self { stream }
+    }
+}
+
+impl<S> BatchedStream for UnwrapBatches<S>
+where
+    S: BatchedStream,
+    S::Batch: IntoIterator,
+    S::Error: Debug,
+{
+    type StreamItem = S::StreamItem;
+    type Batch = S::Batch;
+    type Error = NoError;
+
+    fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
+        self.stream
+            .next_batch()
+            .map(|batch_or_err| Ok(batch_or_err.unwrap()))
     }
 
     fn opt_items_count(&self) -> Option<usize> {

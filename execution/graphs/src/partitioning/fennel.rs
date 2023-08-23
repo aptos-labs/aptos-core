@@ -4,7 +4,6 @@ use crate::graph::NodeIndex;
 use crate::graph_stream::{GraphStream, StreamBatchInfo, StreamNode};
 use crate::partitioning::{PartitionId, StreamingGraphPartitioner};
 use aptos_types::batched_stream::BatchedStream;
-use itertools::Itertools;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum BalanceConstraintMode {
@@ -352,22 +351,24 @@ where
                 // Chooses the best partition by maximizing the score function.
                 // If `apply_balance_constraint` is false, the balancing constraint is ignored.
                 let choose = |apply_balance_constraint| {
-                    let filter_predicate = |&(_, load): &(_, f64)| {
-                        if apply_balance_constraint {
-                            load + node_weight < max_load
-                        } else {
-                            true
-                        }
-                    };
-
                     (edges_to.iter().copied())
                         .zip(self.load.iter().copied())
-                        .filter(filter_predicate)
-                        .map(|(delta_e, old_load)| {
-                            let gamma = self.params.gamma;
-                            delta_e - alpha * ((old_load + 1.).powf(gamma) - old_load.powf(gamma))
+                        .enumerate()
+                        .filter(|&(_partition, (_delta_e, load))| {
+                            if apply_balance_constraint {
+                                load + node_weight < max_load
+                            } else {
+                                true
+                            }
                         })
-                        .position_max_by(|x, y| x.partial_cmp(y).unwrap())
+                        .map(|(partition, (delta_e, load))| {
+                            let gamma = self.params.gamma;
+                            let score = delta_e
+                                - alpha * ((load + node_weight).powf(gamma) - load.powf(gamma));
+                            (partition, score)
+                        })
+                        .max_by(|(_, score1), (_, score2)| score1.partial_cmp(score2).unwrap())
+                        .map(|(partition, _)| partition)
                 };
 
                 // First, try to choose with the balancing constraint.
@@ -413,7 +414,7 @@ where
                 // Return the ownership of `graph_stream` back to `self`.
                 self.graph_stream = Some(graph_stream);
                 Some(Ok(res))
-            }
+            },
             Err(err) => {
                 // `self.graph_stream` stays `None`, indicating that partitioning
                 // cannot be continued.
