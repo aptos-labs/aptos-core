@@ -15,7 +15,6 @@ use aptos_framework::natives::{
 };
 use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
-use aptos_mvhashmap::types::TxnIndex;
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};

@@ -179,7 +179,6 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X:
     base_view: &'a S,
     latest_view: ViewState<'a, T, X>,
     txn_idx: TxnIndex,
-    id_counter: AtomicU32,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
@@ -192,7 +191,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             base_view,
             latest_view,
             txn_idx,
-            id_counter: AtomicU32::new(0),
         }
     }
 
@@ -220,12 +218,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             );
         }
         ret
-    }
-
-    #[allow(dead_code)]
-    fn generate_id(&mut self) -> u64 {
-        self.id_counter.fetch_add(1, Ordering::SeqCst);
-        self.id_counter.load(Ordering::SeqCst).into()
     }
 }
 

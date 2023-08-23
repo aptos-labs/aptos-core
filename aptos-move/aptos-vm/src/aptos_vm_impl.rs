@@ -16,7 +16,6 @@ use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateViewId;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
@@ -615,7 +614,7 @@ impl AptosVMImpl {
         resolver: &'r impl AptosMoveResolver,
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
-        self.move_vm.new_session(txn_idx, resolver, session_id)
+        self.move_vm.new_session(resolver, session_id)
     }
 
     pub fn load_module(
