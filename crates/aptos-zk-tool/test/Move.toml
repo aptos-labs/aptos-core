@@ -1,0 +1,15 @@
+[package]
+name = "multiplier"
+version = "1.0.0"
+authors = []
+
+[addresses]
+
+[dev-addresses]
+
+[dependencies]
+AptosFramework = { local = "/Users/runtianz/aptos-core/aptos-move/framework/aptos-framework" }
+AptosStdlib = { local = "/Users/runtianz/aptos-core/aptos-move/framework/aptos-stdlib" }
+MoveStdlib = { local = "/Users/runtianz/aptos-core/aptos-move/framework/move-stdlib" }
+
+[dev-dependencies]

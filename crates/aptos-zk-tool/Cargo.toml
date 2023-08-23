@@ -1,0 +1,27 @@
+[package]
+name = "aptos-zk-tool"
+description = "Aptos tool for developing zk smart contracts using circom"
+version = "0.0.1"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+ark-bls12-381 = "0.4"
+ark-circom = "0.1"
+ark-groth16 = "0.4"
+ark-serialize = "0.4"
+ark-std = "0.4.0"
+ark-snark = "0.4.0"
+clap = { workspace = true }
+handlebars = "4.3.7"
+hex = { workspace = true }
+rand = { workspace = true }
+serde_json = { workspace = true }
