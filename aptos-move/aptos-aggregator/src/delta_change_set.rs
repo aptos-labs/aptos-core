@@ -5,7 +5,7 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
-use crate::{aggregator_extension::{DeltaValue, AggregatorState, DeltaHistory}, module::AGGREGATOR_MODULE};
+use crate::{aggregator_extension::{DeltaValue, AggregatorState, DeltaHistory, validate_history}, module::AGGREGATOR_MODULE};
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
@@ -29,20 +29,6 @@ pub(crate) const EEXPECTED_OVERFLOW: u64 = 0x02_0003;
 /// or at the end of the transaction), we realize that mistakenly raised
 /// an underflow in one of the previus try_sub operation.
 pub(crate) const EEXPECTED_UNDERFLOW: u64 = 0x02_0004;
-
-
-/// Represents a single aggregator change.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum AggregatorChange {
-    // The state of the aggregator
-    State {
-        max_value: u128,
-        state: AggregatorState,
-    },
-    // A value should be deleted from the storage.
-    Delete,
-}
-
 
 /// Represents an update from aggregator's operation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]

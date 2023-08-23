@@ -213,6 +213,55 @@ pub struct AggregatorSnapshot {
     base_aggregator: AggregatorID,
 }
 
+/// Validates if aggregator's history is correct when applied to
+/// the `base_value`. For example, if history observed a delta of
+/// +100, and the aggregator max_value is 150, then the base value of
+/// 60 will not pass validation (60 + 100 > 150), but the base value
+/// of 30 will (30 + 100 < 150).
+/// To validate the history of an aggregator, we want to ensure that if
+/// the `base_value` is the starting value of the aggregator before the
+/// transaction execution, all the previous calls to try_add/try_sub
+/// functions returned the correct result.
+pub fn validate_history(base_value: u128, max_value: u128, state: &AggregatorState) -> PartialVMResult<()> {
+    if let AggregatorState::Delta {
+        speculative_start_value,
+        speculative_source: _,
+        delta: _,
+        history,
+    } = state
+    {
+        // We need to make sure the following 4 conditions are satisified.
+        //     base_value + max_achieved_positive_delta <= self.max_value
+        //     base_value >= min_achieved_negative_delta
+        //     base_value + min_overflow_positive_delta > self.max_value
+        //     base_value < max_underflow_negative_delta
+        addition(
+            base_value,
+            history.max_achieved_positive_delta,
+            max_value,
+        )?;
+        subtraction(base_value, history.min_achieved_negative_delta)?;
+
+        if history.min_overflow_positive_delta.is_some()
+            && base_value <= max_value - history.min_overflow_positive_delta.unwrap()
+        {
+            return Err(abort_error(
+                format!("Overflow was expected when setting the aggreagator start value to {}. Previous speculative start value = {}, Min overflow delta = {}, Max value = {}", base_value, speculative_start_value, history.min_overflow_positive_delta.unwrap(), max_value),
+                EEXPECTED_OVERFLOW,
+            ));
+        }
+        if history.max_underflow_negative_delta.is_some()
+            && base_value >= history.max_underflow_negative_delta.unwrap()
+        {
+            return Err(abort_error(
+                format!("Underflow was expected when setting the aggreagator start value to {}. Previous speculative start value = {}, Max underflow delta = {}, Max value = {}", base_value, speculative_start_value, history.max_underflow_negative_delta.unwrap(), max_value),
+                EEXPECTED_UNDERFLOW,
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Internal aggregator data structure.
 #[derive(Debug)]
 pub struct Aggregator {
@@ -228,61 +277,21 @@ pub struct Aggregator {
     state: AggregatorState,
 }
 
+
 impl Aggregator {
-    /// Validates if aggregator's history is correct when applied to
-    /// the `base_value`. For example, if history observed a delta of
-    /// +100, and the aggregator max_value is 150, then the base value of
-    /// 60 will not pass validation (60 + 100 > 150), but the base value
-    /// of 30 will (30 + 100 < 150).
-    /// To validate the history of an aggregator, we want to ensure that if
-    /// the `base_value` is the starting value of the aggregator before the
-    /// transaction execution, all the previous calls to try_add/try_sub
-    /// functions returned the correct result.
-    fn validate_history(&self, base_value: u128) -> PartialVMResult<()> {
-        if let AggregatorState::Delta {
-            speculative_start_value,
-            speculative_source: _,
-            delta: _,
-            history,
-        } = &self.state
-        {
-            // We need to make sure the following 4 conditions are satisified.
-            //     base_value + max_achieved_positive_delta <= self.max_value
-            //     base_value >= min_achieved_negative_delta
-            //     base_value + min_overflow_positive_delta > self.max_value
-            //     base_value < max_underflow_negative_delta
-            addition(
-                base_value,
-                history.max_achieved_positive_delta,
-                self.max_value,
-            )?;
-            subtraction(base_value, history.min_achieved_negative_delta)?;
-
-            if history.min_overflow_positive_delta.is_some()
-                && base_value <= self.max_value - history.min_overflow_positive_delta.unwrap()
-            {
-                return Err(abort_error(
-                    format!("Overflow was expected when setting the aggreagator start value to {}. Previous speculative start value = {}, Min overflow delta = {}, Max value = {}", base_value, speculative_start_value, history.min_overflow_positive_delta.unwrap(), self.max_value),
-                    EEXPECTED_OVERFLOW,
-                ));
-            }
-            if history.max_underflow_negative_delta.is_some()
-                && base_value >= history.max_underflow_negative_delta.unwrap()
-            {
-                return Err(abort_error(
-                    format!("Underflow was expected when setting the aggreagator start value to {}. Previous speculative start value = {}, Max underflow delta = {}, Max value = {}", base_value, speculative_start_value, history.max_underflow_negative_delta.unwrap(), self.max_value),
-                    EEXPECTED_UNDERFLOW,
-                ));
-            }
-        }
-        Ok(())
-    }
-
     fn get_mut_history(&mut self) -> Option<&mut DeltaHistory> {
         if let AggregatorState::Delta { history, .. } = &mut self.state {
             return Some(history);
         }
         None
+    }
+
+    pub fn is_data(&self) -> bool {
+        matches!(self.state, AggregatorState::Data { .. })
+    }
+
+    pub fn is_delta(&self) -> bool {
+        matches!(self.state, AggregatorState::Delta { .. })
     }
 
     #[allow(dead_code)]
@@ -617,7 +626,7 @@ impl Aggregator {
                     })?;
 
                 // Validate history and apply the delta.
-                self.validate_history(value_from_storage)?;
+                validate_history(value_from_storage, self.max_value, &self.state)?;
                 self.state = AggregatorState::Delta {
                     speculative_start_value: value_from_storage,
                     speculative_source: SpeculativeValueSource::AggregatedValue,
@@ -1093,10 +1102,10 @@ mod test {
                 max_underflow_negative_delta: None,
             }
         });
-        assert_ok!(aggregator.validate_history(200));
-        assert_err!(aggregator.validate_history(199));
-        assert_ok!(aggregator.validate_history(300));
-        assert_err!(aggregator.validate_history(301));
+        assert_ok!(validate_history(200, aggregator.max_value, &aggregator.state));
+        assert_err!(validate_history(199, aggregator.max_value, &aggregator.state));
+        assert_ok!(validate_history(300, aggregator.max_value, &aggregator.state));
+        assert_err!(validate_history(301, aggregator.max_value, &aggregator.state));
     }
 
     #[test]
@@ -1121,10 +1130,10 @@ mod test {
                 max_underflow_negative_delta: None,
             }
         });
-        assert_err!(aggregator.validate_history(199));
-        assert_ok!(aggregator.validate_history(200));
-        assert_ok!(aggregator.validate_history(300));
-        assert_err!(aggregator.validate_history(301));
+        assert_err!(validate_history(199, aggregator.max_value, &aggregator.state));
+        assert_ok!(validate_history(200, aggregator.max_value, &aggregator.state));
+        assert_ok!(validate_history(300, aggregator.max_value, &aggregator.state));
+        assert_err!(validate_history(301, aggregator.max_value, &aggregator.state));
     }
 
     #[test]
@@ -1150,10 +1159,10 @@ mod test {
                 max_underflow_negative_delta: Some(201),
             }
         });
-        assert_ok!(aggregator.validate_history(100));
-        assert_ok!(aggregator.validate_history(199));
-        assert_ok!(aggregator.validate_history(200));
-        assert_err!(aggregator.validate_history(201));
-        assert_err!(aggregator.validate_history(400));
+        assert_ok!(validate_history(100, aggregator.max_value, &aggregator.state));
+        assert_ok!(validate_history(199, aggregator.max_value, &aggregator.state));
+        assert_ok!(validate_history(200, aggregator.max_value, &aggregator.state));
+        assert_err!(validate_history(201, aggregator.max_value, &aggregator.state));
+        assert_err!(validate_history(400, aggregator.max_value, &aggregator.state));
     }
 }
