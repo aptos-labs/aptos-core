@@ -12,6 +12,8 @@
 -  [Function `empty_with_config`](#0x1_smart_vector_empty_with_config)
 -  [Function `singleton`](#0x1_smart_vector_singleton)
 -  [Function `destroy_empty`](#0x1_smart_vector_destroy_empty)
+-  [Function `destroy`](#0x1_smart_vector_destroy)
+-  [Function `clear`](#0x1_smart_vector_clear)
 -  [Function `borrow`](#0x1_smart_vector_borrow)
 -  [Function `borrow_mut`](#0x1_smart_vector_borrow_mut)
 -  [Function `append`](#0x1_smart_vector_append)
@@ -285,6 +287,59 @@ Aborts if <code>v</code> is not empty.
     <b>let</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a> { inline_vec, big_vec, inline_capacity: _, bucket_size: _ } = v;
     <a href="../../move-stdlib/doc/vector.md#0x1_vector_destroy_empty">vector::destroy_empty</a>(inline_vec);
     <a href="../../move-stdlib/doc/option.md#0x1_option_destroy_none">option::destroy_none</a>(big_vec);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_destroy"></a>
+
+## Function `destroy`
+
+Destroy a table completely when T has <code>drop</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_destroy">destroy</a>&lt;T: drop&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_destroy">destroy</a>&lt;T: drop&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;) {
+    <a href="smart_vector.md#0x1_smart_vector_clear">clear</a>(&<b>mut</b> v);
+    <a href="smart_vector.md#0x1_smart_vector_destroy_empty">destroy_empty</a>(v);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_clear"></a>
+
+## Function `clear`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_clear">clear</a>&lt;T: drop&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_clear">clear</a>&lt;T: drop&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;) {
+    v.inline_vec = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
+    <b>if</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&v.big_vec)) {
+        <a href="big_vector.md#0x1_big_vector_destroy">big_vector::destroy</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> v.big_vec));
+    }
 }
 </code></pre>
 

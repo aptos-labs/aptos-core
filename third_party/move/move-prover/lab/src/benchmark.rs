@@ -23,7 +23,7 @@ use move_prover::{
     check_errors, cli::Options, create_and_process_bytecode, create_init_num_operation_state,
     generate_boogie, verify_boogie,
 };
-use move_stackless_bytecode::options::ProverOptions;
+use move_prover_bytecode_pipeline::options::ProverOptions;
 use std::{
     fmt::Debug,
     fs::File,

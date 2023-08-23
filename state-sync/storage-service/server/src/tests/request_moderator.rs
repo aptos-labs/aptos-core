@@ -24,11 +24,7 @@ use aptos_storage_service_types::{
 use aptos_time_service::MockTimeService;
 use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress, PeerId};
 use claims::assert_matches;
-use std::{collections::HashMap, future::Future, str::FromStr, sync::Arc, time::Duration};
-use tokio::time::timeout;
-
-// Useful test constants
-const MAX_WAIT_TIME_SECS: u64 = 60;
+use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
 
 #[tokio::test]
 async fn test_request_moderator_ignore_pfn() {
@@ -423,14 +419,6 @@ async fn send_invalid_transaction_request(
     mock_client.wait_for_response(receiver).await
 }
 
-/// Spawns the given task with a timeout
-async fn spawn_with_timeout(task: impl Future<Output = ()>, timeout_error_message: &str) {
-    let timeout_duration = Duration::from_secs(MAX_WAIT_TIME_SECS);
-    timeout(timeout_duration, task)
-        .await
-        .expect(timeout_error_message)
-}
-
 /// Waits for the request moderator to garbage collect the peer state
 async fn wait_for_request_moderator_to_garbage_collect(
     unhealthy_peer_states: Arc<RwLock<HashMap<PeerNetworkId, UnhealthyPeerState>>>,
@@ -454,7 +442,7 @@ async fn wait_for_request_moderator_to_garbage_collect(
     };
 
     // Spawn the task with a timeout
-    spawn_with_timeout(
+    utils::spawn_with_timeout(
         garbage_collect,
         "Timed-out while waiting for the request moderator to perform garbage collection",
     )
@@ -496,7 +484,7 @@ async fn wait_for_request_moderator_to_unblock_peer(
     };
 
     // Spawn the task with a timeout
-    spawn_with_timeout(
+    utils::spawn_with_timeout(
         unblock_peer,
         "Timed-out while waiting for the request moderator to unblock the peer",
     )

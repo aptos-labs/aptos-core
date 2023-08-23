@@ -48,6 +48,18 @@ module aptos_std::big_vector {
         table_with_length::destroy_empty(buckets);
     }
 
+    /// Destroy the vector `v` if T has `drop`
+    public fun destroy<T: drop>(v: BigVector<T>) {
+        let BigVector { buckets, end_index, bucket_size: _ } = v;
+        let i = 0;
+        while (end_index > 0) {
+            let num_elements = vector::length(&table_with_length::remove(&mut buckets, i));
+            end_index = end_index - num_elements;
+            i = i + 1;
+        };
+        table_with_length::destroy_empty(buckets);
+    }
+
     /// Acquire an immutable reference to the `i`th element of the vector `v`.
     /// Aborts if `i` is out of bounds.
     public fun borrow<T>(v: &BigVector<T>, i: u64): &T {
@@ -286,14 +298,6 @@ module aptos_std::big_vector {
     /// Return `true` if the vector `v` has no elements and `false` otherwise.
     public fun is_empty<T>(v: &BigVector<T>): bool {
         length(v) == 0
-    }
-
-    #[test_only]
-    fun destroy<T: drop>(v: BigVector<T>) {
-        while (!is_empty(&mut v)) {
-            pop_back(&mut v);
-        };
-        destroy_empty(v)
     }
 
     #[test]

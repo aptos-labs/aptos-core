@@ -34,6 +34,7 @@ module std::features {
     /// available. This is needed because of introduction of a new native function.
     /// Lifetime: transient
     const CODE_DEPENDENCY_CHECK: u64 = 1;
+
     public fun code_dependency_check_enabled(): bool acquires Features {
         is_enabled(CODE_DEPENDENCY_CHECK)
     }
@@ -42,6 +43,7 @@ module std::features {
     /// private functions.
     /// Lifetime: permanent
     const TREAT_FRIEND_AS_PRIVATE: u64 = 2;
+
     public fun treat_friend_as_private(): bool acquires Features {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
     }
@@ -125,7 +127,9 @@ module std::features {
     ///
     /// Lifetime: transient
     const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
+
     public fun get_cryptography_algebra_natives_feature(): u64 { CRYPTOGRAPHY_ALGEBRA_NATIVES }
+
     public fun cryptography_algebra_enabled(): bool acquires Features {
         is_enabled(CRYPTOGRAPHY_ALGEBRA_NATIVES)
     }
@@ -134,7 +138,9 @@ module std::features {
     ///
     /// Lifetime: transient
     const BLS12_381_STRUCTURES: u64 = 13;
+
     public fun get_bls12_381_strutures_feature(): u64 { BLS12_381_STRUCTURES }
+
     public fun bls12_381_structures_enabled(): bool acquires Features {
         is_enabled(BLS12_381_STRUCTURES)
     }
@@ -151,7 +157,9 @@ module std::features {
     /// Whether reward rate decreases periodically.
     /// Lifetime: transient
     const PERIODICAL_REWARD_RATE_DECREASE: u64 = 16;
+
     public fun get_periodical_reward_rate_decrease_feature(): u64 { PERIODICAL_REWARD_RATE_DECREASE }
+
     public fun periodical_reward_rate_decrease_enabled(): bool acquires Features {
         is_enabled(PERIODICAL_REWARD_RATE_DECREASE)
     }
@@ -159,7 +167,9 @@ module std::features {
     /// Whether enable paritial governance voting on aptos_governance.
     /// Lifetime: transient
     const PARTIAL_GOVERNANCE_VOTING: u64 = 17;
+
     public fun get_partial_governance_voting(): u64 { PARTIAL_GOVERNANCE_VOTING }
+
     public fun partial_governance_voting_enabled(): bool acquires Features {
         is_enabled(PARTIAL_GOVERNANCE_VOTING)
     }
@@ -171,7 +181,9 @@ module std::features {
     /// Whether enable paritial governance voting on delegation_pool.
     /// Lifetime: transient
     const DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING: u64 = 21;
+
     public fun get_delegation_pool_partial_governance_voting(): u64 { DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING }
+
     public fun delegation_pool_partial_governance_voting_enabled(): bool acquires Features {
         is_enabled(DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING)
     }
@@ -179,6 +191,7 @@ module std::features {
     /// Whether alternate gas payer is supported
     /// Lifetime: transient
     const FEE_PAYER_ENABLED: u64 = 22;
+
     public fun fee_payer_enabled(): bool acquires Features {
         is_enabled(FEE_PAYER_ENABLED)
     }
@@ -186,7 +199,9 @@ module std::features {
     /// Whether enable MOVE functions to call create_auid method to create AUIDs.
     /// Lifetime: transient
     const APTOS_UNIQUE_IDENTIFIERS: u64 = 23;
+
     public fun get_auids(): u64 { APTOS_UNIQUE_IDENTIFIERS }
+
     public fun auids_enabled(): bool acquires Features {
         is_enabled(APTOS_UNIQUE_IDENTIFIERS)
     }
@@ -196,6 +211,7 @@ module std::features {
     /// Lifetime: transient
     const BULLETPROOFS_NATIVES: u64 = 24;
     public fun get_bulletproofs_feature(): u64 { BULLETPROOFS_NATIVES }
+
     public fun bulletproofs_enabled(): bool acquires Features {
         is_enabled(BULLETPROOFS_NATIVES)
     }
@@ -203,9 +219,22 @@ module std::features {
     /// Fix the native formatter for signer.
     /// Lifetime: transient
     const SIGNER_NATIVE_FORMAT_FIX: u64 = 25;
+
     public fun get_signer_native_format_fix_feature(): u64 { SIGNER_NATIVE_FORMAT_FIX }
+
     public fun signer_native_format_fix_enabled(): bool acquires Features {
         is_enabled(SIGNER_NATIVE_FORMAT_FIX)
+    }
+
+    /// Whether emit function in `event.move` are enabled for module events.
+    ///
+    /// Lifetime: transient
+    const MODULE_EVENT: u64 = 26;
+
+    public fun get_module_event_feature(): u64 { MODULE_EVENT }
+
+    public fun module_event_enabled(): bool acquires Features {
+        is_enabled(MODULE_EVENT)
     }
 
     // ============================================================================================
@@ -224,7 +253,7 @@ module std::features {
     acquires Features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
         if (!exists<Features>(@std)) {
-            move_to<Features>(framework, Features{features: vector[]})
+            move_to<Features>(framework, Features { features: vector[] })
         };
         let features = &mut borrow_global_mut<Features>(@std).features;
         vector::for_each_ref(&enable, |feature| {
@@ -238,7 +267,7 @@ module std::features {
     /// Check whether the feature is enabled.
     fun is_enabled(feature: u64): bool acquires Features {
         exists<Features>(@std) &&
-        contains(&borrow_global<Features>(@std).features, feature)
+            contains(&borrow_global<Features>(@std).features, feature)
     }
 
     /// Helper to include or exclude a feature flag.

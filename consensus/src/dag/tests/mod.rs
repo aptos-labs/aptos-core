@@ -6,6 +6,7 @@ mod dag_network_test;
 mod dag_test;
 mod fetcher_test;
 mod helpers;
+mod integration_tests;
 mod order_rule_tests;
 mod rb_handler_tests;
 mod types_test;

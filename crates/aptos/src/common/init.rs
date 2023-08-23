@@ -9,7 +9,7 @@ use crate::{
             ConfigSearchMode, EncodingOptions, HardwareWalletOptions, PrivateKeyInputOptions,
             ProfileConfig, ProfileOptions, PromptOptions, RngArgs, DEFAULT_PROFILE,
         },
-        utils::{fund_account, prompt_yes_with_override, read_line, wait_for_transactions},
+        utils::{fund_account, prompt_yes_with_override, read_line},
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
@@ -45,6 +45,11 @@ pub struct InitTool {
     /// URL for the Faucet endpoint
     #[clap(long)]
     pub faucet_url: Option<Url>,
+
+    /// Auth token, if we're using the faucet. This is only used this time, we don't
+    /// store it.
+    #[clap(long, env)]
+    pub faucet_auth_token: Option<String>,
 
     /// Whether to skip the faucet for a non-faucet endpoint
     #[clap(long)]
@@ -238,15 +243,14 @@ impl CliCommand<()> for InitTool {
             private_key.clone().unwrap().public_key()
         };
 
-        let client = aptos_rest_client::Client::new(
-            Url::parse(
-                profile_config
-                    .rest_url
-                    .as_ref()
-                    .expect("Must have rest client as created above"),
-            )
-            .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?,
-        );
+        let rest_url = Url::parse(
+            profile_config
+                .rest_url
+                .as_ref()
+                .expect("Must have rest client as created above"),
+        )
+        .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?;
+        let client = aptos_rest_client::Client::new(rest_url);
 
         // lookup the address from onchain instead of deriving it
         // if this is the rotated key, deriving it will outputs an incorrect address
@@ -304,14 +308,15 @@ impl CliCommand<()> for InitTool {
                     "Account {} doesn't exist, creating it and funding it with {} Octas",
                     address, NUM_DEFAULT_OCTAS
                 );
-                let hashes = fund_account(
+                fund_account(
+                    client,
                     Url::parse(faucet_url)
                         .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?,
-                    NUM_DEFAULT_OCTAS,
+                    self.faucet_auth_token.as_deref(),
                     address,
+                    NUM_DEFAULT_OCTAS,
                 )
                 .await?;
-                wait_for_transactions(&client, hashes).await?;
                 eprintln!("Account {} funded successfully", address);
             }
         } else if account_exists {

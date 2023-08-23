@@ -130,11 +130,11 @@ public fun Test::foo<#0>($t0|i: u64) {
 ============ after pipeline `borrow` ================
 
 [variant baseline]
-public intrinsic fun vector::contains<#0>($t0|v: vector<#0>, $t1|e: #0): bool;
+public intrinsic fun vector::contains<#0>($t0|v: &vector<#0>, $t1|e: &#0): bool;
 
 
 [variant baseline]
-public intrinsic fun vector::index_of<#0>($t0|v: vector<#0>, $t1|e: #0): (bool, u64);
+public intrinsic fun vector::index_of<#0>($t0|v: &vector<#0>, $t1|e: &#0): (bool, u64);
 
 
 [variant baseline]
@@ -142,7 +142,7 @@ public intrinsic fun vector::append<#0>($t0|lhs: &mut vector<#0>, $t1|other: vec
 
 
 [variant baseline]
-public native fun vector::borrow<#0>($t0|v: vector<#0>, $t1|i: u64): #0;
+public native fun vector::borrow<#0>($t0|v: &vector<#0>, $t1|i: u64): &#0;
 
 
 [variant baseline]
@@ -158,11 +158,11 @@ public native fun vector::empty<#0>(): vector<#0>;
 
 
 [variant baseline]
-public intrinsic fun vector::is_empty<#0>($t0|v: vector<#0>): bool;
+public intrinsic fun vector::is_empty<#0>($t0|v: &vector<#0>): bool;
 
 
 [variant baseline]
-public native fun vector::length<#0>($t0|v: vector<#0>): u64;
+public native fun vector::length<#0>($t0|v: &vector<#0>): u64;
 
 
 [variant baseline]
@@ -219,18 +219,14 @@ public fun Collection::borrow_mut<#0>($t0|c: &mut Collection::Collection<#0>, $t
      var $t3: &mut #0
      # live_nodes: LocalRoot($t1), Reference($t0)
   0: $t2 := borrow_field<Collection::Collection<#0>>.items($t0)
-     # live_nodes: LocalRoot($t1), Reference($t0), Reference($t2)
+     # live_nodes: LocalRoot($t1), Reference($t2)
      # borrowed_by: Reference($t0) -> {(.items (vector<#0>), Reference($t2))}
      # borrows_from: Reference($t2) -> {(.items (vector<#0>), Reference($t0))}
   1: $t3 := vector::borrow_mut<#0>($t2, $t1)
-     # live_nodes: LocalRoot($t1), Reference($t0), Reference($t3)
-     # borrowed_by: Reference($t0) -> {(.items (vector<#0>), Reference($t2))}, Reference($t2) -> {([], Reference($t3))}
-     # borrows_from: Reference($t2) -> {(.items (vector<#0>), Reference($t0))}, Reference($t3) -> {([], Reference($t2))}
-  2: trace_local[c]($t0)
      # live_nodes: LocalRoot($t1), Reference($t3)
      # borrowed_by: Reference($t0) -> {(.items (vector<#0>), Reference($t2))}, Reference($t2) -> {([], Reference($t3))}
      # borrows_from: Reference($t2) -> {(.items (vector<#0>), Reference($t0))}, Reference($t3) -> {([], Reference($t2))}
-  3: return $t3
+  2: return $t3
 }
 
 

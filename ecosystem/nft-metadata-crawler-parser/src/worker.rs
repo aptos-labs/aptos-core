@@ -120,27 +120,34 @@ async fn spawn_parser(
     semaphore: Arc<Semaphore>,
     receiver: Arc<Mutex<Receiver<(Worker, String)>>>,
     subscription: Subscription,
-    release: bool,
+    ack_parsed_uris: bool,
 ) -> anyhow::Result<()> {
     loop {
-        let _ = semaphore.acquire().await?;
-
         // Pulls worker from Channel
+        let _ = semaphore.acquire().await?;
         let (mut worker, ack) = receiver.lock().await.recv()?;
-        worker.parse().await?;
 
-        // Sends ack to PubSub only if running on release mode
-        if release {
+        // Sends ack to PubSub only if ack_parsed_uris flag is true
+        if ack_parsed_uris {
             info!(
                 token_data_id = worker.token_data_id,
                 token_uri = worker.token_uri,
                 last_transaction_version = worker.last_transaction_version,
                 force = worker.force,
-                "[NFT Metadata Crawler] Acking message"
+                "[NFT Metadata Crawler] Received worker, acking message"
             );
             subscription.ack(vec![ack]).await?;
         }
 
+        worker.parse().await?;
+
+        info!(
+            token_data_id = worker.token_data_id,
+            token_uri = worker.token_uri,
+            last_transaction_version = worker.last_transaction_version,
+            force = worker.force,
+            "[NFT Metadata Crawler] Worker finished"
+        );
         sleep(Duration::from_millis(500)).await;
     }
 }
@@ -256,14 +263,6 @@ impl Worker {
 
     /// Main parsing flow
     pub async fn parse(&mut self) -> anyhow::Result<()> {
-        info!(
-            token_data_id = self.token_data_id,
-            token_uri = self.token_uri,
-            last_transaction_version = self.last_transaction_version,
-            force = self.force,
-            "[NFT Metadata Crawler] Starting worker"
-        );
-
         // Deduplicate token_uri
         // Exit if not force or if token_uri has already been parsed
         if !self.force

@@ -169,6 +169,7 @@ impl MoveHarness {
         let output = self.executor.execute_transaction(txn);
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
+            self.executor.append_events(output.events().to_vec());
         }
         output
     }
@@ -432,6 +433,10 @@ impl MoveHarness {
             .run_block_with_metadata(proposer, failed_proposer_indices, txns)
     }
 
+    pub fn get_events(&self) -> &[ContractEvent] {
+        self.executor.get_events()
+    }
+
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<StateValue> {
         self.executor.read_state_value(state_key)
     }
@@ -605,7 +610,7 @@ impl MoveHarness {
     }
 
     pub fn new_vm(&self) -> AptosVM {
-        AptosVM::new(self.executor.data_store())
+        AptosVM::new_from_state_view(self.executor.data_store())
     }
 
     pub fn set_default_gas_unit_price(&mut self, gas_unit_price: u64) {
