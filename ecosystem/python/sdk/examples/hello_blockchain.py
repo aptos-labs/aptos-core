@@ -16,7 +16,7 @@ One method to do so is to use the CLI:
 import asyncio
 import os
 import sys
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from aptos_sdk.account import Account
 from aptos_sdk.account_address import AccountAddress
@@ -36,7 +36,7 @@ from .common import FAUCET_URL, NODE_URL
 class HelloBlockchainClient(RestClient):
     async def get_message(
         self, contract_address: AccountAddress, account_address: AccountAddress
-    ) -> Optional[str]:
+    ) -> Optional[Dict[str, Any]]:
         """Retrieve the resource message::MessageHolder::message"""
         try:
             return await self.account_resource(
