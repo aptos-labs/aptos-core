@@ -507,7 +507,7 @@ const sidebars = {
       link: { type: "doc", id: "indexer/custom-processors/index" },
       collapsible: true,
       collapsed: true,
-      items: ["indexer/custom-processors/parsing-txns", "indexer/custom-processors/e2e-tutorial"],
+      items: ["indexer/custom-processors/e2e-tutorial", "indexer/custom-processors/parsing-txns"],
     },
     {
       type: "category",
