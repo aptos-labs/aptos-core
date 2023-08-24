@@ -56,7 +56,9 @@ use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::env::MOVE_HOME;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
-use move_package::{source_package::layout::SourcePackageLayout, BuildConfig};
+use move_package::{
+    source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig, CompilerVersion,
+};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
 use serde::{Deserialize, Serialize};
@@ -318,6 +320,8 @@ impl CliCommand<Vec<String>> for CompilePackage {
                     self.move_options.skip_fetch_latest_git_deps,
                     self.move_options.named_addresses(),
                     self.move_options.bytecode_version,
+                    self.move_options.compiler_version,
+                    self.move_options.skip_attribute_checks,
                 )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
@@ -377,6 +381,8 @@ impl CompileScript {
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
+                self.move_options.compiler_version,
+                self.move_options.skip_attribute_checks,
             )
         };
         let package_dir = self.move_options.get_package_path()?;
@@ -449,12 +455,18 @@ impl CliCommand<&'static str> for TestPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
+        let known_attributes = extended_checks::get_all_attribute_names();
         let mut config = BuildConfig {
             dev_mode: self.move_options.dev,
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
             install_dir: self.move_options.output_dir.clone(),
             skip_fetch_latest_git_deps: self.move_options.skip_fetch_latest_git_deps,
+            compiler_config: CompilerConfig {
+                known_attributes: known_attributes.clone(),
+                skip_attribute_checks: self.move_options.skip_attribute_checks,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -465,6 +477,9 @@ impl CliCommand<&'static str> for TestPackage {
             self.move_options.named_addresses(),
             None,
             self.move_options.bytecode_version,
+            self.move_options.compiler_version,
+            self.move_options.skip_attribute_checks,
+            known_attributes.clone(),
         )?;
         let _ = extended_checks::run_extended_checks(model);
         if model.diag_count(Severity::Warning) > 0 {
@@ -500,6 +515,7 @@ impl CliCommand<&'static str> for TestPackage {
 
         // Print coverage summary if --coverage is set
         if self.compute_coverage {
+            // TODO: config seems to be dead here.
             config.test_mode = false;
             let summary = SummaryCoverage {
                 summarize_functions: false,
@@ -570,6 +586,8 @@ impl CliCommand<&'static str> for ProvePackage {
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
                 move_options.bytecode_version,
+                move_options.skip_attribute_checks,
+                extended_checks::get_all_attribute_names(),
             )
         })
         .await
@@ -616,6 +634,9 @@ impl CliCommand<&'static str> for DocumentPackage {
             docgen_options: Some(docgen_options),
             skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
             bytecode_version: move_options.bytecode_version,
+            compiler_version: move_options.compiler_version,
+            skip_attribute_checks: move_options.skip_attribute_checks,
+            known_attributes: extended_checks::get_all_attribute_names().clone(),
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
@@ -681,6 +702,8 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
+                self.move_options.compiler_version,
+                self.move_options.skip_attribute_checks,
             );
         let package = BuiltPackage::build(package_path, options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
@@ -696,7 +719,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
         if !self.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
-                you may want to include less artifacts via `--included-artifacts`. \
+                you may want to include fewer artifacts via `--included-artifacts`. \
                 You can also override this check with `--override-size-check",
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));
@@ -748,6 +771,8 @@ impl IncludedArtifacts {
         skip_fetch_latest_git_deps: bool,
         named_addresses: BTreeMap<String, AccountAddress>,
         bytecode_version: Option<u32>,
+        compiler_version: Option<CompilerVersion>,
+        skip_attribute_checks: bool,
     ) -> BuildOptions {
         use IncludedArtifacts::*;
         match self {
@@ -761,6 +786,9 @@ impl IncludedArtifacts {
                 named_addresses,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
+                compiler_version,
+                skip_attribute_checks,
+                known_attributes: extended_checks::get_all_attribute_names().clone(),
                 ..BuildOptions::default()
             },
             Sparse => BuildOptions {
@@ -772,6 +800,9 @@ impl IncludedArtifacts {
                 named_addresses,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
+                compiler_version,
+                skip_attribute_checks,
+                known_attributes: extended_checks::get_all_attribute_names().clone(),
                 ..BuildOptions::default()
             },
             All => BuildOptions {
@@ -783,6 +814,9 @@ impl IncludedArtifacts {
                 named_addresses,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
+                compiler_version,
+                skip_attribute_checks,
+                known_attributes: extended_checks::get_all_attribute_names().clone(),
                 ..BuildOptions::default()
             },
         }
@@ -924,6 +958,8 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
             move_options.bytecode_version,
+            move_options.compiler_version,
+            move_options.skip_attribute_checks,
         );
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
@@ -1055,6 +1091,8 @@ impl CliCommand<&'static str> for VerifyPackage {
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
+                self.move_options.compiler_version,
+                self.move_options.skip_attribute_checks,
             )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)

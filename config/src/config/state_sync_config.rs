@@ -154,10 +154,14 @@ pub struct StorageServiceConfig {
     pub max_network_channel_size: u64,
     /// Maximum number of bytes to send per network message
     pub max_network_chunk_bytes: u64,
+    /// Maximum number of active subscriptions (per peer)
+    pub max_num_active_subscriptions: u64,
     /// Maximum period (ms) of pending optimistic fetch requests
     pub max_optimistic_fetch_period_ms: u64,
     /// Maximum number of state keys and values per chunk
     pub max_state_chunk_size: u64,
+    /// Maximum period (ms) of pending subscription requests
+    pub max_subscription_period_ms: u64,
     /// Maximum number of transactions per chunk
     pub max_transaction_chunk_size: u64,
     /// Maximum number of transaction outputs per chunk
@@ -179,8 +183,10 @@ impl Default for StorageServiceConfig {
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
+            max_num_active_subscriptions: 30,
             max_optimistic_fetch_period_ms: 5000, // 5 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
+            max_subscription_period_ms: 30_000, // 30 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             min_time_to_ignore_peers_secs: 300, // 5 minutes
@@ -252,6 +258,8 @@ pub struct AptosDataClientConfig {
     pub max_response_timeout_ms: u64,
     /// Maximum number of state keys and values per chunk
     pub max_state_chunk_size: u64,
+    /// Maximum version lag we'll tolerate when sending subscription requests
+    pub max_subscription_version_lag: u64,
     /// Maximum number of transactions per chunk
     pub max_transaction_chunk_size: u64,
     /// Maximum number of transaction outputs per chunk
@@ -277,6 +285,7 @@ impl Default for AptosDataClientConfig {
             max_optimistic_fetch_version_lag: 50_000, // Assumes 5K TPS for 10 seconds, which should be plenty
             max_response_timeout_ms: 60_000,          // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
+            max_subscription_version_lag: 100_000, // Assumes 5K TPS for 20 seconds, which should be plenty
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             optimistic_fetch_timeout_ms: 5000, // 5 seconds

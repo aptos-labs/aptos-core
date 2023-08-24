@@ -33,6 +33,7 @@ from cases.account import (
     test_account_create,
     test_account_fund_with_faucet,
     test_account_lookup_address,
+    test_account_resource_account,
     test_account_rotate_key,
 )
 from cases.config import test_config_show_profiles
@@ -138,6 +139,7 @@ def run_tests(run_helper):
     test_account_fund_with_faucet(run_helper)
     test_account_create(run_helper)
     test_account_lookup_address(run_helper)
+    test_account_resource_account(run_helper)
 
     # Make sure the aptos-cli header is included on the original request
     test_aptos_header_included(run_helper)

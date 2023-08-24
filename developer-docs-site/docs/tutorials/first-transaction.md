@@ -59,7 +59,7 @@ git clone https://github.com/aptos-labs/aptos-core.git
   poetry install
   ```
 
-  Run the [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer-coin.py) example:
+  Run the [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer_coin.py) example:
   ```bash
   poetry run python -m examples.transfer-coin
   ```
@@ -131,7 +131,7 @@ See the TypeScript [`transfer-coin`](https://github.com/aptos-labs/aptos-core/bl
   <TabItem value="python" label="Python">
 
 :::tip See the full code
-See the Python [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer-coin.py) for the complete code as you follow the below steps.
+See the Python [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer_coin.py) for the complete code as you follow the below steps.
 :::
   </TabItem>
   <TabItem value="rust" label="Rust">
@@ -171,7 +171,7 @@ Using the API client we can create a `CoinClient` that we use for common coin op
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/transfer-coin.py section_1
+:!: static/sdks/python/examples/transfer_coin.py section_1
 ```
 
 [`common.py`](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/python/sdk/examples/common.py) initializes these values as follows:
@@ -221,7 +221,7 @@ The next step is to create two accounts locally. [Accounts](../concepts/accounts
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/transfer-coin.py section_2
+:!: static/sdks/python/examples/transfer_coin.py section_2
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">
@@ -248,7 +248,7 @@ In Aptos, each account must have an on-chain representation in order to receive 
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/transfer-coin.py section_3
+:!: static/sdks/python/examples/transfer_coin.py section_3
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">
@@ -281,7 +281,7 @@ Behind the scenes, the `checkBalance` function in `CoinClient` in the SDK querie
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/transfer-coin.py section_4
+:!: static/sdks/python/examples/transfer_coin.py section_4
 ```
 
 Behind the scenes, the SDK queries the CoinStore resource for the AptosCoin and reads the current stored value:
@@ -341,7 +341,7 @@ Breaking the above down into pieces:
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/transfer-coin.py section_5
+:!: static/sdks/python/examples/transfer_coin.py section_5
 ```
 
 Behind the scenes the Python SDK generates, signs, and submits a transaction:
@@ -399,7 +399,7 @@ You can set `checkSuccess` to true when calling `transfer` if you'd like it to t
 The transaction hash can be used to query the status of a transaction:
 
 ```python
-:!: static/sdks/python/examples/transfer-coin.py section_6
+:!: static/sdks/python/examples/transfer_coin.py section_6
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">

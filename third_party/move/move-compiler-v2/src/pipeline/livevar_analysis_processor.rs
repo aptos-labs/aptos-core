@@ -22,6 +22,9 @@ impl FunctionTargetProcessor for LiveVarAnalysisProcessor {
         mut data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
+        if fun_env.is_native() {
+            return data;
+        }
         // Call the existing live-var analysis from the move-prover.
         let target = FunctionTarget::new(fun_env, &data);
         let offset_to_live_refs = livevar_analysis::LiveVarAnnotation::from_map(

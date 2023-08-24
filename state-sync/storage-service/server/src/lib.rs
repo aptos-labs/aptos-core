@@ -7,6 +7,7 @@
 use crate::{
     logging::{LogEntry, LogSchema},
     network::StorageServiceNetworkEvents,
+    subscription::SubscriptionStreamRequests,
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -31,7 +32,7 @@ use handler::Handler;
 use lru::LruCache;
 use moderator::RequestModerator;
 use optimistic_fetch::OptimisticFetchRequest;
-use std::{ops::Deref, sync::Arc, time::Duration};
+use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 use storage::StorageReaderInterface;
 use thiserror::Error;
 use tokio::runtime::Handle;
@@ -44,6 +45,7 @@ mod moderator;
 pub mod network;
 mod optimistic_fetch;
 pub mod storage;
+mod subscription;
 mod utils;
 
 #[cfg(test)]
@@ -75,6 +77,10 @@ pub struct StorageServiceServer<T> {
 
     // A set of active optimistic fetches for peers waiting for new data
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
+
+    // TODO: Reduce lock contention on the mutex.
+    // A set of active subscriptions for peers waiting for new data
+    subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
 
     // A moderator for incoming peer requests
     request_moderator: Arc<RequestModerator>,
@@ -108,6 +114,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         let lru_response_cache = Arc::new(Mutex::new(LruCache::new(
             storage_service_config.max_lru_cache_size as usize,
         )));
+        let subscriptions = Arc::new(Mutex::new(HashMap::new()));
         let request_moderator = Arc::new(RequestModerator::new(
             aptos_data_client_config,
             cached_storage_server_summary.clone(),
@@ -126,6 +133,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
             cached_storage_server_summary,
             lru_response_cache,
             optimistic_fetches,
+            subscriptions,
             request_moderator,
             storage_service_listener,
         }
@@ -133,17 +141,27 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
 
     /// Spawns all continuously running utility tasks
     async fn spawn_continuous_storage_summary_tasks(&mut self) {
-        // Create a channel to notify the optimistic fetch
-        // handler about updates to the cached storage summary.
-        let (cached_summary_update_notifier, cached_summary_update_listener) =
+        // Create channels to notify the optimistic fetch and subscription
+        // handlers about updates to the cached storage summary.
+        let (cache_update_notifier_optimistic_fetch, cache_update_listener_optimistic_fetch) =
+            aptos_channel::new(QueueStyle::LIFO, CACHED_SUMMARY_UPDATE_CHANNEL_SIZE, None);
+        let (cache_update_notifier_subscription, cache_update_listener_subscription) =
             aptos_channel::new(QueueStyle::LIFO, CACHED_SUMMARY_UPDATE_CHANNEL_SIZE, None);
 
         // Spawn the refresher for the storage summary cache
-        self.spawn_storage_summary_refresher(cached_summary_update_notifier)
+        let cache_update_notifiers = vec![
+            cache_update_notifier_optimistic_fetch.clone(),
+            cache_update_notifier_subscription.clone(),
+        ];
+        self.spawn_storage_summary_refresher(cache_update_notifiers)
             .await;
 
         // Spawn the optimistic fetch handler
-        self.spawn_optimistic_fetch_handler(cached_summary_update_listener)
+        self.spawn_optimistic_fetch_handler(cache_update_listener_optimistic_fetch)
+            .await;
+
+        // Spawn the subscription handler
+        self.spawn_subscription_handler(cache_update_listener_subscription)
             .await;
 
         // Spawn the refresher for the request moderator
@@ -153,7 +171,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
     /// Spawns a non-terminating task that refreshes the cached storage server summary
     async fn spawn_storage_summary_refresher(
         &mut self,
-        cached_summary_update_notifier: aptos_channel::Sender<(), CachedSummaryUpdateNotification>,
+        cache_update_notifiers: Vec<aptos_channel::Sender<(), CachedSummaryUpdateNotification>>,
     ) {
         // Clone all required components for the task
         let cached_storage_server_summary = self.cached_storage_server_summary.clone();
@@ -170,8 +188,6 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         // Spawn the task
         self.bounded_executor
             .spawn(async move {
-                // TODO: consider removing the interval once we've tested the notifications
-
                 // Create a ticker for the refresh interval
                 let duration = Duration::from_millis(config.storage_summary_refresh_interval_ms);
                 let ticker = time_service.interval(duration);
@@ -186,7 +202,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
                                 cached_storage_server_summary.clone(),
                                 storage.clone(),
                                 config,
-                                cached_summary_update_notifier.clone(),
+                                cache_update_notifiers.clone(),
                             )
                         },
                         notification = storage_service_listener.select_next_some() => {
@@ -202,7 +218,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
                                 cached_storage_server_summary.clone(),
                                 storage.clone(),
                                 config,
-                                cached_summary_update_notifier.clone(),
+                                cache_update_notifiers.clone(),
                             )
                         },
                     }
@@ -227,13 +243,12 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         let lru_response_cache = self.lru_response_cache.clone();
         let request_moderator = self.request_moderator.clone();
         let storage = self.storage.clone();
+        let subscriptions = self.subscriptions.clone();
         let time_service = self.time_service.clone();
 
         // Spawn the task
         self.bounded_executor
             .spawn(async move {
-                // TODO: consider removing the interval once we've tested the notifications
-
                 // Create a ticker for the refresh interval
                 let duration = Duration::from_millis(config.storage_summary_refresh_interval_ms);
                 let ticker = time_service.interval(duration);
@@ -252,12 +267,13 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
                                 lru_response_cache.clone(),
                                 request_moderator.clone(),
                                 storage.clone(),
+                                subscriptions.clone(),
                                 time_service.clone(),
                             ).await;
                         },
                         notification = cached_summary_update_listener.select_next_some() => {
                             trace!(LogSchema::new(LogEntry::ReceivedCacheUpdateNotification)
-                                .message(&format!("Received cache update notification! Highest synced version: {:?}", notification.highest_synced_version))
+                                .message(&format!("Received cache update notification for optimistic fetch handler! Highest synced version: {:?}", notification.highest_synced_version))
                             );
 
                             // Handle the optimistic fetches because of a cache update
@@ -269,6 +285,75 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
                                 lru_response_cache.clone(),
                                 request_moderator.clone(),
                                 storage.clone(),
+                                subscriptions.clone(),
+                                time_service.clone(),
+                            ).await;
+                        },
+                    }
+                }
+            })
+            .await;
+    }
+
+    /// Spawns a non-terminating task that handles subscriptions
+    async fn spawn_subscription_handler(
+        &mut self,
+        mut cached_summary_update_listener: aptos_channel::Receiver<
+            (),
+            CachedSummaryUpdateNotification,
+        >,
+    ) {
+        // Clone all required components for the task
+        let bounded_executor = self.bounded_executor.clone();
+        let cached_storage_server_summary = self.cached_storage_server_summary.clone();
+        let config = self.storage_service_config;
+        let optimistic_fetches = self.optimistic_fetches.clone();
+        let lru_response_cache = self.lru_response_cache.clone();
+        let request_moderator = self.request_moderator.clone();
+        let storage = self.storage.clone();
+        let subscriptions = self.subscriptions.clone();
+        let time_service = self.time_service.clone();
+
+        // Spawn the task
+        self.bounded_executor
+            .spawn(async move {
+                // Create a ticker for the refresh interval
+                let duration = Duration::from_millis(config.storage_summary_refresh_interval_ms);
+                let ticker = time_service.interval(duration);
+                futures::pin_mut!(ticker);
+
+                // Continuously handle the subscriptions
+                loop {
+                    futures::select! {
+                        _ = ticker.select_next_some() => {
+                            // Handle the subscriptions periodically
+                            handle_active_subscriptions(
+                                bounded_executor.clone(),
+                                cached_storage_server_summary.clone(),
+                                config,
+                                optimistic_fetches.clone(),
+                                lru_response_cache.clone(),
+                                request_moderator.clone(),
+                                storage.clone(),
+                                subscriptions.clone(),
+                                time_service.clone(),
+                            ).await;
+                        },
+                        notification = cached_summary_update_listener.select_next_some() => {
+                            trace!(LogSchema::new(LogEntry::ReceivedCacheUpdateNotification)
+                                .message(&format!("Received cache update notification for subscription handler! Highest synced version: {:?}", notification.highest_synced_version))
+                            );
+
+                            // Handle the subscriptions because of a cache update
+                            handle_active_subscriptions(
+                                bounded_executor.clone(),
+                                cached_storage_server_summary.clone(),
+                                config,
+                                optimistic_fetches.clone(),
+                                lru_response_cache.clone(),
+                                request_moderator.clone(),
+                                storage.clone(),
+                                subscriptions.clone(),
                                 time_service.clone(),
                             ).await;
                         },
@@ -331,8 +416,10 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
             // I/O-bound, so we want to spawn on the blocking thread pool to
             // avoid starving other async tasks on the same runtime.
             let storage = self.storage.clone();
+            let config = self.storage_service_config;
             let cached_storage_server_summary = self.cached_storage_server_summary.clone();
             let optimistic_fetches = self.optimistic_fetches.clone();
+            let subscriptions = self.subscriptions.clone();
             let lru_response_cache = self.lru_response_cache.clone();
             let request_moderator = self.request_moderator.clone();
             let time_service = self.time_service.clone();
@@ -344,9 +431,11 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
                         lru_response_cache,
                         request_moderator,
                         storage,
+                        subscriptions,
                         time_service,
                     )
                     .process_request_and_respond(
+                        config,
                         peer_network_id,
                         storage_service_request,
                         network_request.response_sender,
@@ -369,6 +458,14 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
     ) -> Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>> {
         self.optimistic_fetches.clone()
     }
+
+    #[cfg(test)]
+    /// Returns a copy of the active subscriptions for test purposes
+    pub(crate) fn get_subscriptions(
+        &self,
+    ) -> Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>> {
+        self.subscriptions.clone()
+    }
 }
 
 /// Handles the active optimistic fetches and logs any
@@ -381,6 +478,7 @@ async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
+    subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
     time_service: TimeService,
 ) {
     if let Err(error) = optimistic_fetch::handle_active_optimistic_fetches(
@@ -391,6 +489,7 @@ async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
         lru_response_cache,
         request_moderator,
         storage,
+        subscriptions,
         time_service,
     )
     .await
@@ -401,14 +500,46 @@ async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     }
 }
 
+/// Handles the active subscriptions and logs any
+/// errors that were encountered.
+async fn handle_active_subscriptions<T: StorageReaderInterface>(
+    bounded_exector: BoundedExecutor,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
+    config: StorageServiceConfig,
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
+    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    request_moderator: Arc<RequestModerator>,
+    storage: T,
+    subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
+    time_service: TimeService,
+) {
+    if let Err(error) = subscription::handle_active_subscriptions(
+        bounded_exector,
+        cached_storage_server_summary,
+        config,
+        optimistic_fetches,
+        lru_response_cache,
+        request_moderator,
+        storage,
+        subscriptions,
+        time_service,
+    )
+    .await
+    {
+        error!(LogSchema::new(LogEntry::SubscriptionRequest)
+            .error(&error)
+            .message("Failed to handle active subscriptions!"));
+    }
+}
+
 /// Refreshes the cached storage server summary and sends
-/// a notification via the given channel. If an error
+/// a notification via the given channels. If an error
 /// occurs, it is logged.
 pub(crate) fn refresh_cached_storage_summary<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     storage: T,
     storage_config: StorageServiceConfig,
-    cached_summary_update_notifier: aptos_channel::Sender<(), CachedSummaryUpdateNotification>,
+    cache_update_notifiers: Vec<aptos_channel::Sender<(), CachedSummaryUpdateNotification>>,
 ) {
     // Fetch the new data summary from storage
     let new_data_summary = match storage.get_data_summary() {
@@ -448,17 +579,20 @@ pub(crate) fn refresh_cached_storage_summary<T: StorageReaderInterface>(
             .get_synced_ledger_info_version();
         let update_notification = CachedSummaryUpdateNotification::new(highest_synced_version);
 
-        // Send the notification via the notifier
-        if let Err(error) = cached_summary_update_notifier.push((), update_notification) {
-            error!(LogSchema::new(LogEntry::StorageSummaryRefresh)
-                .error(&Error::StorageErrorEncountered(error.to_string()))
-                .message("Failed to send an update notification for the new cached summary!"));
+        // Send a notification via each notifier channel
+        for cached_summary_update_notifier in cache_update_notifiers {
+            if let Err(error) = cached_summary_update_notifier.push((), update_notification) {
+                error!(LogSchema::new(LogEntry::StorageSummaryRefresh)
+                    .error(&Error::StorageErrorEncountered(error.to_string()))
+                    .message("Failed to send an update notification for the new cached summary!"));
+            }
         }
     }
 }
 
 /// A simple notification sent to the optimistic fetch handler that the
 /// cached storage summary has been updated with the specified version.
+#[derive(Clone, Copy)]
 pub struct CachedSummaryUpdateNotification {
     highest_synced_version: Option<u64>,
 }

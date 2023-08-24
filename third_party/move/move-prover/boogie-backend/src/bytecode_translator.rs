@@ -37,15 +37,17 @@ use move_model::{
     ty::{PrimitiveType, Type, TypeDisplayContext, BOOL_TYPE},
     well_known::{TYPE_INFO_MOVE, TYPE_NAME_GET_MOVE, TYPE_NAME_MOVE},
 };
-use move_stackless_bytecode::{
-    function_target::FunctionTarget,
-    function_target_pipeline::{FunctionTargetsHolder, FunctionVariant, VerificationFlavor},
+use move_prover_bytecode_pipeline::{
     mono_analysis,
     number_operation::{
         FuncOperationMap, GlobalNumberOperationState, NumOperation,
         NumOperation::{Bitwise, Bottom},
     },
     options::ProverOptions,
+};
+use move_stackless_bytecode::{
+    function_target::FunctionTarget,
+    function_target_pipeline::{FunctionTargetsHolder, FunctionVariant, VerificationFlavor},
     stackless_bytecode::{
         AbortAction, BorrowEdge, BorrowNode, Bytecode, Constant, HavocKind, IndexEdgeKind,
         Operation, PropKind,
