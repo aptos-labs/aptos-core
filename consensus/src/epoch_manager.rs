@@ -32,8 +32,8 @@ use crate::{
     metrics_safety_rules::MetricsSafetyRules,
     monitor,
     network::{
-        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingRpcRequest,
-        NetworkReceivers, NetworkSender,
+        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingCommitRequest,
+        IncomingRpcRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::QuorumStoreClient,
@@ -122,7 +122,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     safety_rules_manager: SafetyRulesManager,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to buffer manager
-    buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
     buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
     // channels to round manager
     round_manager_tx: Option<
@@ -496,11 +496,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let (block_tx, block_rx) = unbounded::<OrderedBlocks>();
         let (reset_tx, reset_rx) = unbounded::<ResetRequest>();
 
-        let (commit_msg_tx, commit_msg_rx) = aptos_channel::new::<AccountAddress, VerifiedEvent>(
-            QueueStyle::FIFO,
-            100,
-            Some(&counters::BUFFER_MANAGER_MSGS),
-        );
+        let (commit_msg_tx, commit_msg_rx) =
+            aptos_channel::new::<AccountAddress, IncomingCommitRequest>(
+                QueueStyle::FIFO,
+                100,
+                Some(&counters::BUFFER_MANAGER_MSGS),
+            );
 
         self.buffer_manager_msg_tx = Some(commit_msg_tx);
         self.buffer_manager_reset_tx = Some(reset_tx.clone());
@@ -869,7 +870,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let epoch_state = self.epoch_state.clone().unwrap();
             let quorum_store_enabled = self.quorum_store_enabled;
             let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
-            let buffer_manager_msg_tx = self.buffer_manager_msg_tx.clone();
             let round_manager_tx = self.round_manager_tx.clone();
             let my_peer_id = self.author;
             let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
@@ -888,7 +888,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         Ok(verified_event) => {
                             Self::forward_event(
                                 quorum_store_msg_tx,
-                                buffer_manager_msg_tx,
                                 round_manager_tx,
                                 peer_id,
                                 verified_event,
@@ -1007,7 +1006,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     fn forward_event(
         quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
-        buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
         round_manager_tx: Option<
             aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
         >,
@@ -1026,11 +1024,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             | VerifiedEvent::BatchMsg(_)) => {
                 Self::forward_event_to(quorum_store_msg_tx, peer_id, quorum_store_event)
                     .context("quorum store sender")
-            },
-            buffer_manager_event @ (VerifiedEvent::CommitVote(_)
-            | VerifiedEvent::CommitDecision(_)) => {
-                Self::forward_event_to(buffer_manager_msg_tx, peer_id, buffer_manager_event)
-                    .context("buffer manager sender")
             },
             round_manager_event => Self::forward_event_to(
                 round_manager_tx,
@@ -1079,6 +1072,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     )
                 }
             },
+            IncomingRpcRequest::CommitRequest(request) => {
+                if let Some(tx) = &self.buffer_manager_msg_tx {
+                    tx.push(peer_id, request)
+                } else {
+                    Err(anyhow::anyhow!("Buffer manager not started"))
+                }
+            },
         }
     }
 
@@ -1115,12 +1115,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             tokio::select! {
                 (peer, msg) = network_receivers.consensus_messages.select_next_some() => {
                     monitor!("epoch_manager_process_consensus_messages",
-                    if let Err(e) = self.process_message(peer, msg).await {
-                        error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
-                    });
-                },
-                (peer, msg) = network_receivers.buffer_manager_messages.select_next_some() => {
-                    monitor!("epoch_manager_process_buffer_manager_messages",
                     if let Err(e) = self.process_message(peer, msg).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     });
