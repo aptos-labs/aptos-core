@@ -111,6 +111,8 @@ make it so that a reference to a global object can be returned from a function.
     -  [Function `transfer_raw`](#@Specification_1_transfer_raw)
     -  [Function `transfer_to_object`](#@Specification_1_transfer_to_object)
     -  [Function `verify_ungated_and_descendant`](#@Specification_1_verify_ungated_and_descendant)
+    -  [Function `burn`](#@Specification_1_burn)
+    -  [Function `unburn`](#@Specification_1_unburn)
     -  [Function `ungated_transfer_allowed`](#@Specification_1_ungated_transfer_allowed)
     -  [Function `owner`](#@Specification_1_owner)
     -  [Function `is_owner`](#@Specification_1_is_owner)
@@ -2642,6 +2644,47 @@ Return true if the provided address has indirect or direct ownership of the prov
 <pre><code><b>pragma</b> aborts_if_is_partial;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(destination);
 <b>aborts_if</b> !<b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(destination).allow_ungated_transfer;
+</code></pre>
+
+
+
+<a name="@Specification_1_burn"></a>
+
+### Function `burn`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> object_address = <a href="object.md#0x1_object">object</a>.inner;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address);
+<b>aborts_if</b> <a href="object.md#0x1_object_owner">owner</a>(<a href="object.md#0x1_object">object</a>) != <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+<b>aborts_if</b> <a href="object.md#0x1_object_is_burnt">is_burnt</a>(<a href="object.md#0x1_object">object</a>);
+</code></pre>
+
+
+
+<a name="@Specification_1_unburn"></a>
+
+### Function `unburn`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_unburn">unburn</a>&lt;T: key&gt;(original_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> object_address = <a href="object.md#0x1_object">object</a>.inner;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address);
+<b>aborts_if</b> !<a href="object.md#0x1_object_is_burnt">is_burnt</a>(<a href="object.md#0x1_object">object</a>);
+<b>let</b> tomb_stone = <b>borrow_global</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_address);
+<b>aborts_if</b> tomb_stone.original_owner != <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(original_owner);
 </code></pre>
 
 
