@@ -241,6 +241,23 @@ spec aptos_framework::object {
         aborts_if !global<ObjectCore>(object_address).allow_ungated_transfer;
     }
 
+    spec burn<T: key>(owner: &signer, object: Object<T>) {
+        pragma aborts_if_is_partial;
+        let object_address = object.inner;
+        aborts_if !exists<ObjectCore>(object_address);
+        aborts_if owner(object) != signer::address_of(owner);
+        aborts_if is_burnt(object);
+    }
+
+    spec unburn<T: key>(original_owner: &signer, object: Object<T>) {
+        pragma aborts_if_is_partial;
+        let object_address = object.inner;
+        aborts_if !exists<ObjectCore>(object_address);
+        aborts_if !is_burnt(object);
+        let tomb_stone = borrow_global<TombStone>(object_address);
+        aborts_if tomb_stone.original_owner != signer::address_of(original_owner);
+    }
+
     spec verify_ungated_and_descendant(owner: address, destination: address) {
         pragma aborts_if_is_partial;
         // TODO: Verify the link list loop in verify_ungated_and_descendant
