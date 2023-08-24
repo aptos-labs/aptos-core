@@ -10,7 +10,8 @@ AptosStdlib = { local = "../../framework/aptos-stdlib" }
 std = "0x1"
 aptos_std = "0x1"
 aptos_framework = "0x1"
-developer_address = "0xcafe"
+lottery = "_"
+developer_address = "_"
 
 #[dev-addresses]
 aptos_std_extra = "0x1"

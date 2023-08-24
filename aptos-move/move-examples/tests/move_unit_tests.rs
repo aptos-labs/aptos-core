@@ -123,7 +123,13 @@ fn test_drand() {
 
 #[test]
 fn test_lottery() {
-    test_resource_account_common("lottery");
+    let developer_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
+    let resource_acc_addr = create_resource_address(developer_addr, &[]);
+    let named_address = BTreeMap::from([
+        (String::from("developer_address"), developer_addr),
+        (String::from("lottery"), resource_acc_addr)]);
+
+    run_tests_for_pkg("lottery", named_address);
 }
 
 #[test]

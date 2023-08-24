@@ -38,15 +38,10 @@ module lottery::lottery_test {
     //      vector::empty<u8>()
     //   );
     // ```
-    // because @developer_address is set to `0xcafe` in the `Move.toml`.
-    //
-    // You can double check with:
-    // ```
-    //   debug::print(&create_resource_address(&signer::address_of(&developer_account), b""));
-    // ```
+    // This address derivation is done in `aptos-move/move-examples/tests/move_unit_tests.rs`.
     #[test(
         developer_account = @developer_address,
-        resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5,
+        resource_account = @lottery,
         fx = @aptos_framework,
         u1 = @0xA001, u2 = @0xA002, u3 = @0xA003, u4 = @0xA004
     )]
