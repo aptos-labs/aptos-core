@@ -26,6 +26,7 @@ use std::{
     env, fmt,
     fmt::Debug,
     io::{Stdout, Write},
+    ops::{Deref, DerefMut},
     str::FromStr,
     sync::{self, Arc},
     thread,
@@ -42,6 +43,48 @@ pub const CHANNEL_SIZE: usize = 10000;
 const FLUSH_TIMEOUT: Duration = Duration::from_secs(5);
 const FILTER_REFRESH_INTERVAL: Duration =
     Duration::from_secs(5 /* minutes */ * 60 /* seconds */);
+
+struct TruncatedString(String);
+
+impl TruncatedString {
+    const MAX_LEN: usize = 128;
+    const TRUNCATION_SUFFIX: &str = "(truncated)";
+
+    fn new(s: String) -> Self {
+        let mut truncated = s;
+        if truncated.len() > Self::MAX_LEN + Self::TRUNCATION_SUFFIX.len() {
+            truncated.truncate(Self::MAX_LEN);
+            truncated.push_str(Self::TRUNCATION_SUFFIX);
+        }
+        TruncatedString(truncated)
+    }
+}
+
+impl DerefMut for TruncatedString {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Deref for TruncatedString {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<String> for TruncatedString {
+    fn from(value: String) -> Self {
+        TruncatedString::new(value)
+    }
+}
+
+impl Into<String> for TruncatedString {
+    fn into(self) -> String {
+        self.0
+    }
+}
 
 #[derive(EnumString)]
 #[strum(serialize_all = "lowercase")]
@@ -112,8 +155,12 @@ impl LogEntry {
         impl<'a> Visitor for JsonVisitor<'a> {
             fn visit_pair(&mut self, key: Key, value: Value<'_>) {
                 let v = match value {
-                    Value::Debug(d) => serde_json::Value::String(format!("{:?}", d)),
-                    Value::Display(d) => serde_json::Value::String(d.to_string()),
+                    Value::Debug(d) => {
+                        serde_json::Value::String(TruncatedString::from(format!("{:?}", d)).into())
+                    },
+                    Value::Display(d) => {
+                        serde_json::Value::String(TruncatedString::from(d.to_string()).into())
+                    },
                     Value::Serde(s) => match serde_json::to_value(s) {
                         Ok(value) => value,
                         Err(e) => {
@@ -130,7 +177,10 @@ impl LogEntry {
 
         let metadata = *event.metadata();
         let thread_name = thread_name.map(ToOwned::to_owned);
-        let message = event.message().map(fmt::format);
+        let message = event
+            .message()
+            .map(fmt::format)
+            .map(|s| TruncatedString::from(s).into());
 
         static HOSTNAME: Lazy<Option<String>> = Lazy::new(|| {
             hostname::get()
@@ -744,7 +794,7 @@ impl LoggerFilterUpdater {
 mod tests {
     use super::{AptosData, LogEntry};
     use crate::{
-        aptos_logger::{json_format, RUST_LOG_TELEMETRY},
+        aptos_logger::{json_format, TruncatedString, RUST_LOG_TELEMETRY},
         debug, error, info,
         logger::Logger,
         trace, warn, AptosDataBuilder, Event, Key, KeyValue, Level, LoggerFilterUpdater, Metadata,
@@ -1024,5 +1074,51 @@ mod tests {
                 "hyper",
                 "source_path"
             )));
+    }
+
+    #[test]
+    fn test_log_event_truncation() {
+        let log_entry = LogEntry::new(
+            &Event::new(
+                &Metadata::new(Level::Error, "target", "hyper", "source_path"),
+                Some(format_args!("{}", "a".repeat(2 * TruncatedString::MAX_LEN))),
+                &[
+                    &KeyValue::new(
+                        "key1",
+                        Value::Debug(&"x".repeat(2 * TruncatedString::MAX_LEN)),
+                    ),
+                    &KeyValue::new(
+                        "key2",
+                        Value::Display(&"y".repeat(2 * TruncatedString::MAX_LEN)),
+                    ),
+                ],
+            ),
+            Some("test_thread"),
+            false,
+        );
+        assert_eq!(
+            log_entry.message,
+            Some(format!(
+                "{}{}",
+                "a".repeat(TruncatedString::MAX_LEN),
+                "(truncated)"
+            ))
+        );
+        assert_eq!(
+            log_entry.data().first_key_value().unwrap().1,
+            &serde_json::Value::String(format!(
+                "\"{}{}",
+                "x".repeat(TruncatedString::MAX_LEN - 1),
+                "(truncated)"
+            ))
+        );
+        assert_eq!(
+            log_entry.data().last_key_value().unwrap().1,
+            &serde_json::Value::String(format!(
+                "{}{}",
+                "y".repeat(TruncatedString::MAX_LEN),
+                "(truncated)"
+            ))
+        );
     }
 }
