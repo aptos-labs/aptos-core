@@ -22,6 +22,7 @@ make it so that a reference to a global object can be returned from a function.
 
 
 -  [Resource `ObjectCore`](#0x1_object_ObjectCore)
+-  [Resource `TombStone`](#0x1_object_TombStone)
 -  [Struct `ObjectGroup`](#0x1_object_ObjectGroup)
 -  [Struct `Object`](#0x1_object_Object)
 -  [Struct `ConstructorRef`](#0x1_object_ConstructorRef)
@@ -32,6 +33,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Struct `DeriveRef`](#0x1_object_DeriveRef)
 -  [Struct `TransferEvent`](#0x1_object_TransferEvent)
 -  [Constants](#@Constants_0)
+-  [Function `is_burnt`](#0x1_object_is_burnt)
 -  [Function `address_to_object`](#0x1_object_address_to_object)
 -  [Function `is_object`](#0x1_object_is_object)
 -  [Function `create_object_address`](#0x1_object_create_object_address)
@@ -72,6 +74,8 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `transfer_raw`](#0x1_object_transfer_raw)
 -  [Function `transfer_to_object`](#0x1_object_transfer_to_object)
 -  [Function `verify_ungated_and_descendant`](#0x1_object_verify_ungated_and_descendant)
+-  [Function `burn`](#0x1_object_burn)
+-  [Function `unburn`](#0x1_object_unburn)
 -  [Function `ungated_transfer_allowed`](#0x1_object_ungated_transfer_allowed)
 -  [Function `owner`](#0x1_object_owner)
 -  [Function `is_owner`](#0x1_object_is_owner)
@@ -170,6 +174,35 @@ The core of the object model that defines ownership, transferability, and events
 </dt>
 <dd>
  Emitted events upon transferring of ownership.
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_object_TombStone"></a>
+
+## Resource `TombStone`
+
+This is added to objects that are burnt (ownership transferred to BURN_ADDRESS).
+
+
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<b>struct</b> <a href="object.md#0x1_object_TombStone">TombStone</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>original_owner: <b>address</b></code>
+</dt>
+<dd>
+ Track the previous owner before the object is burnt so they can reclaim later if so desired.
 </dd>
 </dl>
 
@@ -462,6 +495,16 @@ Emitted whenever the object's owner field is changed.
 ## Constants
 
 
+<a name="0x1_object_BURN_ADDRESS"></a>
+
+Address where unwanted objects can be forcefully transferred to.
+
+
+<pre><code><b>const</b> <a href="object.md#0x1_object_BURN_ADDRESS">BURN_ADDRESS</a>: <b>address</b> = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+</code></pre>
+
+
+
 <a name="0x1_object_DERIVE_AUID_ADDRESS_SCHEME"></a>
 
 generate_unique_address uses this for domain separation within its native implementation
@@ -528,6 +571,16 @@ An object already exists at this address
 
 
 <pre><code><b>const</b> <a href="object.md#0x1_object_EOBJECT_EXISTS">EOBJECT_EXISTS</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_object_EOBJECT_NOT_BURNT"></a>
+
+Cannot reclaim objects that weren't burnt.
+
+
+<pre><code><b>const</b> <a href="object.md#0x1_object_EOBJECT_NOT_BURNT">EOBJECT_NOT_BURNT</a>: u64 = 8;
 </code></pre>
 
 
@@ -611,6 +664,31 @@ derivation to produce an object address.
 </code></pre>
 
 
+
+<a name="0x1_object_is_burnt"></a>
+
+## Function `is_burnt`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_burnt">is_burnt</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_burnt">is_burnt</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): bool {
+    <b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(<a href="object.md#0x1_object">object</a>.inner)
+}
+</code></pre>
+
+
+
+</details>
 
 <a name="0x1_object_address_to_object"></a>
 
@@ -1759,6 +1837,92 @@ objects may have cyclic dependencies.
 
         current_address = <a href="object.md#0x1_object">object</a>.owner;
     };
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_burn"></a>
+
+## Function `burn`
+
+Forcefully transfer an unwanted object to BURN_ADDRESS, ignoring whether ungated_transfer is allowed.
+This only works for objects directly owned and for simplicity does not apply to indirectly owned objects.
+Original owners can reclaim burnt objects any time in the future by calling unburn.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>let</b> original_owner = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+    <b>assert</b>!(<a href="object.md#0x1_object_owner">owner</a>(<a href="object.md#0x1_object">object</a>) == original_owner, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>));
+    <b>let</b> object_addr = <a href="object.md#0x1_object">object</a>.inner;
+    <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(object_addr), <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner });
+    <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_addr);
+    <a href="object.md#0x1_object">object</a>.owner = <a href="object.md#0x1_object_BURN_ADDRESS">BURN_ADDRESS</a>;
+
+    // Burn should still emit <a href="event.md#0x1_event">event</a> <b>to</b> make sure ownership is upgrade correctly in indexing.
+    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
+        &<b>mut</b> <a href="object.md#0x1_object">object</a>.transfer_events,
+        <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
+            <a href="object.md#0x1_object">object</a>: object_addr,
+            from: original_owner,
+            <b>to</b>: <a href="object.md#0x1_object_BURN_ADDRESS">BURN_ADDRESS</a>,
+        },
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_unburn"></a>
+
+## Function `unburn`
+
+Allow origin owners to reclaim any objects they previous burnt.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_unburn">unburn</a>&lt;T: key&gt;(original_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_unburn">unburn</a>&lt;T: key&gt;(
+    original_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;,
+) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a>, <a href="object.md#0x1_object_TombStone">TombStone</a> {
+    <b>let</b> object_addr = <a href="object.md#0x1_object">object</a>.inner;
+    <b>assert</b>!(<b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="object.md#0x1_object_EOBJECT_NOT_BURNT">EOBJECT_NOT_BURNT</a>));
+
+    <b>let</b> <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner: original_owner_addr } = <b>move_from</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr);
+    <b>assert</b>!(original_owner_addr == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(original_owner), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>));
+    <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_addr);
+    <a href="object.md#0x1_object">object</a>.owner = original_owner_addr;
+
+    // Unburn reclaims should still emit <a href="event.md#0x1_event">event</a> <b>to</b> make sure ownership is upgrade correctly in indexing.
+    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
+        &<b>mut</b> <a href="object.md#0x1_object">object</a>.transfer_events,
+        <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
+            <a href="object.md#0x1_object">object</a>: object_addr,
+            from: <a href="object.md#0x1_object_BURN_ADDRESS">BURN_ADDRESS</a>,
+            <b>to</b>: original_owner_addr,
+        },
+    );
 }
 </code></pre>
 
