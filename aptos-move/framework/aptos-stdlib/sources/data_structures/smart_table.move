@@ -329,6 +329,106 @@ module aptos_std::smart_table {
         table.target_bucket_size = target_bucket_size;
     }
 
+    /// Apply the function to each key-value pair in the table, consuming it.
+    public inline fun for_each<K: copy + drop, V>(table: SmartTable<K, V>, f: |K, V|) {
+        let SmartTable { buckets, num_buckets, level: _, size: _, split_load_threshold: _, target_bucket_size: _ } = table;
+        let i = 0;
+        while (i < num_buckets) {
+            vector::for_each(table_with_length::remove(&mut buckets, i), |elem| {
+                let Entry { hash: _, key, value } = elem;
+                f(key, value)
+            });
+            i = i + 1;
+        };
+        table_with_length::destroy_empty(buckets);
+    }
+
+    /// Apply the function to a reference of each key-value pair in the table.
+    public inline fun for_each_ref<K, V>(table: &SmartTable<K, V>, f: |&K, &V|) {
+        let i = 0;
+        while (i < table.num_buckets) {
+            vector::for_each_ref(table_with_length::borrow(&table.buckets, i), |elem| {
+                let e: &Entry<K, V> = elem;
+                f(&e.key, &e.value)
+            });
+            i = i + 1;
+        }
+    }
+
+    /// Apply the function to a reference of each key-value pair in the table.
+    public inline fun for_each_mut<K, V>(table: &mut SmartTable<K, V>, f: |&K, &mut V|) {
+        let i = 0;
+        while (i < table.num_buckets) {
+            vector::for_each_mut(table_with_length::borrow_mut(&mut table.buckets, i), |elem| {
+                let e: &mut Entry<K, V> = elem;
+                f(&e.key, &mut e.value)
+            });
+            i = i + 1;
+        };
+    }
+
+    /// Fold the function over the key-value pairs of the table.
+    public inline fun fold<A, K: copy + drop, V>(
+        table: SmartTable<K, V>,
+        init: A,
+        f: |A, K, V|A
+    ): A {
+        for_each(table, |key, value| init = f(init, key, value));
+        init
+    }
+
+    /// Map the function over the key-value pairs of the table.
+    public inline fun map<K: copy + drop + store, V1, V2: store>(
+        table: SmartTable<K, V1>,
+        f: |V1|V2
+    ): SmartTable<K, V2> {
+        let new_table = new_with_config<K, V2>(0, table.split_load_threshold, 0);
+        for_each(table, |key, value| add(&mut new_table, key, f(value)));
+        new_table
+    }
+
+    /// Map the function over the references of key-value pairs in the table without modifying it.
+    public inline fun map_ref<K: copy + drop + store, V1, V2: store>(
+        table: &SmartTable<K, V1>,
+        f: |&V1|V2
+    ): SmartTable<K, V2> {
+        let new_table = new_with_config<K, V2>(0, table.split_load_threshold, 0);
+        for_each_ref(table, |key, value| add(&mut new_table, *key, f(value)));
+        new_table
+    }
+
+    /// Filter entries in the table.
+    public inline fun filter<K: copy + drop + store, V: store>(
+        table: SmartTable<K, V>,
+        p: |&V|bool
+    ): SmartTable<K, V> {
+        let new_table = new_with_config<K, V>(table.num_buckets, table.split_load_threshold, table.target_bucket_size);
+        for_each(table, |key, value| {
+            if (p(&value)) {
+                add(&mut new_table, key, value);
+            }
+        });
+        new_table
+    }
+
+    /// Return true if any key-value pair in the table satisfies the predicate.
+    public inline fun any<K, V>(
+        table: &SmartTable<K, V>,
+        p: |&K, &V|bool
+    ): bool {
+        let found = false;
+        let i = 0;
+        while (i < table.num_buckets) {
+            found = vector::any(table_with_length::borrow(&table.buckets, i), |elem| {
+                let e: &Entry<K, V> = elem;
+                p(&e.key, &e.value)
+            });
+            if (found) break;
+            i = i + 1;
+        };
+        found
+    }
+
     #[test]
     fun smart_table_test() {
         let table = new();
@@ -434,5 +534,99 @@ module aptos_std::smart_table {
         let map = to_simple_map(&table);
         assert!(simple_map::length(&map) == 200, 0);
         destroy(table);
+    }
+
+    #[test_only]
+    fun make(): SmartTable<u64, u64> {
+        let table = new_with_config<u64, u64>(0, 50, 10);
+        let i = 0u64;
+        while (i < 100) {
+            add(&mut table, i, i);
+            i = i + 1;
+        };
+        table
+    }
+
+    #[test]
+    fun test_for_each() {
+        let t = make();
+        let s = 0;
+        for_each(t, |x, y| {
+            s = s + x + y;
+        });
+        assert!(s == 9900, 0)
+    }
+
+    #[test]
+    fun test_for_each_ref() {
+        let t = make();
+        let s = 0;
+        for_each_ref(&t, |x, y| {
+            s = s + *x + *y;
+        });
+        assert!(s == 9900, 0);
+        destroy(t);
+    }
+
+    #[test]
+    fun test_for_each_mut() {
+        let t = make();
+        for_each_mut(&mut t, |_key, val| {
+            let val: &mut u64 = val;
+            *val = *val + 1
+        });
+        for_each_ref(&t, |key, val| {
+            assert!(*key + 1 == *val, *key);
+        });
+        destroy(t);
+    }
+
+    #[test]
+    fun test_fold() {
+        let t = make();
+        let r = fold(t, 1, |accu, key, val| {
+            accu + key + val
+        });
+        assert!(r == 9901, 0);
+    }
+
+    #[test]
+    fun test_map() {
+        let t = make();
+        let r = map(t, |val| val + 1);
+        for_each_ref(&r, |key, val| {
+            assert!(*key + 1 == *val, *key);
+        });
+        destroy(r);
+    }
+
+    #[test]
+    fun test_map_ref() {
+        let t = make();
+        let r = map_ref(&t, |val| *val + 1);
+        for_each_ref(&r, |key, val| {
+            assert!(*key + 1 == *val, *key);
+        });
+        destroy(t);
+        destroy(r);
+    }
+
+    #[test]
+    fun test_filter() {
+        let t = make();
+        let r = filter(t, |val| *val < 50);
+        assert!(length(&r) == 50, 0);
+        assert!(
+            fold(r, 0, |accu, _key, val| {
+                accu + val
+            }) == 1225, 1);
+    }
+
+    #[test]
+    fun test_any() {
+        let t = make();
+        let r = any(&t, |_k, v| *v >= 99);
+        assert!(r, 0);
+        destroy(t);
     }
 }

@@ -35,6 +35,14 @@ it tolerates collisions.
 -  [Function `load_factor`](#0x1_smart_table_load_factor)
 -  [Function `update_split_load_threshold`](#0x1_smart_table_update_split_load_threshold)
 -  [Function `update_target_bucket_size`](#0x1_smart_table_update_target_bucket_size)
+-  [Function `for_each`](#0x1_smart_table_for_each)
+-  [Function `for_each_ref`](#0x1_smart_table_for_each_ref)
+-  [Function `for_each_mut`](#0x1_smart_table_for_each_mut)
+-  [Function `fold`](#0x1_smart_table_fold)
+-  [Function `map`](#0x1_smart_table_map)
+-  [Function `map_ref`](#0x1_smart_table_map_ref)
+-  [Function `filter`](#0x1_smart_table_filter)
+-  [Function `any`](#0x1_smart_table_any)
 -  [Specification](#@Specification_1)
     -  [Struct `SmartTable`](#@Specification_1_SmartTable)
     -  [Function `new_with_config`](#@Specification_1_new_with_config)
@@ -925,6 +933,266 @@ Update <code>target_bucket_size</code>.
 <pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_update_target_bucket_size">update_target_bucket_size</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, target_bucket_size: u64) {
     <b>assert</b>!(target_bucket_size &gt; 0, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EINVALID_TARGET_BUCKET_SIZE">EINVALID_TARGET_BUCKET_SIZE</a>));
     <a href="table.md#0x1_table">table</a>.target_bucket_size = target_bucket_size;
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_for_each"></a>
+
+## Function `for_each`
+
+Apply the function to each key-value pair in the table, consuming it.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each">for_each</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, f: |(K, V)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each">for_each</a>&lt;K: <b>copy</b> + drop, V&gt;(<a href="table.md#0x1_table">table</a>: <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, f: |K, V|) {
+    <b>let</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a> { buckets, num_buckets, level: _, size: _, split_load_threshold: _, target_bucket_size: _ } = <a href="table.md#0x1_table">table</a>;
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; num_buckets) {
+        <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(<a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> buckets, i), |elem| {
+            <b>let</b> <a href="smart_table.md#0x1_smart_table_Entry">Entry</a> { <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>: _, key, value } = elem;
+            f(key, value)
+        });
+        i = i + 1;
+    };
+    <a href="table_with_length.md#0x1_table_with_length_destroy_empty">table_with_length::destroy_empty</a>(buckets);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_for_each_ref"></a>
+
+## Function `for_each_ref`
+
+Apply the function to a reference of each key-value pair in the table.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_ref">for_each_ref</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, f: |(&K, &V)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_ref">for_each_ref</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, f: |&K, &V|) {
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; <a href="table.md#0x1_table">table</a>.num_buckets) {
+        <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(<a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&<a href="table.md#0x1_table">table</a>.buckets, i), |elem| {
+            <b>let</b> e: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = elem;
+            f(&e.key, &e.value)
+        });
+        i = i + 1;
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_for_each_mut"></a>
+
+## Function `for_each_mut`
+
+Apply the function to a reference of each key-value pair in the table.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_mut">for_each_mut</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, f: |(&K, &<b>mut</b> V)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_mut">for_each_mut</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, f: |&K, &<b>mut</b> V|) {
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; <a href="table.md#0x1_table">table</a>.num_buckets) {
+        <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each_mut">vector::for_each_mut</a>(<a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets, i), |elem| {
+            <b>let</b> e: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = elem;
+            f(&e.key, &<b>mut</b> e.value)
+        });
+        i = i + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_fold"></a>
+
+## Function `fold`
+
+Fold the function over the key-value pairs of the table.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_fold">fold</a>&lt;A, K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, init: A, f: |(A, K, V)|A): A
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_fold">fold</a>&lt;A, K: <b>copy</b> + drop, V&gt;(
+    <a href="table.md#0x1_table">table</a>: <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;,
+    init: A,
+    f: |A, K, V|A
+): A {
+    <a href="smart_table.md#0x1_smart_table_for_each">for_each</a>(<a href="table.md#0x1_table">table</a>, |key, value| init = f(init, key, value));
+    init
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_map"></a>
+
+## Function `map`
+
+Map the function over the key-value pairs of the table.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_map">map</a>&lt;K: <b>copy</b>, drop, store, V1, V2: store&gt;(<a href="table.md#0x1_table">table</a>: <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V1&gt;, f: |V1|V2): <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V2&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_map">map</a>&lt;K: <b>copy</b> + drop + store, V1, V2: store&gt;(
+    <a href="table.md#0x1_table">table</a>: <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V1&gt;,
+    f: |V1|V2
+): <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V2&gt; {
+    <b>let</b> new_table = <a href="smart_table.md#0x1_smart_table_new_with_config">new_with_config</a>&lt;K, V2&gt;(0, <a href="table.md#0x1_table">table</a>.split_load_threshold, 0);
+    <a href="smart_table.md#0x1_smart_table_for_each">for_each</a>(<a href="table.md#0x1_table">table</a>, |key, value| <a href="smart_table.md#0x1_smart_table_add">add</a>(&<b>mut</b> new_table, key, f(value)));
+    new_table
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_map_ref"></a>
+
+## Function `map_ref`
+
+Map the function over the references of key-value pairs in the table without modifying it.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_map_ref">map_ref</a>&lt;K: <b>copy</b>, drop, store, V1, V2: store&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V1&gt;, f: |&V1|V2): <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V2&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_map_ref">map_ref</a>&lt;K: <b>copy</b> + drop + store, V1, V2: store&gt;(
+    <a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V1&gt;,
+    f: |&V1|V2
+): <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V2&gt; {
+    <b>let</b> new_table = <a href="smart_table.md#0x1_smart_table_new_with_config">new_with_config</a>&lt;K, V2&gt;(0, <a href="table.md#0x1_table">table</a>.split_load_threshold, 0);
+    <a href="smart_table.md#0x1_smart_table_for_each_ref">for_each_ref</a>(<a href="table.md#0x1_table">table</a>, |key, value| <a href="smart_table.md#0x1_smart_table_add">add</a>(&<b>mut</b> new_table, *key, f(value)));
+    new_table
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_filter"></a>
+
+## Function `filter`
+
+Filter entries in the table.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_filter">filter</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(<a href="table.md#0x1_table">table</a>: <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, p: |&V|bool): <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_filter">filter</a>&lt;K: <b>copy</b> + drop + store, V: store&gt;(
+    <a href="table.md#0x1_table">table</a>: <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;,
+    p: |&V|bool
+): <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt; {
+    <b>let</b> new_table = <a href="smart_table.md#0x1_smart_table_new_with_config">new_with_config</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>.num_buckets, <a href="table.md#0x1_table">table</a>.split_load_threshold, <a href="table.md#0x1_table">table</a>.target_bucket_size);
+    <a href="smart_table.md#0x1_smart_table_for_each">for_each</a>(<a href="table.md#0x1_table">table</a>, |key, value| {
+        <b>if</b> (p(&value)) {
+            <a href="smart_table.md#0x1_smart_table_add">add</a>(&<b>mut</b> new_table, key, value);
+        }
+    });
+    new_table
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_any"></a>
+
+## Function `any`
+
+Return true if any key-value pair in the table satisfies the predicate.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any">any</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, p: |(&K, &V)|bool): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="any.md#0x1_any">any</a>&lt;K, V&gt;(
+    <a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;,
+    p: |&K, &V|bool
+): bool {
+    <b>let</b> found = <b>false</b>;
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; <a href="table.md#0x1_table">table</a>.num_buckets) {
+        found = <a href="../../move-stdlib/doc/vector.md#0x1_vector_any">vector::any</a>(<a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&<a href="table.md#0x1_table">table</a>.buckets, i), |elem| {
+            <b>let</b> e: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = elem;
+            p(&e.key, &e.value)
+        });
+        <b>if</b> (found) <b>break</b>;
+        i = i + 1;
+    };
+    found
 }
 </code></pre>
 
