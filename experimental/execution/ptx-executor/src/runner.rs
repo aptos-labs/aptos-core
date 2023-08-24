@@ -41,7 +41,6 @@ impl PtxRunner {
         finalizer: PtxFinalizerClient,
     ) -> PtxRunnerClient {
         let (work_tx, work_rx) = channel();
-        let client = PtxRunnerClient { work_tx };
         scope.spawn(move |scope| {
             let _timer = TIMER.timer_with(&["runner_block_total"]);
 
@@ -71,7 +70,7 @@ impl PtxRunner {
                 }
             }
         });
-        client
+        PtxRunnerClient { work_tx }
     }
 }
 
@@ -237,38 +236,51 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
     }
 
     fn work(self) {
+        let idx = format!("{}", self.worker_index);
+        let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "block_total"]);
         // Share a VM in the same thread.
         // TODO(ptx): maybe warm up vm like done in AptosExecutorTask
-        let vm = AptosVM::new(&self.base_view.as_move_resolver());
-        let idx = format!("{}", self.worker_index);
-
-        // Inform the manger worker is up.
-        self.inform_worker_ready();
+        let vm = {
+            let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "vm_init"]);
+            AptosVM::new(&self.base_view.as_move_resolver())
+        };
 
         loop {
-            match self.work_rx.recv().expect("Sender died.") {
+            self.worker_ready_tx
+                .send(self.worker_index)
+                .expect("Manager died.");
+
+            let cmd = {
+                let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "wait_work"]);
+                self.work_rx.recv().expect("Manager died.")
+            };
+            match cmd {
                 WorkerCommand::ExecuteTransaction {
                     txn_idx,
                     transaction,
                     dependencies,
                 } => {
-                    let _total = PER_WORKER_TIMER.timer_with(&[&idx, "execute_txn_total"]);
-                    let _pre = PER_WORKER_TIMER.timer_with(&[&idx, "execute_txn_pre_vm"]);
+                    let _total = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_total_with_drops"]);
+                    let _total1 = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_total"]);
+                    let _pre = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_pre_vm"]);
                     trace!("worker {} gonna run txn {}", self.worker_index, txn_idx);
                     let state_view =
                         OverlayedStateView::new_with_overlay(self.base_view, dependencies);
                     let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
-                    let preprocessed_txn = preprocess_transaction::<AptosVM>(transaction);
+                    let preprocessed_txn = {
+                        let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "preprocess_txn"]);
+                        preprocess_transaction::<AptosVM>(transaction)
+                    };
                     drop(_pre);
                     let vm_output = {
-                        let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "per_worker_vm"]);
+                        let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_vm"]);
                         vm.execute_single_transaction(
                             &preprocessed_txn,
                             &vm.as_move_resolver(&state_view),
                             &log_context,
                         )
                     };
-                    let _post = PER_WORKER_TIMER.timer_with(&[&idx, "per_worker_post_vm"]);
+                    let _post = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_post_vm"]);
                     // TODO(ptx): error handling
                     let (_vm_status, vm_output, _msg) = vm_output.expect("VM execution failed.");
 
@@ -279,8 +291,8 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     }
 
                     self.finalizer.add_vm_output(txn_idx, vm_output);
-                    self.inform_worker_ready();
                     trace!("worker {} finished txn {}", self.worker_index, txn_idx);
+                    drop(_total1);
                 },
                 WorkerCommand::Finish => {
                     trace!("worker {} exit.", self.worker_index);
@@ -288,11 +300,5 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                 },
             } // end match command
         } // end loop
-    }
-
-    fn inform_worker_ready(&self) {
-        self.worker_ready_tx
-            .send(self.worker_index)
-            .expect("Manager died.");
-    }
+    } // end work
 }
