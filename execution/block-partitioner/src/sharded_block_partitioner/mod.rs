@@ -1,16 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_partitioner::{
-    counters::BLOCK_PARTITIONING_MISC_TIMERS_SECONDS,
-    cross_shard_messages::CrossShardMsg,
-    dependency_analysis::WriteSetWithTxnIndex,
-    messages::{
-        AddWithCrossShardDep, ControlMsg,
-        ControlMsg::{AddCrossShardDepReq, DiscardCrossShardDepReq},
-        DiscardCrossShardDep, PartitioningResp,
+use crate::{
+    sharded_block_partitioner::{
+        counters::BLOCK_PARTITIONING_MISC_TIMERS_SECONDS,
+        cross_shard_messages::CrossShardMsg,
+        dependency_analysis::WriteSetWithTxnIndex,
+        messages::{
+            AddWithCrossShardDep, ControlMsg,
+            ControlMsg::{AddCrossShardDepReq, DiscardCrossShardDepReq},
+            DiscardCrossShardDep, PartitioningResp,
+        },
+        partitioning_shard::PartitioningShard,
     },
-    partitioning_shard::PartitioningShard,
+    BlockPartitioner,
 };
 use aptos_logger::{error, info};
 use aptos_types::{
@@ -31,6 +34,7 @@ use std::{
     thread,
 };
 
+pub mod config;
 mod conflict_detector;
 mod counters;
 mod cross_shard_messages;
@@ -124,7 +128,7 @@ pub struct ShardedBlockPartitioner {
 }
 
 impl ShardedBlockPartitioner {
-    pub(crate) fn new(
+    pub fn new(
         num_shards: usize,
         max_partitioning_rounds: RoundId,
         cross_shard_dep_avoid_threshold: f32,
@@ -461,6 +465,17 @@ impl Drop for ShardedBlockPartitioner {
                 error!("Failed to join executor shard thread: {:?}", e);
             });
         }
+    }
+}
+
+impl BlockPartitioner for ShardedBlockPartitioner {
+    fn partition(
+        &self,
+        transactions: Vec<AnalyzedTransaction>,
+        num_shards: usize,
+    ) -> PartitionedTransactions {
+        assert_eq!(self.num_shards, num_shards);
+        ShardedBlockPartitioner::partition(self, transactions)
     }
 }
 

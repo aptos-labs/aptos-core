@@ -599,12 +599,15 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "clap 4.3.21",
+ "criterion",
  "dashmap",
  "itertools",
+ "jemallocator",
  "move-core-types",
  "once_cell",
  "rand 0.7.3",
  "rayon",
+ "serde 1.0.149",
 ]
 
 [[package]]
