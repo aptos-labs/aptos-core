@@ -36,6 +36,7 @@ pub enum FeatureFlag {
     MODULE_EVENT = 26,
     EMIT_FEE_STATEMENT = 27,
     STORAGE_DELETION_REFUND = 28,
+    SIGNATURE_CHECKER_V2_SCRIPT_FIX = 29,
 }
 
 /// Representation of features on chain as a bitset.
@@ -48,7 +49,7 @@ pub struct Features {
 impl Default for Features {
     fn default() -> Self {
         Features {
-            features: vec![0b00100000, 0b00100000, 0b00001100],
+            features: vec![0b00100000, 0b00100000, 0b00001100, 0b00100000],
         }
     }
 }
