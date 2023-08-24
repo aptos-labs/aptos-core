@@ -1,10 +1,10 @@
 ---
-title: "Aptos Token"
+title: "Aptos Token (Legacy)"
 ---
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Aptos Token
+# Aptos Token (Legacy)
 
 :::tip Aptos Token standards compared
 Also see the [comparison of Aptos Token standards](../guides/nfts/aptos-token-overview.md).

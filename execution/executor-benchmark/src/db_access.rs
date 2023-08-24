@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_state_view::TStateView;
-use aptos_storage_interface::{cached_state_view::CachedStateView, state_view::DbStateView};
+use aptos_state_view::StateView;
+use aptos_storage_interface::state_view::DbStateView;
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKey,
 };
@@ -120,21 +120,21 @@ impl DbAccessUtil {
 
     pub fn get_account(
         account_key: &StateKey,
-        state_view: &CachedStateView,
+        state_view: &impl StateView,
     ) -> Result<Option<Account>> {
         Self::get_value(account_key, state_view)
     }
 
     pub fn get_coin_store(
         coin_store_key: &StateKey,
-        state_view: &CachedStateView,
+        state_view: &impl StateView,
     ) -> Result<Option<CoinStore>> {
         Self::get_value(coin_store_key, state_view)
     }
 
     pub fn get_value<T: DeserializeOwned>(
         state_key: &StateKey,
-        state_view: &CachedStateView,
+        state_view: &impl StateView,
     ) -> Result<Option<T>> {
         let value = state_view
             .get_state_value_bytes(state_key)?
@@ -146,9 +146,10 @@ impl DbAccessUtil {
         state_key: &StateKey,
         state_view: &DbStateView,
     ) -> Result<Option<T>> {
-        let value = state_view
-            .get_state_value(state_key)?
-            .map(move |value| bcs::from_bytes(value.into_bytes().as_slice()));
-        value.transpose().map_err(anyhow::Error::msg)
+        Self::get_value(state_key, state_view)
+    }
+
+    pub fn get_total_supply(state_view: &impl StateView) -> Result<Option<u128>> {
+        Self::get_value(&TOTAL_SUPPLY_STATE_KEY, state_view)
     }
 }

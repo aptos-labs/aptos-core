@@ -216,7 +216,7 @@ const sidebars = {
         "standards/aptos-object",
         "standards/aptos-coin",
         "standards/fungible-asset",
-        "standards/aptos-token-v2",
+        "standards/digital-asset",
         "standards/aptos-token",
         "standards/wallets",
       ],

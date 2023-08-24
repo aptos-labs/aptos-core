@@ -1,11 +1,10 @@
 ---
-title: "Aptos Token V2"
-id: "aptos-token-v2"
+title: "Aptos Digital Asset Standard"
 ---
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Aptos Token V2
+# Aptos Digital Asset Standard
 
 ## Overview of NFTs
 An [NFT](https://en.wikipedia.org/wiki/Non-fungible_token) is a non-fungible [token](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token-objects/sources/token.move) 
@@ -28,7 +27,7 @@ or minimally contract. Each collection has a similar set of attributes:
 - `maximum`: The maximum number of NFTs that this collection can have. If `maximum` is set to 0, then supply is untracked. 
 
 ## Design principles
-The [Aptos token v2 standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token-objects/sources/token.move) 
+The [Aptos Digital Asset Standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token-objects/sources/token.move) 
 was developed with the following as an improvement on the Aptos Token standard. It has these ideas in mind:
 * **Flexibility** - NFTs are flexible and can be customized to accommodate any creative designs.
 * **Composability** - Multiple NFTs can be easily composed together, such that the final object is greater than the sum of its parts
@@ -39,9 +38,9 @@ functions are non-entry and thus not callable directly from off chain. Creators 
 these fuctionalities or use "no code" solutions also provided in the framework. One such solution is [aptos_token](#aptos-token)
 which provides functionalities such as custom metadata (via PropertyMap) and soul bound.
 
-## Comparison to Token V1
+## Comparison to the legacy Aptos Token Standard
 
-Token V2 uses Aptos [objects](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/object.move)
+Digital Asset uses Aptos [objects](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/object.move)
 rather than account resources traditionally used in Move. This allows for storing data outside the account and adding
 flexibility in this way. 
 * Tokens can be easily extended with custom data and functionalities without requiring any changes in the framework
@@ -86,7 +85,7 @@ See [Aptos Token](#aptos-token) for examples on how Royalty's `MutatorRef` can b
 Royalty can also be set directly on a token if it has a different royalty config than the collection's.
 
 ## Token lifecycle
-All token v2 modules are deployed at `0x4`.
+All Digital Asset modules are deployed at the reserved framework address `0x4`.
 
 ### Collection creation
 Every token belongs to a collection. The developer first needs to create a collection with:
@@ -278,7 +277,7 @@ Tokens can be simply transferred as objects to any user via `object::transfer`
 
 ## Aptos Token
 [Aptos Token](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token-objects/sources/aptos_token.move)
-is a "no code" solution that builds on top of the base token v2 standard and provides a more complete solution that
+is a "no code" solution that builds on top of the base Aptos Digital Asset Standard and provides a more complete solution that
 allows creators to mint NFTs without writing any code. It provides the following main features:
 * Soul bound tokens which are non-transferable by holders
 * Custom defined properties stored in a [PropertyMap](#property-map), a simple map data structure of attribute name (string) -> values (bytes).
@@ -336,17 +335,17 @@ are entry functions and do not return any ref (constructor, mutator, etc.). The 
 the refs obtained from creating the collection and token objects and do not expose raw access to them.
 
 If a creator wants more custom functionalities such as being able to forcefully transfer a soul bound token, they would
-need to write their own custom module that builds on top of the base token v2 standard. They can of course borrow inspiration
+need to write their own custom module that builds on top of the base Aptos Digital Asset Standard. They can of course borrow inspiration
 and code from the Aptos Token module.
 
 ## Fungible Token
-Similar to [EIP-1155](https://eips.ethereum.org/EIPS/eip-1155), the Token v2 standard also supports fungible tokens
+Similar to [EIP-1155](https://eips.ethereum.org/EIPS/eip-1155), the Aptos Digital Asset Standard also supports fungible tokens
 (also known as semi-fungible tokens). An example of this would be armor tokens in a game. Each armor token represents a
 type of armor and is a token in a collection with metadata (e.g. durability, defense, etc.) and can be minted and burned.
 However, there are multiple instances of the same armor type. For example, a player can have 3 wooden armors, where wooden armor
 is a token in the Armor collection.
 
-This can be easily built by combining Token v2 and Fungible Assets. After the creator creates the Armor collection and the
+This can be easily built by creating an asset that is both a Digital Asset (DA) and a Fungible Asset (FA), resulting in a Digital and Fungible Asset (DFA). After the creator creates the Armor collection and the
 Wooden Armor token, they can make the Wooden Armor token "fungible":
 
 ```rust

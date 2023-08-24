@@ -21,6 +21,7 @@ aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
+aptos-experimental-ptx-executor = { workspace = true }
 aptos-genesis = { workspace = true, features = ["testing"] }
 aptos-jellyfish-merkle = { workspace = true }
 aptos-logger = { workspace = true }
