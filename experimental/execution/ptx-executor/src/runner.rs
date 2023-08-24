@@ -288,7 +288,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     // inform output state values to the manager
                     for (key, op) in vm_output.change_set().write_set_iter() {
                         self.scheduler
-                            .inform_state_value((key.clone(), txn_idx), op.as_state_value());
+                            .try_inform_state_value((key.clone(), txn_idx), op.as_state_value());
                     }
 
                     self.finalizer.add_vm_output(txn_idx, vm_output);
