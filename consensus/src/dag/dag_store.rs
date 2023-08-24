@@ -271,22 +271,22 @@ impl Dag {
         }
     }
 
-    pub fn lowest_incomplete_round(&self) -> Option<Round> {
+    pub fn lowest_incomplete_round(&self) -> Round {
+        if self.nodes_by_round.is_empty() {
+            return self.lowest_round();
+        }
+
         for (round, round_nodes) in &self.nodes_by_round {
             if round_nodes.iter().any(|node| node.is_none()) {
-                return Some(*round);
+                return *round;
             }
         }
-        None
+
+        self.highest_round() + 1
     }
 
     pub fn bitmask(&self, target_round: Round) -> DagSnapshotBitmask {
-        let lowest_round = match self.lowest_incomplete_round() {
-            Some(round) => round,
-            None => {
-                return DagSnapshotBitmask::new(self.highest_round() + 1, vec![]);
-            },
-        };
+        let lowest_round = self.lowest_incomplete_round();
 
         let bitmask = self
             .nodes_by_round
