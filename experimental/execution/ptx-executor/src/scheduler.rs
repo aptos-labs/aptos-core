@@ -45,9 +45,11 @@ impl PtxScheduler {
                         worker.add_transaction(txn_idx, transaction, dependencies);
                     },
                     Command::FinishBlock => {
+                        trace!("finish_block.");
                         worker.finish_block();
                     },
                     Command::Exit => {
+                        trace!("exit.");
                         break;
                     },
                 }
@@ -64,6 +66,7 @@ pub(crate) struct PtxSchedulerClient {
 
 impl PtxSchedulerClient {
     pub fn inform_state_value(&self, key: VersionedKey, value: Option<StateValue>) {
+        trace!("inform_val {}", key.1);
         self.send_to_worker(Command::InformStateValue { key, value });
     }
 
@@ -73,6 +76,7 @@ impl PtxSchedulerClient {
         transaction: Transaction,
         dependencies: HashSet<(StateKey, TxnIdx)>,
     ) {
+        trace!("add_txn {}", txn_idx);
         self.send_to_worker(Command::AddTransaction {
             txn_idx,
             transaction,
@@ -81,6 +85,7 @@ impl PtxSchedulerClient {
     }
 
     pub fn finish_block(&self) {
+        trace!("finish_block.");
         self.send_to_worker(Command::FinishBlock);
     }
 
@@ -180,7 +185,7 @@ impl Worker {
         versioned_key: VersionedKey,
         value: Option<StateValue>,
     ) {
-        let pending_txn = self.borrow_pending_txn(txn_idx);
+        let pending_txn = self.transactions[txn_idx].as_mut().unwrap();
         let found_dependency = pending_txn.pending_dependencies.remove(&versioned_key);
         assert!(found_dependency, "Pending dependency not found.");
         let (key, _txn_idx) = versioned_key;
@@ -189,12 +194,6 @@ impl Worker {
         if pending_txn.pending_dependencies.is_empty() {
             self.run_transaction(txn_idx);
         }
-    }
-
-    fn borrow_pending_txn(&mut self, txn_idx: TxnIdx) -> &mut PendingTransaction {
-        self.transactions[txn_idx]
-            .as_mut()
-            .expect("Transaction is not Pending.")
     }
 
     fn take_pending_txn(&mut self, txn_idx: TxnIdx) -> PendingTransaction {
@@ -212,6 +211,7 @@ impl Worker {
         dependencies: HashSet<VersionedKey>,
     ) {
         let _timer = TIMER.timer_with(&["scheduler_add_txn"]);
+        assert_eq!(txn_idx, self.transactions.len());
         self.transactions
             .push(Some(PendingTransaction::new(transaction)));
         self.num_pending_txns += 1;
