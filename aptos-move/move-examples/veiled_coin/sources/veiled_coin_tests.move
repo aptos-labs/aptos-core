@@ -58,7 +58,7 @@ module veiled_coin::veiled_coin_tests {
         assert!(signer::address_of(&aptos_fx) != signer::address_of(recipient), 2);
 
         // Initialize the `veiled_coin` module & enable the feature
-        veiled_coin::init_module_for_testing<coin::FakeMoney>(developer, resource_acct);
+        veiled_coin::init_module_for_testing(developer, resource_acct);
         println(b"Initialized module.");
         features::change_feature_flags(&aptos_fx, vector[features::get_bulletproofs_feature()], vector[]);
         println(b"Enabled feature flags.");

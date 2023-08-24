@@ -247,7 +247,7 @@ module veiled_coin::veiled_coin {
 
     /// Initializes a so-called "resource" account which will maintain a `coin::CoinStore<T>` resource for all `Coin<T>`'s
     /// that have been converted into a `VeiledCoin<T>`.
-    fun init_module<CoinType>(resource_account: &signer) {
+    fun init_module(resource_account: &signer) {
         assert!(
             bulletproofs::get_max_range_bits() >= MAX_BITS_IN_VEILED_COIN_VALUE,
             error::internal(ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE)
@@ -263,8 +263,6 @@ module veiled_coin::veiled_coin {
         let signer_cap = resource_account::retrieve_resource_account_cap(
             resource_account, @developer_addr
         );
-
-        coin::register<CoinType>(resource_account);
 
         // Move the signer capability to the resource account so the contract can sign its transactions
         move_to(resource_account, VeiledCoinMinter { signer_cap } );
@@ -775,13 +773,13 @@ module veiled_coin::veiled_coin {
 
     #[test_only]
     /// So we can call this from `veiled_coin_tests.move`. `developer` must be the signer of @developer_addr
-    public fun init_module_for_testing<CoinType>(developer: &signer, resource_acct: &signer) {
+    public fun init_module_for_testing(developer: &signer, resource_acct: &signer) {
         let seed = vector::empty();
         let auth_key = vector::empty();
         // When deploying this contract we must have both a developer account which deploys the contract, and a resource account under which the contract is published. These two lines mock this flow for testing
         create_account_for_test(signer::address_of(developer));
         resource_account::create_resource_account(developer, seed, auth_key);
-        init_module<CoinType>(resource_acct)
+        init_module(resource_acct)
     }
 
     //
