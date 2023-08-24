@@ -9,6 +9,9 @@ echo "Building tools and services docker images"
 echo "PROFILE: $PROFILE"
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
+echo "Run libudev-dev check"
+PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1 PKG_CONFIG_ALLOW_SYSTEM_LIBS=1 pkg-config --libs --cflags libudev
+
 # Build all the rust binaries
 cargo build --locked --profile=$PROFILE \
     -p aptos \
