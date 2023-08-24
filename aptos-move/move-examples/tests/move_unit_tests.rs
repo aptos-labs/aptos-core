@@ -86,7 +86,7 @@ fn test_veiled_coin() {
     let addr = AccountAddress::from_hex_literal("0x4567").unwrap();
     let resource = create_resource_address(addr, &[]);
     let named_address = BTreeMap::from([
-        (String::from("source_addr"), addr),
+        (String::from("developer_addr"), addr),
         (String::from("veiled_coin"), resource)]);
     run_tests_for_pkg("veiled_coin", named_address);
 }
@@ -118,10 +118,10 @@ fn test_hello_blockchain() {
 
 #[test]
 fn test_drand_lottery() {
-let addr = AccountAddress::from_hex_literal("0x7654").unwrap();
+    let addr = AccountAddress::from_hex_literal("0x7654").unwrap();
     let resource = create_resource_address(addr, &[]);
     let named_address = BTreeMap::from([
-        (String::from("source_addr"), addr),
+        (String::from("developer_addr"), addr),
         (String::from("drand"), resource)]);
     run_tests_for_pkg("drand", named_address);
 }

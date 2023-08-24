@@ -66,12 +66,12 @@ module drand::lottery {
     // Declare the testing module as a friend, so it can call `init_module` below for testing.
     friend drand::lottery_test;
 
-    /// Retrieves a so-called "resource" account which will maintain the list of lottery tickets bought by users. This must have been initialized before the contract is deployed, by the account associated with @source_addr.
+    /// Retrieves a so-called "resource" account which will maintain the list of lottery tickets bought by users. This must have been initialized before the contract is deployed, by the account associated with @developer_addr.
     public(friend) fun init_module(resource_account: &signer) {
         // Retrieve the resource account. This will allow this module to later obtain a `signer` for this account and
         // update the list of purchased lottery tickets.
         let signer_cap = resource_account::retrieve_resource_account_cap(
-            resource_account, @source_addr
+            resource_account, @developer_addr
         );
 
         // Acquire a signer for the resource account that stores the coin bounty

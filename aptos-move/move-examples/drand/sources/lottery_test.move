@@ -27,25 +27,25 @@ module drand::lottery_test {
     }
 
     #[test_only]
-    public fun init_module_for_testing(source: &signer, resource_acct: &signer) {
+    public fun init_module_for_testing(developer: &signer, resource_acct: &signer) {
         let seed = vector::empty();
         let auth_key = vector::empty();
-        // When deploying this contract we must have both a source account which deploys the contract, and a resource account under which the contract is published. These two lines mock this flow for testing
-        create_account_for_test(signer::address_of(source));
-        resource_account::create_resource_account(source, seed, auth_key);
+        // When deploying this contract we must have both a developer account which deploys the contract, and a resource account under which the contract is published. These two lines mock this flow for testing
+        create_account_for_test(signer::address_of(developer));
+        resource_account::create_resource_account(developer, seed, auth_key);
         lottery::init_module(resource_acct)
     }
 
-    #[test(source = @source_addr, resource_acct = @drand, fx = @aptos_framework, u1 = @0xA001, u2 = @0xA002, u3 = @0xA003, u4 = @0xA004)]
+    #[test(developer = @developer_addr, resource_acct = @drand, fx = @aptos_framework, u1 = @0xA001, u2 = @0xA002, u3 = @0xA003, u4 = @0xA004)]
     fun test_lottery(
-        source: signer, resource_acct: signer, fx: signer,
+        developer: signer, resource_acct: signer, fx: signer,
         u1: signer, u2: signer, u3: signer, u4: signer,
     ) {
         enable_cryptography_algebra_natives(&fx);
         timestamp::set_time_has_started_for_testing(&fx);
 
         // Deploy the lottery smart contract
-        init_module_for_testing(&source, &resource_acct);
+        init_module_for_testing(&developer, &resource_acct);
 
         // Needed to mint coins out of thin air for testing
         let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&fx);

@@ -258,10 +258,10 @@ module veiled_coin::veiled_coin {
             error::internal(EU64_COIN_AMOUNT_CLAMPING_IS_INCORRECT)
         );
 
-        // Retrieve the signer capabiltiy of the resource account associated with @source_addr
-        // `retrieve_resource_account_cap` will rotate the resource account's authentication key to 0x0, ensuring the @source_addr account can no longer sign for it
+        // Retrieve the signer capabiltiy of the resource account associated with @developer_addr
+        // `retrieve_resource_account_cap` will rotate the resource account's authentication key to 0x0, ensuring the @developer_addr account can no longer sign for it
         let signer_cap = resource_account::retrieve_resource_account_cap(
-            resource_account, @source_addr
+            resource_account, @developer_addr
         );
 
         coin::register<CoinType>(resource_account);
@@ -774,13 +774,13 @@ module veiled_coin::veiled_coin {
     }
 
     #[test_only]
-    /// So we can call this from `veiled_coin_tests.move`. `source` must be the signer of @source_addr
-    public fun init_module_for_testing<CoinType>(source: &signer, resource_acct: &signer) {
+    /// So we can call this from `veiled_coin_tests.move`. `developer` must be the signer of @developer_addr
+    public fun init_module_for_testing<CoinType>(developer: &signer, resource_acct: &signer) {
         let seed = vector::empty();
         let auth_key = vector::empty();
-        // When deploying this contract we must have both a source account which deploys the contract, and a resource account under which the contract is published. These two lines mock this flow for testing
-        create_account_for_test(signer::address_of(source));
-        resource_account::create_resource_account(source, seed, auth_key);
+        // When deploying this contract we must have both a developer account which deploys the contract, and a resource account under which the contract is published. These two lines mock this flow for testing
+        create_account_for_test(signer::address_of(developer));
+        resource_account::create_resource_account(developer, seed, auth_key);
         init_module<CoinType>(resource_acct)
     }
 
