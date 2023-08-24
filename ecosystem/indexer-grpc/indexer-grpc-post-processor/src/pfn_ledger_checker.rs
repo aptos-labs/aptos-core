@@ -154,6 +154,11 @@ async fn handle_pfn_response(
             INDEXER_GRPC_LATENCY_AGAINST_PFN_LATENCY_IN_SECS
                 .with_label_values(&[&pfn_address.to_string()])
                 .set(latency);
+        } else {
+            // If it's not shown in the map, we set the latency to 10 seconds.
+            INDEXER_GRPC_LATENCY_AGAINST_PFN_LATENCY_IN_SECS
+                .with_label_values(&[&pfn_address.to_string()])
+                .set(10.0);
         }
     }
 }
