@@ -49,9 +49,9 @@ class TransactionGenerator:
     _recipient: AccountAddress
     _offset: int
     _remaining_transactions: int
-    _waiting_for_more = asyncio.Event
-    _complete = asyncio.Event
-    _lock = asyncio.Lock
+    _waiting_for_more: asyncio.Event
+    _complete: asyncio.Event
+    _lock: asyncio.Lock
 
     def __init__(self, client: RestClient, recipient: AccountAddress):
         self._client = client
@@ -139,7 +139,10 @@ class Worker:
             self._account, self._rest_client, self._txn_generator.next_transaction
         )
 
-    def run(queue: Pipe, node_url: str, account: Account, recipient: AccountAddress):
+    @staticmethod
+    def run(
+        queue: Connection, node_url: str, account: Account, recipient: AccountAddress
+    ):
         worker = Worker(queue, node_url, account, recipient)
         asyncio.run(worker.async_run())
 
@@ -200,7 +203,7 @@ async def transfer_transaction(
     sequence_number: int,
     recipient: AccountAddress,
     amount: int,
-) -> str:
+) -> SignedTransaction:
     transaction_arguments = [
         TransactionArgument(recipient, Serializer.struct),
         TransactionArgument(amount, Serializer.u64),
@@ -226,7 +229,7 @@ async def token_transaction(
     sequence_number: int,
     recipient: AccountAddress,
     amount: int,
-) -> str:
+) -> SignedTransaction:
     collection_name = "Funky Alice's"
     if sequence_number == 8351:
         payload = AptosTokenClient.create_collection_payload(
@@ -267,6 +270,7 @@ class Accounts:
         self.senders = senders
         self.receivers = receivers
 
+    @staticmethod
     def generate(path: str, num_accounts: int) -> Accounts:
         source = Account.generate()
         source.store(f"{path}/source.txt")
@@ -279,6 +283,7 @@ class Accounts:
             receivers[-1].store(f"{path}/receiver_{idx}.txt")
         return Accounts(source, senders, receivers)
 
+    @staticmethod
     def load(path: str, num_accounts: int) -> Accounts:
         source = Account.load(f"{path}/source.txt")
         senders = []
@@ -321,8 +326,8 @@ async def distribute(
 
     account_sequence_number = AccountSequenceNumber(rest_client, source.address())
 
-    txns = []
-    txn_hashes = []
+    txns: List[Any] = []
+    txn_hashes: List[str] = []
 
     for account, fund in all_accounts:
         sequence_number = await account_sequence_number.next_sequence_number(
@@ -332,6 +337,7 @@ async def distribute(
             txn_hashes.extend(await asyncio.gather(*txns))
             txns = []
             sequence_number = await account_sequence_number.next_sequence_number()
+        assert sequence_number is not None
         amount = per_node_amount if fund else 0
         txn = await transfer_transaction(
             rest_client, source, sequence_number, account, amount

@@ -28,7 +28,9 @@ async def publish_large_packages(large_packages_dir) -> AccountAddress:
 
     alice = Account.generate()
     await faucet_client.fund_account(alice.address(), 1_000_000_000)
-    await aptos_sdk_cli.publish_package(large_packages_dir, {"large_packages": alice.address()}, alice, NODE_URL)
+    await aptos_sdk_cli.publish_package(
+        large_packages_dir, {"large_packages": alice.address()}, alice, NODE_URL
+    )
     return alice.address()
 
 
