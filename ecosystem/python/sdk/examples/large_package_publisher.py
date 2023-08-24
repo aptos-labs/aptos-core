@@ -12,6 +12,7 @@ import asyncio
 import os
 import sys
 
+import aptos_sdk.cli as aptos_sdk_cli
 from aptos_sdk.account import Account
 from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.aptos_cli_wrapper import AptosCLIWrapper
@@ -27,23 +28,7 @@ async def publish_large_packages(large_packages_dir) -> AccountAddress:
 
     alice = Account.generate()
     await faucet_client.fund_account(alice.address(), 1_000_000_000)
-    AptosCLIWrapper.compile_package(
-        large_packages_dir, {"large_packages": alice.address()}
-    )
-
-    package_build_path = os.path.join(large_packages_dir, "build", "LargePackages")
-    module_path = os.path.join(
-        package_build_path, "bytecode_modules", "large_packages.mv"
-    )
-    with open(module_path, "rb") as f:
-        module = f.read()
-
-    metadata_path = os.path.join(package_build_path, "package-metadata.bcs")
-    with open(metadata_path, "rb") as f:
-        metadata = f.read()
-
-    publisher = PackagePublisher(rest_client)
-    await publisher.publish_package_experimental(alice, metadata, [module])
+    await aptos_sdk_cli.publish_package(large_packages_dir, {"large_packages": alice.address()}, alice, NODE_URL)
     return alice.address()
 
 
@@ -72,27 +57,9 @@ async def main(
     else:
         input("\nUpdate the module with Alice's address, compile, and press Enter.")
 
-    package_build_path = os.path.join(
-        large_package_example_dir, "build", "LargePackageExample"
-    )
-    module_directory = os.path.join(package_build_path, "bytecode_modules")
-    module_paths = os.listdir(module_directory)
-    modules = []
-    for module_path in module_paths:
-        module_path = os.path.join(module_directory, module_path)
-        if not os.path.isfile(module_path) and not module_path.endswith(".mv"):
-            continue
-        with open(module_path, "rb") as f:
-            module = f.read()
-            modules.append(module)
-
-    metadata_path = os.path.join(package_build_path, "package-metadata.bcs")
-    with open(metadata_path, "rb") as f:
-        metadata = f.read()
-
     publisher = PackagePublisher(rest_client)
-    await publisher.publish_package_experimental(
-        alice, metadata, modules, large_packages_account
+    await publisher.publish_package_in_path(
+        alice, large_package_example_dir, large_packages_account
     )
 
 
