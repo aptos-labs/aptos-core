@@ -6,6 +6,7 @@
 //! TODO(aldenhu): doc
 
 use crate::{common::BASE_VERSION, metrics::TIMER, scheduler::PtxSchedulerClient};
+use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
 use aptos_state_view::StateView;
 use aptos_types::state_store::state_key::StateKey;
@@ -13,7 +14,7 @@ use once_cell::sync::Lazy;
 use rayon::Scope;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-const NUM_IO_THREADS: usize = 32;
+const NUM_IO_THREADS: usize = 64;
 
 pub(crate) static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -47,7 +48,7 @@ impl PtxStateReader {
         IO_POOL.scope(move |io_scope| loop {
             let scheduler = scheduler.clone();
             match work_rx.recv().expect("Channel closed.") {
-                Command::Read { state_key } => io_scope.spawn(move |_scope| {
+                Command::Read { state_key } => io_scope.spawn(move |_io_scope| {
                     let value = state_view.get_state_value(&state_key).unwrap();
                     scheduler.inform_state_value((state_key, BASE_VERSION), value);
                 }),
@@ -56,6 +57,7 @@ impl PtxStateReader {
                 },
             }
         });
+        trace!("IO scope exit.");
     }
 }
 

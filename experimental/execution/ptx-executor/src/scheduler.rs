@@ -134,18 +134,18 @@ struct Worker {
     num_pending_txns: usize,
     block_finished: bool,
     runner: PtxRunnerClient,
-    scheduler: PtxSchedulerClient,
+    myself: PtxSchedulerClient,
 }
 
 impl Worker {
-    fn new(runner: PtxRunnerClient, scheduler: PtxSchedulerClient) -> Self {
+    fn new(runner: PtxRunnerClient, myself: PtxSchedulerClient) -> Self {
         Self {
             transactions: Vec::with_capacity(EXPECTANT_BLOCK_SIZE),
             state_values: HashMap::with_capacity(EXPECTANT_BLOCK_KEYS),
             num_pending_txns: 0,
             block_finished: false,
             runner,
-            scheduler,
+            myself,
         }
     }
 
@@ -244,7 +244,6 @@ impl Worker {
     }
 
     pub fn finish_block(&mut self) {
-        let _timer = TIMER.timer_with(&["scheduler_finish_block"]);
         self.block_finished = true;
         self.maybe_exit();
     }
@@ -252,8 +251,7 @@ impl Worker {
     fn maybe_exit(&self) {
         if self.block_finished && self.num_pending_txns == 0 {
             self.runner.finish_block();
-            trace!("scheduler exit");
-            self.scheduler.exit();
+            self.myself.exit();
         }
     }
 
@@ -270,6 +268,8 @@ impl Worker {
 
         self.runner
             .add_transaction(txn_idx, transaction, met_dependencies);
+        // Try to exit only after the sending the work to the runner, so that a
+        // `runner.finish_block()` call happens after that.
         self.maybe_exit();
     }
 }
