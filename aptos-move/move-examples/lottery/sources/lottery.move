@@ -32,10 +32,6 @@ module lottery::lottery {
     /// The minimum price of a lottery ticket, in APT.
     const TICKET_PRICE: u64 = 10_000;
 
-    /// The address from which the developers created the resource account.
-    /// TODO: This needs to be updated before deploying. See the [resource account flow here](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/resource_account.move).
-    const DEVELOPER_ADDRESS: address = @0xcafe;
-
     /// A lottery: a list of users who bought tickets and the time at which
     /// it was started.
     ///
@@ -62,7 +58,7 @@ module lottery::lottery {
     /// [here](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/resource_account.move).
     public(friend) fun init_module(resource_account: &signer) {
         let signer_cap = resource_account::retrieve_resource_account_cap(
-            resource_account, DEVELOPER_ADDRESS
+            resource_account, @developer_address
         );
 
         // Initialize an AptosCoin coin store there, which is where the lottery
