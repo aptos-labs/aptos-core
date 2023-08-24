@@ -70,6 +70,13 @@ impl PtxSchedulerClient {
         self.send_to_worker(Command::InformStateValue { key, value });
     }
 
+    pub fn try_inform_state_value(&self, key: VersionedKey, value: Option<StateValue>) {
+        // TODO(aldenhu): hack: scheduler quits before runner
+        self.work_tx
+            .send(Command::InformStateValue { key, value })
+            .ok();
+    }
+
     pub fn add_transaction(
         &self,
         txn_idx: TxnIdx,
