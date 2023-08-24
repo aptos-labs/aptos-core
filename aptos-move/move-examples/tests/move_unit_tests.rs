@@ -79,10 +79,9 @@ fn test_resource_account_common(pkg: &str) {
 fn test_veiled_coin() {
     let addr = AccountAddress::from_hex_literal("0x4567").unwrap();
     let resource = create_resource_address(addr, &[]);
-    let named_address = BTreeMap::from([(
-        String::from("source_addr"),
-        addr,
-    ),(String::from("veiled_coin"), resource)]);
+    let named_address = BTreeMap::from([
+        (String::from("source_addr"), addr),
+        (String::from("veiled_coin"), resource)]);
     run_tests_for_pkg("veiled_coin", named_address);
 }
 

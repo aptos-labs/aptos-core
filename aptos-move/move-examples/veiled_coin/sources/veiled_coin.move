@@ -100,6 +100,14 @@
 /// the resource account can be used to transfer out the normal from its coin store. Transfering out a coin like this
 /// requires a `signer` for the resource account, which the `veiled_coin` module can obtain via a `SignerCapability`.
 ///
+/// ## Deploying this contract
+///
+/// To deploy this contract, run the CLI command:
+/// aptos move create-resource-account-and-publish-package --seed [seed] --address-name veiled_coin --profile [profile name] --named-addresses source_addr=[profile's account address] 
+/// where seed is an arbitrary positive integer, profile name is the name of the profile deploying the contract in your config file, and profile's account address is the `account` field for this profile in your config
+///
+/// This will deploy the contract under the resource account address obtained by sha3_256(profile address, seed).
+///
 /// ## References
 ///
 /// [BAZB20] Zether: Towards Privacy in a Smart Contract World; by Bunz, Benedikt and Agrawal, Shashank and Zamani,
@@ -250,23 +258,16 @@ module veiled_coin::veiled_coin {
             error::internal(EU64_COIN_AMOUNT_CLAMPING_IS_INCORRECT)
         );
 
+        // Retrieve the signer capabiltiy of the resource account associated with @source_addr
+        // `retrieve_resource_account_cap` will rotate the resource account's authentication key to 0x0, ensuring the @source_addr account can no longer sign for it
         let signer_cap = resource_account::retrieve_resource_account_cap(
             resource_account, @source_addr
         );
 
         coin::register<CoinType>(resource_account);
 
+        // Move the signer capability to the resource account so the contract can sign its transactions
         move_to(resource_account, VeiledCoinMinter { signer_cap } );
-
-        // Create the resource account. This will allow this module to later obtain a `signer` for this account and
-        // transfer `Coin<T>`'s into its `CoinStore<T>` before minting a `VeiledCoin<T>`.
-        //let (_resource, signer_cap) = account::create_resource_account(deployer, vector::empty());
-
-        //move_to(deployer,
-          //  VeiledCoinMinter {
-           //     signer_cap
-           // }
-       // )
     }
 
     //
@@ -775,11 +776,11 @@ module veiled_coin::veiled_coin {
     #[test_only]
     /// So we can call this from `veiled_coin_tests.move`. `source` must be the signer of @source_addr
     public fun init_module_for_testing<CoinType>(source: &signer, resource_acct: &signer) {
+        let seed = vector::empty();
         let auth_key = vector::empty();
-        //let origin_addr = signer::address_of(source);
-        //let _acct = borrow_global<Account>(origin_addr);
+        // When deploying this contract we must have both a source account which deploys the contract, and a resource account under which the contract is published. These two lines mock this flow for testing
         create_account_for_test(signer::address_of(source));
-        resource_account::create_resource_account(source, vector::empty(), auth_key);
+        resource_account::create_resource_account(source, seed, auth_key);
         init_module<CoinType>(resource_acct)
     }
 
