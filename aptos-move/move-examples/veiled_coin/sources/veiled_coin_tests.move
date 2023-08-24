@@ -45,7 +45,8 @@ module veiled_coin::veiled_coin_tests {
     ///
     /// Can be called with `sender` set to be equal to `recipient`.
     fun set_up_for_veiled_coin_test(
-        veiled_coin: &signer,
+        source: &signer,
+        resource_acct: &signer,
         aptos_fx: signer,
         sender: &signer,
         recipient: &signer,
@@ -57,7 +58,7 @@ module veiled_coin::veiled_coin_tests {
         assert!(signer::address_of(&aptos_fx) != signer::address_of(recipient), 2);
 
         // Initialize the `veiled_coin` module & enable the feature
-        veiled_coin::init_module_for_testing<coin::FakeMoney>(veiled_coin);
+        veiled_coin::init_module_for_testing<coin::FakeMoney>(source, resource_acct);
         println(b"Initialized module.");
         features::change_feature_flags(&aptos_fx, vector[features::get_bulletproofs_feature()], vector[]);
         println(b"Enabled feature flags.");
@@ -117,9 +118,10 @@ module veiled_coin::veiled_coin_tests {
     // Tests
     //
 
-    #[test(veiled_coin = @veiled_coin, aptos_fx = @aptos_framework, sender = @0xc0ffee, recipient = @0x1337)]
+    #[test(source = @source_addr, resource_acct = @veiled_coin, aptos_fx = @aptos_framework, sender = @0xc0ffee, recipient = @0x1337)]
     fun veil_test(
-        veiled_coin: signer,
+        source: signer,
+        resource_acct: signer,
         aptos_fx: signer,
         sender: signer,
         recipient: signer
@@ -132,7 +134,7 @@ module veiled_coin::veiled_coin_tests {
 
         // Split 500 and 500 between `sender` and `recipient`
         set_up_for_veiled_coin_test(
-            &veiled_coin, aptos_fx, &sender, &recipient, 500u32, 500u32);
+            &source, &resource_acct, aptos_fx, &sender, &recipient, 500u32, 500u32);
 
         // Register a veiled balance at the `recipient`'s account
         let (recipient_sk, recipient_pk) = generate_elgamal_keypair();
@@ -191,9 +193,10 @@ module veiled_coin::veiled_coin_tests {
             signer::address_of(&recipient), 100u32, &ristretto255::scalar_zero(), &recipient_pk), 1);
     }
 
-    #[test(veiled_coin = @veiled_coin, aptos_fx = @aptos_framework, sender = @0x1337)]
+    #[test(source = @source_addr, resource_acct = @veiled_coin, aptos_fx = @aptos_framework, sender = @0x1337)]
     fun unveil_test(
-        veiled_coin: signer,
+        source: signer,
+        resource_acct: signer,
         aptos_fx: signer,
         sender: signer,
     ) {
@@ -205,7 +208,7 @@ module veiled_coin::veiled_coin_tests {
 
         // Create a `sender` account with 500 `FakeCoin`'s
         set_up_for_veiled_coin_test(
-            &veiled_coin, aptos_fx, &sender, &sender, 500, 0);
+            &source, &resource_acct, aptos_fx, &sender, &sender, 500, 0);
 
         // Register a veiled balance for the `sender`
         let (sender_sk, sender_pk) = generate_elgamal_keypair();
@@ -270,14 +273,15 @@ module veiled_coin::veiled_coin_tests {
         assert!(remaining_public_balance == veiled_coin::cast_u32_to_u64_amount(400), 3);
     }
 
-    #[test(veiled_coin = @veiled_coin, aptos_fx = @aptos_framework, sender = @0xc0ffee, recipient = @0x1337)]
+    #[test(source = @source_addr, resource_acct = @veiled_coin, aptos_fx = @aptos_framework, sender = @0xc0ffee, recipient = @0x1337)]
     fun basic_viability_test(
-        veiled_coin: signer,
+        source: signer,
+        resource_acct: signer, 
         aptos_fx: signer,
         sender: signer,
         recipient: signer
     ) {
-        set_up_for_veiled_coin_test(&veiled_coin, aptos_fx, &sender, &recipient, 500, 500);
+        set_up_for_veiled_coin_test(&source, &resource_acct, aptos_fx, &sender, &recipient, 500, 500);
 
         // Creates a balance of `b = 150` veiled coins at sender (requires registering a veiled coin store at 'sender')
         let (sender_sk, sender_pk) = generate_elgamal_keypair();

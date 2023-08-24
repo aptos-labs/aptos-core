@@ -108,7 +108,7 @@ module veiled_coin::veiled_coin {
     use std::error;
     use std::option::Option;
     use std::signer;
-    //use std::vector;
+    use std::vector;
 
     use aptos_std::ristretto255;
     use aptos_std::ristretto255_bulletproofs as bulletproofs;
@@ -122,6 +122,7 @@ module veiled_coin::veiled_coin {
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::resource_account;
+    use aptos_framework::account::create_account_for_test;
 
     use veiled_coin::helpers;
     use veiled_coin::sigma_protos;
@@ -718,7 +719,7 @@ module veiled_coin::veiled_coin {
 
     /// Returns a signer for the resource account storing all the normal coins that have been veiled.
     fun get_resource_account_signer(): signer acquires VeiledCoinMinter {
-        account::create_signer_with_capability(&borrow_global<VeiledCoinMinter>(@source_addr).signer_cap)
+        account::create_signer_with_capability(&borrow_global<VeiledCoinMinter>(@veiled_coin).signer_cap)
     }
 
     /// Mints a veiled coin from a normal coin, shelving the normal coin into the resource account's coin store.
@@ -772,9 +773,14 @@ module veiled_coin::veiled_coin {
     }
 
     #[test_only]
-    /// So we can call this from `veiled_coin_tests.move`.
-    public fun init_module_for_testing<CoinType>(deployer: &signer) {
-        init_module<CoinType>(deployer)
+    /// So we can call this from `veiled_coin_tests.move`. `source` must be the signer of @source_addr
+    public fun init_module_for_testing<CoinType>(source: &signer, resource_acct: &signer) {
+        let auth_key = vector::empty();
+        //let origin_addr = signer::address_of(source);
+        //let _acct = borrow_global<Account>(origin_addr);
+        create_account_for_test(signer::address_of(source));
+        resource_account::create_resource_account(source, vector::empty(), auth_key);
+        init_module<CoinType>(resource_acct)
     }
 
     //
