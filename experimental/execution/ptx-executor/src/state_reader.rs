@@ -53,6 +53,7 @@ impl PtxStateReader {
                     scheduler.inform_state_value((state_key, BASE_VERSION), value);
                 }),
                 Command::FinishBlock => {
+                    trace!("finish_block.");
                     break;
                 },
             }

@@ -6,6 +6,7 @@
 //! TODO(aldenhu): doc
 
 use crate::{metrics::TIMER, sorter::PtxSorterClient};
+use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::transaction::Transaction;
 use rayon::Scope;
@@ -26,6 +27,7 @@ impl PtxAnalyzer {
                     },
                     Command::Finish => {
                         sorter.finish_block();
+                        trace!("finish_block.");
                         break;
                     },
                 }

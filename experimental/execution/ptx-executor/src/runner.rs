@@ -64,6 +64,7 @@ impl PtxRunner {
                     },
                     Command::FinishBlock => {
                         manager.finish_block();
+                        trace!("finish_block.");
                         break;
                     },
                     Command::SpawnWorkers { .. } => panic!("SpawnWorkers called twice."),
