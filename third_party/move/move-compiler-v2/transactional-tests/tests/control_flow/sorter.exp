@@ -286,7 +286,7 @@ B0:
 
 >>> V2 Compiler {
 == BEGIN Bytecode ==
-// Move bytecode v6
+// Move bytecode v4294967295
 module 42.heap {
 
 
@@ -567,7 +567,7 @@ B5:
 task 1 'run'. lines 67-73:
 
 == BEGIN Bytecode ==
-// Move bytecode v6
+// Move bytecode v4294967295
 script {
 use 0000000000000000000000000000000000000000000000000000000000000042::heap;
 

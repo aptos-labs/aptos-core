@@ -7,12 +7,13 @@ use aptos_config::config::{
 };
 use aptos_executor::block_executor::TransactionBlockExecutor;
 use aptos_executor_benchmark::{native_executor::NativeExecutor, pipeline::PipelineConfig};
+use aptos_experimental_ptx_executor::PtxBlockExecutor;
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::args::TransactionTypeArg;
 use aptos_vm::AptosVM;
-use clap::{Parser, Subcommand};
+use clap::{ArgGroup, Parser, Subcommand};
 use once_cell::sync::Lazy;
 use std::{
     path::PathBuf,
@@ -126,6 +127,19 @@ struct ProfilerOpt {
 }
 
 #[derive(Parser, Debug)]
+#[clap(group(
+    ArgGroup::new("vm_selection")
+    .args(&["use_native_executor", "use_ptx_executor"]),
+))]
+pub struct VmSelectionOpt {
+    #[clap(long)]
+    use_native_executor: bool,
+
+    #[clap(long)]
+    use_ptx_executor: bool,
+}
+
+#[derive(Parser, Debug)]
 struct Opt {
     #[clap(long, default_value_t = 10000)]
     block_size: usize,
@@ -166,8 +180,8 @@ struct Opt {
     #[clap(long)]
     verify_sequence_numbers: bool,
 
-    #[clap(long)]
-    use_native_executor: bool,
+    #[clap(flatten)]
+    vm_selection_opt: VmSelectionOpt,
 
     #[clap(flatten)]
     profiler_opt: ProfilerOpt,
@@ -376,8 +390,10 @@ fn main() {
         let _mem_start = memory_profiler.start_profiling();
     }
 
-    if opt.use_native_executor {
+    if opt.vm_selection_opt.use_native_executor {
         run::<NativeExecutor>(opt);
+    } else if opt.vm_selection_opt.use_ptx_executor {
+        run::<PtxBlockExecutor>(opt);
     } else {
         run::<AptosVM>(opt);
     }

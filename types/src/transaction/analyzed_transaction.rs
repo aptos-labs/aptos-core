@@ -4,6 +4,7 @@
 use crate::{
     access_path::AccessPath,
     account_config::{AccountResource, CoinStoreResource},
+    block_metadata::BlockMetadata,
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{SignedTransaction, Transaction, TransactionPayload},
 };
@@ -169,6 +170,34 @@ impl AnalyzedTransaction {
             read_hints,
         )
     }
+
+    pub fn analyzed_transaction_for_block_metadata(block_meta: BlockMetadata) -> Self {
+        // TODO(ptx): Add read hints for block metadata
+        AnalyzedTransaction::new(Transaction::BlockMetadata(block_meta), vec![], vec![])
+    }
+
+    pub fn analyzed_transaction_for_state_checkpoint(hash_value: HashValue) -> Self {
+        AnalyzedTransaction::new(Transaction::StateCheckpoint(hash_value), vec![], vec![])
+    }
+
+    pub fn expect_p_txn(self) -> (Transaction, Vec<StateKey>, Vec<StateKey>) {
+        assert!(self.predictable_transaction());
+        (
+            self.transaction,
+            Self::expect_specific_locations(self.read_hints),
+            Self::expect_specific_locations(self.write_hints),
+        )
+    }
+
+    fn expect_specific_locations(locations: Vec<StorageLocation>) -> Vec<StateKey> {
+        locations
+            .into_iter()
+            .map(|loc| match loc {
+                StorageLocation::Specific(key) => key,
+                _ => unreachable!(),
+            })
+            .collect()
+    }
 }
 
 impl PartialEq<Self> for AnalyzedTransaction {
@@ -198,7 +227,7 @@ impl From<Transaction> for AnalyzedTransaction {
                         (AccountAddress::ONE, "coin", "transfer") => {
                             let sender_address = signed_txn.sender();
                             let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
-                            AnalyzedTransaction::analyzed_transaction_for_coin_transfer(
+                            Self::analyzed_transaction_for_coin_transfer(
                                 signed_txn,
                                 sender_address,
                                 receiver_address,
@@ -208,7 +237,7 @@ impl From<Transaction> for AnalyzedTransaction {
                         (AccountAddress::ONE, "aptos_account", "transfer") => {
                             let sender_address = signed_txn.sender();
                             let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
-                            AnalyzedTransaction::analyzed_transaction_for_coin_transfer(
+                            Self::analyzed_transaction_for_coin_transfer(
                                 signed_txn,
                                 sender_address,
                                 receiver_address,
@@ -218,7 +247,7 @@ impl From<Transaction> for AnalyzedTransaction {
                         (AccountAddress::ONE, "aptos_account", "create_account") => {
                             let sender_address = signed_txn.sender();
                             let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
-                            AnalyzedTransaction::analyzed_transaction_for_create_account(
+                            Self::analyzed_transaction_for_create_account(
                                 signed_txn,
                                 sender_address,
                                 receiver_address,
@@ -229,7 +258,13 @@ impl From<Transaction> for AnalyzedTransaction {
                 },
                 _ => todo!("Only entry function transactions are supported for now"),
             },
-            _ => AnalyzedTransaction::new_with_no_hints(txn),
+            Transaction::BlockMetadata(block_meta) => {
+                Self::analyzed_transaction_for_block_metadata(block_meta)
+            },
+            Transaction::StateCheckpoint(hash_value) => {
+                Self::analyzed_transaction_for_state_checkpoint(hash_value)
+            },
+            Transaction::GenesisTransaction(_) => Self::new_with_no_hints(txn),
         }
     }
 }

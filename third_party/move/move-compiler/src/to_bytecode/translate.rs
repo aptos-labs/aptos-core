@@ -7,9 +7,7 @@ use crate::{
     cfgir::{ast as G, translate::move_value_from_value_},
     compiled_unit::*,
     diag,
-    expansion::ast::{
-        AbilitySet, Address, Attributes, ModuleIdent, ModuleIdent_, SpecId, Visibility,
-    },
+    expansion::ast::{AbilitySet, Address, ModuleIdent, ModuleIdent_, SpecId, Visibility},
     hlir::{
         ast::{self as H, Value_},
         translate::{display_var, DisplayVar},
@@ -36,11 +34,7 @@ use std::{
 };
 
 type CollectedInfos = UniqueMap<FunctionName, CollectedInfo>;
-type CollectedInfo = (
-    Vec<(Var, H::SingleType)>,
-    BTreeMap<SpecId, SpecAnchor>,
-    Attributes,
-);
+type CollectedInfo = BTreeMap<SpecId, SpecAnchor>;
 
 fn extract_decls(
     compilation_env: &mut CompilationEnv,
@@ -371,11 +365,7 @@ fn function_info_map(
         .into_iter()
         .map(|(n, v)| (Symbol::from(n.as_str()), v))
         .collect();
-    let (params, specs, attributes) = collected_function_infos.get_(&name).unwrap();
-    let parameters = params
-        .iter()
-        .map(|(v, ty)| var_info(&local_map, *v, ty.clone()))
-        .collect();
+    let specs = collected_function_infos.get_(&name).unwrap();
     let spec_info = specs
         .iter()
         .map(|(id, anchor)| {
@@ -399,21 +389,14 @@ fn function_info_map(
             (*id, info)
         })
         .collect();
-    let function_info = FunctionInfo {
-        spec_info,
-        parameters,
-        attributes: attributes.clone(),
-    };
+    let function_info = FunctionInfo { spec_info };
 
     let name_loc = *collected_function_infos.get_loc_(&name).unwrap();
     let function_name = FunctionName(sp(name_loc, name));
     (function_name, function_info)
 }
 
-fn script_function_info(
-    source_map: &SourceMap,
-    (params, specs, attributes): CollectedInfo,
-) -> FunctionInfo {
+fn script_function_info(source_map: &SourceMap, info: CollectedInfo) -> FunctionInfo {
     let idx = F::FunctionDefinitionIndex(0);
     let function_source_map = source_map.get_function_source_map(idx).unwrap();
     let local_map = function_source_map
@@ -421,11 +404,7 @@ fn script_function_info(
         .into_iter()
         .map(|(n, v)| (Symbol::from(n.as_str()), v))
         .collect();
-    let parameters = params
-        .into_iter()
-        .map(|(v, ty)| var_info(&local_map, v, ty))
-        .collect();
-    let spec_info = specs
+    let spec_info = info
         .into_iter()
         .map(|(id, anchor)| {
             let SpecAnchor {
@@ -448,11 +427,7 @@ fn script_function_info(
             (id, info)
         })
         .collect();
-    FunctionInfo {
-        spec_info,
-        parameters,
-        attributes,
-    }
+    FunctionInfo { spec_info }
 }
 
 fn used_local_info(
@@ -591,7 +566,7 @@ fn function(
     fdef: G::Function,
 ) -> ((IR::FunctionName, IR::Function), CollectedInfo) {
     let G::Function {
-        attributes,
+        attributes: _,
         visibility: v,
         entry,
         signature,
@@ -635,10 +610,7 @@ fn function(
         specifications: vec![],
         body,
     };
-    (
-        (name, sp(loc, ir_function)),
-        (parameters, context.finish_function(), attributes),
-    )
+    ((name, sp(loc, ir_function)), context.finish_function())
 }
 
 fn visibility(v: Visibility) -> IR::FunctionVisibility {

@@ -47,6 +47,7 @@ use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
 use hex::FromHexError;
 use move_core_types::{account_address::AccountAddress, language_storage::TypeTag};
+use move_package::CompilerVersion;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -1117,6 +1118,10 @@ pub struct MovePackageDir {
     #[clap(long)]
     pub bytecode_version: Option<u32>,
 
+    /// Specify the version of the compiler.
+    #[clap(long)]
+    pub compiler_version: Option<CompilerVersion>,
+
     /// Do not complain about unknown attributes in Move code.
     #[clap(long)]
     pub skip_attribute_checks: bool,
@@ -1131,6 +1136,7 @@ impl MovePackageDir {
             named_addresses: Default::default(),
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
+            compiler_version: None,
             skip_attribute_checks: false,
         }
     }

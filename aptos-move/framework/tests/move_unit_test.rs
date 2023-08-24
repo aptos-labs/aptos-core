@@ -7,6 +7,7 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEAT
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
+use move_package::CompilerConfig;
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use tempfile::tempdir;
@@ -18,7 +19,10 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         move_package::BuildConfig {
             test_mode: true,
             install_dir: Some(tempdir().unwrap().path().to_path_buf()),
-            known_attributes: extended_checks::get_all_attribute_names().clone(),
+            compiler_config: CompilerConfig {
+                known_attributes: extended_checks::get_all_attribute_names().clone(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         // TODO(Gas): double check if this is correct
