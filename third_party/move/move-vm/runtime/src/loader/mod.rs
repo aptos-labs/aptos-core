@@ -3,11 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig,
-    data_cache::TransactionDataCache,
-    logging::expect_no_verification_errors,
-    native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    session::LoadedFunctionInstantiation,
+    config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
+    native_functions::NativeFunctions, session::LoadedFunctionInstantiation,
 };
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -15,10 +12,10 @@ use move_binary_format::{
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         AbilitySet, Bytecode, CompiledModule, CompiledScript, Constant, ConstantPoolIndex,
-        FieldHandleIndex, FieldInstantiationIndex, FunctionDefinition, FunctionDefinitionIndex,
-        FunctionHandleIndex, FunctionInstantiationIndex, Signature, SignatureIndex,
-        StructDefInstantiationIndex, StructDefinition, StructDefinitionIndex,
-        StructFieldInformation, TableIndex, TypeParameterIndex, Visibility,
+        FieldHandleIndex, FieldInstantiationIndex, FunctionDefinitionIndex, FunctionHandleIndex,
+        FunctionInstantiationIndex, Signature, SignatureIndex, StructDefInstantiationIndex,
+        StructDefinition, StructDefinitionIndex, StructFieldInformation, TableIndex,
+        TypeParameterIndex,
     },
     IndexKind,
 };
@@ -39,7 +36,10 @@ use std::{
     sync::Arc,
 };
 
+mod function;
 mod type_loader;
+
+pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
 
 use type_loader::make_type_internal;
 
@@ -535,9 +535,9 @@ impl Loader {
             .resolve_function_by_name(function_name, module_id)
             .map_err(|err| err.finish(Location::Undefined))?;
 
-        let parameters = func.parameter_types.clone();
+        let parameters = func.parameter_types().to_vec();
 
-        let return_ = func.return_types.clone();
+        let return_ = func.return_types().to_vec();
 
         Ok((module, func, parameters, return_))
     }
@@ -1689,12 +1689,6 @@ impl<'a> Resolver<'a> {
     }
 }
 
-#[derive(Clone, Debug)]
-enum FunctionHandle {
-    Local(Arc<Function>),
-    Remote { module: ModuleId, name: Identifier },
-}
-
 // A Module is very similar to a binary Module but data is "transformed" to a representation
 // more appropriate to execution.
 // When code executes indexes in instructions are resolved against those runtime structure
@@ -2244,228 +2238,7 @@ impl Script {
     }
 }
 
-// A simple wrapper for the "owner" of the function (Module or Script)
-#[derive(Debug, Clone)]
-enum Scope {
-    Module(ModuleId),
-    Script(ScriptHash),
-}
-
-// A runtime function
-// #[derive(Debug)]
-// https://github.com/rust-lang/rust/issues/70263
-#[derive(Clone)]
-pub(crate) struct Function {
-    #[allow(unused)]
-    file_format_version: u32,
-    index: FunctionDefinitionIndex,
-    code: Vec<Bytecode>,
-    parameters: Signature,
-    return_: Signature,
-    locals: Signature,
-    type_parameters: Vec<AbilitySet>,
-    native: Option<NativeFunction>,
-    def_is_native: bool,
-    def_is_friend_or_private: bool,
-    scope: Scope,
-    name: Identifier,
-    return_types: Vec<Type>,
-    local_types: Vec<Type>,
-    parameter_types: Vec<Type>,
-}
-
-// This struct must be treated as an identifier for a function and not somehow relying on
-// the internal implementation.
-pub struct LoadedFunction {
-    pub(crate) module: Arc<Module>,
-    pub(crate) function: Arc<Function>,
-}
-
-impl std::fmt::Debug for Function {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_struct("Function")
-            .field("scope", &self.scope)
-            .field("name", &self.name)
-            .finish()
-    }
-}
-
-impl Function {
-    fn new(
-        natives: &NativeFunctions,
-        index: FunctionDefinitionIndex,
-        def: &FunctionDefinition,
-        module: &CompiledModule,
-    ) -> Self {
-        let handle = module.function_handle_at(def.function);
-        let name = module.identifier_at(handle.name).to_owned();
-        let module_id = module.self_id();
-        let def_is_friend_or_private = match def.visibility {
-            Visibility::Friend | Visibility::Private => true,
-            Visibility::Public => false,
-        };
-        let (native, def_is_native) = if def.is_native() {
-            (
-                natives.resolve(
-                    module_id.address(),
-                    module_id.name().as_str(),
-                    name.as_str(),
-                ),
-                true,
-            )
-        } else {
-            (None, false)
-        };
-        let scope = Scope::Module(module_id);
-        let parameters = module.signature_at(handle.parameters).clone();
-        // Native functions do not have a code unit
-        let (code, locals) = match &def.code {
-            Some(code) => (
-                code.code.clone(),
-                Signature(
-                    parameters
-                        .0
-                        .iter()
-                        .chain(module.signature_at(code.locals).0.iter())
-                        .cloned()
-                        .collect(),
-                ),
-            ),
-            None => (vec![], Signature(vec![])),
-        };
-        let return_ = module.signature_at(handle.return_).clone();
-        let type_parameters = handle.type_parameters.clone();
-        Self {
-            file_format_version: module.version(),
-            index,
-            code,
-            parameters,
-            return_,
-            locals,
-            type_parameters,
-            native,
-            def_is_native,
-            def_is_friend_or_private,
-            scope,
-            name,
-            local_types: vec![],
-            return_types: vec![],
-            parameter_types: vec![],
-        }
-    }
-
-    #[allow(unused)]
-    pub(crate) fn file_format_version(&self) -> u32 {
-        self.file_format_version
-    }
-
-    pub(crate) fn module_id(&self) -> Option<&ModuleId> {
-        match &self.scope {
-            Scope::Module(module_id) => Some(module_id),
-            Scope::Script(_) => None,
-        }
-    }
-
-    pub(crate) fn index(&self) -> FunctionDefinitionIndex {
-        self.index
-    }
-
-    pub(crate) fn get_resolver<'a>(&self, loader: &'a Loader) -> Resolver<'a> {
-        match &self.scope {
-            Scope::Module(module_id) => {
-                let module = loader
-                    .get_module(module_id)
-                    .expect("ModuleId on Function must exist");
-                Resolver::for_module(loader, module)
-            },
-            Scope::Script(script_hash) => {
-                let script = loader.get_script(script_hash);
-                Resolver::for_script(loader, script)
-            },
-        }
-    }
-
-    pub(crate) fn local_count(&self) -> usize {
-        self.locals.len()
-    }
-
-    pub(crate) fn arg_count(&self) -> usize {
-        self.parameters.len()
-    }
-
-    pub(crate) fn return_type_count(&self) -> usize {
-        self.return_.len()
-    }
-
-    pub(crate) fn name(&self) -> &str {
-        self.name.as_str()
-    }
-
-    pub(crate) fn code(&self) -> &[Bytecode] {
-        &self.code
-    }
-
-    pub(crate) fn type_parameters(&self) -> &[AbilitySet] {
-        &self.type_parameters
-    }
-
-    pub(crate) fn local_types(&self) -> &[Type] {
-        &self.local_types
-    }
-
-    pub(crate) fn return_types(&self) -> &[Type] {
-        &self.return_types
-    }
-
-    pub(crate) fn parameter_types(&self) -> &[Type] {
-        &self.parameter_types
-    }
-
-    pub(crate) fn pretty_string(&self) -> String {
-        match &self.scope {
-            Scope::Script(_) => "Script::main".into(),
-            Scope::Module(id) => format!(
-                "0x{}::{}::{}",
-                id.address().to_hex(),
-                id.name().as_str(),
-                self.name.as_str()
-            ),
-        }
-    }
-
-    pub(crate) fn is_native(&self) -> bool {
-        self.def_is_native
-    }
-
-    pub(crate) fn is_friend_or_private(&self) -> bool {
-        self.def_is_friend_or_private
-    }
-
-    pub(crate) fn get_native(&self) -> PartialVMResult<&UnboxedNativeFunction> {
-        self.native.as_deref().ok_or_else(|| {
-            PartialVMError::new(StatusCode::MISSING_DEPENDENCY)
-                .with_message(format!("Missing Native Function `{}`", self.name))
-        })
-    }
-}
-
-//
-// Internal structures that are saved at the proper index in the proper tables to access
-// execution information (interpreter).
-// The following structs are internal to the loader and never exposed out.
-// The `Loader` will create those struct and the proper table when loading a module.
-// The `Resolver` uses those structs to return information to the `Interpreter`.
-//
-
-// A function instantiation.
-#[derive(Debug, Clone)]
-struct FunctionInstantiation {
-    // index to `ModuleCache::functions` global table
-    handle: FunctionHandle,
-    instantiation: Vec<Type>,
-}
-
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 struct StructDef {
     // struct field count
     field_count: u16,
