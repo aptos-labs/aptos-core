@@ -6,7 +6,9 @@
 //! TODO(aldenhu): doc
 
 use crate::{
-    common::{TxnIdx, VersionedKey, EXPECTANT_BLOCK_KEYS, EXPECTANT_BLOCK_SIZE},
+    common::{
+        Entry, HashMap, HashSet, TxnIdx, VersionedKey, VersionedKeyHelper, EXPECTANT_BLOCK_SIZE,
+    },
     metrics::TIMER,
     runner::PtxRunnerClient,
 };
@@ -17,10 +19,7 @@ use aptos_types::{
     transaction::Transaction,
 };
 use rayon::Scope;
-use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
-    sync::mpsc::{channel, Sender},
-};
+use std::sync::mpsc::{channel, Sender};
 
 pub(crate) struct PtxScheduler;
 
@@ -142,7 +141,7 @@ impl PendingTransaction {
 
 struct Worker {
     transactions: Vec<Option<PendingTransaction>>,
-    state_values: HashMap<VersionedKey, StateValueState>,
+    state_values: Vec<HashMap<StateKey, StateValueState>>,
     num_pending_txns: usize,
     block_finished: bool,
     runner: PtxRunnerClient,
@@ -151,9 +150,11 @@ struct Worker {
 
 impl Worker {
     fn new(runner: PtxRunnerClient, myself: PtxSchedulerClient) -> Self {
+        let mut state_values = Vec::with_capacity(EXPECTANT_BLOCK_SIZE);
+        state_values.push(HashMap::new()); // for base reads
         Self {
             transactions: Vec::with_capacity(EXPECTANT_BLOCK_SIZE),
-            state_values: HashMap::with_capacity(EXPECTANT_BLOCK_KEYS),
+            state_values,
             num_pending_txns: 0,
             block_finished: false,
             runner,
@@ -161,9 +162,10 @@ impl Worker {
         }
     }
 
-    pub fn inform_state_value(&mut self, key: VersionedKey, value: Option<StateValue>) {
+    pub fn inform_state_value(&mut self, versioned_key: VersionedKey, value: Option<StateValue>) {
         let _timer = TIMER.timer_with(&["scheduler_inform_state_value"]);
-        match self.state_values.entry(key.clone()) {
+        match self.state_values[versioned_key.txn_idx_shifted()].entry(versioned_key.key().clone())
+        {
             Entry::Occupied(mut existing) => {
                 let old_state = existing.insert(StateValueState::Ready {
                     value: value.clone(),
@@ -172,7 +174,11 @@ impl Worker {
                     StateValueState::Pending { subscribers } => {
                         for subscriber in subscribers {
                             // TODO(ptx): reduce clone / memcpy
-                            self.inform_state_value_to_txn(subscriber, key.clone(), value.clone());
+                            self.inform_state_value_to_txn(
+                                subscriber,
+                                versioned_key.clone(),
+                                value.clone(),
+                            );
                         }
                     },
                     StateValueState::Ready { .. } => {
@@ -221,19 +227,23 @@ impl Worker {
         assert_eq!(txn_idx, self.transactions.len());
         self.transactions
             .push(Some(PendingTransaction::new(transaction)));
+        self.state_values.push(HashMap::new());
         self.num_pending_txns += 1;
         let pending_txn = self.transactions[txn_idx].as_mut().unwrap();
 
         for versioned_key in dependencies {
-            match self.state_values.entry(versioned_key.clone()) {
+            match self.state_values[versioned_key.txn_idx_shifted()]
+                .entry(versioned_key.key().clone())
+            {
                 Entry::Occupied(mut existing) => match existing.get_mut() {
                     StateValueState::Pending { subscribers } => {
                         pending_txn.pending_dependencies.insert(versioned_key);
                         subscribers.push(txn_idx);
                     },
                     StateValueState::Ready { value } => {
-                        let (key, _txn_idx) = versioned_key;
-                        pending_txn.met_dependencies.insert(key, value.clone());
+                        pending_txn
+                            .met_dependencies
+                            .insert(versioned_key.key().clone(), value.clone());
                     },
                 },
                 Entry::Vacant(vacant) => {

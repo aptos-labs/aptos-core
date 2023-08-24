@@ -48,3 +48,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 smallvec = { workspace = true }
 tracing = { workspace = true }
+
+# experimental
+hashbrown = "0.14.0"
