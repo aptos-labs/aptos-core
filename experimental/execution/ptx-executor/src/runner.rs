@@ -6,7 +6,7 @@
 //! TODO(aldenhu): doc
 
 use crate::{
-    common::TxnIdx,
+    common::{HashMap, TxnIdx},
     finalizer::PtxFinalizerClient,
     metrics::{PER_WORKER_TIMER, TIMER},
     scheduler::PtxSchedulerClient,
@@ -27,10 +27,7 @@ use aptos_vm::{
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use rayon::Scope;
-use std::{
-    collections::HashMap,
-    sync::mpsc::{channel, Receiver, Sender},
-};
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub(crate) struct PtxRunner;
 

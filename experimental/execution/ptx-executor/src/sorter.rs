@@ -6,7 +6,7 @@
 //! TODO(aldenhu): doc
 
 use crate::{
-    common::{TxnIdx, VersionedKey, BASE_VERSION, EXPECTANT_BLOCK_KEYS},
+    common::{Entry, HashMap, HashSet, TxnIdx, VersionedKey, BASE_VERSION, EXPECTANT_BLOCK_KEYS},
     metrics::TIMER,
     scheduler::PtxSchedulerClient,
     state_reader::PtxStateReaderClient,
@@ -17,10 +17,7 @@ use aptos_types::{
     state_store::state_key::StateKey, transaction::analyzed_transaction::AnalyzedTransaction,
 };
 use rayon::Scope;
-use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
-    sync::mpsc::{channel, Sender},
-};
+use std::sync::mpsc::{channel, Sender};
 
 #[derive(Clone)]
 pub(crate) struct PtxSorter;
