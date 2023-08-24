@@ -32,6 +32,7 @@ pub mod hashable;
 pub mod ordering_state_computer;
 pub mod persisting_phase;
 pub mod pipeline_phase;
+pub mod reliable_broadcast;
 pub mod signing_phase;
 
 #[cfg(test)]

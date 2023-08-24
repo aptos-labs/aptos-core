@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{experimental::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
+use crate::{
+    experimental::{hashable::Hashable, reliable_broadcast::DropGuard},
+    state_replication::StateComputerCommitCallBackType,
+};
 use anyhow::anyhow;
 use aptos_consensus_types::{
     common::Author, executed_block::ExecutedBlock, experimental::commit_vote::CommitVote,
@@ -105,6 +108,7 @@ pub struct SignedItem {
     pub partial_commit_proof: LedgerInfoWithPartialSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub commit_vote: CommitVote,
+    pub rb_handle: Option<DropGuard>,
 }
 
 pub struct AggregatedItem {
@@ -244,6 +248,7 @@ impl BufferItem {
                     callback,
                     partial_commit_proof,
                     commit_vote,
+                    rb_handle: None,
                 }))
             },
             _ => {
@@ -438,9 +443,9 @@ impl BufferItem {
         matches!(self, Self::Aggregated(_))
     }
 
-    pub fn unwrap_signed_ref(&self) -> &SignedItem {
+    pub fn unwrap_signed_mut(&mut self) -> &mut SignedItem {
         match self {
-            BufferItem::Signed(item) => item.as_ref(),
+            BufferItem::Signed(item) => item.as_mut(),
             _ => panic!("Not signed item"),
         }
     }
