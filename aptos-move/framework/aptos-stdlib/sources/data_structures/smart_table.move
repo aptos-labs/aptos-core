@@ -103,13 +103,21 @@ module aptos_std::smart_table {
 
     /// Destroy a table completely when V has `drop`.
     public fun destroy<K: drop, V: drop>(table: SmartTable<K, V>) {
-        let i = 0;
+        clear(&mut table);
+        destroy_empty(table);
+    }
+
+    /// Clear a table completely when T has `drop`.
+    public fun clear<K: drop, V: drop>(table: &mut SmartTable<K, V>) {
+        *table_with_length::borrow_mut(&mut table.buckets, 0) = vector::empty();
+        let i = 1;
         while (i < table.num_buckets) {
             table_with_length::remove(&mut table.buckets, i);
             i = i + 1;
         };
-        let SmartTable { buckets, num_buckets: _, level: _, size: _, split_load_threshold: _, target_bucket_size: _ } = table;
-        table_with_length::destroy_empty(buckets);
+        table.num_buckets = 1;
+        table.level = 0;
+        table.size = 0;
     }
 
     /// Add (key, value) pair in the hash map, it may grow one bucket if current load factor exceeds the threshold.
@@ -433,6 +441,24 @@ module aptos_std::smart_table {
         };
         let map = to_simple_map(&table);
         assert!(simple_map::length(&map) == 200, 0);
+        destroy(table);
+    }
+
+    #[test]
+    public fun smart_table_clear_test() {
+        let table = new();
+        let i = 0u64;
+        while (i < 200) {
+            add(&mut table, i, i);
+            i = i + 1;
+        };
+        clear(&mut table);
+        let i = 0;
+        while (i < 200) {
+            add(&mut table, i, i);
+            i = i + 1;
+        };
+        assert!(table.size == 200, 0);
         destroy(table);
     }
 }

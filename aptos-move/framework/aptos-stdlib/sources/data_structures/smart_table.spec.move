@@ -15,7 +15,7 @@ spec aptos_std::smart_table {
             map_spec_set = spec_set,
             map_spec_del = spec_remove,
             map_spec_len = spec_len,
-            map_spec_has_key = spec_contains;
+        map_spec_has_key = spec_contains;
     }
 
     spec new_with_config<K: copy + drop + store, V: store>(num_initial_buckets: u64, split_load_threshold: u8, target_bucket_size: u64): SmartTable<K, V> {
@@ -26,8 +26,12 @@ spec aptos_std::smart_table {
         pragma verify = false;
     }
 
+    spec clear<K: drop, V: drop>(table: &mut SmartTable<K, V>) {
+        pragma verify = false;
+    }
+
     spec split_one_bucket<K, V>(table: &mut SmartTable<K, V>) {
-        pragma verify= false;
+        pragma verify = false;
     }
 
     spec bucket_index(level: u8, num_buckets: u64, hash: u64): u64 {

@@ -298,7 +298,7 @@ Aborts if <code>v</code> is not empty.
 
 ## Function `destroy`
 
-Destroy a table completely when T has <code>drop</code>.
+Destroy a vector completely when T has <code>drop</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_destroy">destroy</a>&lt;T: drop&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;)
@@ -324,6 +324,7 @@ Destroy a table completely when T has <code>drop</code>.
 
 ## Function `clear`
 
+Clear a vector completely when T has <code>drop</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_clear">clear</a>&lt;T: drop&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;)
