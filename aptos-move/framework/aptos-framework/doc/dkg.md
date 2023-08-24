@@ -255,7 +255,7 @@ An invalid block time was encountered.
     <b>if</b> (target_epoch == dkg_state.target_epoch + 1 && dkg_state.state_id == 0) {
         dkg_state.target_epoch = target_epoch;
         dkg_state.state_id = 1;
-        dkg_state.countdown = 5; //TODO: for debugging
+        dkg_state.countdown = 999999999; //TODO: for debugging
         <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a>&gt;(
             &<b>mut</b> dkg_state.events,
             <a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a> { locked_new_validator_set },
