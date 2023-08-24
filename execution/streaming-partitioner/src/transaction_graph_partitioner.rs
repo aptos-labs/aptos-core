@@ -254,9 +254,8 @@ mod tests {
     };
     use aptos_graphs::partitioning::{
         fennel::{AlphaComputationMode, BalanceConstraintMode, FennelGraphPartitioner},
-        metis::MetisGraphPartitioner,
         random::RandomPartitioner,
-        PartitionId, WholeGraphStreamingPartitioner,
+        PartitionId,
     };
     use aptos_transaction_orderer::common::PTransaction;
     use aptos_types::batched_stream::{
@@ -289,7 +288,11 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "metis-partitioner")]
     fn test_metis_11_transactions_over_4_batches() {
+        use aptos_graphs::partitioning::metis::*;
+        use aptos_graphs::partitioning::WholeGraphStreamingPartitioner;
+
         let input_stream = input_11_transactions_over_4_batches();
 
         let metis = MetisGraphPartitioner::new(2);
@@ -352,7 +355,11 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "metis-partitioner")]
     fn test_metis_100k_transactions_over_100_batches_into_60_partitions() {
+        use aptos_graphs::partitioning::metis::*;
+        use aptos_graphs::partitioning::WholeGraphStreamingPartitioner;
+
         let input_stream = input_random_p2p_transactions(100, 1000, 1000);
 
         let metis = MetisGraphPartitioner::new(60);

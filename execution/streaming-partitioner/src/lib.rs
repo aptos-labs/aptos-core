@@ -7,7 +7,7 @@ use aptos_transaction_orderer::common::PTransaction;
 use aptos_types::batched_stream::BatchedStream;
 
 /// Indicates the position of the transaction in the serialization order of the block.
-pub type SerializationIdx = u64;
+pub type SerializationIdx = u32;
 
 /// A transaction with its dependencies, serialization index, and partition.
 #[derive(Clone, Debug)]

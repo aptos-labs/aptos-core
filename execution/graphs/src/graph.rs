@@ -2,8 +2,7 @@
 
 use std::iter::Sum;
 
-// In stable Rust, there are no good ways to implement "number" traits.
-// Hence, NodeIndex is a fixed type alias and not a generic parameter or an associated type.
+// For simplicity, `NodeIndex` is a fixed type and not a generic parameter or an associated type.
 pub type NodeIndex = u32;
 
 /// A node in a graph.

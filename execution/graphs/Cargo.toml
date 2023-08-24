@@ -15,8 +15,12 @@ rust-version.workspace = true
 anyhow = { workspace = true }
 aptos-types = { workspace = true }
 itertools = { workspace = true }
-metis = { workspace = true }
+metis = { version = "0.1.2", optional = true }
 namable_closures = { workspace = true }
 nonmax = { workspace = true }
 rand = { workspace = true }
 thiserror = { workspace = true }
+
+[features]
+# Enables the metis partitioner, which requires metis to be installed on the system.
+metis-partitioner = ["metis"]

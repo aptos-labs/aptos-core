@@ -24,3 +24,7 @@ nonmax = { workspace = true }
 rand = { workspace = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
+
+[features]
+# Enables the metis partitioner, which requires metis to be installed on the system.
+metis-partitioner = ["aptos-graphs/metis-partitioner"]

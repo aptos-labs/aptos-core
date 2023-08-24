@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 
 pub mod fennel;
+#[cfg(feature = "metis-partitioner")]
 pub mod metis;
 pub mod random;
 pub mod whole_graph_streaming_partitioner;
