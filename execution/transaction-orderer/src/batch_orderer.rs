@@ -2,10 +2,12 @@
 
 use crate::{
     common::{Direction, PTransaction},
-    const_option::{ConstNone, ConstOption, ConstSome},
     reservation_table::{HashMapReservationTable, ReservationTable},
 };
-use aptos_types::block_executor::partitioner::TxnIndex;
+use aptos_types::{
+    block_executor::partitioner::TxnIndex,
+    const_option::{ConstNone, ConstOption, ConstSome},
+};
 use std::{
     collections::{BTreeSet, HashMap, HashSet, VecDeque},
     hash::Hash,
