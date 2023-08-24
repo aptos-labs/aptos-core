@@ -1,8 +1,10 @@
 // Copyright © Aptos Foundation
 
-use crate::graph_stream::StreamNode;
-use crate::partitioning::{PartitionId, StreamingGraphPartitioner};
-use crate::GraphStream;
+use crate::{
+    graph_stream::StreamNode,
+    partitioning::{PartitionId, StreamingGraphPartitioner},
+    GraphStream,
+};
 use aptos_types::batched_stream::BatchedStream;
 use rand::Rng;
 
@@ -52,9 +54,9 @@ impl<S> BatchedStream for RandomPartitionerStream<S>
 where
     S: GraphStream,
 {
-    type StreamItem = (StreamNode<S>, PartitionId);
     type Batch = Vec<Self::StreamItem>;
     type Error = S::Error;
+    type StreamItem = (StreamNode<S>, PartitionId);
 
     fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
         self.graph_stream.next_batch().map(|batch_or_err| {

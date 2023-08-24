@@ -1,17 +1,16 @@
 // Copyright © Aptos Foundation
 
-use std::collections::HashMap;
-
-use rand::seq::SliceRandom;
-
-use aptos_graphs::graph::Node;
-use aptos_graphs::graph_stream::{BatchInfo, StreamBatchInfo, StreamNode};
-use aptos_graphs::partitioning::{PartitionId, StreamingGraphPartitioner};
-use aptos_graphs::{GraphStream, NodeIndex};
+use crate::{PartitionedTransaction, SerializationIdx, StreamingTransactionPartitioner};
+use aptos_graphs::{
+    graph::Node,
+    graph_stream::{BatchInfo, StreamBatchInfo, StreamNode},
+    partitioning::{PartitionId, StreamingGraphPartitioner},
+    GraphStream, NodeIndex,
+};
 use aptos_transaction_orderer::common::PTransaction;
 use aptos_types::batched_stream::{BatchedStream, MapItems};
-
-use crate::{PartitionedTransaction, SerializationIdx, StreamingTransactionPartitioner};
+use rand::seq::SliceRandom;
+use std::collections::HashMap;
 
 /// The weight of a node in the transaction graph.
 ///
@@ -62,7 +61,6 @@ where
     P: Clone + StreamingGraphPartitioner<TransactionGraphStream<S, NF, EF>>,
 {
     type Error = P::Error;
-
     type ResultStream = MapItems<
         P::ResultStream,
         fn(
@@ -180,16 +178,14 @@ where
     NF: Clone + Fn(&T) -> NodeWeight,
     EF: Clone + Fn(SerializationIdx, SerializationIdx) -> EdgeWeight,
 {
-    type NodeData = TxnWithDeps<T>;
-    type NodeWeight = NodeWeight;
-    type EdgeWeight = EdgeWeight;
-    type Error = S::Error;
-
-    type NodeEdges<'a> = std::iter::Copied<std::slice::Iter<'a, (NodeIndex, EdgeWeight)>>
-    where Self: 'a;
-
     type Batch<'a> = Vec<(StreamNode<Self>, Self::NodeEdges<'a>)>
     where Self: 'a;
+    type EdgeWeight = EdgeWeight;
+    type Error = S::Error;
+    type NodeData = TxnWithDeps<T>;
+    type NodeEdges<'a> = std::iter::Copied<std::slice::Iter<'a, (NodeIndex, EdgeWeight)>>
+    where Self: 'a;
+    type NodeWeight = NodeWeight;
 
     fn next_batch(
         &mut self,
@@ -252,21 +248,22 @@ pub struct TxnWithDeps<T: PTransaction> {
 
 #[cfg(test)]
 mod tests {
-    use aptos_graphs::partitioning::fennel::{
-        AlphaComputationMode, BalanceConstraintMode, FennelGraphPartitioner,
+    use crate::{
+        transaction_graph_partitioner::{EdgeWeight, NodeWeight},
+        PartitionedTransaction, SerializationIdx, StreamingTransactionPartitioner,
     };
-    use aptos_graphs::partitioning::metis::MetisGraphPartitioner;
-    use aptos_graphs::partitioning::random::RandomPartitioner;
-    use aptos_graphs::partitioning::{PartitionId, WholeGraphStreamingPartitioner};
+    use aptos_graphs::partitioning::{
+        fennel::{AlphaComputationMode, BalanceConstraintMode, FennelGraphPartitioner},
+        metis::MetisGraphPartitioner,
+        random::RandomPartitioner,
+        PartitionId, WholeGraphStreamingPartitioner,
+    };
     use aptos_transaction_orderer::common::PTransaction;
     use aptos_types::batched_stream::{
         BatchedStream, IntoNoErrorBatchedStream, NoErrorBatchedStream,
     };
     use rand::Rng;
     use std::fmt::Debug;
-
-    use crate::transaction_graph_partitioner::{EdgeWeight, NodeWeight};
-    use crate::{PartitionedTransaction, SerializationIdx, StreamingTransactionPartitioner};
 
     #[test]
     fn test_fennel_11_transactions_over_4_batches() {
@@ -560,11 +557,9 @@ mod tests {
             }
         };
 
-        MockPTransaction::new(
-            estimated_gas,
-            vec![sender, receiver],
-            vec![sender, receiver],
-        )
+        MockPTransaction::new(estimated_gas, vec![sender, receiver], vec![
+            sender, receiver,
+        ])
     }
 
     #[derive(Clone, Debug)]
@@ -586,10 +581,8 @@ mod tests {
 
     impl<K> PTransaction for MockPTransaction<K> {
         type Key = K;
-
         type ReadSetIter<'a> = std::slice::Iter<'a, Self::Key>
         where Self: 'a;
-
         type WriteSetIter<'a> = std::slice::Iter<'a, Self::Key>
         where Self: 'a;
 

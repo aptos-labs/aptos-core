@@ -1,14 +1,13 @@
 // Copyright © Aptos Foundation
 
+use crate::{graph, graph::NodeIndex, WeightedGraph};
+use aptos_types::{
+    closuretools::{ClosureTools, MapClosure},
+    no_error,
+    no_error::NoError,
+};
 use namable_closures::{closure, Closure};
 use rand::seq::SliceRandom;
-
-use aptos_types::closuretools::{ClosureTools, MapClosure};
-use aptos_types::no_error;
-use aptos_types::no_error::NoError;
-
-use crate::{graph, WeightedGraph};
-use crate::graph::NodeIndex;
 
 /// Convenience type alias for a node in a graph stream.
 pub type StreamNode<S> = graph::Node<<S as GraphStream>::NodeData, <S as GraphStream>::NodeWeight>;
@@ -153,18 +152,16 @@ impl<'a, S> GraphStream for &'a mut S
 where
     S: GraphStream,
 {
-    type NodeData = S::NodeData;
-    type NodeWeight = S::NodeWeight;
-    type EdgeWeight = S::EdgeWeight;
-    type Error = S::Error;
-
-    type NodeEdges<'b> = S::NodeEdges<'b>
-    where
-        Self: 'b;
-
     type Batch<'b> = S::Batch<'b>
     where
         Self: 'b;
+    type EdgeWeight = S::EdgeWeight;
+    type Error = S::Error;
+    type NodeData = S::NodeData;
+    type NodeEdges<'b> = S::NodeEdges<'b>
+    where
+        Self: 'b;
+    type NodeWeight = S::NodeWeight;
 
     fn next_batch(
         &mut self,
@@ -231,21 +228,19 @@ impl<'graph, G: WeightedGraph> InputOrderGraphStream<'graph, G> {
 }
 
 impl<'graph, G: WeightedGraph> GraphStream for InputOrderGraphStream<'graph, G> {
-    type NodeData = &'graph G::NodeData;
-    type NodeWeight = G::NodeWeight;
-    type EdgeWeight = G::EdgeWeight;
-    type Error = NoError;
-
-    type NodeEdges<'a> = G::WeightedNodeEdgesIter<'a>
-    where
-        Self: 'a;
-
     type Batch<'a> = MapClosure<
         std::ops::Range<NodeIndex>,
         Closure<'a, Self, (NodeIndex,), (StreamNode<Self>, Self::NodeEdges<'a>)>,
     >
     where
         Self: 'a;
+    type EdgeWeight = G::EdgeWeight;
+    type Error = NoError;
+    type NodeData = &'graph G::NodeData;
+    type NodeEdges<'a> = G::WeightedNodeEdgesIter<'a>
+    where
+        Self: 'a;
+    type NodeWeight = G::NodeWeight;
 
     fn next_batch(&mut self) -> Option<no_error::Result<(Self::Batch<'_>, StreamBatchInfo<Self>)>> {
         if self.current_node == self.graph.node_count() as NodeIndex {
@@ -325,21 +320,19 @@ impl<'graph, G: WeightedGraph> RandomOrderGraphStream<'graph, G> {
 }
 
 impl<'graph, G: WeightedGraph> GraphStream for RandomOrderGraphStream<'graph, G> {
-    type NodeData = &'graph G::NodeData;
-    type NodeWeight = G::NodeWeight;
-    type EdgeWeight = G::EdgeWeight;
-    type Error = NoError;
-
-    type NodeEdges<'a> = G::WeightedNodeEdgesIter<'a>
-    where
-        Self: 'a;
-
     type Batch<'a> = MapClosure<
         std::iter::Copied<std::slice::Iter<'a, NodeIndex>>,
         Closure<'a, Self, (NodeIndex,), (StreamNode<Self>, Self::NodeEdges<'a>)>
     >
     where
         Self: 'a;
+    type EdgeWeight = G::EdgeWeight;
+    type Error = NoError;
+    type NodeData = &'graph G::NodeData;
+    type NodeEdges<'a> = G::WeightedNodeEdgesIter<'a>
+    where
+        Self: 'a;
+    type NodeWeight = G::NodeWeight;
 
     fn next_batch(&mut self) -> Option<no_error::Result<(Self::Batch<'_>, StreamBatchInfo<Self>)>> {
         if self.current_node == self.order.len() as NodeIndex {
@@ -413,16 +406,14 @@ impl<S> GraphStream for Materialize<S>
 where
     S: GraphStream,
 {
-    type NodeData = S::NodeData;
-    type NodeWeight = S::NodeWeight;
-    type EdgeWeight = S::EdgeWeight;
-    type Error = S::Error;
-
-    type NodeEdges<'a> = S::NodeEdges<'a>
-    where Self: 'a;
-
     type Batch<'a> = Vec<(StreamNode<S>, Self::NodeEdges<'a>)>
     where Self: 'a;
+    type EdgeWeight = S::EdgeWeight;
+    type Error = S::Error;
+    type NodeData = S::NodeData;
+    type NodeEdges<'a> = S::NodeEdges<'a>
+    where Self: 'a;
+    type NodeWeight = S::NodeWeight;
 
     fn next_batch(
         &mut self,
@@ -480,16 +471,14 @@ where
     S: GraphStream,
     R: rand::Rng,
 {
-    type NodeData = S::NodeData;
-    type NodeWeight = S::NodeWeight;
-    type EdgeWeight = S::EdgeWeight;
-    type Error = S::Error;
-
-    type NodeEdges<'a> = S::NodeEdges<'a>
-    where Self: 'a;
-
     type Batch<'a> = Vec<(StreamNode<S>, Self::NodeEdges<'a>)>
     where Self: 'a;
+    type EdgeWeight = S::EdgeWeight;
+    type Error = S::Error;
+    type NodeData = S::NodeData;
+    type NodeEdges<'a> = S::NodeEdges<'a>
+    where Self: 'a;
+    type NodeWeight = S::NodeWeight;
 
     fn next_batch(
         &mut self,

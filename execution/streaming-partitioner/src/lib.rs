@@ -32,5 +32,8 @@ where
         Error = Self::Error,
     >;
 
-    fn partition_transactions(&mut self, transactions: S) -> Result<Self::ResultStream, Self::Error>;
+    fn partition_transactions(
+        &mut self,
+        transactions: S,
+    ) -> Result<Self::ResultStream, Self::Error>;
 }

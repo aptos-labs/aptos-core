@@ -1,14 +1,15 @@
 // Copyright © Aptos Foundation
 
 pub mod fennel;
-pub mod random;
 pub mod metis;
+pub mod random;
 pub mod whole_graph_streaming_partitioner;
 
-use crate::graph::NodeIndex;
-use crate::graph_stream::{GraphStream, StreamNode};
+use crate::{
+    graph::NodeIndex,
+    graph_stream::{GraphStream, StreamNode},
+};
 use aptos_types::batched_stream::BatchedStream;
-
 pub use whole_graph_streaming_partitioner::WholeGraphStreamingPartitioner;
 
 // In stable Rust, there are no good ways to implement "number" traits.

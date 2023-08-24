@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 
+use crate::{no_error, no_error::NoError};
 use std::fmt::Debug;
-use crate::no_error;
-use crate::no_error::NoError;
 
 /// A trait to represent fallible batched computation.
 ///
@@ -99,7 +98,7 @@ pub trait BatchedStream: Sized {
     fn map_results<B, E, F>(self, f: F) -> MapResults<Self, F>
     where
         B: IntoIterator,
-        F: FnMut(Result<Self::Batch, Self::Error>) -> Result<B, E>
+        F: FnMut(Result<Self::Batch, Self::Error>) -> Result<B, E>,
     {
         MapResults::new(self, f)
     }
@@ -178,9 +177,9 @@ impl<'a, S> BatchedStream for &'a mut S
 where
     S: BatchedStream,
 {
-    type StreamItem = S::StreamItem;
     type Batch = S::Batch;
     type Error = S::Error;
+    type StreamItem = S::StreamItem;
 
     fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
         (**self).next_batch()
@@ -229,7 +228,9 @@ where
     type Stream = IterIntoBatchedStream<Self>;
 
     fn into_batched_stream(self) -> Self::Stream {
-        IterIntoBatchedStream { iter: self.into_iter() }
+        IterIntoBatchedStream {
+            iter: self.into_iter(),
+        }
     }
 }
 
@@ -249,7 +250,9 @@ where
     type Stream = IterIntoNoErrorBatchedStream<Self>;
 
     fn into_no_error_batched_stream(self) -> Self::Stream {
-        IterIntoNoErrorBatchedStream { iter: self.into_iter() }
+        IterIntoNoErrorBatchedStream {
+            iter: self.into_iter(),
+        }
     }
 }
 
@@ -285,9 +288,9 @@ where
     I: IntoIterator<Item = Result<II, E>>,
     II: IntoIterator,
 {
-    type StreamItem = II::Item;
     type Batch = II;
     type Error = E;
+    type StreamItem = II::Item;
 
     fn next_batch(&mut self) -> Option<Result<II, E>> {
         self.iter.next()
@@ -310,12 +313,12 @@ pub struct IterIntoNoErrorBatchedStream<I: IntoIterator> {
 
 impl<I, B> BatchedStream for IterIntoNoErrorBatchedStream<I>
 where
-    I: IntoIterator<Item =B>,
+    I: IntoIterator<Item = B>,
     B: IntoIterator,
 {
-    type StreamItem = B::Item;
     type Batch = B;
     type Error = NoError;
+    type StreamItem = B::Item;
 
     fn next_batch(&mut self) -> Option<no_error::Result<Self::Batch>> {
         self.iter.next().map(|batch| Ok(batch))
@@ -345,9 +348,9 @@ impl<S> Materialize<S> {
 }
 
 impl<S: BatchedStream> BatchedStream for Materialize<S> {
-    type StreamItem = S::StreamItem;
     type Batch = Vec<S::StreamItem>;
     type Error = S::Error;
+    type StreamItem = S::StreamItem;
 
     fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
         // NB: due to the use of specialization in the standard library,
@@ -532,9 +535,9 @@ impl<'a, I> BatchedStream for &'a mut BatchedIter<I>
 where
     I: Iterator,
 {
-    type StreamItem = I::Item;
     type Batch = Vec<I::Item>;
     type Error = NoError;
+    type StreamItem = I::Item;
 
     fn next_batch(&mut self) -> Option<no_error::Result<Self::Batch>> {
         let mut batch = self.iter.by_ref().take(self.batch_size).peekable();
@@ -580,9 +583,9 @@ impl<B, E> BatchedStream for Once<B, E>
 where
     B: IntoIterator,
 {
-    type StreamItem = B::Item;
     type Batch = B;
     type Error = E;
+    type StreamItem = B::Item;
 
     fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
         self.result.take()
@@ -612,9 +615,9 @@ where
     F: FnMut(S::Batch) -> Result<B, S::Error>,
     B: IntoIterator,
 {
-    type StreamItem = B::Item;
     type Batch = B;
     type Error = S::Error;
+    type StreamItem = B::Item;
 
     fn next_batch(&mut self) -> Option<Result<B, S::Error>> {
         self.stream
@@ -644,14 +647,14 @@ impl<S, F> MapResults<S, F> {
 }
 
 impl<S, F, B, E> BatchedStream for MapResults<S, F>
-    where
-        S: BatchedStream,
-        F: FnMut(Result<S::Batch, S::Error>) -> Result<B, E>,
-        B: IntoIterator,
+where
+    S: BatchedStream,
+    F: FnMut(Result<S::Batch, S::Error>) -> Result<B, E>,
+    B: IntoIterator,
 {
-    type StreamItem = B::Item;
     type Batch = B;
     type Error = E;
+    type StreamItem = B::Item;
 
     fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
         self.stream
@@ -686,9 +689,9 @@ where
     F: FnMut(S::Batch) -> R,
     R: IntoIterator,
 {
-    type StreamItem = R::Item;
     type Batch = R;
     type Error = S::Error;
+    type StreamItem = R::Item;
 
     fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
         self.stream
@@ -722,9 +725,9 @@ where
     S: BatchedStream,
     F: Clone + Fn(S::StreamItem) -> R,
 {
-    type StreamItem = R;
     type Batch = std::iter::Map<<S::Batch as IntoIterator>::IntoIter, F>;
     type Error = S::Error;
+    type StreamItem = R;
 
     fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
         self.stream
@@ -758,9 +761,9 @@ where
     S: BatchedStream,
     F: Fn(S::Error) -> E,
 {
-    type StreamItem = S::StreamItem;
     type Batch = S::Batch;
     type Error = E;
+    type StreamItem = S::StreamItem;
 
     fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
         self.stream
@@ -794,9 +797,9 @@ where
     S::Batch: IntoIterator,
     S::Error: Debug,
 {
-    type StreamItem = S::StreamItem;
     type Batch = S::Batch;
     type Error = NoError;
+    type StreamItem = S::StreamItem;
 
     fn next_batch(&mut self) -> Option<Result<Self::Batch, Self::Error>> {
         self.stream

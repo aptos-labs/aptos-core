@@ -1,8 +1,10 @@
 // Copyright © Aptos Foundation
 
-use crate::graph::NodeIndex;
-use crate::graph_stream::{GraphStream, StreamBatchInfo, StreamNode};
-use crate::partitioning::{PartitionId, StreamingGraphPartitioner};
+use crate::{
+    graph::NodeIndex,
+    graph_stream::{GraphStream, StreamBatchInfo, StreamNode},
+    partitioning::{PartitionId, StreamingGraphPartitioner},
+};
 use aptos_types::batched_stream::BatchedStream;
 
 #[derive(Clone, Copy, PartialEq)]
@@ -398,9 +400,9 @@ where
     S::EdgeWeight: Into<f64> + Copy,
     S::Error: Into<anyhow::Error>,
 {
-    type StreamItem = (StreamNode<S>, PartitionId);
     type Batch = Vec<Self::StreamItem>;
     type Error = Error;
+    type StreamItem = (StreamNode<S>, PartitionId);
 
     fn next_batch(&mut self) -> Option<Result<Vec<(StreamNode<S>, PartitionId)>>> {
         // Take ownership of `self.graph_stream` to avoid borrowing it mutably.
@@ -446,10 +448,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::graph_stream::input_order_stream;
-    use crate::partitioning::fennel::FennelGraphPartitioner;
-    use crate::partitioning::StreamingGraphPartitioner;
-    use crate::test_utils::simple_four_nodes_two_partitions_graph;
+    use crate::{
+        graph_stream::input_order_stream,
+        partitioning::{fennel::FennelGraphPartitioner, StreamingGraphPartitioner},
+        test_utils::simple_four_nodes_two_partitions_graph,
+    };
     use aptos_types::batched_stream::BatchedStream;
 
     #[test]

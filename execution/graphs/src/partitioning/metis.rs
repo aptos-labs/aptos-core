@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::graph::WeightedGraph;
-use crate::partitioning::{GraphPartitioner, PartitionId};
+use crate::{
+    graph::WeightedGraph,
+    partitioning::{GraphPartitioner, PartitionId},
+};
 
 /// A weighted undirected graph in the format expected by the Metis library.
 struct MetisGraph {
@@ -197,9 +199,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::partitioning::metis::MetisGraphPartitioner;
-    use crate::partitioning::GraphPartitioner;
-    use crate::test_utils::simple_four_nodes_two_partitions_graph;
+    use crate::{
+        partitioning::{metis::MetisGraphPartitioner, GraphPartitioner},
+        test_utils::simple_four_nodes_two_partitions_graph,
+    };
 
     // NOTE: Metis should be installed on the system.
     // Please see the description of the `metis` crate for details:

@@ -7,18 +7,15 @@ pub trait ClosureTools: Iterator + Sized {
     /// [`Iterator::map`] that is compatible with the [`namable_closures`] crate.
     fn map_closure<F>(self, f: F) -> MapClosure<Self, F>
     where
-        F: StableFnMut<(Self::Item,)>
+        F: StableFnMut<(Self::Item,)>,
     {
-        MapClosure {
-            iter: self,
-            f,
-        }
+        MapClosure { iter: self, f }
     }
 
     /// [`Iterator::filter`] that is compatible with the [`namable_closures`] crate.
     fn filter_closure<P>(self, predicate: P) -> FilterClosure<Self, P>
     where
-        P: for <'a> StableFnMut<(&'a Self::Item,), Output = bool>
+        P: for<'a> StableFnMut<(&'a Self::Item,), Output = bool>,
     {
         FilterClosure {
             iter: self,
@@ -54,11 +51,13 @@ pub struct FilterClosure<I, P> {
 impl<I, P> Iterator for FilterClosure<I, P>
 where
     I: Iterator,
-    P: for <'a> StableFnMut<(&'a I::Item,), Output = bool>,
+    P: for<'a> StableFnMut<(&'a I::Item,), Output = bool>,
 {
     type Item = I::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().filter(|x| self.predicate.stable_call_mut((x,)))
+        self.iter
+            .next()
+            .filter(|x| self.predicate.stable_call_mut((x,)))
     }
 }
