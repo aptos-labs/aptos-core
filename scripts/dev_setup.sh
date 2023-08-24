@@ -672,7 +672,7 @@ function install_lld {
 # this is needed for hdpi crate from aptos-ledger
 function install_libudev-dev {
   # Need to install libudev-dev for linux
-  if [[ "$(uname)" == "Linux" ]]; then
+  if [[ "$(uname)" == "Linux" && "$PACKAGE_MANAGER" != "pacman" ]]; then
     install_pkg libudev-dev "$PACKAGE_MANAGER"
   fi
 }
@@ -1036,12 +1036,10 @@ fi
 install_python3
 if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
   pip3 install pre-commit
+  install_libudev-dev
 else
   install_pkg python-pre-commit "$PACKAGE_MANAGER"
 fi
-
-# Install libudev-dev for linux
-install_libudev-dev
 
 # For now best effort install, will need to improve later
 if command -v pre-commit; then
