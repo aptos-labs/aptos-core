@@ -241,7 +241,7 @@ pub fn run_benchmark<V>(
         .collect::<HashMap<_, _>>();
     let start_commit_total = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum();
 
-    let start_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
+    let mut start_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
     if let Some(transaction_generator_creator) = transaction_generator_creator {
         generator.run_workload(
             block_size,
@@ -259,6 +259,7 @@ pub fn run_benchmark<V>(
         );
     }
     if pipeline_config.delay_execution_start {
+        start_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
         start_time = Instant::now();
     }
     pipeline.start_execution();
