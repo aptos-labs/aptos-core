@@ -17,6 +17,7 @@ import sys
 
 from aptos_sdk.account import Account
 from aptos_sdk.account_address import AccountAddress
+from aptos_sdk.aptos_cli_wrapper import AptosCLIWrapper
 from aptos_sdk.async_client import FaucetClient, RestClient
 from aptos_sdk.bcs import Serializer
 from aptos_sdk.package_publisher import PackagePublisher
@@ -78,11 +79,7 @@ class CoinClient(RestClient):
         return balance["data"]["coin"]["value"]
 
 
-async def main():
-    assert (
-        len(sys.argv) == 2
-    ), "Expecting an argument that points to the moon_coin directory."
-
+async def main(moon_coin_path: str):
     alice = Account.generate()
     bob = Account.generate()
 
@@ -97,10 +94,12 @@ async def main():
     bob_fund = faucet_client.fund_account(bob.address(), 20_000_000)
     await asyncio.gather(*[alice_fund, bob_fund])
 
-    input("\nUpdate the module with Alice's address, compile, and press enter.")
+    if AptosCLIWrapper.does_cli_exist():
+        AptosCLIWrapper.compile_package(moon_coin_path, {"MoonCoin": alice.address()})
+    else:
+        input("\nUpdate the module with Alice's address, compile, and press enter.")
 
     # :!:>publish
-    moon_coin_path = sys.argv[1]
     module_path = os.path.join(
         moon_coin_path, "build", "Examples", "bytecode_modules", "moon_coin.mv"
     )
@@ -133,4 +132,8 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    assert (
+        len(sys.argv) == 2
+    ), "Expecting an argument that points to the moon_coin directory."
+
+    asyncio.run(main(sys.argv[1]))
