@@ -704,6 +704,12 @@ lto = "thin"
 strip = true
 codegen-units = 1
 
+[profile.ci]
+inherits = "release"
+debug = true
+overflow-checks = true
+debug-assertions = true
+
 [profile.bench]
 debug = true
 
