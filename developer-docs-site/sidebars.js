@@ -327,12 +327,7 @@ const sidebars = {
         slug: "/category/nft",
         keywords: ["nft"],
       },
-      items: [
-        "guides/nfts/aptos-token-comparison",
-        "guides/nfts/mint-nft-cli",
-        "guides/nfts/mint-onchain-data",
-        "guides/nfts/nft-minting-tool",
-      ],
+      items: ["guides/nfts/aptos-token-comparison", "guides/nfts/mint-nft-cli", "guides/nfts/mint-onchain-data"],
     },
     {
       type: "category",
