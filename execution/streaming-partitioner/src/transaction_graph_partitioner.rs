@@ -134,7 +134,7 @@ where
         // Find this transaction's dependencies.
         let deps: Vec<SerializationIdx> = tx
             .read_set()
-            .filter_map(|key| self.last_write.get(&key).copied())
+            .filter_map(|key| self.last_write.get(key).copied())
             .collect();
 
         let mut new_edges_weight = 0 as EdgeWeight;
@@ -261,7 +261,7 @@ mod tests {
     use aptos_types::batched_stream::{
         BatchedStream, IntoNoErrorBatchedStream, NoErrorBatchedStream,
     };
-    use rand::Rng;
+    use rand::{rngs::StdRng, Rng, SeedableRng};
     use std::fmt::Debug;
 
     #[test]
@@ -291,8 +291,7 @@ mod tests {
     #[test]
     #[cfg(feature = "metis-partitioner")]
     fn test_metis_11_transactions_over_4_batches() {
-        use aptos_graphs::partitioning::metis::*;
-        use aptos_graphs::partitioning::WholeGraphStreamingPartitioner;
+        use aptos_graphs::partitioning::{metis::*, WholeGraphStreamingPartitioner};
 
         let input_stream = input_11_transactions_over_4_batches();
 
@@ -358,8 +357,7 @@ mod tests {
     #[test]
     #[cfg(feature = "metis-partitioner")]
     fn test_metis_100k_transactions_over_100_batches_into_60_partitions() {
-        use aptos_graphs::partitioning::metis::*;
-        use aptos_graphs::partitioning::WholeGraphStreamingPartitioner;
+        use aptos_graphs::partitioning::{metis::*, WholeGraphStreamingPartitioner};
 
         let input_stream = input_random_p2p_transactions(100, 1000, 1000);
 
@@ -450,8 +448,15 @@ mod tests {
         txns_per_batch: usize,
         n_accounts: usize,
     ) -> impl NoErrorBatchedStream<StreamItem = MockPTransaction<u32>> {
+        // create an RNG with a fixed seed for reproducibility.
+        let mut rng = StdRng::seed_from_u64(42);
+
         (0..n_batches)
-            .map(move |_| (0..txns_per_batch).map(move |_| random_p2p_transaction(n_accounts)))
+            .map(move |_| {
+                (0..txns_per_batch)
+                    .map(|_| random_p2p_transaction(n_accounts, &mut rng))
+                    .collect::<Vec<_>>()
+            })
             .into_no_error_batched_stream()
     }
 
@@ -553,8 +558,7 @@ mod tests {
         println!();
     }
 
-    fn random_p2p_transaction(n_accounts: usize) -> MockPTransaction<u32> {
-        let mut rng = rand::thread_rng();
+    fn random_p2p_transaction(n_accounts: usize, rng: &mut StdRng) -> MockPTransaction<u32> {
         let estimated_gas = rng.gen_range(1, 100);
 
         let sender = rng.gen_range(0, n_accounts as u32);

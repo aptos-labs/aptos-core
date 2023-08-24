@@ -38,12 +38,12 @@ where
     fn partition_stream(&self, graph_stream: S) -> Result<Self::ResultStream, Self::Error> {
         let graph = graph_stream
             .collect()
-            .map_err(|err: S::Error| Error::GraphStreamError(err))?;
+            .map_err(Error::GraphStreamError)?;
 
         let partitioning = self
             .graph_partitioner
             .partition(&graph)
-            .map_err(|err| Error::GraphPartitionerError(err))?;
+            .map_err(Error::GraphPartitionerError)?;
 
         let nodes = graph.into_nodes();
         Ok(batched_stream::once(

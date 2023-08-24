@@ -344,8 +344,8 @@ impl<'graph, G: WeightedGraph> GraphStream for RandomOrderGraphStream<'graph, G>
             (self.current_node + self.batch_size as NodeIndex).min(self.order.len() as NodeIndex);
 
         Some(Ok((
-            (&self.order[batch_start as usize..self.current_node as usize])
-                .into_iter()
+            self.order[batch_start as usize..self.current_node as usize]
+                .iter()
                 .copied()
                 .map_closure(closure!(self_ = self => |idx| {
                     let node_ref = self_.graph.get_node(idx);

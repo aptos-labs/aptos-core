@@ -150,7 +150,7 @@ where
     type ResultStream = FennelStream<S>;
 
     fn partition_stream(&self, graph_stream: S) -> Result<FennelStream<S>> {
-        FennelStream::new(graph_stream, self.clone())
+        FennelStream::new(graph_stream, *self)
     }
 }
 

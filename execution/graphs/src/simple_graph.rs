@@ -9,6 +9,7 @@ use std::iter::Sum;
 
 /// A weighted undirected graph represented in a simple format, where for each node
 /// we store its weight and a list of its neighbours with the corresponding edge weights.
+#[derive(Clone, Debug, Default)]
 pub struct SimpleUndirectedGraph<Data, NW, EW> {
     node_weights: Vec<NW>,
     node_data: Vec<Data>,
