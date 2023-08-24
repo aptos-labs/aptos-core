@@ -131,6 +131,8 @@ async fn handle_pfn_response(
     indexer_grpc_response_time_map: IndexerGrpcResponseTimeMap,
 ) -> Result<()> {
     info!("Start processing pfn_address: {}", pfn_address);
+    // Let the map be filled with some data first.
+    tokio::time::sleep(Duration::from_secs(10)).await;
     let client = reqwest::Client::new();
     loop {
         let pfn_ledger_time = SystemTime::now();
