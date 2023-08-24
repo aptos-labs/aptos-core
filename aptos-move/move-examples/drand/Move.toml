@@ -10,4 +10,5 @@ AptosFramework = { local = "../../framework/aptos-framework" }
 std = "0x1"
 aptos_std = "0x1"
 aptos_framework = "0x1"
+source_addr = "_"
 drand = "_"

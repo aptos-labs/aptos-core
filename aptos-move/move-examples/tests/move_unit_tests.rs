@@ -118,7 +118,12 @@ fn test_hello_blockchain() {
 
 #[test]
 fn test_drand_lottery() {
-    test_common("drand");
+let addr = AccountAddress::from_hex_literal("0x7654").unwrap();
+    let resource = create_resource_address(addr, &[]);
+    let named_address = BTreeMap::from([
+        (String::from("source_addr"), addr),
+        (String::from("drand"), resource)]);
+    run_tests_for_pkg("drand", named_address);
 }
 
 #[test]

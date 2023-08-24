@@ -18,6 +18,7 @@ module drand::lottery {
     use std::vector;
     use std::option::{Self, Option};
     use aptos_framework::coin;
+    use aptos_framework::resource_account;
     use std::error;
     use aptos_framework::timestamp;
     use aptos_framework::aptos_coin::AptosCoin;
@@ -65,11 +66,13 @@ module drand::lottery {
     // Declare the testing module as a friend, so it can call `init_module` below for testing.
     friend drand::lottery_test;
 
-    /// Initializes a so-called "resource" account which will maintain the list of lottery tickets bought by users.
-    public(friend) fun init_module(deployer: &signer) {
-        // Create the resource account. This will allow this module to later obtain a `signer` for this account and
+    /// Retrieves a so-called "resource" account which will maintain the list of lottery tickets bought by users. This must have been initialized before the contract is deployed, by the account associated with @source_addr.
+    public(friend) fun init_module(resource_account: &signer) {
+        // Retrieve the resource account. This will allow this module to later obtain a `signer` for this account and
         // update the list of purchased lottery tickets.
-        let (_resource, signer_cap) = account::create_resource_account(deployer, vector::empty());
+        let signer_cap = resource_account::retrieve_resource_account_cap(
+            resource_account, @source_addr
+        );
 
         // Acquire a signer for the resource account that stores the coin bounty
         let rsrc_acc_signer = account::create_signer_with_capability(&signer_cap);
@@ -77,8 +80,8 @@ module drand::lottery {
         // Initialize an AptosCoin coin store there, which is where the lottery bounty will be kept
         coin::register<AptosCoin>(&rsrc_acc_signer);
 
-        // Initialiaze the loterry as 'not started'
-        move_to(deployer,
+        // Initialiaze the lottery as 'not started'
+        move_to(resource_account,
             Lottery {
                 tickets: vector::empty<address>(),
                 draw_at: option::none(),
