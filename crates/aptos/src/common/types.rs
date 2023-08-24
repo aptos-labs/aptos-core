@@ -32,7 +32,10 @@ use aptos_rest_client::{
     error::RestError,
     AptosBaseUrl, Client, Transaction,
 };
-use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
+use aptos_sdk::{
+    transaction_builder::TransactionFactory,
+    types::{HardwareWalletAccount, HardwareWalletType, LocalAccount, TransactionSigner},
+};
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
@@ -191,6 +194,12 @@ impl From<bcs::Error> for CliError {
     }
 }
 
+impl From<aptos_ledger::AptosLedgerError> for CliError {
+    fn from(e: aptos_ledger::AptosLedgerError) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
 /// Config saved to `.aptos/config.yaml`
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {
@@ -223,6 +232,9 @@ pub struct ProfileConfig {
     /// URL for the Faucet endpoint (if applicable)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub faucet_url: Option<String>,
+    /// Derivation path index of the account on ledger
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub derivation_path: Option<String>,
 }
 
 /// ProfileConfig but without the private parts
@@ -419,6 +431,11 @@ impl ProfileOptions {
                 .clone()
                 .unwrap_or_else(|| DEFAULT_PROFILE.to_string()),
         ))
+    }
+
+    pub fn derivation_path(&self) -> CliTypedResult<Option<String>> {
+        let profile = self.profile()?;
+        Ok(profile.derivation_path)
     }
 
     pub fn public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
@@ -724,6 +741,40 @@ pub trait ParsePrivateKey {
 }
 
 #[derive(Debug, Default, Parser)]
+pub struct HardwareWalletOptions {
+    /// Derivation Path of your account in hardware wallet
+    ///
+    /// e.g format - m/44\'/637\'/0\'/0\'/0\'
+    /// Make sure your wallet is unlocked and have Aptos opened
+    #[clap(long)]
+    pub derivation_path: Option<String>,
+
+    /// Index of your account in hardware wallet
+    ///
+    /// This is the simpler version of derivation path e.g format - [0]
+    /// we will translate this index into [m/44'/637'/0'/0'/0]
+    #[clap(long)]
+    pub derivation_index: Option<String>,
+}
+
+impl HardwareWalletOptions {
+    pub fn extract_derivation_path(&self) -> CliTypedResult<Option<String>> {
+        if let Some(derivation_path) = &self.derivation_path {
+            Ok(Some(derivation_path.clone()))
+        } else if let Some(derivation_index) = &self.derivation_index {
+            let derivation_path = format!("m/44'/637'/{}'/0'/0'", derivation_index);
+            Ok(Some(derivation_path))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn is_hardware_wallet(&self) -> bool {
+        self.derivation_path.is_some() || self.derivation_index.is_some()
+    }
+}
+
+#[derive(Debug, Default, Parser)]
 pub struct PrivateKeyInputOptions {
     /// Signing Ed25519 private key file path
     ///
@@ -768,6 +819,50 @@ impl PrivateKeyInputOptions {
         PrivateKeyInputOptions {
             private_key: None,
             private_key_file: Some(file),
+        }
+    }
+
+    /// Extract public key from CLI args with fallback to config
+    /// This will first try to extract public key from private_key from CLI args
+    /// With fallback to profile
+    /// NOTE: Use this function instead of 'extract_private_key_and_address' if this is HardwareWallet profile
+    /// HardwareWallet profile does not have private key in config
+    pub fn extract_public_key_and_address(
+        &self,
+        encoding: EncodingType,
+        profile: &ProfileOptions,
+        maybe_address: Option<AccountAddress>,
+    ) -> CliTypedResult<(Ed25519PublicKey, AccountAddress)> {
+        // Order of operations
+        // 1. CLI inputs
+        // 2. Profile
+        // 3. Derived
+        if let Some(private_key) = self.extract_private_key_cli(encoding)? {
+            // If we use the CLI inputs, then we should derive or use the address from the input
+            if let Some(address) = maybe_address {
+                Ok((private_key.public_key(), address))
+            } else {
+                let address = account_address_from_public_key(&private_key.public_key());
+                Ok((private_key.public_key(), address))
+            }
+        } else if let Some((Some(public_key), maybe_config_address)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| (p.public_key, p.account))
+        {
+            match (maybe_address, maybe_config_address) {
+                (Some(address), _) => Ok((public_key, address)),
+                (_, Some(address)) => Ok((public_key, address)),
+                (None, None) => {
+                    let address = account_address_from_public_key(&public_key);
+                    Ok((public_key, address))
+                },
+            }
+        } else {
+            Err(CliError::CommandArgumentError(
+                "One of ['--private-key', '--private-key-file'], or ['public_key'] must present in profile".to_string(),
+            ))
         }
     }
 
@@ -846,14 +941,47 @@ impl PrivateKeyInputOptions {
     }
 }
 
+// Extract the public key by deriving private key, fall back to public key from profile
+// Order of operations
+// 1. Get the private key (either from CLI input or profile), and derive the public key from it
+// 2. Else get the public key directly from the config profile
+// 3. Else error
 impl ExtractPublicKey for PrivateKeyInputOptions {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
         profile: &ProfileOptions,
     ) -> CliTypedResult<Ed25519PublicKey> {
-        self.extract_private_key(encoding, profile)
-            .map(|private_key| private_key.public_key())
+        // 1. Get the private key, and derive the public key
+        let private_key = if let Some(key) = self.extract_private_key_cli(encoding)? {
+            Some(key)
+        } else if let Some(Some(private_key)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| p.private_key)
+        {
+            Some(private_key)
+        } else {
+            None
+        };
+
+        // 2. Get the public key from the config profile
+        // 3. Else error
+        if let Some(key) = private_key {
+            Ok(key.public_key())
+        } else if let Some(Some(public_key)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| p.public_key)
+        {
+            Ok(public_key)
+        } else {
+            Err(CliError::CommandArgumentError(
+                "Unable to extract public key from Private Key input nor Profile".to_string(),
+            ))
+        }
     }
 }
 
@@ -1369,6 +1497,12 @@ impl Default for GasOptions {
     }
 }
 
+#[derive(Debug)]
+pub enum AccountType {
+    Local,
+    HardwareWallet,
+}
+
 /// Common options for interacting with an account for a validator
 #[derive(Debug, Default, Parser)]
 pub struct TransactionOptions {
@@ -1404,7 +1538,29 @@ impl TransactionOptions {
         self.rest_options.client(&self.profile_options)
     }
 
-    /// Retrieves the public key and the associated address
+    pub fn get_transaction_account_type(&self) -> CliTypedResult<AccountType> {
+        if self.private_key_options.private_key.is_some()
+            || self.private_key_options.private_key_file.is_some()
+        {
+            Ok(AccountType::Local)
+        } else if let Some(profile) = CliConfig::load_profile(
+            self.profile_options.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )? {
+            if profile.private_key.is_some() {
+                Ok(AccountType::Local)
+            } else {
+                Ok(AccountType::HardwareWallet)
+            }
+        } else {
+            Err(CliError::CommandArgumentError(
+                "One of ['--private-key', '--private-key-file'] or profile must be used"
+                    .to_string(),
+            ))
+        }
+    }
+
+    /// Retrieves the private key and the associated address
     /// TODO: Cache this information
     pub fn get_key_and_address(&self) -> CliTypedResult<(Ed25519PrivateKey, AccountAddress)> {
         self.private_key_options.extract_private_key_and_address(
@@ -1414,8 +1570,21 @@ impl TransactionOptions {
         )
     }
 
+    pub fn get_public_key_and_address(&self) -> CliTypedResult<(Ed25519PublicKey, AccountAddress)> {
+        self.private_key_options.extract_public_key_and_address(
+            self.encoding_options.encoding,
+            &self.profile_options,
+            self.sender_account,
+        )
+    }
+
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
         Ok(self.get_key_and_address()?.1)
+    }
+
+    pub fn get_public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
+        self.private_key_options
+            .extract_public_key(self.encoding_options.encoding, &self.profile_options)
     }
 
     /// Gets the auth key by account address. We need to fetch the auth key from Rest API rather than creating an
@@ -1444,7 +1613,7 @@ impl TransactionOptions {
         payload: TransactionPayload,
     ) -> CliTypedResult<Transaction> {
         let client = self.rest_client()?;
-        let (sender_key, sender_address) = self.get_key_and_address()?;
+        let (sender_public_key, sender_address) = self.get_public_key_and_address()?;
 
         // Ask to confirm price if the gas unit price is estimated above the lowest value when
         // it is automatically estimated
@@ -1500,7 +1669,7 @@ impl TransactionOptions {
 
             let signed_transaction = SignedTransaction::new(
                 unsigned_transaction,
-                sender_key.public_key(),
+                sender_public_key.clone(),
                 Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
             );
 
@@ -1539,15 +1708,43 @@ impl TransactionOptions {
             .with_gas_unit_price(gas_unit_price)
             .with_max_gas_amount(max_gas)
             .with_transaction_expiration_time(self.gas_options.expiration_secs);
-        let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
-        let transaction =
-            sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
-        let response = client
-            .submit_and_wait(&transaction)
-            .await
-            .map_err(|err| CliError::ApiError(err.to_string()))?;
 
-        Ok(response.into_inner())
+        match self.get_transaction_account_type() {
+            Ok(AccountType::Local) => {
+                let (private_key, _) = self.get_key_and_address()?;
+                let sender_account =
+                    &mut LocalAccount::new(sender_address, private_key, sequence_number);
+                let transaction = sender_account
+                    .sign_with_transaction_builder(transaction_factory.payload(payload));
+                let response = client
+                    .submit_and_wait(&transaction)
+                    .await
+                    .map_err(|err| CliError::ApiError(err.to_string()))?;
+
+                Ok(response.into_inner())
+            },
+            Ok(AccountType::HardwareWallet) => {
+                let sender_account = &mut HardwareWalletAccount::new(
+                    sender_address,
+                    sender_public_key,
+                    self.profile_options
+                        .derivation_path()
+                        .expect("derivative path is missing from profile")
+                        .unwrap(),
+                    HardwareWalletType::Ledger,
+                    sequence_number,
+                );
+                let transaction = sender_account
+                    .sign_with_transaction_builder(transaction_factory.payload(payload))?;
+                let response = client
+                    .submit_and_wait(&transaction)
+                    .await
+                    .map_err(|err| CliError::ApiError(err.to_string()))?;
+
+                Ok(response.into_inner())
+            },
+            Err(err) => Err(err),
+        }
     }
 
     /// Simulate the transaction locally using the debugger, with the gas profiler enabled.
