@@ -1,8 +1,10 @@
 // Copyright © Aptos Foundation
 
 use crate::batch_orderer::{BatchOrderer, BatchOrdererWithWindow};
-use std::cell::RefCell;
-use std::cmp::{max, min};
+use std::{
+    cell::RefCell,
+    cmp::{max, min},
+};
 
 /// Orders transactions in a way to avoid close dependencies between transactions
 /// as much as possible. I.e., if transaction A depends on transaction B (i.e., it reads or

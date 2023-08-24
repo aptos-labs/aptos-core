@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation};
+use aptos_types::{
+    state_store::state_key::StateKey,
+    transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
+};
 
 pub trait PTransaction {
     type Key;
@@ -14,9 +16,9 @@ pub trait PTransaction {
     where
         Self: 'a;
 
-    fn read_set<'a>(&'a self) -> Self::ReadSetIter<'a>;
+    fn read_set(&self) -> Self::ReadSetIter<'_>;
 
-    fn write_set<'a>(&'a self) -> Self::WriteSetIter<'a>;
+    fn write_set(&self) -> Self::WriteSetIter<'_>;
 }
 
 impl PTransaction for AnalyzedTransaction {
@@ -26,16 +28,12 @@ impl PTransaction for AnalyzedTransaction {
     type WriteSetIter<'a> =
         std::iter::Map<std::slice::Iter<'a, StorageLocation>, fn(&StorageLocation) -> &StateKey>;
 
-    fn read_set<'a>(&'a self) -> Self::ReadSetIter<'a> {
-        self.read_hints()
-            .into_iter()
-            .map(StorageLocation::state_key)
+    fn read_set(&self) -> Self::ReadSetIter<'_> {
+        self.read_hints().iter().map(StorageLocation::state_key)
     }
 
-    fn write_set<'a>(&'a self) -> Self::WriteSetIter<'a> {
-        self.write_hints()
-            .into_iter()
-            .map(StorageLocation::state_key)
+    fn write_set(&self) -> Self::WriteSetIter<'_> {
+        self.write_hints().iter().map(StorageLocation::state_key)
     }
 }
 

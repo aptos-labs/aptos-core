@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::hash::Hash;
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    hash::Hash,
+};
 
 /// For each key, maintains a set of reservations and a set of pending requests,
 /// each identified by a transaction ID.
@@ -127,7 +129,7 @@ where
     }
 
     fn is_satisfied(&self, idx: Id, request_key: &K) -> bool {
-        let Some(entry) = self.0.get(&request_key) else { return true };
+        let Some(entry) = self.0.get(request_key) else { return true };
         let Some(&first_reservation) = entry.reservations.front() else { return true };
         first_reservation >= idx
     }

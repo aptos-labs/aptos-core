@@ -1,23 +1,24 @@
 // Copyright © Aptos Foundation
 
-use std::cmp::min;
-use std::time::Duration;
-use std::{io, sync::Mutex, time::Instant};
-
-use clap::Parser;
-use rand::rngs::OsRng;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-
 use aptos_block_partitioner::test_utils::{
     create_signed_p2p_transaction, generate_test_account, TestAccount,
 };
-use aptos_transaction_orderer::batch_orderer::SequentialDynamicAriaOrderer;
-use aptos_transaction_orderer::block_orderer::BatchedBlockOrdererWithWindow;
-use aptos_transaction_orderer::block_partitioner::{
-    BlockPartitioner, OrderedRoundRobinPartitioner,
+use aptos_transaction_orderer::{
+    batch_orderer::SequentialDynamicAriaOrderer,
+    block_orderer::BatchedBlockOrdererWithWindow,
+    block_partitioner::{BlockPartitioner, OrderedRoundRobinPartitioner},
+    transaction_compressor::compress_transactions,
 };
-use aptos_transaction_orderer::transaction_compressor::compress_transactions;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
+use clap::Parser;
+use rand::rngs::OsRng;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::{
+    cmp::min,
+    io,
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 
 #[derive(Debug, Parser)]
 struct Args {

@@ -1,13 +1,15 @@
 // Copyright © Aptos Foundation
 
-use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
-use std::hash::Hash;
-
+use crate::{
+    common::{Direction, PTransaction},
+    const_option::{ConstNone, ConstOption, ConstSome},
+    reservation_table::{HashMapReservationTable, ReservationTable},
+};
 use aptos_types::block_executor::partitioner::TxnIndex;
-
-use crate::common::{Direction, PTransaction};
-use crate::const_option::{ConstNone, ConstOption, ConstSome};
-use crate::reservation_table::{HashMapReservationTable, ReservationTable};
+use std::{
+    collections::{BTreeSet, HashMap, HashSet, VecDeque},
+    hash::Hash,
+};
 
 /// Creates batches of non-conflicting transactions.
 /// Each time `commit_prefix` is called, returns a sequence of transactions
@@ -229,7 +231,7 @@ where
             if let Some(window) = self.window.as_option_mut() {
                 if !window.recent_writes.is_empty() {
                     for k in tx.write_set() {
-                        if let Some(write_info) = window.recent_writes.get_mut(&k) {
+                        if let Some(write_info) = window.recent_writes.get_mut(k) {
                             pending_recent_write_dependencies += 1;
                             write_info.dependencies.insert(idx);
                         }

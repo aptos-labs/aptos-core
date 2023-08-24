@@ -1,9 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::common::PTransaction;
-use std::collections::HashMap;
-use std::hash::Hash;
-use std::rc::Rc;
+use std::{collections::HashMap, hash::Hash, rc::Rc};
 
 pub type CompressedKey = u32;
 
@@ -21,11 +19,11 @@ impl<T> PTransaction for CompressedPTransaction<T> {
     type ReadSetIter<'a> = std::slice::Iter<'a, Self::Key> where T: 'a;
     type WriteSetIter<'a> = std::slice::Iter<'a, Self::Key> where T: 'a;
 
-    fn read_set<'a>(&'a self) -> Self::ReadSetIter<'a> {
+    fn read_set(&self) -> Self::ReadSetIter<'_> {
         self.read_set.iter()
     }
 
-    fn write_set<'a>(&'a self) -> Self::WriteSetIter<'a> {
+    fn write_set(&self) -> Self::WriteSetIter<'_> {
         self.write_set.iter()
     }
 }
@@ -41,6 +39,12 @@ impl<K> TransactionCompressor<K> {
             key_mapping: HashMap::new(),
             next_key: 0,
         }
+    }
+}
+
+impl<K> Default for TransactionCompressor<K> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
