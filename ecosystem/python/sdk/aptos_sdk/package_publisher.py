@@ -1,6 +1,8 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
+import os
+import tomllib
 from typing import List
 
 from .account import Account
@@ -48,16 +50,34 @@ class PackagePublisher:
         )
         return await self.client.submit_bcs_transaction(signed_transaction)
 
-    @staticmethod
-    def create_chunks(data: bytes) -> List[bytes]:
-        chunks: List[bytes] = []
-        read_data = 0
-        while read_data < len(data):
-            start_read_data = read_data
-            read_data = min(read_data + MAX_TRANSACTION_SIZE, len(data))
-            taken_data = data[start_read_data:read_data]
-            chunks.append(taken_data)
-        return chunks
+    async def publish_package_in_path(
+        self,
+        sender: Account,
+        package_dir: str,
+        large_package_address: AccountAddress = MODULE_ADDRESS,
+    ) -> List[str]:
+        with open(os.path.join(package_dir, "Move.toml"), "rb") as f:
+            data = tomllib.load(f)
+        package = data["package"]["name"]
+
+        package_build_dir = os.path.join(package_dir, "build", package)
+        module_directory = os.path.join(package_build_dir, "bytecode_modules")
+        module_paths = os.listdir(module_directory)
+        modules = []
+        for module_path in module_paths:
+            module_path = os.path.join(module_directory, module_path)
+            if not os.path.isfile(module_path) and not module_path.endswith(".mv"):
+                continue
+            with open(module_path, "rb") as f:
+                module = f.read()
+                modules.append(module)
+
+        metadata_path = os.path.join(package_build_dir, "package-metadata.bcs")
+        with open(metadata_path, "rb") as f:
+            metadata = f.read()
+        return await self.publish_package_experimental(
+            sender, metadata, modules, large_package_address
+        )
 
     async def publish_package_experimental(
         self,
@@ -172,3 +192,14 @@ class PackagePublisher:
         )
 
         return TransactionPayload(payload)
+
+    @staticmethod
+    def create_chunks(data: bytes) -> List[bytes]:
+        chunks: List[bytes] = []
+        read_data = 0
+        while read_data < len(data):
+            start_read_data = read_data
+            read_data = min(read_data + MAX_TRANSACTION_SIZE, len(data))
+            taken_data = data[start_read_data:read_data]
+            chunks.append(taken_data)
+        return chunks
