@@ -1034,8 +1034,13 @@ if [[ "$INSTALL_JSTS" == "true" ]]; then
 fi
 
 install_python3
-pip3 install pre-commit
+if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
+  pip3 install pre-commit
+else
+  install_pkg python-pre-commit "$PACKAGE_MANAGER"
+fi
 
+# Install libudev-dev for linux
 install_libudev-dev
 
 # For now best effort install, will need to improve later
