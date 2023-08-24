@@ -4,7 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
-## [2.1.0] - 2023/08/23
+## [2.1.0] - 2023/08/24
 ### Updated
 - Updated CLI source compilation to use rust toolchain version 1.71.1 (from 1.71.0).
 ### Added
