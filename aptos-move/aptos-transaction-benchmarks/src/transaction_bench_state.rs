@@ -29,19 +29,42 @@ use aptos_vm::{
         local_executor_shard::{LocalExecutorClient, LocalExecutorService},
         ShardedBlockExecutor,
     },
+    AptosVM, VMExecutor,
 };
+use once_cell::sync::Lazy;
 use proptest::{collection::vec, prelude::Strategy, strategy::ValueTree, test_runner::TestRunner};
-use std::{net::SocketAddr, sync::Arc, time::Instant};
+use std::{
+    net::SocketAddr,
+    ops::Deref,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
+
+pub static SHARDED_BLOCK_EXECUTOR: Lazy<
+    Arc<Mutex<ShardedBlockExecutor<FakeDataStore, LocalExecutorClient<FakeDataStore>>>>,
+> = Lazy::new(|| {
+    let client = LocalExecutorService::setup_local_executor_shards(AptosVM::get_num_shards(), None);
+    Arc::new(Mutex::new(ShardedBlockExecutor::new(client)))
+});
+
+pub static BLOCK_PARTITIONER: Lazy<Arc<Mutex<Box<dyn BlockPartitioner>>>> = Lazy::new(|| {
+    Arc::new(Mutex::new(
+        PartitionerV1Config::default()
+            .num_shards(AptosVM::get_num_shards())
+            .max_partitioning_rounds(4)
+            .cross_shard_dep_avoid_threshold(0.9)
+            .partition_last_round(true)
+            .build(),
+    ))
+});
 
 pub struct TransactionBenchState<S> {
     num_transactions: usize,
     strategy: S,
     account_universe: AccountUniverse,
-    sharded_block_executor:
-        Option<Arc<ShardedBlockExecutor<FakeDataStore, LocalExecutorClient<FakeDataStore>>>>,
-    block_partitioner: Option<Box<dyn BlockPartitioner>>,
     validator_set: ValidatorSet,
     state_view: Arc<FakeDataStore>,
+    num_executor_shards: usize,
 }
 
 impl<S> TransactionBenchState<S>
@@ -90,25 +113,7 @@ where
         let universe = universe_gen.setup_gas_cost_stability(&mut executor);
 
         let state_view = Arc::new(executor.get_state_view().clone());
-        let (parallel_block_executor, block_partitioner) = if num_executor_shards == 1 {
-            (None, None)
-        } else {
-            let client =
-                LocalExecutorService::setup_local_executor_shards(num_executor_shards, None);
-            let parallel_block_executor = Arc::new(ShardedBlockExecutor::new(client));
-            (
-                Some(parallel_block_executor),
-                Some(
-                    PartitionerV1Config::default()
-                        .num_shards(num_executor_shards)
-                        .max_partitioning_rounds(4)
-                        .cross_shard_dep_avoid_threshold(0.9)
-                        .partition_last_round(true)
-                        .build(),
-                ),
-            )
-        };
-
+        AptosVM::set_num_shards_once(num_executor_shards);
         let validator_set = ValidatorSet::fetch_config(
             &FakeExecutor::from_head_genesis()
                 .get_state_view()
@@ -120,10 +125,9 @@ where
             num_transactions,
             strategy,
             account_universe: universe,
-            sharded_block_executor: parallel_block_executor,
-            block_partitioner,
             validator_set,
             state_view,
+            num_executor_shards,
         }
     }
 
@@ -166,12 +170,12 @@ where
     ) -> Option<PartitionedTransactions> {
         if self.is_shareded() {
             Some(
-                self.block_partitioner.as_ref().unwrap().partition(
+                BLOCK_PARTITIONER.lock().unwrap().partition(
                     txns.iter()
                         .skip(1)
                         .map(|txn| txn.clone().into())
                         .collect::<Vec<AnalyzedTransaction>>(),
-                    self.sharded_block_executor.as_ref().unwrap().num_shards()
+                    self.num_executor_shards,
                 ),
             )
         } else {
@@ -196,7 +200,7 @@ where
     }
 
     fn is_shareded(&self) -> bool {
-        self.sharded_block_executor.is_some()
+        self.num_executor_shards > 1
     }
 
     fn execute_benchmark_sequential(
@@ -226,24 +230,19 @@ where
     fn execute_benchmark_sharded(
         &self,
         transactions: PartitionedTransactions,
-        concurrency_level_per_shard: usize,
+        _concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> (Vec<TransactionOutput>, usize) {
         let block_size = transactions.num_txns();
         let timer = Instant::now();
-        let output = self
-            .sharded_block_executor
-            .as_ref()
-            .unwrap()
-            .execute_block(
-                self.state_view.clone(),
-                transactions,
-                concurrency_level_per_shard,
-                maybe_block_gas_limit,
-            )
-            .expect("VM should not fail to start");
+        let output = AptosVM::execute_block_sharded(
+            SHARDED_BLOCK_EXECUTOR.lock().unwrap().deref(),
+            transactions,
+            self.state_view.clone(),
+            maybe_block_gas_limit,
+        )
+        .expect("VM should not fail to start");
         let exec_time = timer.elapsed().as_millis();
-
         (output, block_size * 1000 / exec_time as usize)
     }
 
