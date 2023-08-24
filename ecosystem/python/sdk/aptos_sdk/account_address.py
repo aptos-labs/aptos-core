@@ -56,6 +56,9 @@ class AccountAddress:
             suffix = suffix.lstrip("0") or "0"
         return f"0x{suffix}"
 
+    def __repr__(self):
+        return self.__str__()
+
     def is_special(self):
         """
         Returns whether the address is a "special" address. Addresses are considered

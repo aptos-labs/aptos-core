@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::utils::fund_account;
 use crate::{
     common::{
         init::Network,
@@ -43,6 +44,7 @@ use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
 use hex::FromHexError;
 use move_core_types::{account_address::AccountAddress, language_storage::TypeTag};
+use move_package::CompilerVersion;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -987,6 +989,14 @@ pub struct MovePackageDir {
     /// Specify the version of the bytecode the compiler is going to emit.
     #[clap(long)]
     pub bytecode_version: Option<u32>,
+
+    /// Specify the version of the compiler.
+    #[clap(long)]
+    pub compiler_version: Option<CompilerVersion>,
+
+    /// Do not complain about unknown attributes in Move code.
+    #[clap(long)]
+    pub skip_attribute_checks: bool,
 }
 
 impl MovePackageDir {
@@ -998,6 +1008,8 @@ impl MovePackageDir {
             named_addresses: Default::default(),
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
+            compiler_version: None,
+            skip_attribute_checks: false,
         }
     }
 
@@ -1263,14 +1275,22 @@ pub struct FaucetOptions {
     /// URL for the faucet endpoint e.g. `https://faucet.devnet.aptoslabs.com`
     #[clap(long)]
     faucet_url: Option<reqwest::Url>,
+
+    /// Auth token to bypass faucet ratelimits. You can also set this as an environment
+    /// variable with FAUCET_AUTH_TOKEN.
+    #[clap(long, env)]
+    faucet_auth_token: Option<String>,
 }
 
 impl FaucetOptions {
-    pub fn new(faucet_url: Option<reqwest::Url>) -> Self {
-        FaucetOptions { faucet_url }
+    pub fn new(faucet_url: Option<reqwest::Url>, faucet_auth_token: Option<String>) -> Self {
+        FaucetOptions {
+            faucet_url,
+            faucet_auth_token,
+        }
     }
 
-    pub fn faucet_url(&self, profile: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
+    fn faucet_url(&self, profile: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
         if let Some(ref faucet_url) = self.faucet_url {
             Ok(faucet_url.clone())
         } else if let Some(Some(url)) = CliConfig::load_profile(
@@ -1282,8 +1302,26 @@ impl FaucetOptions {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
         } else {
-            Err(CliError::CommandArgumentError("No faucet given.  Please add --faucet-url or add a faucet URL to the .aptos/config.yaml for the current profile".to_string()))
+            Err(CliError::CommandArgumentError("No faucet given. Please add --faucet-url or add a faucet URL to the .aptos/config.yaml for the current profile".to_string()))
         }
+    }
+
+    /// Fund an account with the faucet.
+    pub async fn fund_account(
+        &self,
+        rest_client: Client,
+        profile: &ProfileOptions,
+        num_octas: u64,
+        address: AccountAddress,
+    ) -> CliTypedResult<()> {
+        fund_account(
+            rest_client,
+            self.faucet_url(profile)?,
+            self.faucet_auth_token.as_deref(),
+            address,
+            num_octas,
+        )
+        .await
     }
 }
 

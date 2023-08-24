@@ -295,7 +295,7 @@ module aptos_std::math128 {
         assert!(result == 13043817825332782212, 0);
     }
 
-    #[testonly]
+    #[test_only]
     /// For functions that approximate a value it's useful to test a value is close
     /// to the most correct value up to last digit
     fun assert_approx_the_same(x: u128, y: u128, precission: u128) {

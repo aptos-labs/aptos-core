@@ -11,7 +11,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
-use std::{fmt::Debug, hash::Hash};
+use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
 #[derive(Debug)]
@@ -74,16 +74,22 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 
-    /// Get the writes of a transaction from its output.
-    fn get_writes(
+    /// Get the writes of a transaction from its output, separately for resources, modules and
+    /// aggregator_v1.
+    fn resource_write_set(
         &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::Value,
-    )>;
+    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+
+    fn module_write_set(
+        &self,
+    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+
+    fn aggregator_v1_write_set(
+        &self,
+    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
 
     /// Get the aggregator deltas of a transaction from its output.
-    fn get_deltas(&self) -> Vec<(<Self::Txn as Transaction>::Key, DeltaOp)>;
+    fn aggregator_v1_delta_set(&self) -> HashMap<<Self::Txn as Transaction>::Key, DeltaOp>;
 
     /// Get the events of a transaction from its output.
     fn get_events(&self) -> Vec<<Self::Txn as Transaction>::Event>;

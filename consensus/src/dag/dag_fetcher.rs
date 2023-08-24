@@ -3,7 +3,7 @@
 
 use super::{dag_network::RpcWithFallback, types::NodeMetadata, RpcHandler};
 use crate::dag::{
-    dag_network::DAGNetworkSender,
+    dag_network::TDAGNetworkSender,
     dag_store::Dag,
     types::{CertifiedNode, FetchResponse, Node, RemoteFetchRequest},
 };
@@ -13,14 +13,78 @@ use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_time_service::TimeService;
 use aptos_types::epoch_state::EpochState;
-use futures::StreamExt;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use futures::{stream::FuturesUnordered, Stream, StreamExt};
+use std::{
+    collections::HashMap,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+    time::Duration,
+};
 use thiserror::Error as ThisError;
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
 
+pub struct FetchWaiter<T> {
+    rx: Receiver<oneshot::Receiver<T>>,
+    futures: Pin<Box<FuturesUnordered<oneshot::Receiver<T>>>>,
+}
+
+impl<T> FetchWaiter<T> {
+    fn new(rx: Receiver<oneshot::Receiver<T>>) -> Self {
+        Self {
+            rx,
+            futures: Box::pin(FuturesUnordered::new()),
+        }
+    }
+}
+
+impl<T> Stream for FetchWaiter<T> {
+    type Item = Result<T, oneshot::error::RecvError>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if let Poll::Ready(Some(rx)) = self.rx.poll_recv(cx) {
+            self.futures.push(rx);
+        }
+
+        self.futures.as_mut().poll_next(cx)
+    }
+}
+
+pub struct FetchRequester {
+    request_tx: Sender<LocalFetchRequest>,
+    node_waiter_tx: Sender<oneshot::Receiver<Node>>,
+    certified_node_waiter_tx: Sender<oneshot::Receiver<CertifiedNode>>,
+}
+
+impl FetchRequester {
+    pub fn request_for_node(&self, node: Node) -> anyhow::Result<()> {
+        let (res_tx, res_rx) = oneshot::channel();
+        let fetch_req = LocalFetchRequest::Node(node, res_tx);
+        self.request_tx
+            .try_send(fetch_req)
+            .map_err(|e| anyhow::anyhow!("unable to send node fetch request to channel: {}", e))?;
+        self.node_waiter_tx.try_send(res_rx)?;
+        Ok(())
+    }
+
+    pub fn request_for_certified_node(&self, node: CertifiedNode) -> anyhow::Result<()> {
+        let (res_tx, res_rx) = oneshot::channel();
+        let fetch_req = LocalFetchRequest::CertifiedNode(node, res_tx);
+        self.request_tx.try_send(fetch_req).map_err(|e| {
+            anyhow::anyhow!(
+                "unable to send certified node fetch request to channel: {}",
+                e
+            )
+        })?;
+        self.certified_node_waiter_tx.try_send(res_rx)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
 pub enum LocalFetchRequest {
     Node(Node, oneshot::Sender<Node>),
     CertifiedNode(CertifiedNode, oneshot::Sender<CertifiedNode>),
@@ -55,9 +119,9 @@ impl LocalFetchRequest {
     }
 }
 
-struct DagFetcher {
+pub struct DagFetcher {
     epoch_state: Arc<EpochState>,
-    network: Arc<dyn DAGNetworkSender>,
+    network: Arc<dyn TDAGNetworkSender>,
     dag: Arc<RwLock<Dag>>,
     request_rx: Receiver<LocalFetchRequest>,
     time_service: TimeService,
@@ -66,11 +130,18 @@ struct DagFetcher {
 impl DagFetcher {
     pub fn new(
         epoch_state: Arc<EpochState>,
-        network: Arc<dyn DAGNetworkSender>,
+        network: Arc<dyn TDAGNetworkSender>,
         dag: Arc<RwLock<Dag>>,
         time_service: TimeService,
-    ) -> (Self, Sender<LocalFetchRequest>) {
+    ) -> (
+        Self,
+        FetchRequester,
+        FetchWaiter<Node>,
+        FetchWaiter<CertifiedNode>,
+    ) {
         let (request_tx, request_rx) = tokio::sync::mpsc::channel(16);
+        let (node_tx, node_rx) = tokio::sync::mpsc::channel(100);
+        let (certified_node_tx, certified_node_rx) = tokio::sync::mpsc::channel(100);
         (
             Self {
                 epoch_state,
@@ -79,7 +150,13 @@ impl DagFetcher {
                 request_rx,
                 time_service,
             },
-            request_tx,
+            FetchRequester {
+                request_tx,
+                node_waiter_tx: node_tx,
+                certified_node_waiter_tx: certified_node_tx,
+            },
+            FetchWaiter::new(node_rx),
+            FetchWaiter::new(certified_node_rx),
         )
     }
 

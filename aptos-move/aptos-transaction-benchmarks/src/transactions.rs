@@ -5,7 +5,7 @@
 use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_block_partitioner::{
-    sharded_block_partitioner::ShardedBlockPartitioner, BlockPartitionerConfig,
+    sharded_block_partitioner::config::PartitionerV1Config, BlockPartitioner,
 };
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
@@ -199,7 +199,7 @@ struct TransactionBenchState<S> {
     account_universe: AccountUniverse,
     parallel_block_executor:
         Option<Arc<ShardedBlockExecutor<FakeDataStore, LocalExecutorClient<FakeDataStore>>>>,
-    block_partitioner: Option<ShardedBlockPartitioner>,
+    block_partitioner: Option<Box<dyn BlockPartitioner>>,
     validator_set: ValidatorSet,
     state_view: Arc<FakeDataStore>,
 }
@@ -259,7 +259,7 @@ where
             (
                 Some(parallel_block_executor),
                 Some(
-                    BlockPartitionerConfig::default()
+                    PartitionerV1Config::default()
                         .num_shards(num_executor_shards)
                         .max_partitioning_rounds(4)
                         .cross_shard_dep_avoid_threshold(0.9)
@@ -381,6 +381,7 @@ where
                     .into_iter()
                     .map(|txn| txn.into())
                     .collect::<Vec<AnalyzedTransaction>>(),
+                self.parallel_block_executor.as_ref().unwrap().num_shards(),
             );
             parallel_block_executor
                 .execute_block(

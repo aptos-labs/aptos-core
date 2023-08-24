@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{CliCommand, CliError, CliResult, CliTypedResult, MovePackageDir};
+use aptos_framework::extended_checks;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
@@ -10,7 +11,7 @@ use move_coverage::{
     source_coverage::SourceCoverageBuilder, summary::summarize_inst_cov,
 };
 use move_disassembler::disassembler::Disassembler;
-use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig};
+use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig, CompilerConfig};
 
 /// Display a coverage summary for all modules in a package
 ///
@@ -149,6 +150,11 @@ fn compile_coverage(
         additional_named_addresses: move_options.named_addresses(),
         test_mode: false,
         install_dir: move_options.output_dir.clone(),
+        compiler_config: CompilerConfig {
+            known_attributes: extended_checks::get_all_attribute_names().clone(),
+            skip_attribute_checks: false,
+            ..Default::default()
+        },
         ..Default::default()
     };
     let path = move_options.get_package_path()?;

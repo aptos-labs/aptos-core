@@ -193,13 +193,13 @@ then there is a guarantee that T_N will never be included in the blockchain.
 ### Fungible Asset
 
 - A **fungible asset** is an asset, such as a currency, share, in-game resource, etc., that is interchangeable with another identical asset without any loss in its value. For example, APT is a fungible asset because you can exchange one APT for another.
-- Follow the [Digital Asset Standards](../standards/index.md#digital-asset-standards) to create fungible assets on the Aptos blockchain. 
+- Follow the [Asset Standards](../standards/index.md#asset-standards) to create fungible assets on the Aptos blockchain. 
 - Next generation of the Coin standard that addresses shortcomings of `aptos_framework::coin` such as lack of guaranteed enforcement of freeze and burn and advanced functionalities such as programmable transfers, e.g., approve in ERC-20.
 
 ### Fungible Token
 
-- For TokenV1 (aptos_token::token), a **fungible token** is a token that is interchangeable with other identical tokens (i.e., tokens that share the same `TokenId`). This means the tokens have the same `creator address`, `collection name`, `token name`, and `property version`.
-- For TokenV2 (aptos_token_objects::token), a **fungible token** is a fungible asset with metadata object includes a TokenV2 resource.
+- For the legacy Aptos Token Standard (aptos_token::token), a **fungible token** is a token that is interchangeable with other identical tokens (i.e., tokens that share the same `TokenId`). This means the tokens have the same `creator address`, `collection name`, `token name`, and `property version`.
+- For the Aptos Digital Asset Standard (aptos_token_objects::token), a **fungible token** is a fungible asset with metadata object that includes a Digital Asset resource.
 
 ### Fungible Unit
 
