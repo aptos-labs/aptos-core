@@ -87,6 +87,7 @@ fn test_certified_node_handler() {
         network_sender.clone(),
         ExponentialBackoff::from_millis(10),
         aptos_time_service::TimeService::mock(),
+        Duration::from_millis(500),
     ));
     let time_service = TimeService::mock();
     let validators = signers.iter().map(|vs| vs.author()).collect();

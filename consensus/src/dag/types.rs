@@ -453,12 +453,7 @@ impl SignatureBuilder {
     }
 }
 
-impl<M> BroadcastStatus<M> for SignatureBuilder
-where
-    M: RBMessage,
-    Vote: TryFrom<M> + Into<M>,
-    Node: TryFrom<M> + Into<M>,
-{
+impl BroadcastStatus<DAGMessage> for SignatureBuilder {
     type Ack = Vote;
     type Aggregated = NodeCertificate;
     type Message = Node;
@@ -507,12 +502,7 @@ impl CertifiedAck {
     }
 }
 
-impl<M> BroadcastStatus<M> for CertificateAckState
-where
-    M: RBMessage,
-    CertifiedAck: TryFrom<M> + Into<M>,
-    CertifiedNode: TryFrom<M> + Into<M>,
-{
+impl BroadcastStatus<DAGMessage> for CertificateAckState {
     type Ack = CertifiedAck;
     type Aggregated = ();
     type Message = CertifiedNode;

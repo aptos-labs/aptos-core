@@ -24,7 +24,7 @@ use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
 };
 use futures::stream::{AbortHandle, Abortable};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub fn bootstrap_dag(
@@ -57,6 +57,8 @@ pub fn bootstrap_dag(
         rb_network_sender,
         rb_backoff_policy,
         time_service.clone(),
+        // TODO: add to config
+        Duration::from_millis(500),
     ));
 
     let dag = Arc::new(RwLock::new(Dag::new(

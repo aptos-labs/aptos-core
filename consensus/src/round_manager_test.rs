@@ -15,7 +15,7 @@ use crate::{
     },
     metrics_safety_rules::MetricsSafetyRules,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
-    network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
+    network_interface::{CommitMessage, ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
     persistent_liveness_storage::RecoveryData,
@@ -335,11 +335,14 @@ impl NodeSetup {
     pub async fn next_network_message(&mut self) -> ConsensusMsg {
         match self.next_network_event().await {
             Event::Message(_, msg) => msg,
-            Event::RpcRequest(_, msg, _, _) => panic!(
-                "Unexpected event, got RpcRequest, expected Message: {:?} on node {}",
-                msg,
-                self.identity_desc()
-            ),
+            Event::RpcRequest(_, msg, _, _) if matches!(msg, ConsensusMsg::CommitMessage(_)) => msg,
+            Event::RpcRequest(_, msg, _, _) => {
+                panic!(
+                    "Unexpected event, got RpcRequest, expected Message: {:?} on node {}",
+                    msg,
+                    self.identity_desc()
+                )
+            },
             _ => panic!("Unexpected Network Event"),
         }
     }
@@ -381,6 +384,12 @@ impl NodeSetup {
     pub async fn next_commit_decision(&mut self) -> CommitDecision {
         match self.next_network_message().await {
             ConsensusMsg::CommitDecisionMsg(v) => *v,
+            ConsensusMsg::CommitMessage(d) if matches!(*d, CommitMessage::Decision(_)) => {
+                match *d {
+                    CommitMessage::Decision(d) => d,
+                    _ => unreachable!(),
+                }
+            },
             msg => panic!(
                 "Unexpected Consensus Message: {:?} on node {}",
                 msg,
