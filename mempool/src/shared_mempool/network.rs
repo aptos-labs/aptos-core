@@ -481,7 +481,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
 
         // Log all the metrics
         let latency = start_time.elapsed();
-        debug!(
+        trace!(
             LogSchema::event_log(LogEntry::BroadcastTransaction, LogEvent::Success)
                 .peer(&peer)
                 .batch_id(&batch_id)
