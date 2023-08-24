@@ -287,6 +287,7 @@ mod tests {
         print_output("Fennel partitioning (11 txns)", 2, 11, res, true);
     }
 
+    // Run with `--features metis-partitioner` to enable Metis tests.
     #[test]
     #[cfg(feature = "metis-partitioner")]
     fn test_metis_11_transactions_over_4_batches() {
@@ -541,7 +542,7 @@ mod tests {
             cut_edges_weight as f64 / total_edges_weight as f64
         );
         println!(
-            "Max partition weight: {} / {} ({:.2}, ideal: {:.4}, imbalance: {:.4})",
+            "Max partition weight: {} / {} ({:.4}, ideal: {:.4}, imbalance: {:.4})",
             max_partition_weight,
             total_node_weight,
             max_partition_weight as f64 / total_node_weight as f64,
