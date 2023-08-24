@@ -129,6 +129,8 @@ async def main():
     print("Bob".ljust(WIDTH, " ") + format_account_info(bob))
     print()
 
+    await rest_client.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

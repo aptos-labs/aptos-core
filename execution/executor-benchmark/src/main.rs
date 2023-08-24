@@ -2,6 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_block_partitioner::{
+    sharded_block_partitioner::config::PartitionerV1Config, v2::config::PartitionerV2Config,
+    PartitionerConfig,
+};
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
@@ -100,6 +104,16 @@ pub struct PipelineOpt {
     async_partitioning: bool,
     #[clap(long)]
     use_global_executor: bool,
+    #[clap(long, default_value = "4")]
+    max_partitioning_rounds: usize,
+    #[clap(long, default_value = "0.90")]
+    partitioner_cross_shard_dep_avoid_threshold: f32,
+    #[clap(long, default_value = "2")]
+    partitioner_version: usize,
+    #[clap(long, default_value = "8")]
+    partitioner_v2_num_threads: usize,
+    #[clap(long, default_value = "64")]
+    partitioner_v2_dashmap_num_shards: usize,
 }
 
 impl PipelineOpt {
@@ -113,6 +127,26 @@ impl PipelineOpt {
             num_executor_shards: self.num_executor_shards,
             async_partitioning: self.async_partitioning,
             use_global_executor: self.use_global_executor,
+            partitioner_config: self.partitioner_config(),
+        }
+    }
+
+    fn partitioner_config(&self) -> PartitionerConfig {
+        match self.partitioner_version {
+            1 => PartitionerConfig::V1(PartitionerV1Config {
+                num_shards: self.num_executor_shards,
+                max_partitioning_rounds: self.max_partitioning_rounds,
+                cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
+                partition_last_round: !self.use_global_executor,
+            }),
+            2 => PartitionerConfig::V2(PartitionerV2Config {
+                num_threads: self.partitioner_v2_num_threads,
+                max_partitioning_rounds: self.max_partitioning_rounds,
+                cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
+                dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
+                partition_last_round: self.use_global_executor,
+            }),
+            _ => panic!("Unknown partitioner version: {}", self.partitioner_version),
         }
     }
 }

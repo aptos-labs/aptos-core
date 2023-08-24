@@ -24,10 +24,10 @@ pub struct AnalyzedTransaction {
     /// Set of storage locations that are read by the transaction - this doesn't include location
     /// that are written by the transactions to avoid duplication of locations across read and write sets
     /// This can be accurate or strictly overestimated.
-    read_hints: Vec<StorageLocation>,
+    pub read_hints: Vec<StorageLocation>,
     /// Set of storage locations that are written by the transaction. This can be accurate or strictly
     /// overestimated.
-    write_hints: Vec<StorageLocation>,
+    pub write_hints: Vec<StorageLocation>,
     /// A transaction is predictable if neither the read_hint or the write_hint have wildcards.
     predictable_transaction: bool,
     /// The hash of the transaction - this is cached for performance reasons.
