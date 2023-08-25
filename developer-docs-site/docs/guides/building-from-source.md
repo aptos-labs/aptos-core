@@ -171,7 +171,7 @@ If you installed the Move Prover Tools above then you don't need to skip the pro
 Other documentation of specific tools has recommended patterns for `cargo build` and `cargo run`
 
 * [Run a Local Testnet](../nodes/local-testnet/run-a-local-testnet.md)
-* [Indxer](../nodes/indexer-fullnode.md)
+* [Indxer](../indexer/legacy/indexer-fullnode.md)
 * [Node Health Checker](../nodes/measure/node-health-checker.md)
 * [Develop in a Local Testnet](local-testnet-dev-flow.md)
 * [Running a Local Multinode Network](running-a-local-multi-node-network.md)
