@@ -963,7 +963,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 )?;
             },
             _ => {
-                bail!("[EpochManager] Unexpected messages: {:?}", msg);
+                bail!("[EpochManager] Unexpected messages");
             },
         }
         Ok(None)
