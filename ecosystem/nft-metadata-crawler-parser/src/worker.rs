@@ -148,8 +148,8 @@ async fn spawn_parser(
                 );
                 panic!();
             }),
-            NaiveDateTime::parse_from_str(&parts[3], "%Y-%m-%d %H:%M:%S %Z").unwrap_or(
-                NaiveDateTime::parse_from_str(&parts[3], "%Y-%m-%d %H:%M:%S%.f %Z").unwrap_or_else(
+            NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S %Z").unwrap_or(
+                NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S%.f %Z").unwrap_or_else(
                     |e| {
                         error!(
                             error = ?e,
