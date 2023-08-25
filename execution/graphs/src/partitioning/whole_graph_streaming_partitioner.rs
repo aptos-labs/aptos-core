@@ -6,7 +6,6 @@ use crate::{
     GraphStream, SimpleUndirectedGraph,
 };
 use aptos_types::batched_stream;
-use std::iter::Sum;
 
 /// Converts a `GraphPartitioner` to a `StreamingGraphPartitioner` by reading the whole
 /// graph from the stream, reconstructing it in memory and then partitioning it.
@@ -26,9 +25,7 @@ impl<P> WholeGraphStreamingPartitioner<P> {
 impl<S, P> StreamingGraphPartitioner<S> for WholeGraphStreamingPartitioner<P>
 where
     S: GraphStream,
-    S::NodeWeight: Copy + Default + Sum,
-    S::EdgeWeight: Copy + Default + Sum,
-    P: GraphPartitioner<SimpleUndirectedGraph<S::NodeData, S::NodeWeight, S::EdgeWeight>>,
+    P: GraphPartitioner<SimpleUndirectedGraph<S::NodeData>>,
 {
     // NB: Using `anyhow::Error` for simplicity here.
     type Error = Error<S::Error, P::Error>;

@@ -5,22 +5,24 @@ use crate::{
     graph_stream::{FromGraphStream, GraphStream},
     WeightedGraph,
 };
-use std::iter::Sum;
+use crate::graph::{EdgeWeight, NodeWeight};
 
 /// A weighted undirected graph represented in a simple format, where for each node
 /// we store its weight and a list of its neighbours with the corresponding edge weights.
-#[derive(Clone, Debug, Default)]
-pub struct SimpleUndirectedGraph<Data, NW, EW> {
-    node_weights: Vec<NW>,
+#[derive(Clone, Debug)]
+pub struct SimpleUndirectedGraph<Data> {
+    node_weights: Vec<NodeWeight>,
     node_data: Vec<Data>,
-    edges: Vec<Vec<(NodeIndex, EW)>>,
+    edges: Vec<Vec<(NodeIndex, EdgeWeight)>>,
 }
 
-impl<Data, NW, EW> SimpleUndirectedGraph<Data, NW, EW>
-where
-    NW: Copy + Sum,
-    EW: Copy + Sum,
-{
+impl<Data> Default for SimpleUndirectedGraph<Data> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<Data> SimpleUndirectedGraph<Data> {
     /// Creates a new empty graph.
     pub fn new() -> Self {
         Self {
@@ -31,7 +33,7 @@ where
     }
 
     /// Adds a node to the graph.
-    pub fn add_node(&mut self, data: Data, weight: NW) -> NodeIndex {
+    pub fn add_node(&mut self, data: Data, weight: NodeWeight) -> NodeIndex {
         let idx = self.node_weights.len() as NodeIndex;
         self.node_weights.push(weight);
         self.node_data.push(data);
@@ -40,7 +42,7 @@ where
     }
 
     /// Adds an undirected edge to the graph.
-    pub fn add_edge(&mut self, source: NodeIndex, target: NodeIndex, weight: EW) {
+    pub fn add_edge(&mut self, source: NodeIndex, target: NodeIndex, weight: EdgeWeight) {
         self.edges[source as usize].push((target, weight));
         self.edges[target as usize].push((source, weight));
     }
@@ -58,17 +60,15 @@ where
     }
 }
 
-impl<S, Data, NW, EW> FromGraphStream<S> for SimpleUndirectedGraph<Data, NW, EW>
+impl<S, Data> FromGraphStream<S> for SimpleUndirectedGraph<Data>
 where
-    S: GraphStream<NodeWeight = NW, EdgeWeight = EW, NodeData = Data>,
-    NW: Copy + Default,
-    EW: Copy + Default,
+    S: GraphStream<NodeData = Data>,
 {
     type Error = S::Error;
 
     /// Reconstructs an undirected graph from a `GraphStream`.
     fn from_graph_stream(mut graph_stream: S) -> Result<Self, S::Error> {
-        let mut node_weights: Vec<NW> = Vec::new();
+        let mut node_weights: Vec<NodeWeight> = Vec::new();
         let mut node_data: Vec<Option<Data>> = Vec::new();
         let mut graph_edges: Vec<Vec<_>> = Vec::new();
 
@@ -77,7 +77,7 @@ where
 
             for (node, edges) in batch {
                 if node.index as usize >= node_weights.len() {
-                    node_weights.resize(node.index as usize + 1, NW::default());
+                    node_weights.resize(node.index as usize + 1, 0 as NodeWeight);
                     node_data.resize_with(node.index as usize + 1, || None);
                     graph_edges.resize(node.index as usize + 1, Vec::new());
                 }
@@ -105,22 +105,16 @@ where
     }
 }
 
-impl<Data, NW, EW> WeightedGraph for SimpleUndirectedGraph<Data, NW, EW>
-where
-    NW: Copy + Sum,
-    EW: Copy + Sum,
-{
-    type EdgeWeight = EW;
+impl<Data> WeightedGraph for SimpleUndirectedGraph<Data> {
     type NodeData = Data;
     type NodeEdgesIter<'a> = std::iter::Map<
-        std::slice::Iter<'a, (NodeIndex, EW)>,
-        fn(&'a (NodeIndex, EW)) -> NodeIndex,
+        std::slice::Iter<'a, (NodeIndex, EdgeWeight)>,
+        fn(&'a (NodeIndex, EdgeWeight)) -> NodeIndex,
     >
     where Self: 'a;
-    type NodeWeight = NW;
-    type NodesIter<'a> = NodesIter<'a, Data, NW, EW>
+    type NodesIter<'a> = NodesIter<'a, Data>
     where Self: 'a;
-    type WeightedNodeEdgesIter<'a> = std::iter::Copied<std::slice::Iter<'a, (NodeIndex, EW)>>
+    type WeightedNodeEdgesIter<'a> = std::iter::Copied<std::slice::Iter<'a, (NodeIndex, EdgeWeight)>>
     where Self: 'a;
 
     fn node_count(&self) -> usize {
@@ -160,13 +154,13 @@ where
     }
 }
 
-pub struct NodesIter<'a, Data, NW, EW> {
-    graph: &'a SimpleUndirectedGraph<Data, NW, EW>,
+pub struct NodesIter<'a, Data> {
+    graph: &'a SimpleUndirectedGraph<Data>,
     node_indices: std::ops::Range<NodeIndex>,
 }
 
-impl<'a, Data, NW: Copy, EW> Iterator for NodesIter<'a, Data, NW, EW> {
-    type Item = NodeRef<'a, Data, NW>;
+impl<'a, Data> Iterator for NodesIter<'a, Data> {
+    type Item = NodeRef<'a, Data>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.node_indices.next().map(|idx| NodeRef {

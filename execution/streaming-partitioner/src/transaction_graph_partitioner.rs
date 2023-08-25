@@ -3,7 +3,7 @@
 use crate::{PartitionedTransaction, SerializationIdx, StreamingTransactionPartitioner};
 use aptos_graphs::{
     graph::Node,
-    graph_stream::{BatchInfo, StreamBatchInfo, StreamNode},
+    graph_stream::{BatchInfo, StreamNode},
     partitioning::{PartitionId, StreamingGraphPartitioner},
     GraphStream, NodeIndex,
 };
@@ -11,16 +11,7 @@ use aptos_transaction_orderer::common::PTransaction;
 use aptos_types::batched_stream::{BatchedStream, MapItems};
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
-
-/// The weight of a node in the transaction graph.
-///
-/// For simplicity, it is a fixed type and not a generic parameter.
-type NodeWeight = i32;
-
-/// The weight of an edge in the transaction graph.
-///
-/// For simplicity, it is a fixed type and not a generic parameter.
-type EdgeWeight = i32;
+use aptos_graphs::graph::{EdgeWeight, NodeWeight};
 
 /// Partitions transactions using a streaming graph partitioner on a graph
 /// where the nodes are transactions and the edges are dependencies with
@@ -180,16 +171,14 @@ where
 {
     type Batch<'a> = Vec<(StreamNode<Self>, Self::NodeEdges<'a>)>
     where Self: 'a;
-    type EdgeWeight = EdgeWeight;
     type Error = S::Error;
     type NodeData = TxnWithDeps<T>;
     type NodeEdges<'a> = std::iter::Copied<std::slice::Iter<'a, (NodeIndex, EdgeWeight)>>
     where Self: 'a;
-    type NodeWeight = NodeWeight;
 
     fn next_batch(
         &mut self,
-    ) -> Option<Result<(Self::Batch<'_>, StreamBatchInfo<Self>), Self::Error>> {
+    ) -> Option<Result<(Self::Batch<'_>, BatchInfo), Self::Error>> {
         let batch = match self.transactions.next_batch()? {
             Ok(batch) => batch,
             Err(err) => return Some(Err(err)),

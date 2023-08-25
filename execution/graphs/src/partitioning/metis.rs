@@ -1,9 +1,24 @@
 // Copyright © Aptos Foundation
 
+use crate::graph::{EdgeWeight, NodeWeight};
 use crate::{
     graph::WeightedGraph,
     partitioning::{GraphPartitioner, PartitionId},
 };
+
+/// Compile-time assertion that `NodeWeight` can be converted to the type used to
+/// represent node weights in Metis.
+pub const NODE_WEIGHT_MUST_BE_CONVERTIBLE_TO_I32: () = {
+    assert_into::<NodeWeight, metis::Idx>()
+};
+
+/// Compile-time assertion that `EdgeWeight` can be converted to the type used to
+/// represent node weights in Metis.
+pub const EDGE_WEIGHT_MUST_BE_CONVERTIBLE_TO_I32: () = {
+    assert_into::<EdgeWeight, metis::Idx>()
+};
+
+const fn assert_into<From: Into<To>, To>() {}
 
 /// A weighted undirected graph in the format expected by the Metis library.
 struct MetisGraph {
@@ -112,11 +127,7 @@ impl MetisGraph {
         }
     }
 
-    fn weighted<G: WeightedGraph>(graph: &G) -> Self
-    where
-        G::NodeWeight: Into<metis::Idx>,
-        G::EdgeWeight: Into<metis::Idx>,
-    {
+    fn weighted<G: WeightedGraph>(graph: &G) -> Self {
         let mut res = Self::unweighted(graph);
 
         res.vwgt = Some(
@@ -179,11 +190,7 @@ impl MetisGraphPartitioner {
     }
 }
 
-impl<G: WeightedGraph> GraphPartitioner<G> for MetisGraphPartitioner
-where
-    G::NodeWeight: Into<metis::Idx>,
-    G::EdgeWeight: Into<metis::Idx>,
-{
+impl<G: WeightedGraph> GraphPartitioner<G> for MetisGraphPartitioner {
     type Error = anyhow::Error;
 
     /// Partitions the graph using the Metis graph partitioner.
