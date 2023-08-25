@@ -10,7 +10,7 @@ use crate::{
         ForbiddenError, InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
     },
 };
-use anyhow::{bail, ensure, format_err, Context as AnyhowContext};
+use anyhow::{format_err, Context as AnyhowContext};
 use aptos_api_types::{
     AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, ResourceGroup,
     TransactionOnChainData,
@@ -22,7 +22,7 @@ use aptos_logger::error;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::TStateView;
 use aptos_storage_interface::{
-    db_ensure,
+    db_ensure, db_other_bail,
     errors::AptosDbError,
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
     DbReader, Order, MAX_REQUEST_LIMIT,
@@ -176,7 +176,10 @@ impl Context {
         self.node_config.api.max_submit_transaction_batch_size
     }
 
-    pub async fn submit_transaction(&self, txn: SignedTransaction) -> Result<SubmissionStatus> {
+    pub async fn submit_transaction(
+        &self,
+        txn: SignedTransaction,
+    ) -> anyhow::Result<SubmissionStatus> {
         let (req_sender, callback) = oneshot::channel();
         self.mp_sender
             .clone()
@@ -264,6 +267,7 @@ impl Context {
         self.db
             .state_view_at_version(Some(version))?
             .get_state_value_bytes(state_key)
+            .map_err(Into::into)
     }
 
     pub fn get_state_value_poem<E: InternalError>(
@@ -292,7 +296,7 @@ impl Context {
             .take(MAX_REQUEST_LIMIT as usize)
             .collect::<Result<_>>()?;
         if iter.next().transpose()?.is_some() {
-            bail!("Too many state items under account ({:?}).", address);
+            db_other_bail!("Too many state items under account ({:?}).", address);
         }
         Ok(kvs)
     }
@@ -327,12 +331,12 @@ impl Context {
                                 Some(Ok((struct_tag, v.into_bytes())))
                             }
                             Ok(Path::Code(_)) => None,
-                            Err(e) => Some(Err(anyhow::Error::from(e))),
+                            Err(e) => Some(Err(AptosDbError::from(e))),
                         }
                     }
                     _ => {
                         error!("storage prefix scan return inconsistent key ({:?}) with expected key prefix ({:?}).", k, StateKeyPrefix::from(address));
-                        Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
+                        Some(Err(AptosDbError::Other( format!("storage prefix scan return inconsistent key ({:?})", k ))))
                     }
                 },
                 Err(e) => Some(Err(e)),
@@ -398,12 +402,12 @@ impl Context {
                         match Path::try_from(path.as_slice()) {
                             Ok(Path::Code(module_id)) => Some(Ok((module_id, v.into_bytes()))),
                             Ok(Path::Resource(_)) | Ok(Path::ResourceGroup(_)) => None,
-                            Err(e) => Some(Err(anyhow::Error::from(e))),
+                            Err(e) => Some(Err(AptosDbError::from(e))),
                         }
                     }
                     _ => {
                         error!("storage prefix scan return inconsistent key ({:?}) with expected key prefix ({:?}).", k, StateKeyPrefix::from(address));
-                        Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
+                        Some(Err(AptosDbError::Other(format!( "storage prefix scan return inconsistent key ({:?})", k ))))
                     }
                 },
                 Err(e) => Some(Err(e)),

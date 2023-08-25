@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    db_ensure as ensure,
     jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -13,9 +14,8 @@ use crate::{
         get_ledger_commit_progress, get_overall_commit_progress, get_state_kv_commit_progress,
         truncate_state_merkle_db,
     },
-    AptosDB, StateStore,
+    AptosDB, AptosDbError, Result, StateStore,
 };
-use anyhow::{ensure, Result};
 use aptos_config::config::RocksdbConfigs;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_schemadb::{ReadOptions, DB};

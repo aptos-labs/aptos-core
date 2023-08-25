@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    db_debugger::common::DbDir, ledger_store::LedgerStore,
-    schema::transaction_accumulator::TransactionAccumulatorSchema,
+    db_debugger::common::DbDir, db_ensure as ensure, ledger_store::LedgerStore,
+    schema::transaction_accumulator::TransactionAccumulatorSchema, AptosDbError, Result,
 };
-use anyhow::{ensure, Result};
 use aptos_crypto::hash::CryptoHash;
 use aptos_types::{proof::position::Position, transaction::Version};
 use clap::Parser;

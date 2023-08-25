@@ -45,3 +45,15 @@ impl From<RecvError> for AptosDbError {
         Self::Other(format!("{}", error))
     }
 }
+
+impl From<std::io::Error> for AptosDbError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Other(format!("{}", error))
+    }
+}
+
+impl From<std::num::ParseIntError> for AptosDbError {
+    fn from(error: std::num::ParseIntError) -> Self {
+        Self::Other(format!("{}", error))
+    }
+}

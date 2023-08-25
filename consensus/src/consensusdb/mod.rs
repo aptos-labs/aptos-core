@@ -14,6 +14,7 @@ use aptos_logger::prelude::*;
 use aptos_schemadb::{
     schema::Schema, Options, ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME,
 };
+use aptos_storage_interface::errors::AptosDbError;
 pub use schema::{
     block::BlockSchema,
     dag::{CertifiedNodeSchema, DagVoteSchema, NodeSchema, OrderedAnchorIdSchema},
@@ -203,6 +204,6 @@ impl ConsensusDB {
     pub fn get_all_data<S: Schema>(&self) -> Result<Vec<(S::Key, S::Value)>, DbError> {
         let mut iter = self.db.iter::<S>(ReadOptions::default())?;
         iter.seek_to_first();
-        Ok(iter.collect::<Result<Vec<(S::Key, S::Value)>>>()?)
+        Ok(iter.collect::<Result<Vec<(S::Key, S::Value)>, AptosDbError>>()?)
     }
 }

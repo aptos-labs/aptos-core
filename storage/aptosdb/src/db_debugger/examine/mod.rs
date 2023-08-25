@@ -3,7 +3,7 @@
 
 mod print_db_versions;
 
-use anyhow::Result;
+use crate::Result;
 
 #[derive(clap::Subcommand)]
 #[clap(about = "Examine databases.")]

@@ -7,7 +7,10 @@ use crate::{
 use aptos_config::config::RocksdbConfigs;
 use aptos_types::nibble::{nibble_path::NibblePath, Nibble};
 use clap::Parser;
-use std::path::{Path, PathBuf};
+use std::{
+    num::ParseIntError,
+    path::{Path, PathBuf},
+};
 
 pub const PAGE_SIZE: usize = 10;
 
@@ -41,6 +44,10 @@ impl AsRef<Path> for DbDir {
 
 pub fn parse_nibble_path(src: &str) -> Result<NibblePath> {
     src.chars()
-        .map(|c| Ok(Nibble::from(u8::from_str_radix(&c.to_string(), 16)?)))
+        .map(|c| {
+            Ok(Nibble::from(
+                u8::from_str_radix(&c.to_string(), 16).map_err(Into::<ParseIntError>::into)?,
+            ))
+        })
         .collect()
 }

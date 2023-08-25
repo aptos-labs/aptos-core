@@ -19,7 +19,7 @@ pub struct Cmd {
 impl Cmd {
     pub fn run(self) -> Result<()> {
         ensure!(!self.output_dir.exists(), "Output dir already exists.");
-        fs::create_dir_all(&self.output_dir)?;
+        fs::create_dir_all(&self.output_dir).map_err(Into::<std::io::Error>::into)?;
 
         // TODO(grao): Support sharded state merkle db and split_ledger_db here.
         AptosDB::create_checkpoint(self.db_dir, self.output_dir, false, false)

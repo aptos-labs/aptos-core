@@ -4,7 +4,7 @@
 mod get_path;
 mod get_snapshots;
 
-use anyhow::Result;
+use crate::Result;
 
 /// Tool supports listing snapshots before version and printing node in merkel tree with version and nibble path
 #[derive(clap::Subcommand)]
