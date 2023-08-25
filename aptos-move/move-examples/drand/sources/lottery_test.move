@@ -1,20 +1,36 @@
 module drand::lottery_test {
+    #[test_only]
+    use drand::init_module_for_testing;
+    #[test_only]
     use drand::lottery;
-    use aptos_framework::timestamp;
+    #[test_only]
     use std::signer;
+    #[test_only]
     use aptos_framework::account;
+    #[test_only]
     use aptos_framework::coin;
-    use aptos_framework::aptos_coin::{Self, AptosCoin};
-    use std::option;
-    use aptos_std::debug;
-    use std::string;
+    #[test_only]
     use aptos_framework::coin::MintCapability;
-    use aptos_framework::resource_account;
-    use aptos_framework::account::create_account_for_test;
-    use std::vector;
     #[test_only]
     use aptos_std::crypto_algebra::enable_cryptography_algebra_natives;
+    #[test_only]
+    use std::vector;
+    #[test_only]
+    use aptos_framework::account::create_account_for_test;
+    #[test_only]
+    use aptos_framework::resource_account;
+    #[test_only]
+    use std::string;
+    #[test_only]
+    use aptos_std::debug;
+    #[test_only]
+    use std::option;
+    #[test_only]
+    use aptos_framework::aptos_coin::{Self, AptosCoin};
+    #[test_only]
+    use aptos_framework::timestamp;
 
+    #[test_only]
     fun give_coins(mint_cap: &MintCapability<AptosCoin>, to: &signer) {
         let to_addr = signer::address_of(to);
         if (!account::exists_at(to_addr)) {
@@ -26,15 +42,6 @@ module drand::lottery_test {
         coin::deposit(to_addr, coins);
     }
 
-    #[test_only]
-    public fun init_module_for_testing(developer: &signer, resource_acct: &signer) {
-        let seed = vector::empty();
-        let auth_key = vector::empty();
-        // When deploying this contract we must have both a developer account which deploys the contract, and a resource account under which the contract is published. These two lines mock this flow for testing
-        create_account_for_test(signer::address_of(developer));
-        resource_account::create_resource_account(developer, seed, auth_key);
-        lottery::init_module(resource_acct)
-    }
 
     #[test(developer = @developer_addr, resource_acct = @drand, fx = @aptos_framework, u1 = @0xA001, u2 = @0xA002, u3 = @0xA003, u4 = @0xA004)]
     fun test_lottery(

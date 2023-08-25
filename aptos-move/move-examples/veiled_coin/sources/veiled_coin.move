@@ -133,7 +133,9 @@ module veiled_coin::veiled_coin {
 
     #[test_only]
     use aptos_framework::account::create_account_for_test;
+    #[test_only]
     use std::vector;
+    #[test_only]
     use aptos_std::ristretto255::Scalar;
 
 

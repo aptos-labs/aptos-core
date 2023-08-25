@@ -67,7 +67,7 @@ module drand::lottery {
     friend drand::lottery_test;
 
     /// Retrieves a so-called "resource" account which will maintain the list of lottery tickets bought by users. This must have been initialized before the contract is deployed, by the account associated with @developer_addr.
-    public(friend) fun init_module(resource_account: &signer) {
+    fun init_module(resource_account: &signer) {
         // Retrieve the resource account. This will allow this module to later obtain a `signer` for this account and
         // update the list of purchased lottery tickets.
         let signer_cap = resource_account::retrieve_resource_account_cap(
@@ -189,5 +189,19 @@ module drand::lottery {
         let rsrc_acc_addr = signer::address_of(&rsrc_acc_signer);
 
         (rsrc_acc_signer, rsrc_acc_addr)
+    }
+
+    //
+    // Test functions
+    //
+
+    #[test_only]
+    public fun init_module_for_testing(developer: &signer, resource_acct: &signer) {
+        let seed = vector::empty();
+        let auth_key = vector::empty();
+        // When deploying this contract we must have both a developer account which deploys the contract, and a resource account under which the contract is published. These two lines mock this flow for testing
+        create_account_for_test(signer::address_of(developer));
+        resource_account::create_resource_account(developer, seed, auth_key);
+        lottery::init_module(resource_acct)
     }
 }
