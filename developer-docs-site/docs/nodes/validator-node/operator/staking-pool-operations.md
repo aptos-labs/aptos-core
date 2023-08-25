@@ -387,4 +387,4 @@ aptos node analyze-validator-performance \
 
 ## Tracking rewards
 
-`DistributeEvent` is emitted when there is a transfer from staking_contract to the operator or staker (owner). Rewards can be tracked either by listening to `DistributeEvent` or by using the [View functon](../../../integration/aptos-apis.md#reading-state-with-the-view-function) to call `staking_contract_amounts`. This will return `accumulated_rewards` and `commission_amount`.
+`DistributeEvent` is emitted when there is a transfer from staking_contract to the operator or staker (owner). Rewards can be tracked either by listening to `DistributeEvent` or by using the [View function](../../../integration/aptos-apis.md#reading-state-with-the-view-function) to call `staking_contract_amounts`. This will return `accumulated_rewards` and `commission_amount`.
