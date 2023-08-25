@@ -17,6 +17,7 @@ AUTH
 AWS
 Ait
 AlertManager
+allowfullscreen
 Ansible
 ApiExplorer
 Aptos
@@ -145,6 +146,7 @@ Homebrew
 HotStuff
 IDE
 IDEs
+iframe
 IMCODING
 IOPS
 IPFS
@@ -211,10 +213,12 @@ PropertyMap
 Prover
 PureEdDSA
 PyPi
+px
 Quickstart
 RBAC
 README
 READMEs
+rgba
 RPC
 RTT
 RawTransaction
