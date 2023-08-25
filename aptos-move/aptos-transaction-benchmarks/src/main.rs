@@ -186,8 +186,7 @@ fn execute(opt: ExecuteOpt) {
         opt.num_executor_shards,
         opt.concurrency_level_per_shard,
         opt.remote_executor_addresses,
-        false,
-        //opt.no_conflict_txns,
+        opt.no_conflict_txns,
         opt.maybe_block_gas_limit,
         opt.generate_then_execute,
     );
