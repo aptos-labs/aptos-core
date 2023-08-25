@@ -157,10 +157,12 @@ async fn handle_pfn_response(
                 .with_label_values(&[&pfn_address.to_string()])
                 .set(latency);
         } else {
-            // If it's not shown in the map, we set the latency to 10 seconds.
-            INDEXER_GRPC_LATENCY_AGAINST_PFN_LATENCY_IN_SECS
-                .with_label_values(&[&pfn_address.to_string()])
-                .set(10.0);
+            tracing::error!(
+                first_version_in_map = map_read_lock.first_key_value().unwrap().0,
+                last_version_in_map = map_read_lock.last_key_value().unwrap().0,
+                pfn_version = ledger_version,
+                "ledger_version is not found in the map",
+            );
         }
     }
 }
@@ -198,6 +200,7 @@ async fn handle_indexer_grpc(
                 for transaction in item.transactions {
                     let version = transaction.version;
                     map_update_lock.insert(version, time_now);
+                    info!("Insert version {} into map.", version);
                     if map_update_lock.len() > LOOKUP_TABLE_SIZE {
                         map_update_lock.pop_first();
                     }
