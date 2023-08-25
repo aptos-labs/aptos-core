@@ -10,7 +10,7 @@ use diesel::{
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
 #[diesel(primary_key(token_uri))]
@@ -34,11 +34,6 @@ impl NFTMetadataCrawlerURIsQuery {
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> anyhow::Result<Option<Self>> {
         let mut op = || {
-            info!(
-                token_uri = token_uri,
-                "[NFT Metadata Crawler] Deduping by token_uri"
-            );
-
             parsed_token_uris::table
                 .find(token_uri.clone())
                 .first::<NFTMetadataCrawlerURIsQuery>(conn)
@@ -53,7 +48,7 @@ impl NFTMetadataCrawlerURIsQuery {
 
         match retry(backoff, &mut op) {
             Ok(result) => {
-                warn!(token_uri = token_uri, "token_uri has been found");
+                info!(token_uri = token_uri, "token_uri has been found");
                 Ok(result)
             },
             Err(_) => Ok(op()?),
@@ -66,12 +61,6 @@ impl NFTMetadataCrawlerURIsQuery {
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> anyhow::Result<Option<Self>> {
         let mut op = || {
-            info!(
-                token_uri = token_uri,
-                raw_image_uri = raw_image_uri,
-                "[NFT Metadata Crawler] Deduping by raw_animation_image"
-            );
-
             parsed_token_uris::table
                 .filter(parsed_token_uris::raw_image_uri.eq(raw_image_uri.clone()))
                 .filter(parsed_token_uris::token_uri.ne(token_uri.clone()))
@@ -87,7 +76,7 @@ impl NFTMetadataCrawlerURIsQuery {
 
         match retry(backoff, &mut op) {
             Ok(result) => {
-                warn!(
+                info!(
                     raw_image_uri = raw_image_uri,
                     "raw_image_uri has been found"
                 );
@@ -103,12 +92,6 @@ impl NFTMetadataCrawlerURIsQuery {
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> anyhow::Result<Option<Self>> {
         let mut op = || {
-            info!(
-                token_uri = token_uri,
-                raw_animation_uri = raw_animation_uri,
-                "[NFT Metadata Crawler] Deduping by raw_animation_uri"
-            );
-
             parsed_token_uris::table
                 .filter(parsed_token_uris::raw_animation_uri.eq(raw_animation_uri.clone()))
                 .filter(parsed_token_uris::token_uri.ne(token_uri.clone()))
@@ -124,7 +107,7 @@ impl NFTMetadataCrawlerURIsQuery {
 
         match retry(backoff, &mut op) {
             Ok(result) => {
-                warn!(
+                info!(
                     raw_animation_uri = raw_animation_uri,
                     "raw_animation_uri has been found"
                 );
