@@ -7,9 +7,12 @@ title: "Example Queries"
 ## Running example queries
 
 1. Open the Hasura Explorer for the network you want to query. You can find the URLs [here](./labs-hosted#hasura-explorer).
-1. Paste the **Query** code from an example into the main query section, and the **Query variables** code from the same example into the QUERY VARIABLES section (below the main query section).
+1. Paste the **Query** code from an example into the main query section, and the **Query Variables** code from the same example into the Query Variables section (below the main query section).
 
-## Example token queries
+## More Examples
+You can find many more example queries in the [TypeScript SDK](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk/src/indexer/queries). Indeed if you're using the TypeScript SDK, you should look at the [IndexerClient](../../sdks/ts-sdk/typescript-sdk-indexer-client-class).
+
+## Example Token Queries
 
 Getting all tokens currently in account.
 
@@ -31,7 +34,7 @@ query CurrentTokens($owner_address: String, $offset: Int) {
 }
 ```
 
-**Query variables**
+**Query Variables**
 ```json
 {
   "owner_address": "0xaa921481e07b82a26dbd5d3bc472b9ad82d3e5bfd248bacac160eac51687c2ff",
@@ -64,7 +67,7 @@ query TokenActivities($token_id_hash: String, $offset: Int) {
 }
 ```
 
-**Query variables**
+**Query Variables**
 
 ```json
 {
@@ -98,7 +101,7 @@ query CurrentOffers($to_address: String, $offset: Int) {
 }
 ```
 
-** Query variables**
+** Query Variables**
 
 ```json
 {
@@ -107,7 +110,7 @@ query CurrentOffers($to_address: String, $offset: Int) {
 }
 ```
 
-## Example coin queries
+## Example Coin Queries
 
 Getting coin activities (including gas fees).
 
@@ -131,7 +134,7 @@ query CoinActivity($owner_address: String, $offset: Int) {
 }
 ```
 
-**Query variables**
+**Query Variables**
 
 ```json
 {
@@ -163,7 +166,7 @@ query CurrentBalances($owner_address: String, $offset: Int)Ï {
 }
 ```
 
-**Query variables**
+**Query Variables**
 
 ```json
 {
@@ -172,7 +175,7 @@ query CurrentBalances($owner_address: String, $offset: Int)Ï {
 }
 ```
 
-## Example explorer queries
+## Example Explorer Queries
 
 Getting all user transaction versions (to filter on user transaction for block explorer).
 
@@ -186,7 +189,7 @@ query UserTransactions($limit: Int) {
 }
 ```
 
-**Query variables**
+**Query Variables**
 
 ```json
 {
