@@ -846,6 +846,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload<P>) {
+        let validator_set: ValidatorSet = payload
+            .get()
+            .expect("failed to get ValidatorSet from payload");
+        let epoch_state = EpochState {
+            epoch: payload.epoch(),
+            verifier: (&validator_set).into(),
+        };
+        debug!("start_new_epoch: epoch={}", epoch_state.epoch);
         let maybe_dkg_state: anyhow::Result<DKGState> = payload.get();
         match maybe_dkg_state {
             Err(_) => {
@@ -877,13 +885,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 //dkg todo: decide if we need to hardcode the dkg keys for epoch 1, for forge testing etc.
             }
         }
-        let validator_set: ValidatorSet = payload
-            .get()
-            .expect("failed to get ValidatorSet from payload");
-        let epoch_state = EpochState {
-            epoch: payload.epoch(),
-            verifier: (&validator_set).into(),
-        };
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
