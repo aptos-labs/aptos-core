@@ -1116,25 +1116,25 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 (peer, msg) = network_receivers.consensus_messages.select_next_some() => {
                     monitor!("epoch_manager_process_consensus_messages",
                     if let Err(e) = self.process_message(peer, msg).await {
-                        error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
+                        // error!(epoch = self.epoch(), error = e, kind = error_kind(&e));
                     });
                 },
                 (peer, msg) = network_receivers.buffer_manager_messages.select_next_some() => {
                     monitor!("epoch_manager_process_buffer_manager_messages",
                     if let Err(e) = self.process_message(peer, msg).await {
-                        error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
+                        // error!(epoch = self.epoch(), error = e, kind = error_kind(&e));
                     });
                 },
                 (peer, msg) = network_receivers.quorum_store_messages.select_next_some() => {
                     monitor!("epoch_manager_process_quorum_store_messages",
                     if let Err(e) = self.process_message(peer, msg).await {
-                        error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
+                        // error!(epoch = self.epoch(), error = e, kind = error_kind(&e));
                     });
                 },
                 (peer, request) = network_receivers.rpc_rx.select_next_some() => {
                     monitor!("epoch_manager_process_rpc",
                     if let Err(e) = self.process_rpc_request(peer, request) {
-                        error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
+                        // error!(epoch = self.epoch(), error = e, kind = error_kind(&e));
                     });
                 },
                 round = round_timeout_sender_rx.select_next_some() => {
