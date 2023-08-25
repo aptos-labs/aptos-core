@@ -1,5 +1,5 @@
 [package]
-name = "aptos-runtimes"
+name = "aptos-experimental-runtimes"
 description = "Simple runtime spawning utilities"
 version = "0.1.0"
 
@@ -13,5 +13,10 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-runtimes = { workspace = true }
+core_affinity = { workspace = true }
+libc = { workspace = true }
+num_cpus = { workspace = true }
+once_cell = { workspace = true }
 rayon = { workspace = true }
 tokio = { workspace = true }
