@@ -46,6 +46,12 @@
 
 <dl>
 <dt>
+<code>target_epoch: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
 <code>locked_new_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="stake.md#0x1_stake_ValidatorInfo">stake::ValidatorInfo</a>&gt;</code>
 </dt>
 <dd>
@@ -258,7 +264,10 @@ An invalid block time was encountered.
         dkg_state.countdown = 999999999; //TODO: for debugging
         <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a>&gt;(
             &<b>mut</b> dkg_state.events,
-            <a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a> { locked_new_validator_set },
+            <a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a> {
+                target_epoch,
+                locked_new_validator_set,
+            },
         );
     } <b>else</b> {
         <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"unexpected <a href="dkg.md#0x1_dkg_start">dkg::start</a>()..."));
