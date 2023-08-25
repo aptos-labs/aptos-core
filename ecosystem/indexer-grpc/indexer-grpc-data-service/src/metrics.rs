@@ -10,9 +10,9 @@ use once_cell::sync::Lazy;
 /// Latest processed transaction version.
 pub static LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "indexer_grpc_data_service_latest_processed_version",
+        "indexer_grpc_data_service_v2_latest_processed_version",
         "Latest processed transaction version",
-        &["request_token", "processor_name"],
+        &["request_token", "email"],
     )
     .unwrap()
 });
@@ -20,9 +20,9 @@ pub static LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
 /// Number of transactions that served by data service.
 pub static PROCESSED_VERSIONS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "indexer_grpc_data_service_processed_versions",
+        "indexer_grpc_data_service_v2_processed_versions",
         "Number of transactions that have been processed by data service",
-        &["request_token", "processor_name"],
+        &["request_token", "email"],
     )
     .unwrap()
 });
@@ -40,9 +40,9 @@ pub static ERROR_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Data latency for data service based on latest processed transaction based on selected processor.
 pub static PROCESSED_LATENCY_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!(
-        "indexer_grpc_data_service_latest_data_latency_in_secs",
+        "indexer_grpc_data_service_v2_latest_data_latency_in_secs",
         "Latency of data service based on latest processed transaction",
-        &["request_token", "processor_name"],
+        &["request_token", "email"],
     )
     .unwrap()
 });
@@ -60,9 +60,9 @@ pub static PROCESSED_LATENCY_IN_SECS_ALL: Lazy<HistogramVec> = Lazy::new(|| {
 /// Number of transactions in each batch that data service has processed.
 pub static PROCESSED_BATCH_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "indexer_grpc_data_service_processed_batch_size",
+        "indexer_grpc_data_service_v2_processed_batch_size",
         "Size of latest processed batch by data service",
-        &["request_token", "processor_name"],
+        &["request_token", "email"],
     )
     .unwrap()
 });
