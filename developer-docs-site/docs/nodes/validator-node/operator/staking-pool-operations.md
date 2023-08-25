@@ -301,7 +301,7 @@ aptos stake request-commission \
   --profile mainnet-operator
 ```
 
-If you run the `aptos stake request-commission` command before the end of the the lockup expiration, the command will initiate unlock for any locked commission earned up until that moment in time.
+If you run the `aptos stake request-commission` command before the end of the lockup expiration, the command will initiate unlock for any locked commission earned up until that moment in time.
 
 See example below:
 
