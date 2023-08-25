@@ -116,24 +116,26 @@ module veiled_coin::veiled_coin {
     use std::error;
     use std::option::Option;
     use std::signer;
-    use std::vector;
 
     use aptos_std::ristretto255;
     use aptos_std::ristretto255_bulletproofs as bulletproofs;
     use aptos_std::ristretto255_bulletproofs::RangeProof;
     use aptos_std::ristretto255_elgamal as elgamal;
     use aptos_std::ristretto255_pedersen as pedersen;
-    #[test_only]
-    use aptos_std::ristretto255::Scalar;
 
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::resource_account;
-    use aptos_framework::account::create_account_for_test;
 
     use veiled_coin::helpers;
     use veiled_coin::sigma_protos;
+
+    #[test_only]
+    use aptos_framework::account::create_account_for_test;
+    use std::vector;
+    use aptos_std::ristretto255::Scalar;
+
 
     //
     // Errors
