@@ -242,7 +242,7 @@ impl BuildConfig {
         let path = SourcePackageLayout::try_find_root(path)?;
         let toml_manifest =
             self.parse_toml_manifest(path.join(SourcePackageLayout::Manifest.path()))?;
-        let mutx = PackageLock::lock();
+        let mutx = PackageLock::strict_lock();
         // This should be locked as it inspects the environment for `MOVE_HOME` which could
         // possibly be set by a different process in parallel.
         let manifest = manifest_parser::parse_source_manifest(toml_manifest)?;

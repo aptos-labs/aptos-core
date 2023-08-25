@@ -2,7 +2,8 @@
 
 use super::dag_test;
 use crate::{
-    dag::{bootstrap::bootstrap_dag, CertifiedNode},
+    dag::bootstrap::bootstrap_dag,
+    experimental::buffer_manager::OrderedBlocks,
     network::{DAGNetworkSenderImpl, IncomingDAGRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
@@ -56,7 +57,7 @@ impl DagBootstrapUnit {
         network_events: Box<
             Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>,
         >,
-    ) -> (Self, UnboundedReceiver<Vec<Arc<CertifiedNode>>>) {
+    ) -> (Self, UnboundedReceiver<OrderedBlocks>) {
         let epoch_state = EpochState {
             epoch,
             verifier: storage.get_validator_set().into(),
@@ -155,10 +156,7 @@ fn bootstrap_nodes(
     playground: &mut NetworkPlayground,
     signers: Vec<ValidatorSigner>,
     validators: ValidatorVerifier,
-) -> (
-    Vec<DagBootstrapUnit>,
-    Vec<UnboundedReceiver<Vec<Arc<CertifiedNode>>>>,
-) {
+) -> (Vec<DagBootstrapUnit>, Vec<UnboundedReceiver<OrderedBlocks>>) {
     let peers_and_metadata = playground.peer_protocols();
     let (nodes, ordered_node_receivers) = signers
         .iter()
@@ -201,7 +199,6 @@ async fn test_dag_e2e() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     let (signers, validators) = random_validator_verifier(num_nodes, None, false);
-    let author_indexes = validators.address_to_validator_index().clone();
 
     let (nodes, mut ordered_node_receivers) = bootstrap_nodes(&mut playground, signers, validators);
     for node in nodes {
@@ -210,24 +207,16 @@ async fn test_dag_e2e() {
 
     runtime.spawn(playground.start());
 
-    let display = |node: &Arc<CertifiedNode>| {
-        (
-            node.metadata().round(),
-            *author_indexes.get(node.metadata().author()).unwrap(),
-        )
-    };
-
     for _ in 1..10 {
         let mut all_ordered = vec![];
         for receiver in &mut ordered_node_receivers {
             let block = receiver.next().await.unwrap();
-            all_ordered.push(block)
+            all_ordered.push(block.ordered_blocks)
         }
-        let first: Vec<_> = all_ordered.first().unwrap().iter().map(display).collect();
+        let first = all_ordered.first().unwrap();
         assert_gt!(first.len(), 0, "must order nodes");
         debug!("Nodes: {:?}", first);
-        for ordered in all_ordered.iter() {
-            let a: Vec<_> = ordered.iter().map(display).collect();
+        for a in all_ordered.iter() {
             assert_eq!(a.len(), first.len(), "length should match");
             assert_eq!(a, first);
         }

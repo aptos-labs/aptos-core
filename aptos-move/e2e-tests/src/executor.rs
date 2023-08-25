@@ -77,6 +77,8 @@ static RNG_SEED: [u8; 32] = [9u8; 32];
 
 const ENV_TRACE_DIR: &str = "TRACE";
 
+const ENV_ENABLE_PARALLEL: &str = "E2E_PARALLEL_EXEC";
+
 /// Directory structure of the trace dir
 pub const TRACE_FILE_NAME: &str = "name";
 pub const TRACE_FILE_ERROR: &str = "error";
@@ -101,7 +103,10 @@ pub struct FakeExecutor {
     executed_output: Option<GoldenOutputs>,
     trace_dir: Option<PathBuf>,
     rng: KeyGen,
-    no_parallel_exec: bool,
+    /// If set, determines whether or not to execute a comparison test with the parallel
+    /// block executor. If not set, environment variable E2E_PARALLEL_EXEC must be set
+    /// s.t. the comparison test is executed.
+    no_parallel_exec: Option<bool>,
     features: Features,
     chain_id: u8,
 }
@@ -128,7 +133,7 @@ impl FakeExecutor {
             executed_output: None,
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
-            no_parallel_exec: false,
+            no_parallel_exec: None,
             features: Features::default(),
             chain_id: chain_id.id(),
         };
@@ -138,9 +143,17 @@ impl FakeExecutor {
         executor
     }
 
-    /// Configure this executor to not use parallel execution.
+    /// Configure this executor to not use parallel execution. By default, parallel execution is
+    /// enabled if E2E_PARALLEL_EXEC is set. This overrides the default.
     pub fn set_not_parallel(mut self) -> Self {
-        self.no_parallel_exec = true;
+        self.no_parallel_exec = Some(true);
+        self
+    }
+
+    /// Configure this executor to use parallel execution. By default, parallel execution is
+    /// enabled if E2E_PARALLEL_EXEC is set. This overrides the default.
+    pub fn set_parallel(mut self) -> Self {
+        self.no_parallel_exec = Some(false);
         self
     }
 
@@ -194,7 +207,7 @@ impl FakeExecutor {
             executed_output: None,
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
-            no_parallel_exec: false,
+            no_parallel_exec: None,
             features: Features::default(),
             chain_id: ChainId::test().id(),
         }
@@ -463,7 +476,14 @@ impl FakeExecutor {
         }
 
         let output = AptosVM::execute_block(txn_block.clone(), &self.data_store, None);
-        if !self.no_parallel_exec {
+
+        let no_parallel = if let Some(no_parallel) = self.no_parallel_exec {
+            no_parallel
+        } else {
+            env::var(ENV_ENABLE_PARALLEL).is_err()
+        };
+
+        if !no_parallel {
             let parallel_output = self.execute_transaction_block_parallel(txn_block);
             assert_eq!(output, parallel_output);
         }

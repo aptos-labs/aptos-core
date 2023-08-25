@@ -3,7 +3,11 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{common::TxnIdx, metrics::TIMER, state_view::OverlayedStateView};
+use crate::{
+    common::{TxnIdx, EXPECTANT_BLOCK_SIZE},
+    metrics::TIMER,
+    state_view::OverlayedStateView,
+};
 use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
 use aptos_state_view::StateView;
@@ -64,7 +68,7 @@ impl PtxFinalizerClient {
 
 struct Worker<'view> {
     result_tx: Sender<TransactionOutput>,
-    vm_output_buffer: VecDeque<Option<VMOutput>>,
+    buffer: VecDeque<Option<VMOutput>>,
     next_idx: TxnIdx,
     state_view: OverlayedStateView<'view>,
 }
@@ -73,7 +77,7 @@ impl<'view> Worker<'view> {
     fn new(base_view: &'view (dyn StateView + Sync), result_tx: Sender<TransactionOutput>) -> Self {
         Self {
             result_tx,
-            vm_output_buffer: VecDeque::new(),
+            buffer: VecDeque::with_capacity(EXPECTANT_BLOCK_SIZE),
             next_idx: 0,
             state_view: OverlayedStateView::new(base_view),
         }
@@ -83,30 +87,22 @@ impl<'view> Worker<'view> {
         trace!("seen txn: {}", txn_idx);
         assert!(txn_idx >= self.next_idx);
         let idx_in_buffer = txn_idx - self.next_idx;
-        if self.vm_output_buffer.len() < idx_in_buffer + 1 {
-            self.vm_output_buffer.resize(idx_in_buffer + 1, None);
+        if self.buffer.len() < idx_in_buffer + 1 {
+            self.buffer.resize(idx_in_buffer + 1, None);
         }
-        self.vm_output_buffer[idx_in_buffer] = Some(vm_output);
+        self.buffer[idx_in_buffer] = Some(vm_output);
         while self.ready_to_finalize_one() {
-            trace!(
-                "finalize txn: {}, buf len {}",
-                txn_idx,
-                self.vm_output_buffer.len(),
-            );
-            let vm_output = self.vm_output_buffer.pop_front().unwrap().unwrap();
-            self.next_idx += 1;
-            self.finalize_one(vm_output);
+            trace!("finalize {}, buf len {}", txn_idx, self.buffer.len());
+            self.finalize_one();
         }
     }
 
     fn ready_to_finalize_one(&self) -> bool {
-        self.vm_output_buffer
-            .front()
-            .and_then(Option::as_ref)
-            .is_some()
+        self.buffer.front().and_then(Option::as_ref).is_some()
     }
 
-    fn finalize_one(&mut self, vm_output: VMOutput) {
+    fn finalize_one(&mut self) {
+        let vm_output = self.buffer.pop_front().unwrap().unwrap();
         let txn_out = vm_output
             .try_into_transaction_output(&self.state_view)
             .unwrap();
@@ -114,6 +110,7 @@ impl<'view> Worker<'view> {
             self.state_view.overwrite(key.clone(), op.as_state_value());
         }
         self.result_tx.send(txn_out).expect("Channel closed.");
+        self.next_idx += 1;
     }
 
     fn finish_block(&mut self) {
