@@ -14,7 +14,7 @@ use crate::{
     transaction_shuffler::TransactionShuffler,
     txn_notifier::TxnNotifier,
 };
-use anyhow::Result;
+use anyhow::{Error, Result};
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
@@ -29,6 +29,7 @@ use fail::fail_point;
 use futures::{SinkExt, StreamExt};
 use std::{boxed::Box, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
+use aptos_types::dkg::StartDKGEvent;
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
@@ -274,11 +275,20 @@ impl StateComputer for ExecutionProxy {
             .send((Box::new(wrapped_callback), txns, reconfig_events))
             .await
             .expect("Failed to send async state sync notification");
-        debug!("[DKG] in commit, num_dkg_events={}", dkg_events.len());
+        debug!("[DKG] commit: num_dkg_events={}", dkg_events.len());
         let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().as_ref().unwrap().clone();
-        debug!("[DKG] in commit, lock acquired.");
+        debug!("[DKG] commit: lock acquired.");
         // trigger the start of dkg
         if !dkg_events.is_empty() {
+            match StartDKGEvent::try_from(dkg_events
+                .first().unwrap()) {
+                Ok(e) => {
+                    debug!("[DKG] commit: StartDKGEvent={:?}", &e);
+                }
+                _ => {
+                    debug!("[DKG] commit: StartDKGEvent decoding failure?");
+                }
+            }
             dkg_manager_wrapper.start_dkg(dkg_events).await;
         }
 

@@ -52,11 +52,14 @@ impl DKGManagerWrapper {
     pub async fn start_dkg(&self, dkg_events: Vec<ContractEvent>) {
         match self {
             DKGManagerWrapper::NoDKG => {
+                debug!("[DKG] start_dkg: DKGManagerWrapper::NoDKG!");
                 error!("[DKG] No DKG manager!");
             },
             DKGManagerWrapper::WithDKG(dkg_manager) => {
+                debug!("[DKG] start_dkg: DKGManagerWrapper::WithDKG!");
                 let dkg_manager_clone = dkg_manager.clone();
                 let mut guard = dkg_manager_clone.lock();
+                debug!("[DKG] start_dkg: dkg_manager lock acquired");
                 guard.start_dkg(dkg_events);
             },
         }
@@ -118,12 +121,14 @@ impl DKGManager {
 
     pub fn start_dkg(&mut self, dkg_events: Vec<ContractEvent>) {
         // thread::sleep(Duration::from_millis(TRANSCRIPT_COMPUTE_TIME_MS));
+        debug!("[DKG] start_dkg: liveness check 1");
         let first_event = StartDKGEvent::try_from(dkg_events
             .first().unwrap()).unwrap();
-
+        debug!("[DKG] start_dkg: liveness check 2");
         let (my_index, _) = first_event.locked_new_validator_info.iter().find_position(|x|x.account_address == self.author).unwrap();
+        debug!("[DKG] start_dkg: liveness check 3");
         let dkg_rounding = DKGRounding::from(first_event);
-        debug!("[DKG] my_index={}", my_index);
+        debug!("[DKG] start_dkg: my_index={}", my_index);
         debug!(
             "[DKG] Starting DKG with the following parameters: \n
             number of validators: {:?} \n

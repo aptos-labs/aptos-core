@@ -853,7 +853,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
         };
-        debug!("start_new_epoch: epoch={}", epoch_state.epoch);
+        debug!("[DKG] start_new_epoch with current_epoch={:?}, target_epoch={}", self.epoch_state.as_ref().map(|a|a.epoch), epoch_state.epoch);
         let maybe_dkg_state: anyhow::Result<DKGState> = payload.get();
         match maybe_dkg_state {
             Err(_) => {

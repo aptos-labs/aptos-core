@@ -17,6 +17,7 @@ module aptos_framework::dkg {
     const EINVALID_GUID_FOR_EVENT: u64 = 5;
 
     struct StartDKGEvent has drop, store {
+        target_epoch: u64,
         locked_new_validator_set: vector<ValidatorInfo>,
     }
 
@@ -70,7 +71,10 @@ module aptos_framework::dkg {
             dkg_state.countdown = 999999999; //TODO: for debugging
             event::emit_event<StartDKGEvent>(
                 &mut dkg_state.events,
-                StartDKGEvent { locked_new_validator_set },
+                StartDKGEvent {
+                    target_epoch,
+                    locked_new_validator_set,
+                },
             );
         } else {
             debug::print(&utf8(b"unexpected dkg::start()..."));

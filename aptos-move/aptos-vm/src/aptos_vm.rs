@@ -1323,11 +1323,12 @@ impl AptosVM {
         // We already verify the validity of the dkg transcript in the state_computer, so it is valid.
 
         let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
-        if self
+        let reconfigure_with_dkg_enabled = self
             .0
             .get_features()
-            .is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG)
-        {
+            .is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG);
+        debug!("[DKG] process_block_prologue: reconfigure_with_dkg={}", reconfigure_with_dkg_enabled);
+        if reconfigure_with_dkg_enabled {
             session
                 .execute_function_bypass_visibility(
                     &BLOCK_MODULE,

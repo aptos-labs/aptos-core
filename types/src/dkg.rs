@@ -12,6 +12,7 @@ use crate::on_chain_config::{ConfigID, OnChainConfig};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StartDKGEvent {
+    pub target_epoch: u64,
     pub locked_new_validator_info: Vec<ValidatorInfo>,
 }
 
