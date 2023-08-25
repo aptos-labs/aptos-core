@@ -849,11 +849,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
+        let (my_index, _) = validator_set.active_validators.iter().find_position(|x|x.account_address == self.author).expect(format!("[DKG] my addr is not found in new validator set.").as_str());
+        debug!("[DKG] start_new_epoch: with my_index={}", my_index);
         let epoch_state = EpochState {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
         };
-        debug!("[DKG] start_new_epoch with current_epoch={:?}, target_epoch={}", self.epoch_state.as_ref().map(|a|a.epoch), epoch_state.epoch);
+        debug!("[DKG] start_new_epoch: with current_epoch={:?}, target_epoch={}", self.epoch_state.as_ref().map(|a|a.epoch), epoch_state.epoch);
         let maybe_dkg_state: anyhow::Result<DKGState> = payload.get();
         match maybe_dkg_state {
             Err(_) => {
@@ -861,7 +863,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 //dkg todo: when epoch starts with no dkg transcript, proceed epoch without randomness.
             }
             Ok(state) if state.target_epoch > 1 => {
-                debug!("[DKG] start_new_epoch with dkg_state={:?}", state);
+                debug!("[DKG] start_new_epoch with DKGState[state_id={}, target_epoch={}, countdown={}, trx_size={}]", state.state_id, state.target_epoch, state.countdown, state.serialized_transcript.len());
                 let trxs = bcs::from_bytes::<DKGTranscriptWrapper>(state.serialized_transcript.as_slice()).unwrap();
                 let st: Storage = (&self.config.safety_rules.backend).try_into().unwrap();
                 if let Err(error) = st.available() {
@@ -874,11 +876,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 let mut dk_bytes = private_key.to_bytes(); //in big-endian
                 dk_bytes.reverse();// now in small-endian, needed by pvss API.
                 let dk = aptos_dkg::pvss::encryption_dlog::g1::DecryptPrivKey::try_from(dk_bytes.as_slice()).unwrap();
-                let pvss_config = self.dkg_manager_wrapper.get_pvss_config().unwrap();
-                let (sk1, pk1) = trxs.trx_one_third.decrypt_own_share(&pvss_config.wc_1, &pvss_config.my_index, &dk);
-                let (sk2, pk2) = trxs.trx_two_third.decrypt_own_share(&pvss_config.wc_2, &pvss_config.my_index, &dk);
+                // let pvss_config = self.dkg_manager_wrapper.get_pvss_config().unwrap();
+                // let (sk1, pk1) = trxs.trx_one_third.decrypt_own_share(&pvss_config.wc_1, &Player { id: my_index}, &dk);
+                // let (sk2, pk2) = trxs.trx_two_third.decrypt_own_share(&pvss_config.wc_2, &Player { id: my_index}, &dk);
                 //dkg todo: start randgen with these keys.
-                debug!("[DKG] starting new epoch with sk1={:?}, sk2={:?}", sk1, sk2);
+                debug!("[DKG] starting new epoch with something!");
             }
             _ => {
                 debug!("No trxs in epoch 1. This is expected.");

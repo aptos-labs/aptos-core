@@ -125,17 +125,9 @@ impl DKGManager {
         let first_event = StartDKGEvent::try_from(dkg_events
             .first().unwrap()).unwrap();
         debug!("[DKG] start_dkg: first_event={:?}", first_event);
-        let (my_index, _) = first_event.locked_new_validator_info.iter().find_position(|x|x.account_address == self.author).unwrap();
-        debug!("[DKG] start_dkg: liveness check 3");
         let dkg_rounding = DKGRounding::from(first_event);
-        debug!("[DKG] start_dkg: my_index={}", my_index);
         debug!(
-            "[DKG] Starting DKG with the following parameters: \n
-            number of validators: {:?} \n
-            validator stakes: \n {:?} \n
-            validator weights: \n {:?} \n
-            validator 1/3 weights: \n {:?} \n
-            validator 2/3 weights: \n {:?} \n",
+            "[DKG] Starting DKG with the following parameters: number of validators: {:?}, validator stakes: {:?}, validator weights: {:?}, validator 1/3 weights: {:?}, validator 2/3 weights: {:?}",
             dkg_rounding.validator_stakes().len(),
             dkg_rounding.validator_stakes(),
             dkg_rounding.validator_weights(),
@@ -185,7 +177,7 @@ impl DKGManager {
         //     .expect("serialized transcript should deserialize correctly");
         // assert_eq!(trx_2, deserialized);
 
-        let dkg_pvss_config = DKGPvssConfig::new(wc_1.clone(), wc_2.clone(), pp, consensus_keys, Player{id: my_index}, &DST_PVSS_TESTING_APP[..]);
+        let dkg_pvss_config = DKGPvssConfig::new(wc_1.clone(), wc_2.clone(), pp, consensus_keys, &DST_PVSS_TESTING_APP[..]);
         self.dkg_store.add_pvss_config(dkg_pvss_config);
 
         let dkg_trx_wrapper = DKGTranscriptWrapper {

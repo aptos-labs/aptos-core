@@ -34,7 +34,6 @@ pub struct DKGPvssConfig {
     pub wc_2: <WT as Transcript>::SecretSharingConfig,
     pub pp: <das::Transcript as Transcript>::PvssPublicParameters,
     pub eks: Vec<<das::Transcript as Transcript>::EncryptPubKey>,
-    pub my_index: Player,
     pub dst: &'static [u8],
 }
 
@@ -44,7 +43,6 @@ impl DKGPvssConfig {
         wc_2: <WT as Transcript>::SecretSharingConfig,
         pp: <das::Transcript as Transcript>::PvssPublicParameters,
         eks: Vec<<das::Transcript as Transcript>::EncryptPubKey>,
-        my_index: Player,
         dst: &'static [u8],
     ) -> Self {
         Self {
@@ -52,7 +50,6 @@ impl DKGPvssConfig {
             wc_2,
             pp,
             eks,
-            my_index,
             dst,
         }
     }

@@ -290,7 +290,10 @@ module aptos_framework::stake {
 
     public(friend) fun get_active_validator_set(): vector<ValidatorInfo> acquires ValidatorSet {
         let validator_set = borrow_global<ValidatorSet>(@aptos_framework);
-        validator_set.active_validators
+        let ret = validator_set.active_validators;
+        vector::append(&mut ret, validator_set.pending_inactive);
+        ret
+
     }
 
     #[view]
