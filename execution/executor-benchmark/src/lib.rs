@@ -15,10 +15,11 @@ pub mod transaction_executor;
 pub mod transaction_generator;
 
 use crate::{
-    pipeline::Pipeline, transaction_committer::TransactionCommitter,
+    db_access::DbAccessUtil, pipeline::Pipeline, transaction_committer::TransactionCommitter,
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
 use aptos_block_executor::counters as block_executor_counters;
+use aptos_block_partitioner::PartitionerConfig;
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
 use aptos_executor::{
@@ -34,7 +35,7 @@ use aptos_jellyfish_merkle::metrics::{
 use aptos_logger::{info, warn};
 use aptos_metrics_core::Histogram;
 use aptos_sdk::types::LocalAccount;
-use aptos_storage_interface::DbReaderWriter;
+use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_transaction_generator_lib::{
     create_txn_generator_creator, TransactionGeneratorCreator, TransactionType,
     TransactionType::NonConflictingCoinTransfer,
@@ -101,6 +102,7 @@ pub fn run_benchmark<V>(
     transaction_mix: Option<Vec<(TransactionType, usize)>>,
     mut transactions_per_sender: usize,
     connected_tx_grps: usize,
+    shuffle_connected_txns: bool,
     num_main_signer_accounts: usize,
     num_additional_dst_pool_accounts: usize,
     source_dir: impl AsRef<Path>,
@@ -170,6 +172,7 @@ pub fn run_benchmark<V>(
                 num_executor_shards: 1,
                 async_partitioning: false,
                 use_global_executor: false,
+                partitioner_config: PartitionerConfig::default(),
             },
         )
     });
@@ -177,7 +180,7 @@ pub fn run_benchmark<V>(
     let version = db.reader.get_latest_version().unwrap();
 
     let (pipeline, block_sender) =
-        Pipeline::new(executor, version, pipeline_config.clone(), Some(num_blocks));
+        Pipeline::new(executor, version, pipeline_config, Some(num_blocks));
 
     let mut num_accounts_to_load = num_main_signer_accounts;
     if let Some(mix) = &transaction_mix {
@@ -252,6 +255,7 @@ pub fn run_benchmark<V>(
             num_blocks,
             transactions_per_sender,
             connected_tx_grps,
+            shuffle_connected_txns,
         );
     }
     if pipeline_config.delay_execution_start {
@@ -321,8 +325,9 @@ pub fn run_benchmark<V>(
     );
 
     if verify_sequence_numbers {
-        generator.verify_sequence_numbers(db.reader);
+        generator.verify_sequence_numbers(db.reader.clone());
     }
+    log_total_supply(&db.reader);
 }
 
 fn init_workload<V>(
@@ -471,7 +476,7 @@ fn add_accounts_impl<V>(
     if verify_sequence_numbers {
         println!("Verifying sequence numbers...");
         // Do a sanity check on the sequence number to make sure all transactions are committed.
-        generator.verify_sequence_numbers(db.reader);
+        generator.verify_sequence_numbers(db.reader.clone());
     }
 
     println!(
@@ -480,6 +485,8 @@ fn add_accounts_impl<V>(
         generator.version(),
         generator.num_existing_accounts() + num_new_accounts,
     );
+
+    log_total_supply(&db.reader);
 
     // Write metadata
     generator.write_meta(&output_dir, num_new_accounts);
@@ -579,6 +586,7 @@ mod tests {
                 num_executor_shards: 1,
                 async_partitioning: false,
                 use_global_executor: false,
+                partitioner_config: Default::default(),
             },
         );
 
@@ -588,10 +596,11 @@ mod tests {
             6, /* block_size */
             5, /* num_blocks */
             transaction_type.map(|t| vec![(t.materialize(2, false), 1)]),
-            2,  /* transactions per sender */
-            0,  /* independent tx groups in a block */
-            25, /* num_main_signer_accounts */
-            30, /* num_dst_pool_accounts */
+            2,     /* transactions per sender */
+            0,     /* connected txn groups in a block */
+            false, /* shuffle the connected txns in a block */
+            25,    /* num_main_signer_accounts */
+            30,    /* num_dst_pool_accounts */
             storage_dir.as_ref(),
             checkpoint_dir,
             verify_sequence_numbers,
@@ -608,6 +617,7 @@ mod tests {
                 num_executor_shards: 1,
                 async_partitioning: false,
                 use_global_executor: false,
+                partitioner_config: Default::default(),
             },
         );
     }
@@ -627,4 +637,10 @@ mod tests {
         // correct execution not yet implemented, so cannot be checked for validity
         test_generic_benchmark::<NativeExecutor>(None, false);
     }
+}
+
+fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
+    let total_supply =
+        DbAccessUtil::get_total_supply(&db_reader.latest_state_checkpoint_view().unwrap()).unwrap();
+    info!("total supply is {:?} octas", total_supply)
 }

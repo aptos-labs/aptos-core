@@ -5,6 +5,7 @@ use crate::{
     block_partitioning::BlockPartitioningStage, GasMesurement, TransactionCommitter,
     TransactionExecutor,
 };
+use aptos_block_partitioner::PartitionerConfig;
 use aptos_crypto::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
@@ -23,7 +24,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct PipelineConfig {
     pub delay_execution_start: bool,
     pub split_stages: bool,
@@ -33,6 +34,7 @@ pub struct PipelineConfig {
     pub num_executor_shards: usize,
     pub async_partitioning: bool,
     pub use_global_executor: bool,
+    pub partitioner_config: PartitionerConfig,
 }
 
 pub struct Pipeline<V> {
@@ -92,7 +94,7 @@ where
         let mut join_handles = vec![];
 
         let mut partitioning_stage =
-            BlockPartitioningStage::new(num_partitioner_shards, !config.use_global_executor);
+            BlockPartitioningStage::new(num_partitioner_shards, config.partitioner_config);
 
         let mut exe = TransactionExecutor::new(
             executor_1,

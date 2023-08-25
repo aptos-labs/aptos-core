@@ -3,7 +3,7 @@
 
 use super::{dag_network::RpcWithFallback, types::NodeMetadata, RpcHandler};
 use crate::dag::{
-    dag_network::DAGNetworkSender,
+    dag_network::TDAGNetworkSender,
     dag_store::Dag,
     types::{CertifiedNode, FetchResponse, Node, RemoteFetchRequest},
 };
@@ -53,14 +53,19 @@ impl<T> Stream for FetchWaiter<T> {
     }
 }
 
+pub trait TFetchRequester: Send + Sync {
+    fn request_for_node(&self, node: Node) -> anyhow::Result<()>;
+    fn request_for_certified_node(&self, node: CertifiedNode) -> anyhow::Result<()>;
+}
+
 pub struct FetchRequester {
     request_tx: Sender<LocalFetchRequest>,
     node_waiter_tx: Sender<oneshot::Receiver<Node>>,
     certified_node_waiter_tx: Sender<oneshot::Receiver<CertifiedNode>>,
 }
 
-impl FetchRequester {
-    pub fn request_for_node(&self, node: Node) -> anyhow::Result<()> {
+impl TFetchRequester for FetchRequester {
+    fn request_for_node(&self, node: Node) -> anyhow::Result<()> {
         let (res_tx, res_rx) = oneshot::channel();
         let fetch_req = LocalFetchRequest::Node(node, res_tx);
         self.request_tx
@@ -70,7 +75,7 @@ impl FetchRequester {
         Ok(())
     }
 
-    pub fn request_for_certified_node(&self, node: CertifiedNode) -> anyhow::Result<()> {
+    fn request_for_certified_node(&self, node: CertifiedNode) -> anyhow::Result<()> {
         let (res_tx, res_rx) = oneshot::channel();
         let fetch_req = LocalFetchRequest::CertifiedNode(node, res_tx);
         self.request_tx.try_send(fetch_req).map_err(|e| {
@@ -121,7 +126,7 @@ impl LocalFetchRequest {
 
 pub struct DagFetcher {
     epoch_state: Arc<EpochState>,
-    network: Arc<dyn DAGNetworkSender>,
+    network: Arc<dyn TDAGNetworkSender>,
     dag: Arc<RwLock<Dag>>,
     request_rx: Receiver<LocalFetchRequest>,
     time_service: TimeService,
@@ -130,7 +135,7 @@ pub struct DagFetcher {
 impl DagFetcher {
     pub fn new(
         epoch_state: Arc<EpochState>,
-        network: Arc<dyn DAGNetworkSender>,
+        network: Arc<dyn TDAGNetworkSender>,
         dag: Arc<RwLock<Dag>>,
         time_service: TimeService,
     ) -> (

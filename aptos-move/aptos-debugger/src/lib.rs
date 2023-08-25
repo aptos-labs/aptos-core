@@ -252,5 +252,5 @@ fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
     vm_output
         .events()
         .iter()
-        .any(|event| *event.key() == new_epoch_event_key)
+        .any(|event| event.event_key() == Some(&new_epoch_event_key))
 }

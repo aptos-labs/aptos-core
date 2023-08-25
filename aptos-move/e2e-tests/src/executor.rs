@@ -35,6 +35,7 @@ use aptos_types::{
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
+    contract_event::ContractEvent,
     on_chain_config::{
         Features, OnChainConfig, TimedFeatureOverride, TimedFeatures, ValidatorSet, Version,
     },
@@ -76,6 +77,8 @@ static RNG_SEED: [u8; 32] = [9u8; 32];
 
 const ENV_TRACE_DIR: &str = "TRACE";
 
+const ENV_ENABLE_PARALLEL: &str = "E2E_PARALLEL_EXEC";
+
 /// Directory structure of the trace dir
 pub const TRACE_FILE_NAME: &str = "name";
 pub const TRACE_FILE_ERROR: &str = "error";
@@ -94,12 +97,16 @@ pub type TraceSeqMapping = (usize, Vec<usize>, Vec<usize>);
 /// This struct is a mock in-memory implementation of the Aptos executor.
 pub struct FakeExecutor {
     data_store: FakeDataStore,
+    event_store: Vec<ContractEvent>,
     executor_thread_pool: Arc<rayon::ThreadPool>,
     block_time: u64,
     executed_output: Option<GoldenOutputs>,
     trace_dir: Option<PathBuf>,
     rng: KeyGen,
-    no_parallel_exec: bool,
+    /// If set, determines whether or not to execute a comparison test with the parallel
+    /// block executor. If not set, environment variable E2E_PARALLEL_EXEC must be set
+    /// s.t. the comparison test is executed.
+    no_parallel_exec: Option<bool>,
     features: Features,
     chain_id: u8,
 }
@@ -120,12 +127,13 @@ impl FakeExecutor {
         );
         let mut executor = FakeExecutor {
             data_store: FakeDataStore::default(),
+            event_store: Vec::new(),
             executor_thread_pool,
             block_time: 0,
             executed_output: None,
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
-            no_parallel_exec: false,
+            no_parallel_exec: None,
             features: Features::default(),
             chain_id: chain_id.id(),
         };
@@ -135,9 +143,17 @@ impl FakeExecutor {
         executor
     }
 
-    /// Configure this executor to not use parallel execution.
+    /// Configure this executor to not use parallel execution. By default, parallel execution is
+    /// enabled if E2E_PARALLEL_EXEC is set. This overrides the default.
     pub fn set_not_parallel(mut self) -> Self {
-        self.no_parallel_exec = true;
+        self.no_parallel_exec = Some(true);
+        self
+    }
+
+    /// Configure this executor to use parallel execution. By default, parallel execution is
+    /// enabled if E2E_PARALLEL_EXEC is set. This overrides the default.
+    pub fn set_parallel(mut self) -> Self {
+        self.no_parallel_exec = Some(false);
         self
     }
 
@@ -185,12 +201,13 @@ impl FakeExecutor {
         );
         FakeExecutor {
             data_store: FakeDataStore::default(),
+            event_store: Vec::new(),
             executor_thread_pool,
             block_time: 0,
             executed_output: None,
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
-            no_parallel_exec: false,
+            no_parallel_exec: None,
             features: Features::default(),
             chain_id: ChainId::test().id(),
         }
@@ -305,6 +322,10 @@ impl FakeExecutor {
     /// Applies a [`WriteSet`] to this executor's data store.
     pub fn apply_write_set(&mut self, write_set: &WriteSet) {
         self.data_store.add_write_set(write_set);
+    }
+
+    pub fn append_events(&mut self, events: Vec<ContractEvent>) {
+        self.event_store.extend(events);
     }
 
     /// Adds an account to this executor's data store.
@@ -455,7 +476,14 @@ impl FakeExecutor {
         }
 
         let output = AptosVM::execute_block(txn_block.clone(), &self.data_store, None);
-        if !self.no_parallel_exec {
+
+        let no_parallel = if let Some(no_parallel) = self.no_parallel_exec {
+            no_parallel
+        } else {
+            env::var(ENV_ENABLE_PARALLEL).is_err()
+        };
+
+        if !no_parallel {
             let parallel_output = self.execute_transaction_block_parallel(txn_block);
             assert_eq!(output, parallel_output);
         }
@@ -558,6 +586,10 @@ impl FakeExecutor {
         seq
     }
 
+    pub fn get_events(&self) -> &[ContractEvent] {
+        self.event_store.as_slice()
+    }
+
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<StateValue> {
         TStateView::get_state_value(&self.data_store, state_key).unwrap()
     }
@@ -575,7 +607,7 @@ impl FakeExecutor {
 
     /// Verifies the given transaction by running it through the VM verifier.
     pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
-        let vm = AptosVM::new(self.get_state_view());
+        let vm = AptosVM::new_from_state_view(self.get_state_view());
         vm.validate_transaction(txn, &self.data_store)
     }
 
@@ -623,7 +655,10 @@ impl FakeExecutor {
             .expect("Must execute transactions");
 
         // Check if we emit the expected event for block metadata, there might be more events for transaction fees.
-        let event = outputs[0].events()[0].clone();
+        let event = outputs[0].events()[0]
+            .v1()
+            .expect("The first event must be a block metadata v0 event")
+            .clone();
         assert_eq!(event.key(), &new_block_event_key());
         assert!(bcs::from_bytes::<NewBlockEvent>(event.event_data()).is_ok());
 
@@ -744,7 +779,7 @@ impl FakeExecutor {
         let a1 = Arc::new(Mutex::new(Vec::<DynamicExpression>::new()));
         let a2 = Arc::clone(&a1);
 
-        let write_set = {
+        let (write_set, _events) = {
             // FIXME: should probably read the timestamp from storage.
             let timed_features =
                 TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
@@ -797,11 +832,10 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (write_set, _events) = change_set
+            change_set
                 .try_into_storage_change_set()
                 .expect("Failed to convert to ChangeSet")
-                .into_inner();
-            write_set
+                .into_inner()
         };
         self.data_store.add_write_set(&write_set);
 
@@ -820,7 +854,7 @@ impl FakeExecutor {
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) {
-        let write_set = {
+        let (write_set, events) = {
             // FIXME: should probably read the timestamp from storage.
             let timed_features =
                 TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
@@ -858,13 +892,13 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (write_set, _events) = change_set
+            change_set
                 .try_into_storage_change_set()
                 .expect("Failed to convert to ChangeSet")
-                .into_inner();
-            write_set
+                .into_inner()
         };
         self.data_store.add_write_set(&write_set);
+        self.event_store.extend(events);
     }
 
     pub fn try_exec(
@@ -873,7 +907,7 @@ impl FakeExecutor {
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
-    ) -> Result<WriteSet, VMStatus> {
+    ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
@@ -904,11 +938,11 @@ impl FakeExecutor {
             )
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
-        let (write_set, _events) = change_set
+        let (write_set, events) = change_set
             .try_into_storage_change_set()
             .expect("Failed to convert to ChangeSet")
             .into_inner();
-        Ok(write_set)
+        Ok((write_set, events))
     }
 
     pub fn execute_view_function(

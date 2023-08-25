@@ -63,7 +63,7 @@ struct LiquidityPool has key {
 }
 ```
 
-In the above code, `token_a` and `token_b` are references to other objects. Specifically, `Object<T>` is a reference to an object stored at a given address that contains `T` resource. In this example, they're fungible assets (similar to coins). This will be covered in more detail in the fungible asset standard.
+In the above code, `token_a` and `token_b` are references to other objects. Specifically, `Object<T>` is a reference to an object stored at a given address that contains `T` resource. In this example, they're fungible assets (similar to coins). This is covered in more detail in the [Aptos Fungible Asset Standard](./fungible-asset.md).
 LiquidityPool resource is part of the ObjectGroup resource group. This means that the LiquidityPool resource is stored in the same storage slot as the ObjectCore resource. This is more storage and gas efficient for reading and writing data.
 
 LiquidityPool resource can be added during construction of the object:

@@ -21,16 +21,16 @@ use aptos_storage_service_types::{
         NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
         StorageServiceRequest,
     },
-    responses::{CompleteDataRange, StorageServerSummary},
+    responses::StorageServerSummary,
 };
 use aptos_time_service::TimeService;
-use aptos_types::{epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures};
+use aptos_types::epoch_change::EpochChangeProof;
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use futures::channel::oneshot;
 use lru::LruCache;
 use rand::{rngs::OsRng, Rng};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Handle;
 
 #[tokio::test]
@@ -78,6 +78,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
         storage_service_config,
         time_service.clone(),
     ));
+    let subscriptions = Arc::new(Mutex::new(HashMap::new()));
 
     // Verify that there are no peers with ready optimistic fetches
     let peers_with_ready_optimistic_fetches =
@@ -89,6 +90,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
             lru_response_cache.clone(),
             request_moderator.clone(),
             storage_reader.clone(),
+            subscriptions.clone(),
             time_service.clone(),
         )
         .await
@@ -97,7 +99,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
 
     // Update the storage server summary so that there is new data for optimistic fetch 1
     let synced_ledger_info =
-        update_storage_server_summary(cached_storage_server_summary.clone(), 2, 1);
+        utils::update_storage_summary_cache(cached_storage_server_summary.clone(), 2, 1);
 
     // Verify that optimistic fetch 1 is ready
     let peers_with_ready_optimistic_fetches =
@@ -109,6 +111,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
             lru_response_cache.clone(),
             request_moderator.clone(),
             storage_reader.clone(),
+            subscriptions.clone(),
             time_service.clone(),
         )
         .await
@@ -123,7 +126,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
 
     // Update the storage server summary so that there is new data for optimistic fetch 2,
     // but the optimistic fetch is invalid because it doesn't respect an epoch boundary.
-    let _ = update_storage_server_summary(cached_storage_server_summary.clone(), 100, 2);
+    let _ = utils::update_storage_summary_cache(cached_storage_server_summary.clone(), 100, 2);
 
     // Verify that optimistic fetch 2 is not returned because it was invalid
     let peers_with_ready_optimistic_fetches =
@@ -135,6 +138,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
             lru_response_cache,
             request_moderator,
             storage_reader,
+            subscriptions,
             time_service,
         )
         .await
@@ -171,6 +175,7 @@ async fn test_remove_expired_optimistic_fetches() {
         storage_service_config,
         time_service.clone(),
     ));
+    let subscriptions = Arc::new(Mutex::new(HashMap::new()));
 
     // Create the first batch of test optimistic fetches
     let num_optimistic_fetches_in_batch = 10;
@@ -188,7 +193,7 @@ async fn test_remove_expired_optimistic_fetches() {
     utils::elapse_time(max_optimistic_fetch_period_ms / 2, &time_service).await;
 
     // Update the storage server summary so that there is new data
-    let _ = update_storage_server_summary(cached_storage_server_summary.clone(), 1, 1);
+    let _ = utils::update_storage_summary_cache(cached_storage_server_summary.clone(), 1, 1);
 
     // Remove the expired optimistic fetches and verify none were removed
     let peers_with_ready_optimistic_fetches =
@@ -200,6 +205,7 @@ async fn test_remove_expired_optimistic_fetches() {
             lru_response_cache.clone(),
             request_moderator.clone(),
             storage.clone(),
+            subscriptions.clone(),
             time_service.clone(),
         )
         .await
@@ -233,6 +239,7 @@ async fn test_remove_expired_optimistic_fetches() {
             lru_response_cache.clone(),
             request_moderator.clone(),
             storage.clone(),
+            subscriptions.clone(),
             time_service.clone(),
         )
         .await
@@ -253,6 +260,7 @@ async fn test_remove_expired_optimistic_fetches() {
             lru_response_cache,
             request_moderator,
             storage.clone(),
+            subscriptions,
             time_service.clone(),
         )
         .await
@@ -312,28 +320,4 @@ fn create_optimistic_fetch_request(
 
     // Create and return the optimistic fetch request
     OptimisticFetchRequest::new(storage_service_request, response_sender, time_service)
-}
-
-/// Updates the storage server summary with new data and returns the synced ledger info
-fn update_storage_server_summary(
-    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
-    highest_synced_version: u64,
-    highest_synced_epoch: u64,
-) -> LedgerInfoWithSignatures {
-    // Create the storage server summary and synced ledger info
-    let mut storage_server_summary = StorageServerSummary::default();
-    let highest_synced_ledger_info =
-        utils::create_test_ledger_info_with_sigs(highest_synced_epoch, highest_synced_version);
-
-    // Update the epoch ending ledger infos and synced ledger info
-    storage_server_summary
-        .data_summary
-        .epoch_ending_ledger_infos = Some(CompleteDataRange::new(0, highest_synced_epoch).unwrap());
-    storage_server_summary.data_summary.synced_ledger_info =
-        Some(highest_synced_ledger_info.clone());
-
-    // Update the cached storage server summary
-    cached_storage_server_summary.store(Arc::new(storage_server_summary));
-
-    highest_synced_ledger_info
 }

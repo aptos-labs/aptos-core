@@ -114,10 +114,11 @@ use arr_macro::arr;
 use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
+#[cfg(any(test, feature = "fuzzing"))]
+use std::default::Default;
 use std::{
     borrow::Borrow,
     collections::HashMap,
-    default::Default,
     fmt::{Debug, Formatter},
     iter::Iterator,
     path::Path,
@@ -136,7 +137,7 @@ pub(crate) const NUM_STATE_SHARDS: usize = 16;
 static COMMIT_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
         .num_threads(32)
-        .thread_name(|index| format!("commit_{}", index))
+        .thread_name(|index| format!("commit-{}", index))
         .build()
         .unwrap()
 });
@@ -788,11 +789,15 @@ impl AptosDB {
             .into_iter()
             .map(|(seq, ver, idx)| {
                 let event = self.event_store.get_event_by_version_and_index(ver, idx)?;
+                let v0 = match &event {
+                    ContractEvent::V1(event) => event,
+                    ContractEvent::V2(_) => bail!("Unexpected module event"),
+                };
                 ensure!(
-                    seq == event.sequence_number(),
+                    seq == v0.sequence_number(),
                     "Index broken, expected seq:{}, actual:{}",
                     seq,
-                    event.sequence_number()
+                    v0.sequence_number()
                 );
                 Ok(EventWithVersion::new(ver, event))
             })
