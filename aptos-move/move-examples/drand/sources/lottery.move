@@ -11,6 +11,15 @@
 /// incorrectly treated as a valid future drand round, even though that round has passed. It is therefore important that
 /// contracts account for any drift between the Aptos clock and the drand clock. In this example, this can be done by
 /// increasing the MINIMUM_LOTTERY_DURATION_SECS to account for this drift.
+///
+/// ### Deploying this contract
+///
+/// This contract can be deployed with the following CLI command:
+/// aptos move create-resource-account-and-publish-package --seed [arbitrary positive integer] --address-name drand --profile [name of profile in aptos config file] --named-addresses developer_addr=[address of profile used]
+///
+/// This will deploy the contract to a resource account with address sha3_512(developer_addr, seed). Note that the 
+/// deploying address will NOT be able to update the contract after deployment. If this is desired, the contract 
+/// can be modified to deploy to the developer address instead, which can use a multisig among several parties for more security in performing updates.
 
 module drand::lottery {
     use std::signer;

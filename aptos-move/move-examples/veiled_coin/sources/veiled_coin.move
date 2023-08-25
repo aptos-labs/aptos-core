@@ -107,6 +107,9 @@
 /// where seed is an arbitrary positive integer, profile name is the name of the profile deploying the contract in your config file, and profile's account address is the `account` field for this profile in your config
 ///
 /// This will deploy the contract under the resource account address obtained by sha3_256(profile address, seed).
+/// This will deploy the contract to a resource account with address sha3_512(developer_addr, seed). Note that the 
+/// deploying address will NOT be able to update the contract after deployment. If this is desired, the contract 
+/// can be modified to deploy to the developer address instead, which can use a multisig among several parties for more security in performing updates.
 ///
 /// ## References
 ///
