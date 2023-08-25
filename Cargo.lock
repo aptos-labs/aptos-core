@@ -2035,39 +2035,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-indexer-grpc-parser"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "aptos-indexer-grpc-server-framework",
- "aptos-indexer-grpc-utils",
- "aptos-metrics-core",
- "aptos-moving-average",
- "aptos-protos",
- "aptos-runtimes",
- "async-trait",
- "base64 0.13.0",
- "bcs 0.1.4",
- "bigdecimal",
- "chrono",
- "clap 4.3.21",
- "diesel",
- "diesel_migrations",
- "field_count",
- "futures",
- "hex",
- "once_cell",
- "prost",
- "regex",
- "serde 1.0.149",
- "serde_json",
- "sha2 0.9.9",
- "tokio",
- "tonic 0.8.3",
- "tracing",
-]
-
-[[package]]
 name = "aptos-indexer-grpc-post-processor"
 version = "1.0.0"
 dependencies = [
