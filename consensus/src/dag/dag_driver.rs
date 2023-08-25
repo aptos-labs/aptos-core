@@ -10,6 +10,7 @@ use super::{
 };
 use crate::{
     dag::{
+        dag_fetcher::TFetchRequester,
         dag_store::Dag,
         types::{CertificateAckState, CertifiedNode, Node, NodeCertificate, SignatureBuilder},
     },

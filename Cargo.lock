@@ -117,6 +117,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "250f629c0161ad8107cf89319e990051fae62832fd343083bea452d93e2205fd"
 
 [[package]]
+name = "allocator-api2"
+version = "0.2.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0942ffc6dcaadf03badf6e6a2d0228460359d5e34b57ccdc720b7382dfbd5ec5"
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -209,7 +215,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "2.0.3"
+version = "2.1.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -229,6 +235,7 @@ dependencies = [
  "aptos-github-client",
  "aptos-global-constants",
  "aptos-keygen",
+ "aptos-ledger",
  "aptos-logger",
  "aptos-network-checker",
  "aptos-node",
@@ -1327,6 +1334,7 @@ dependencies = [
  "bcs 0.1.4",
  "dashmap",
  "fail 0.5.0",
+ "hashbrown 0.14.0",
  "move-binary-format",
  "move-bytecode-utils",
  "move-bytecode-verifier",
@@ -1345,6 +1353,19 @@ dependencies = [
  "serde_json",
  "smallvec",
  "tracing",
+]
+
+[[package]]
+name = "aptos-experimental-runtimes"
+version = "0.1.0"
+dependencies = [
+ "aptos-runtimes",
+ "core_affinity",
+ "libc",
+ "num_cpus",
+ "once_cell",
+ "rayon",
+ "tokio",
 ]
 
 [[package]]
@@ -1872,6 +1893,7 @@ dependencies = [
  "anyhow",
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
+ "aptos-logger",
  "aptos-metrics-core",
  "aptos-moving-average",
  "aptos-protos",
@@ -3091,6 +3113,7 @@ dependencies = [
 name = "aptos-runtimes"
 version = "0.1.0"
 dependencies = [
+ "rayon",
  "tokio",
 ]
 
@@ -3165,6 +3188,7 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-global-constants",
+ "aptos-ledger",
  "aptos-rest-client",
  "aptos-types",
  "bcs 0.1.4",
@@ -3600,6 +3624,7 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-node-resource-metrics",
  "aptos-push-metrics",
  "aptos-types",
  "aptos-vm",
@@ -5444,6 +5469,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
 
 [[package]]
+name = "core_affinity"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "622892f5635ce1fc38c8f16dfc938553ed64af482edb5e150bf4caedbfcb2304"
+dependencies = [
+ "libc",
+ "num_cpus",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "cpp_demangle"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7240,6 +7276,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43a3c133739dddd0d2990f9a4bdf8eb4b21ef50e4851ca85ab661199821d510e"
 dependencies = [
  "ahash 0.8.3",
+]
+
+[[package]]
+name = "hashbrown"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c6201b9ff9fd90a5a3bac2e56a830d0caa509576f0e503818ee82c181b3437a"
+dependencies = [
+ "ahash 0.8.3",
+ "allocator-api2",
 ]
 
 [[package]]
@@ -10133,11 +10179,11 @@ dependencies = [
 
 [[package]]
 name = "num_cpus"
-version = "1.13.1"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19e64526ebdee182341572e50e9ad03965aa510cd94427a4549448f285e957a1"
+checksum = "4161fcb6d602d4d2081af7c3a45852d875a03dd337a6bfdd6e06407b61342a43"
 dependencies = [
- "hermit-abi 0.1.19",
+ "hermit-abi 0.3.1",
  "libc",
 ]
 

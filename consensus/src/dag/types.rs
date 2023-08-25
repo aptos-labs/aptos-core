@@ -129,6 +129,10 @@ impl NodeMetadata {
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
+
+    pub fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
 }
 
 impl Deref for NodeMetadata {
@@ -268,6 +272,10 @@ impl Node {
     pub fn round(&self) -> Round {
         self.metadata.round
     }
+
+    pub fn payload(&self) -> &Payload {
+        &self.payload
+    }
 }
 
 impl TDAGMessage for Node {
@@ -335,8 +343,8 @@ impl NodeId {
         self.round
     }
 
-    pub fn author(&self) -> Author {
-        self.author
+    pub fn author(&self) -> &Author {
+        &self.author
     }
 }
 

@@ -415,6 +415,7 @@ pub struct DAGNetworkSenderImpl {
 }
 
 impl DAGNetworkSenderImpl {
+    #[allow(unused)]
     pub fn new(sender: Arc<NetworkSender>) -> Self {
         Self {
             sender,

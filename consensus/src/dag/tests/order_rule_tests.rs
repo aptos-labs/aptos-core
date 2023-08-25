@@ -5,20 +5,20 @@ use crate::{
     dag::{
         anchor_election::RoundRobinAnchorElection,
         dag_store::Dag,
-        order_rule::OrderRule,
+        order_rule::{Notifier, OrderRule},
         tests::{dag_test::MockStorage, helpers::new_certified_node},
         types::{NodeCertificate, NodeMetadata},
         CertifiedNode,
     },
     test_utils::placeholder_ledger_info,
 };
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
     aggregate_signature::AggregateSignature, epoch_state::EpochState,
     validator_verifier::random_validator_verifier,
 };
-use futures_channel::mpsc::{unbounded, UnboundedReceiver};
+use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use proptest::prelude::*;
 use std::sync::Arc;
 
@@ -117,6 +117,20 @@ fn generate_dag_nodes(
     nodes
 }
 
+pub struct TestNotifier {
+    pub tx: UnboundedSender<Vec<Arc<CertifiedNode>>>,
+}
+
+impl Notifier for TestNotifier {
+    fn send(
+        &mut self,
+        ordered_nodes: Vec<Arc<CertifiedNode>>,
+        _failed_authors: Vec<(Round, Author)>,
+    ) -> anyhow::Result<()> {
+        Ok(self.tx.unbounded_send(ordered_nodes)?)
+    }
+}
+
 fn create_order_rule(
     epoch_state: Arc<EpochState>,
     dag: Arc<RwLock<Dag>>,
@@ -127,7 +141,14 @@ fn create_order_rule(
     ));
     let (tx, rx) = unbounded();
     (
-        OrderRule::new(epoch_state, ledger_info, dag, anchor_election, tx),
+        OrderRule::new(
+            epoch_state,
+            ledger_info,
+            dag,
+            anchor_election,
+            Box::new(TestNotifier { tx }),
+            Arc::new(MockStorage::new()),
+        ),
         rx,
     )
 }
@@ -153,7 +174,7 @@ proptest! {
             epoch: 1,
             verifier: validator_verifier,
         });
-        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()));
+        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 1);
         for round_nodes in &nodes {
             for node in round_nodes.iter().flatten() {
                 dag.add_node(node.clone()).unwrap();
@@ -231,7 +252,7 @@ fn test_order_rule_basic() {
         epoch: 1,
         verifier: validator_verifier,
     });
-    let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()));
+    let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 1);
     for round_nodes in &nodes {
         for node in round_nodes.iter().flatten() {
             dag.add_node(node.clone()).unwrap();
