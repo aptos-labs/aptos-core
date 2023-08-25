@@ -17,12 +17,12 @@ use aptos_indexer_grpc_utils::{
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
     time_diff_since_pb_timestamp_in_secs, EncodedTransactionWithVersion,
 };
+use aptos_logger::prelude::{sample, SampleRate};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
     transaction::v1::Transaction,
 };
-use aptos_logger::prelude::{SampleRate, sample};
 use futures::Stream;
 use prost::Message;
 use serde::{Deserialize, Serialize};
