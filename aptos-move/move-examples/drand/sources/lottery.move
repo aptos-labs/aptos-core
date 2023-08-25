@@ -24,6 +24,8 @@ module drand::lottery {
     use aptos_framework::aptos_coin::AptosCoin;
     use drand::drand;
     //use aptos_std::debug;
+    #[test_only]
+    use aptos_framework::account::create_account_for_test;
 
     /// Error code code when someone tries to start a very "short" lottery where users might not have enough time
     /// to buy tickets.
@@ -132,7 +134,7 @@ module drand::lottery {
     /// Allows anyone to close the lottery (if enough time has elapsed) and to decide the winner, by uploading
     /// the correct _drand-signed bytes_ associated with the committed draw time in `Lottery::draw_at`.
     /// These bytes will then be verified and used to extract randomness.
-    public entry fun close_lottery(drand_signed_bytes: vector<u8>): Option<address> acquires Lottery {
+    public entry fun close_lottery(drand_signed_bytes: vector<u8>) acquires Lottery {
         // Get the Lottery resource
         let lottery = borrow_global_mut<Lottery>(@drand);
 
@@ -145,7 +147,7 @@ module drand::lottery {
             // It's time to draw, but nobody signed up => nobody won.
             // Close the lottery (even if the randomness might be incorrect).
             option::extract(&mut lottery.draw_at);
-            return option::none<address>()
+            return
         };
 
         // Determine the next drand round after `draw_at`
@@ -177,7 +179,6 @@ module drand::lottery {
         // Close the lottery
         option::extract(&mut lottery.draw_at);
         lottery.tickets = vector::empty<address>();
-        option::some(winner_addr)
     }
 
     //
@@ -202,6 +203,6 @@ module drand::lottery {
         // When deploying this contract we must have both a developer account which deploys the contract, and a resource account under which the contract is published. These two lines mock this flow for testing
         create_account_for_test(signer::address_of(developer));
         resource_account::create_resource_account(developer, seed, auth_key);
-        lottery::init_module(resource_acct)
+        init_module(resource_acct)
     }
 }
