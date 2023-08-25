@@ -139,7 +139,7 @@ module lottery::lottery_test {
         //debug::print(&timestamp::now_seconds());
 
         //
-        // Send a TXN with `drand_signed_bytes` to close the lottery and determine the winner
+        // Send a TXN  to close the lottery and determine the winner
         //
         let winner_addr = lottery::decide_winners_internal();
 
