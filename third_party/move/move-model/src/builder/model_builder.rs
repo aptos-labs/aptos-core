@@ -16,7 +16,7 @@ use crate::{
         SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
-    ty::Type,
+    ty::{Constraint, Type},
 };
 use codespan_reporting::diagnostic::Severity;
 #[allow(unused_imports)]
@@ -67,6 +67,7 @@ pub(crate) struct SpecOrBuiltinFunEntry {
     pub loc: Loc,
     pub oper: Operation,
     pub type_params: Vec<TypeParameter>,
+    pub type_param_constraints: BTreeMap<usize, Constraint>,
     pub params: Vec<Parameter>,
     pub result_type: Type,
     pub visibility: EntryVisibility,

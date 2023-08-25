@@ -5,7 +5,7 @@ module 0x42::borrow {
     }
     private fun mut_expr(x: u64) {
         {
-          let r: &mut u64 = Borrow(Mutable)(Add(x, 1));
+          let r: &mut u64 = Borrow(Mutable)(Add<u64>(x, 1));
           r = 22;
           Deref(r)
         }
