@@ -17,6 +17,7 @@ use aptos_indexer_grpc_utils::{
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
     time_diff_since_pb_timestamp_in_secs, EncodedTransactionWithVersion,
 };
+use aptos_logger::prelude::{sample, SampleRate};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
@@ -327,13 +328,16 @@ impl RawData for RawDataServerWrapper {
                     // 3. Update the current version and record current tps.
                     tps_calculator.tick_now(current_batch_size as u64);
                     current_version = end_of_batch_version + 1;
-                    info!(
-                        current_version = current_version,
-                        end_version = end_of_batch_version,
-                        batch_size = current_batch_size,
-                        tps = (tps_calculator.avg() * 1000.0) as u64,
-                        "[Indexer Data] Sending batch."
-                    );
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(15)),
+                        info!(
+                            current_version = current_version,
+                            end_version = end_of_batch_version,
+                            batch_size = current_batch_size,
+                            tps = (tps_calculator.avg() * 1000.0) as u64,
+                            "[Indexer Data] Sending batch."
+                        );
+                    )
                 }
                 info!("[Indexer Data] Client disconnected.");
                 if let Some(start_time) = connection_start_time {
@@ -487,9 +491,12 @@ async fn channel_send_multiple_with_timeout(
             RESPONSE_CHANNEL_SEND_TIMEOUT,
         )
         .await?;
-        info!(
-            "[data service] response waiting time in seconds: {}",
-            current_instant.elapsed().as_secs_f64()
+        sample!(
+            SampleRate::Duration(Duration::from_secs(60)),
+            info!(
+                "[data service] response waiting time in seconds: {}",
+                current_instant.elapsed().as_secs_f64()
+            );
         );
     }
     Ok(())

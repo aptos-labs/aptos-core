@@ -1880,6 +1880,7 @@ dependencies = [
  "anyhow",
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
+ "aptos-logger",
  "aptos-metrics-core",
  "aptos-moving-average",
  "aptos-protos",
