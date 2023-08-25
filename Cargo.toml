@@ -48,6 +48,7 @@ members = [
     "consensus/consensus-types",
     "consensus/safety-rules",
     "crates/aptos",
+    "crates/aptos-api-tester",
     "crates/aptos-bitvec",
     "crates/aptos-build-info",
     "crates/aptos-compression",
@@ -119,6 +120,8 @@ members = [
     "execution/executor-service",
     "execution/executor-test-helpers",
     "execution/executor-types",
+    "experimental/execution/ptx-executor",
+    "experimental/runtimes",
     "mempool",
     "network",
     "network/builder",
@@ -195,8 +198,10 @@ members = [
     "third_party/move/move-ir/types",
     "third_party/move/move-model",
     "third_party/move/move-model/bytecode",
+    "third_party/move/move-model/bytecode-test-utils",
     "third_party/move/move-prover",
     "third_party/move/move-prover/boogie-backend",
+    "third_party/move/move-prover/bytecode-pipeline",
     "third_party/move/move-prover/lab",
     "third_party/move/move-prover/move-abigen",
     "third_party/move/move-prover/move-docgen",
@@ -298,6 +303,7 @@ aptos-enum-conversion-derive = { path = "crates/aptos-enum-conversion-derive" }
 aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
+aptos-experimental-ptx-executor = { path = "experimental/execution/ptx-executor" }
 aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
 aptos-faucet-core = { path = "crates/aptos-faucet/core" }
 aptos-faucet-service = { path = "crates/aptos-faucet/service" }
@@ -454,6 +460,7 @@ cloud-storage = { version = "0.11.1", features = ["global-client"] }
 codespan-reporting = "0.11.1"
 console-subscriber = "0.1.8"
 const_format = "0.2.26"
+core_affinity = "0.8.1"
 criterion = "0.3.5"
 criterion-cpu-time = "0.1.0"
 crossbeam = "0.8.1"
@@ -502,7 +509,7 @@ heck = "0.3.2"
 hex = "0.4.3"
 hkdf = "0.10.0"
 hostname = "0.3.1"
-httpmock = "0.6"
+httpmock = "0.6.8"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-tls = "0.5.0"
 image = "0.24.5"
@@ -518,6 +525,7 @@ jemallocator = { version = "0.3.2", features = [
 ] }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
+libc = "0.2.147"
 libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
 log = "0.4.17"
@@ -563,7 +571,7 @@ random_word = "0.3.0"
 rayon = "1.5.2"
 redis = { version = "0.22.3", features = ["tokio-comp", "script", "connection-manager"] }
 redis-test = { version = "0.1.1", features = ["aio"] }
-regex = "1.5.5"
+regex = "1.9.3"
 reqwest = { version = "0.11.11", features = [
     "blocking",
     "cookies",
@@ -658,7 +666,9 @@ move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }
 move-prover = { path = "third_party/move/move-prover" }
 move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backend" }
+move-prover-bytecode-pipeline = { path = "third_party/move/move-prover/bytecode-pipeline" }
 move-stackless-bytecode = { path = "third_party/move/move-model/bytecode" }
+move-stackless-bytecode-test-utils = { path = "third_party/move/move-model/bytecode-test-utils" }
 aptos-move-stdlib = { path = "aptos-move/framework/move-stdlib" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 move-prover-test-utils = { path = "third_party/move/move-prover/test-utils" }
@@ -696,6 +706,12 @@ opt-level = "z"
 lto = "thin"
 strip = true
 codegen-units = 1
+
+[profile.ci]
+inherits = "release"
+debug = true
+overflow-checks = true
+debug-assertions = true
 
 [profile.bench]
 debug = true

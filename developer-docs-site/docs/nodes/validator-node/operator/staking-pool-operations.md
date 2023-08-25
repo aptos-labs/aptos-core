@@ -55,11 +55,11 @@ You can either enter the private key from an existing wallet, or create new wall
 ### Initialize staking pool
 
 ```bash
-aptos stake initialize-stake-owner \
-  --initial-stake-amount 100000000000000 \
-  --operator-address <operator-address> \
-  --voter-address <voter-address> \
-  --profile mainnet-owner
+aptos stake create-staking-contract \
+--operator <operator-address> \
+--voter <voter-address> \
+--amount 100000000000000 \
+--commission-percentage 10
 ```
 
 ### Transfer coin between accounts

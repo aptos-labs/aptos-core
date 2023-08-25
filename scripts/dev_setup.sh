@@ -25,7 +25,7 @@ VAULT_VERSION=1.5.0
 Z3_VERSION=4.11.2
 CVC5_VERSION=0.0.3
 DOTNET_VERSION=6.0
-BOOGIE_VERSION=2.15.8
+BOOGIE_VERSION=3.0.1
 ALLURE_VERSION=2.15.pr1135
 # this is 3.21.4; the "3" is silent
 PROTOC_VERSION=21.4
@@ -672,7 +672,7 @@ function install_lld {
 # this is needed for hdpi crate from aptos-ledger
 function install_libudev-dev {
   # Need to install libudev-dev for linux
-  if [[ "$(uname)" == "Linux" ]]; then
+  if [[ "$(uname)" == "Linux" && "$PACKAGE_MANAGER" != "pacman" ]]; then
     install_pkg libudev-dev "$PACKAGE_MANAGER"
   fi
 }
@@ -1034,9 +1034,12 @@ if [[ "$INSTALL_JSTS" == "true" ]]; then
 fi
 
 install_python3
-pip3 install pre-commit
-
-install_libudev-dev
+if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
+  pip3 install pre-commit
+  install_libudev-dev
+else
+  install_pkg python-pre-commit "$PACKAGE_MANAGER"
+fi
 
 # For now best effort install, will need to improve later
 if command -v pre-commit; then

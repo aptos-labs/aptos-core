@@ -90,7 +90,7 @@ pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
-            .thread_name(|index| format!("par_exec_{}", index))
+            .thread_name(|index| format!("par_exec-{}", index))
             .build()
             .unwrap(),
     )
@@ -428,6 +428,12 @@ impl AptosVM {
                 TransactionPayload::Script(script) => {
                     let loaded_func =
                         session.load_script(script.code(), script.ty_args().to_vec())?;
+                    // Gerardo: consolidate the extended validation to verifier.
+                    verifier::event_validation::verify_no_event_emission_in_script(
+                        script.code(),
+                        session.get_vm_config().max_binary_format_version,
+                    )?;
+
                     let args =
                         verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
                             &mut session,
@@ -996,6 +1002,7 @@ impl AptosVM {
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
         verifier::resource_groups::validate_resource_groups(session, modules)?;
+        verifier::event_validation::validate_module_events(session, modules)?;
 
         if !expected_modules.is_empty() {
             return Err(Self::metadata_validation_error(
@@ -1239,7 +1246,7 @@ impl AptosVM {
         change_set: &VMChangeSet,
     ) -> Result<(), VMStatus> {
         assert!(
-            change_set.aggregator_write_set().is_empty(),
+            change_set.aggregator_v1_write_set().is_empty(),
             "Waypoint change set should not have any aggregator writes."
         );
 
@@ -1260,11 +1267,11 @@ impl AptosVM {
         let has_new_block_event = change_set
             .events()
             .iter()
-            .any(|e| *e.key() == new_block_event_key());
+            .any(|e| e.event_key() == Some(&new_block_event_key()));
         let has_new_epoch_event = change_set
             .events()
             .iter()
-            .any(|e| *e.key() == new_epoch_event_key());
+            .any(|e| e.event_key() == Some(&new_epoch_event_key()));
         if has_new_block_event && has_new_epoch_event {
             Ok(())
         } else {
@@ -1646,7 +1653,7 @@ impl VMAdapter for AptosVM {
             .change_set()
             .events()
             .iter()
-            .any(|event| *event.key() == new_epoch_event_key)
+            .any(|event| event.event_key() == Some(&new_epoch_event_key))
     }
 
     fn execute_single_transaction(

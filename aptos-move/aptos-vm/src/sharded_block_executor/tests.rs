@@ -59,7 +59,7 @@ fn test_sharded_block_executor_with_conflict_sequential() {
     let num_shards = 7;
     for last_round_partition in [true, false] {
         let partitioner = PartitionerV1Config::default()
-            .num_shards(8)
+            .num_shards(num_shards)
             .cross_shard_dep_avoid_threshold(0.9)
             .partition_last_round(last_round_partition)
             .build();
@@ -76,7 +76,7 @@ fn test_sharded_block_executor_with_random_transfers_parallel() {
         let num_shards = rng.gen_range(1, max_num_shards);
         let sharded_block_executor = setup_sharded_block_executor(num_shards, Some(4));
         let partitioner = PartitionerV1Config::default()
-            .num_shards(8)
+            .num_shards(num_shards)
             .cross_shard_dep_avoid_threshold(0.9)
             .partition_last_round(last_round_partition)
             .build();

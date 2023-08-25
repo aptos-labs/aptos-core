@@ -3,23 +3,30 @@
 
 use super::dag_store::NodeStatus;
 use crate::dag::{
-    anchor_election::AnchorElection, dag_store::Dag, types::NodeMetadata, CertifiedNode,
+    anchor_election::AnchorElection, dag_store::Dag, storage::DAGStorage, types::NodeMetadata,
+    CertifiedNode,
 };
-use aptos_consensus_types::common::Round;
-use aptos_crypto::HashValue;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfo};
-use futures_channel::mpsc::UnboundedSender;
 use std::sync::Arc;
+
+pub trait Notifier: Send {
+    fn send(
+        &mut self,
+        ordered_nodes: Vec<Arc<CertifiedNode>>,
+        failed_author: Vec<(Round, Author)>,
+    ) -> anyhow::Result<()>;
+}
 
 pub struct OrderRule {
     epoch_state: Arc<EpochState>,
-    ordered_block_id: HashValue,
     lowest_unordered_anchor_round: Round,
     dag: Arc<RwLock<Dag>>,
     anchor_election: Box<dyn AnchorElection>,
-    ordered_nodes_sender: UnboundedSender<Vec<Arc<CertifiedNode>>>,
+    notifier: Box<dyn Notifier>,
+    storage: Arc<dyn DAGStorage>,
 }
 
 impl OrderRule {
@@ -28,17 +35,55 @@ impl OrderRule {
         latest_ledger_info: LedgerInfo,
         dag: Arc<RwLock<Dag>>,
         anchor_election: Box<dyn AnchorElection>,
-        ordered_nodes_sender: UnboundedSender<Vec<Arc<CertifiedNode>>>,
+        notifier: Box<dyn Notifier>,
+        storage: Arc<dyn DAGStorage>,
     ) -> Self {
         // TODO: we need to initialize the anchor election based on the dag
-        Self {
+        let mut anchors = storage.get_ordered_anchor_ids().unwrap();
+        let mut expired = anchors.clone();
+        expired.retain(|(id, _)| id.epoch() < epoch_state.epoch);
+        if let Err(e) =
+            storage.delete_ordered_anchor_ids(expired.into_iter().map(|(id, _)| id).collect())
+        {
+            error!("Failed to delete expired anchors: {:?}", e);
+        }
+        anchors.retain(|(id, _)| id.epoch() == epoch_state.epoch);
+        let committed_round = if latest_ledger_info.ends_epoch() {
+            0
+        } else {
+            latest_ledger_info.round()
+        };
+        let mut order_rule = Self {
             epoch_state,
-            ordered_block_id: latest_ledger_info.commit_info().id(),
             lowest_unordered_anchor_round: latest_ledger_info.commit_info().round() + 1,
             dag,
             anchor_election,
-            ordered_nodes_sender,
+            notifier,
+            storage,
+        };
+        // Sort by round first, TODO: make the schema encode support the ordering directly
+        anchors.sort_by(|(a, _), (b, _)| a.round().cmp(&b.round()));
+        for (id, _) in anchors {
+            let maybe_anchor = order_rule
+                .dag
+                .read()
+                .get_node_by_round_author(id.round(), id.author())
+                .cloned();
+            if id.round() <= committed_round {
+                // mark already committed node
+                if let Some(anchor) = maybe_anchor {
+                    order_rule
+                        .dag
+                        .write()
+                        .reachable_mut(&anchor, None)
+                        .for_each(|node_statue| node_statue.mark_as_ordered());
+                }
+            } else {
+                // re-process pending anchors
+                order_rule.finalize_order(maybe_anchor.expect("Uncommitted anchor should exist"));
+            }
         }
+        order_rule
     }
 
     /// Check if two rounds have the same parity
@@ -124,9 +169,9 @@ impl OrderRule {
 
     /// Finalize the ordering with the given anchor node, update anchor election and construct blocks for execution.
     pub fn finalize_order(&mut self, anchor: Arc<CertifiedNode>) {
-        let _failed_anchors: Vec<_> = (self.lowest_unordered_anchor_round..anchor.round())
+        let failed_authors: Vec<_> = (self.lowest_unordered_anchor_round..anchor.round())
             .step_by(2)
-            .map(|failed_round| self.anchor_election.get_anchor(failed_round))
+            .map(|failed_round| (failed_round, self.anchor_election.get_anchor(failed_round)))
             .collect();
         assert!(Self::check_parity(
             self.lowest_unordered_anchor_round,
@@ -143,7 +188,11 @@ impl OrderRule {
             })
             .collect();
         ordered_nodes.reverse();
-        if let Err(e) = self.ordered_nodes_sender.unbounded_send(ordered_nodes) {
+        if let Err(e) = self
+            .storage
+            .save_ordered_anchor_id(&anchor.id())
+            .and_then(|_| self.notifier.send(ordered_nodes, failed_authors))
+        {
             error!("Failed to send ordered nodes {:?}", e);
         }
     }

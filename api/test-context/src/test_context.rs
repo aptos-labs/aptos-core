@@ -51,7 +51,7 @@ use std::{boxed::Box, iter::once, net::SocketAddr, path::PathBuf, sync::Arc, tim
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
 
-const TRANSFER_AMOUNT: u64 = 10_000_000;
+const TRANSFER_AMOUNT: u64 = 200_000_000;
 
 #[derive(Clone, Debug)]
 pub enum ApiSpecificConfig {
@@ -768,7 +768,7 @@ impl TestContext {
         let mut request = json!({
             "sender": account.address(),
             "sequence_number": account.sequence_number().to_string(),
-            "gas_unit_price": "0",
+            "gas_unit_price": "100",
             "max_gas_amount": "1000000",
             "expiration_timestamp_secs": "16373698888888",
             "payload": payload,

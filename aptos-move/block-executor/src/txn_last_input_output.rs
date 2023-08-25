@@ -15,7 +15,6 @@ use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
 use std::{
-    collections::HashSet,
     fmt::Debug,
     iter::{empty, Iterator},
     sync::{
@@ -31,7 +30,6 @@ type TxnInput<K> = Vec<ReadDescriptor<K>>;
 pub(crate) struct TxnOutput<T: TransactionOutput, E: Debug> {
     output_status: ExecutionStatus<T, Error<E>>,
 }
-type KeySet<T> = HashSet<<<T as TransactionOutput>::Txn as Transaction>::Key>;
 
 impl<T: TransactionOutput, E: Debug> TxnOutput<T, E> {
     pub fn from_output_status(output_status: ExecutionStatus<T, Error<E>>) -> Self {
@@ -56,6 +54,8 @@ enum ReadKind {
     Storage,
     /// Read triggered a delta application failure.
     DeltaApplicationFailure,
+    /// Module read. TODO: Design a better representation once more meaningfully separated.
+    Module,
 }
 
 #[derive(Clone)]
@@ -87,6 +87,13 @@ impl<K: ModulePath> ReadDescriptor<K> {
         }
     }
 
+    pub fn from_module(access_path: K) -> Self {
+        Self {
+            access_path,
+            kind: ReadKind::Module,
+        }
+    }
+
     pub fn from_delta_application_failure(access_path: K) -> Self {
         Self {
             access_path,
@@ -115,7 +122,8 @@ impl<K: ModulePath> ReadDescriptor<K> {
 
     // Does the read descriptor describe a read from storage.
     pub fn validate_storage(&self) -> bool {
-        self.kind == ReadKind::Storage
+        // Module reading supported from storage version only at the moment.
+        self.kind == ReadKind::Storage || self.kind == ReadKind::Module
     }
 
     // Does the read descriptor describe to a read with a delta application failure.
@@ -187,13 +195,18 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         input: Vec<ReadDescriptor<K>>,
         output: ExecutionStatus<T, Error<E>>,
     ) -> anyhow::Result<()> {
-        let read_modules: Vec<AccessPath> =
-            input.iter().filter_map(|desc| desc.module_path()).collect();
+        let read_modules: Vec<AccessPath> = input
+            .iter()
+            .filter_map(|desc| {
+                matches!(desc.kind, ReadKind::Module)
+                    .then(|| desc.module_path().expect("Module path guaranteed to exist"))
+            })
+            .collect();
         let written_modules: Vec<AccessPath> = match &output {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => output
-                .get_writes()
-                .into_iter()
-                .filter_map(|(k, _)| k.module_path())
+                .module_write_set()
+                .keys()
+                .map(|k| k.module_path().expect("Module path guaranteed to exist"))
                 .collect(),
             ExecutionStatus::Abort(_) => Vec::new(),
         };
@@ -264,50 +277,41 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         self.outputs[txn_idx as usize].load_full()
     }
 
-    // Extracts a set of paths written or updated during execution from transaction
-    // output: (modified by writes, modified by deltas).
-    pub(crate) fn modified_keys(&self, txn_idx: TxnIndex) -> KeySet<T> {
-        match &self.outputs[txn_idx as usize].load_full() {
-            None => HashSet::new(),
-            Some(txn_output) => match &txn_output.output_status {
-                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t
-                    .get_writes()
-                    .into_iter()
-                    .map(|(k, _)| k)
-                    .chain(t.get_deltas().into_iter().map(|(k, _)| k))
-                    .collect(),
-                ExecutionStatus::Abort(_) => HashSet::new(),
-            },
-        }
+    // Extracts a set of paths (keys) written or updated during execution from transaction
+    // output, .1 for each item is false for non-module paths and true for module paths.
+    pub(crate) fn modified_keys(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<impl Iterator<Item = (<<T as TransactionOutput>::Txn as Transaction>::Key, bool)>>
+    {
+        self.outputs[txn_idx as usize]
+            .load_full()
+            .and_then(|txn_output| match &txn_output.output_status {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
+                    t.resource_write_set()
+                        .into_keys()
+                        .chain(t.aggregator_v1_write_set().into_keys())
+                        .chain(t.aggregator_v1_delta_set().into_keys())
+                        .map(|k| (k, false))
+                        .chain(t.module_write_set().into_keys().map(|k| (k, true))),
+                ),
+                ExecutionStatus::Abort(_) => None,
+            })
     }
 
     pub(crate) fn delta_keys(
         &self,
         txn_idx: TxnIndex,
-    ) -> (
-        usize,
-        Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
-    ) {
-        let ret: (
-            usize,
-            Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
-        ) = self.outputs[txn_idx as usize].load().as_ref().map_or(
-            (
-                0,
-                Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Key>()),
-            ),
+    ) -> Vec<<<T as TransactionOutput>::Txn as Transaction>::Key> {
+        self.outputs[txn_idx as usize].load().as_ref().map_or(
+            vec![],
             |txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                    let deltas = t.get_deltas();
-                    (deltas.len(), Box::new(deltas.into_iter().map(|(k, _)| k)))
+                    t.aggregator_v1_delta_set().into_keys().collect()
                 },
-                ExecutionStatus::Abort(_) => (
-                    0,
-                    Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Key>()),
-                ),
+                ExecutionStatus::Abort(_) => vec![],
             },
-        );
-        ret
+        )
     }
 
     pub(crate) fn events(
