@@ -33,7 +33,7 @@ fn native_create_snapshot(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(ty_args.len() == 1);
+    debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_BASE)?;
 
@@ -92,6 +92,7 @@ fn native_copy_snapshot(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_COPY_SNAPSHOT_BASE)?;
 
@@ -143,6 +144,7 @@ fn native_read_snapshot(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_READ_SNAPSHOT_BASE)?;
 
@@ -181,6 +183,61 @@ fn native_read_snapshot(
 }
 
 /***************************************************************************************************
+ * native fun native fun string_concat<Element>(before: String, snapshot: &AggregatorSnapshot<Element>, after: String): AggregatorSnapshot<String>;
+ **************************************************************************************************/
+
+fn native_string_concat(
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(ty_args.len(), 1);
+    debug_assert_eq!(args.len(), 3);
+    context.charge(AGGREGATOR_V2_STRING_CONCAT_BASE)?;
+    // Check if the type is a string
+    let ty = context
+        .deref()
+        .type_to_fully_annotated_layout(&ty_args[0])?;
+    if let MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, .. }) = ty {
+        if type_.name.as_str() == "String"
+            && type_.module.as_str() == "string"
+            && type_.address == AccountAddress::ONE
+        {
+            let after = safely_pop_arg!(args, Reference)
+                .read_ref()
+                .map_err(SafeNativeError::InvariantViolation)?
+                .value_as::<Struct>()?
+                .unpack()?
+                .next()
+                .unwrap()
+                .value_as::<Vec<u8>>()?;
+            let snapshot_value =
+                aggregator_snapshot_string_info(&safely_pop_arg!(args, StructRef))?;
+            let before = safely_pop_arg!(args, Reference)
+                .read_ref()
+                .map_err(SafeNativeError::InvariantViolation)?
+                .value_as::<Struct>()?
+                .unpack()?
+                .next()
+                .unwrap()
+                .value_as::<Vec<u8>>()?;
+            let mut result = before.clone();
+            result.extend(snapshot_value);
+            result.extend(after);
+
+            let move_string_value = Value::struct_(Struct::pack(vec![Value::vector_u8(result)]));
+            let move_snapshot_value = Value::struct_(Struct::pack(vec![move_string_value]));
+            return Ok(smallvec![move_snapshot_value]);
+        }
+    }
+    // If not a string, return an error
+    Err(PartialVMError::new(StatusCode::ABORTED)
+        .with_message("Unsupported type supplied to aggregator".to_string())
+        .with_sub_status(0x02_0005)
+        .into())
+}
+
+/***************************************************************************************************
  * module
  **************************************************************************************************/
 
@@ -191,6 +248,7 @@ pub fn make_all(
         ("create_snapshot", native_create_snapshot as RawSafeNative),
         ("copy_snapshot", native_copy_snapshot),
         ("read_snapshot", native_read_snapshot),
+        ("string_concat", native_string_concat),
     ];
     builder.make_named_natives(natives)
 }
