@@ -274,8 +274,9 @@ impl StateComputer for ExecutionProxy {
             .send((Box::new(wrapped_callback), txns, reconfig_events))
             .await
             .expect("Failed to send async state sync notification");
-
+        debug!("[DKG] in commit, num_dkg_events={}", dkg_events.len());
         let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().as_ref().unwrap().clone();
+        debug!("[DKG] in commit, num_dkg_events={}", dkg_events.len());
         // trigger the start of dkg
         if !dkg_events.is_empty() {
             dkg_manager_wrapper.start_dkg(dkg_events).await;

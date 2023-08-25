@@ -23,7 +23,10 @@ impl ParsedTransactionOutput {
     pub fn parse_dkg_events(events: &[ContractEvent]) -> impl Iterator<Item = &ContractEvent> {
         events
             .iter()
-            .filter(|e: &&ContractEvent| *e.key() == *START_DKG_EVENT_KEY)
+            .filter(|e: &&ContractEvent| {
+                println!("[DKG] parse_dkg_events: event_key={}", *e.key());
+                *e.key() == *START_DKG_EVENT_KEY
+            })
     }
 }
 
