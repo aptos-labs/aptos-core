@@ -52,6 +52,7 @@ import {
   Account_Transactions_Order_By,
   Current_Collections_V2_Order_By,
   Current_Collection_Ownership_V2_View_Order_By,
+  Current_Fungible_Asset_Balances_Bool_Exp,
   Current_Fungible_Asset_Balances_Order_By,
   Current_Token_Datas_V2_Order_By,
   Current_Token_Ownerships_V2_Order_By,
@@ -830,19 +831,17 @@ export class IndexerClient {
     extraArgs?: {
       options?: IndexerPaginationArgs;
       orderBy?: IndexerSortBy<Current_Fungible_Asset_Balances_Order_By>[];
+      filter?: [Current_Fungible_Asset_Balances_Bool_Exp];
     },
   ): Promise<GetAccountCoinsDataQuery> {
     const address = HexString.ensure(ownerAddress).hex();
     IndexerClient.validateAddress(address);
 
-    const whereCondition: any = {
-      owner_address: { _eq: address },
-    };
-
     const graphqlQuery = {
       query: GetAccountCoinsData,
       variables: {
-        where_condition: whereCondition,
+        address,
+        where_condition: extraArgs?.filter ?? [],
         offset: extraArgs?.options?.offset,
         limit: extraArgs?.options?.limit,
         order_by: extraArgs?.orderBy,

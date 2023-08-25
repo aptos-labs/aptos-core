@@ -102,9 +102,9 @@ export const GetAccountCoinsDataCount = `
 }
     `;
 export const GetAccountCoinsData = `
-    query getAccountCoinsData($where_condition: current_fungible_asset_balances_bool_exp!, $offset: Int, $limit: Int, $order_by: [current_fungible_asset_balances_order_by!]) {
+    query getAccountCoinsData($address: String!, $where_condition: [current_fungible_asset_balances_bool_exp!], $offset: Int, $limit: Int, $order_by: [current_fungible_asset_balances_order_by!]) {
   current_fungible_asset_balances(
-    where: $where_condition
+    where: {owner_address: {_eq: $address}, _and: $where_condition}
     offset: $offset
     limit: $limit
     order_by: $order_by

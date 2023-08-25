@@ -365,6 +365,17 @@ describe("Indexer", () => {
     );
 
     it(
+      "filters on account coin data query",
+      async () => {
+        const accountCoinData = await indexerClient.getAccountCoinsData(alice.address().hex(), {
+          filter: [{ is_primary: { _eq: false } }],
+        });
+        expect(accountCoinData.current_fungible_asset_balances.length).toBe(0);
+      },
+      longTestTimeout,
+    );
+
+    it(
       "gets account coin data count",
       async () => {
         const accountCoinDataCount = await indexerClient.getAccountCoinsDataCount(alice.address().hex());

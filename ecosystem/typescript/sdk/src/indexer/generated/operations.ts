@@ -10,7 +10,8 @@ export type GetAccountCoinsDataCountQueryVariables = Types.Exact<{
 export type GetAccountCoinsDataCountQuery = { __typename?: 'query_root', current_fungible_asset_balances_aggregate: { __typename?: 'current_fungible_asset_balances_aggregate', aggregate?: { __typename?: 'current_fungible_asset_balances_aggregate_fields', count: number } | null } };
 
 export type GetAccountCoinsDataQueryVariables = Types.Exact<{
-  where_condition: Types.Current_Fungible_Asset_Balances_Bool_Exp;
+  address: Types.Scalars['String'];
+  where_condition?: Types.InputMaybe<Array<Types.Current_Fungible_Asset_Balances_Bool_Exp> | Types.Current_Fungible_Asset_Balances_Bool_Exp>;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
   limit?: Types.InputMaybe<Types.Scalars['Int']>;
   order_by?: Types.InputMaybe<Array<Types.Current_Fungible_Asset_Balances_Order_By> | Types.Current_Fungible_Asset_Balances_Order_By>;
