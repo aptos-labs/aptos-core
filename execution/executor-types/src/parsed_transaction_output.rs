@@ -24,7 +24,6 @@ impl ParsedTransactionOutput {
         events
             .iter()
             .filter(|e: &&ContractEvent| {
-                println!("[DKG] parse_dkg_events: event_key={}", *e.key());
                 *e.key() == *START_DKG_EVENT_KEY
             })
     }

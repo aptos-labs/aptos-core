@@ -92,7 +92,7 @@ pub fn rounding_scheme(
     // dkg todo: better rounding?
     let validator_weights = validator_stakes
         .iter()
-        .map(|s| *s as usize / ROUNDING_UNIT)
+        .map(|s| 10)
         .collect::<Vec<usize>>();
     let total_weight = validator_weights.iter().sum::<usize>();
     // dkg todo: calculate the actual weights of one third stake and two third stake

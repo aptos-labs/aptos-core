@@ -124,7 +124,7 @@ impl DKGManager {
         debug!("[DKG] start_dkg: liveness check 1");
         let first_event = StartDKGEvent::try_from(dkg_events
             .first().unwrap()).unwrap();
-        debug!("[DKG] start_dkg: liveness check 2");
+        debug!("[DKG] start_dkg: first_event={:?}", first_event);
         let (my_index, _) = first_event.locked_new_validator_info.iter().find_position(|x|x.account_address == self.author).unwrap();
         debug!("[DKG] start_dkg: liveness check 3");
         let dkg_rounding = DKGRounding::from(first_event);
