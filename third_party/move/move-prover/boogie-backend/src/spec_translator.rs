@@ -1101,11 +1101,10 @@ impl<'env> SpecTranslator<'env> {
             );
         }
         let struct_type = &self.get_node_type(args[0].node_id());
-        let (_, _, inst) = struct_type.skip_reference().require_struct();
+        let (_, _, _) = struct_type.skip_reference().require_struct();
         let field_env = struct_env.get_field(field_id);
-        emit!(self.writer, "{}(", boogie_field_sel(&field_env, inst));
         self.translate_exp(&args[0]);
-        emit!(self.writer, ")");
+        emit!(self.writer, "->{}", boogie_field_sel(&field_env));
     }
 
     fn translate_update_field(
@@ -1181,12 +1180,9 @@ impl<'env> SpecTranslator<'env> {
         emit!(self.writer, "{}[", resource_name);
 
         let is_signer = self.env.get_node_type(args[0].node_id()).is_signer();
-        if is_signer {
-            emit!(self.writer, "$addr#$signer(");
-        }
         self.translate_exp(&args[0]);
         if is_signer {
-            emit!(self.writer, ")");
+            emit!(self.writer, "->$addr");
         }
         emit!(self.writer, "]");
     }
@@ -1806,10 +1802,7 @@ impl<'env> SpecTranslator<'env> {
                     );
                     emit!(
                         self.writer,
-                        &format!(
-                            " && $1_signer_is_txn_signer_addr($addr#$signer({}))",
-                            target
-                        )
+                        &format!(" && $1_signer_is_txn_signer_addr({}->$addr)", target)
                     );
                 }
             },

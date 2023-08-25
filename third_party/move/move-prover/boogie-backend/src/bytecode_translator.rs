@@ -149,14 +149,14 @@ impl<'env> BoogieTranslator<'env> {
                 emitln!(
                     writer,
                     "axiom (forall t: $TypeParamInfo :: {{$TypeName(t)}} \
-                            is#$TypeParam{}(t) ==> $IsEqual'vec'u8''($TypeName(t), {}));",
+                            t is $TypeParam{} ==> $IsEqual'vec'u8''($TypeName(t), {}));",
                     name,
                     TypeIdentToken::convert_to_bytes(TypeIdentToken::make(&name.to_lowercase()))
                 );
                 emitln!(
                     writer,
                     "axiom (forall t: $TypeParamInfo :: {{$TypeName(t)}} \
-                            $IsEqual'vec'u8''($TypeName(t), {}) ==> is#$TypeParam{}(t));",
+                            $IsEqual'vec'u8''($TypeName(t), {}) ==> t is $TypeParam{});",
                     TypeIdentToken::convert_to_bytes(TypeIdentToken::make(&name.to_lowercase())),
                     name,
                 );
@@ -164,21 +164,19 @@ impl<'env> BoogieTranslator<'env> {
 
             // type name <-> type info: vector
             let mut tokens = TypeIdentToken::make("vector<");
-            tokens.push(TypeIdentToken::Variable(
-                "$TypeName(e#$TypeParamVector(t))".to_string(),
-            ));
+            tokens.push(TypeIdentToken::Variable("$TypeName(t->e)".to_string()));
             tokens.extend(TypeIdentToken::make(">"));
             emitln!(
                 writer,
                 "axiom (forall t: $TypeParamInfo :: {{$TypeName(t)}} \
-                            is#$TypeParamVector(t) ==> $IsEqual'vec'u8''($TypeName(t), {}));",
+                            t is $TypeParamVector ==> $IsEqual'vec'u8''($TypeName(t), {}));",
                 TypeIdentToken::convert_to_bytes(tokens)
             );
             // TODO(mengxu): this will parse it to an uninterpreted vector element type
             emitln!(
                 writer,
                 "axiom (forall t: $TypeParamInfo :: {{$TypeName(t)}} \
-                            ($IsPrefix'vec'u8''($TypeName(t), {}) && $IsSuffix'vec'u8''($TypeName(t), {})) ==> is#$TypeParamVector(t));",
+                            ($IsPrefix'vec'u8''($TypeName(t), {}) && $IsSuffix'vec'u8''($TypeName(t), {})) ==> t is $TypeParamVector);",
                 TypeIdentToken::convert_to_bytes(TypeIdentToken::make("vector<")),
                 TypeIdentToken::convert_to_bytes(TypeIdentToken::make(">")),
             );
@@ -186,28 +184,22 @@ impl<'env> BoogieTranslator<'env> {
             // type name <-> type info: struct
             let mut tokens = TypeIdentToken::make("0x");
             // TODO(mengxu): this is not a correct radix16 encoding of an integer
-            tokens.push(TypeIdentToken::Variable(
-                "MakeVec1(a#$TypeParamStruct(t))".to_string(),
-            ));
+            tokens.push(TypeIdentToken::Variable("MakeVec1(t->a)".to_string()));
             tokens.extend(TypeIdentToken::make("::"));
-            tokens.push(TypeIdentToken::Variable(
-                "m#$TypeParamStruct(t)".to_string(),
-            ));
+            tokens.push(TypeIdentToken::Variable("t->m".to_string()));
             tokens.extend(TypeIdentToken::make("::"));
-            tokens.push(TypeIdentToken::Variable(
-                "s#$TypeParamStruct(t)".to_string(),
-            ));
+            tokens.push(TypeIdentToken::Variable("t->s".to_string()));
             emitln!(
                 writer,
                 "axiom (forall t: $TypeParamInfo :: {{$TypeName(t)}} \
-                            is#$TypeParamStruct(t) ==> $IsEqual'vec'u8''($TypeName(t), {}));",
+                            t is $TypeParamStruct ==> $IsEqual'vec'u8''($TypeName(t), {}));",
                 TypeIdentToken::convert_to_bytes(tokens)
             );
             // TODO(mengxu): this will parse it to an uninterpreted struct
             emitln!(
                 writer,
                 "axiom (forall t: $TypeParamInfo :: {{$TypeName(t)}} \
-                            $IsPrefix'vec'u8''($TypeName(t), {}) ==> is#$TypeParamVector(t));",
+                            $IsPrefix'vec'u8''($TypeName(t), {}) ==> t is $TypeParamVector);",
                 TypeIdentToken::convert_to_bytes(TypeIdentToken::make("0x")),
             );
         }
@@ -405,7 +397,7 @@ impl<'env> StructTranslator<'env> {
 
         // Emit data type
         let struct_name = boogie_struct_name(struct_env, self.type_inst);
-        emitln!(writer, "type {{:datatype}} {};", struct_name);
+        emitln!(writer, "datatype {} {{", struct_name);
 
         // Emit constructor
         let fields = struct_env
@@ -422,13 +414,8 @@ impl<'env> StructTranslator<'env> {
                 )
             })
             .join(", ");
-        emitln!(
-            writer,
-            "function {{:constructor}} {}({}): {};",
-            struct_name,
-            fields,
-            struct_name
-        );
+        emitln!(writer, "    {}({})", struct_name, fields,);
+        emitln!(writer, "}");
 
         let suffix = boogie_type_suffix_for_struct(struct_env, self.type_inst, false);
 
@@ -457,7 +444,7 @@ impl<'env> StructTranslator<'env> {
                             if p == pos {
                                 "x".to_string()
                             } else {
-                                format!("{}(s)", boogie_field_sel(f, self.type_inst))
+                                format!("s->{}", boogie_field_sel(f))
                             }
                         })
                         .join(", ");
@@ -476,7 +463,7 @@ impl<'env> StructTranslator<'env> {
                 } else {
                     let mut sep = "";
                     for field in struct_env.get_fields() {
-                        let sel = format!("{}({})", boogie_field_sel(&field, self.type_inst), "s");
+                        let sel = format!("s->{}", boogie_field_sel(&field));
                         let ty = &field.get_type().instantiate(self.type_inst);
                         let bv_flag = self.field_bv_flag(&field.get_id());
                         emitln!(
@@ -503,17 +490,17 @@ impl<'env> StructTranslator<'env> {
                 } else {
                     let mut sep = "";
                     for field in &fields {
-                        let sel_fun = boogie_field_sel(field, self.type_inst);
+                        let field_sel = boogie_field_sel(field);
                         let bv_flag = self.field_bv_flag(&field.get_id());
                         let field_suffix =
                             boogie_type_suffix_bv(env, &self.inst(&field.get_type()), bv_flag);
                         emit!(
                             writer,
-                            "{}$IsEqual'{}'({}(s1), {}(s2))",
+                            "{}$IsEqual'{}'(s1->{}, s2->{})",
                             sep,
                             field_suffix,
-                            sel_fun,
-                            sel_fun,
+                            field_sel,
+                            field_sel,
                         );
                         sep = "\n&& ";
                     }
@@ -930,7 +917,7 @@ impl<'env> FunctionTranslator<'env> {
         for i in 0..fun_target.get_parameter_count() {
             let ty = fun_target.get_local_type(i);
             if ty.is_reference() {
-                emitln!(writer, "assume l#$Mutation($t{}) == $Param({});", i, i);
+                emitln!(writer, "assume $t{}->l == $Param({});", i, i);
             }
         }
     }
@@ -1471,47 +1458,41 @@ impl<'env> FunctionTranslator<'env> {
                             args
                         );
                     },
-                    Unpack(mid, sid, inst) => {
-                        let inst = &self.inst_slice(inst);
+                    Unpack(mid, sid, _) => {
                         let struct_env = env.get_module(*mid).into_struct(*sid);
                         for (i, ref field_env) in struct_env.get_fields().enumerate() {
-                            let field_sel = format!(
-                                "{}({})",
-                                boogie_field_sel(field_env, inst),
-                                str_local(srcs[0])
-                            );
+                            let field_sel =
+                                format!("{}->{}", str_local(srcs[0]), boogie_field_sel(field_env),);
                             emitln!(writer, "{} := {};", str_local(dests[i]), field_sel);
                         }
                     },
-                    BorrowField(mid, sid, inst, field_offset) => {
-                        let inst = &self.inst_slice(inst);
+                    BorrowField(mid, sid, _, field_offset) => {
                         let src_str = str_local(srcs[0]);
                         let dest_str = str_local(dests[0]);
                         let struct_env = env.get_module(*mid).into_struct(*sid);
                         let field_env = &struct_env.get_field_by_offset(*field_offset);
-                        let sel_fun = boogie_field_sel(field_env, inst);
+                        let field_sel = boogie_field_sel(field_env);
                         emitln!(
                             writer,
-                            "{} := $ChildMutation({}, {}, {}($Dereference({})));",
+                            "{} := $ChildMutation({}, {}, $Dereference({})->{});",
                             dest_str,
                             src_str,
                             field_offset,
-                            sel_fun,
-                            src_str
+                            src_str,
+                            field_sel,
                         );
                     },
-                    GetField(mid, sid, inst, field_offset) => {
-                        let inst = &self.inst_slice(inst);
+                    GetField(mid, sid, _, field_offset) => {
                         let src = srcs[0];
                         let mut src_str = str_local(src);
                         let dest_str = str_local(dests[0]);
                         let struct_env = env.get_module(*mid).into_struct(*sid);
                         let field_env = &struct_env.get_field_by_offset(*field_offset);
-                        let sel_fun = boogie_field_sel(field_env, inst);
+                        let field_sel = boogie_field_sel(field_env);
                         if self.get_local_type(src).is_reference() {
                             src_str = format!("$Dereference({})", src_str);
                         };
-                        emitln!(writer, "{} := {}({});", dest_str, sel_fun, src_str);
+                        emitln!(writer, "{} := {}->{};", dest_str, src_str, field_sel);
                     },
                     Exists(mid, sid, inst) => {
                         let inst = self.inst_slice(inst);
@@ -1588,7 +1569,7 @@ impl<'env> FunctionTranslator<'env> {
                         let signer_str = str_local(srcs[1]);
                         emitln!(
                             writer,
-                            "if ($ResourceExists({}, $addr#$signer({}))) {{",
+                            "if ($ResourceExists({}, {}->$addr)) {{",
                             memory,
                             signer_str
                         );
@@ -1597,7 +1578,7 @@ impl<'env> FunctionTranslator<'env> {
                         writer.with_indent(|| {
                             emitln!(
                                 writer,
-                                "{} := $ResourceUpdate({}, $addr#$signer({}), {});",
+                                "{} := $ResourceUpdate({}, {}->$addr, {});",
                                 memory,
                                 memory,
                                 signer_str,
@@ -2193,11 +2174,7 @@ impl<'env> FunctionTranslator<'env> {
                         make_bitwise(bv_oper_str, op1, op2, dest);
                     },
                     Uninit => {
-                        emitln!(
-                            writer,
-                            "assume l#$Mutation($t{}) == $Uninitialized();",
-                            srcs[0]
-                        );
+                        emitln!(writer, "assume $t{}->l == $Uninitialized();", srcs[0]);
                     },
                     Destroy => {},
                     TraceLocal(idx) => {
@@ -2301,15 +2278,9 @@ impl<'env> FunctionTranslator<'env> {
                 let src_value = format!("$Dereference({})", src_str);
                 let get_path_index = |offset: usize| {
                     if offset == 0 {
-                        format!(
-                            "ReadVec(p#$Mutation({}), LenVec(p#$Mutation($t{})))",
-                            src_str, idx
-                        )
+                        format!("ReadVec({}->p, LenVec($t{}->p))", src_str, idx)
                     } else {
-                        format!(
-                            "ReadVec(p#$Mutation({}), LenVec(p#$Mutation($t{})) + {})",
-                            src_str, idx, offset
-                        )
+                        format!("ReadVec({}->p, LenVec($t{}->p) + {})", src_str, idx, offset)
                     }
                 };
                 let update = if let BorrowEdge::Hyper(edges) = edge {
@@ -2370,8 +2341,8 @@ impl<'env> FunctionTranslator<'env> {
                     let memory = memory.to_owned().instantiate(self.type_inst);
                     let struct_env = &self.parent.env.get_struct_qid(memory.to_qualified_id());
                     let field_env = &struct_env.get_field_by_offset(*offset);
-                    let sel_fun = boogie_field_sel(field_env, &memory.inst);
-                    let new_dest = format!("{}({})", sel_fun, (*mk_dest)());
+                    let field_sel = boogie_field_sel(field_env);
+                    let new_dest = format!("{}->{}", (*mk_dest)(), field_sel);
                     let mut new_dest_needed = false;
                     let new_src = self.translate_write_back_update(
                         &mut || {
