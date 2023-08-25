@@ -229,7 +229,6 @@ const sidebars = {
       collapsed: true,
       items: [
         "integration/aptos-apis",
-        "integration/indexing",
         {
           type: "category",
           label: "Integrate with Wallets",
@@ -449,7 +448,6 @@ const sidebars = {
         "nodes/full-node/run-a-fullnode-on-gcp",
       ],
     },
-    "nodes/indexer-fullnode",
     {
       type: "category",
       label: "Monitor Nodes",
@@ -486,6 +484,50 @@ const sidebars = {
           ],
         },
       ],
+    },
+  ],
+  indexerSidebar: [
+    {
+      type: "html",
+      value: "Indexer",
+      className: "sidebar-title",
+    },
+    "indexer/indexer-landing",
+    {
+      type: "category",
+      label: "Indexer API",
+      link: { type: "doc", id: "indexer/api/index" },
+      collapsible: true,
+      collapsed: true,
+      items: ["indexer/api/labs-hosted", "indexer/api/self-hosted", "indexer/api/example-queries"],
+    },
+    {
+      type: "category",
+      label: "Custom Processors",
+      link: { type: "doc", id: "indexer/custom-processors/index" },
+      collapsible: true,
+      collapsed: true,
+      items: ["indexer/custom-processors/parsing-txns", "indexer/custom-processors/e2e-tutorial"],
+    },
+    {
+      type: "category",
+      label: "Transaction Stream Service",
+      link: { type: "doc", id: "indexer/txn-stream/index" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        "indexer/txn-stream/labs-hosted",
+        "indexer/txn-stream/self-hosted",
+        "indexer/txn-stream/local-development",
+      ],
+    },
+    {
+      type: "category",
+      label: "Legacy Indexer",
+      link: { type: "doc", id: "indexer/legacy/index" },
+      collapsible: true,
+      collapsed: true,
+      items: ["indexer/legacy/indexer-fullnode", "indexer/legacy/custom-data-model"],
     },
   ],
   refSidebar: [
