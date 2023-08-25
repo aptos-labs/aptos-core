@@ -10,8 +10,7 @@ use crate::natives::{
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
-    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
-    SafeNativeResult,
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
 use aptos_types::vm_status::StatusCode;
 use move_binary_format::errors::PartialVMError;
@@ -19,7 +18,7 @@ use move_core_types::value::{MoveStructLayout, MoveTypeLayout};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    values::{Reference, Struct, StructRef, Value},
+    values::{Struct, StructRef, Value},
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, ops::Deref};
@@ -60,10 +59,7 @@ fn native_create_snapshot(
                     && type_.module.as_str() == "string"
                     && type_.address == AccountAddress::ONE
                 {
-                    let input = safely_pop_arg!(args, Reference)
-                        .read_ref()
-                        .map_err(SafeNativeError::InvariantViolation)?
-                        .value_as::<Struct>()?
+                    let input = safely_pop_arg!(args, Struct)
                         .unpack()?
                         .next()
                         .unwrap()
@@ -203,28 +199,25 @@ fn native_string_concat(
             && type_.module.as_str() == "string"
             && type_.address == AccountAddress::ONE
         {
-            let after = safely_pop_arg!(args, Reference)
-                .read_ref()
-                .map_err(SafeNativeError::InvariantViolation)?
-                .value_as::<Struct>()?
+            let after = safely_pop_arg!(args, Struct)
                 .unpack()?
                 .next()
                 .unwrap()
                 .value_as::<Vec<u8>>()?;
             let snapshot_value =
                 aggregator_snapshot_string_info(&safely_pop_arg!(args, StructRef))?;
-            let before = safely_pop_arg!(args, Reference)
-                .read_ref()
-                .map_err(SafeNativeError::InvariantViolation)?
-                .value_as::<Struct>()?
+            let before = safely_pop_arg!(args, Struct)
                 .unpack()?
                 .next()
                 .unwrap()
                 .value_as::<Vec<u8>>()?;
             let mut result = before.clone();
-            result.extend(snapshot_value);
-            result.extend(after);
-
+            result.extend(&snapshot_value);
+            result.extend(&after);
+            println!(
+                "before: {:?}, snaphsot_value: {:?}, after: {:?}, result: {:?}",
+                before, snapshot_value, after, result
+            );
             let move_string_value = Value::struct_(Struct::pack(vec![Value::vector_u8(result)]));
             let move_snapshot_value = Value::struct_(Struct::pack(vec![move_string_value]));
             return Ok(smallvec![move_snapshot_value]);

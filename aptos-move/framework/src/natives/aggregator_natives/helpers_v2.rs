@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use move_binary_format::errors::PartialVMResult;
-use move_vm_types::values::{Reference, StructRef, Value};
+use move_vm_types::values::{Reference, Struct, StructRef, Value};
 
 const VALUE_FIELD_INDEX: usize = 0;
 /// Given a reference to `Aggregator` Move struct returns a field value at `index`.
@@ -29,7 +29,11 @@ pub(crate) fn aggregator_snapshot_u64_info(
 pub(crate) fn aggregator_snapshot_string_info(
     aggregator_snapshot: &StructRef,
 ) -> PartialVMResult<Vec<u8>> {
-    let value =
-        get_aggregator_field(aggregator_snapshot, VALUE_FIELD_INDEX)?.value_as::<Vec<u8>>()?;
+    let value = get_aggregator_field(aggregator_snapshot, VALUE_FIELD_INDEX)?
+        .value_as::<Struct>()?
+        .unpack()?
+        .next()
+        .unwrap()
+        .value_as::<Vec<u8>>()?;
     Ok(value)
 }

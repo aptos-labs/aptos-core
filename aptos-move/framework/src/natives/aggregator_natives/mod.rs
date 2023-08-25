@@ -3,7 +3,7 @@
 
 pub mod aggregator;
 pub mod aggregator_factory;
-pub mod aggregator_snapshot;
+pub mod aggregator_v2;
 pub mod context;
 mod helpers;
 mod helpers_v2;

@@ -201,10 +201,10 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [aggregator_destroy_base: InternalGas, "aggregator.destroy.base", 10000],
         [aggregator_factory_new_aggregator_base: InternalGas, "aggregator_factory.new_aggregator.base", 10000],
 
-        [aggregator_v2_create_snapshot_base: InternalGas, "aggregator_snapshot.create_snapshot", 6000],
-        [aggregator_v2_copy_snapshot_base: InternalGas, "aggregator_snapshot.copy_snapshot", 6000],
-        [aggregator_v2_read_snapshot_base: InternalGas, "aggregator_snapshot.read_snapshot", 6000],
-        [aggregator_v2_string_concat_base: InternalGas, "aggregator_snapshot.string_concat", 6000],
+        [aggregator_v2_create_snapshot_base: InternalGas, "aggregator_v2.create_snapshot", 6000],
+        [aggregator_v2_copy_snapshot_base: InternalGas, "aggregator_v2.copy_snapshot", 6000],
+        [aggregator_v2_read_snapshot_base: InternalGas, "aggregator_v2.read_snapshot", 6000],
+        [aggregator_v2_string_concat_base: InternalGas, "aggregator_v2.string_concat", 6000],
 
 
         [object_exists_at_base: InternalGas, { 7.. => "object.exists_at.base" }, 5000],
