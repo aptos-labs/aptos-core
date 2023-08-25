@@ -214,10 +214,6 @@ fn native_string_concat(
             let mut result = before.clone();
             result.extend(&snapshot_value);
             result.extend(&after);
-            println!(
-                "before: {:?}, snaphsot_value: {:?}, after: {:?}, result: {:?}",
-                before, snapshot_value, after, result
-            );
             let move_string_value = Value::struct_(Struct::pack(vec![Value::vector_u8(result)]));
             let move_snapshot_value = Value::struct_(Struct::pack(vec![move_string_value]));
             return Ok(smallvec![move_snapshot_value]);
