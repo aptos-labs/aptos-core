@@ -25,3 +25,11 @@ pub(crate) fn aggregator_snapshot_u64_info(
     let value = get_aggregator_field(aggregator_snapshot, VALUE_FIELD_INDEX)?.value_as::<u64>()?;
     Ok(value)
 }
+
+pub(crate) fn aggregator_snapshot_string_info(
+    aggregator_snapshot: &StructRef,
+) -> PartialVMResult<Vec<u8>> {
+    let value =
+        get_aggregator_field(aggregator_snapshot, VALUE_FIELD_INDEX)?.value_as::<Vec<u8>>()?;
+    Ok(value)
+}
