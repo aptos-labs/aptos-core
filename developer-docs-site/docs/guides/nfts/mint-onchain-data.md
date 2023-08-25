@@ -42,7 +42,7 @@ Parameters:
 - token name: "Silver Coin".
 - token description: "The currency in my game".
 - maximum: 0. 0 means there is no maximum supply of this token.
-- uri: Your token url can point to anything. Usually it is an arweave or ipfs url pointing to an token image or JSON
+- uri: Your token url can point to anything. Usually it is an arweave or ipfs url pointing to a token image or JSON
   file containing the required metadata. 
 - royalty_payee_address: Used for NFT. For FT, it is recommended to set the creator address. 
 - royalty_points_denominator: Used for NFT. Set to 0 as N/A. 
