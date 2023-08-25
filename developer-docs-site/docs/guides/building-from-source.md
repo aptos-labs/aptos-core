@@ -106,7 +106,6 @@ If the script above does not work for you, you can install these manually, but i
 1. [Rust](https://www.rust-lang.org/tools/install).
 1. [CMake](https://cmake.org/download/).
 1. [LLVM](https://releases.llvm.org/).
-1. [libssl-dev](https://packages.ubuntu.com/bionic/libssl-dev) and [libclang-dev](https://packages.ubuntu.com/bionic/libclang-dev)
 
 </details>
 
