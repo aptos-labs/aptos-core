@@ -222,6 +222,7 @@ where
             let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                 .with_label_values(&["verified_state_view"])
                 .start_timer();
+            info!("next_version: {}", parent_output.next_version());
             CachedStateView::new(
                 StateViewId::BlockExecution { block_id },
                 Arc::clone(&self.db.reader),
