@@ -82,6 +82,15 @@ impl MoveHarness {
         }
     }
 
+    pub fn new_with_executor(executor: FakeExecutor) -> Self {
+        register_package_hooks(Box::new(AptosPackageHooks {}));
+        Self {
+            executor,
+            txn_seq_no: BTreeMap::default(),
+            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+        }
+    }
+
     pub fn new_with_validators(count: u64) -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
