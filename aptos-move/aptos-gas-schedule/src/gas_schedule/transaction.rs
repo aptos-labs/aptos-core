@@ -140,6 +140,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
             10 << 20, // all events from a single transaction are 10MB max
         ],
         [
+            max_write_ops_per_transaction: NumSlots,
+            { 11.. => "max_write_ops_per_transaction" },
+            8192,
+        ],
+        [
             storage_fee_per_state_slot_create: FeePerSlot,
             { 7.. => "storage_fee_per_state_slot_create" },
             50000,
