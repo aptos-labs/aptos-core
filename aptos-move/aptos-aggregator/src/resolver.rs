@@ -3,11 +3,33 @@
 
 use crate::aggregator_extension::AggregatorID;
 
+/// Defines different ways a value of an aggregator can be resolved in
+/// `AggregatorResolver`. The implementation of the trait can use custom
+///  logic for different reading modes.
+pub enum AggregatorReadMode {
+    /// The returned value is guaranteed to be correct.
+    Precise,
+    /// The returned value is based on speculation or approximation. For
+    /// example, while reading and accumulating deltas only some of them
+    /// can be taken into account.
+    Speculative,
+}
+
 /// Returns a value of an aggregator from cache or global storage.
 ///   - Ok(..)       if aggregator value exists
 ///   - Err(..)      otherwise.
 pub trait AggregatorResolver {
-    fn resolve_aggregator_value(&self, id: &AggregatorID) -> Result<u128, anyhow::Error>;
+    /// Returns a value of an aggregator. If `allow_speculative` flag is set,
+    /// the returned value is not guaranteed to be cor
+    fn resolve_aggregator_value(
+        &self,
+        id: &AggregatorID,
+        mode: AggregatorReadMode,
+    ) -> Result<u128, anyhow::Error>;
+
+    /// Returns a unique per-block identifier that can be used when creating a
+    /// new aggregator.
+    fn generate_aggregator_id(&self) -> AggregatorID;
 }
 
 // Utils to store aggregator values in data store. Here, we
@@ -15,10 +37,7 @@ pub trait AggregatorResolver {
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils {
     use super::*;
-    use crate::{
-        aggregator_extension::AggregatorHandle,
-        delta_change_set::{deserialize, serialize},
-    };
+    use crate::{aggregator_extension::AggregatorHandle, delta_change_set::serialize};
     use aptos_state_view::TStateView;
     use aptos_types::state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -54,15 +73,23 @@ pub mod test_utils {
     }
 
     impl AggregatorResolver for AggregatorStore {
-        fn resolve_aggregator_value(&self, id: &AggregatorID) -> Result<u128, anyhow::Error> {
+        fn resolve_aggregator_value(
+            &self,
+            id: &AggregatorID,
+            _mode: AggregatorReadMode,
+        ) -> Result<u128, anyhow::Error> {
             let AggregatorID { handle, key } = id;
             let state_key = StateKey::table_item(*handle, key.0.to_vec());
-            match self.get_state_value_bytes(&state_key)? {
-                Some(bytes) => Ok(deserialize(&bytes)),
+            match self.get_state_value_u128(&state_key)? {
+                Some(value) => Ok(value),
                 None => {
                     anyhow::bail!("Could not find the value of the aggregator")
                 },
             }
+        }
+
+        fn generate_aggregator_id(&self) -> AggregatorID {
+            unimplemented!("Aggregator id generation will be implemented for V2 aggregators.")
         }
     }
 

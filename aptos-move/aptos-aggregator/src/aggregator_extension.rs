@@ -3,7 +3,7 @@
 
 use crate::{
     delta_change_set::{addition, subtraction},
-    resolver::AggregatorResolver,
+    resolver::{AggregatorReadMode, AggregatorResolver},
 };
 use aptos_types::{state_store::table::TableHandle, vm_status::StatusCode};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -241,18 +241,22 @@ impl Aggregator {
         // In theory, any delta will be applied to existing value. However,
         // something may go wrong, so we guard by throwing an error in
         // extension.
-        let value_from_storage = resolver.resolve_aggregator_value(id).map_err(|e| {
-            extension_error(format!("Could not find the value of the aggregator: {}", e))
-        })?;
+        let value_from_storage = resolver
+            .resolve_aggregator_value(id, AggregatorReadMode::Precise)
+            .map_err(|e| {
+                extension_error(format!("Could not find the value of the aggregator: {}", e))
+            })?;
 
         // Validate history and apply the delta.
         self.validate_history(value_from_storage)?;
         match self.state {
             AggregatorState::PositiveDelta => {
-                self.value = addition(value_from_storage, self.value, self.limit)?;
+                self.value = addition(value_from_storage, self.value, self.limit)
+                    .expect("Validated delta cannot overflow");
             },
             AggregatorState::NegativeDelta => {
-                self.value = subtraction(value_from_storage, self.value)?;
+                self.value = subtraction(value_from_storage, self.value)
+                    .expect("Validated delta cannot underflow");
             },
             AggregatorState::Data => {
                 unreachable!("Materialization only happens in Delta state")

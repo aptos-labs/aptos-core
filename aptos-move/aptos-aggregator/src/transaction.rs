@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::delta_change_set::deserialize;
 use aptos_types::write_set::TransactionWrite;
 
 /// Helpful trait for e.g. extracting u128 value out of TransactionWrite that we know is
@@ -13,7 +12,12 @@ impl AggregatorValue {
     /// the value raw bytes can't be deserialized into an u128.
     pub fn from_write(write: &dyn TransactionWrite) -> Option<Self> {
         let v = write.extract_raw_bytes();
-        v.map(|bytes| Self(deserialize(&bytes)))
+        v.map(|bytes| {
+            Self(
+                bcs::from_bytes(&bytes)
+                    .expect("Deserializing into an aggregator value always succeeds"),
+            )
+        })
     }
 
     pub fn into(self) -> u128 {

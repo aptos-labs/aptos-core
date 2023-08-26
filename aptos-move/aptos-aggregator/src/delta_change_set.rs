@@ -271,11 +271,6 @@ pub fn serialize(value: &u128) -> Vec<u8> {
     bcs::to_bytes(value).expect("unexpected serialization error in aggregator")
 }
 
-/// Deserializes value for delta application.
-pub fn deserialize(value_bytes: &[u8]) -> u128 {
-    bcs::from_bytes(value_bytes).expect("unexpected deserialization error in aggregator")
-}
-
 // Helper for tests, #[cfg(test)] doesn't work for cross-crate.
 pub fn delta_sub(v: u128, limit: u128) -> DeltaOp {
     DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v)

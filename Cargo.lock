@@ -3916,6 +3916,7 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-state-view",
  "aptos-types",
+ "bcs 0.1.4",
  "claims",
  "either",
  "move-binary-format",

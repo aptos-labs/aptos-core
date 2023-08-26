@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::check_change_set::CheckChangeSet;
-use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaOp};
+use aptos_aggregator::delta_change_set::{serialize, DeltaOp};
 use aptos_state_view::StateView;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -246,7 +246,10 @@ impl VMChangeSet {
                     | CreationWithMetadata { data, .. }
                     | ModificationWithMetadata { data, .. } => {
                         // Apply delta on top of creation or modification.
-                        let base: u128 = deserialize(data);
+                        // TODO(aggregator): This will not be needed anymore once aggregator
+                        // change sets carry non-serialized information.
+                        let base: u128 = bcs::from_bytes(data)
+                            .expect("Deserializing into an aggregator value always succeeds");
                         let value = additional_delta_op
                             .apply_to(base)
                             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;

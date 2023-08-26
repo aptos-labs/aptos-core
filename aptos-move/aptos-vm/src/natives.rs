@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Error;
+use aptos_aggregator::resolver::AggregatorReadMode;
 #[cfg(feature = "testing")]
 use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::AggregatorResolver};
 #[cfg(feature = "testing")]
@@ -35,10 +36,18 @@ struct AptosBlankStorage;
 
 #[cfg(feature = "testing")]
 impl AggregatorResolver for AptosBlankStorage {
-    fn resolve_aggregator_value(&self, _id: &AggregatorID) -> Result<u128, anyhow::Error> {
+    fn resolve_aggregator_value(
+        &self,
+        _id: &AggregatorID,
+        _mode: AggregatorReadMode,
+    ) -> Result<u128, Error> {
         // All Move tests have aggregator in Data state, and so the resolver should
         // not be called.
         unreachable!("Aggregator cannot be resolved for blank storage")
+    }
+
+    fn generate_aggregator_id(&self) -> AggregatorID {
+        unimplemented!("Aggregator id generation will be implemented for V2 aggregators.")
     }
 }
 
