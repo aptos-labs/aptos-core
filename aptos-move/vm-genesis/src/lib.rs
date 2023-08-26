@@ -20,7 +20,7 @@ use aptos_gas_schedule::{
 use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, ContractEventV1},
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         TimedFeatures, APTOS_MAX_KNOWN_VERSION,
@@ -419,6 +419,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
         FeatureFlag::GAS_PAYER_ENABLED,
         FeatureFlag::BULLETPROOFS_NATIVES,
+        FeatureFlag::MODULE_EVENT,
     ]
 }
 
@@ -630,16 +631,22 @@ fn emit_new_block_and_epoch_event(session: &mut SessionExt) {
 
 /// Verify the consistency of the genesis `WriteSet`
 fn verify_genesis_write_set(events: &[ContractEvent]) {
-    let new_epoch_events: Vec<&ContractEvent> = events
+    let new_epoch_events: Vec<&ContractEventV1> = events
         .iter()
-        .filter(|e| e.key() == &NewEpochEvent::event_key())
+        .filter_map(|e| {
+            if e.event_key() == Some(&NewEpochEvent::event_key()) {
+                Some(e.v1().unwrap())
+            } else {
+                None
+            }
+        })
         .collect();
     assert_eq!(
         new_epoch_events.len(),
         1,
         "There should only be exactly one NewEpochEvent"
     );
-    assert_eq!(new_epoch_events[0].sequence_number(), 0,);
+    assert_eq!(new_epoch_events[0].sequence_number(), 0);
 }
 
 /// An enum specifying whether the compiled stdlib/scripts should be used or freshly built versions

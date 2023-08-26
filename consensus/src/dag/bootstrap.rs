@@ -11,9 +11,11 @@ use super::{
     rb_handler::NodeBroadcastHandler,
     storage::DAGStorage,
     types::DAGMessage,
-    CertifiedNode,
 };
-use crate::{network::IncomingDAGRequest, state_replication::PayloadClient};
+use crate::{
+    dag::adapter::BufferManagerAdapter, experimental::buffer_manager::OrderedBlocks,
+    network::IncomingDAGRequest, state_replication::PayloadClient,
+};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
@@ -39,12 +41,13 @@ pub fn bootstrap_dag(
     AbortHandle,
     AbortHandle,
     aptos_channel::Sender<Author, IncomingDAGRequest>,
-    futures_channel::mpsc::UnboundedReceiver<Vec<Arc<CertifiedNode>>>,
+    futures_channel::mpsc::UnboundedReceiver<OrderedBlocks>,
 ) {
     let validators = epoch_state.verifier.get_ordered_account_addresses();
     let current_round = latest_ledger_info.round();
 
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
+    let adapter = Box::new(BufferManagerAdapter::new(ordered_nodes_tx, storage.clone()));
     let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
 
     // A backoff policy that starts at 100ms and doubles each iteration.
@@ -56,7 +59,11 @@ pub fn bootstrap_dag(
         time_service.clone(),
     ));
 
-    let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage.clone())));
+    let dag = Arc::new(RwLock::new(Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        current_round,
+    )));
 
     let anchor_election = Box::new(RoundRobinAnchorElection::new(validators));
     let order_rule = OrderRule::new(
@@ -64,7 +71,8 @@ pub fn bootstrap_dag(
         latest_ledger_info,
         dag.clone(),
         anchor_election,
-        ordered_nodes_tx,
+        adapter,
+        storage.clone(),
     );
 
     let (dag_fetcher, fetch_requester, node_fetch_waiter, certified_node_fetch_waiter) =
@@ -86,10 +94,15 @@ pub fn bootstrap_dag(
         time_service,
         storage.clone(),
         order_rule,
+        fetch_requester.clone(),
+    );
+    let rb_handler = NodeBroadcastHandler::new(
+        dag.clone(),
+        signer,
+        epoch_state.clone(),
+        storage.clone(),
         fetch_requester,
     );
-    let rb_handler =
-        NodeBroadcastHandler::new(dag.clone(), signer, epoch_state.clone(), storage.clone());
     let fetch_handler = FetchRequestHandler::new(dag, epoch_state.clone());
 
     let dag_handler = NetworkHandler::new(

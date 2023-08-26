@@ -16,6 +16,10 @@ Public fullnodes can be run by anyone. This tutorial explains how to configure a
 This document describes how to start a public fullnode in the Aptos `mainnet` network yet can easily be used to do the same in the `devnet` and `testnet` networks. To do so, instead check out the desired branch and use the `genesis.blob` and `waypoint.txt` node files for the respective branch: [`mainnet`](../node-files-all-networks/node-files.md), [`devnet`](../node-files-all-networks/node-files-devnet.md), and [`testnet`](../node-files-all-networks/node-files-testnet.md).
 :::
 
+:::tip Starting a node in testnet?
+If this is the first time you're starting a fullnode in `testnet`, it is recommended to bootstrap your node first by restoring from a [backup](../full-node/aptos-db-restore.md) or downloading [a snapshot](../full-node/bootstrap-fullnode.md). This will avoid any potential issues with network connectivity and peer discovery.
+:::
+
 ## Hardware requirements
 
 We recommend the following hardware resources:
