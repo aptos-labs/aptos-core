@@ -47,7 +47,7 @@ impl ExecutionOutput {
     }
 
     pub fn next_version(&self) -> u64 {
-        self.state().current_version.unwrap()
+        self.state().current_version.unwrap() + 1
     }
 
     pub fn is_same_state(&self, rhs: &Self) -> bool {
