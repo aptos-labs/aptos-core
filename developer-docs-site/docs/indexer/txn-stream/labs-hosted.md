@@ -14,4 +14,4 @@ All endpoints are in GCP us-central1 unless otherwise specified.
 
 ## Rate limits
 
-todo
+Coming soon!
