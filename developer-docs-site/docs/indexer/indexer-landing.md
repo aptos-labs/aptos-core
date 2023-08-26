@@ -9,7 +9,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 ## Quick Start
 
-Refer to this role-oriented guide to help you quickly jump to the relevant docs:
+Refer to this role-oriented guide to help you quickly find the relevant docs:
 
 - Core Infra Provider: You want to run your own Transaction Stream Service in addition to the rest of the stack.
   - See docs for [Self-Hosted Transaction Stream Service](txn-stream/self-hosted).
