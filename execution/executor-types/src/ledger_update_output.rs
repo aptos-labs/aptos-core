@@ -6,7 +6,9 @@
 use crate::StateComputeResult;
 use anyhow::{ensure, Result};
 use aptos_crypto::{hash::TransactionAccumulatorHasher, HashValue};
-use aptos_storage_interface::{cached_state_view::ShardedStateCache, ExecutedTrees};
+use aptos_storage_interface::{
+    cached_state_view::ShardedStateCache, state_delta::StateDelta, ExecutedTrees,
+};
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -16,8 +18,8 @@ use aptos_types::{
 };
 use std::sync::Arc;
 
-#[derive(Default)]
-pub struct ExecutedBlock {
+#[derive(Default, Debug)]
+pub struct LedgerUpdateOutput {
     pub status: Vec<TransactionStatus>,
     pub to_commit: Vec<Arc<TransactionToCommit>>,
     pub result_view: ExecutedTrees,
@@ -29,7 +31,7 @@ pub struct ExecutedBlock {
     pub sharded_state_cache: ShardedStateCache,
 }
 
-impl ExecutedBlock {
+impl LedgerUpdateOutput {
     pub fn new_empty(result_view: ExecutedTrees) -> Self {
         Self {
             result_view,
@@ -52,6 +54,14 @@ impl ExecutedBlock {
 
     pub fn has_reconfiguration(&self) -> bool {
         self.next_epoch_state.is_some()
+    }
+
+    pub fn num_transactions(&self) -> u64 {
+        self.result_view.num_transactions()
+    }
+
+    pub fn state(&self) -> &StateDelta {
+        self.result_view.state()
     }
 
     /// Ensure that every block committed by consensus ends with a state checkpoint. That can be

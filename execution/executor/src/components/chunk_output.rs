@@ -7,11 +7,12 @@
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_executor_types::{ExecutedBlock, ExecutedChunk};
+use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
 use aptos_infallible::Mutex;
-use aptos_logger::{sample, sample::SampleRate, trace, warn};
+use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
+    state_delta::StateDelta,
     ExecutedTrees,
 };
 use aptos_types::{
@@ -154,30 +155,21 @@ impl ChunkOutput {
         ApplyChunkOutput::apply_chunk(self, base_view, append_state_checkpoint_to_block)
     }
 
-    pub fn apply_to_ledger_for_block(
+    pub fn into_state_checkpoint_output(
         self,
-        base_view: &ExecutedTrees,
+        parent_state: &StateDelta,
         append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> Result<(ExecutedBlock, Vec<Transaction>, Vec<Transaction>)> {
-        fail_point!("executor::apply_to_ledger_for_block", |_| {
+    ) -> Result<(StateDelta, StateCheckpointOutput)> {
+        fail_point!("executor::into_state_checkpoint_output", |_| {
             Err(anyhow::anyhow!(
-                "Injected error in apply_to_ledger_for_block."
+                "Injected error in into_state_checkpoint_output."
             ))
         });
-        ApplyChunkOutput::apply_block(self, base_view, append_state_checkpoint_to_block)
-    }
-
-    pub fn trace_log_transaction_status(&self) {
-        let status: Vec<_> = self
-            .transaction_outputs
-            .iter()
-            .map(TransactionOutput::status)
-            .cloned()
-            .collect();
-
-        if !status.is_empty() {
-            trace!("Execution status: {:?}", status);
-        }
+        ApplyChunkOutput::calculate_state_checkpoint(
+            self,
+            parent_state,
+            append_state_checkpoint_to_block,
+        )
     }
 
     fn execute_block_sharded<V: VMExecutor>(
