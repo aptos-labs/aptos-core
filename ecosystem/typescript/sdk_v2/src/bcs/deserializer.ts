@@ -5,6 +5,7 @@
 import { MAX_U32_NUMBER } from "./consts";
 import { Uint128, Uint16, Uint256, Uint32, Uint64, Uint8 } from "./types";
 
+
 // The class must implement a static deserialize method.
 interface Deserializable<T> {
   deserialize(deserializer: Deserializer): T;
