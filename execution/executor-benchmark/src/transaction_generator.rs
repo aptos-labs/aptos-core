@@ -275,6 +275,7 @@ impl TransactionGenerator {
         transactions_per_sender: usize,
         connected_tx_grps: usize,
         shuffle_connected_txns: bool,
+        maybe_hotspot_probability: Option<f32>,
     ) {
         assert!(self.block_sender.is_some());
         self.gen_transfer_transactions(
@@ -283,6 +284,7 @@ impl TransactionGenerator {
             transactions_per_sender,
             connected_tx_grps,
             shuffle_connected_txns,
+            maybe_hotspot_probability,
         );
     }
 
@@ -453,6 +455,42 @@ impl TransactionGenerator {
         }
     }
 
+    /// Generates transactions for random pairs of accounts, assuming account
+    pub fn gen_random_transfers_with_hotspot(
+        &mut self,
+        block_size: usize,
+        num_blocks: usize,
+        hotspot_probability: f32,
+    ) {
+        assert!(hotspot_probability >= 0.5 && hotspot_probability < 1.0);
+        println!("Started generating trandom transfers with hotspot.");
+        let num_accounts = self.main_signer_accounts.as_ref().unwrap().len();
+        let num_hotspot_accounts =  ((1.0 - hotspot_probability) * num_accounts as f32).ceil() as usize;
+        let mut rng = thread_rng();
+        for _ in 0..num_blocks {
+            let transactions: Vec<_> = (0..block_size)
+                .map(|_| {
+                    let sender_idx = rand_with_hotspot(&mut rng, num_accounts, num_hotspot_accounts);
+                    let receiver_idx = rand_with_hotspot(&mut rng, num_accounts, num_hotspot_accounts);
+                    let receiver = self.main_signer_accounts.as_ref().unwrap().accounts[receiver_idx].address();
+                    let sender = &mut self.main_signer_accounts.as_mut().unwrap().accounts[sender_idx];
+                    let amount = 1;
+                    let txn = sender.sign_with_transaction_builder(
+                        self.transaction_factory.transfer(receiver, amount),
+                    );
+                    Transaction::UserTransaction(txn)
+                })
+                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
+                .collect();
+            self.version += transactions.len() as Version;
+
+            if let Some(sender) = &self.block_sender {
+                sender.send(transactions).unwrap();
+            }
+        }
+    }
+
+
     /// 'Conflicting groups of txns' are a type of 'connected groups of txns'.
     /// Here we generate conflicts completely on one particular address (which can be sender or
     /// receiver).
@@ -568,6 +606,7 @@ impl TransactionGenerator {
         transactions_per_sender: usize,
         connected_tx_grps: usize,
         shuffle_connected_txns: bool,
+        maybe_hotspot_probability: Option<f32>,
     ) {
         if connected_tx_grps > 0 {
             self.gen_connected_grps_transfer_transactions(
@@ -576,6 +615,8 @@ impl TransactionGenerator {
                 connected_tx_grps,
                 shuffle_connected_txns,
             );
+        } else if maybe_hotspot_probability.is_some() {
+            self.gen_random_transfers_with_hotspot(block_size, num_blocks, maybe_hotspot_probability.unwrap());
         } else {
             self.gen_random_transfer_transactions(block_size, num_blocks, transactions_per_sender);
         }
@@ -621,6 +662,17 @@ impl TransactionGenerator {
     /// Drops the sender to notify the receiving end of the channel.
     pub fn drop_sender(&mut self) {
         self.block_sender.take().unwrap();
+    }
+}
+
+/// With probability `1-h/n`, pick an integer in [0, h) uniformly at random;
+/// with probability `h/n`, pick an integer in [h, n) uniformly at random.
+fn rand_with_hotspot<R: Rng>(rng: &mut R, n: usize, h: usize) -> usize {
+    let from_hotspot = rng.gen_range(0, n) > h;
+    if from_hotspot {
+        rng.gen_range(0, h)
+    } else {
+        rng.gen_range(h, n)
     }
 }
 

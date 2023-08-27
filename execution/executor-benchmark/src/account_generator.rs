@@ -4,6 +4,7 @@
 use aptos_sdk::{move_types::account_address::AccountAddress, types::LocalAccount};
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 use std::{collections::VecDeque, sync::mpsc};
+use rand::distributions::{Distribution, WeightedIndex};
 
 type Seed = [u8; 32];
 
