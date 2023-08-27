@@ -425,6 +425,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::EMIT_FEE_STATEMENT,
         FeatureFlag::STORAGE_DELETION_REFUND,
         FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX,
+        FeatureFlag::SAFER_RESOURCE_GROUPS,
     ]
 }
 

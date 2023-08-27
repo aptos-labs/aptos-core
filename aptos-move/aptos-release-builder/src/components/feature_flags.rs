@@ -80,6 +80,7 @@ pub enum FeatureFlag {
     EmitFeeStatement,
     StorageDeletionRefund,
     SignatureCheckerV2ScriptFix,
+    SaferResourceGroups,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -210,6 +211,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::SignatureCheckerV2ScriptFix => {
                 AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX
             },
+            FeatureFlag::SaferResourceGroups => AptosFeatureFlag::SAFER_RESOURCE_GROUPS,
         }
     }
 }
@@ -263,6 +265,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX => {
                 FeatureFlag::SignatureCheckerV2ScriptFix
             },
+            AptosFeatureFlag::SAFER_RESOURCE_GROUPS => FeatureFlag::SaferResourceGroups,
         }
     }
 }

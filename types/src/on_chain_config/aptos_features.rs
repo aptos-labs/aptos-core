@@ -37,6 +37,7 @@ pub enum FeatureFlag {
     EMIT_FEE_STATEMENT = 27,
     STORAGE_DELETION_REFUND = 28,
     SIGNATURE_CHECKER_V2_SCRIPT_FIX = 29,
+    SAFER_RESOURCE_GROUPS = 30,
 }
 
 /// Representation of features on chain as a bitset.
