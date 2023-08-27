@@ -469,7 +469,7 @@ impl TransactionGenerator {
         hotspot_probability: f32,
     ) {
         assert!((0.5..1.0).contains(&hotspot_probability));
-        println!("Started generating trandom transfers with hotspot.");
+        println!("Started generating random transfers with hotspot.");
         let num_accounts = self.main_signer_accounts.as_ref().unwrap().len();
         let num_hotspot_accounts =
             ((1.0 - hotspot_probability) * num_accounts as f32).ceil() as usize;
