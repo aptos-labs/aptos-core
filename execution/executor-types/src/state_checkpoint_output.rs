@@ -13,7 +13,7 @@ use aptos_types::{
 };
 
 pub struct TransactionsByStatus {
-    status: Vec<TransactionStatus>,
+    statuses: Vec<TransactionStatus>,
     to_keep: Vec<(Transaction, ParsedTransactionOutput)>,
     to_discard: Vec<Transaction>,
     to_retry: Vec<Transaction>,
@@ -27,7 +27,7 @@ impl TransactionsByStatus {
         to_retry: Vec<Transaction>,
     ) -> Self {
         Self {
-            status,
+            statuses: status,
             to_keep,
             to_discard,
             to_retry,
@@ -38,6 +38,10 @@ impl TransactionsByStatus {
         self.to_keep.len()
     }
 
+    pub fn txn_statuses(&self) -> &[TransactionStatus] {
+        &self.statuses
+    }
+
     pub fn into_inner(
         self,
     ) -> (
@@ -46,7 +50,7 @@ impl TransactionsByStatus {
         Vec<Transaction>,
         Vec<Transaction>,
     ) {
-        (self.status, self.to_keep, self.to_discard, self.to_retry)
+        (self.statuses, self.to_keep, self.to_discard, self.to_retry)
     }
 }
 
@@ -76,6 +80,10 @@ impl StateCheckpointOutput {
             block_state_updates,
             sharded_state_cache,
         }
+    }
+
+    pub fn txn_statuses(&self) -> &[TransactionStatus] {
+        self.txns.txn_statuses()
     }
 
     pub fn into_inner(

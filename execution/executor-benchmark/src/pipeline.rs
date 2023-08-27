@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_partitioning::BlockPartitioningStage, GasMesurement, TransactionCommitter,
-    TransactionExecutor,
+    block_partitioning::BlockPartitioningStage, ledger_update_stage::LedgerUpdateStage,
+    GasMesurement, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::PartitionerConfig;
 use aptos_crypto::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
-use aptos_executor_types::BlockExecutorTrait;
+use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait};
 use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
@@ -57,6 +57,7 @@ where
         let parent_block_id = executor.committed_block_id();
         let executor_1 = Arc::new(executor);
         let executor_2 = executor_1.clone();
+        let executor_3 = executor_1.clone();
 
         let (raw_block_sender, raw_block_receiver) = mpsc::sync_channel::<Vec<Transaction>>(
             if config.delay_execution_start {
@@ -68,6 +69,15 @@ where
 
         // Assume the distributed executor and the distributed partitioner share the same worker set.
         let num_partitioner_shards = config.num_executor_shards;
+
+        let (ledger_update_sender, ledger_update_receiver) =
+            mpsc::sync_channel::<LedgerUpdateMessage>(
+                if config.split_stages || config.skip_commit {
+                    (num_blocks.unwrap() + 1).max(3)
+                } else {
+                    3
+                }, /* bound */
+            );
 
         let (commit_sender, commit_receiver) = mpsc::sync_channel::<CommitBlockMessage>(
             if config.split_stages || config.skip_commit {
@@ -96,11 +106,12 @@ where
         let mut partitioning_stage =
             BlockPartitioningStage::new(num_partitioner_shards, config.partitioner_config);
 
-        let mut exe = TransactionExecutor::new(
-            executor_1,
-            parent_block_id,
-            version,
+        let mut exe = TransactionExecutor::new(executor_1, parent_block_id, ledger_update_sender);
+
+        let mut ledger_update_stage = LedgerUpdateStage::new(
+            executor_2,
             Some(commit_sender),
+            version,
             config.allow_discards,
             config.allow_aborts,
         );
@@ -212,6 +223,16 @@ where
             join_handles.push(par_exe_thread);
         }
 
+        let ledger_update_thread = std::thread::Builder::new()
+            .name("ledger_update".to_string())
+            .spawn(move || {
+                while let Ok(ledger_update_msg) = ledger_update_receiver.recv() {
+                    ledger_update_stage.ledger_update(ledger_update_msg);
+                }
+            })
+            .expect("Failed to spawn ledger update thread.");
+        join_handles.push(ledger_update_thread);
+
         let skip_commit = config.skip_commit;
 
         let commit_thread = std::thread::Builder::new()
@@ -221,7 +242,7 @@ where
                 info!("Starting commit thread");
                 if !skip_commit {
                     let mut committer =
-                        TransactionCommitter::new(executor_2, version, commit_receiver);
+                        TransactionCommitter::new(executor_3, version, commit_receiver);
                     committer.run();
                 }
             })
@@ -254,6 +275,16 @@ pub struct ExecuteBlockMessage {
     pub current_block_start_time: Instant,
     pub partition_time: Duration,
     pub block: ExecutableBlock,
+}
+
+pub struct LedgerUpdateMessage {
+    pub current_block_start_time: Instant,
+    pub execution_time: Duration,
+    pub partition_time: Duration,
+    pub block_id: HashValue,
+    pub parent_block_id: HashValue,
+    pub state_checkpoint_output: StateCheckpointOutput,
+    pub first_block_start_time: Instant,
 }
 
 /// Message from execution stage to commit stage.

@@ -7,6 +7,7 @@ pub mod block_partitioning;
 pub mod db_access;
 pub mod db_generator;
 mod db_reliable_submitter;
+mod ledger_update_stage;
 mod metrics;
 pub mod native_executor;
 pub mod pipeline;
