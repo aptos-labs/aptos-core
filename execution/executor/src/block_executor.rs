@@ -175,14 +175,7 @@ where
     }
 
     fn root_smt(&self) -> SparseMerkleTree<StateValue> {
-        self.block_tree
-            .root_block()
-            .output
-            .get_ledger_update()
-            .result_view
-            .state()
-            .current
-            .clone()
+        self.block_tree.root_block().output.state().current.clone()
     }
 }
 
@@ -280,9 +273,7 @@ where
         // 1. The block tree must also have the current block id with or without the ledger update output.
         // 2. We must have the ledger update output of the parent block.
         let parent_output = parent_block.output.get_ledger_update();
-        let parent_view = &parent_output.result_view;
-        let parent_accumulator = parent_view.txn_accumulator();
-
+        let parent_accumulator = parent_output.txn_accumulator();
         let current_output = block_vec.pop().expect("Must exist").unwrap();
         parent_block.ensure_has_child(block_id)?;
         if current_output.output.has_ledger_update() {
@@ -301,7 +292,6 @@ where
             parent_output.reconfig_suffix()
         } else {
             let (output, _, _) = ApplyChunkOutput::calculate_ledger_update(
-                current_output.output.state().clone(),
                 state_checkpoint_output,
                 parent_accumulator.clone(),
             )?;
@@ -358,7 +348,6 @@ where
         let mut first_version = committed_block
             .output
             .get_ledger_update()
-            .result_view
             .txn_accumulator()
             .num_leaves();
 
@@ -389,17 +378,11 @@ where
             let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
             APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
 
-            let result_in_memory_state =
-                block.output.get_ledger_update().result_view.state().clone();
+            let result_in_memory_state = block.output.state().clone();
             self.db.writer.save_transaction_block(
                 &txns_to_commit,
                 first_version,
-                committed_block
-                    .output
-                    .get_ledger_update()
-                    .result_view
-                    .state()
-                    .base_version,
+                committed_block.output.state().base_version,
                 if i == blocks.len() - 1 {
                     Some(&ledger_info_with_sigs)
                 } else {

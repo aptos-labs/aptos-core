@@ -52,7 +52,6 @@ impl Block {
     pub fn num_persisted_transactions(&self) -> LeafCount {
         self.output
             .get_ledger_update()
-            .result_view
             .txn_accumulator()
             .num_leaves()
     }
@@ -232,7 +231,7 @@ impl BlockTree {
 
         let output = ExecutionOutput::new_with_ledger_update(
             ledger_view.state().clone(),
-            LedgerUpdateOutput::new_empty(ledger_view),
+            LedgerUpdateOutput::new_empty(ledger_view.txn_accumulator().clone()),
         );
 
         block_lookup.fetch_or_add_block(id, output, None)
@@ -256,17 +255,12 @@ impl BlockTree {
                 "Updated with a new root block as a virtual block of reconfiguration block"
             );
             let output = ExecutionOutput::new_with_ledger_update(
-                last_committed_block
-                    .output
-                    .get_ledger_update()
-                    .result_view
-                    .state()
-                    .clone(),
+                last_committed_block.output.state().clone(),
                 LedgerUpdateOutput::new_empty(
                     last_committed_block
                         .output
                         .get_ledger_update()
-                        .result_view
+                        .txn_accumulator()
                         .clone(),
                 ),
             );

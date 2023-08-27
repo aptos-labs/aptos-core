@@ -101,7 +101,6 @@ impl ApplyChunkOutput {
     }
 
     pub fn calculate_ledger_update(
-        state: StateDelta,
         state_checkpoint_output: StateCheckpointOutput,
         base_txn_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
     ) -> Result<(LedgerUpdateOutput, Vec<Transaction>, Vec<Transaction>)> {
@@ -126,22 +125,18 @@ impl ApplyChunkOutput {
                 state_updates_vec,
                 state_checkpoint_hashes,
             );
-        // TODO get rid of the ExecutedTree here.
-        let result_view = ExecutedTrees::new(
-            state,
-            Arc::new(base_txn_accumulator.append(&transaction_info_hashes)),
-        );
-
+        let transaction_accumulator =
+            Arc::new(base_txn_accumulator.append(&transaction_info_hashes));
         Ok((
             LedgerUpdateOutput {
                 status,
                 to_commit,
-                result_view,
                 next_epoch_state,
                 reconfig_events,
                 transaction_info_hashes,
                 block_state_updates,
                 sharded_state_cache,
+                transaction_accumulator,
             },
             to_discard,
             to_retry,

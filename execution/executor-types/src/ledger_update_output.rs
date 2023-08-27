@@ -6,9 +6,7 @@
 use crate::StateComputeResult;
 use anyhow::{ensure, Result};
 use aptos_crypto::{hash::TransactionAccumulatorHasher, HashValue};
-use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, state_delta::StateDelta, ExecutedTrees,
-};
+use aptos_storage_interface::{cached_state_view::ShardedStateCache};
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -22,19 +20,23 @@ use std::sync::Arc;
 pub struct LedgerUpdateOutput {
     pub status: Vec<TransactionStatus>,
     pub to_commit: Vec<Arc<TransactionToCommit>>,
-    pub result_view: ExecutedTrees,
     /// If set, this is the new epoch info that should be changed to if this is committed.
     pub next_epoch_state: Option<EpochState>,
     pub reconfig_events: Vec<ContractEvent>,
     pub transaction_info_hashes: Vec<HashValue>,
     pub block_state_updates: ShardedStateUpdates,
     pub sharded_state_cache: ShardedStateCache,
+    /// The in-memory Merkle Accumulator representing a blockchain state consistent with the
+    /// `state_tree`.
+    pub transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
 }
 
 impl LedgerUpdateOutput {
-    pub fn new_empty(result_view: ExecutedTrees) -> Self {
+    pub fn new_empty(
+        transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
+    ) -> Self {
         Self {
-            result_view,
+            transaction_accumulator,
             ..Default::default()
         }
     }
@@ -42,10 +44,13 @@ impl LedgerUpdateOutput {
     pub fn reconfig_suffix(&self) -> Self {
         assert!(self.next_epoch_state.is_some());
         Self {
-            result_view: self.result_view.clone(),
             next_epoch_state: self.next_epoch_state.clone(),
             ..Default::default()
         }
+    }
+
+    pub fn txn_accumulator(&self) -> &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>> {
+        &self.transaction_accumulator
     }
 
     pub fn transactions_to_commit(&self) -> Vec<Arc<TransactionToCommit>> {
@@ -54,14 +59,6 @@ impl LedgerUpdateOutput {
 
     pub fn has_reconfiguration(&self) -> bool {
         self.next_epoch_state.is_some()
-    }
-
-    pub fn num_transactions(&self) -> u64 {
-        self.result_view.num_transactions()
-    }
-
-    pub fn state(&self) -> &StateDelta {
-        self.result_view.state()
     }
 
     /// Ensure that every block committed by consensus ends with a state checkpoint. That can be
@@ -84,7 +81,7 @@ impl LedgerUpdateOutput {
         &self,
         parent_accumulator: &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
     ) -> StateComputeResult {
-        let txn_accu = self.result_view.txn_accumulator();
+        let txn_accu = self.txn_accumulator();
 
         StateComputeResult::new(
             txn_accu.root_hash(),
