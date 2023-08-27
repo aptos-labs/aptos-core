@@ -12,6 +12,7 @@ proposals:
       - FeatureFlag:
           enabled:
             - module_event
+            - safer_resource_groups
       - Framework:
           bytecode_version: 6
           git_hash: ~
