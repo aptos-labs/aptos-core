@@ -348,11 +348,12 @@ where
                 Some(mix_per_phase[0].clone())
             };
 
-            let maybe_hotspot_probability = if opt.hotspot_probability >= 0.5 && opt.hotspot_probability < 1.0 {
-                Some(opt.hotspot_probability)
-            } else {
-                None
-            };
+            let maybe_hotspot_probability =
+                if opt.hotspot_probability >= 0.5 && opt.hotspot_probability < 1.0 {
+                    Some(opt.hotspot_probability)
+                } else {
+                    None
+                };
             aptos_executor_benchmark::run_benchmark::<E>(
                 opt.block_size,
                 blocks,

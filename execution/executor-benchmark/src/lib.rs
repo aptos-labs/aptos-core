@@ -601,7 +601,7 @@ mod tests {
             2,     /* transactions per sender */
             0,     /* connected txn groups in a block */
             false, /* shuffle the connected txns in a block */
-            None,
+            None,  /* maybe_hotspot_probability */
             25,    /* num_main_signer_accounts */
             30,    /* num_dst_pool_accounts */
             storage_dir.as_ref(),
