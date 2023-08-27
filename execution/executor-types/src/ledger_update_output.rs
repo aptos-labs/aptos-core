@@ -6,7 +6,7 @@
 use crate::StateComputeResult;
 use anyhow::{ensure, Result};
 use aptos_crypto::{hash::TransactionAccumulatorHasher, HashValue};
-use aptos_storage_interface::{cached_state_view::ShardedStateCache};
+use aptos_storage_interface::cached_state_view::ShardedStateCache;
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
