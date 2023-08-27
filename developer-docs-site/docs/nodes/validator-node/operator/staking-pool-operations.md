@@ -117,6 +117,13 @@ aptos stake withdraw-stake \
   --profile mainnet-owner
 ```
 
+### Update commission
+```bash
+aptos move run --function-id 0x1::staking_contract::update_commision \
+--args address:<operator_address> u64:<commission_percentage> \
+--profile mainnet-owner
+```
+
 ## Perform operator operations
 
 ### 1. Initialize Aptos CLI
