@@ -5,9 +5,7 @@
 use derivative::Derivative;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
-    file_format::{
-        AbilitySet, SignatureToken, StructTypeParameter, TypeParameterIndex,
-    },
+    file_format::{AbilitySet, SignatureToken, StructTypeParameter, TypeParameterIndex},
 };
 use move_core_types::{
     gas_algebra::AbstractMemorySize, identifier::Identifier, language_storage::ModuleId,
@@ -346,6 +344,50 @@ impl Type {
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("VecMutBorrow expects a vector reference".to_string()),
             ),
+        }
+    }
+
+    pub fn abilities(&self) -> PartialVMResult<AbilitySet> {
+        match self {
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::Address => Ok(AbilitySet::PRIMITIVES),
+
+            // Technically unreachable but, no point in erroring if we don't have to
+            Type::Reference(_) | Type::MutableReference(_) => Ok(AbilitySet::REFERENCES),
+            Type::Signer => Ok(AbilitySet::SIGNER),
+
+            Type::TyParam(_) => Err(PartialVMError::new(StatusCode::UNREACHABLE).with_message(
+                "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
+            )),
+
+            Type::Vector(ty) => {
+                AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
+                    ty.abilities()?
+                ])
+            },
+            Type::Struct { ability, .. } => Ok(*ability),
+            Type::StructInstantiation {
+                ty_args,
+                base_ability_set: base_ability,
+                phantom_ty_args_mask: is_phantom_params,
+                ..
+            } => {
+                let type_argument_abilities = ty_args
+                    .iter()
+                    .map(|arg| arg.abilities())
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                AbilitySet::polymorphic_abilities(
+                    *base_ability,
+                    is_phantom_params.iter().copied(),
+                    type_argument_abilities,
+                )
+            },
         }
     }
 }

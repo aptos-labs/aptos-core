@@ -1144,7 +1144,7 @@ impl Frame {
         local_tys: &[Type],
         locals: &Locals,
         _ty_args: &[Type],
-        resolver: &Resolver,
+        _resolver: &Resolver,
         interpreter: &mut Interpreter,
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
@@ -1158,7 +1158,7 @@ impl Frame {
             Bytecode::Ret => {
                 for (idx, ty) in local_tys.iter().enumerate() {
                     if !locals.is_invalid(idx)? {
-                        check_ability(resolver.loader().abilities(ty)?.has_drop())?;
+                        check_ability(ty.abilities()?.has_drop())?;
                     }
                 }
             },
@@ -1171,7 +1171,7 @@ impl Frame {
                 let val_ty = interpreter.operand_stack.pop_ty()?;
                 ty.check_eq(&val_ty)?;
                 if !locals.is_invalid(*idx as usize)? {
-                    check_ability(resolver.loader().abilities(&ty)?.has_drop())?;
+                    check_ability(ty.abilities()?.has_drop())?;
                 }
             },
             // We will check the rest of the instructions after execution phase.
@@ -1270,7 +1270,7 @@ impl Frame {
             },
             Bytecode::Pop => {
                 let ty = interpreter.operand_stack.pop_ty()?;
-                check_ability(resolver.loader().abilities(&ty)?.has_drop())?;
+                check_ability(ty.abilities()?.has_drop())?;
             },
             Bytecode::LdU8(_) => interpreter.operand_stack.push_ty(Type::U8)?,
             Bytecode::LdU16(_) => interpreter.operand_stack.push_ty(Type::U16)?,
@@ -1289,7 +1289,7 @@ impl Frame {
             },
             Bytecode::CopyLoc(idx) => {
                 let ty = local_tys[*idx as usize].clone();
-                check_ability(resolver.loader().abilities(&ty)?.has_copy())?;
+                check_ability(ty.abilities()?.has_copy())?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::MoveLoc(idx) => {
@@ -1349,7 +1349,7 @@ impl Frame {
                 let field_count = resolver.field_count(*idx);
                 let args_ty = resolver.get_struct_fields(*idx)?;
                 let output_ty = resolver.get_struct_type(*idx)?;
-                let ability = resolver.loader().abilities(&output_ty)?;
+                let ability = output_ty.abilities()?;
 
                 // If the struct has a key ability, we expects all of its field to have store ability but not key ability.
                 let field_expected_abilities = if ability.has_key() {
@@ -1375,9 +1375,7 @@ impl Frame {
                 {
                     // Fields ability should be a subset of the struct ability because abilities can be weakened but not the other direction.
                     // For example, it is ok to have a struct that doesn't have a copy capability where its field is a struct that has copy capability but not vice versa.
-                    check_ability(
-                        field_expected_abilities.is_subset(resolver.loader().abilities(&ty)?),
-                    )?;
+                    check_ability(field_expected_abilities.is_subset(ty.abilities()?))?;
                     ty.check_eq(expected_ty)?;
                 }
 
@@ -1387,7 +1385,7 @@ impl Frame {
                 let field_count = resolver.field_instantiation_count(*idx);
                 let args_ty = resolver.instantiate_generic_struct_fields(*idx, ty_args)?;
                 let output_ty = resolver.instantiate_generic_type(*idx, ty_args)?;
-                let ability = resolver.loader().abilities(&output_ty)?;
+                let ability = output_ty.abilities()?;
 
                 // If the struct has a key ability, we expects all of its field to have store ability but not key ability.
                 let field_expected_abilities = if ability.has_key() {
@@ -1413,9 +1411,7 @@ impl Frame {
                 {
                     // Fields ability should be a subset of the struct ability because abilities can be weakened but not the other direction.
                     // For example, it is ok to have a struct that doesn't have a copy capability where its field is a struct that has copy capability but not vice versa.
-                    check_ability(
-                        field_expected_abilities.is_subset(resolver.loader().abilities(&ty)?),
-                    )?;
+                    check_ability(field_expected_abilities.is_subset(ty.abilities()?))?;
                     ty.check_eq(expected_ty)?;
                 }
 
@@ -1442,7 +1438,7 @@ impl Frame {
                 let ref_ty = interpreter.operand_stack.pop_ty()?;
                 match ref_ty {
                     Type::Reference(inner) | Type::MutableReference(inner) => {
-                        check_ability(resolver.loader().abilities(&inner)?.has_copy())?;
+                        check_ability(inner.abilities()?.has_copy())?;
                         interpreter.operand_stack.push_ty(inner.as_ref().clone())?;
                     },
                     _ => {
@@ -1459,7 +1455,7 @@ impl Frame {
                 match ref_ty {
                     Type::MutableReference(inner) => {
                         if *inner == val_ty {
-                            check_ability(resolver.loader().abilities(&inner)?.has_drop())?;
+                            check_ability(inner.abilities()?.has_drop())?;
                         } else {
                             return Err(PartialVMError::new(
                                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -1541,7 +1537,7 @@ impl Frame {
                             ),
                     );
                 }
-                check_ability(resolver.loader().abilities(&lhs)?.has_drop())?;
+                check_ability(lhs.abilities()?.has_drop())?;
                 interpreter.operand_stack.push_ty(Type::Bool)?;
             },
             Bytecode::MutBorrowGlobal(idx) => {
@@ -1550,7 +1546,7 @@ impl Frame {
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
                 let ty = resolver.get_struct_type(*idx)?;
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
                     .push_ty(Type::MutableReference(Box::new(ty)))?;
@@ -1561,7 +1557,7 @@ impl Frame {
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
                 let ty = resolver.get_struct_type(*idx)?;
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
                     .push_ty(Type::Reference(Box::new(ty)))?;
@@ -1572,7 +1568,7 @@ impl Frame {
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
                 let ty = resolver.instantiate_generic_type(*idx, ty_args)?;
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
                     .push_ty(Type::MutableReference(Box::new(ty)))?;
@@ -1583,7 +1579,7 @@ impl Frame {
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
                 let ty = resolver.instantiate_generic_type(*idx, ty_args)?;
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
                     .push_ty(Type::Reference(Box::new(ty)))?;
@@ -1602,7 +1598,7 @@ impl Frame {
                     .pop_ty()?
                     .check_eq(&Type::Reference(Box::new(Type::Signer)))?;
                 ty.check_eq(&resolver.get_struct_type(*idx)?)?;
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                check_ability(ty.abilities()?.has_key())?;
             },
             Bytecode::MoveToGeneric(idx) => {
                 let ty = interpreter.operand_stack.pop_ty()?;
@@ -1611,7 +1607,7 @@ impl Frame {
                     .pop_ty()?
                     .check_eq(&Type::Reference(Box::new(Type::Signer)))?;
                 ty.check_eq(&resolver.instantiate_generic_type(*idx, ty_args)?)?;
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                check_ability(ty.abilities()?.has_key())?;
             },
             Bytecode::MoveFrom(idx) => {
                 interpreter
@@ -1619,7 +1615,7 @@ impl Frame {
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
                 let ty = resolver.get_struct_type(*idx)?;
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                check_ability(ty.abilities()?.has_key())?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::MoveFromGeneric(idx) => {
@@ -1628,7 +1624,7 @@ impl Frame {
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
                 let ty = resolver.instantiate_generic_type(*idx, ty_args)?;
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                check_ability(ty.abilities()?.has_key())?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::FreezeRef => {

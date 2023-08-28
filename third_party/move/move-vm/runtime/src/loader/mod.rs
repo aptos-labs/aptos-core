@@ -40,7 +40,6 @@ mod type_loader;
 
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
 pub(crate) use modules::{Module, ModuleCache};
-
 use type_loader::make_type_internal;
 
 type ScriptHash = [u8; 32];
@@ -1125,7 +1124,7 @@ impl Loader {
             ));
         }
         for (ty, expected_k) in ty_args.iter().zip(constraints) {
-            if !expected_k.is_subset(self.abilities(ty)?) {
+            if !expected_k.is_subset(ty.abilities()?) {
                 return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED));
             }
         }
@@ -1175,50 +1174,6 @@ impl Loader {
         self.module_cache
             .read()
             .resolve_struct_by_name(&name.name, &name.module)
-    }
-
-    pub(crate) fn abilities(&self, ty: &Type) -> PartialVMResult<AbilitySet> {
-        match ty {
-            Type::Bool
-            | Type::U8
-            | Type::U16
-            | Type::U32
-            | Type::U64
-            | Type::U128
-            | Type::U256
-            | Type::Address => Ok(AbilitySet::PRIMITIVES),
-
-            // Technically unreachable but, no point in erroring if we don't have to
-            Type::Reference(_) | Type::MutableReference(_) => Ok(AbilitySet::REFERENCES),
-            Type::Signer => Ok(AbilitySet::SIGNER),
-
-            Type::TyParam(_) => Err(PartialVMError::new(StatusCode::UNREACHABLE).with_message(
-                "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
-            )),
-
-            Type::Vector(ty) => AbilitySet::polymorphic_abilities(
-                AbilitySet::VECTOR,
-                vec![false],
-                vec![self.abilities(ty)?],
-            ),
-            Type::Struct { ability, .. } => Ok(*ability),
-            Type::StructInstantiation {
-                ty_args,
-                base_ability_set: base_ability,
-                phantom_ty_args_mask: is_phantom_params,
-                ..
-            } => {
-                let type_argument_abilities = ty_args
-                    .iter()
-                    .map(|arg| self.abilities(arg))
-                    .collect::<PartialVMResult<Vec<_>>>()?;
-                AbilitySet::polymorphic_abilities(
-                    *base_ability,
-                    is_phantom_params.iter().map(|b| *b),
-                    type_argument_abilities,
-                )
-            },
-        }
     }
 }
 
@@ -1587,12 +1542,12 @@ impl Script {
                 .resolve_struct_by_name(struct_name, &module_id)
                 .map_err(|err| err.finish(Location::Script))?;
             if !struct_handle.abilities.is_subset(struct_.abilities)
-                || &struct_handle
+                || struct_handle
                     .type_parameters
                     .iter()
                     .map(|ty| ty.is_phantom)
                     .collect::<Vec<_>>()
-                    != &struct_.phantom_ty_args_mask
+                    != struct_.phantom_ty_args_mask
             {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
