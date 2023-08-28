@@ -15,6 +15,9 @@ proposals:
       - Framework:
           bytecode_version: 6
           git_hash: ~
+      - FeatureFlag:
+          disabled:
+            - module_event
   - name: enable_block_gas_limit
     metadata:
       title: "Enable Block Gas Limit"
