@@ -117,6 +117,13 @@ aptos stake withdraw-stake \
   --profile mainnet-owner
 ```
 
+### Update commission
+```bash
+aptos move run --function-id 0x1::staking_contract::update_commision \
+--args address:<operator_address> u64:<commission_percentage> \
+--profile mainnet-owner
+```
+
 ## Perform operator operations
 
 ### 1. Initialize Aptos CLI
@@ -301,7 +308,7 @@ aptos stake request-commission \
   --profile mainnet-operator
 ```
 
-If you run the `aptos stake request-commission` command before the end of the the lockup expiration, the command will initiate unlock for any locked commission earned up until that moment in time.
+If you run the `aptos stake request-commission` command before the end of the lockup expiration, the command will initiate unlock for any locked commission earned up until that moment in time.
 
 See example below:
 
@@ -387,4 +394,4 @@ aptos node analyze-validator-performance \
 
 ## Tracking rewards
 
-`DistributeEvent` is emitted when there is a transfer from staking_contract to the operator or staker (owner). Rewards can be tracked either by listening to `DistributeEvent` or by using the [View functon](../../../integration/aptos-apis.md#reading-state-with-the-view-function) to call `staking_contract_amounts`. This will return `accumulated_rewards` and `commission_amount`.
+`DistributeEvent` is emitted when there is a transfer from staking_contract to the operator or staker (owner). Rewards can be tracked either by listening to `DistributeEvent` or by using the [View function](../../../integration/aptos-apis.md#reading-state-with-the-view-function) to call `staking_contract_amounts`. This will return `accumulated_rewards` and `commission_amount`.

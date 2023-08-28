@@ -83,15 +83,15 @@ impl DAGStorage for MockStorage {
     }
 
     fn save_ordered_anchor_id(&self, _node_id: &NodeId) -> anyhow::Result<()> {
-        todo!()
+        Ok(())
     }
 
     fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>> {
-        todo!()
+        Ok(vec![])
     }
 
     fn delete_ordered_anchor_ids(&self, _node_ids: Vec<NodeId>) -> anyhow::Result<()> {
-        todo!()
+        Ok(())
     }
 }
 
@@ -102,7 +102,7 @@ fn setup() -> (Vec<ValidatorSigner>, Arc<EpochState>, Dag, Arc<MockStorage>) {
         verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
-    let dag = Dag::new(epoch_state.clone(), storage.clone());
+    let dag = Dag::new(epoch_state.clone(), storage.clone(), 1);
     (signers, epoch_state, dag, storage)
 }
 
@@ -190,7 +190,7 @@ fn test_dag_recover_from_storage() {
             assert!(dag.add_node(node).is_ok());
         }
     }
-    let new_dag = Dag::new(epoch_state.clone(), storage.clone());
+    let new_dag = Dag::new(epoch_state.clone(), storage.clone(), 1);
 
     for metadata in &metadatas {
         assert!(new_dag.exists(metadata));
@@ -201,7 +201,7 @@ fn test_dag_recover_from_storage() {
         verifier: epoch_state.verifier.clone(),
     });
 
-    let _new_epoch_dag = Dag::new(new_epoch_state, storage.clone());
+    let _new_epoch_dag = Dag::new(new_epoch_state, storage.clone(), 1);
     assert!(storage.certified_node_data.lock().is_empty());
 }
 
@@ -209,7 +209,7 @@ fn test_dag_recover_from_storage() {
 fn test_dag_bitmask() {
     let (signers, epoch_state, mut dag, _) = setup();
 
-    let mut metadatas = vec![];
+    assert_eq!(dag.bitmask(15), DagSnapshotBitmask::new(1, vec![]));
 
     for round in 1..5 {
         let parents = dag
@@ -217,7 +217,6 @@ fn test_dag_bitmask() {
             .unwrap_or_default();
         for signer in &signers[0..3] {
             let node = new_certified_node(round, signer.author(), parents.clone());
-            metadatas.push(node.metadata().clone());
             assert!(dag.add_node(node).is_ok());
         }
     }
@@ -226,12 +225,12 @@ fn test_dag_bitmask() {
         DagSnapshotBitmask::new(1, vec![vec![true, true, true, false]; 4])
     );
 
+    // Populate the fourth author for all rounds
     for round in 1..5 {
         let parents = dag
             .get_strong_links_for_round(round, &epoch_state.verifier)
             .unwrap_or_default();
         let node = new_certified_node(round, signers[3].author(), parents.clone());
-        metadatas.push(node.metadata().clone());
         assert!(dag.add_node(node).is_ok());
     }
     assert_eq!(dag.bitmask(15), DagSnapshotBitmask::new(5, vec![]));
