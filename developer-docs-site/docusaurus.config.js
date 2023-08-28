@@ -167,10 +167,6 @@ const config = {
               to: "tutorials/build-e2e-dapp/e2e-dapp-index",
             },
             {
-              label: "Learn about Indexing",
-              to: "indexer/indexer-landing",
-            },
-            {
               type: "doc",
               label: "Advanced Builder Guides",
               docId: "/category/advanced-builders",
@@ -324,6 +320,14 @@ const config = {
       "@docusaurus/plugin-client-redirects",
       {
         redirects: [
+          {
+            to: "/indexer/indexer-landing",
+            from: "/integration/indexing",
+          },
+          {
+            to: "/indexer/indexer-landing",
+            from: "/nodes/indexer-fullnode",
+          },
           {
             to: "/integration/creating-a-signed-transaction",
             from: "/tutorials/your-first-transaction-sdk",
