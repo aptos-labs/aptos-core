@@ -74,12 +74,13 @@ module aptos_std::smart_vector {
         option::destroy_none(big_vec);
     }
 
-    /// Destroy a table completely when T has `drop`.
+    /// Destroy a vector completely when T has `drop`.
     public fun destroy<T: drop>(v: SmartVector<T>) {
         clear(&mut v);
         destroy_empty(v);
     }
 
+    /// Clear a vector completely when T has `drop`.
     public fun clear<T: drop>(v: &mut SmartVector<T>) {
         v.inline_vec = vector[];
         if (option::is_some(&v.big_vec)) {

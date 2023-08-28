@@ -18,6 +18,7 @@ it tolerates collisions.
 -  [Function `new_with_config`](#0x1_smart_table_new_with_config)
 -  [Function `destroy_empty`](#0x1_smart_table_destroy_empty)
 -  [Function `destroy`](#0x1_smart_table_destroy)
+-  [Function `clear`](#0x1_smart_table_clear)
 -  [Function `add`](#0x1_smart_table_add)
 -  [Function `add_all`](#0x1_smart_table_add_all)
 -  [Function `unzip_entries`](#0x1_smart_table_unzip_entries)
@@ -39,6 +40,7 @@ it tolerates collisions.
     -  [Struct `SmartTable`](#@Specification_1_SmartTable)
     -  [Function `new_with_config`](#@Specification_1_new_with_config)
     -  [Function `destroy`](#@Specification_1_destroy)
+    -  [Function `clear`](#@Specification_1_clear)
     -  [Function `add_all`](#@Specification_1_add_all)
     -  [Function `to_simple_map`](#@Specification_1_to_simple_map)
     -  [Function `split_one_bucket`](#@Specification_1_split_one_bucket)
@@ -361,13 +363,41 @@ Destroy a table completely when V has <code>drop</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_destroy">destroy</a>&lt;K: drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;) {
-    <b>let</b> i = 0;
+    <a href="smart_table.md#0x1_smart_table_clear">clear</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>);
+    <a href="smart_table.md#0x1_smart_table_destroy_empty">destroy_empty</a>(<a href="table.md#0x1_table">table</a>);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_clear"></a>
+
+## Function `clear`
+
+Clear a table completely when T has <code>drop</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_clear">clear</a>&lt;K: drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_clear">clear</a>&lt;K: drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;) {
+    *<a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets, 0) = <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
+    <b>let</b> i = 1;
     <b>while</b> (i &lt; <a href="table.md#0x1_table">table</a>.num_buckets) {
         <a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets, i);
         i = i + 1;
     };
-    <b>let</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a> { buckets, num_buckets: _, level: _, size: _, split_load_threshold: _, target_bucket_size: _ } = <a href="table.md#0x1_table">table</a>;
-    <a href="table_with_length.md#0x1_table_with_length_destroy_empty">table_with_length::destroy_empty</a>(buckets);
+    <a href="table.md#0x1_table">table</a>.num_buckets = 1;
+    <a href="table.md#0x1_table">table</a>.level = 0;
+    <a href="table.md#0x1_table">table</a>.size = 0;
 }
 </code></pre>
 
@@ -1003,7 +1033,7 @@ Update <code>target_bucket_size</code>.
     map_spec_set = spec_set,
     map_spec_del = spec_remove,
     map_spec_len = spec_len,
-    map_spec_has_key = spec_contains;
+map_spec_has_key = spec_contains;
 </code></pre>
 
 
@@ -1030,6 +1060,22 @@ Update <code>target_bucket_size</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_destroy">destroy</a>&lt;K: drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_clear"></a>
+
+### Function `clear`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_clear">clear</a>&lt;K: drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;)
 </code></pre>
 
 
@@ -1083,7 +1129,7 @@ Update <code>target_bucket_size</code>.
 
 
 
-<pre><code><b>pragma</b> verify= <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 
