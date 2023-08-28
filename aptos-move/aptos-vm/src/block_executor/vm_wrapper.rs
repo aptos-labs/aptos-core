@@ -13,6 +13,7 @@ use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use aptos_vm_types::resolver::ResourceGroupResolver;
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
@@ -35,7 +36,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         // Using adapter allows us to fetch those.
         // TODO: with new adapter we can relax trait bounds on S and avoid
         // creating `StorageAdapter` here.
-        let config_storage = StorageAdapter::new(argument);
+        let config_storage = StorageAdapter::<_, ()>::new(argument);
         let vm = AptosVM::new(&config_storage);
 
         // Loading `0x1::account` and its transitive dependency into the code cache.
@@ -48,7 +49,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
 
         let _ = vm.load_module(
             &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            &vm.as_move_resolver(argument),
+            &vm.as_move_resolver::<_, ()>(argument, None),
         );
 
         Self {
@@ -62,16 +63,17 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
-        view: &impl StateView,
+        view: &(impl StateView + ResourceGroupResolver),
         txn: &PreprocessedTransaction,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
+        let storage_adapter = &self.vm.as_move_resolver(view, Some((view, true)));
 
         match self
             .vm
-            .execute_single_transaction(txn, &self.vm.as_move_resolver(view), &log_context)
+            .execute_single_transaction(txn, storage_adapter, &log_context)
         {
             Ok((vm_status, mut vm_output, sender)) => {
                 if materialize_deltas {

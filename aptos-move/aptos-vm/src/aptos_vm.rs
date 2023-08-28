@@ -47,6 +47,7 @@ use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculat
 use aptos_vm_types::{
     change_set::VMChangeSet,
     output::VMOutput,
+    resolver::ResourceGroupResolver,
     storage::{ChangeSetConfigs, StorageGasParameters},
 };
 use fail::fail_point;
@@ -121,7 +122,7 @@ impl AptosVM {
     }
 
     pub fn new_from_state_view(state_view: &impl StateView) -> Self {
-        let config_storage = StorageAdapter::new(state_view);
+        let config_storage = StorageAdapter::<_, ()>::new(state_view);
         Self(AptosVMImpl::new(&config_storage))
     }
 
@@ -253,11 +254,16 @@ impl AptosVM {
         .1
     }
 
-    pub fn as_move_resolver<'a, S>(&self, state_view: &'a S) -> StorageAdapter<'a, S> {
+    pub fn as_move_resolver<'a, S: StateView, R: ResourceGroupResolver>(
+        &self,
+        state_view: &'a S,
+        maybe_resource_group_resolver: Option<(&'a R, bool)>,
+    ) -> StorageAdapter<'a, S, R> {
         StorageAdapter::new_with_cached_config(
             state_view,
             self.0.get_gas_feature_version(),
             self.0.get_features(),
+            maybe_resource_group_resolver,
         )
     }
 
@@ -1079,14 +1085,15 @@ impl AptosVM {
         };
 
         if self.0.get_gas_feature_version() >= 1 {
-            // Create a new session so that the data cache is flushed.
-            // This is to ensure we correctly charge for loading certain resources, even if they
-            // have been previously cached in the prologue.
+            // Create a new session so that the behavior of flushing "data cache" is maintained
+            // backwards-compatibly to when the resolver was actually holding the resource group
+            // cache and additionally charging the group size for gas on the first access.
             //
-            // TODO(Gas): Do this in a better way in the future, perhaps without forcing the data cache to be flushed.
-            // By releasing resource group cache, we start with a fresh slate for resource group
-            // cost accounting.
+            // Now the caching happens differently (in block executor), but the gas charging behavior
+            // is maintained by tracking the first access.
             resolver.release_resource_group_cache();
+
+            // TODO(Gas): Do this in a better way, e.g. without additinal session.
             session = self.0.new_session(resolver, SessionId::txn(txn));
         }
 
@@ -1209,10 +1216,11 @@ impl AptosVM {
             balance,
         )?;
 
-        let resolver = StorageAdapter::new_with_cached_config(
+        let resolver = StorageAdapter::<_, ()>::new_with_cached_config(
             state_view,
             vm.0.get_gas_feature_version(),
             vm.0.get_features(),
+            None,
         );
         let (status, output) =
             vm.execute_user_transaction_impl(&resolver, txn, log_context, &mut gas_meter);
@@ -1394,7 +1402,7 @@ impl AptosVM {
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let (vm_status, vm_output) = simulation_vm.simulate_signed_transaction(
-            &simulation_vm.0.as_move_resolver(state_view),
+            &simulation_vm.0.as_move_resolver::<_, ()>(state_view, None),
             txn,
             &log_context,
         );
@@ -1423,7 +1431,7 @@ impl AptosVM {
                 vm.0.get_storage_gas_parameters(&log_context)?.clone(),
                 gas_budget,
             )));
-        let resolver = vm.as_move_resolver(state_view);
+        let resolver = vm.as_move_resolver::<_, ()>(state_view, None);
         let mut session = vm.new_session(&resolver, SessionId::Void);
 
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
@@ -1601,7 +1609,7 @@ impl VMValidator for AptosVM {
             },
         };
 
-        let resolver = self.as_move_resolver(state_view);
+        let resolver = self.as_move_resolver::<_, ()>(state_view, None);
         let mut session = self.0.new_session(&resolver, SessionId::prologue(&txn));
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,

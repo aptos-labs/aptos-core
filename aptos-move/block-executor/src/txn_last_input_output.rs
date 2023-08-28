@@ -23,20 +23,21 @@ use std::{
     },
 };
 
-type TxnInput<K> = Vec<ReadDescriptor<K>>;
+type TxnInput<T> = Vec<ReadDescriptor<<T as Transaction>::Key, <T as Transaction>::Tag>>;
+
 // When a transaction is committed, the output delta writes must be populated by
 // the WriteOps corresponding to the deltas in the corresponding outputs.
 #[derive(Debug)]
-pub(crate) struct TxnOutput<T: TransactionOutput, E: Debug> {
-    output_status: ExecutionStatus<T, Error<E>>,
+pub(crate) struct TxnOutput<O: TransactionOutput, E: Debug> {
+    output_status: ExecutionStatus<O, Error<E>>,
 }
 
-impl<T: TransactionOutput, E: Debug> TxnOutput<T, E> {
-    pub fn from_output_status(output_status: ExecutionStatus<T, Error<E>>) -> Self {
+impl<O: TransactionOutput, E: Debug> TxnOutput<O, E> {
+    pub fn from_output_status(output_status: ExecutionStatus<O, Error<E>>) -> Self {
         Self { output_status }
     }
 
-    pub fn output_status(&self) -> &ExecutionStatus<T, Error<E>> {
+    pub fn output_status(&self) -> &ExecutionStatus<O, Error<E>> {
         &self.output_status
     }
 }
@@ -56,19 +57,37 @@ enum ReadKind {
     DeltaApplicationFailure,
     /// Module read. TODO: Design a better representation once more meaningfully separated.
     Module,
+    /// Size of a group that was returned to the caller
+    GroupSize(usize),
+    /// Existence query
+    Exists(bool),
 }
 
 #[derive(Clone)]
-pub struct ReadDescriptor<K> {
+pub struct ReadDescriptor<K, T> {
     access_path: K,
-
+    maybe_tag: Option<T>,
     kind: ReadKind,
 }
 
-impl<K: ModulePath> ReadDescriptor<K> {
-    pub fn from_version(access_path: K, txn_idx: TxnIndex, incarnation: Incarnation) -> Self {
+impl<K: ModulePath, T> ReadDescriptor<K, T> {
+    pub fn from_exists(access_path: K, maybe_tag: Option<T>, exists: bool) -> Self {
         Self {
             access_path,
+            maybe_tag,
+            kind: ReadKind::Exists(exists),
+        }
+    }
+
+    pub fn from_version(
+        access_path: K,
+        maybe_tag: Option<T>,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+    ) -> Self {
+        Self {
+            access_path,
+            maybe_tag,
             kind: ReadKind::Version(txn_idx, incarnation),
         }
     }
@@ -76,13 +95,15 @@ impl<K: ModulePath> ReadDescriptor<K> {
     pub fn from_resolved(access_path: K, value: u128) -> Self {
         Self {
             access_path,
+            maybe_tag: None,
             kind: ReadKind::Resolved(value),
         }
     }
 
-    pub fn from_storage(access_path: K) -> Self {
+    pub fn from_storage(access_path: K, maybe_tag: Option<T>) -> Self {
         Self {
             access_path,
+            maybe_tag,
             kind: ReadKind::Storage,
         }
     }
@@ -90,6 +111,7 @@ impl<K: ModulePath> ReadDescriptor<K> {
     pub fn from_module(access_path: K) -> Self {
         Self {
             access_path,
+            maybe_tag: None,
             kind: ReadKind::Module,
         }
     }
@@ -97,7 +119,16 @@ impl<K: ModulePath> ReadDescriptor<K> {
     pub fn from_delta_application_failure(access_path: K) -> Self {
         Self {
             access_path,
+            maybe_tag: None,
             kind: ReadKind::DeltaApplicationFailure,
+        }
+    }
+
+    pub fn from_group_size(access_path: K, group_size: usize) -> Self {
+        Self {
+            access_path,
+            maybe_tag: None,
+            kind: ReadKind::GroupSize(group_size),
         }
     }
 
@@ -107,6 +138,10 @@ impl<K: ModulePath> ReadDescriptor<K> {
 
     pub fn path(&self) -> &K {
         &self.access_path
+    }
+
+    pub fn tag(&self) -> Option<&T> {
+        self.maybe_tag.as_ref()
     }
 
     // Does the read descriptor describe a read from MVHashMap w. a specified version.
@@ -132,10 +167,10 @@ impl<K: ModulePath> ReadDescriptor<K> {
     }
 }
 
-pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
-    inputs: Vec<CachePadded<ArcSwapOption<TxnInput<K>>>>, // txn_idx -> input.
+pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
+    inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input.
 
-    outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<T, E>>>>, // txn_idx -> output.
+    outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<O, E>>>>, // txn_idx -> output.
 
     // Record all writes and reads to access paths corresponding to modules (code) in any
     // (speculative) executions. Used to avoid a potential race with module publishing and
@@ -146,7 +181,9 @@ pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
     module_read_write_intersection: AtomicBool,
 }
 
-impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputOutput<K, T, E> {
+impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
+    TxnLastInputOutput<T, O, E>
+{
     pub fn new(num_txns: TxnIndex) -> Self {
         Self {
             inputs: (0..num_txns)
@@ -192,8 +229,8 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     pub(crate) fn record(
         &self,
         txn_idx: TxnIndex,
-        input: Vec<ReadDescriptor<K>>,
-        output: ExecutionStatus<T, Error<E>>,
+        input: Vec<ReadDescriptor<T::Key, T::Tag>>,
+        output: ExecutionStatus<O, Error<E>>,
     ) -> anyhow::Result<()> {
         let read_modules: Vec<AccessPath> = input
             .iter()
@@ -234,7 +271,10 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         self.module_read_write_intersection.load(Ordering::Acquire)
     }
 
-    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<Vec<ReadDescriptor<K>>>> {
+    pub(crate) fn read_set(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<Arc<Vec<ReadDescriptor<T::Key, T::Tag>>>> {
         self.inputs[txn_idx as usize].load_full()
     }
 
@@ -273,7 +313,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         }
     }
 
-    pub(crate) fn txn_output(&self, txn_idx: TxnIndex) -> Option<Arc<TxnOutput<T, E>>> {
+    pub(crate) fn txn_output(&self, txn_idx: TxnIndex) -> Option<Arc<TxnOutput<O, E>>> {
         self.outputs[txn_idx as usize].load_full()
     }
 
@@ -282,8 +322,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     pub(crate) fn modified_keys(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<impl Iterator<Item = (<<T as TransactionOutput>::Txn as Transaction>::Key, bool)>>
-    {
+    ) -> Option<impl Iterator<Item = (T::Key, bool)>> {
         self.outputs[txn_idx as usize]
             .load_full()
             .and_then(|txn_output| match &txn_output.output_status {
@@ -299,10 +338,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
             })
     }
 
-    pub(crate) fn delta_keys(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Vec<<<T as TransactionOutput>::Txn as Transaction>::Key> {
+    pub(crate) fn delta_keys(&self, txn_idx: TxnIndex) -> Vec<T::Key> {
         self.outputs[txn_idx as usize].load().as_ref().map_or(
             vec![],
             |txn_output| match &txn_output.output_status {
@@ -314,20 +350,15 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         )
     }
 
-    pub(crate) fn events(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Event>> {
+    pub(crate) fn events(&self, txn_idx: TxnIndex) -> Box<dyn Iterator<Item = T::Event>> {
         self.outputs[txn_idx as usize].load().as_ref().map_or(
-            Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Event>()),
+            Box::new(empty::<T::Event>()),
             |txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     let events = t.get_events();
                     Box::new(events.into_iter())
                 },
-                ExecutionStatus::Abort(_) => {
-                    Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Event>())
-                },
+                ExecutionStatus::Abort(_) => Box::new(empty::<T::Event>()),
             },
         )
     }
@@ -337,7 +368,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     pub(crate) fn record_delta_writes(
         &self,
         txn_idx: TxnIndex,
-        delta_writes: Vec<(<<T as TransactionOutput>::Txn as Transaction>::Key, WriteOp)>,
+        delta_writes: Vec<(T::Key, WriteOp)>,
     ) {
         match &self.outputs[txn_idx as usize]
             .load_full()
@@ -353,7 +384,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
 
     // Must be executed after parallel execution is done, grabs outputs. Will panic if
     // other outstanding references to the recorded outputs exist.
-    pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<T, Error<E>> {
+    pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<O, Error<E>> {
         let owning_ptr = self.outputs[txn_idx as usize]
             .swap(None)
             .expect("[BlockSTM]: Output must be recorded after execution");

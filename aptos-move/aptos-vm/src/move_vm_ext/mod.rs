@@ -9,7 +9,7 @@ mod session;
 mod vm;
 
 pub use crate::move_vm_ext::{
-    resolver::{AptosMoveResolver, MoveResolverExt, StateValueMetadataResolver},
+    resolver::{AptosMoveResolver, MoveResolverExt},
     respawned_session::RespawnedSession,
     session::{SessionExt, SessionId},
     vm::{get_max_binary_format_version, verifier_config, MoveVmExt},

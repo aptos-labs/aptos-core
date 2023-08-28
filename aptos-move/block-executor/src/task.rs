@@ -11,6 +11,8 @@ use aptos_types::{
     fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
+use aptos_vm_types::resolver::TResourceGroupResolver;
+use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -29,7 +31,21 @@ pub enum ExecutionStatus<T, E> {
 /// Trait that defines a transaction type that can be executed by the block executor. A transaction
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + Clone + 'static {
-    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
+    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + ModulePath;
+    /// Some keys contain multiple "resources" distinguished by a tag. Reading these keys requires
+    /// specifying a tag, and output requires merging all resources together (Note: this may change
+    /// in the future if write-set format changes to be per-resource, could be more performant).
+    /// Is generic primarily to provide easy plug-in replacement for mock tests and be extensible.
+    type Tag: PartialOrd
+        + Ord
+        + Send
+        + Sync
+        + Clone
+        + Hash
+        + Eq
+        + Debug
+        + DeserializeOwned
+        + Serialize;
     type Value: Send + Sync + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }
@@ -62,7 +78,11 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        view: &(impl TStateView<Key = <Self::Txn as Transaction>::Key>
+              + TResourceGroupResolver<
+            Key = <Self::Txn as Transaction>::Key,
+            Tag = <Self::Txn as Transaction>::Tag,
+        >),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
@@ -74,11 +94,18 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 
-    /// Get the writes of a transaction from its output, separately for resources, modules and
-    /// aggregator_v1.
+    /// Get the writes of a transaction from its output, separately for resources,
+    /// resources within groups, modules and aggregator_v1.
     fn resource_write_set(
         &self,
     ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+
+    fn resource_group_write_set(
+        &self,
+    ) -> HashMap<
+        <Self::Txn as Transaction>::Key,
+        HashMap<<Self::Txn as Transaction>::Tag, <Self::Txn as Transaction>::Value>,
+    >;
 
     fn module_write_set(
         &self,

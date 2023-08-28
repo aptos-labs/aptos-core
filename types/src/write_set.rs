@@ -166,14 +166,30 @@ impl WriteOp {
 }
 
 pub trait TransactionWrite {
+    fn creation_from_bytes(bytes: Vec<u8>) -> Self;
+
+    fn bytes_len(&self) -> usize;
+
     fn extract_raw_bytes(&self) -> Option<Vec<u8>>;
 
     fn as_state_value(&self) -> Option<StateValue>;
+
+    fn as_u128(&self) -> anyhow::Result<Option<u128>>;
+
+    fn is_deletion(&self) -> bool;
 }
 
 impl TransactionWrite for WriteOp {
+    fn creation_from_bytes(bytes: Vec<u8>) -> Self {
+        WriteOp::Creation(bytes)
+    }
+
     fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
         self.clone().into_bytes()
+    }
+
+    fn bytes_len(&self) -> usize {
+        self.bytes().map(|bytes| bytes.len()).unwrap_or(0)
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
@@ -181,6 +197,17 @@ impl TransactionWrite for WriteOp {
             None => StateValue::new_legacy(bytes.to_vec()),
             Some(metadata) => StateValue::new_with_metadata(bytes.to_vec(), metadata.clone()),
         })
+    }
+
+    fn as_u128(&self) -> anyhow::Result<Option<u128>> {
+        match self.bytes() {
+            Some(bytes) => Ok(Some(bcs::from_bytes(bytes)?)),
+            None => Ok(None),
+        }
+    }
+
+    fn is_deletion(&self) -> bool {
+        self.is_deletion()
     }
 }
 

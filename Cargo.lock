@@ -576,6 +576,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "arc-swap",
  "bcs 0.1.4",
  "claims",
@@ -592,6 +593,7 @@ dependencies = [
  "proptest-derive",
  "rand 0.7.3",
  "rayon",
+ "serde 1.0.149",
 ]
 
 [[package]]
@@ -2440,6 +2442,7 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rayon",
+ "serde 1.0.149",
 ]
 
 [[package]]
@@ -3810,6 +3813,7 @@ dependencies = [
  "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
+ "claims",
  "crossbeam-channel",
  "dashmap",
  "fail 0.5.0",

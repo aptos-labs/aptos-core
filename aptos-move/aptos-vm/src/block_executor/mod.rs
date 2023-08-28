@@ -35,15 +35,16 @@ use aptos_types::{
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::output::VMOutput;
-use move_core_types::vm_status::VMStatus;
+use move_core_types::{language_storage::StructTag, vm_status::VMStatus};
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::{collections::HashMap, sync::Arc};
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
-    type Event = ContractEvent;
     type Key = StateKey;
+    type Tag = StructTag;
     type Value = WriteOp;
+    type Event = ContractEvent;
 }
 
 // Wrapper to avoid orphan rule
@@ -97,6 +98,18 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .expect("Output to be set to get writes")
             .change_set()
             .resource_write_set()
+            .clone()
+    }
+
+    /// Should never be called after incorporate_delta_writes, as it
+    /// will consume vm_output to prepare an output with deltas.
+    fn resource_group_write_set(&self) -> HashMap<StateKey, HashMap<StructTag, WriteOp>> {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get writes")
+            .change_set()
+            .resource_group_write_set()
             .clone()
     }
 

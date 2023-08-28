@@ -1,10 +1,11 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::types::{Flag, Incarnation, MVDataError, MVDataOutput, TxnIndex, Version};
-use anyhow::Result;
-use aptos_aggregator::{delta_change_set::DeltaOp, transaction::AggregatorValue};
+use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_types::write_set::TransactionWrite;
+use claims::assert_some;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{collections::btree_map::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
@@ -123,7 +124,10 @@ impl<V: TransactionWrite> VersionedValue<V> {
                 (EntryCell::Write(incarnation, data), Some(accumulator)) => {
                     // Deltas were applied. We must deserialize the value
                     // of the write and apply the aggregated delta accumulator.
-                    return match AggregatorValue::from_write(data.as_ref()) {
+                    return match data
+                        .as_u128()
+                        .expect("Aggregator value must deserialize to u128")
+                    {
                         None => {
                             // Resolve to the write if the WriteOp was deletion
                             // (MoveVM will observe 'deletion'). This takes precedence
@@ -137,7 +141,7 @@ impl<V: TransactionWrite> VersionedValue<V> {
                                 .map_err(|_| DeltaApplicationFailure)
                                 .and_then(|a| {
                                     // Apply accumulated delta to resolve the aggregator value.
-                                    a.apply_to(value.into())
+                                    a.apply_to(value)
                                         .map(|result| Resolved(result))
                                         .map_err(|_| DeltaApplicationFailure)
                                 })
@@ -210,14 +214,15 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         }
     }
 
-    pub(crate) fn set_aggregator_base_value(&self, key: &K, value: u128) {
+    pub fn set_aggregator_base_value(&self, key: &K, value: u128) {
         let mut v = self.values.get_mut(key).expect("Path must exist");
 
         // Record base value. If a value was added by another thread, assert they're equal.
         assert_eq!(*v.aggregator_base_value.get_or_insert(value), value);
     }
 
-    pub(crate) fn add_delta(&self, key: K, txn_idx: TxnIndex, delta: DeltaOp) {
+    /// Add a delta at a specified key.
+    pub fn add_delta(&self, key: K, txn_idx: TxnIndex, delta: DeltaOp) {
         let mut v = self.values.entry(key).or_default();
         v.versioned_map
             .insert(txn_idx, CachePadded::new(Entry::new_delta_from(delta)));
@@ -238,13 +243,13 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
     pub fn delete(&self, key: &K, txn_idx: TxnIndex) {
         // TODO: investigate logical deletion.
         let mut v = self.values.get_mut(key).expect("Path must exist");
-        assert!(
-            v.versioned_map.remove(&txn_idx).is_some(),
-            "Entry must exist to be deleted"
+        assert_some!(
+            v.versioned_map.remove(&txn_idx),
+            "Entry for key / idx must exist to be deleted"
         );
     }
 
-    pub(crate) fn fetch_data(
+    pub fn fetch_data(
         &self,
         key: &K,
         txn_idx: TxnIndex,
@@ -282,7 +287,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
     /// transaction has indeed produced a delta recorded at the given key.
     ///
     /// If the result is Err(op), it means the base value to apply DeltaOp op hadn't been set.
-    pub(crate) fn materialize_delta(&self, key: &K, txn_idx: TxnIndex) -> Result<u128, DeltaOp> {
+    pub fn materialize_delta(&self, key: &K, txn_idx: TxnIndex) -> Result<u128, DeltaOp> {
         let mut v = self.values.get_mut(key).expect("Path must exist");
 
         // +1 makes sure we include the delta from txn_idx.

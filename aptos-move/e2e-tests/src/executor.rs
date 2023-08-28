@@ -723,7 +723,7 @@ impl FakeExecutor {
             timed_features,
         )
         .unwrap();
-        let remote_view = StorageAdapter::new(&self.data_store);
+        let remote_view: StorageAdapter<_, ()> = StorageAdapter::new(&self.data_store);
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
@@ -797,7 +797,7 @@ impl FakeExecutor {
                 }),
             )
             .unwrap();
-            let remote_view = StorageAdapter::new(&self.data_store);
+            let remote_view: StorageAdapter<_, ()> = StorageAdapter::new(&self.data_store);
             let mut session = vm.new_session(&remote_view, SessionId::void());
 
             let fun_name = Self::name(function_name);
@@ -868,7 +868,7 @@ impl FakeExecutor {
                 timed_features,
             )
             .unwrap();
-            let remote_view = StorageAdapter::new(&self.data_store);
+            let remote_view: StorageAdapter<_, ()> = StorageAdapter::new(&self.data_store);
             let mut session = vm.new_session(&remote_view, SessionId::void());
             session
                 .execute_function_bypass_visibility(
@@ -919,7 +919,7 @@ impl FakeExecutor {
             TimedFeatures::enable_all(),
         )
         .unwrap();
-        let remote_view = StorageAdapter::new(&self.data_store);
+        let remote_view: StorageAdapter<_, ()> = StorageAdapter::new(&self.data_store);
         let mut session = vm.new_session(&remote_view, SessionId::void());
         session
             .execute_function_bypass_visibility(

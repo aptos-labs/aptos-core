@@ -15,8 +15,13 @@ use aptos_types::{
     },
     write_set::TransactionWrite,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
-use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
+use aptos_vm_types::{
+    change_set::VMChangeSet, resolver::TResourceGroupResolver, storage::ChangeSetConfigs,
+};
+use move_core_types::{
+    language_storage::StructTag,
+    vm_status::{err_msg, StatusCode, VMStatus},
+};
 
 /// We finish the session after the user transaction is done running to get the change set and
 /// charge gas and storage fee based on it before running storage refunds and the transaction
@@ -27,7 +32,7 @@ pub struct RespawnedSession<'r, 'l> {
     state_view: ChangeSetStateView<'r>,
     #[borrows(state_view)]
     #[covariant]
-    resolver: StorageAdapter<'this, ChangeSetStateView<'r>>,
+    resolver: StorageAdapter<'this, ChangeSetStateView<'r>, ChangeSetStateView<'r>>,
     #[borrows(resolver)]
     #[not_covariant]
     session: Option<SessionExt<'this, 'l>>,
@@ -51,6 +56,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
                     state_view,
                     vm.get_gas_feature_version(),
                     vm.get_features(),
+                    Some((state_view, false)),
                 )
             },
             session_builder: |resolver| Some(vm.new_session(resolver, session_id)),
@@ -96,6 +102,26 @@ struct ChangeSetStateView<'r> {
 impl<'r> ChangeSetStateView<'r> {
     pub fn new(base: &'r dyn StateView, change_set: VMChangeSet) -> Result<Self, VMStatus> {
         Ok(Self { base, change_set })
+    }
+}
+
+impl TResourceGroupResolver for ChangeSetStateView<'_> {
+    type Key = StateKey;
+    type Tag = StructTag;
+
+    fn get_resource_from_group(
+        &self,
+        key: &StateKey,
+        resource_tag: &StructTag,
+        // In respawned session, gas is irrelevant, so we never return group size.
+        _return_group_size: bool,
+    ) -> anyhow::Result<(Option<Vec<u8>>, Option<usize>)> {
+        self.change_set
+            .resource_group_write_set()
+            .get(key)
+            .and_then(|g| g.get(resource_tag))
+            .map(|op| (op.extract_raw_bytes(), None))
+            .ok_or(anyhow::Error::msg("Not resolved via VMChangeSet"))
     }
 }
 

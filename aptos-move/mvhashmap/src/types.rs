@@ -30,6 +30,19 @@ pub enum MVDataError {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub enum MVGroupError {
+    /// The base group contents are not initialized. These are required for groups
+    /// and not for normal resources to save deserialization of group contents.
+    NotInitialized,
+    /// No prior entry is found.
+    NotFound,
+    /// A dependency on other transaction has been found during the read.
+    Dependency(TxnIndex),
+    /// Tag serialization is needed for group size computation
+    TagSerializationError,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum MVModulesError {
     /// No prior entry is found.
     NotFound,

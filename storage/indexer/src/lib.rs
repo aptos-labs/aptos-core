@@ -88,7 +88,7 @@ impl Indexer {
 
     pub fn index_with_annotator(
         &self,
-        annotator: &MoveValueAnnotator<StorageAdapter<DbStateView>>,
+        annotator: &MoveValueAnnotator<StorageAdapter<DbStateView, ()>>,
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
@@ -152,7 +152,7 @@ impl Indexer {
 
 struct TableInfoParser<'a> {
     indexer: &'a Indexer,
-    annotator: &'a MoveValueAnnotator<'a, StorageAdapter<'a, DbStateView>>,
+    annotator: &'a MoveValueAnnotator<'a, StorageAdapter<'a, DbStateView, ()>>,
     result: HashMap<TableHandle, TableInfo>,
     pending_on: HashMap<TableHandle, Vec<&'a [u8]>>,
 }
@@ -160,7 +160,7 @@ struct TableInfoParser<'a> {
 impl<'a> TableInfoParser<'a> {
     pub fn new(
         indexer: &'a Indexer,
-        annotator: &'a MoveValueAnnotator<StorageAdapter<DbStateView>>,
+        annotator: &'a MoveValueAnnotator<StorageAdapter<DbStateView, ()>>,
     ) -> Self {
         Self {
             indexer,

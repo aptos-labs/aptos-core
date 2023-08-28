@@ -28,6 +28,7 @@ use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
+    cell::RefCell,
     collections::HashMap,
     marker::PhantomData,
     sync::{
@@ -70,8 +71,7 @@ enum CommitRole {
 }
 
 pub struct BlockExecutor<T, E, S, L, X> {
-    // number of active concurrent tasks, corresponding
-    // to the maximum number of rayon
+    // number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
     executor_thread_pool: Arc<ThreadPool>,
@@ -113,8 +113,8 @@ where
     fn execute(
         version: Version,
         signature_verified_block: &[T],
-        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
         scheduler: &Scheduler,
         executor: &E,
         base_view: &S,
@@ -160,7 +160,7 @@ where
                 if prev_modified_keys.remove(&k).is_none() {
                     updates_outside = true;
                 }
-                versioned_cache.add_delta(k, idx_to_execute, d);
+                versioned_cache.data().add_delta(k, idx_to_execute, d);
             }
         };
 
@@ -209,8 +209,8 @@ where
     fn validate(
         version_to_validate: Version,
         validation_wave: Wave,
-        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
         scheduler: &Scheduler,
     ) -> SchedulerTask {
         use MVDataError::*;
@@ -223,7 +223,7 @@ where
             .expect("[BlockSTM]: Prior read-set must be recorded");
 
         let valid = read_set.iter().all(|r| {
-            match versioned_cache.fetch_data(r.path(), idx_to_validate) {
+            match versioned_cache.data().fetch_data(r.path(), idx_to_validate) {
                 Ok(Versioned(version, _)) => r.validate_version(version),
                 Ok(Resolved(value)) => r.validate_resolved(value),
                 // Dependency implies a validation failure, and if the original read were to
@@ -274,7 +274,7 @@ where
         post_commit_txs: &Vec<Sender<u32>>,
         worker_idx: &mut usize,
         scheduler_task: &mut SchedulerTask,
-        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         accumulated_fee_statement: &mut FeeStatement,
         txn_fee_statements: &mut Vec<FeeStatement>,
     ) {
@@ -362,8 +362,8 @@ where
     fn worker_commit_hook(
         &self,
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
-        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
     ) {
         let delta_keys = last_input_output.delta_keys(txn_idx);
@@ -381,6 +381,7 @@ where
             // single materialized aggregator. If needed, the contention may be further
             // mitigated by batching consecutive commit_hooks.
             let committed_delta = versioned_cache
+                .data()
                 .materialize_delta(&k, txn_idx)
                 .unwrap_or_else(|op| {
                     // TODO: this logic should improve with the new AGGR data structure
@@ -390,7 +391,9 @@ where
                         .expect("Error reading the base value for committed delta in storage")
                         .expect("No base value for committed delta in storage");
 
-                    versioned_cache.set_aggregator_base_value(&k, storage_value);
+                    versioned_cache
+                        .data()
+                        .set_aggregator_base_value(&k, storage_value);
                     op.apply_to(storage_value)
                         .expect("Materializing delta w. base value set must succeed")
                 });
@@ -418,8 +421,8 @@ where
         &self,
         executor_arguments: &E::Argument,
         block: &[T],
-        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
         base_view: &S,
@@ -623,6 +626,10 @@ where
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
+
+        // Shared throughput different sessions / txn executions for generating IDs via
+        // the view provided to the executor.
+        let shared_view_counter = RefCell::<u32>::new(0);
         let executor = E::init(executor_arguments);
         drop(init_timer);
 
@@ -635,10 +642,7 @@ where
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let unsync_view = LatestView::<T, S, X>::new(
                 base_view,
-                ViewState::Unsync(SequentialState {
-                    unsync_map: &data_map,
-                    _counter: &0,
-                }),
+                ViewState::Unsync(SequentialState::new(&data_map, &shared_view_counter)),
                 idx as TxnIndex,
             );
             let res = executor.execute_transaction(&unsync_view, txn, idx as TxnIndex, true);
@@ -646,9 +650,8 @@ where
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
-                    assert_eq!(
-                        output.aggregator_v1_delta_set().len(),
-                        0,
+                    assert!(
+                        output.aggregator_v1_delta_set().is_empty(),
                         "Sequential execution must materialize deltas"
                     );
                     // Apply the writes.
