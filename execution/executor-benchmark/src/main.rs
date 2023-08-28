@@ -114,6 +114,8 @@ pub struct PipelineOpt {
     partitioner_v2_num_threads: usize,
     #[clap(long, default_value = "64")]
     partitioner_v2_dashmap_num_shards: usize,
+    #[clap(long, default_value = "2.0")]
+    partitioner_v2_load_imbalance_tolerance: f32,
 }
 
 impl PipelineOpt {
@@ -145,7 +147,7 @@ impl PipelineOpt {
                 cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
                 dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
                 partition_last_round: self.use_global_executor,
-                load_imbalance_tolerance: 2.0,
+                load_imbalance_tolerance: self.partitioner_v2_load_imbalance_tolerance,
             }),
             _ => panic!("Unknown partitioner version: {}", self.partitioner_version),
         }
