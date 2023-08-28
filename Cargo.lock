@@ -700,6 +700,7 @@ dependencies = [
  "cfg-if",
  "cfg_block",
  "get_if_addrs",
+ "maplit",
  "mirai-annotations",
  "num_cpus",
  "poem-openapi",
