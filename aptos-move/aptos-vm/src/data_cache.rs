@@ -47,6 +47,7 @@ pub(crate) fn get_resource_group_from_metadata(
 pub struct StorageAdapter<'a, S> {
     state_store: &'a S,
     accurate_byte_count: bool,
+    group_byte_count_as_sum: bool,
     max_binary_format_version: u32,
     resource_group_cache:
         RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
@@ -61,10 +62,14 @@ impl<'a, S> StorageAdapter<'a, S> {
         let mut s = Self {
             state_store,
             accurate_byte_count: false,
+            group_byte_count_as_sum: false,
             max_binary_format_version: 0,
             resource_group_cache: RefCell::new(BTreeMap::new()),
         };
         if gas_feature_version >= 9 {
+            if gas_feature_version >= 11 {
+                s.group_byte_count_as_sum = true;
+            }
             s.accurate_byte_count = true;
         }
         s.max_binary_format_version = get_max_binary_format_version(features, gas_feature_version);
@@ -77,6 +82,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         let mut s = Self {
             state_store,
             accurate_byte_count: false,
+            group_byte_count_as_sum: false,
             max_binary_format_version: 0,
             resource_group_cache: RefCell::new(BTreeMap::new()),
         };
@@ -84,6 +90,9 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         let features = Features::fetch_config(&s).unwrap_or_default();
         if gas_feature_version >= 9 {
             s.accurate_byte_count = true;
+            if gas_feature_version >= 11 {
+                s.group_byte_count_as_sum = true;
+            }
         }
         s.max_binary_format_version = get_max_binary_format_version(&features, gas_feature_version);
         s
@@ -113,17 +122,30 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
                 return Ok((buf, buf_size));
             }
             let group_data = self.get_resource_group_data(address, &resource_group)?;
-            if let Some(group_data) = group_data {
+            if let Some(group_data_blob) = group_data {
+                let common_error = || {
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("Resource group deserialization error".to_string())
+                        .finish(Location::Undefined)
+                };
+
+                let group_data: BTreeMap<StructTag, Vec<u8>> =
+                    bcs::from_bytes(&group_data_blob).map_err(|_| common_error())?;
+
                 let len = if self.accurate_byte_count {
-                    group_data.len()
+                    if self.group_byte_count_as_sum {
+                        group_data.iter().try_fold(0, |len, (tag, res)| {
+                            let delta =
+                                bcs::serialized_size(tag).map_err(|_| common_error())? + res.len();
+                            Ok(len + delta)
+                        })?
+                    } else {
+                        group_data_blob.len()
+                    }
                 } else {
                     0
                 };
-                let group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&group_data)
-                    .map_err(|_| {
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .finish(Location::Undefined)
-                    })?;
+
                 let res = group_data.get(struct_tag).cloned();
                 let res_size = resource_size(&res);
                 cache.insert(resource_group, group_data);
