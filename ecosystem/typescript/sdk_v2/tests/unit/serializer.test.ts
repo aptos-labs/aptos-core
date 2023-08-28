@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { Serializer } from "../../src/bcs/serializer";
+import { Serializable, Serializer } from "../../src/bcs/serializer";
 
 describe("BCS Serializer", () => {
   let serializer: Serializer;
@@ -18,6 +18,10 @@ describe("BCS Serializer", () => {
         0x82, 0xc6, 0x92, 0xe2, 0x88, 0xab,
       ]),
     );
+
+    serializer = new Serializer();
+    serializer.serializeStr("abcd1234");
+    expect(serializer.getBytes()).toEqual(new Uint8Array([8, 0x61, 0x62, 0x63, 0x64, 0x31, 0x32, 0x33, 0x34]));
   });
 
   it("serializes an empty string", () => {
@@ -175,5 +179,70 @@ describe("BCS Serializer", () => {
       serializer = new Serializer();
       serializer.serializeU32AsUleb128(-1);
     }).toThrow("Value is out of range");
+  });
+
+  it("serializes multiple values procedurally", () => {
+    const serializedBytes = serializer
+      .serializeBytes(new Uint8Array([0x41, 0x70, 0x74, 0x6f, 0x73]))
+      .serializeBool(true)
+      .serializeBool(false)
+      .serializeU8(254)
+      .serializeU8(255)
+      .serializeU16(65535)
+      .serializeU16(4660)
+      .serializeU32(4294967295)
+      .serializeU32(305419896)
+      .serializeU64(BigInt("18446744073709551615"))
+      .serializeU64(BigInt("1311768467750121216"))
+      .serializeU128(BigInt("340282366920938463463374607431768211455"))
+      .serializeU128(BigInt("1311768467750121216"))
+      .getBytes();
+    expect(serializedBytes).toEqual(
+      new Uint8Array([
+        5, 0x41, 0x70, 0x74, 0x6f, 0x73, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff, 0x34, 0x12, 0xff, 0xff, 0xff, 0xff, 0x78,
+        0x56, 0x34, 0x12, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xef, 0xcd, 0xab, 0x78, 0x56, 0x34,
+        0x12, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00,
+        0xef, 0xcd, 0xab, 0x78, 0x56, 0x34, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      ]),
+    );
+  });
+
+  it("serializes multiple Serializable values", () => {
+    class MoveStructA implements Serializable {
+      constructor(public name: string, public description: string, public numbers: Array<number>) {}
+
+      serialize(serializer: Serializer): void {
+        serializer.serializeStr(this.name).serializeStr(this.description).serializeBytes(new Uint8Array(this.numbers));
+      }
+    }
+    class MoveStructB implements Serializable {
+      constructor(
+        public moveStructA: MoveStructA,
+        public name: string,
+        public description: string,
+        public numbers: Array<number>,
+      ) {}
+
+      serialize(serializer: Serializer): void {
+        serializer
+          .serialize(this.moveStructA)
+          .serializeStr(this.name)
+          .serializeStr(this.description)
+          .serializeBytes(new Uint8Array(this.numbers));
+      }
+    }
+
+    const moveStructA = new MoveStructA("abc", "123", [1, 2, 3, 4]);
+    const moveStructB = new MoveStructB(moveStructA, "def", "456", [5, 6, 7, 8]);
+
+    // Serialize a string, a u64 number, and a MoveStruct.
+    const serializedBytes = serializer.serialize(moveStructB).getBytes();
+
+    expect(serializedBytes).toEqual(
+      new Uint8Array([
+        3, 0x61, 0x62, 0x63, 3, 0x31, 0x32, 0x33, 4, 0x01, 0x02, 0x03, 0x04, 3, 0x64, 0x65, 0x66, 3, 0x34, 0x35, 0x36,
+        4, 0x05, 0x06, 0x07, 0x08,
+      ]),
+    );
   });
 });
