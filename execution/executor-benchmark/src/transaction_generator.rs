@@ -32,6 +32,7 @@ use std::{
     path::Path,
     sync::{mpsc, Arc},
 };
+use aptos_logger::info;
 
 const META_FILENAME: &str = "metadata.toml";
 pub const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
@@ -275,7 +276,7 @@ impl TransactionGenerator {
         transactions_per_sender: usize,
         connected_tx_grps: usize,
         shuffle_connected_txns: bool,
-        maybe_hotspot_probability: Option<f32>,
+        hotspot_probability: Option<f32>,
     ) {
         assert!(self.block_sender.is_some());
         self.gen_transfer_transactions(
@@ -284,7 +285,7 @@ impl TransactionGenerator {
             transactions_per_sender,
             connected_tx_grps,
             shuffle_connected_txns,
-            maybe_hotspot_probability,
+            hotspot_probability,
         );
     }
 
@@ -469,7 +470,7 @@ impl TransactionGenerator {
         hotspot_probability: f32,
     ) {
         assert!((0.5..1.0).contains(&hotspot_probability));
-        println!("Started generating random transfers with hotspot.");
+        info!("Started generating random transfers with hotspot probability {hotspot_probability}.");
         let num_accounts = self.main_signer_accounts.as_ref().unwrap().len();
         let num_hotspot_accounts =
             ((1.0 - hotspot_probability) * num_accounts as f32).ceil() as usize;
@@ -617,7 +618,7 @@ impl TransactionGenerator {
         transactions_per_sender: usize,
         connected_tx_grps: usize,
         shuffle_connected_txns: bool,
-        maybe_hotspot_probability: Option<f32>,
+        hotspot_probability: Option<f32>,
     ) {
         if connected_tx_grps > 0 {
             self.gen_connected_grps_transfer_transactions(
@@ -626,11 +627,11 @@ impl TransactionGenerator {
                 connected_tx_grps,
                 shuffle_connected_txns,
             );
-        } else if maybe_hotspot_probability.is_some() {
+        } else if hotspot_probability.is_some() {
             self.gen_random_transfers_with_hotspot(
                 block_size,
                 num_blocks,
-                maybe_hotspot_probability.unwrap(),
+                hotspot_probability.unwrap(),
             );
         } else {
             self.gen_random_transfer_transactions(block_size, num_blocks, transactions_per_sender);
