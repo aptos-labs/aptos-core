@@ -190,6 +190,9 @@ struct Opt {
     #[clap(long)]
     shuffle_connected_txns: bool,
 
+    #[clap(long, default_value_t = 0.0)]
+    hotspot_probability: f32,
+
     #[clap(long)]
     concurrency_level: Option<usize>,
 
@@ -346,6 +349,12 @@ where
                 Some(mix_per_phase[0].clone())
             };
 
+            let maybe_hotspot_probability =
+                if opt.hotspot_probability >= 0.5 && opt.hotspot_probability < 1.0 {
+                    Some(opt.hotspot_probability)
+                } else {
+                    None
+                };
             aptos_executor_benchmark::run_benchmark::<E>(
                 opt.block_size,
                 blocks,
@@ -353,6 +362,7 @@ where
                 opt.transactions_per_sender,
                 opt.connected_tx_grps,
                 opt.shuffle_connected_txns,
+                maybe_hotspot_probability,
                 main_signer_accounts,
                 additional_dst_pool_accounts,
                 data_dir,
