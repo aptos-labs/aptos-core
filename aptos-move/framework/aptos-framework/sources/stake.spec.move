@@ -1,7 +1,7 @@
 spec aptos_framework::stake {
     // There's a prover error in function rotate_consensus_key.
     // There's new cycles in function on_new_epoch.
-    // Something wrong in function update_performance_statistics, append and remove_validators, maybe a bug, or because i am vagetable.
+    // Something wrong in function update_performance_statistics, append and remove_validators, maybe a bug
 
     // -----------------
     // Global invariants
@@ -20,6 +20,8 @@ spec aptos_framework::stake {
         apply ValidatorOwnerNoChange to *;
         // property 3: The total staked value in the stake pool should be constant (excluding adding and withdrawing operations).
         apply StakedValueNochange to * except add_stake, add_stake_with_cap, withdraw, withdraw_with_cap, on_new_epoch, update_stake_pool;
+        // ghost var
+        global g_validator_perf: ValidatorPerformance;
     }
 
     spec schema ValidatorOwnerNoChange {
@@ -201,9 +203,11 @@ spec aptos_framework::stake {
         let post post_validator_perf = global<ValidatorPerformance>(@aptos_framework);
         let validator_len = len(validator_perf.validators);
         let cur_proposer_index = option::spec_borrow(proposer_index);
-        let post p_cur_proposer_index = option::spec_borrow(proposer_index);
         ensures option::spec_is_some(proposer_index) && cur_proposer_index < validator_len ==>
-           post_validator_perf.validators[p_cur_proposer_index].successful_proposals == validator_perf.validators[cur_proposer_index].successful_proposals + 1;
+           post_validator_perf.validators[cur_proposer_index].successful_proposals == validator_perf.validators[cur_proposer_index].successful_proposals + 1;
+        invariant (option::spec_is_some(proposer_index) && option::spec_borrow(proposer_index) < validator_len) ==>
+            (validator_perf.validators[option::spec_borrow(proposer_index)].successful_proposals ==
+                g_validator_perf.validators[option::spec_borrow(proposer_index)].successful_proposals + 1);
         ensures forall i in 0..len(failed_proposer_indices): failed_proposer_indices[i] < validator_len ==>
             post_validator_perf.validators[failed_proposer_indices[i]].failed_proposals == validator_perf.validators[failed_proposer_indices[i]].failed_proposals + 1;
     }

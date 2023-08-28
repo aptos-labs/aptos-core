@@ -987,6 +987,10 @@ module aptos_framework::stake {
     public(friend) fun update_performance_statistics(proposer_index: Option<u64>, failed_proposer_indices: vector<u64>) acquires ValidatorPerformance {
         // Validator set cannot change until the end of the epoch, so the validator index in arguments should
         // match with those of the validators in ValidatorPerformance resource.
+        spec {
+            update g_validator_perf = global<ValidatorPerformance>(@aptos_framework);
+        };
+
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
         let validator_len = vector::length(&validator_perf.validators);
 
