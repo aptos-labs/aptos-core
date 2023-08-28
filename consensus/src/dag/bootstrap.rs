@@ -90,7 +90,6 @@ pub fn bootstrap_dag(
         dag.clone(),
         payload_client,
         rb,
-        current_round,
         time_service,
         storage.clone(),
         order_rule,
