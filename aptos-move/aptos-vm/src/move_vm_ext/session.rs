@@ -18,7 +18,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
-    state_store::{state_key::StateKey, state_value::StateValueMetadata, table::TableHandle},
+    state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::SignatureCheckedTransaction,
     write_set::WriteOp,
 };
@@ -365,7 +365,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         for (id, change) in aggregator_change_set.changes {
             let AggregatorID { handle, key } = id;
             let key_bytes = key.0.to_vec();
-            let state_key = StateKey::table_item(TableHandle::from(handle), key_bytes);
+            let state_key = StateKey::table_item(handle, key_bytes);
 
             match change {
                 AggregatorChange::Write(value) => {

@@ -126,7 +126,7 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::delta_change_set::{delta_add, deserialize, serialize};
+    use aptos_aggregator::delta_change_set::{delta_add, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::write_set::WriteOp;
     use aptos_vm_types::check_change_set::CheckChangeSet;
@@ -150,8 +150,7 @@ mod test {
     }
 
     fn read(view: &ChangeSetStateView, s: impl ToString) -> u128 {
-        let bytes = view.get_state_value(&key(s)).unwrap().unwrap().into_bytes();
-        deserialize(&bytes)
+        view.get_state_value_u128(&key(s)).unwrap().unwrap()
     }
 
     #[test]
