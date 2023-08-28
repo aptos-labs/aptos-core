@@ -19,8 +19,7 @@ pub enum AggregatorReadMode {
 ///   - Ok(..)       if aggregator value exists
 ///   - Err(..)      otherwise.
 pub trait AggregatorResolver {
-    /// Returns a value of an aggregator. If `allow_speculative` flag is set,
-    /// the returned value is not guaranteed to be cor
+    /// Returns a value of an aggregator.
     fn resolve_aggregator_value(
         &self,
         id: &AggregatorID,
