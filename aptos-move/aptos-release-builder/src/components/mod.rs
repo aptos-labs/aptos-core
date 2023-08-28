@@ -281,12 +281,25 @@ impl ReleaseEntry {
                         )
                         .await
                 })?;
-                if features.has_modified(on_chain_features.inner()) {
-                    bail!(
-                        "Feature mismatch: Got {:?}, expected {:?}",
-                        on_chain_features.inner(),
-                        features
-                    );
+
+                for to_enable in &features.enabled {
+                    let flag = to_enable.clone().into();
+                    if !on_chain_features.inner().is_enabled(flag) {
+                        bail!(
+                            "Feature flag config mismatch: Expected {:?} to be enabled",
+                            to_enable
+                        );
+                    }
+                }
+
+                for to_disable in &features.disabled {
+                    let flag = to_disable.clone().into();
+                    if on_chain_features.inner().is_enabled(flag) {
+                        bail!(
+                            "Feature flag config mismatch: Expected {:?} to be disabled",
+                            to_disable
+                        );
+                    }
                 }
             },
             ReleaseEntry::Consensus(consensus_config) => {
