@@ -29,6 +29,23 @@
 -  [Function `contains`](#0x1_smart_vector_contains)
 -  [Function `length`](#0x1_smart_vector_length)
 -  [Function `is_empty`](#0x1_smart_vector_is_empty)
+-  [Function `for_each`](#0x1_smart_vector_for_each)
+-  [Function `for_each_reverse`](#0x1_smart_vector_for_each_reverse)
+-  [Function `for_each_ref`](#0x1_smart_vector_for_each_ref)
+-  [Function `for_each_mut`](#0x1_smart_vector_for_each_mut)
+-  [Function `enumerate_ref`](#0x1_smart_vector_enumerate_ref)
+-  [Function `enumerate_mut`](#0x1_smart_vector_enumerate_mut)
+-  [Function `fold`](#0x1_smart_vector_fold)
+-  [Function `foldr`](#0x1_smart_vector_foldr)
+-  [Function `map_ref`](#0x1_smart_vector_map_ref)
+-  [Function `map`](#0x1_smart_vector_map)
+-  [Function `filter`](#0x1_smart_vector_filter)
+-  [Function `zip`](#0x1_smart_vector_zip)
+-  [Function `zip_reverse`](#0x1_smart_vector_zip_reverse)
+-  [Function `zip_ref`](#0x1_smart_vector_zip_ref)
+-  [Function `zip_mut`](#0x1_smart_vector_zip_mut)
+-  [Function `zip_map`](#0x1_smart_vector_zip_map)
+-  [Function `zip_map_ref`](#0x1_smart_vector_zip_map_ref)
 -  [Specification](#@Specification_1)
     -  [Struct `SmartVector`](#@Specification_1_SmartVector)
     -  [Function `empty`](#@Specification_1_empty)
@@ -57,7 +74,7 @@
 
 ## Struct `SmartVector`
 
-A Scalable vector implementation based on tables, elements are grouped into buckets with <code>bucket_size</code>.
+A Scalable vector implementation based on tables, Ts are grouped into buckets with <code>bucket_size</code>.
 The option wrapping BigVector saves space in the metadata associated with BigVector when smart_vector is
 so small that inline_vec vector can hold all the data.
 
@@ -142,6 +159,16 @@ bucket_size cannot be 0
 
 
 <pre><code><b>const</b> <a href="smart_vector.md#0x1_smart_vector_EZERO_BUCKET_SIZE">EZERO_BUCKET_SIZE</a>: u64 = 4;
+</code></pre>
+
+
+
+<a name="0x1_smart_vector_ESMART_VECTORS_LENGTH_MISMATCH"></a>
+
+The length of the smart vectors are not equal.
+
+
+<pre><code><b>const</b> <a href="smart_vector.md#0x1_smart_vector_ESMART_VECTORS_LENGTH_MISMATCH">ESMART_VECTORS_LENGTH_MISMATCH</a>: u64 = 131077;
 </code></pre>
 
 
@@ -242,7 +269,7 @@ When inline_capacity = 0, SmartVector degrades to a wrapper of BigVector.
 
 ## Function `singleton`
 
-Create a vector of length 1 containing the passed in element.
+Create a vector of length 1 containing the passed in T.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_singleton">singleton</a>&lt;T: store&gt;(element: T): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
@@ -352,7 +379,7 @@ Clear a vector completely when T has <code>drop</code>.
 
 ## Function `borrow`
 
-Acquire an immutable reference to the <code>i</code>th element of the vector <code>v</code>.
+Acquire an immutable reference to the <code>i</code>th T of the vector <code>v</code>.
 Aborts if <code>i</code> is out of bounds.
 
 
@@ -384,7 +411,7 @@ Aborts if <code>i</code> is out of bounds.
 
 ## Function `borrow_mut`
 
-Return a mutable reference to the <code>i</code>th element in the vector <code>v</code>.
+Return a mutable reference to the <code>i</code>th T in the vector <code>v</code>.
 Aborts if <code>i</code> is out of bounds.
 
 
@@ -416,7 +443,7 @@ Aborts if <code>i</code> is out of bounds.
 
 ## Function `append`
 
-Empty and destroy the other vector, and push each of the elements in the other vector onto the lhs vector in the
+Empty and destroy the other vector, and push each of the Ts in the other vector onto the lhs vector in the
 same order as they occurred in other.
 Disclaimer: This function may be costly. Use it at your own discretion.
 
@@ -511,7 +538,7 @@ Disclaimer: This function may be costly as the smart vector may be huge in size.
 
 ## Function `push_back`
 
-Add element <code>val</code> to the end of the vector <code>v</code>. It grows the buckets when the current buckets are full.
+Add T <code>val</code> to the end of the vector <code>v</code>. It grows the buckets when the current buckets are full.
 This operation will cost more gas when it adds new bucket.
 
 
@@ -557,7 +584,7 @@ This operation will cost more gas when it adds new bucket.
 
 ## Function `pop_back`
 
-Pop an element from the end of vector <code>v</code>. It does shrink the buckets if they're empty.
+Pop an T from the end of vector <code>v</code>. It does shrink the buckets if they're empty.
 Aborts if <code>v</code> is empty.
 
 
@@ -596,8 +623,8 @@ Aborts if <code>v</code> is empty.
 
 ## Function `remove`
 
-Remove the element at index i in the vector v and return the owned value that was previously stored at i in v.
-All elements occurring at indices greater than i will be shifted down by 1. Will abort if i is out of bounds.
+Remove the T at index i in the vector v and return the owned value that was previously stored at i in v.
+All Ts occurring at indices greater than i will be shifted down by 1. Will abort if i is out of bounds.
 Disclaimer: This function may be costly. Use it at your own discretion.
 
 
@@ -638,8 +665,8 @@ Disclaimer: This function may be costly. Use it at your own discretion.
 
 ## Function `swap_remove`
 
-Swap the <code>i</code>th element of the vector <code>v</code> with the last element and then pop the vector.
-This is O(1), but does not preserve ordering of elements in the vector.
+Swap the <code>i</code>th T of the vector <code>v</code> with the last T and then pop the vector.
+This is O(1), but does not preserve ordering of Ts in the vector.
 Aborts if <code>i</code> is out of bounds.
 
 
@@ -691,7 +718,7 @@ Aborts if <code>i</code> is out of bounds.
 
 ## Function `swap`
 
-Swap the elements at the i'th and j'th indices in the vector v. Will abort if either of i or j are out of bounds
+Swap the Ts at the i'th and j'th indices in the vector v. Will abort if either of i or j are out of bounds
 for v.
 
 
@@ -736,7 +763,7 @@ for v.
 
 ## Function `reverse`
 
-Reverse the order of the elements in the vector v in-place.
+Reverse the order of the Ts in the vector v in-place.
 Disclaimer: This function may be costly. Use it at your own discretion.
 
 
@@ -753,7 +780,7 @@ Disclaimer: This function may be costly. Use it at your own discretion.
     <b>let</b> inline_len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&v.inline_vec);
     <b>let</b> i = 0;
     <b>let</b> new_inline_vec = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    // Push the last `inline_len` elements into a temp <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>.
+    // Push the last `inline_len` Ts into a temp <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>.
     <b>while</b> (i &lt; inline_len) {
         <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> new_inline_vec, <a href="smart_vector.md#0x1_smart_vector_pop_back">pop_back</a>(v));
         i = i + 1;
@@ -773,7 +800,7 @@ Disclaimer: This function may be costly. Use it at your own discretion.
         <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> v.inline_vec, <a href="../../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> new_inline_vec));
     };
     <a href="../../move-stdlib/doc/vector.md#0x1_vector_destroy_empty">vector::destroy_empty</a>(new_inline_vec);
-    // Push the rest elements originally left in inline_vector back <b>to</b> the end of the smart <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>.
+    // Push the rest Ts originally left in inline_vector back <b>to</b> the end of the smart <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>.
     <b>while</b> (!<a href="../../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&<b>mut</b> temp_vec)) {
         <a href="smart_vector.md#0x1_smart_vector_push_back">push_back</a>(v, <a href="../../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> temp_vec));
     };
@@ -881,7 +908,7 @@ Return the length of the vector.
 
 ## Function `is_empty`
 
-Return <code><b>true</b></code> if the vector <code>v</code> has no elements and <code><b>false</b></code> otherwise.
+Return <code><b>true</b></code> if the vector <code>v</code> has no Ts and <code><b>false</b></code> otherwise.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_is_empty">is_empty</a>&lt;T&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;): bool
@@ -895,6 +922,552 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_is_empty">is_empty</a>&lt;T&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;): bool {
     <a href="smart_vector.md#0x1_smart_vector_length">length</a>(v) == 0
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_for_each"></a>
+
+## Function `for_each`
+
+Apply the function to each T in the vector, consuming it.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each">for_each</a>&lt;T: store&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |T|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each">for_each</a>&lt;T: store&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;, f: |T|) {
+    aptos_std::smart_vector::reverse(&<b>mut</b> v); // We need <b>to</b> reverse the <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a> <b>to</b> consume it efficiently
+    aptos_std::smart_vector::for_each_reverse(v, |e| f(e));
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_for_each_reverse"></a>
+
+## Function `for_each_reverse`
+
+Apply the function to each T in the vector, consuming it.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each_reverse">for_each_reverse</a>&lt;T&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |T|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each_reverse">for_each_reverse</a>&lt;T&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;, f: |T|) {
+    <b>let</b> len = aptos_std::smart_vector::length(&v);
+    <b>while</b> (len &gt; 0) {
+        f(aptos_std::smart_vector::pop_back(&<b>mut</b> v));
+        len = len - 1;
+    };
+    aptos_std::smart_vector::destroy_empty(v)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_for_each_ref"></a>
+
+## Function `for_each_ref`
+
+Apply the function to a reference of each T in the vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each_ref">for_each_ref</a>&lt;T&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |&T|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each_ref">for_each_ref</a>&lt;T&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;, f: |&T|) {
+    <b>let</b> i = 0;
+    <b>let</b> len = aptos_std::smart_vector::length(v);
+    <b>while</b> (i &lt; len) {
+        f(aptos_std::smart_vector::borrow(v, i));
+        i = i + 1
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_for_each_mut"></a>
+
+## Function `for_each_mut`
+
+Apply the function to a mutable reference to each T in the vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each_mut">for_each_mut</a>&lt;T&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |&<b>mut</b> T|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each_mut">for_each_mut</a>&lt;T&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;, f: |&<b>mut</b> T|) {
+    <b>let</b> i = 0;
+    <b>let</b> len = aptos_std::smart_vector::length(v);
+    <b>while</b> (i &lt; len) {
+        f(aptos_std::smart_vector::borrow_mut(v, i));
+        i = i + 1
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_enumerate_ref"></a>
+
+## Function `enumerate_ref`
+
+Apply the function to a reference of each T in the vector with its index.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_enumerate_ref">enumerate_ref</a>&lt;T&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |(u64, &T)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_enumerate_ref">enumerate_ref</a>&lt;T&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;, f: |u64, &T|) {
+    <b>let</b> i = 0;
+    <b>let</b> len = aptos_std::smart_vector::length(v);
+    <b>while</b> (i &lt; len) {
+        f(i, aptos_std::smart_vector::borrow(v, i));
+        i = i + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_enumerate_mut"></a>
+
+## Function `enumerate_mut`
+
+Apply the function to a mutable reference of each T in the vector with its index.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_enumerate_mut">enumerate_mut</a>&lt;T&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |(u64, &<b>mut</b> T)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_enumerate_mut">enumerate_mut</a>&lt;T&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;, f: |u64, &<b>mut</b> T|) {
+    <b>let</b> i = 0;
+    <b>let</b> len = <a href="smart_vector.md#0x1_smart_vector_length">length</a>(v);
+    <b>while</b> (i &lt; len) {
+        f(i, <a href="smart_vector.md#0x1_smart_vector_borrow_mut">borrow_mut</a>(v, i));
+        i = i + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_fold"></a>
+
+## Function `fold`
+
+Fold the function over the Ts. For example, <code><a href="smart_vector.md#0x1_smart_vector_fold">fold</a>(<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1,2,3], 0, f)</code> will execute
+<code>f(f(f(0, 1), 2), 3)</code>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_fold">fold</a>&lt;Accumulator, T: store&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, init: Accumulator, f: |(Accumulator, T)|Accumulator): Accumulator
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_fold">fold</a>&lt;Accumulator, T: store&gt;(
+    v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;,
+    init: Accumulator,
+    f: |Accumulator, T|Accumulator
+): Accumulator {
+    <b>let</b> accu = init;
+    aptos_std::smart_vector::for_each(v, |elem| accu = f(accu, elem));
+    accu
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_foldr"></a>
+
+## Function `foldr`
+
+Fold right like fold above but working right to left. For example, <code><a href="smart_vector.md#0x1_smart_vector_fold">fold</a>(<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1,2,3], 0, f)</code> will execute
+<code>f(1, f(2, f(3, 0)))</code>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_foldr">foldr</a>&lt;Accumulator, T&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, init: Accumulator, f: |(T, Accumulator)|Accumulator): Accumulator
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_foldr">foldr</a>&lt;Accumulator, T&gt;(
+    v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;,
+    init: Accumulator,
+    f: |T, Accumulator|Accumulator
+): Accumulator {
+    <b>let</b> accu = init;
+    aptos_std::smart_vector::for_each_reverse(v, |elem| accu = f(elem, accu));
+    accu
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_map_ref"></a>
+
+## Function `map_ref`
+
+Map the function over the references of the Ts of the vector, producing a new vector without modifying the
+original vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_map_ref">map_ref</a>&lt;T1, T2: store&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, f: |&T1|T2): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_map_ref">map_ref</a>&lt;T1, T2: store&gt;(
+    v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;,
+    f: |&T1|T2
+): <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T2&gt; {
+    <b>let</b> result = aptos_std::smart_vector::new&lt;T2&gt;();
+    aptos_std::smart_vector::for_each_ref(v, |elem| aptos_std::smart_vector::push_back(&<b>mut</b> result, f(elem)));
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_map"></a>
+
+## Function `map`
+
+Map the function over the Ts of the vector, producing a new vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_map">map</a>&lt;T1: store, T2: store&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, f: |T1|T2): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_map">map</a>&lt;T1: store, T2: store&gt;(
+    v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;,
+    f: |T1|T2
+): <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T2&gt; {
+    <b>let</b> result = aptos_std::smart_vector::new&lt;T2&gt;();
+    aptos_std::smart_vector::for_each(v, |elem| <a href="smart_vector.md#0x1_smart_vector_push_back">push_back</a>(&<b>mut</b> result, f(elem)));
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_filter"></a>
+
+## Function `filter`
+
+Filter the vector using the boolean function, removing all Ts for which <code>p(e)</code> is not true.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_filter">filter</a>&lt;T: drop, store&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, p: |&T|bool): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_filter">filter</a>&lt;T: store + drop&gt;(
+    v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;,
+    p: |&T|bool
+): <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt; {
+    <b>let</b> result = aptos_std::smart_vector::new&lt;T&gt;();
+    aptos_std::smart_vector::for_each(v, |elem| {
+        <b>if</b> (p(&elem)) aptos_std::smart_vector::push_back(&<b>mut</b> result, elem);
+    });
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_zip"></a>
+
+## Function `zip`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip">zip</a>&lt;T1: store, T2: store&gt;(v1: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, v2: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;, f: |(T1, T2)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip">zip</a>&lt;T1: store, T2: store&gt;(v1: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;, v2: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T2&gt;, f: |T1, T2|) {
+    // We need <b>to</b> reverse the vectors <b>to</b> consume it efficiently
+    aptos_std::smart_vector::reverse(&<b>mut</b> v1);
+    aptos_std::smart_vector::reverse(&<b>mut</b> v2);
+    aptos_std::smart_vector::zip_reverse(v1, v2, |e1, e2| f(e1, e2));
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_zip_reverse"></a>
+
+## Function `zip_reverse`
+
+Apply the function to each pair of elements in the two given vectors in the reverse order, consuming them.
+This errors out if the vectors are not of the same length.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_reverse">zip_reverse</a>&lt;T1, T2&gt;(v1: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, v2: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;, f: |(T1, T2)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_reverse">zip_reverse</a>&lt;T1, T2&gt;(
+    v1: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;,
+    v2: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T2&gt;,
+    f: |T1, T2|,
+) {
+    <b>let</b> len = aptos_std::smart_vector::length(&v1);
+    // We can't <b>use</b> the constant <a href="smart_vector.md#0x1_smart_vector_ESMART_VECTORS_LENGTH_MISMATCH">ESMART_VECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(len == aptos_std::smart_vector::length(&v2), 0x20005);
+    <b>while</b> (len &gt; 0) {
+        f(aptos_std::smart_vector::pop_back(&<b>mut</b> v1), aptos_std::smart_vector::pop_back(&<b>mut</b> v2));
+        len = len - 1;
+    };
+    aptos_std::smart_vector::destroy_empty(v1);
+    aptos_std::smart_vector::destroy_empty(v2);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_zip_ref"></a>
+
+## Function `zip_ref`
+
+Apply the function to the references of each pair of elements in the two given vectors.
+This errors out if the vectors are not of the same length.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_ref">zip_ref</a>&lt;T1, T2&gt;(v1: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, v2: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;, f: |(&T1, &T2)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_ref">zip_ref</a>&lt;T1, T2&gt;(
+    v1: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;,
+    v2: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T2&gt;,
+    f: |&T1, &T2|,
+) {
+    <b>let</b> len = aptos_std::smart_vector::length(v1);
+    // We can't <b>use</b> the constant <a href="smart_vector.md#0x1_smart_vector_ESMART_VECTORS_LENGTH_MISMATCH">ESMART_VECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(len == aptos_std::smart_vector::length(v2), 0x20005);
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; len) {
+        f(aptos_std::smart_vector::borrow(v1, i), aptos_std::smart_vector::borrow(v2, i));
+        i = i + 1
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_zip_mut"></a>
+
+## Function `zip_mut`
+
+Apply the function to mutable references to each pair of elements in the two given vectors.
+This errors out if the vectors are not of the same length.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_mut">zip_mut</a>&lt;T1, T2&gt;(v1: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, v2: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;, f: |(&<b>mut</b> T1, &<b>mut</b> T2)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_mut">zip_mut</a>&lt;T1, T2&gt;(
+    v1: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;,
+    v2: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T2&gt;,
+    f: |&<b>mut</b> T1, &<b>mut</b> T2|,
+) {
+    <b>let</b> i = 0;
+    <b>let</b> len = aptos_std::smart_vector::length(v1);
+    // We can't <b>use</b> the constant <a href="smart_vector.md#0x1_smart_vector_ESMART_VECTORS_LENGTH_MISMATCH">ESMART_VECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(len == aptos_std::smart_vector::length(v2), 0x20005);
+    <b>while</b> (i &lt; len) {
+        f(aptos_std::smart_vector::borrow_mut(v1, i), aptos_std::smart_vector::borrow_mut(v2, i));
+        i = i + 1
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_zip_map"></a>
+
+## Function `zip_map`
+
+Map the function over the element pairs of the two vectors, producing a new vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_map">zip_map</a>&lt;T1: store, T2: store, NewT: store&gt;(v1: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, v2: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;, f: |(T1, T2)|NewT): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;NewT&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_map">zip_map</a>&lt;T1: store, T2: store, NewT: store&gt;(
+    v1: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;,
+    v2: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T2&gt;,
+    f: |T1, T2|NewT
+): <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;NewT&gt; {
+    // We can't <b>use</b> the constant <a href="smart_vector.md#0x1_smart_vector_ESMART_VECTORS_LENGTH_MISMATCH">ESMART_VECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(aptos_std::smart_vector::length(&v1) == aptos_std::smart_vector::length(&v2), 0x20005);
+
+    <b>let</b> result = aptos_std::smart_vector::new&lt;NewT&gt;();
+    aptos_std::smart_vector::zip(v1, v2, |e1, e2| <a href="smart_vector.md#0x1_smart_vector_push_back">push_back</a>(&<b>mut</b> result, f(e1, e2)));
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_zip_map_ref"></a>
+
+## Function `zip_map_ref`
+
+Map the function over the references of the element pairs of two vectors, producing a new vector from the return
+values without modifying the original vectors.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_map_ref">zip_map_ref</a>&lt;T1, T2, NewT: store&gt;(v1: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, v2: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;, f: |(&T1, &T2)|NewT): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;NewT&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_map_ref">zip_map_ref</a>&lt;T1, T2, NewT: store&gt;(
+    v1: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;,
+    v2: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T2&gt;,
+    f: |&T1, &T2|NewT
+): <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;NewT&gt; {
+    // We can't <b>use</b> the constant <a href="smart_vector.md#0x1_smart_vector_ESMART_VECTORS_LENGTH_MISMATCH">ESMART_VECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(aptos_std::smart_vector::length(v1) == aptos_std::smart_vector::length(v2), 0x20005);
+
+    <b>let</b> result = aptos_std::smart_vector::new&lt;NewT&gt;();
+    aptos_std::smart_vector::zip_ref(v1, v2, |e1, e2| <a href="smart_vector.md#0x1_smart_vector_push_back">push_back</a>(&<b>mut</b> result, f(e1, e2)));
+    result
 }
 </code></pre>
 

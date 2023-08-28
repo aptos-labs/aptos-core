@@ -64,6 +64,26 @@ spec aptos_std::smart_table {
         pragma verify = false;
     }
 
+    spec borrow_kv<K, V>(e: &Entry<K, V>): (&K, &V) {
+        pragma verify = false;
+    }
+
+    spec borrow_kv_mut<K, V>(e: &mut Entry<K, V>): (&mut K, &mut V) {
+        pragma verify = false;
+    }
+
+    spec num_buckets<K, V>(table: &SmartTable<K, V>): u64 {
+        pragma verify = false;
+    }
+
+    spec borrow_buckets<K, V>(table: &SmartTable<K, V>): &TableWithLength<u64, vector<Entry<K, V>>> {
+        pragma verify = false;
+    }
+
+    spec borrow_buckets_mut<K, V>(table: &mut SmartTable<K, V>): &mut TableWithLength<u64, vector<Entry<K, V>>> {
+        pragma verify = false;
+    }
+
     // Specification functions for tables
     spec native fun spec_len<K, V>(t: SmartTable<K, V>): num;
     spec native fun spec_contains<K, V>(t: SmartTable<K, V>, k: K): bool;

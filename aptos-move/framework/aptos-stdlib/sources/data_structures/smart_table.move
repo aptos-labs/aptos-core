@@ -337,6 +337,86 @@ module aptos_std::smart_table {
         table.target_bucket_size = target_bucket_size;
     }
 
+    /// Apply the function to a reference of each key-value pair in the table.
+    public inline fun for_each_ref<K, V>(table: &SmartTable<K, V>, f: |&K, &V|) {
+        let i = 0;
+        while (i < aptos_std::smart_table::num_buckets(table)) {
+            vector::for_each_ref(
+                aptos_std::table_with_length::borrow(aptos_std::smart_table::borrow_buckets(table), i),
+                |elem| {
+                    let (key, value) = aptos_std::smart_table::borrow_kv(elem);
+                    f(key, value)
+                }
+            );
+            i = i + 1;
+        }
+    }
+
+    /// Apply the function to a mutable reference of each key-value pair in the table.
+    public inline fun for_each_mut<K, V>(table: &mut SmartTable<K, V>, f: |&K, &mut V|) {
+        let i = 0;
+        while (i < aptos_std::smart_table::num_buckets(table)) {
+            vector::for_each_mut(
+                table_with_length::borrow_mut(aptos_std::smart_table::borrow_buckets_mut(table), i),
+                |elem| {
+                    let (key, value) = aptos_std::smart_table::borrow_kv_mut(elem);
+                    f(key, value)
+                }
+            );
+            i = i + 1;
+        };
+    }
+
+    /// Map the function over the references of key-value pairs in the table without modifying it.
+    public inline fun map_ref<K: copy + drop + store, V1, V2: store>(
+        table: &SmartTable<K, V1>,
+        f: |&V1|V2
+    ): SmartTable<K, V2> {
+        let new_table = new<K, V2>();
+        for_each_ref(table, |key, value| add(&mut new_table, *key, f(value)));
+        new_table
+    }
+
+    /// Return true if any key-value pair in the table satisfies the predicate.
+    public inline fun any<K, V>(
+        table: &SmartTable<K, V>,
+        p: |&K, &V|bool
+    ): bool {
+        let found = false;
+        let i = 0;
+        while (i < aptos_std::smart_table::num_buckets(table)) {
+            found = vector::any(table_with_length::borrow(aptos_std::smart_table::borrow_buckets(table), i), |elem| {
+                let (key, value) = aptos_std::smart_table::borrow_kv(elem);
+                p(key, value)
+            });
+            if (found) break;
+            i = i + 1;
+        };
+        found
+    }
+
+    // Helper functions to circumvent the scope issue of inline functions.
+    public fun borrow_kv<K, V>(e: &Entry<K, V>): (&K, &V) {
+        (&e.key, &e.value)
+    }
+
+    public fun borrow_kv_mut<K, V>(e: &mut Entry<K, V>): (&mut K, &mut V) {
+        (&mut e.key, &mut e.value)
+    }
+
+    public fun num_buckets<K, V>(table: &SmartTable<K, V>): u64 {
+        table.num_buckets
+    }
+
+    public fun borrow_buckets<K, V>(table: &SmartTable<K, V>): &TableWithLength<u64, vector<Entry<K, V>>> {
+        &table.buckets
+    }
+
+    public fun borrow_buckets_mut<K, V>(table: &mut SmartTable<K, V>): &mut TableWithLength<u64, vector<Entry<K, V>>> {
+        &mut table.buckets
+    }
+
+
     #[test]
     fun smart_table_test() {
         let table = new();

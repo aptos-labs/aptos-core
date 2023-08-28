@@ -36,6 +36,15 @@ it tolerates collisions.
 -  [Function `load_factor`](#0x1_smart_table_load_factor)
 -  [Function `update_split_load_threshold`](#0x1_smart_table_update_split_load_threshold)
 -  [Function `update_target_bucket_size`](#0x1_smart_table_update_target_bucket_size)
+-  [Function `for_each_ref`](#0x1_smart_table_for_each_ref)
+-  [Function `for_each_mut`](#0x1_smart_table_for_each_mut)
+-  [Function `map_ref`](#0x1_smart_table_map_ref)
+-  [Function `any`](#0x1_smart_table_any)
+-  [Function `borrow_kv`](#0x1_smart_table_borrow_kv)
+-  [Function `borrow_kv_mut`](#0x1_smart_table_borrow_kv_mut)
+-  [Function `num_buckets`](#0x1_smart_table_num_buckets)
+-  [Function `borrow_buckets`](#0x1_smart_table_borrow_buckets)
+-  [Function `borrow_buckets_mut`](#0x1_smart_table_borrow_buckets_mut)
 -  [Specification](#@Specification_1)
     -  [Struct `SmartTable`](#@Specification_1_SmartTable)
     -  [Function `new_with_config`](#@Specification_1_new_with_config)
@@ -49,6 +58,11 @@ it tolerates collisions.
     -  [Function `load_factor`](#@Specification_1_load_factor)
     -  [Function `update_split_load_threshold`](#@Specification_1_update_split_load_threshold)
     -  [Function `update_target_bucket_size`](#@Specification_1_update_target_bucket_size)
+    -  [Function `borrow_kv`](#@Specification_1_borrow_kv)
+    -  [Function `borrow_kv_mut`](#@Specification_1_borrow_kv_mut)
+    -  [Function `num_buckets`](#@Specification_1_num_buckets)
+    -  [Function `borrow_buckets`](#@Specification_1_borrow_buckets)
+    -  [Function `borrow_buckets_mut`](#@Specification_1_borrow_buckets_mut)
 
 
 <pre><code><b>use</b> <a href="hash.md#0x1_aptos_hash">0x1::aptos_hash</a>;
@@ -962,6 +976,264 @@ Update <code>target_bucket_size</code>.
 
 </details>
 
+<a name="0x1_smart_table_for_each_ref"></a>
+
+## Function `for_each_ref`
+
+Apply the function to a reference of each key-value pair in the table.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_ref">for_each_ref</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, f: |(&K, &V)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_ref">for_each_ref</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, f: |&K, &V|) {
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; aptos_std::smart_table::num_buckets(<a href="table.md#0x1_table">table</a>)) {
+        <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(
+            aptos_std::table_with_length::borrow(aptos_std::smart_table::borrow_buckets(<a href="table.md#0x1_table">table</a>), i),
+            |elem| {
+                <b>let</b> (key, value) = aptos_std::smart_table::borrow_kv(elem);
+                f(key, value)
+            }
+        );
+        i = i + 1;
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_for_each_mut"></a>
+
+## Function `for_each_mut`
+
+Apply the function to a mutable reference of each key-value pair in the table.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_mut">for_each_mut</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, f: |(&K, &<b>mut</b> V)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_mut">for_each_mut</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, f: |&K, &<b>mut</b> V|) {
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; aptos_std::smart_table::num_buckets(<a href="table.md#0x1_table">table</a>)) {
+        <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each_mut">vector::for_each_mut</a>(
+            <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(aptos_std::smart_table::borrow_buckets_mut(<a href="table.md#0x1_table">table</a>), i),
+            |elem| {
+                <b>let</b> (key, value) = aptos_std::smart_table::borrow_kv_mut(elem);
+                f(key, value)
+            }
+        );
+        i = i + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_map_ref"></a>
+
+## Function `map_ref`
+
+Map the function over the references of key-value pairs in the table without modifying it.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_map_ref">map_ref</a>&lt;K: <b>copy</b>, drop, store, V1, V2: store&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V1&gt;, f: |&V1|V2): <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V2&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_map_ref">map_ref</a>&lt;K: <b>copy</b> + drop + store, V1, V2: store&gt;(
+    <a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V1&gt;,
+    f: |&V1|V2
+): <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V2&gt; {
+    <b>let</b> new_table = <a href="smart_table.md#0x1_smart_table_new">new</a>&lt;K, V2&gt;();
+    <a href="smart_table.md#0x1_smart_table_for_each_ref">for_each_ref</a>(<a href="table.md#0x1_table">table</a>, |key, value| <a href="smart_table.md#0x1_smart_table_add">add</a>(&<b>mut</b> new_table, *key, f(value)));
+    new_table
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_any"></a>
+
+## Function `any`
+
+Return true if any key-value pair in the table satisfies the predicate.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any">any</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, p: |(&K, &V)|bool): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="any.md#0x1_any">any</a>&lt;K, V&gt;(
+    <a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;,
+    p: |&K, &V|bool
+): bool {
+    <b>let</b> found = <b>false</b>;
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; aptos_std::smart_table::num_buckets(<a href="table.md#0x1_table">table</a>)) {
+        found = <a href="../../move-stdlib/doc/vector.md#0x1_vector_any">vector::any</a>(<a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(aptos_std::smart_table::borrow_buckets(<a href="table.md#0x1_table">table</a>), i), |elem| {
+            <b>let</b> (key, value) = aptos_std::smart_table::borrow_kv(elem);
+            p(key, value)
+        });
+        <b>if</b> (found) <b>break</b>;
+        i = i + 1;
+    };
+    found
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_borrow_kv"></a>
+
+## Function `borrow_kv`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_kv">borrow_kv</a>&lt;K, V&gt;(e: &<a href="smart_table.md#0x1_smart_table_Entry">smart_table::Entry</a>&lt;K, V&gt;): (&K, &V)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_kv">borrow_kv</a>&lt;K, V&gt;(e: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt;): (&K, &V) {
+    (&e.key, &e.value)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_borrow_kv_mut"></a>
+
+## Function `borrow_kv_mut`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_kv_mut">borrow_kv_mut</a>&lt;K, V&gt;(e: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_Entry">smart_table::Entry</a>&lt;K, V&gt;): (&<b>mut</b> K, &<b>mut</b> V)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_kv_mut">borrow_kv_mut</a>&lt;K, V&gt;(e: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt;): (&<b>mut</b> K, &<b>mut</b> V) {
+    (&<b>mut</b> e.key, &<b>mut</b> e.value)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_num_buckets"></a>
+
+## Function `num_buckets`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_num_buckets">num_buckets</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_num_buckets">num_buckets</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;): u64 {
+    <a href="table.md#0x1_table">table</a>.num_buckets
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_borrow_buckets"></a>
+
+## Function `borrow_buckets`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_buckets">borrow_buckets</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;): &<a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;u64, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="smart_table.md#0x1_smart_table_Entry">smart_table::Entry</a>&lt;K, V&gt;&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_buckets">borrow_buckets</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;): &TableWithLength&lt;u64, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt;&gt;&gt; {
+    &<a href="table.md#0x1_table">table</a>.buckets
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_table_borrow_buckets_mut"></a>
+
+## Function `borrow_buckets_mut`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_buckets_mut">borrow_buckets_mut</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;): &<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;u64, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="smart_table.md#0x1_smart_table_Entry">smart_table::Entry</a>&lt;K, V&gt;&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_buckets_mut">borrow_buckets_mut</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;): &<b>mut</b> TableWithLength&lt;u64, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt;&gt;&gt; {
+    &<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="@Specification_1"></a>
 
 ## Specification
@@ -1204,6 +1476,86 @@ map_spec_has_key = spec_contains;
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_update_target_bucket_size">update_target_bucket_size</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, target_bucket_size: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_borrow_kv"></a>
+
+### Function `borrow_kv`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_kv">borrow_kv</a>&lt;K, V&gt;(e: &<a href="smart_table.md#0x1_smart_table_Entry">smart_table::Entry</a>&lt;K, V&gt;): (&K, &V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_borrow_kv_mut"></a>
+
+### Function `borrow_kv_mut`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_kv_mut">borrow_kv_mut</a>&lt;K, V&gt;(e: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_Entry">smart_table::Entry</a>&lt;K, V&gt;): (&<b>mut</b> K, &<b>mut</b> V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_num_buckets"></a>
+
+### Function `num_buckets`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_num_buckets">num_buckets</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_borrow_buckets"></a>
+
+### Function `borrow_buckets`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_buckets">borrow_buckets</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;): &<a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;u64, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="smart_table.md#0x1_smart_table_Entry">smart_table::Entry</a>&lt;K, V&gt;&gt;&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_borrow_buckets_mut"></a>
+
+### Function `borrow_buckets_mut`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_buckets_mut">borrow_buckets_mut</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;): &<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;u64, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="smart_table.md#0x1_smart_table_Entry">smart_table::Entry</a>&lt;K, V&gt;&gt;&gt;
 </code></pre>
 
 
