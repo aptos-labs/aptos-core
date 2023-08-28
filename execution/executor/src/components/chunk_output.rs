@@ -19,6 +19,7 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
     contract_event::ContractEvent,
+    epoch_state::EpochState,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
 use aptos_vm::{
@@ -159,7 +160,7 @@ impl ChunkOutput {
         self,
         parent_state: &StateDelta,
         append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> Result<(StateDelta, StateCheckpointOutput)> {
+    ) -> Result<(StateDelta, Option<EpochState>, StateCheckpointOutput)> {
         fail_point!("executor::into_state_checkpoint_output", |_| {
             Err(anyhow::anyhow!(
                 "Injected error in into_state_checkpoint_output."

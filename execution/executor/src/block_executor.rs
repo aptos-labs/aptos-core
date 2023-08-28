@@ -211,42 +211,58 @@ where
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
             "execute_block"
         );
-        let state_view = {
-            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                .with_label_values(&["verified_state_view"])
-                .start_timer();
-            info!("next_version: {}", parent_output.next_version());
-            CachedStateView::new(
-                StateViewId::BlockExecution { block_id },
-                Arc::clone(&self.db.reader),
-                parent_output.next_version(),
-                parent_output.state().current.clone(),
-                Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
-            )?
-        };
+        let committed_block_id = self.committed_block_id();
+        let (state, epoch_state, state_checkpoint_output) =
+            if parent_block_id != committed_block_id && parent_output.has_reconfiguration() {
+                info!(
+                    LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+                    "reconfig_descendant_block_received"
+                );
+                (
+                    parent_output.state().clone(),
+                    parent_output.epoch_state().clone(),
+                    StateCheckpointOutput::default(),
+                )
+            } else {
+                let state_view = {
+                    let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                        .with_label_values(&["verified_state_view"])
+                        .start_timer();
+                    info!("next_version: {}", parent_output.next_version());
+                    CachedStateView::new(
+                        StateViewId::BlockExecution { block_id },
+                        Arc::clone(&self.db.reader),
+                        parent_output.next_version(),
+                        parent_output.state().current.clone(),
+                        Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
+                    )?
+                };
 
-        let chunk_output = {
-            let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
-            fail_point!("executor::vm_execute_block", |_| {
-                Err(Error::from(anyhow::anyhow!(
-                    "Injected error in vm_execute_block"
-                )))
-            });
-            V::execute_transaction_block(transactions, state_view, maybe_block_gas_limit)?
-        };
+                let chunk_output = {
+                    let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
+                    fail_point!("executor::vm_execute_block", |_| {
+                        Err(Error::from(anyhow::anyhow!(
+                            "Injected error in vm_execute_block"
+                        )))
+                    });
+                    V::execute_transaction_block(transactions, state_view, maybe_block_gas_limit)?
+                };
 
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-            .with_label_values(&["state_checkpoint"])
-            .start_timer();
+                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                    .with_label_values(&["state_checkpoint"])
+                    .start_timer();
 
-        let (state, state_checkpoint_output) = chunk_output.into_state_checkpoint_output(
-            parent_output.state(),
-            maybe_block_gas_limit.map(|_| block_id),
+                chunk_output.into_state_checkpoint_output(
+                    parent_output.state(),
+                    maybe_block_gas_limit.map(|_| block_id),
+                )?
+            };
+
+        let _ = self.block_tree.add_block(
+            parent_block_id,
+            block_id,
+            ExecutionOutput::new(state, epoch_state),
         )?;
-
-        let _ =
-            self.block_tree
-                .add_block(parent_block_id, block_id, ExecutionOutput::new(state))?;
         Ok(state_checkpoint_output)
     }
 
@@ -276,29 +292,38 @@ where
             return Ok(current_output
                 .output
                 .get_ledger_update()
-                .as_state_compute_result(parent_accumulator));
+                .as_state_compute_result(
+                    parent_accumulator,
+                    current_output.output.epoch_state().clone(),
+                ));
         }
 
-        let output = if parent_block_id != committed_block_id && parent_output.has_reconfiguration()
-        {
-            info!(
-                LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
-                "reconfig_descendant_block_received"
-            );
-            parent_output.reconfig_suffix()
-        } else {
-            let (output, _, _) = ApplyChunkOutput::calculate_ledger_update(
-                state_checkpoint_output,
-                parent_accumulator.clone(),
-            )?;
-            output
-        };
-        output.ensure_ends_with_state_checkpoint()?;
+        let output =
+            if parent_block_id != committed_block_id && parent_block.output.has_reconfiguration() {
+                info!(
+                    LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+                    "reconfig_descendant_block_received"
+                );
+                parent_output.reconfig_suffix()
+            } else {
+                let (output, _, _) = ApplyChunkOutput::calculate_ledger_update(
+                    state_checkpoint_output,
+                    parent_accumulator.clone(),
+                )?;
+                output
+            };
+
+        if !current_output.output.has_reconfiguration() {
+            output.ensure_ends_with_state_checkpoint()?;
+        }
 
         let _timer = APTOS_EXECUTOR_LEDGER_UPDATE_OTHER_SECONDS
             .with_label_values(&["as_state_compute_result"])
             .start_timer();
-        let state_compute_result = output.as_state_compute_result(parent_accumulator);
+        let state_compute_result = output.as_state_compute_result(
+            parent_accumulator,
+            current_output.output.epoch_state().clone(),
+        );
         current_output.output.set_ledger_update(output);
         Ok(state_compute_result)
     }

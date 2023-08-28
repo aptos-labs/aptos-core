@@ -231,6 +231,7 @@ impl BlockTree {
 
         let output = ExecutionOutput::new_with_ledger_update(
             ledger_view.state().clone(),
+            None,
             LedgerUpdateOutput::new_empty(ledger_view.txn_accumulator().clone()),
         );
 
@@ -256,6 +257,7 @@ impl BlockTree {
             );
             let output = ExecutionOutput::new_with_ledger_update(
                 last_committed_block.output.state().clone(),
+                None,
                 LedgerUpdateOutput::new_empty(
                     last_committed_block
                         .output

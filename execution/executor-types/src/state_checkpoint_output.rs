@@ -7,11 +7,11 @@ use crate::ParsedTransactionOutput;
 use aptos_crypto::HashValue;
 use aptos_storage_interface::cached_state_view::ShardedStateCache;
 use aptos_types::{
-    epoch_state::EpochState,
     state_store::ShardedStateUpdates,
     transaction::{Transaction, TransactionStatus},
 };
 
+#[derive(Default)]
 pub struct TransactionsByStatus {
     statuses: Vec<TransactionStatus>,
     to_keep: Vec<(Transaction, ParsedTransactionOutput)>,
@@ -54,11 +54,11 @@ impl TransactionsByStatus {
     }
 }
 
+#[derive(Default)]
 pub struct StateCheckpointOutput {
     txns: TransactionsByStatus,
     state_updates_vec: Vec<ShardedStateUpdates>,
     state_checkpoint_hashes: Vec<Option<HashValue>>,
-    next_epoch_state: Option<EpochState>,
     block_state_updates: ShardedStateUpdates,
     sharded_state_cache: ShardedStateCache,
 }
@@ -68,7 +68,6 @@ impl StateCheckpointOutput {
         txns: TransactionsByStatus,
         state_updates_vec: Vec<ShardedStateUpdates>,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
-        next_epoch_state: Option<EpochState>,
         block_state_updates: ShardedStateUpdates,
         sharded_state_cache: ShardedStateCache,
     ) -> Self {
@@ -76,7 +75,6 @@ impl StateCheckpointOutput {
             txns,
             state_updates_vec,
             state_checkpoint_hashes,
-            next_epoch_state,
             block_state_updates,
             sharded_state_cache,
         }
@@ -92,7 +90,6 @@ impl StateCheckpointOutput {
         TransactionsByStatus,
         Vec<ShardedStateUpdates>,
         Vec<Option<HashValue>>,
-        Option<EpochState>,
         ShardedStateUpdates,
         ShardedStateCache,
     ) {
@@ -100,7 +97,6 @@ impl StateCheckpointOutput {
             self.txns,
             self.state_updates_vec,
             self.state_checkpoint_hashes,
-            self.next_epoch_state,
             self.block_state_updates,
             self.sharded_state_cache,
         )

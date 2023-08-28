@@ -5,31 +5,45 @@
 
 use crate::LedgerUpdateOutput;
 use aptos_storage_interface::state_delta::StateDelta;
+use aptos_types::epoch_state::EpochState;
 use once_cell::sync::OnceCell;
 
 pub struct ExecutionOutput {
     state: StateDelta,
+    /// If set, this is the new epoch info that should be changed to if this is committed.
+    next_epoch_state: Option<EpochState>,
     ledger_update_output: OnceCell<LedgerUpdateOutput>,
 }
 
 impl ExecutionOutput {
-    pub fn new(state: StateDelta) -> Self {
+    pub fn new(state: StateDelta, next_epoch_state: Option<EpochState>) -> Self {
         Self {
             state,
+            next_epoch_state,
             ledger_update_output: OnceCell::new(),
         }
     }
 
     pub fn new_with_ledger_update(
         state: StateDelta,
+        next_epoch_state: Option<EpochState>,
         ledger_update_output: LedgerUpdateOutput,
     ) -> Self {
         let ledger_update = OnceCell::new();
         ledger_update.set(ledger_update_output).unwrap();
         Self {
             state,
+            next_epoch_state,
             ledger_update_output: ledger_update,
         }
+    }
+
+    pub fn epoch_state(&self) -> &Option<EpochState> {
+        &self.next_epoch_state
+    }
+
+    pub fn has_reconfiguration(&self) -> bool {
+        self.next_epoch_state.is_some()
     }
 
     pub fn has_ledger_update(&self) -> bool {

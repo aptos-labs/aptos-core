@@ -40,6 +40,7 @@ fn empty_block() -> ExecutionOutput {
     let result_view = ExecutedTrees::new_empty();
     ExecutionOutput::new_with_ledger_update(
         result_view.state().clone(),
+        None,
         LedgerUpdateOutput::new_empty(ExecutedTrees::new_empty().txn_accumulator().clone()),
     )
 }

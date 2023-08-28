@@ -24,6 +24,7 @@ use aptos_logger::error;
 use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
 use aptos_types::{
     contract_event::ContractEvent,
+    epoch_state::EpochState,
     proof::accumulator::InMemoryAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue, ShardedStateUpdates},
     transaction::{
@@ -46,7 +47,7 @@ impl ApplyChunkOutput {
         chunk_output: ChunkOutput,
         parent_state: &StateDelta,
         append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> Result<(StateDelta, StateCheckpointOutput)> {
+    ) -> Result<(StateDelta, Option<EpochState>, StateCheckpointOutput)> {
         let ChunkOutput {
             state_cache,
             transactions,
@@ -89,11 +90,11 @@ impl ApplyChunkOutput {
 
         Ok((
             result_state,
+            next_epoch_state,
             StateCheckpointOutput::new(
                 TransactionsByStatus::new(status, to_keep, to_discard, to_retry),
                 state_updates_vec,
                 state_checkpoint_hashes,
-                next_epoch_state,
                 block_state_updates,
                 sharded_state_cache,
             ),
@@ -108,7 +109,6 @@ impl ApplyChunkOutput {
             txns,
             state_updates_vec,
             state_checkpoint_hashes,
-            next_epoch_state,
             block_state_updates,
             sharded_state_cache,
         ) = state_checkpoint_output.into_inner();
@@ -131,7 +131,6 @@ impl ApplyChunkOutput {
             LedgerUpdateOutput {
                 status,
                 to_commit,
-                next_epoch_state,
                 reconfig_events,
                 transaction_info_hashes,
                 block_state_updates,

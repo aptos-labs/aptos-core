@@ -20,8 +20,6 @@ use std::sync::Arc;
 pub struct LedgerUpdateOutput {
     pub status: Vec<TransactionStatus>,
     pub to_commit: Vec<Arc<TransactionToCommit>>,
-    /// If set, this is the new epoch info that should be changed to if this is committed.
-    pub next_epoch_state: Option<EpochState>,
     pub reconfig_events: Vec<ContractEvent>,
     pub transaction_info_hashes: Vec<HashValue>,
     pub block_state_updates: ShardedStateUpdates,
@@ -42,9 +40,8 @@ impl LedgerUpdateOutput {
     }
 
     pub fn reconfig_suffix(&self) -> Self {
-        assert!(self.next_epoch_state.is_some());
         Self {
-            next_epoch_state: self.next_epoch_state.clone(),
+            transaction_accumulator: Arc::clone(&self.transaction_accumulator),
             ..Default::default()
         }
     }
@@ -57,21 +54,16 @@ impl LedgerUpdateOutput {
         self.to_commit.iter().map(Arc::clone).collect()
     }
 
-    pub fn has_reconfiguration(&self) -> bool {
-        self.next_epoch_state.is_some()
-    }
-
     /// Ensure that every block committed by consensus ends with a state checkpoint. That can be
     /// one of the two cases: 1. a reconfiguration (txns in the proposed block after the txn caused
     /// the reconfiguration will be retried) 2. a Transaction::StateCheckpoint at the end of the
     /// block.
     pub fn ensure_ends_with_state_checkpoint(&self) -> Result<()> {
         ensure!(
-            self.next_epoch_state.is_some()
-                || self.to_commit.last().map_or(true, |txn| matches!(
-                    txn.transaction(),
-                    Transaction::StateCheckpoint(_)
-                )),
+            self.to_commit.last().map_or(true, |txn| matches!(
+                txn.transaction(),
+                Transaction::StateCheckpoint(_)
+            )),
             "Block not ending with a state checkpoint.",
         );
         Ok(())
@@ -80,6 +72,7 @@ impl LedgerUpdateOutput {
     pub fn as_state_compute_result(
         &self,
         parent_accumulator: &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
+        next_epoch_state: Option<EpochState>,
     ) -> StateComputeResult {
         let txn_accu = self.txn_accumulator();
 
@@ -89,7 +82,7 @@ impl LedgerUpdateOutput {
             txn_accu.num_leaves(),
             parent_accumulator.frozen_subtree_roots().clone(),
             parent_accumulator.num_leaves(),
-            self.next_epoch_state.clone(),
+            next_epoch_state,
             self.status.clone(),
             self.transaction_info_hashes.clone(),
             self.reconfig_events.clone(),
