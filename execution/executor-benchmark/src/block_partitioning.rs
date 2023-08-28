@@ -46,9 +46,9 @@ impl BlockPartitioningStage {
                 let last_txn = txns.pop().unwrap();
                 let analyzed_transactions = txns.into_iter().map(|t| t.into()).collect();
                 let timer = TIMER.with_label_values(&["partition"]).start_timer();
-                timer.stop_and_record();
                 let mut partitioned_txns =
                     partitioner.partition(analyzed_transactions, self.num_executor_shards);
+                timer.stop_and_record();
                 partitioned_txns.add_checkpoint_txn(last_txn);
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(partitioned_txns))
             },
