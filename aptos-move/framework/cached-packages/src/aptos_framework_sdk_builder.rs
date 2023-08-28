@@ -839,6 +839,11 @@ pub enum EntryFunctionCall {
         contract_addresses: Vec<AccountAddress>,
     },
 
+    VestingUpdateCommissionPercentage {
+        contract_address: AccountAddress,
+        new_commission_percentage: u64,
+    },
+
     VestingUpdateOperator {
         contract_address: AccountAddress,
         new_operator: AccountAddress,
@@ -1370,6 +1375,10 @@ impl EntryFunctionCall {
             VestingUnlockRewardsMany { contract_addresses } => {
                 vesting_unlock_rewards_many(contract_addresses)
             },
+            VestingUpdateCommissionPercentage {
+                contract_address,
+                new_commission_percentage,
+            } => vesting_update_commission_percentage(contract_address, new_commission_percentage),
             VestingUpdateOperator {
                 contract_address,
                 new_operator,
@@ -3790,6 +3799,27 @@ pub fn vesting_unlock_rewards_many(contract_addresses: Vec<AccountAddress>) -> T
     ))
 }
 
+pub fn vesting_update_commission_percentage(
+    contract_address: AccountAddress,
+    new_commission_percentage: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("update_commission_percentage").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&contract_address).unwrap(),
+            bcs::to_bytes(&new_commission_percentage).unwrap(),
+        ],
+    ))
+}
+
 pub fn vesting_update_operator(
     contract_address: AccountAddress,
     new_operator: AccountAddress,
@@ -5258,6 +5288,19 @@ mod decoder {
         }
     }
 
+    pub fn vesting_update_commission_percentage(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingUpdateCommissionPercentage {
+                contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                new_commission_percentage: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn vesting_update_operator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingUpdateOperator {
@@ -5763,6 +5806,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "vesting_unlock_rewards_many".to_string(),
             Box::new(decoder::vesting_unlock_rewards_many),
+        );
+        map.insert(
+            "vesting_update_commission_percentage".to_string(),
+            Box::new(decoder::vesting_update_commission_percentage),
         );
         map.insert(
             "vesting_update_operator".to_string(),
