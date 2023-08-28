@@ -67,8 +67,8 @@ impl TDAGNetworkSender for MockNetworkSender {
     }
 }
 
-#[test]
-fn test_certified_node_handler() {
+#[tokio::test]
+async fn test_certified_node_handler() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
@@ -115,7 +115,6 @@ fn test_certified_node_handler() {
         dag,
         Arc::new(MockPayloadManager::new(None)),
         rb,
-        1,
         time_service,
         storage,
         order_rule,
