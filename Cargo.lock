@@ -8926,6 +8926,7 @@ dependencies = [
  "fail 0.4.0",
  "hex-literal",
  "invalid-mutations",
+ "log",
  "move-binary-format",
  "move-borrow-graph",
  "move-core-types",

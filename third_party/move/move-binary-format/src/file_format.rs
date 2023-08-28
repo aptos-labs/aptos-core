@@ -2054,6 +2054,52 @@ impl CompiledModule {
     pub fn self_id(&self) -> ModuleId {
         self.module_id_for_handle(self.self_handle())
     }
+
+    pub fn find_function_handle(
+        &self,
+        module_id: &ModuleId,
+        function: &IdentStr,
+    ) -> Vec<FunctionHandle> {
+        let mut handles = vec![];
+        if let Some(addr_idx) = self
+            .address_identifiers
+            .iter()
+            .position(|addr| addr == module_id.address())
+        {
+            if let Some(module_name_idx) = self
+                .identifiers
+                .iter()
+                .position(|ident| ident.as_ref() == module_id.name())
+            {
+                if let Some(function_name_idx) = self
+                    .identifiers
+                    .iter()
+                    .position(|ident| ident.as_ref() == function)
+                {
+                    let module_handle = ModuleHandle {
+                        address: AddressIdentifierIndex(addr_idx as u16),
+                        name: IdentifierIndex(module_name_idx as u16),
+                    };
+                    if let Some(module_idx) = self
+                        .module_handles
+                        .iter()
+                        .position(|handle| handle == &module_handle)
+                    {
+                        let module_handle_idx = ModuleHandleIndex(module_idx as u16);
+                        for handle in &self.function_handles {
+                            if handle.module == module_handle_idx
+                                && handle.name == IdentifierIndex(function_name_idx as u16)
+                            {
+                                handles.push(handle.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        handles
+    }
 }
 
 /// Return the simplest module that will pass the bounds checker

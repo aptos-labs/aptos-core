@@ -16,7 +16,10 @@ use move_binary_format::{
     errors::{Location, PartialVMError, VMResult},
     file_format::{CompiledModule, CompiledScript},
 };
-use move_core_types::{state::VMState, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, ident_str, language_storage::ModuleId, state::VMState,
+    vm_status::StatusCode,
+};
 use std::time::Instant;
 
 #[derive(Debug, Clone)]
@@ -112,6 +115,16 @@ pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModul
         RecursiveStructDefChecker::verify_module(module)?;
         InstantiationLoopChecker::verify_module(module)?;
         CodeUnitVerifier::verify_module(config, module)?;
+
+        if !module
+            .find_function_handle(
+                &ModuleId::new(AccountAddress::ONE, ident_str!("coin").to_owned()),
+                ident_str!("supply"),
+            )
+            .is_empty()
+        {
+            log::error!("called coin::supply() from {}", module.self_id())
+        }
 
         // Add the failpoint injection to test the catch_unwind behavior.
         fail::fail_point!("verifier-failpoint-panic");
