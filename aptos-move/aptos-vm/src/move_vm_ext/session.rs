@@ -362,7 +362,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
         }
 
-        for (id, change) in aggregator_change_set.changes {
+        for (id, change) in aggregator_change_set.aggregator_v1_changes {
             match id {
                 // Process Aggregator V1.
                 AggregatorID::Legacy { handle, key } => {
@@ -370,19 +370,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     let state_key = StateKey::table_item(TableHandle::from(handle), key_bytes);
 
                     match change {
-                        AggregatorChange::State {
-                            max_value,
-                            state,
-                        } => {
-                            match state {
-                                AggregatorState::Data { value } => {
-                                    let write_op = woc.convert_aggregator_mod(&state_key, value)?;
-                                    aggregator_v1_write_set.insert(state_key, write_op);
-                                },
-                                AggregatorState::Delta { .. } => {
-                                    aggregator_v1_delta_set.insert(state_key, change);
-                                }
-                            }
+                        AggregatorChange::Write(value) => {
+                            let write_op = woc.convert_aggregator_mod(&state_key, value)?;
+                            aggregator_v1_write_set.insert(state_key, write_op);
+                        },
+                        AggregatorChange::Merge(delta_op) => {
+                            aggregator_v1_delta_set.insert(state_key, delta_op);
                         },
                         AggregatorChange::Delete => {
                             let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
@@ -392,9 +385,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 },
                 // Process Aggregator V2.
                 AggregatorID::Ephemeral(_) => {
-                    aggregator_v2_change_set.insert(id, change);
+                    unreachable!("Aggregator V1 change set should contain only Legacy AggregatorIDs")
                 },
             }
+        }
+
+        for (id, change) in aggregator_change_set.aggregator_v2_changes {
+            assert!(id.is_ephemeral(), "Aggregator V1 should not be in the V2 change set.");
+            aggregator_v2_change_set.insert(id, change);
         }
 
         VMChangeSet::new(

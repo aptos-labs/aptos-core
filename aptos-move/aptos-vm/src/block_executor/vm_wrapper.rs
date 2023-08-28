@@ -77,8 +77,11 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                 if materialize_deltas {
                     // TODO: Integrate aggregator v2.
                     vm_output = vm_output
-                        .try_materialize(view)
+                        .try_materialize_aggregator_v1_delta_set(view)
                         .expect("Delta materialization failed");
+                    vm_output = vm_output
+                        .try_materialize_aggregator_v2_changes(view)
+                        .expect("Aggregator change materialization failed");
                 }
 
                 if vm_output.status().is_discarded() {

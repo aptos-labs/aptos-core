@@ -367,8 +367,10 @@ where
         base_view: &S,
     ) {
         let delta_keys = last_input_output.delta_keys(txn_idx);
+        let aggregator_ephemeral_keys = last_input_output.aggregator_ephemeral_keys(txn_idx);
         let _events = last_input_output.events(txn_idx);
         let mut delta_writes = Vec::with_capacity(delta_keys.len());
+        let mut aggregator_changes = Vec::with_capacity(aggregator_ephemeral_keys.len());
         for k in delta_keys.into_iter() {
             // Note that delta materialization happens concurrently, but under concurrent
             // commit_hooks (which may be dispatched by the coordinator), threads may end up
@@ -399,6 +401,18 @@ where
             delta_writes.push((k, WriteOp::Modification(serialize(&committed_delta))));
         }
         last_input_output.record_delta_writes(txn_idx, delta_writes);
+        
+        for k in aggregator_ephemeral_keys.iter() {
+            let aggregator_value = versioned_cache
+                .materialize_aggregator_value(&k, txn_idx)
+                .unwrap_or_else(|op| {
+
+                });
+            aggregator_changes.push((k, aggregator_value));
+        }
+        last_input_output.record_aggregator_changes(txn_idx, aggregator_changes);
+        // Parse through the write set and apply the aggregator changes.
+        
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             let txn_output = last_input_output.txn_output(txn_idx).unwrap();
             let execution_status = txn_output.output_status();

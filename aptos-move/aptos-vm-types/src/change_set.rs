@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::check_change_set::CheckChangeSet;
-use aptos_aggregator::{delta_change_set::{deserialize, serialize, DeltaOp, AggregatorChange}, aggregator_extension::AggregatorID};
+use aptos_aggregator::{delta_change_set::{deserialize, serialize, DeltaOp, AggregatorChange}, aggregator_extension::AggregatorID, aggregator_change_set::AggregatorChange};
 use aptos_state_view::StateView;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -214,7 +214,7 @@ impl VMChangeSet {
         } = self;
 
         let into_write =
-            |(state_key, aggregator_change): (StateKey, AggregatorChange)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
+            |(state_key, aggregator_change): (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
                 let write = aggregator_change.try_into_write_op(state_view, &state_key)?;
                 Ok((state_key, write))
             };
@@ -231,6 +231,38 @@ impl VMChangeSet {
             module_write_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set: HashMap::new(),
+            aggregator_v2_change_set,
+            events,
+        })
+    }
+
+    pub fn try_materialize_aggregator_v2_changes(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
+        let Self {
+            resource_write_set,
+            module_write_set,
+            mut aggregator_v1_write_set,
+            aggregator_v1_delta_set,
+            aggregator_v2_change_set,
+            events,
+        } = self;
+
+        let materialize_aggregator =
+            |(aggregator_id, aggregator_change): (AggregatorID, AggregatorChange)| -> anyhow::Result<(AggregatorID, AggregatorChange), VMStatus> {
+                let aggregator_change = aggregator_change.materialize_aggregator(state_view, &aggregator_id)?;
+                Ok((aggregator_id, aggregator_change))
+            };
+        
+        let aggregator_v2_change_set =
+            aggregator_v2_change_set
+                .into_iter()
+                .map(materialize_aggregator)
+                .collect::<anyhow::Result<HashMap<AggregatorID, AggregatorChange>, VMStatus>>()?;
+        
+        Ok(Self {
+            resource_write_set,
+            module_write_set,
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set,
             aggregator_v2_change_set,
             events,
         })

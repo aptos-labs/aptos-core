@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
-    aggregator_extension::{AggregatorData, AggregatorID},
-    // delta_change_set::DeltaOp,
+    aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
+    delta_change_set::{DeltaOp, DeltaUpdate},
     resolver::AggregatorResolver, aggregator_change_set::AggregatorChange,
 };
-// use aptos_types::vm_status::VMStatus;
+use aptos_types::vm_status::VMStatus;
 use better_any::{Tid, TidAble};
-// use move_binary_format::errors::Location;
+use move_binary_format::errors::Location;
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -16,11 +16,23 @@ use std::{
 
 pub type TxnIndex = u32;
 
+/// Represents a single aggregator change.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum AggregatorChangeV1 {
+    // A value should be written to storage.
+    Write(u128),
+    // A delta should be merged with the value from storage.
+    Merge(DeltaOp),
+    // A value should be deleted from the storage.
+    Delete,
+}
+
 /// Represents changes made by all aggregators during this context. This change
 /// set can be converted into appropriate `WriteSet` and `DeltaChangeSet` by the
 /// user, e.g. VM session.
 pub struct AggregatorChangeSet {
-    pub changes: HashMap<AggregatorID, AggregatorChange>,
+    pub aggregator_v1_changes: HashMap<AggregatorID, AggregatorChangeV1>,
+    pub aggregator_v2_changes: HashMap<AggregatorID, AggregatorChange>,
 }
 
 /// Native context that can be attached to VM `NativeContextExtensions`.
@@ -56,73 +68,70 @@ impl<'a> NativeAggregatorContext<'a> {
             aggregator_data, ..
         } = self;
         let (_, destroyed_aggregators, aggregators) = aggregator_data.into_inner().into();
-        let mut changes = HashMap::new();
+
+        let mut aggregator_v1_changes = HashMap::new();
+        let mut aggregator_v2_changes = HashMap::new();
 
         // First, process all writes and deltas.
         for (id, aggregator) in aggregators {
             let (max_value, state) = aggregator.into();
-            changes.insert(id, AggregatorChange::State {
-                max_value,
-                state,
-            });
+            match id {
+                AggregatorID::Ephemeral(_) => {
+                    let change = AggregatorChange {
+                        max_value,
+                        state,
+                        history: None,
+                    };
+                    aggregator_v2_changes.insert(id, change);
+                },
+                AggregatorID::Legacy(_, _) => {
+                    let change = match state {
+                        AggregatorState::Data => AggregatorChangeV1::Write(value),
+                        AggregatorState::PositiveDelta => {
+                            let history = history.unwrap();
+                            let plus = DeltaUpdate::Plus(value);
+                            let delta_op = DeltaOp::new(
+                                plus,
+                                max_value,
+                                history.max_achieved_positive,
+                                history.min_achieved_negative,
+                                history.min_overflow_positive,
+                                history.max_underflow_negative,
+                            );
+                            AggregatorChangeV1::Merge(delta_op)
+                        },
+                        AggregatorState::NegativeDelta => {
+                            let history = history.unwrap();
+                            let minus = DeltaUpdate::Minus(value);
+                            let delta_op = DeltaOp::new(
+                                minus,
+                                max_value,
+                                history.max_achieved_positive,
+                                history.min_achieved_negative,
+                                history.min_overflow_positive,
+                                history.max_underflow_negative,
+                            );
+                            AggregatorChangeV1::Merge(delta_op)
+                        },
+                    };
+                    aggregator_v1_changes.insert(id, change);
+                },
+            }
         }
 
         // Additionally, do not forget to delete destroyed values from storage.
         for id in destroyed_aggregators {
-            changes.insert(id, AggregatorChange::Delete);
+            aggregator_v1_changes.insert(id, AggregatorChangeV1::Delete);
         }
 
-        AggregatorChangeSet { changes }
+        AggregatorChangeSet { aggregator_v1_changes, aggregator_v2_changes }
     }
 }
-
-// impl AggregatorChangeSet {
-//     pub fn squash(&mut self, other: Self) -> Result<(), VMStatus> {
-//         for (other_id, other_change) in other.changes {
-//             match self.changes.entry(other_id) {
-//                 // If something was changed only in `other` session, add it.
-//                 btree_map::Entry::Vacant(entry) => {
-//                     entry.insert(other_change);
-//                 },
-//                 // Otherwise, we might need to aggregate deltas.
-//                 btree_map::Entry::Occupied(mut entry) => {
-//                     use AggregatorChange::*;
-
-//                     let entry_mut = entry.get_mut();
-//                     match (*entry_mut, other_change) {
-//                         (Write(_) | Merge(_), Write(data)) => *entry_mut = Write(data),
-//                         (Write(_) | Merge(_), Delete) => *entry_mut = Delete,
-//                         (Write(data), Merge(delta)) => {
-//                             let new_data = delta
-//                                 .apply_to(data)
-//                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-//                             *entry_mut = Write(new_data);
-//                         },
-//                         (Merge(delta1), Merge(mut delta2)) => {
-//                             // `delta1` occurred before `delta2`, therefore we must ensure we merge the latter
-//                             // one to the initial delta.
-//                             delta2
-//                                 .merge_with_previous_delta(delta1)
-//                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-//                             *entry_mut = Merge(delta2)
-//                         },
-//                         // Hashing properties guarantee that aggregator keys should
-//                         // not collide, making this case impossible.
-//                         (Delete, _) => unreachable!("resource cannot be accessed after deletion"),
-//                     }
-//                 },
-//             }
-//         }
-//         Ok(())
-//     }
-// }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::{
-        aggregator_extension::DeltaValue, aggregator_id_for_test, AggregatorStore,
-    };
+    use aptos_aggregator::{aggregator_id_for_test, AggregatorStore, aggregator_extension::DeltaHistory};
     use claims::{assert_matches, assert_ok};
 
     fn get_test_resolver() -> AggregatorStore {
@@ -161,17 +170,17 @@ mod test {
         aggregator_data
             .get_aggregator(aggregator_id_for_test(500), 500)
             .unwrap()
-            .try_add(context.resolver, 150)
+            .try_add(150)
             .unwrap();
         aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .unwrap()
-            .try_add(context.resolver, 100)
+            .try_add(100)
             .unwrap();
         aggregator_data
             .get_aggregator(aggregator_id_for_test(700), 700)
             .unwrap()
-            .try_add(context.resolver, 200)
+            .try_add(200)
             .unwrap();
 
         aggregator_data.remove_aggregator(aggregator_id_for_test(100));
@@ -187,35 +196,35 @@ mod test {
         let context = NativeAggregatorContext::new([0; 32], &resolver);
 
         test_set_up(&context);
-        let AggregatorChangeSet { changes } = context.into_change_set();
+        let AggregatorChangeSet { aggregator_v1_changes, aggregator_v2_changes } = context.into_change_set();
 
         assert!(!changes.contains_key(&aggregator_id_for_test(100)));
         assert_matches!(
-            changes.get(&aggregator_id_for_test(200)).unwrap(),
-            AggregatorChange::Write(0)
+            aggregator_v1_changes.get(&aggregator_id_for_test(200)).unwrap(),
+            AggregatorChangeV1::Write(0)
         );
         assert!(!changes.contains_key(&aggregator_id_for_test(300)));
         assert_matches!(
-            changes.get(&aggregator_id_for_test(400)).unwrap(),
-            AggregatorChange::Write(0)
+            aggregator_v1_changes.get(&aggregator_id_for_test(400)).unwrap(),
+            AggregatorChangeV1::Write(0)
         );
         assert_matches!(
-            changes.get(&aggregator_id_for_test(500)).unwrap(),
-            AggregatorChange::Delete
+            aggregator_v1_changes.get(&aggregator_id_for_test(500)).unwrap(),
+            AggregatorChangeV1::Delete
         );
-        let delta_100 = DeltaOp::new(DeltaValue::Positive(100), 600, 100, 0, None, None);
+        let delta_100 = DeltaOp::new(DeltaUpdate::Plus(100), 600, DeltaHistory { max_achieved_positive_delta: 100, min_achieved_negative_delta: 0, min_overflow_positive_delta: None, max_underflow_negative_delta: None });
         assert_eq!(
-            *changes.get(&aggregator_id_for_test(600)).unwrap(),
-            AggregatorChange::Merge(delta_100)
+            *aggregator_v1_changes.get(&aggregator_id_for_test(600)).unwrap(),
+            AggregatorChangeV1::Merge(delta_100)
         );
-        let delta_200 = DeltaOp::new(DeltaValue::Positive(200), 700, 200, 0, None, None);
+        let delta_200 = DeltaOp::new(DeltaUpdate::Plus(200), 700, DeltaHistory { max_achieved_positive_delta: 200, min_achieved_negative_delta: 0, min_overflow_positive_delta: None, max_underflow_negative_delta: None });
         assert_eq!(
-            *changes.get(&aggregator_id_for_test(700)).unwrap(),
-            AggregatorChange::Merge(delta_200)
+            *aggregator_v1_changes.get(&aggregator_id_for_test(700)).unwrap(),
+            AggregatorChangeV1::Merge(delta_200)
         );
         assert_matches!(
-            changes.get(&aggregator_id_for_test(800)).unwrap(),
-            AggregatorChange::Delete
+            aggregator_v1_changes.get(&aggregator_id_for_test(800)).unwrap(),
+            AggregatorChangeV1::Delete
         );
     }
 }
