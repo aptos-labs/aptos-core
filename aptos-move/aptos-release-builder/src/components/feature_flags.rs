@@ -6,6 +6,7 @@ use anyhow::Result;
 use aptos_types::on_chain_config::{FeatureFlag as AptosFeatureFlag, Features as AptosFeatures};
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -15,6 +16,35 @@ pub struct Features {
     pub enabled: Vec<FeatureFlag>,
     #[serde(default)]
     pub disabled: Vec<FeatureFlag>,
+}
+
+impl Features {
+    pub fn empty() -> Self {
+        Self {
+            enabled: vec![],
+            disabled: vec![],
+        }
+    }
+
+    pub fn squash(&mut self, rhs: Self) {
+        let mut enabled: HashSet<_> = self.enabled.iter().cloned().collect();
+        let mut disabled: HashSet<_> = self.disabled.iter().cloned().collect();
+        let to_enable: HashSet<_> = rhs.enabled.into_iter().collect();
+        let to_disable: HashSet<_> = rhs.disabled.into_iter().collect();
+
+        disabled = disabled.difference(&to_enable).cloned().collect();
+        enabled.extend(to_enable);
+
+        enabled = enabled.difference(&to_disable).cloned().collect();
+        disabled.extend(to_disable);
+
+        self.enabled = enabled.into_iter().collect();
+        self.disabled = disabled.into_iter().collect();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.enabled.is_empty() && self.disabled.is_empty()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, EnumIter, PartialEq, Eq, Serialize, Hash)]
