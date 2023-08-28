@@ -75,6 +75,7 @@ export class Serializer {
   serializeStr(value: string) {
     const textEncoder = new TextEncoder();
     this.serializeBytes(textEncoder.encode(value));
+    return this;
   }
 
   /**
@@ -135,6 +136,7 @@ export class Serializer {
   @checkNumberRange(0, MAX_U16_NUMBER)
   serializeU16(value: Uint16) {
     this.serializeWithFunction(DataView.prototype.setUint16, 2, value);
+    return this;
   }
 
   /**
@@ -151,6 +153,7 @@ export class Serializer {
   @checkNumberRange(0, MAX_U32_NUMBER)
   serializeU32(value: Uint32) {
     this.serializeWithFunction(DataView.prototype.setUint32, 4, value);
+    return this;
   }
 
   /**
@@ -172,6 +175,7 @@ export class Serializer {
     // write little endian number
     this.serializeU32(Number(low));
     this.serializeU32(Number(high));
+    return this;
   }
 
   /**
@@ -187,6 +191,7 @@ export class Serializer {
     // write little endian number
     this.serializeU64(low);
     this.serializeU64(high);
+    return this;
   }
 
   /**
@@ -202,6 +207,7 @@ export class Serializer {
     // write little endian number
     this.serializeU128(low);
     this.serializeU128(high);
+    return this;
   }
 
   /**
