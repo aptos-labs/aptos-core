@@ -11,6 +11,7 @@ use crate::{
     logging::{LogEntry, LogSchema},
     metrics::{
         APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_LEDGER_UPDATE_OTHER_SECONDS, APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS,
         APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS,
         APTOS_EXECUTOR_TRANSACTIONS_SAVED, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
@@ -206,7 +207,6 @@ where
             .expect("Must exist.")
             .ok_or(Error::BlockNotFound(parent_block_id))?;
         let parent_output = &parent_block.output;
-        info!("Parent block ok:");
         info!(
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
             "execute_block"
@@ -235,8 +235,6 @@ where
             V::execute_transaction_block(transactions, state_view, maybe_block_gas_limit)?
         };
 
-        info!("Block execution ok:");
-
         let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
             .with_label_values(&["state_checkpoint"])
             .start_timer();
@@ -246,12 +244,9 @@ where
             maybe_block_gas_limit.map(|_| block_id),
         )?;
 
-        info!("State checkpoint ok:");
-
         let _ =
             self.block_tree
                 .add_block(parent_block_id, block_id, ExecutionOutput::new(state))?;
-        info!("Block tree add block ok:");
         Ok(state_checkpoint_output)
     }
 
@@ -261,6 +256,7 @@ where
         parent_block_id: HashValue,
         state_checkpoint_output: StateCheckpointOutput,
     ) -> Result<StateComputeResult, Error> {
+        let _timer = APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.start_timer();
         let committed_block_id = self.committed_block_id();
         let mut block_vec = self
             .block_tree
@@ -299,7 +295,7 @@ where
         };
         output.ensure_ends_with_state_checkpoint()?;
 
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+        let _timer = APTOS_EXECUTOR_LEDGER_UPDATE_OTHER_SECONDS
             .with_label_values(&["as_state_compute_result"])
             .start_timer();
         let state_compute_result = output.as_state_compute_result(parent_accumulator);
