@@ -104,25 +104,41 @@ fn get_local_config_yaml<P: AsRef<Path>>(node_config_path: P) -> Result<Value, E
     Ok(local_config_yaml)
 }
 
-/// Optimize and sanitize the node config for the current environment
-fn optimize_and_sanitize_node_config(
-    node_config: &mut NodeConfig,
-    local_config_yaml: Value,
-) -> Result<(), Error> {
+fn config_to_node_type_chain_id(node_config: &NodeConfig) -> Option<(NodeType, ChainId)> {
     // Get the role and chain_id for the node
     let node_type = NodeType::extract_from_config(node_config);
     let chain_id = match get_chain_id(node_config) {
         Ok(chain_id) => chain_id,
         Err(error) => {
             println!("Failed to get the chain ID from the genesis blob! Skipping config sanitization. Error: {:?}", error);
-            return Ok(());
+            return None;
         },
+    };
+    Some((node_type, chain_id))
+}
+
+/// Optimize and sanitize the node config for the current environment
+fn optimize_and_sanitize_node_config(
+    node_config: &mut NodeConfig,
+    local_config_yaml: Value,
+) -> Result<(), Error> {
+    let (node_type, chain_id) = match config_to_node_type_chain_id(node_config) {
+        None => return Ok(()),
+        Some((node_type, chain_id)) => (node_type, chain_id),
     };
 
     // Optimize the node config
     NodeConfig::optimize(node_config, &local_config_yaml, node_type, chain_id)?;
 
     // Sanitize the node config
+    NodeConfig::sanitize(node_config, node_type, chain_id)
+}
+
+pub fn sanitize_node_config(node_config: &mut NodeConfig) -> Result<(), Error> {
+    let (node_type, chain_id) = match config_to_node_type_chain_id(node_config) {
+        None => return Ok(()),
+        Some((node_type, chain_id)) => (node_type, chain_id),
+    };
     NodeConfig::sanitize(node_config, node_type, chain_id)
 }
 
