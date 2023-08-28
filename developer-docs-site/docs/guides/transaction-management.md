@@ -41,7 +41,7 @@ Currently this framework assumes that the network builds no substantial queue, t
 - Further handling of transaction processing rates to ensure that the expiration timer is properly set.
 - Handling of transaction failures to either be ignored or resubmitted based upon desired outcome.
 
-Note, an account should be manged by a single instance of the transaction manager. Otherwise each instance of the transaction manager will likely have stale in-memory state resulting in overlapping sequence numbers.
+Note, an account should be managed by a single instance of the transaction manager. Otherwise each instance of the transaction manager will likely have stale in-memory state resulting in overlapping sequence numbers.
 
 ### Implementations
 
@@ -63,7 +63,7 @@ Each transaction requires a distinct sequence number that is sequential to previ
 
 In parallel, monitor new transactions submitted. Once the earliest transaction expiration time has expired synchronize up to that transaction. Then repeat the process for the next transaction.
 
-If there is any failure, wait until all outstanding transactions have timed out and leave it to the application to decide how to proceed, e.g., replay failed transactions. The best method for waiting for outstanded transactions is first to query the ledger timestamp and ensure it is at least elapsed the maximum timeout from the last transactions submit time. From there, validate with mempool that all transactions since the last known committed transaction are either committed or no longer exist within the mmempool. This can be done by querying the REST API for transactions of a specific account, specifying the currently being evaluated sequence number and setting a limit to 1. Once these checks are complete, the local transaction number can be resynchronized.
+If there is any failure, wait until all outstanding transactions have timed out and leave it to the application to decide how to proceed, e.g., replay failed transactions. The best method for waiting for outstanded transactions is first to query the ledger timestamp and ensure it is at least elapsed the maximum timeout from the last transactions submit time. From there, validate with mempool that all transactions since the last known committed transaction are either committed or no longer exist within the mempool. This can be done by querying the REST API for transactions of a specific account, specifying the currently being evaluated sequence number and setting a limit to 1. Once these checks are complete, the local transaction number can be resynchronized.
 
 These failure handling steps are critical for the following reasons:
 * Mempool does not immediate evict expired transactions.
