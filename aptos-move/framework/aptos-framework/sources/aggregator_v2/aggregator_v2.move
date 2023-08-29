@@ -19,31 +19,47 @@ module aptos_framework::aggregator_v2 {
 
     public native fun string_concat<Element>(before: String, snapshot: &AggregatorSnapshot<Element>, after: String): AggregatorSnapshot<String>;
 
-    #[test]
-    public fun test_correct_read() {
+    #[test(fx = @std)]
+    public fun test_correct_read(fx: signer) {
+        use std::features;
+        let feature = features::get_aggregator_snapshots_feature();
+        features::change_feature_flags(&fx, vector[feature], vector[]);
+
         let snapshot = create_snapshot(42);
         let snapshot2 = copy_snapshot(&snapshot);
         assert!(read_snapshot(&snapshot) == 42, 0);
         assert!(read_snapshot(&snapshot2) == 42, 0);
     }
 
-    #[test]
-    public fun test_correct_read_string() {
+    #[test(fx = @std)]
+    public fun test_correct_read_string(fx: signer) {
+        use std::features;
+        let feature = features::get_aggregator_snapshots_feature();
+        features::change_feature_flags(&fx, vector[feature], vector[]);
+
         let snapshot = create_snapshot(std::string::utf8(b"42"));
         let snapshot2 = copy_snapshot(&snapshot);
         assert!(read_snapshot(&snapshot) == std::string::utf8(b"42"), 0);
         assert!(read_snapshot(&snapshot2) == std::string::utf8(b"42"), 0);
     }
 
-    #[test]
+    #[test(fx = @std)]
     #[expected_failure]
-    public fun test_incorrect_string_concat() {
+    public fun test_incorrect_string_concat(fx: signer) {
+        use std::features;
+        let feature = features::get_aggregator_snapshots_feature();
+        features::change_feature_flags(&fx, vector[feature], vector[]);
+
         let snapshot = create_snapshot(42);
         string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
     }
 
-    #[test]
-    public fun test_correct_string_concat() {
+    #[test(fx = @std)]
+    public fun test_correct_string_concat(fx: signer) {
+        use std::features;
+        let feature = features::get_aggregator_snapshots_feature();
+        features::change_feature_flags(&fx, vector[feature], vector[]);
+
         let snapshot = create_snapshot<String>(std::string::utf8(b"42"));
         let snapshot2 = string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
         assert!(read_snapshot(&snapshot2) == std::string::utf8(b"before42after"), 0);
