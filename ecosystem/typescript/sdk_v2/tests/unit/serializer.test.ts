@@ -209,10 +209,19 @@ describe("BCS Serializer", () => {
 
   it("serializes multiple Serializable values", () => {
     class MoveStructA implements Serializable {
-      constructor(public name: string, public description: string, public numbers: Array<number>) {}
+      constructor(
+        public name: string,
+        public description: string,
+        public enabled: boolean,
+        public numbers: Array<number>,
+      ) {}
 
       serialize(serializer: Serializer): void {
-        serializer.serializeStr(this.name).serializeStr(this.description).serializeBytes(new Uint8Array(this.numbers));
+        serializer
+          .serializeStr(this.name)
+          .serializeStr(this.description)
+          .serializeBool(this.enabled)
+          .serializeBytes(new Uint8Array(this.numbers));
       }
     }
     class MoveStructB implements Serializable {
@@ -232,15 +241,14 @@ describe("BCS Serializer", () => {
       }
     }
 
-    const moveStructA = new MoveStructA("abc", "123", [1, 2, 3, 4]);
+    const moveStructA = new MoveStructA("abc", "123", false, [1, 2, 3, 4]);
     const moveStructB = new MoveStructB(moveStructA, "def", "456", [5, 6, 7, 8]);
 
-    // Serialize a string, a u64 number, and a MoveStruct.
     const serializedBytes = serializer.serialize(moveStructB).getBytes();
 
     expect(serializedBytes).toEqual(
       new Uint8Array([
-        3, 0x61, 0x62, 0x63, 3, 0x31, 0x32, 0x33, 4, 0x01, 0x02, 0x03, 0x04, 3, 0x64, 0x65, 0x66, 3, 0x34, 0x35, 0x36,
+        3, 0x61, 0x62, 0x63, 3, 0x31, 0x32, 0x33, 0x00, 4, 0x01, 0x02, 0x03, 0x04, 3, 0x64, 0x65, 0x66, 3, 0x34, 0x35, 0x36,
         4, 0x05, 0x06, 0x07, 0x08,
       ]),
     );

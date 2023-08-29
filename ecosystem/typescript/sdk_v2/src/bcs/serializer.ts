@@ -79,7 +79,7 @@ export class Serializer {
    * BCS layout for "bytes": bytes_length | bytes
    * where bytes_length is a u32 integer encoded as a uleb128 integer, equal to the length of the bytes array.
    */
-  serializeBytes(value: Uint8Array): this {
+  serializeByteVector(value: Uint8Array): this {
     this.serializeU32AsUleb128(value.length);
     this.appendToBuffer(value);
     return this;
@@ -262,6 +262,14 @@ export class Serializer {
     // NOTE: The `serialize` method called by `value` is defined in the
     // Serializable interface, not the one defined in this class.
     value.serialize(this);
+    return this;
+  }
+
+  serializeVector<T extends Serializable>(values: Array<T>): this {
+    this.serializeU32AsUleb128(values.length);
+    values.forEach((value) => {
+      this.serialize(value);
+    });
     return this;
   }
 
