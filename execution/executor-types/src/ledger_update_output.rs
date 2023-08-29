@@ -6,7 +6,7 @@
 use crate::StateComputeResult;
 use anyhow::{ensure, Result};
 use aptos_crypto::{hash::TransactionAccumulatorHasher, HashValue};
-use aptos_storage_interface::{cached_state_view::ShardedStateCache, ExecutedTrees};
+use aptos_storage_interface::cached_state_view::ShardedStateCache;
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -16,42 +16,42 @@ use aptos_types::{
 };
 use std::sync::Arc;
 
-#[derive(Default)]
-pub struct ExecutedBlock {
+#[derive(Default, Debug)]
+pub struct LedgerUpdateOutput {
     pub status: Vec<TransactionStatus>,
     pub to_commit: Vec<Arc<TransactionToCommit>>,
-    pub result_view: ExecutedTrees,
-    /// If set, this is the new epoch info that should be changed to if this is committed.
-    pub next_epoch_state: Option<EpochState>,
     pub reconfig_events: Vec<ContractEvent>,
     pub transaction_info_hashes: Vec<HashValue>,
     pub block_state_updates: ShardedStateUpdates,
     pub sharded_state_cache: ShardedStateCache,
+    /// The in-memory Merkle Accumulator representing a blockchain state consistent with the
+    /// `state_tree`.
+    pub transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
 }
 
-impl ExecutedBlock {
-    pub fn new_empty(result_view: ExecutedTrees) -> Self {
+impl LedgerUpdateOutput {
+    pub fn new_empty(
+        transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
+    ) -> Self {
         Self {
-            result_view,
+            transaction_accumulator,
             ..Default::default()
         }
     }
 
     pub fn reconfig_suffix(&self) -> Self {
-        assert!(self.next_epoch_state.is_some());
         Self {
-            result_view: self.result_view.clone(),
-            next_epoch_state: self.next_epoch_state.clone(),
+            transaction_accumulator: Arc::clone(&self.transaction_accumulator),
             ..Default::default()
         }
     }
 
-    pub fn transactions_to_commit(&self) -> Vec<Arc<TransactionToCommit>> {
-        self.to_commit.iter().map(Arc::clone).collect()
+    pub fn txn_accumulator(&self) -> &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>> {
+        &self.transaction_accumulator
     }
 
-    pub fn has_reconfiguration(&self) -> bool {
-        self.next_epoch_state.is_some()
+    pub fn transactions_to_commit(&self) -> Vec<Arc<TransactionToCommit>> {
+        self.to_commit.iter().map(Arc::clone).collect()
     }
 
     /// Ensure that every block committed by consensus ends with a state checkpoint. That can be
@@ -60,11 +60,10 @@ impl ExecutedBlock {
     /// block.
     pub fn ensure_ends_with_state_checkpoint(&self) -> Result<()> {
         ensure!(
-            self.next_epoch_state.is_some()
-                || self.to_commit.last().map_or(true, |txn| matches!(
-                    txn.transaction(),
-                    Transaction::StateCheckpoint(_)
-                )),
+            self.to_commit.last().map_or(true, |txn| matches!(
+                txn.transaction(),
+                Transaction::StateCheckpoint(_)
+            )),
             "Block not ending with a state checkpoint.",
         );
         Ok(())
@@ -73,8 +72,9 @@ impl ExecutedBlock {
     pub fn as_state_compute_result(
         &self,
         parent_accumulator: &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
+        next_epoch_state: Option<EpochState>,
     ) -> StateComputeResult {
-        let txn_accu = self.result_view.txn_accumulator();
+        let txn_accu = self.txn_accumulator();
 
         StateComputeResult::new(
             txn_accu.root_hash(),
@@ -82,7 +82,7 @@ impl ExecutedBlock {
             txn_accu.num_leaves(),
             parent_accumulator.frozen_subtree_roots().clone(),
             parent_accumulator.num_leaves(),
-            self.next_epoch_state.clone(),
+            next_epoch_state,
             self.status.clone(),
             self.transaction_info_hashes.clone(),
             self.reconfig_events.clone(),
