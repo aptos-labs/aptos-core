@@ -328,7 +328,7 @@ impl TestContext {
     }
 
     pub async fn create_account(&mut self) -> LocalAccount {
-        let mut root = self.root_account().await;
+        let root = self.root_account().await;
         let account = self.gen_account();
         let factory = self.transaction_factory();
         let txn = root.sign_with_transaction_builder(
@@ -351,7 +351,7 @@ impl TestContext {
     }
 
     pub async fn mint_user_account(&self, account: &LocalAccount) -> SignedTransaction {
-        let mut tc = self.root_account().await;
+        let tc = self.root_account().await;
         let factory = self.transaction_factory();
         tc.sign_with_transaction_builder(
             factory
@@ -799,7 +799,7 @@ impl TestContext {
             .post("/transactions", request)
             .await;
         self.commit_mempool_txns(1).await;
-        *account.sequence_number_mut() += 1;
+        account.increment_sequence_number();
     }
 
     pub async fn simulate_multisig_transaction(

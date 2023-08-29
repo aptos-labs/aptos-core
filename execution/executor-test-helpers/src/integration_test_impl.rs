@@ -48,7 +48,7 @@ pub fn test_execution_with_storage_impl_inner(
     let (genesis, validators) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
 
-    let mut core_resources_account: LocalAccount = LocalAccount::new(
+    let core_resources_account: LocalAccount = LocalAccount::new(
         aptos_test_root_address(),
         AccountKey::from_private_key(aptos_vm_genesis::GENESIS_KEYPAIR.0.clone()),
         0,
@@ -67,8 +67,8 @@ pub fn test_execution_with_storage_impl_inner(
     let seed = [3u8; 32];
     let mut rng = ::rand::rngs::StdRng::from_seed(seed);
 
-    let mut account1 = LocalAccount::generate(&mut rng);
-    let mut account2 = LocalAccount::generate(&mut rng);
+    let account1 = LocalAccount::generate(&mut rng);
+    let account2 = LocalAccount::generate(&mut rng);
     let account3 = LocalAccount::generate(&mut rng);
     let account4 = LocalAccount::generate(&mut rng);
 

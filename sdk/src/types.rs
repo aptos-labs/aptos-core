@@ -23,6 +23,7 @@ use bip39::{Language, Mnemonic, Seed};
 use ed25519_dalek_bip32::{DerivationPath, ExtendedSecretKey};
 use std::{
     str::FromStr,
+    sync::atomic::{AtomicU64, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -37,7 +38,7 @@ pub struct LocalAccount {
     /// Authentication key of the account.
     key: AccountKey,
     /// Latest known sequence number of the account, it can be different from validator.
-    sequence_number: u64,
+    sequence_number: AtomicU64,
 }
 
 impl LocalAccount {
@@ -48,7 +49,7 @@ impl LocalAccount {
         Self {
             address,
             key: key.into(),
-            sequence_number,
+            sequence_number: AtomicU64::new(sequence_number),
         }
     }
 
@@ -71,7 +72,7 @@ impl LocalAccount {
         Ok(Self {
             address,
             key,
-            sequence_number,
+            sequence_number: AtomicU64::new(sequence_number),
         })
     }
 
@@ -94,20 +95,16 @@ impl LocalAccount {
             .into_inner()
     }
 
-    pub fn sign_with_transaction_builder(
-        &mut self,
-        builder: TransactionBuilder,
-    ) -> SignedTransaction {
+    pub fn sign_with_transaction_builder(&self, builder: TransactionBuilder) -> SignedTransaction {
         let raw_txn = builder
             .sender(self.address())
-            .sequence_number(self.sequence_number())
+            .sequence_number(self.increment_sequence_number())
             .build();
-        *self.sequence_number_mut() += 1;
         self.sign_transaction(raw_txn)
     }
 
     pub fn sign_multi_agent_with_transaction_builder(
-        &mut self,
+        &self,
         secondary_signers: Vec<&Self>,
         builder: TransactionBuilder,
     ) -> SignedTransaction {
@@ -121,9 +118,8 @@ impl LocalAccount {
             .collect();
         let raw_txn = builder
             .sender(self.address())
-            .sequence_number(self.sequence_number())
+            .sequence_number(self.increment_sequence_number())
             .build();
-        *self.sequence_number_mut() += 1;
         raw_txn
             .sign_multi_agent(
                 self.private_key(),
@@ -135,7 +131,7 @@ impl LocalAccount {
     }
 
     pub fn sign_fee_payer_with_transaction_builder(
-        &mut self,
+        &self,
         secondary_signers: Vec<&Self>,
         fee_payer_signer: &Self,
         builder: TransactionBuilder,
@@ -150,9 +146,8 @@ impl LocalAccount {
             .collect();
         let raw_txn = builder
             .sender(self.address())
-            .sequence_number(self.sequence_number())
+            .sequence_number(self.increment_sequence_number())
             .build();
-        *self.sequence_number_mut() += 1;
         raw_txn
             .sign_fee_payer(
                 self.private_key(),
@@ -182,11 +177,20 @@ impl LocalAccount {
     }
 
     pub fn sequence_number(&self) -> u64 {
-        self.sequence_number
+        self.sequence_number.load(Ordering::SeqCst)
     }
 
-    pub fn sequence_number_mut(&mut self) -> &mut u64 {
-        &mut self.sequence_number
+    pub fn increment_sequence_number(&self) -> u64 {
+        self.sequence_number.fetch_add(1, Ordering::SeqCst)
+    }
+
+    pub fn decrement_sequence_number(&self) -> u64 {
+        self.sequence_number.fetch_sub(1, Ordering::SeqCst)
+    }
+
+    pub fn set_sequence_number(&self, sequence_number: u64) {
+        self.sequence_number
+            .store(sequence_number, Ordering::SeqCst);
     }
 
     pub fn rotate_key<T: Into<AccountKey>>(&mut self, new_key: T) -> AccountKey {
