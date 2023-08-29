@@ -66,13 +66,23 @@ module 0xCAFE::test {
     }
 
     public entry fun init_collection_of_1000(account: &signer) {
-        let collection = smart_table::new_with_config(16, 0, 10);
+        let collection = smart_table::new_with_config(1024, 0, 2);
         let i = 0;
         while (i < 1000) {
             smart_table::add(&mut collection, i, Item {});
             i = i + 1;
         };
         move_to(account, Collection { collection });
+    }
+
+    public entry fun grow_collection(account: &signer, begin: u64, end: u64) acquires Collection {
+        let addr = signer::address_of(account);
+        let collection = &mut borrow_global_mut<Collection>(addr).collection;
+        let i = begin;
+        while (i < end) {
+            smart_table::add(collection, i, Item {});
+            i = i + 1;
+        };
     }
 
     public entry fun destroy_collection(account: &signer) acquires Collection {
