@@ -4,6 +4,9 @@
 module aptos_framework::aggregator_v2 {
     use std::string::String;
 
+    /// The generic type supplied to the aggregator or aggregator snapshot is invalid
+    const EINVALID_TYPE: u64 = 5;
+        
     struct AggregatorSnapshot<Element> has store, drop {
         value: Element,
     }

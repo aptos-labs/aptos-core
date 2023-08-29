@@ -9,6 +9,7 @@ to allow transition of usages.
 
 
 -  [Struct `AggregatorSnapshot`](#0x1_aggregator_v2_AggregatorSnapshot)
+-  [Constants](#@Constants_0)
 -  [Function `create_snapshot`](#0x1_aggregator_v2_create_snapshot)
 -  [Function `copy_snapshot`](#0x1_aggregator_v2_copy_snapshot)
 -  [Function `read_snapshot`](#0x1_aggregator_v2_read_snapshot)
@@ -46,6 +47,21 @@ to allow transition of usages.
 
 
 </details>
+
+<a name="@Constants_0"></a>
+
+## Constants
+
+
+<a name="0x1_aggregator_v2_EINVALID_TYPE"></a>
+
+The generic type supplied to the aggregator or aggregator snapshot is invalid
+
+
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EINVALID_TYPE">EINVALID_TYPE</a>: u64 = 5;
+</code></pre>
+
+
 
 <a name="0x1_aggregator_v2_create_snapshot"></a>
 

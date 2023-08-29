@@ -4,7 +4,7 @@
 use crate::natives::{
     aggregator_natives::helpers_v2::{
         aggregator_snapshot_string_info, aggregator_snapshot_u128_info,
-        aggregator_snapshot_u64_info,
+        aggregator_snapshot_u64_info, string_value_info,
     },
     AccountAddress,
 };
@@ -22,6 +22,20 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, ops::Deref};
+
+/// Checks if the type argument `type_arg` is a string type
+fn is_string_type(context: &SafeNativeContext, type_arg: &Type) -> SafeNativeResult<bool> {
+    let ty = context.deref().type_to_fully_annotated_layout(type_arg)?;
+    if let MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, .. }) = ty {
+        if type_.name.as_str() == "String"
+            && type_.module.as_str() == "string"
+            && type_.address == AccountAddress::ONE
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
 
 /***************************************************************************************************
  * native fun create_snapshot(value: Element): AggregatorSnapshot<Element>;
@@ -51,28 +65,15 @@ fn native_create_snapshot(
         },
         _ => {
             // Check if the type is a string
-            let ty = context
-                .deref()
-                .type_to_fully_annotated_layout(&ty_args[0])?;
-            if let MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, .. }) = ty {
-                if type_.name.as_str() == "String"
-                    && type_.module.as_str() == "string"
-                    && type_.address == AccountAddress::ONE
-                {
-                    let input = safely_pop_arg!(args, Struct)
-                        .unpack()?
-                        .next()
-                        .unwrap()
-                        .value_as::<Vec<u8>>()?;
-                    let move_string_value =
-                        Value::struct_(Struct::pack(vec![Value::vector_u8(input)]));
-                    let move_snapshot_value = Value::struct_(Struct::pack(vec![move_string_value]));
-                    return Ok(smallvec![move_snapshot_value]);
-                }
+            if is_string_type(context, &ty_args[0])? {
+                let input = string_value_info(safely_pop_arg!(args, Struct))?;
+                let move_string_value = Value::struct_(Struct::pack(vec![Value::vector_u8(input)]));
+                let move_snapshot_value = Value::struct_(Struct::pack(vec![move_string_value]));
+                return Ok(smallvec![move_snapshot_value]);
             }
             // If not a string, return an error
             Err(PartialVMError::new(StatusCode::ABORTED)
-                .with_message("Unsupported type supplied to aggregator".to_string())
+                .with_message("Unsupported type supplied to aggregator snapshot".to_string())
                 .with_sub_status(0x02_0005)
                 .into())
         },
@@ -107,24 +108,15 @@ fn native_copy_snapshot(
         },
         _ => {
             // Check if the type is a string
-            let ty = context
-                .deref()
-                .type_to_fully_annotated_layout(&ty_args[0])?;
-            if let MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, .. }) = ty {
-                if type_.name.as_str() == "String"
-                    && type_.module.as_str() == "string"
-                    && type_.address == AccountAddress::ONE
-                {
-                    let value = aggregator_snapshot_string_info(&safely_pop_arg!(args, StructRef))?;
-                    let move_string_value =
-                        Value::struct_(Struct::pack(vec![Value::vector_u8(value)]));
-                    let move_snapshot_value = Value::struct_(Struct::pack(vec![move_string_value]));
-                    return Ok(smallvec![move_snapshot_value]);
-                }
+            if is_string_type(context, &ty_args[0])? {
+                let value = aggregator_snapshot_string_info(&safely_pop_arg!(args, StructRef))?;
+                let move_string_value = Value::struct_(Struct::pack(vec![Value::vector_u8(value)]));
+                let move_snapshot_value = Value::struct_(Struct::pack(vec![move_string_value]));
+                return Ok(smallvec![move_snapshot_value]);
             }
             // If not a string, return an error
             Err(PartialVMError::new(StatusCode::ABORTED)
-                .with_message("Unsupported type supplied to aggregator".to_string())
+                .with_message("Unsupported type supplied to aggregator snapshot".to_string())
                 .with_sub_status(0x02_0005)
                 .into())
         },
@@ -155,23 +147,14 @@ fn native_read_snapshot(
         },
         _ => {
             // Check if the type is a string
-            let ty = context
-                .deref()
-                .type_to_fully_annotated_layout(&ty_args[0])?;
-            if let MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, .. }) = ty {
-                if type_.name.as_str() == "String"
-                    && type_.module.as_str() == "string"
-                    && type_.address == AccountAddress::ONE
-                {
-                    let value = aggregator_snapshot_string_info(&safely_pop_arg!(args, StructRef))?;
-                    let move_string_value =
-                        Value::struct_(Struct::pack(vec![Value::vector_u8(value)]));
-                    return Ok(smallvec![move_string_value]);
-                }
+            if is_string_type(context, &ty_args[0])? {
+                let value = aggregator_snapshot_string_info(&safely_pop_arg!(args, StructRef))?;
+                let move_string_value = Value::struct_(Struct::pack(vec![Value::vector_u8(value)]));
+                return Ok(smallvec![move_string_value]);
             }
             // If not a string, return an error
             Err(PartialVMError::new(StatusCode::ABORTED)
-                .with_message("Unsupported type supplied to aggregator".to_string())
+                .with_message("Unsupported type supplied to aggregator snapshot".to_string())
                 .with_sub_status(0x02_0005)
                 .into())
         },
@@ -191,37 +174,20 @@ fn native_string_concat(
     debug_assert_eq!(args.len(), 3);
     context.charge(AGGREGATOR_V2_STRING_CONCAT_BASE)?;
     // Check if the type is a string
-    let ty = context
-        .deref()
-        .type_to_fully_annotated_layout(&ty_args[0])?;
-    if let MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, .. }) = ty {
-        if type_.name.as_str() == "String"
-            && type_.module.as_str() == "string"
-            && type_.address == AccountAddress::ONE
-        {
-            let after = safely_pop_arg!(args, Struct)
-                .unpack()?
-                .next()
-                .unwrap()
-                .value_as::<Vec<u8>>()?;
-            let snapshot_value =
-                aggregator_snapshot_string_info(&safely_pop_arg!(args, StructRef))?;
-            let before = safely_pop_arg!(args, Struct)
-                .unpack()?
-                .next()
-                .unwrap()
-                .value_as::<Vec<u8>>()?;
-            let mut result = before.clone();
-            result.extend(&snapshot_value);
-            result.extend(&after);
-            let move_string_value = Value::struct_(Struct::pack(vec![Value::vector_u8(result)]));
-            let move_snapshot_value = Value::struct_(Struct::pack(vec![move_string_value]));
-            return Ok(smallvec![move_snapshot_value]);
-        }
+    if is_string_type(context, &ty_args[0])? {
+        let after = string_value_info(safely_pop_arg!(args, Struct))?;
+        let snapshot_value = aggregator_snapshot_string_info(&safely_pop_arg!(args, StructRef))?;
+        let before = string_value_info(safely_pop_arg!(args, Struct))?;
+        let mut result = before.clone();
+        result.extend(&snapshot_value);
+        result.extend(&after);
+        let move_string_value = Value::struct_(Struct::pack(vec![Value::vector_u8(result)]));
+        let move_snapshot_value = Value::struct_(Struct::pack(vec![move_string_value]));
+        return Ok(smallvec![move_snapshot_value]);
     }
     // If not a string, return an error
     Err(PartialVMError::new(StatusCode::ABORTED)
-        .with_message("Unsupported type supplied to aggregator".to_string())
+        .with_message("Unsupported type supplied to aggregator snapshot".to_string())
         .with_sub_status(0x02_0005)
         .into())
 }
