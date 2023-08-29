@@ -30,3 +30,9 @@ proposals:
           transaction_shuffler_type:
             deprecated_sender_aware_v1: 32
           block_gas_limit : 35000
+  - name: enable_aggregator_snapshots
+    metadata:
+      title: "Enable Aggregator Snapshots"
+      description: "AIP-43: Aggregator snapshots can be used to postpone the read operations on aggregators to the commit phase and improve concurrency of transaction execution."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
+    execution_mode: MultiStep
