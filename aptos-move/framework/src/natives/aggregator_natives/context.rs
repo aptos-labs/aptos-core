@@ -3,12 +3,10 @@
 
 use aptos_aggregator::{
     aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
-    delta_change_set::{DeltaOp, DeltaUpdate},
+    delta_change_set::DeltaOp,
     resolver::AggregatorResolver, aggregator_change_set::AggregatorChange,
 };
-use aptos_types::vm_status::VMStatus;
 use better_any::{Tid, TidAble};
-use move_binary_format::errors::Location;
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -80,39 +78,25 @@ impl<'a> NativeAggregatorContext<'a> {
                     let change = AggregatorChange {
                         max_value,
                         state,
-                        history: None,
+                        base_aggregator: None,
                     };
                     aggregator_v2_changes.insert(id, change);
                 },
-                AggregatorID::Legacy(_, _) => {
+                AggregatorID::Legacy { .. } => {
                     let change = match state {
-                        AggregatorState::Data => AggregatorChangeV1::Write(value),
-                        AggregatorState::PositiveDelta => {
-                            let history = history.unwrap();
-                            let plus = DeltaUpdate::Plus(value);
+                        AggregatorState::Data { value } => AggregatorChangeV1::Write(value),
+                        AggregatorState::Delta {
+                            delta,
+                            history,
+                            ..
+                        } => {
                             let delta_op = DeltaOp::new(
-                                plus,
+                                delta,
                                 max_value,
-                                history.max_achieved_positive,
-                                history.min_achieved_negative,
-                                history.min_overflow_positive,
-                                history.max_underflow_negative,
+                                history
                             );
                             AggregatorChangeV1::Merge(delta_op)
-                        },
-                        AggregatorState::NegativeDelta => {
-                            let history = history.unwrap();
-                            let minus = DeltaUpdate::Minus(value);
-                            let delta_op = DeltaOp::new(
-                                minus,
-                                max_value,
-                                history.max_achieved_positive,
-                                history.min_achieved_negative,
-                                history.min_overflow_positive,
-                                history.max_underflow_negative,
-                            );
-                            AggregatorChangeV1::Merge(delta_op)
-                        },
+                        }
                     };
                     aggregator_v1_changes.insert(id, change);
                 },

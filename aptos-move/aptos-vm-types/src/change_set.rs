@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::check_change_set::CheckChangeSet;
-use aptos_aggregator::{delta_change_set::{deserialize, serialize, DeltaOp, AggregatorChange}, aggregator_extension::AggregatorID, aggregator_change_set::AggregatorChange};
+use aptos_aggregator::{delta_change_set::{deserialize, serialize, DeltaOp}, aggregator_extension::AggregatorID, aggregator_change_set::AggregatorChange};
 use aptos_state_view::StateView;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -269,10 +269,10 @@ impl VMChangeSet {
     }
 
     fn squash_additional_aggregator_changes(
-        aggregator_write_set: &mut HashMap<StateKey, WriteOp>,
-        aggregator_delta_set: &mut HashMap<StateKey, DeltaOp>,
-        additional_aggregator_write_set: HashMap<StateKey, WriteOp>,
-        additional_aggregator_delta_set: HashMap<StateKey, DeltaOp>,
+        aggregator_v1_write_set: &mut HashMap<StateKey, WriteOp>,
+        aggregator_v1_delta_set: &mut HashMap<StateKey, DeltaOp>,
+        additional_aggregator_v1_write_set: HashMap<StateKey, WriteOp>,
+        additional_aggregator_v1_delta_set: HashMap<StateKey, DeltaOp>,
     ) -> anyhow::Result<(), VMStatus> {
         use WriteOp::*;
 
@@ -324,7 +324,7 @@ impl VMChangeSet {
         }
 
         // Next, squash write ops.
-        for (key, additional_write_op) in additional_aggregator_write_set {
+        for (key, additional_write_op) in additional_aggregator_v1_write_set {
             match aggregator_v1_write_set.entry(key) {
                 Occupied(mut entry) => {
                     squash_writes_pair!(entry, additional_write_op);
@@ -385,7 +385,6 @@ impl VMChangeSet {
         Self::squash_additional_aggregator_changes(
             &mut self.aggregator_v1_write_set,
             &mut self.aggregator_v1_delta_set,
-            &mut self.aggregator_v2_change_set,
             additional_aggregator_write_set,
             additional_aggregator_delta_set,
         )?;

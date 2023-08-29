@@ -5,7 +5,7 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
-use crate::{aggregator_extension::{DeltaValue, AggregatorState, DeltaHistory, validate_history}, module::AGGREGATOR_MODULE};
+use crate::{aggregator_extension::{DeltaValue, DeltaHistory}, module::AGGREGATOR_MODULE};
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
