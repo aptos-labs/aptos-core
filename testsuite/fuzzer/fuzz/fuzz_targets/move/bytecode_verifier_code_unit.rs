@@ -82,4 +82,4 @@ fuzz_target!(|code_unit: CodeUnit| {
     if utils::compiled_module_serde(&module).is_ok() {
         let _ = move_bytecode_verifier::verify_module(&module);
     }
- });
+});
