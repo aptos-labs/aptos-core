@@ -70,7 +70,7 @@ return true.
 -  [Function `signer_native_format_fix_enabled`](#0x1_features_signer_native_format_fix_enabled)
 -  [Function `get_module_event_feature`](#0x1_features_get_module_event_feature)
 -  [Function `module_event_enabled`](#0x1_features_module_event_enabled)
--  [Function `aggregator_snapshots_feature`](#0x1_features_aggregator_snapshots_feature)
+-  [Function `get_aggregator_snapshots_feature`](#0x1_features_get_aggregator_snapshots_feature)
 -  [Function `aggregator_snapshots_enabled`](#0x1_features_aggregator_snapshots_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
@@ -1321,13 +1321,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_aggregator_snapshots_feature"></a>
+<a name="0x1_features_get_aggregator_snapshots_feature"></a>
 
-## Function `aggregator_snapshots_feature`
+## Function `get_aggregator_snapshots_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_feature">aggregator_snapshots_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64
 </code></pre>
 
 
@@ -1336,7 +1336,7 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_feature">aggregator_snapshots_feature</a>(): u64 { <a href="features.md#0x1_features_AGGREGATOR_SNAPSHOTS">AGGREGATOR_SNAPSHOTS</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64 { <a href="features.md#0x1_features_AGGREGATOR_SNAPSHOTS">AGGREGATOR_SNAPSHOTS</a> }
 </code></pre>
 
 
