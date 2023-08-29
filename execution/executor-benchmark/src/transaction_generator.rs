@@ -470,7 +470,6 @@ impl TransactionGenerator {
         hotspot_probability: f32,
     ) {
         assert!((0.5..1.0).contains(&hotspot_probability));
-        info!("Started generating random transfers with hotspot probability {hotspot_probability}.");
         let num_accounts = self.main_signer_accounts.as_ref().unwrap().len();
         let num_hotspot_accounts =
             ((1.0 - hotspot_probability) * num_accounts as f32).ceil() as usize;
@@ -620,7 +619,13 @@ impl TransactionGenerator {
         shuffle_connected_txns: bool,
         hotspot_probability: Option<f32>,
     ) {
+        info!("Starting block generation.");
+        info!("block_size={block_size}");
+        info!("num_blocks={num_blocks}");
         if connected_tx_grps > 0 {
+            info!("block_generation_mode=connected_tx_grps");
+            info!("connected_tx_grps={connected_tx_grps}");
+            info!("shuffle_connected_txns={shuffle_connected_txns}");
             self.gen_connected_grps_transfer_transactions(
                 block_size,
                 num_blocks,
@@ -628,12 +633,16 @@ impl TransactionGenerator {
                 shuffle_connected_txns,
             );
         } else if hotspot_probability.is_some() {
+            info!("block_generation_mode=sample_from_pool_with_hotspot");
+            info!("hotspot_ratio={hotspot_probability:?}");
             self.gen_random_transfers_with_hotspot(
                 block_size,
                 num_blocks,
                 hotspot_probability.unwrap(),
             );
         } else {
+            info!("block_generation_mode=default_sample");
+            info!("transactions_per_sender={transactions_per_sender}");
             self.gen_random_transfer_transactions(block_size, num_blocks, transactions_per_sender);
         }
     }
