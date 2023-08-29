@@ -1228,6 +1228,7 @@ dependencies = [
  "bcs 0.1.4",
  "chrono",
  "clap 4.3.21",
+ "derivative",
  "indicatif 0.15.0",
  "itertools",
  "jemallocator",

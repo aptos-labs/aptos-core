@@ -20,7 +20,6 @@ use crate::{
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
 use aptos_block_executor::counters as block_executor_counters;
-use aptos_block_partitioner::PartitionerConfig;
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
 use aptos_executor::{
@@ -166,17 +165,7 @@ pub fn run_benchmark<V>(
             db.clone(),
             // Initialization pipeline is temporary, so needs to be fully committed.
             // No discards/aborts allowed during initialization, even if they are allowed later.
-            PipelineConfig {
-                delay_execution_start: false,
-                split_stages: false,
-                skip_commit: false,
-                allow_discards: false,
-                allow_aborts: false,
-                num_executor_shards: 1,
-                async_partitioning: false,
-                use_global_executor: false,
-                partitioner_config: PartitionerConfig::default(),
-            },
+            PipelineConfig::default(),
         )
     });
 
@@ -207,8 +196,8 @@ pub fn run_benchmark<V>(
         genesis_key,
         block_sender,
         source_dir,
-        version,
         Some(num_accounts_to_load),
+        pipeline_config.num_generator_workers,
     );
 
     let mut start_time = Instant::now();
@@ -446,11 +435,11 @@ fn add_accounts_impl<V>(
     config.storage.rocksdb_configs.skip_index_and_usage = skip_index_and_usage;
     let (db, executor) = init_db_and_executor::<V>(&config);
 
-    let version = db.reader.get_latest_version().unwrap();
+    let start_version = db.reader.get_latest_version().unwrap();
 
     let (pipeline, block_sender) = Pipeline::new(
         executor,
-        version,
+        start_version,
         pipeline_config,
         Some(1 + num_new_accounts / block_size * 101 / 100),
     );
@@ -460,8 +449,8 @@ fn add_accounts_impl<V>(
         genesis_key,
         block_sender,
         &source_dir,
-        version,
         None,
+        pipeline_config.num_generator_workers,
     );
 
     let start_time = Instant::now();
@@ -477,7 +466,8 @@ fn add_accounts_impl<V>(
     pipeline.join();
 
     let elapsed = start_time.elapsed().as_secs_f32();
-    let delta_v = db.reader.get_latest_version().unwrap() - version;
+    let now_version = db.reader.get_latest_version().unwrap();
+    let delta_v = now_version - start_version;
     info!(
         "Overall TPS: account creation: {} txn/s",
         delta_v as f32 / elapsed,
@@ -492,7 +482,7 @@ fn add_accounts_impl<V>(
     println!(
         "Created {} new accounts. Now at version {}, total # of accounts {}.",
         num_new_accounts,
-        generator.version(),
+        now_version,
         generator.num_existing_accounts() + num_new_accounts,
     );
 
@@ -587,17 +577,7 @@ mod tests {
             false,
             false,
             false,
-            PipelineConfig {
-                delay_execution_start: false,
-                split_stages: false,
-                skip_commit: false,
-                allow_discards: false,
-                allow_aborts: false,
-                num_executor_shards: 1,
-                async_partitioning: false,
-                use_global_executor: false,
-                partitioner_config: Default::default(),
-            },
+            PipelineConfig::default(),
         );
 
         println!("run_benchmark");
@@ -619,17 +599,7 @@ mod tests {
             false,
             false,
             false,
-            PipelineConfig {
-                delay_execution_start: false,
-                split_stages: true,
-                skip_commit: false,
-                allow_discards: false,
-                allow_aborts: false,
-                num_executor_shards: 1,
-                async_partitioning: false,
-                use_global_executor: false,
-                partitioner_config: Default::default(),
-            },
+            PipelineConfig::default(),
         );
     }
 

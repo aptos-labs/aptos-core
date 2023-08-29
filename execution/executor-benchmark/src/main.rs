@@ -105,6 +105,8 @@ pub struct PipelineOpt {
     #[clap(long)]
     use_global_executor: bool,
     #[clap(long, default_value = "4")]
+    num_generator_workers: usize,
+    #[clap(long, default_value = "4")]
     max_partitioning_rounds: usize,
     #[clap(long, default_value = "0.90")]
     partitioner_cross_shard_dep_avoid_threshold: f32,
@@ -127,6 +129,7 @@ impl PipelineOpt {
             num_executor_shards: self.num_executor_shards,
             async_partitioning: self.async_partitioning,
             use_global_executor: self.use_global_executor,
+            num_generator_workers: self.num_generator_workers,
             partitioner_config: self.partitioner_config(),
         }
     }
