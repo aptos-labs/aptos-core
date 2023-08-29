@@ -30,12 +30,12 @@ describe("BCS Serializer", () => {
   });
 
   it("serializes dynamic length bytes", () => {
-    serializer.serializeBytes(new Uint8Array([0x41, 0x70, 0x74, 0x6f, 0x73]));
+    serializer.serializeByteVector(new Uint8Array([0x41, 0x70, 0x74, 0x6f, 0x73]));
     expect(serializer.getBytes()).toEqual(new Uint8Array([5, 0x41, 0x70, 0x74, 0x6f, 0x73]));
   });
 
   it("serializes dynamic length bytes with zero elements", () => {
-    serializer.serializeBytes(new Uint8Array([]));
+    serializer.serializeByteVector(new Uint8Array([]));
     expect(serializer.getBytes()).toEqual(new Uint8Array([0]));
   });
 
@@ -183,7 +183,7 @@ describe("BCS Serializer", () => {
 
   it("serializes multiple values procedurally", () => {
     const serializedBytes = serializer
-      .serializeBytes(new Uint8Array([0x41, 0x70, 0x74, 0x6f, 0x73]))
+      .serializeByteVector(new Uint8Array([0x41, 0x70, 0x74, 0x6f, 0x73]))
       .serializeBool(true)
       .serializeBool(false)
       .serializeU8(254)
@@ -221,7 +221,7 @@ describe("BCS Serializer", () => {
           .serializeStr(this.name)
           .serializeStr(this.description)
           .serializeBool(this.enabled)
-          .serializeBytes(new Uint8Array(this.numbers));
+          .serializeByteVector(new Uint8Array(this.numbers));
       }
     }
     class MoveStructB implements Serializable {
@@ -237,7 +237,7 @@ describe("BCS Serializer", () => {
           .serialize(this.moveStructA)
           .serializeStr(this.name)
           .serializeStr(this.description)
-          .serializeBytes(new Uint8Array(this.numbers));
+          .serializeByteVector(new Uint8Array(this.numbers));
       }
     }
 

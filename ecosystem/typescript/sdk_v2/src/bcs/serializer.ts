@@ -69,7 +69,7 @@ export class Serializer {
    */
   serializeStr(value: string): this {
     const textEncoder = new TextEncoder();
-    this.serializeBytes(textEncoder.encode(value));
+    this.serializeByteVector(textEncoder.encode(value));
     return this;
   }
 
@@ -259,7 +259,7 @@ export class Serializer {
    * @returns the serializer instance
    */
   serialize<T extends Serializable>(value: T): this {
-    // NOTE: The `serialize` method called by `value` is defined in the
+    // NOTE: The `serialize` method called by `value` is defined in `value`'s
     // Serializable interface, not the one defined in this class.
     value.serialize(this);
     return this;
@@ -278,6 +278,11 @@ export class Serializer {
    */
   getBytes(): Uint8Array {
     return new Uint8Array(this.buffer).slice(0, this.offset);
+  }
+
+  // A static helper method to serialize a BCS `Serializable` value and return the bytes.
+  static toBCSBytes<T extends Serializable>(value: T): Uint8Array {
+    return new Serializer().serialize(value).getBytes();
   }
 }
 
