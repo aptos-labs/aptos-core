@@ -7,6 +7,7 @@ use crate::{
     move_vm_ext::{SessionExt, SessionId},
 };
 use anyhow::{bail, Result};
+use aptos_gas_algebra::Fee;
 use aptos_state_view::{StateView, StateViewId, TStateView};
 use aptos_types::{
     state_store::{
@@ -30,6 +31,7 @@ pub struct RespawnedSession<'r, 'l> {
     #[borrows(resolver)]
     #[not_covariant]
     session: Option<SessionExt<'this, 'l>>,
+    pub storage_refund: Fee,
 }
 
 impl<'r, 'l> RespawnedSession<'r, 'l> {
@@ -38,6 +40,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         session_id: SessionId,
         base_state_view: &'r dyn StateView,
         previous_session_change_set: VMChangeSet,
+        storage_refund: Fee,
     ) -> Result<Self, VMStatus> {
         let state_view = ChangeSetStateView::new(base_state_view, previous_session_change_set)?;
 
@@ -51,6 +54,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
                 )
             },
             session_builder: |resolver| Some(vm.new_session(resolver, session_id)),
+            storage_refund,
         }
         .build())
     }
@@ -76,6 +80,10 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
                 )
             })?;
         Ok(change_set)
+    }
+
+    pub fn get_storage_fee_refund(&self) -> Fee {
+        *self.borrow_storage_refund()
     }
 }
 
@@ -126,7 +134,7 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::delta_change_set::{delta_add, deserialize, serialize};
+    use aptos_aggregator::delta_change_set::{delta_add, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::write_set::WriteOp;
     use aptos_vm_types::check_change_set::CheckChangeSet;
@@ -150,8 +158,7 @@ mod test {
     }
 
     fn read(view: &ChangeSetStateView, s: impl ToString) -> u128 {
-        let bytes = view.get_state_value(&key(s)).unwrap().unwrap().into_bytes();
-        deserialize(&bytes)
+        view.get_state_value_u128(&key(s)).unwrap().unwrap()
     }
 
     #[test]

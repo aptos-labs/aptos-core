@@ -18,7 +18,7 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{AccountResource, CORE_CODE_ADDRESS},
+    account_config::{AccountResource, CoinStoreResource, CORE_CODE_ADDRESS},
     contract_event::ContractEvent,
     on_chain_config::{FeatureFlag, GasScheduleV2, OnChainConfig},
     state_store::{
@@ -77,6 +77,15 @@ impl MoveHarness {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor: FakeExecutor::from_head_genesis(),
+            txn_seq_no: BTreeMap::default(),
+            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+        }
+    }
+
+    pub fn new_with_executor(executor: FakeExecutor) -> Self {
+        register_package_hooks(Box::new(AptosPackageHooks {}));
+        Self {
+            executor,
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
         }
@@ -507,6 +516,12 @@ impl MoveHarness {
     /// Checks whether resource exists.
     pub fn exists_resource(&self, addr: &AccountAddress, struct_tag: StructTag) -> bool {
         self.read_resource_raw(addr, struct_tag).is_some()
+    }
+
+    pub fn read_aptos_balance(&self, addr: &AccountAddress) -> u64 {
+        self.read_resource::<CoinStoreResource>(addr, CoinStoreResource::struct_tag())
+            .unwrap()
+            .coin()
     }
 
     /// Write the resource data `T`.

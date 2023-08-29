@@ -274,7 +274,7 @@ where
                 genesis_config.recurring_lockup_duration_secs = 7200;
             })))
             .with_randomize_first_validator_ports(random_ports);
-        let (root_key, _genesis, genesis_waypoint, validators) = builder.build(rng)?;
+        let (root_key, _genesis, genesis_waypoint, mut validators) = builder.build(rng)?;
 
         // Write the mint key to disk
         let serialized_keys = bcs::to_bytes(&root_key)?;
@@ -287,6 +287,8 @@ where
             &mut fs::File::create(waypoint_file_path)?,
             genesis_waypoint.to_string().as_bytes(),
         )?;
+
+        aptos_config::config::sanitize_node_config(&mut validators[0].config)?;
 
         // Return the validator config
         validators[0].config.clone()

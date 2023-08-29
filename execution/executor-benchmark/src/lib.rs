@@ -103,7 +103,7 @@ pub fn run_benchmark<V>(
     mut transactions_per_sender: usize,
     connected_tx_grps: usize,
     shuffle_connected_txns: bool,
-    maybe_hotspot_probability: Option<f32>,
+    hotspot_probability: Option<f32>,
     num_main_signer_accounts: usize,
     num_additional_dst_pool_accounts: usize,
     source_dir: impl AsRef<Path>,
@@ -257,7 +257,7 @@ pub fn run_benchmark<V>(
             transactions_per_sender,
             connected_tx_grps,
             shuffle_connected_txns,
-            maybe_hotspot_probability,
+            hotspot_probability,
         );
     }
     if pipeline_config.delay_execution_start {

@@ -168,12 +168,12 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     /// Return the fee statement of the transaction.
     /// Should never be called after vm_output is consumed.
     fn fee_statement(&self) -> FeeStatement {
-        self.vm_output
+        *self
+            .vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get fee statement")
             .fee_statement()
-            .clone()
     }
 }
 
