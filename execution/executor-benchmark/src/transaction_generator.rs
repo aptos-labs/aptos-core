@@ -33,7 +33,6 @@ use std::{
     path::Path,
     sync::{mpsc, Arc},
 };
-use aptos_logger::info;
 
 const META_FILENAME: &str = "metadata.toml";
 pub const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
