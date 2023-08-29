@@ -14,6 +14,7 @@ use move_binary_format::file_format::{
     Visibility,
 };
 use move_core_types::{account_address::AccountAddress, ident_str};
+mod utils;
 
 #[derive(Arbitrary, Debug)]
 struct Mixed {
@@ -92,5 +93,7 @@ fuzz_target!(|mix: Mixed| {
     };
 
     module.function_defs.push(fun_def);
-    let _ = move_bytecode_verifier::verify_module(&module);
+    if utils::compiled_module_serde(&module).is_ok() {
+        let _ = move_bytecode_verifier::verify_module(&module);
+    }
 });
