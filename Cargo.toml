@@ -122,9 +122,9 @@ members = [
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
     "mempool",
-    "network",
     "network/builder",
     "network/discovery",
+    "network/framework",
     "network/memsocket",
     "network/netcore",
     "network/peer-monitoring-service/client",
@@ -349,7 +349,7 @@ aptos-moving-average = { path = "crates/moving-average" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
-aptos-network = { path = "network" }
+aptos-network = { path = "network/framework" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
@@ -363,8 +363,8 @@ aptos-openapi = { path = "crates/aptos-openapi" }
 aptos-package-builder = { path = "aptos-move/package-builder" }
 aptos-peer-monitoring-service-client = { path = "network/peer-monitoring-service/client" }
 aptos-peer-monitoring-service-server = { path = "network/peer-monitoring-service/server" }
-aptos-profiler = { path = "crates/aptos-profiler" }
 aptos-peer-monitoring-service-types = { path = "network/peer-monitoring-service/types" }
+aptos-profiler = { path = "crates/aptos-profiler" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "crates/aptos-protos" }
 aptos-proxy = { path = "crates/proxy" }

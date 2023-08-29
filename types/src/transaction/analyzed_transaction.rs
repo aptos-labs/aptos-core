@@ -122,8 +122,10 @@ impl AnalyzedTransaction {
         let mut write_hints = vec![
             Self::account_resource_location(sender_address),
             Self::coin_store_location(sender_address),
-            Self::coin_store_location(receiver_address),
         ];
+        if sender_address != receiver_address {
+            write_hints.push(Self::coin_store_location(receiver_address));
+        }
         if !receiver_exists {
             // If the receiver doesn't exist, we create the receiver account, so we need to write the
             // receiver account resource.

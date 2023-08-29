@@ -34,6 +34,8 @@ pub enum FeatureFlag {
     BULLETPROOFS_NATIVES = 24,
     SIGNER_NATIVE_FORMAT_FIX = 25,
     MODULE_EVENT = 26,
+    EMIT_FEE_STATEMENT = 27,
+    STORAGE_DELETION_REFUND = 28,
 }
 
 /// Representation of features on chain as a bitset.
@@ -74,6 +76,17 @@ impl Features {
 
     pub fn is_module_event_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::MODULE_EVENT)
+    }
+
+    pub fn is_emit_fee_statement_enabled(&self) -> bool {
+        // requires module events
+        self.is_module_event_enabled() && self.is_enabled(FeatureFlag::EMIT_FEE_STATEMENT)
+    }
+
+    pub fn is_storage_deletion_refund_enabled(&self) -> bool {
+        // requires emit fee statement
+        self.is_emit_fee_statement_enabled()
+            && self.is_enabled(FeatureFlag::STORAGE_DELETION_REFUND)
     }
 }
 

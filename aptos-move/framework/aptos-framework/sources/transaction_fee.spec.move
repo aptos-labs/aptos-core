@@ -133,6 +133,7 @@ spec aptos_framework::transaction_fee {
     spec burn_fee(account: address, fee: u64) {
         use aptos_std::type_info;
         use aptos_framework::optional_aggregator;
+        use aptos_framework::coin;
         use aptos_framework::coin::{CoinInfo, CoinStore};
 
 
@@ -146,7 +147,6 @@ spec aptos_framework::transaction_fee {
         let coin_store = global<CoinStore<AptosCoin>>(account_addr);
         let post post_coin_store = global<CoinStore<AptosCoin>>(account_addr);
 
-        modifies global<CoinInfo<AptosCoin>>(aptos_addr);
         modifies global<CoinStore<AptosCoin>>(account_addr);
 
         aborts_if amount != 0 && !(exists<CoinInfo<AptosCoin>>(aptos_addr)
@@ -154,8 +154,8 @@ spec aptos_framework::transaction_fee {
         aborts_if coin_store.coin.value < amount;
 
         let maybe_supply = global<CoinInfo<AptosCoin>>(aptos_addr).supply;
-        let supply = option::spec_borrow(maybe_supply);
-        let value = optional_aggregator::optional_aggregator_value(supply);
+        let supply_aggr = option::spec_borrow(maybe_supply);
+        let value = optional_aggregator::optional_aggregator_value(supply_aggr);
 
         let post post_maybe_supply = global<CoinInfo<AptosCoin>>(aptos_addr).supply;
         let post post_supply = option::spec_borrow(post_maybe_supply);
@@ -169,6 +169,29 @@ spec aptos_framework::transaction_fee {
         } else {
             option::spec_is_none(post_maybe_supply)
         };
+        ensures coin::supply<AptosCoin> == old(coin::supply<AptosCoin>) - amount;
+    }
+
+    spec mint_and_refund(account: address, refund: u64) {
+        use aptos_std::type_info;
+        use aptos_framework::aptos_coin::AptosCoin;
+        use aptos_framework::coin::{CoinInfo, CoinStore};
+        use aptos_framework::coin;
+
+        pragma opaque;
+
+        let aptos_addr = type_info::type_of<AptosCoin>().account_address;
+        modifies global<CoinInfo<AptosCoin>>(aptos_addr);
+
+        aborts_if !exists<CoinStore<AptosCoin>>(account);
+        modifies global<CoinStore<AptosCoin>>(account);
+
+        aborts_if !exists<AptosCoinMintCapability>(@aptos_framework);
+
+        let supply = coin::supply<AptosCoin>;
+        let post post_supply = coin::supply<AptosCoin>;
+        aborts_if [abstract] supply + refund > MAX_U128;
+        ensures post_supply == supply + refund;
     }
 
     spec collect_fee(account: address, fee: u64) {
@@ -199,5 +222,32 @@ spec aptos_framework::transaction_fee {
         aborts_if !system_addresses::is_aptos_framework_address(addr);
         aborts_if exists<AptosCoinCapabilities>(addr);
         ensures exists<AptosCoinCapabilities>(addr);
+    }
+
+    /// Ensure caller is admin.
+    /// Aborts if `AptosCoinMintCapability` already exists.
+    spec store_aptos_coin_mint_cap(aptos_framework: &signer, mint_cap: MintCapability<AptosCoin>) {
+        use std::signer;
+        let addr = signer::address_of(aptos_framework);
+        aborts_if !system_addresses::is_aptos_framework_address(addr);
+        aborts_if exists<AptosCoinMintCapability>(addr);
+        ensures exists<AptosCoinMintCapability>(addr);
+    }
+
+    /// Ensure caller is admin.
+    /// Aborts if `AptosCoinCapabilities` under the stake module does not exist.
+    /// Aborts if `AptosCoinMintCapability` already exists.
+    spec initialize_storage_refund(aptos_framework: &signer) {
+        use std::signer;
+        let addr = signer::address_of(aptos_framework);
+        aborts_if !system_addresses::is_aptos_framework_address(addr);
+        aborts_if !exists<stake::AptosCoinCapabilities>(addr);
+        aborts_if exists<AptosCoinMintCapability>(addr);
+        ensures exists<AptosCoinMintCapability>(addr);
+    }
+
+    /// Aborts if module event feature is not enabled.
+    spec emit_fee_statement {
+        aborts_if !std::features::spec_module_event_enabled();
     }
 }
