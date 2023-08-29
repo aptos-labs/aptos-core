@@ -2587,6 +2587,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-indexer-grpc-server-framework",
+ "aptos-metrics-core",
  "async-trait",
  "backoff",
  "base64 0.13.0",
@@ -2601,6 +2602,7 @@ dependencies = [
  "google-cloud-pubsub",
  "google-cloud-storage",
  "image",
+ "once_cell",
  "regex",
  "reqwest",
  "serde 1.0.149",
