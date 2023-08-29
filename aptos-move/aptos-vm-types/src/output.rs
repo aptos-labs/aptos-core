@@ -70,34 +70,21 @@ impl VMOutput {
     /// Materializes delta sets.
     /// Guarantees that if deltas are materialized successfully, the output
     /// has an empty delta set.
-    pub fn try_materialize_aggregator_v1_delta_set(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
+    pub fn try_materialize(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
         // First, check if output of transaction should be discarded or delta
         // change set is empty. In both cases, we do not need to apply any
         // deltas and can return immediately.
-        if self.status().is_discarded() || self.change_set().aggregator_v1_delta_set().is_empty() {
+        if self.status().is_discarded()
+            || (self.change_set().aggregator_v1_delta_set().is_empty()
+                && self.change_set().aggregator_v2_change_set().is_empty())
+        {
             return Ok(self);
         }
 
         let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
-        let materialized_change_set = change_set.try_materialize_aggregator_v1_delta_set(state_view)?;
-        Ok(VMOutput::new(
-            materialized_change_set,
-            fee_statement,
-            status,
-        ))
-    }
-
-    /// Materializes aggregator changes
-    pub fn try_materialize_aggregator_v2_changes(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
-        // First, check if output of transaction should be discarded or aggregator
-        // change set is empty. In both cases, we do not need to apply any
-        // deltas and can return immediately.
-        if self.status().is_discarded() || self.change_set().aggregator_v2_changes().is_empty() {
-            return Ok(self);
-        }
-
-        let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
-        let materialized_change_set = change_set.try_materialize_aggregator_v2_changes(state_view)?;
+        let materialized_change_set = change_set
+            .try_materialize_aggregator_v1_delta_set(state_view)?
+            .try_materialize_aggregator_v2_changes(state_view)?;
         Ok(VMOutput::new(
             materialized_change_set,
             fee_statement,

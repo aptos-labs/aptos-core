@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
+    aggregator_change_set::AggregatorChange,
     aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
     delta_change_set::DeltaOp,
-    resolver::AggregatorResolver, aggregator_change_set::AggregatorChange,
+    resolver::AggregatorResolver,
 };
 use better_any::{Tid, TidAble};
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-};
+use std::{cell::RefCell, collections::HashMap};
 
 pub type TxnIndex = u32;
 
@@ -85,18 +83,10 @@ impl<'a> NativeAggregatorContext<'a> {
                 AggregatorID::Legacy { .. } => {
                     let change = match state {
                         AggregatorState::Data { value } => AggregatorChangeV1::Write(value),
-                        AggregatorState::Delta {
-                            delta,
-                            history,
-                            ..
-                        } => {
-                            let delta_op = DeltaOp::new(
-                                delta,
-                                max_value,
-                                history
-                            );
+                        AggregatorState::Delta { delta, history, .. } => {
+                            let delta_op = DeltaOp::new(delta, max_value, history);
                             AggregatorChangeV1::Merge(delta_op)
-                        }
+                        },
                     };
                     aggregator_v1_changes.insert(id, change);
                 },
@@ -108,14 +98,20 @@ impl<'a> NativeAggregatorContext<'a> {
             aggregator_v1_changes.insert(id, AggregatorChangeV1::Delete);
         }
 
-        AggregatorChangeSet { aggregator_v1_changes, aggregator_v2_changes }
+        AggregatorChangeSet {
+            aggregator_v1_changes,
+            aggregator_v2_changes,
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::{aggregator_id_for_test, AggregatorStore, aggregator_extension::DeltaHistory};
+    use aptos_aggregator::{
+        aggregator_extension::{DeltaHistory, DeltaValue},
+        aggregator_id_for_test, AggregatorStore,
+    };
     use claims::{assert_matches, assert_ok};
 
     fn get_test_resolver() -> AggregatorStore {
@@ -154,17 +150,17 @@ mod test {
         aggregator_data
             .get_aggregator(aggregator_id_for_test(500), 500)
             .unwrap()
-            .try_add(150)
+            .try_add(context.resolver, 150)
             .unwrap();
         aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .unwrap()
-            .try_add(100)
+            .try_add(context.resolver, 100)
             .unwrap();
         aggregator_data
             .get_aggregator(aggregator_id_for_test(700), 700)
             .unwrap()
-            .try_add(200)
+            .try_add(context.resolver, 200)
             .unwrap();
 
         aggregator_data.remove_aggregator(aggregator_id_for_test(100));
@@ -180,34 +176,59 @@ mod test {
         let context = NativeAggregatorContext::new([0; 32], &resolver);
 
         test_set_up(&context);
-        let AggregatorChangeSet { aggregator_v1_changes, aggregator_v2_changes } = context.into_change_set();
+        let AggregatorChangeSet {
+            aggregator_v1_changes,
+            ..
+        } = context.into_change_set();
 
-        assert!(!changes.contains_key(&aggregator_id_for_test(100)));
+        assert!(!aggregator_v1_changes.contains_key(&aggregator_id_for_test(100)));
         assert_matches!(
-            aggregator_v1_changes.get(&aggregator_id_for_test(200)).unwrap(),
+            aggregator_v1_changes
+                .get(&aggregator_id_for_test(200))
+                .unwrap(),
             AggregatorChangeV1::Write(0)
         );
-        assert!(!changes.contains_key(&aggregator_id_for_test(300)));
+        assert!(!aggregator_v1_changes.contains_key(&aggregator_id_for_test(300)));
         assert_matches!(
-            aggregator_v1_changes.get(&aggregator_id_for_test(400)).unwrap(),
+            aggregator_v1_changes
+                .get(&aggregator_id_for_test(400))
+                .unwrap(),
             AggregatorChangeV1::Write(0)
         );
         assert_matches!(
-            aggregator_v1_changes.get(&aggregator_id_for_test(500)).unwrap(),
+            aggregator_v1_changes
+                .get(&aggregator_id_for_test(500))
+                .unwrap(),
             AggregatorChangeV1::Delete
         );
-        let delta_100 = DeltaOp::new(DeltaUpdate::Plus(100), 600, DeltaHistory { max_achieved_positive_delta: 100, min_achieved_negative_delta: 0, min_overflow_positive_delta: None, max_underflow_negative_delta: None });
+        let delta_100 = DeltaOp::new(DeltaValue::Positive(100), 600, DeltaHistory {
+            max_achieved_positive_delta: 100,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        });
         assert_eq!(
-            *aggregator_v1_changes.get(&aggregator_id_for_test(600)).unwrap(),
+            *aggregator_v1_changes
+                .get(&aggregator_id_for_test(600))
+                .unwrap(),
             AggregatorChangeV1::Merge(delta_100)
         );
-        let delta_200 = DeltaOp::new(DeltaUpdate::Plus(200), 700, DeltaHistory { max_achieved_positive_delta: 200, min_achieved_negative_delta: 0, min_overflow_positive_delta: None, max_underflow_negative_delta: None });
+        let delta_200 = DeltaOp::new(DeltaValue::Positive(200), 700, DeltaHistory {
+            max_achieved_positive_delta: 200,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        });
         assert_eq!(
-            *aggregator_v1_changes.get(&aggregator_id_for_test(700)).unwrap(),
+            *aggregator_v1_changes
+                .get(&aggregator_id_for_test(700))
+                .unwrap(),
             AggregatorChangeV1::Merge(delta_200)
         );
         assert_matches!(
-            aggregator_v1_changes.get(&aggregator_id_for_test(800)).unwrap(),
+            aggregator_v1_changes
+                .get(&aggregator_id_for_test(800))
+                .unwrap(),
             AggregatorChangeV1::Delete
         );
     }

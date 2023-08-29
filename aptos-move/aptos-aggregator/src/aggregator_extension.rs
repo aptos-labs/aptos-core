@@ -222,7 +222,11 @@ pub struct AggregatorSnapshot {
 /// the `base_value` is the starting value of the aggregator before the
 /// transaction execution, all the previous calls to try_add/try_sub
 /// functions returned the correct result.
-pub fn validate_history(base_value: u128, max_value: u128, state: &AggregatorState) -> PartialVMResult<()> {
+pub fn validate_history(
+    base_value: u128,
+    max_value: u128,
+    state: &AggregatorState,
+) -> PartialVMResult<()> {
     if let AggregatorState::Delta {
         speculative_start_value,
         speculative_source: _,
@@ -235,11 +239,7 @@ pub fn validate_history(base_value: u128, max_value: u128, state: &AggregatorSta
         //     base_value >= min_achieved_negative_delta
         //     base_value + min_overflow_positive_delta > self.max_value
         //     base_value < max_underflow_negative_delta
-        addition(
-            base_value,
-            history.max_achieved_positive_delta,
-            max_value,
-        )?;
+        addition(base_value, history.max_achieved_positive_delta, max_value)?;
         subtraction(base_value, history.min_achieved_negative_delta)?;
 
         if history.min_overflow_positive_delta.is_some()
@@ -276,7 +276,6 @@ pub struct Aggregator {
     // Describes a state of an aggregator.
     state: AggregatorState,
 }
-
 
 impl Aggregator {
     fn get_mut_history(&mut self) -> Option<&mut DeltaHistory> {
@@ -318,7 +317,7 @@ impl Aggregator {
     fn get_delta(&self) -> Option<DeltaValue> {
         match self.state {
             AggregatorState::Data { .. } => None,
-            AggregatorState::Delta {delta, ..} => Some(delta),
+            AggregatorState::Delta { delta, .. } => Some(delta),
         }
     }
 
@@ -326,12 +325,16 @@ impl Aggregator {
     fn get_history(&self) -> Option<&DeltaHistory> {
         match self.state {
             AggregatorState::Data { .. } => None,
-            AggregatorState::Delta {ref history, ..} => Some(history),
+            AggregatorState::Delta { ref history, .. } => Some(history),
         }
     }
 
     /// Implements logic for adding to an aggregator.
-    pub fn try_add(&mut self, resolver: &dyn AggregatorResolver, input: u128) -> PartialVMResult<()> {
+    pub fn try_add(
+        &mut self,
+        resolver: &dyn AggregatorResolver,
+        input: u128,
+    ) -> PartialVMResult<()> {
         if input > self.max_value {
             // we do not have to record the overflow.
             // We record the delta that result in overflows/underflows so that when we compute the actual value
@@ -432,7 +435,11 @@ impl Aggregator {
     }
 
     /// Implements logic for subtracting from an aggregator.
-    pub fn try_sub(&mut self, resolver: &dyn AggregatorResolver, input: u128) -> PartialVMResult<()> {
+    pub fn try_sub(
+        &mut self,
+        resolver: &dyn AggregatorResolver,
+        input: u128,
+    ) -> PartialVMResult<()> {
         if input > self.max_value {
             // we do not have to record the underflow.
             // We record the delta that result in overflows/underflows so that when we compute the actual value
@@ -563,12 +570,16 @@ impl Aggregator {
                     })?;
 
                 // Assert that the history is empty.
-                assert_eq!(*self.get_history().unwrap(), DeltaHistory {
-                    max_achieved_positive_delta: 0,
-                    min_achieved_negative_delta: 0,
-                    min_overflow_positive_delta: None,
-                    max_underflow_negative_delta: None,
-                }, "History must be empty when reading the last committed value");
+                assert_eq!(
+                    *self.get_history().unwrap(),
+                    DeltaHistory {
+                        max_achieved_positive_delta: 0,
+                        min_achieved_negative_delta: 0,
+                        min_overflow_positive_delta: None,
+                        max_underflow_negative_delta: None,
+                    },
+                    "History must be empty when reading the last committed value"
+                );
                 self.state = AggregatorState::Delta {
                     speculative_start_value: value_from_storage,
                     speculative_source: SpeculativeValueSource::LastCommittedValue,
@@ -811,10 +822,7 @@ mod test {
     #[test]
     fn test_read_aggregator_not_in_storage() {
         let mut aggregator_data = AggregatorData::default();
-        assert_err!(aggregator_data.get_aggregator(
-            aggregator_id_for_test(300),
-            700
-        ));
+        assert_err!(aggregator_data.get_aggregator(aggregator_id_for_test(300), 700));
     }
 
     #[test]
@@ -1102,10 +1110,26 @@ mod test {
                 max_underflow_negative_delta: None,
             }
         });
-        assert_ok!(validate_history(200, aggregator.max_value, &aggregator.state));
-        assert_err!(validate_history(199, aggregator.max_value, &aggregator.state));
-        assert_ok!(validate_history(300, aggregator.max_value, &aggregator.state));
-        assert_err!(validate_history(301, aggregator.max_value, &aggregator.state));
+        assert_ok!(validate_history(
+            200,
+            aggregator.max_value,
+            &aggregator.state
+        ));
+        assert_err!(validate_history(
+            199,
+            aggregator.max_value,
+            &aggregator.state
+        ));
+        assert_ok!(validate_history(
+            300,
+            aggregator.max_value,
+            &aggregator.state
+        ));
+        assert_err!(validate_history(
+            301,
+            aggregator.max_value,
+            &aggregator.state
+        ));
     }
 
     #[test]
@@ -1130,10 +1154,26 @@ mod test {
                 max_underflow_negative_delta: None,
             }
         });
-        assert_err!(validate_history(199, aggregator.max_value, &aggregator.state));
-        assert_ok!(validate_history(200, aggregator.max_value, &aggregator.state));
-        assert_ok!(validate_history(300, aggregator.max_value, &aggregator.state));
-        assert_err!(validate_history(301, aggregator.max_value, &aggregator.state));
+        assert_err!(validate_history(
+            199,
+            aggregator.max_value,
+            &aggregator.state
+        ));
+        assert_ok!(validate_history(
+            200,
+            aggregator.max_value,
+            &aggregator.state
+        ));
+        assert_ok!(validate_history(
+            300,
+            aggregator.max_value,
+            &aggregator.state
+        ));
+        assert_err!(validate_history(
+            301,
+            aggregator.max_value,
+            &aggregator.state
+        ));
     }
 
     #[test]
@@ -1159,10 +1199,30 @@ mod test {
                 max_underflow_negative_delta: Some(201),
             }
         });
-        assert_ok!(validate_history(100, aggregator.max_value, &aggregator.state));
-        assert_ok!(validate_history(199, aggregator.max_value, &aggregator.state));
-        assert_ok!(validate_history(200, aggregator.max_value, &aggregator.state));
-        assert_err!(validate_history(201, aggregator.max_value, &aggregator.state));
-        assert_err!(validate_history(400, aggregator.max_value, &aggregator.state));
+        assert_ok!(validate_history(
+            100,
+            aggregator.max_value,
+            &aggregator.state
+        ));
+        assert_ok!(validate_history(
+            199,
+            aggregator.max_value,
+            &aggregator.state
+        ));
+        assert_ok!(validate_history(
+            200,
+            aggregator.max_value,
+            &aggregator.state
+        ));
+        assert_err!(validate_history(
+            201,
+            aggregator.max_value,
+            &aggregator.state
+        ));
+        assert_err!(validate_history(
+            400,
+            aggregator.max_value,
+            &aggregator.state
+        ));
     }
 }

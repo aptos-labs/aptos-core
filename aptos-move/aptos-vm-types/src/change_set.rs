@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::check_change_set::CheckChangeSet;
-use aptos_aggregator::{delta_change_set::{deserialize, serialize, DeltaOp}, aggregator_extension::AggregatorID, aggregator_change_set::AggregatorChange};
+use aptos_aggregator::{
+    aggregator_change_set::AggregatorChange,
+    aggregator_extension::AggregatorID,
+    delta_change_set::{deserialize, serialize, DeltaOp},
+};
 use aptos_state_view::StateView;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -197,13 +201,20 @@ impl VMChangeSet {
         &self.aggregator_v1_delta_set
     }
 
+    pub fn aggregator_v2_change_set(&self) -> &HashMap<AggregatorID, AggregatorChange> {
+        &self.aggregator_v2_change_set
+    }
+
     pub fn events(&self) -> &[ContractEvent] {
         &self.events
     }
 
     /// Materializes this change set: all aggregator v1 deltas are converted into writes and
     /// are combined with existing aggregator writes. The aggregator v2 changeset is not touched.
-    pub fn try_materialize_aggregator_v1_delta_set(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
+    pub fn try_materialize_aggregator_v1_delta_set(
+        self,
+        state_view: &impl StateView,
+    ) -> anyhow::Result<Self, VMStatus> {
         let Self {
             resource_write_set,
             module_write_set,
@@ -219,11 +230,10 @@ impl VMChangeSet {
                 Ok((state_key, write))
             };
 
-        let materialized_aggregator_delta_set =
-            aggregator_v1_delta_set
-                .into_iter()
-                .map(into_write)
-                .collect::<anyhow::Result<HashMap<StateKey, WriteOp>, VMStatus>>()?;
+        let materialized_aggregator_delta_set = aggregator_v1_delta_set
+            .into_iter()
+            .map(into_write)
+            .collect::<anyhow::Result<HashMap<StateKey, WriteOp>, VMStatus>>()?;
         aggregator_v1_write_set.extend(materialized_aggregator_delta_set.into_iter());
 
         Ok(Self {
@@ -236,28 +246,37 @@ impl VMChangeSet {
         })
     }
 
-    pub fn try_materialize_aggregator_v2_changes(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
+    pub fn try_materialize_aggregator_v2_changes(
+        self,
+        state_view: &impl StateView,
+    ) -> anyhow::Result<Self, VMStatus> {
         let Self {
             resource_write_set,
             module_write_set,
-            mut aggregator_v1_write_set,
+            aggregator_v1_write_set,
             aggregator_v1_delta_set,
             aggregator_v2_change_set,
             events,
         } = self;
 
-        let materialize_aggregator =
-            |(aggregator_id, aggregator_change): (AggregatorID, AggregatorChange)| -> anyhow::Result<(AggregatorID, AggregatorChange), VMStatus> {
-                let aggregator_change = aggregator_change.materialize_aggregator(state_view, &aggregator_id)?;
-                Ok((aggregator_id, aggregator_change))
-            };
-        
-        let aggregator_v2_change_set =
-            aggregator_v2_change_set
-                .into_iter()
-                .map(materialize_aggregator)
-                .collect::<anyhow::Result<HashMap<AggregatorID, AggregatorChange>, VMStatus>>()?;
-        
+        let materialize_aggregator = |(aggregator_id, aggregator_change): (
+            AggregatorID,
+            AggregatorChange,
+        )|
+         -> anyhow::Result<
+            (AggregatorID, AggregatorChange),
+            VMStatus,
+        > {
+            let aggregator_change =
+                aggregator_change.materialize_aggregator(state_view, &aggregator_id)?;
+            Ok((aggregator_id, aggregator_change))
+        };
+
+        let aggregator_v2_change_set = aggregator_v2_change_set
+            .into_iter()
+            .map(materialize_aggregator)
+            .collect::<anyhow::Result<HashMap<AggregatorID, AggregatorChange>, VMStatus>>()?;
+
         Ok(Self {
             resource_write_set,
             module_write_set,
@@ -378,7 +397,7 @@ impl VMChangeSet {
             module_write_set: additional_module_write_set,
             aggregator_v1_write_set: additional_aggregator_write_set,
             aggregator_v1_delta_set: additional_aggregator_delta_set,
-            aggregator_v2_change_set: additional_aggregator_change_set,
+            aggregator_v2_change_set: _additional_aggregator_change_set,
             events: additional_events,
         } = additional_change_set;
 

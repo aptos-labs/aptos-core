@@ -5,7 +5,10 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
-use crate::{aggregator_extension::{DeltaValue, DeltaHistory}, module::AGGREGATOR_MODULE};
+use crate::{
+    aggregator_extension::{DeltaHistory, DeltaValue},
+    module::AGGREGATOR_MODULE,
+};
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
@@ -44,11 +47,7 @@ pub struct DeltaOp {
 
 impl DeltaOp {
     /// Creates a new delta op.
-    pub fn new(
-        update: DeltaValue,
-        max_value: u128,
-        history: DeltaHistory
-        ) -> Self {
+    pub fn new(update: DeltaValue, max_value: u128, history: DeltaHistory) -> Self {
         Self {
             history,
             max_value,
@@ -68,7 +67,11 @@ impl DeltaOp {
         // this is possible if the values observed during execution didn't
         // overflow or dropped below zero. The check can be emulated by actually
         // doing addition and subtraction.
-        addition(base, self.history.max_achieved_positive_delta, self.max_value)?;
+        addition(
+            base,
+            self.history.max_achieved_positive_delta,
+            self.max_value,
+        )?;
         subtraction(base, self.history.min_achieved_negative_delta)?;
 
         // If delta has been successfully validated, apply the update.
@@ -83,9 +86,11 @@ impl DeltaOp {
         match delta.update {
             // Suppose that maximum value seen is +M and we shift by +V. Then the
             // new maximum value is M+V provided addition do no overflow.
-            DeltaValue::Positive(value) => {
-                addition(value, self.history.max_achieved_positive_delta, self.max_value)
-            },
+            DeltaValue::Positive(value) => addition(
+                value,
+                self.history.max_achieved_positive_delta,
+                self.max_value,
+            ),
             // Suppose that maximum value seen is +M and we shift by -V this time.
             // If M >= V, the result is +(M-V). Otherwise, `self` should have never
             // reached any positive value. By convention, we use 0 for the latter
@@ -110,9 +115,11 @@ impl DeltaOp {
             // Otherwise, given  the minimum value of -M and the shift of -V the new
             // minimum value becomes -(M+V), which of course can overflow on addition,
             // implying that we subtracted too much and there was an underflow.
-            DeltaValue::Negative(value) => {
-                addition(value, self.history.min_achieved_negative_delta, self.max_value)
-            },
+            DeltaValue::Negative(value) => addition(
+                value,
+                self.history.min_achieved_negative_delta,
+                self.max_value,
+            ),
         }
     }
 
@@ -272,14 +279,20 @@ impl std::fmt::Debug for DeltaOp {
                 write!(
                     f,
                     "+{} ensures 0 <= result <= {}, range [-{}, {}]",
-                    value, self.max_value, self.history.min_achieved_negative_delta, self.history.max_achieved_positive_delta
+                    value,
+                    self.max_value,
+                    self.history.min_achieved_negative_delta,
+                    self.history.max_achieved_positive_delta
                 )
             },
             DeltaValue::Negative(value) => {
                 write!(
                     f,
                     "-{} ensures 0 <= result <= {}, range [-{}, {}]",
-                    value, self.max_value, self.history.min_achieved_negative_delta, self.history.max_achieved_positive_delta
+                    value,
+                    self.max_value,
+                    self.history.min_achieved_negative_delta,
+                    self.history.max_achieved_positive_delta
                 )
             },
         }
@@ -298,12 +311,22 @@ pub fn deserialize(value_bytes: &[u8]) -> u128 {
 
 // Helper for tests, #[cfg(test)] doesn't work for cross-crate.
 pub fn delta_sub(v: u128, max_value: u128) -> DeltaOp {
-    DeltaOp::new(DeltaValue::Negative(v), max_value, DeltaHistory {max_achieved_positive_delta: 0, min_achieved_negative_delta: v, min_overflow_positive_delta: None, max_underflow_negative_delta: None})
+    DeltaOp::new(DeltaValue::Negative(v), max_value, DeltaHistory {
+        max_achieved_positive_delta: 0,
+        min_achieved_negative_delta: v,
+        min_overflow_positive_delta: None,
+        max_underflow_negative_delta: None,
+    })
 }
 
 // Helper for tests, #[cfg(test)] doesn't work for cross-crate.
 pub fn delta_add(v: u128, max_value: u128) -> DeltaOp {
-    DeltaOp::new(DeltaValue::Positive(v), max_value, DeltaHistory {max_achieved_positive_delta: v, min_achieved_negative_delta: 0, min_overflow_positive_delta: None, max_underflow_negative_delta: None})
+    DeltaOp::new(DeltaValue::Positive(v), max_value, DeltaHistory {
+        max_achieved_positive_delta: v,
+        min_achieved_negative_delta: 0,
+        min_overflow_positive_delta: None,
+        max_underflow_negative_delta: None,
+    })
 }
 
 #[cfg(test)]
