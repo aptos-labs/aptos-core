@@ -189,6 +189,9 @@ struct Opt {
     #[clap(long)]
     shuffle_connected_txns: bool,
 
+    #[clap(long, conflicts_with_all = &["connected_tx_grps", "transactions_per_sender"])]
+    hotspot_probability: Option<f32>,
+
     #[clap(long)]
     concurrency_level: Option<usize>,
 
@@ -345,6 +348,12 @@ where
                 Some(mix_per_phase[0].clone())
             };
 
+            if let Some(hotspot_probability) = opt.hotspot_probability {
+                if !(0.5..1.0).contains(&hotspot_probability) {
+                    panic!("Parameter hotspot-probability has to a decimal number in [0.5, 1.0).");
+                }
+            }
+
             aptos_executor_benchmark::run_benchmark::<E>(
                 opt.block_size,
                 blocks,
@@ -352,6 +361,7 @@ where
                 opt.transactions_per_sender,
                 opt.connected_tx_grps,
                 opt.shuffle_connected_txns,
+                opt.hotspot_probability,
                 main_signer_accounts,
                 additional_dst_pool_accounts,
                 data_dir,

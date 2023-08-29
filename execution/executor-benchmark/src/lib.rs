@@ -103,6 +103,7 @@ pub fn run_benchmark<V>(
     mut transactions_per_sender: usize,
     connected_tx_grps: usize,
     shuffle_connected_txns: bool,
+    hotspot_probability: Option<f32>,
     num_main_signer_accounts: usize,
     num_additional_dst_pool_accounts: usize,
     source_dir: impl AsRef<Path>,
@@ -256,6 +257,7 @@ pub fn run_benchmark<V>(
             transactions_per_sender,
             connected_tx_grps,
             shuffle_connected_txns,
+            hotspot_probability,
         );
     }
     if pipeline_config.delay_execution_start {
@@ -599,6 +601,7 @@ mod tests {
             2,     /* transactions per sender */
             0,     /* connected txn groups in a block */
             false, /* shuffle the connected txns in a block */
+            None,  /* maybe_hotspot_probability */
             25,    /* num_main_signer_accounts */
             30,    /* num_dst_pool_accounts */
             storage_dir.as_ref(),
