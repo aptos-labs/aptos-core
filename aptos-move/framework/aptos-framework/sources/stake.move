@@ -987,13 +987,13 @@ module aptos_framework::stake {
     public(friend) fun update_performance_statistics(proposer_index: Option<u64>, failed_proposer_indices: vector<u64>) acquires ValidatorPerformance {
         // Validator set cannot change until the end of the epoch, so the validator index in arguments should
         // match with those of the validators in ValidatorPerformance resource.
-        spec {
-            update g_validator_perf = global<ValidatorPerformance>(@aptos_framework);
-        };
-
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
         let validator_len = vector::length(&validator_perf.validators);
 
+        spec {
+            update valid = validator_perf;
+            update ghost_prosper_idx = proposer_index;
+        };
         // proposer_index is an option because it can be missing (for NilBlocks)
         if (option::is_some(&proposer_index)) {
             let cur_proposer_index = option::extract(&mut proposer_index);
@@ -1013,6 +1013,9 @@ module aptos_framework::stake {
         while ({
             spec {
                 invariant len(validator_perf.validators) == validator_len;
+                invariant (option::spec_is_some(ghost_prosper_idx) && option::spec_borrow(ghost_prosper_idx) < validator_len) ==>
+                    (validator_perf.validators[option::spec_borrow(ghost_prosper_idx)].successful_proposals ==
+                        valid.validators[option::spec_borrow(ghost_prosper_idx)].successful_proposals + 1);
             };
             f < f_len
         }) {
