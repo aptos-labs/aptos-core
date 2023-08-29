@@ -18,7 +18,7 @@ use tokio::sync::{mpsc::Receiver, oneshot};
 #[derive(Debug)]
 pub enum BatchCoordinatorCommand {
     Shutdown(oneshot::Sender<()>),
-    NewBatches(Vec<Batch>),
+    NewBatches(PeerId, Vec<Batch>),
 }
 
 pub struct BatchCoordinator {
@@ -59,14 +59,10 @@ impl BatchCoordinator {
 
         let batch_store = self.batch_store.clone();
         let network_sender = self.network_sender.clone();
-        let my_peer_id = self.my_peer_id;
         tokio::spawn(async move {
             let peer_id = persist_requests[0].author();
             let signed_batch_infos = batch_store.persist(persist_requests);
             if !signed_batch_infos.is_empty() {
-                if my_peer_id != peer_id {
-                    counters::RECEIVED_REMOTE_BATCHES_COUNT.inc_by(signed_batch_infos.len() as u64);
-                }
                 network_sender
                     .send_signed_batch_info_msg(signed_batch_infos, vec![peer_id])
                     .await;
@@ -110,15 +106,19 @@ impl BatchCoordinator {
         Ok(())
     }
 
-    async fn handle_batches_msg(&mut self, batches: Vec<Batch>) {
+    async fn handle_batches_msg(&mut self, author: PeerId, batches: Vec<Batch>) {
         if let Err(e) = self.ensure_max_limits(&batches) {
-            warn!("Batch from {}: {}", batches.first().unwrap().author(), e);
+            warn!("Batch from {}: {}", author, e);
             return;
         }
 
         let mut persist_requests = vec![];
         for batch in batches.into_iter() {
             persist_requests.push(batch.into());
+        }
+        counters::RECEIVED_BATCH_COUNT.inc_by(persist_requests.len() as u64);
+        if author != self.my_peer_id {
+            counters::RECEIVED_REMOTE_BATCH_COUNT.inc_by(persist_requests.len() as u64);
         }
         self.persist_and_send_digests(persist_requests);
     }
@@ -132,8 +132,8 @@ impl BatchCoordinator {
                         .expect("Failed to send shutdown ack to QuorumStoreCoordinator");
                     break;
                 },
-                BatchCoordinatorCommand::NewBatches(batches) => {
-                    self.handle_batches_msg(batches).await;
+                BatchCoordinatorCommand::NewBatches(author, batches) => {
+                    self.handle_batches_msg(author, batches).await;
                 },
             }
         }

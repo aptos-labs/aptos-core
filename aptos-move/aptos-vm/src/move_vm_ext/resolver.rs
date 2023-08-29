@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_aggregator::resolver::AggregatorResolver;
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
 use aptos_table_natives::TableResolver;
@@ -31,6 +32,7 @@ pub trait StateValueMetadataResolver {
 /// top of storage, e.g. get resources from resource groups, etc.
 pub trait AptosMoveResolver:
     MoveResolver
+    + AggregatorResolver
     + TableResolver
     + StateStorageUsageResolver
     + StateValueMetadataResolver

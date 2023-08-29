@@ -17,6 +17,7 @@ AUTH
 AWS
 Ait
 AlertManager
+allowfullscreen
 Ansible
 ApiExplorer
 Aptos
@@ -28,6 +29,7 @@ AptosNet
 AptosRelease
 AptosToken
 AptosWalletAdapterProvider
+asia
 BCS
 BFT
 BIP
@@ -134,6 +136,7 @@ GLB
 GLTF
 GPU
 GPUs
+GRPC
 GUID
 Gbps
 Grafana
@@ -143,6 +146,7 @@ Homebrew
 HotStuff
 IDE
 IDEs
+iframe
 IMCODING
 IOPS
 IPFS
@@ -209,10 +213,12 @@ PropertyMap
 Prover
 PureEdDSA
 PyPi
+px
 Quickstart
 RBAC
 README
 READMEs
+rgba
 RPC
 RTT
 RawTransaction

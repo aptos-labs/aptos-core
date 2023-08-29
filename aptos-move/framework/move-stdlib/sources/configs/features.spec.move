@@ -68,4 +68,10 @@ spec std::features {
         aborts_if [abstract] false;
         ensures [abstract] result == spec_partial_governance_voting_enabled();
     }
+
+    spec module_event_enabled {
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_module_event_enabled();
+    }
 }

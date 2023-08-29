@@ -10,7 +10,7 @@ use diesel::{
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tracing::warn;
+use tracing::info;
 
 #[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
 #[diesel(primary_key(token_uri))]
@@ -48,7 +48,7 @@ impl NFTMetadataCrawlerURIsQuery {
 
         match retry(backoff, &mut op) {
             Ok(result) => {
-                warn!(token_uri = token_uri, "token_uri has been found");
+                info!(token_uri = token_uri, "token_uri has been found");
                 Ok(result)
             },
             Err(_) => Ok(op()?),
@@ -76,7 +76,7 @@ impl NFTMetadataCrawlerURIsQuery {
 
         match retry(backoff, &mut op) {
             Ok(result) => {
-                warn!(
+                info!(
                     raw_image_uri = raw_image_uri,
                     "raw_image_uri has been found"
                 );
@@ -107,7 +107,7 @@ impl NFTMetadataCrawlerURIsQuery {
 
         match retry(backoff, &mut op) {
             Ok(result) => {
-                warn!(
+                info!(
                     raw_animation_uri = raw_animation_uri,
                     "raw_animation_uri has been found"
                 );

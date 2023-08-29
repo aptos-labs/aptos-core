@@ -319,7 +319,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
- "aptos-language-e2e-tests",
  "aptos-state-view",
  "aptos-table-natives",
  "aptos-types",
@@ -1356,6 +1355,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-experimental-runtimes"
+version = "0.1.0"
+dependencies = [
+ "aptos-runtimes",
+ "core_affinity",
+ "libc",
+ "num_cpus",
+ "once_cell",
+ "rayon",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-fallible"
 version = "0.1.0"
 dependencies = [
@@ -1541,7 +1553,6 @@ dependencies = [
  "aptos-gas-algebra",
  "aptos-gas-meter",
  "aptos-gas-schedule",
- "aptos-language-e2e-tests",
  "aptos-move-stdlib",
  "aptos-native-interface",
  "aptos-sdk-builder",
@@ -1880,6 +1891,7 @@ dependencies = [
  "anyhow",
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
+ "aptos-logger",
  "aptos-metrics-core",
  "aptos-moving-average",
  "aptos-protos",
@@ -2018,39 +2030,6 @@ dependencies = [
  "tracing",
  "url",
  "warp",
-]
-
-[[package]]
-name = "aptos-indexer-grpc-parser"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "aptos-indexer-grpc-server-framework",
- "aptos-indexer-grpc-utils",
- "aptos-metrics-core",
- "aptos-moving-average",
- "aptos-protos",
- "aptos-runtimes",
- "async-trait",
- "base64 0.13.0",
- "bcs 0.1.4",
- "bigdecimal",
- "chrono",
- "clap 4.3.21",
- "diesel",
- "diesel_migrations",
- "field_count",
- "futures",
- "hex",
- "once_cell",
- "prost",
- "regex",
- "serde 1.0.149",
- "serde_json",
- "sha2 0.9.9",
- "tokio",
- "tonic 0.8.3",
- "tracing",
 ]
 
 [[package]]
@@ -2223,7 +2202,6 @@ dependencies = [
  "aptos-native-interface",
  "aptos-proptest-helpers",
  "aptos-state-view",
- "aptos-table-natives",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
@@ -3099,6 +3077,7 @@ dependencies = [
 name = "aptos-runtimes"
 version = "0.1.0"
 dependencies = [
+ "rayon",
  "tokio",
 ]
 
@@ -3609,6 +3588,7 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-node-resource-metrics",
  "aptos-push-metrics",
  "aptos-types",
  "aptos-vm",
@@ -3936,6 +3916,7 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-state-view",
  "aptos-types",
+ "bcs 0.1.4",
  "claims",
  "either",
  "move-binary-format",
@@ -5451,6 +5432,17 @@ name = "core-foundation-sys"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
+
+[[package]]
+name = "core_affinity"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "622892f5635ce1fc38c8f16dfc938553ed64af482edb5e150bf4caedbfcb2304"
+dependencies = [
+ "libc",
+ "num_cpus",
+ "winapi 0.3.9",
+]
 
 [[package]]
 name = "cpp_demangle"
@@ -10152,11 +10144,11 @@ dependencies = [
 
 [[package]]
 name = "num_cpus"
-version = "1.13.1"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19e64526ebdee182341572e50e9ad03965aa510cd94427a4549448f285e957a1"
+checksum = "4161fcb6d602d4d2081af7c3a45852d875a03dd337a6bfdd6e06407b61342a43"
 dependencies = [
- "hermit-abi 0.1.19",
+ "hermit-abi 0.3.1",
  "libc",
 ]
 

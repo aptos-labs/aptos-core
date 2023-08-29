@@ -264,6 +264,7 @@ impl AptosVM {
     fn fee_statement_from_gas_meter(
         txn_data: &TransactionMetadata,
         gas_meter: &impl AptosGasMeter,
+        storage_fee_refund: u64,
     ) -> FeeStatement {
         let gas_used = txn_data
             .max_gas_amount()
@@ -273,8 +274,8 @@ impl AptosVM {
             gas_used.into(),
             u64::from(gas_meter.execution_gas_used()),
             u64::from(gas_meter.io_gas_used()),
-            u64::from(gas_meter.storage_fee_used_in_gas_units()),
             u64::from(gas_meter.storage_fee_used()),
+            storage_fee_refund,
         )
     }
 
@@ -287,9 +288,11 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> (VMStatus, VMOutput) {
+        // Clear side effects: create new session and clear refunds from fee statement.
         let mut session = self
             .0
             .new_session(resolver, SessionId::epilogue_meta(txn_data));
+        let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, 0);
 
         match TransactionStatus::from_vm_status(
             error_code.clone(),
@@ -314,7 +317,6 @@ impl AptosVM {
                     },
                     _ => status,
                 };
-                let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
                 // The transaction should be charged for gas, so run the epilogue to do that.
                 // This is running in a new session that drops any side effects from the
                 // attempted transaction (e.g., spending funds that were needed to pay for gas),
@@ -324,6 +326,7 @@ impl AptosVM {
                 if let Err(e) = self.0.run_failure_epilogue(
                     &mut session,
                     gas_meter.balance(),
+                    fee_statement,
                     txn_data,
                     log_context,
                 ) {
@@ -354,10 +357,19 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
+        let fee_statement = AptosVM::fee_statement_from_gas_meter(
+            txn_data,
+            gas_meter,
+            u64::from(respawned_session.get_storage_fee_refund()),
+        );
         respawned_session.execute(|session| {
-            self.0
-                .run_success_epilogue(session, gas_meter.balance(), txn_data, log_context)
+            self.0.run_success_epilogue(
+                session,
+                gas_meter.balance(),
+                fee_statement,
+                txn_data,
+                log_context,
+            )
         })?;
         let change_set = respawned_session.finish(change_set_configs)?;
         let output = VMOutput::new(
@@ -505,15 +517,18 @@ impl AptosVM {
             gas_meter.charge_io_gas_for_write(key, op)?;
         }
 
-        gas_meter.process_storage_fee_for_all(
+        let mut storage_refund = gas_meter.process_storage_fee_for_all(
             &mut change_set,
             txn_data.transaction_size,
             txn_data.gas_unit_price,
         )?;
+        if !self.0.get_features().is_storage_deletion_refund_enabled() {
+            storage_refund = 0.into();
+        }
 
         // TODO(Gas): Charge for aggregator writes
         let session_id = SessionId::epilogue_meta(txn_data);
-        RespawnedSession::spawn(&self.0, session_id, resolver, change_set)
+        RespawnedSession::spawn(&self.0, session_id, resolver, change_set, storage_refund)
     }
 
     // Execute a multisig transaction:
@@ -720,6 +735,7 @@ impl AptosVM {
             SessionId::epilogue_meta(txn_data),
             resolver,
             VMChangeSet::empty(),
+            0.into(),
         )?;
 
         let execution_error = ExecutionError::try_from(execution_error)
