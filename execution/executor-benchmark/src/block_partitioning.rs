@@ -50,6 +50,12 @@ impl BlockPartitioningStage {
                     partitioner.partition(analyzed_transactions, self.num_executor_shards);
                 timer.stop_and_record();
                 partitioned_txns.add_checkpoint_txn(last_txn);
+                for (shard_id, x) in partitioned_txns.sharded_txns.iter().enumerate() {
+                    for (round_id, sub_block) in x.sub_blocks.iter().enumerate() {
+                        println!("AFTERPAR - round_id={}, shard_id={}, txn_count={}", round_id, shard_id, sub_block.num_txns());
+                    }
+                }
+                println!("AFTERPAR - partitioned_txns.global_txns.len()={}", partitioned_txns.global_txns.len());
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(partitioned_txns))
             },
         };
