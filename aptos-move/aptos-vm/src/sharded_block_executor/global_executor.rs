@@ -44,7 +44,6 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         trace!("executing the last round in global executor",);
-        println!("num_global_txns={}", transactions.len());
         if transactions.is_empty() {
             return Ok(vec![]);
         }
