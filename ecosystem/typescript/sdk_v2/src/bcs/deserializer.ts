@@ -5,7 +5,6 @@
 import { MAX_U32_NUMBER } from "./consts";
 import { Uint128, Uint16, Uint256, Uint32, Uint64, Uint8 } from "./types";
 
-
 // The class must implement a static deserialize method.
 interface Deserializable<T> {
   deserialize(deserializer: Deserializer): T;
@@ -189,5 +188,24 @@ export class Deserializer {
     }
 
     return Number(value);
+  }
+
+  // Require that the input value is a class that extends Deserializable.
+  deserialize<T>(cls: Deserializable<T>): T {
+    // NOTE: The `deserialize` method called by `cls` is defined in the `cls`'s
+    // Deserializable interface, not the one defined in this class.
+    return cls.deserialize(this);
+  }
+
+  /**
+   * Deserializes a vector of values.
+   */
+  deserializeVector<T>(cls: Deserializable<T>): T[] {
+      const length = this.deserializeUleb128AsU32();
+      const list: T[] = [];
+      for (let i = 0; i < length; i += 1) {
+        list.push(this.deserialize(cls));
+      }
+      return list;
   }
 }

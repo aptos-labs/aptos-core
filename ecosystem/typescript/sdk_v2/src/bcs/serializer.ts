@@ -74,7 +74,7 @@ export class Serializer {
    */
   serializeStr(value: string) {
     const textEncoder = new TextEncoder();
-    this.serializeBytes(textEncoder.encode(value));
+    this.serializeByteVector(textEncoder.encode(value));
     return this;
   }
 
@@ -240,6 +240,11 @@ export class Serializer {
    */
   toUint8Array(): Uint8Array {
     return new Uint8Array(this.buffer).slice(0, this.offset);
+  }
+
+  // A static helper method to serialize a BCS `Serializable` value and return the bytes.
+  static toBCSBytes<T extends Serializable>(value: T): Uint8Array {
+    return new Serializer().serialize(value).getBytes();
   }
 }
 
