@@ -125,7 +125,7 @@ impl PartitionerV2 {
                 .into_par_iter()
                 .for_each(|(shard_id, txn_idx1s)| {
                     txn_idx1s.into_par_iter().for_each(|txn_idx1| {
-                        let txn_idx0 = state.i1_to_i0[txn_idx1];
+                        let txn_idx0 = state.idx1_to_idx0[txn_idx1];
                         let mut in_round_conflict_detected = false;
                         let write_set = state.write_sets[txn_idx0].read().unwrap();
                         let read_set = state.read_sets[txn_idx0].read().unwrap();
@@ -161,7 +161,7 @@ impl PartitionerV2 {
                 .for_each(|(shard_id, txn_idx1s)| {
                     let txn_idxs = mem::take(&mut *txn_idx1s.write().unwrap());
                     txn_idxs.into_par_iter().for_each(|txn_idx1| {
-                        let txn_idx0 = state.i1_to_i0[txn_idx1];
+                        let txn_idx0 = state.idx1_to_idx0[txn_idx1];
                         let sender_idx = state.sender_idx(txn_idx0);
                         let min_discarded = min_discard_table
                             .get(&sender_idx)
@@ -205,7 +205,7 @@ impl PartitionerV2 {
             }
         }
 
-        state.i1_to_t2 = (0..state.num_txns()).map(|_tid| RwLock::new(0)).collect();
+        state.idx1_to_idx2 = (0..state.num_txns()).map(|_tid| RwLock::new(0)).collect();
 
         state.thread_pool.install(|| {
             (0..num_rounds).into_par_iter().for_each(|round_id| {
@@ -218,7 +218,7 @@ impl PartitionerV2 {
                             .for_each(|pos_in_sub_block| {
                                 let txn_idx1 = state.finalized_txn_matrix[round_id][shard_id]
                                     [pos_in_sub_block];
-                                *state.i1_to_t2[txn_idx1].write().unwrap() =
+                                *state.idx1_to_idx2[txn_idx1].write().unwrap() =
                                     state.start_index_matrix[round_id][shard_id] + pos_in_sub_block;
                             });
                     });

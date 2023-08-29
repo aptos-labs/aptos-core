@@ -30,7 +30,7 @@ use std::{
         Arc, Mutex, RwLock,
     },
 };
-use crate::v2::types::{TxnIdx0, TxnIdx1};
+use crate::v2::types::{TxnIdx0, TxnIdx1, TxnIdx2};
 
 /// All the parameters, indexes, temporary states needed in a `PartitionerV2` session wrapped in a single struct
 /// to make async drop easy.
@@ -86,14 +86,23 @@ pub struct PartitionState {
     // A `ConflictingTxnTracker` for each key that helps resolve conflicts and speed-up edge creation.
     pub(crate) trackers: DashMap<StorageKeyIdx, RwLock<ConflictingTxnTracker>>,
 
-    pub(crate) i1_to_i0: Vec<TxnIdx0>,
+    /// Map the `TxnIdx1` of a transaction to its `TxnIdx0`.
+    ///
+    /// recall that:
+    /// `TxnIdx0` refers to the txn positions in the original block.
+    /// `TxnIdx1` refers to the txn positions after pre-partitioning but before discarding.
+    pub(crate) idx1_to_idx0: Vec<TxnIdx0>,
 
     // Results of `remove_cross_shard_dependencies()`.
     pub(crate) finalized_txn_matrix: Vec<Vec<Vec<TxnIdx1>>>,
     pub(crate) start_index_matrix: Vec<Vec<TxnIdx1>>,
 
-    /// TxnIdx1 -> TxnIdx2
-    pub(crate) i1_to_t2: Vec<RwLock<TxnIndex>>,
+    /// Map the TxnIdx1 of a transaction to its TxnIdx2.
+    ///
+    /// recall that:
+    /// `TxnIdx1` refers to the txn positions after pre-partitioning but before discarding.
+    /// `TxnIdx2` refers to the txn positions after discarding, which is also the finalized txn idx.
+    pub(crate) idx1_to_idx2: Vec<RwLock<TxnIdx2>>,
 
     // Temporary sub-block matrix used in `add_edges()`.
     pub(crate) sub_block_matrix: Vec<Vec<Mutex<Option<SubBlock<AnalyzedTransaction>>>>>,
@@ -155,11 +164,11 @@ impl PartitionState {
             cross_shard_dep_avoid_threshold,
             num_rounds_limit,
             finalized_txn_matrix: Vec::with_capacity(num_rounds_limit),
-            i1_to_t2: vec![],
+            idx1_to_idx2: vec![],
             start_index_matrix: vec![],
             txns: takable_txns,
             sub_block_matrix: vec![],
-            i1_to_i0: vec![0; num_txns],
+            idx1_to_idx0: vec![0; num_txns],
             load_imbalance_tolerance,
             pre_partitioned_idx0s: vec![],
         }
@@ -214,7 +223,7 @@ impl PartitionState {
         round_id: RoundId,
         shard_id: ShardId,
     ) {
-        let txn_idx0 = self.i1_to_i0[txn_idx1];
+        let txn_idx0 = self.idx1_to_idx0[txn_idx1];
         let write_set = self.write_sets[txn_idx0].read().unwrap();
         let read_set = self.read_sets[txn_idx0].read().unwrap();
         for &key_idx in write_set.iter().chain(read_set.iter()) {
@@ -287,7 +296,7 @@ impl PartitionState {
         shard_id: ShardId,
         txn_idx1: TxnIdx1,
     ) -> TransactionWithDependencies<AnalyzedTransaction> {
-        let txn_idx0 = self.i1_to_i0[txn_idx1];
+        let txn_idx0 = self.idx1_to_idx0[txn_idx1];
         let txn = self.txns[txn_idx0].write().unwrap().take().unwrap();
         let mut deps = CrossShardDependencies::default();
 
@@ -303,7 +312,7 @@ impl PartitionState {
                 .last()
             {
                 let src_txn_idx = ShardedTxnIndex {
-                    txn_index: *self.i1_to_t2[txn_idx.txn_idx1].read().unwrap(),
+                    txn_index: *self.idx1_to_idx2[txn_idx.txn_idx1].read().unwrap(),
                     shard_id: txn_idx.shard_id(),
                     round_id: txn_idx.round_id(),
                 };
@@ -326,7 +335,7 @@ impl PartitionState {
                     let final_sub_blk_idx =
                         self.final_sub_block_idx(follower_txn_idx.sub_block_idx);
                     let dst_txn_idx = ShardedTxnIndex {
-                        txn_index: *self.i1_to_t2[follower_txn_idx.txn_idx1]
+                        txn_index: *self.idx1_to_idx2[follower_txn_idx.txn_idx1]
                             .read()
                             .unwrap(),
                         shard_id: final_sub_blk_idx.shard_id,

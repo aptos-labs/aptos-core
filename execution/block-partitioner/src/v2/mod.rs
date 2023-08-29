@@ -138,7 +138,7 @@ impl PartitionerV2 {
         for (shard_id, txn_idxs) in state.pre_partitioned_idx0s.iter().enumerate() {
             state.start_txn_idxs_by_shard[shard_id] = i1;
             for &i0 in txn_idxs {
-                state.i1_to_i0[i1] = i0;
+                state.idx1_to_idx0[i1] = i0;
                 i1 += 1;
             }
         }
@@ -175,12 +175,12 @@ impl BlockPartitioner for PartitionerV2 {
         // Step 1: build some necessary indices for txn senders/storage locations.
         Self::init(&mut state);
 
-        // Step 1.5: pre-partition.
+        // Step 2: pre-partition.
         Self::pre_partition(&mut state);
 
-        // Step 1.8: update trackers.
+        // Step 3: update trackers.
         for txn_idx1 in 0..state.num_txns() {
-            let txn_idx0 = state.i1_to_i0[txn_idx1];
+            let txn_idx0 = state.idx1_to_idx0[txn_idx1];
             let wset_guard = state.write_sets[txn_idx0].read().unwrap();
             let rset_guard = state.read_sets[txn_idx0].read().unwrap();
             let writes = wset_guard.iter().map(|key_idx|(key_idx, true));
@@ -197,15 +197,15 @@ impl BlockPartitioner for PartitionerV2 {
             }
         }
 
-        // Step 2: remove cross-shard dependencies by move some txns into new rounds.
+        // Step 4: remove cross-shard dependencies by move some txns into new rounds.
         // As a result, we get a txn matrix of no more than `self.max_partitioning_rounds` rows and exactly `num_executor_shards` columns.
         // It's guaranteed that inside every round other than the last round, there's no cross-shard dependency. (But cross-round dependencies are always possible.)
         Self::remove_cross_shard_dependencies(&mut state);
 
-        // Step 3: build some additional indices of the resulting txn matrix from Step 2.
+        // Step 5: build some additional indices of the resulting txn matrix from the previous step.
         Self::build_index_from_txn_matrix(&mut state);
 
-        // Step 4: calculate all the cross-shard dependencies and prepare the input for sharded execution.
+        // Step 6: calculate all the cross-shard dependencies and prepare the input for sharded execution.
         let ret = Self::add_edges(&mut state);
 
         // Async clean-up.
