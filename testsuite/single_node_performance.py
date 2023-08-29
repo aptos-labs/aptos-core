@@ -17,21 +17,21 @@ from dataclasses import dataclass
 # Calibrate from https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e
 # Local machine numbers will be higher.
 EXPECTED_TPS = {
-    ("no-op", False, 1): (18000.0, True),
+    ("no-op", False, 1): (20500.0, True),
     ("no-op", False, 1000): (2800.0, True),
-    ("coin-transfer", False, 1): (12500.0, True),
+    ("coin-transfer", False, 1): (13000.0, True),
     ("coin-transfer", True, 1): (30300.0, True),
-    ("account-generation", False, 1): (10500.0, True),
+    ("account-generation", False, 1): (12500.0, True),
     # ("account-generation", True, 1): (26500.0, True),
-    ("account-resource32-b", False, 1): (15400.0, True),
-    ("modify-global-resource", False, 1): (3400.0, True),
-    ("modify-global-resource", False, 10): (10100.0, True),
-    ("publish-package", False, 1): (120.0, True),
-    ("mix_publish_transfer", False, 1): (1400.0, False),
-    ("batch100-transfer", False, 1): (370, True),
+    ("account-resource32-b", False, 1): (18500.0, True),
+    ("modify-global-resource", False, 1): (3550.0, True),
+    ("modify-global-resource", False, 10): (10600.0, True),
+    ("publish-package", False, 1): (125.0, True),
+    ("mix_publish_transfer", False, 1): (1600.0, False),
+    ("batch100-transfer", False, 1): (390, True),
     # ("batch100-transfer", True, 1): (940, True),
     ("token-v1ft-mint-and-transfer", False, 1): (1550.0, True),
-    ("token-v1ft-mint-and-transfer", False, 20): (7000.0, True),
+    ("token-v1ft-mint-and-transfer", False, 20): (7700.0, True),
     # ("token-v1nft-mint-and-transfer-sequential", False, 1): (1000.0, True),
     # ("token-v1nft-mint-and-transfer-sequential", False, 20): (5150.0, True),
     # ("token-v1nft-mint-and-transfer-parallel", False, 1): (1300.0, True),
@@ -42,7 +42,7 @@ EXPECTED_TPS = {
     # ("no-op2-signers", False, 1): (18000.0, True),
     # ("no-op5-signers", False, 1): (18000.0, True),
     ("token-v2-ambassador-mint", False, 1): (1500.0, True),
-    ("token-v2-ambassador-mint", False, 20): (5000.0, True),
+    ("token-v2-ambassador-mint", False, 20): (5500.0, True),
 }
 
 NOISE_LOWER_LIMIT = 0.8
