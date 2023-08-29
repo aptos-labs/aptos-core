@@ -227,6 +227,14 @@ export class Serializer {
     this.appendToBuffer(new Uint8Array(valueArray));
   }
 
+  serializeVector<T extends Serializable>(values: Array<T>): this {
+    this.serializeU32AsUleb128(values.length);
+    values.forEach((value) => {
+      this.serialize(value);
+    });
+    return this;
+  }
+
   /**
    * Returns the buffered bytes
    */
