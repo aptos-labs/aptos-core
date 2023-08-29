@@ -117,7 +117,7 @@ impl PartitionState {
         num_executor_shards: ShardId,
         num_rounds_limit: usize,
         cross_shard_dep_avoid_threshold: f32,
-        merge_discarded: bool,
+        partition_last_round: bool,
         load_imbalance_tolerance: f32,
     ) -> Self {
         let _timer = MISC_TIMERS_SECONDS
@@ -148,7 +148,7 @@ impl PartitionState {
 
         Self {
             dashmap_num_shards,
-            partition_last_round: merge_discarded,
+            partition_last_round,
             thread_pool,
             num_executor_shards,
             pre_partitioned: vec![],
