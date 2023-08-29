@@ -74,3 +74,16 @@ proposals:
               sender_aware_v2: 32
             block_gas_limit: 35000
             transaction_deduper_type: txn_hash_and_authenticator_v1
+  - name: enable_storage_deletion_refund
+    metadata:
+      title: "Enable Storage Deletion Refund"
+      description: "AIP-32: Storage Deletion Refund"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/127"
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/aip_32_initialization.move
+      - FeatureFlag:
+          enabled:
+            - storage_slot_metadata
+            - emit_fee_statement
+            - storage_deletion_refund
