@@ -2,7 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "testing")]
 use anyhow::Error;
+#[cfg(feature = "testing")]
 use aptos_aggregator::resolver::AggregatorReadMode;
 #[cfg(feature = "testing")]
 use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::AggregatorResolver};
@@ -12,6 +14,7 @@ use aptos_framework::natives::cryptography::algebra::AlgebraContext;
 use aptos_framework::natives::event::NativeEventContext;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
+#[cfg(feature = "testing")]
 use aptos_table_natives::{TableHandle, TableResolver};
 #[cfg(feature = "testing")]
 use aptos_types::chain_id::ChainId;
