@@ -20,7 +20,7 @@ proposals:
       title: "Enable Block Gas Limit"
       description: "AIP-33: The block gas limit is a feature that terminates block execution when the gas consumed by the committed prefix of transactions exceeds the limit, thus providing predictable latency."
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/132"
-    execution_mode: SingleStep
+    execution_mode: MultiStep
     update_sequence:
     - Execution:
         V3:
@@ -33,7 +33,7 @@ proposals:
       title: "Enable Transaction Shuffling"
       description : "AIP-27: Sender Aware Transaction Shuffling"
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/109"
-    execution_mode: SingleStep
+    execution_mode: MultiStep
     update_sequence:
       - Execution:
           V3:
