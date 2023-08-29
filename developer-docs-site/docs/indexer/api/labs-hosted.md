@@ -22,7 +22,7 @@ The following URLs are for the Hasura Explorer for the Labs-Hosted Indexer API:
 
 ## Rate limits
 
-The following rate limit applies for this Aptos-provided indexing service:
+The following rate limit applies for the Aptos Labs hosted indexer API:
 
 - For a web application that calls this Aptos-provided indexer API directly from the client (for example, wallet or explorer), the rate limit is currently 5000 requests per five minutes by IP address. **Note that this limit can change with or without prior notice.**
 
