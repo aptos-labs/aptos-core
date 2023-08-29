@@ -7,6 +7,7 @@ pub mod block_partitioning;
 pub mod db_access;
 pub mod db_generator;
 mod db_reliable_submitter;
+mod ledger_update_stage;
 mod metrics;
 pub mod native_executor;
 pub mod pipeline;
@@ -26,7 +27,8 @@ use aptos_executor::{
     block_executor::{BlockExecutor, TransactionBlockExecutor},
     metrics::{
         APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS, APTOS_EXECUTOR_OTHER_TIMERS_SECONDS,
+        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
 use aptos_jellyfish_merkle::metrics::{
@@ -216,17 +218,13 @@ pub fn run_benchmark<V>(
     let start_vm_only = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
     let other_labels = vec![
         ("1.", true, "verified_state_view"),
-        ("2.", true, "apply_to_ledger"),
+        ("2.", true, "state_checkpoint"),
         ("2.1.", false, "sort_transactions"),
         ("2.2.", false, "calculate_for_transaction_block"),
         ("2.2.1.", false, "get_sharded_state_updates"),
         ("2.2.2.", false, "calculate_block_state_updates"),
         ("2.2.3.", false, "calculate_usage"),
         ("2.2.4.", false, "make_checkpoint"),
-        ("2.3.", false, "assemble_ledger_diff_for_block"),
-        ("2.3.1.", false, "calculate_events_and_writeset_hashes"),
-        ("3.", true, "as_state_compute_result"),
-        ("4.", true, "get_txns_to_commit"),
     ];
 
     let start_by_other = other_labels
@@ -240,6 +238,7 @@ pub fn run_benchmark<V>(
             )
         })
         .collect::<HashMap<_, _>>();
+    let start_ledger_update_total = APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.get_sample_sum();
     let start_commit_total = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum();
 
     let start_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
@@ -319,9 +318,18 @@ pub fn run_benchmark<V>(
             );
         }
     }
+
+    let time_in_ledger_update =
+        APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.get_sample_sum() - start_ledger_update_total;
+    info!(
+        "Overall fraction of total: {:.3} in ledger update (component TPS: {})",
+        time_in_ledger_update / elapsed,
+        delta_v / time_in_ledger_update
+    );
+
     let time_in_commit = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum() - start_commit_total;
     info!(
-        "Overall fraction of total: {:.3} in commit (component TPS: {})",
+        "Overall fraction of total: {:.4} in commit (component TPS: {})",
         time_in_commit / elapsed,
         delta_v / time_in_commit
     );
