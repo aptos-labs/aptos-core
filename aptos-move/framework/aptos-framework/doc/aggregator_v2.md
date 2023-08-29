@@ -53,12 +53,12 @@ to allow transition of usages.
 ## Constants
 
 
-<a name="0x1_aggregator_v2_EINVALID_TYPE"></a>
+<a name="0x1_aggregator_v2_EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE"></a>
 
-The generic type supplied to the aggregator or aggregator snapshot is invalid
+The generic type supplied to the aggregator snapshot is not supported
 
 
-<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EINVALID_TYPE">EINVALID_TYPE</a>: u64 = 5;
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE">EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE</a>: u64 = 5;
 </code></pre>
 
 

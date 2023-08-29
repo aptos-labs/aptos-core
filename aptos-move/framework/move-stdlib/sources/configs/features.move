@@ -237,6 +237,16 @@ module std::features {
         is_enabled(MODULE_EVENT)
     }
 
+    /// Whether the aggregator snapshots feature is enabled.
+    /// Lifetime: transient
+    const AGGREGATOR_SNAPSHOTS: u64 = 29;
+
+    public fun aggregator_snapshots_feature(): u64 { AGGREGATOR_SNAPSHOTS }
+
+    public fun aggregator_snapshots_enabled(): bool acquires Features {
+        is_enabled(AGGREGATOR_SNAPSHOTS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

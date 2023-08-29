@@ -10,10 +10,9 @@ use crate::natives::{
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
-    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
-use aptos_types::vm_status::StatusCode;
-use move_binary_format::errors::PartialVMError;
 use move_core_types::value::{MoveStructLayout, MoveTypeLayout};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
@@ -22,6 +21,12 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, ops::Deref};
+
+/// The generic type supplied supplied to aggregator snapshots is not supported
+pub const EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE: u64 = 0x02_0005;
+
+/// The aggregator snapshots feature is not enabled
+pub const EAGGREGATOR_SNAPSHOTS_NOT_ENABLED: u64 = 0x02_0006;
 
 /// Checks if the type argument `type_arg` is a string type
 fn is_string_type(context: &SafeNativeContext, type_arg: &Type) -> SafeNativeResult<bool> {
@@ -46,6 +51,12 @@ fn native_create_snapshot(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    if context.is_aggregator_snapshots_enabled() {
+        return Err(SafeNativeError::Abort {
+            abort_code: EAGGREGATOR_SNAPSHOTS_NOT_ENABLED,
+        });
+    }
+
     debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_BASE)?;
@@ -72,10 +83,9 @@ fn native_create_snapshot(
                 return Ok(smallvec![move_snapshot_value]);
             }
             // If not a string, return an error
-            Err(PartialVMError::new(StatusCode::ABORTED)
-                .with_message("Unsupported type supplied to aggregator snapshot".to_string())
-                .with_sub_status(0x02_0005)
-                .into())
+            Err(SafeNativeError::Abort {
+                abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
+            })
         },
     }
 }
@@ -115,10 +125,9 @@ fn native_copy_snapshot(
                 return Ok(smallvec![move_snapshot_value]);
             }
             // If not a string, return an error
-            Err(PartialVMError::new(StatusCode::ABORTED)
-                .with_message("Unsupported type supplied to aggregator snapshot".to_string())
-                .with_sub_status(0x02_0005)
-                .into())
+            Err(SafeNativeError::Abort {
+                abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
+            })
         },
     }
 }
@@ -153,10 +162,9 @@ fn native_read_snapshot(
                 return Ok(smallvec![move_string_value]);
             }
             // If not a string, return an error
-            Err(PartialVMError::new(StatusCode::ABORTED)
-                .with_message("Unsupported type supplied to aggregator snapshot".to_string())
-                .with_sub_status(0x02_0005)
-                .into())
+            Err(SafeNativeError::Abort {
+                abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
+            })
         },
     }
 }
@@ -186,10 +194,9 @@ fn native_string_concat(
         return Ok(smallvec![move_snapshot_value]);
     }
     // If not a string, return an error
-    Err(PartialVMError::new(StatusCode::ABORTED)
-        .with_message("Unsupported type supplied to aggregator snapshot".to_string())
-        .with_sub_status(0x02_0005)
-        .into())
+    Err(SafeNativeError::Abort {
+        abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
+    })
 }
 
 /***************************************************************************************************

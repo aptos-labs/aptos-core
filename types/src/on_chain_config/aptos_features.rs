@@ -36,6 +36,7 @@ pub enum FeatureFlag {
     MODULE_EVENT = 26,
     EMIT_FEE_STATEMENT = 27,
     STORAGE_DELETION_REFUND = 28,
+    AGGREGATOR_SNAPSHOTS = 29,
 }
 
 /// Representation of features on chain as a bitset.
@@ -87,6 +88,10 @@ impl Features {
         // requires emit fee statement
         self.is_emit_fee_statement_enabled()
             && self.is_enabled(FeatureFlag::STORAGE_DELETION_REFUND)
+    }
+
+    pub fn is_aggregator_snapshots_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::AGGREGATOR_SNAPSHOTS)
     }
 }
 
