@@ -155,7 +155,7 @@ impl AptosNodeArgs {
     }
 }
 
-pub fn load_seed(input: &str) -> Result<Option<[u8; 32]>, FromHexError> {
+pub fn load_seed(input: &str) -> Result<[u8; 32]>, FromHexError> {
     let trimmed_input = input.trim();
     if !trimmed_input.is_empty() {
         FromHex::from_hex(trimmed_input).map(Some)
