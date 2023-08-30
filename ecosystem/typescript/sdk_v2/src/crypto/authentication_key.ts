@@ -4,6 +4,8 @@
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import { AccountAddress, Hex } from "../core";
 import { HexInput } from "../types";
+import { MultiEd25519PublicKey } from "./multi_ed25519";
+import { Ed25519PublicKey } from "./ed25519";
 
 /**
  * Each account stores an authentication key. Authentication key enables account owners to rotate
@@ -36,25 +38,7 @@ export class AuthenticationKey {
    * authenticating the transaction. `0x01` is the 1-byte scheme for multisig.
    */
   static fromMultiEd25519PublicKey(publicKey: MultiEd25519PublicKey): AuthenticationKey {
-    const pubKeyBytes = publicKey.toBytes();
-
-    const bytes = new Uint8Array(pubKeyBytes.length + 1);
-    bytes.set(pubKeyBytes);
-    bytes.set([AuthenticationKey.MULTI_ED25519_SCHEME], pubKeyBytes.length);
-
-    const hash = sha3Hash.create();
-    hash.update(bytes);
-
-    return new AuthenticationKey(hash.digest());
-  }
-
-  /**
-   * Converts a K-of-N MultiEd25519PublicKey to AuthenticationKey with:
-   * `auth_key = sha3-256(p_1 | … | p_n | K | 0x01)`. `K` represents the K-of-N required for
-   * authenticating the transaction. `0x01` is the 1-byte scheme for multisig.
-   */
-  static fromMultiEd25519PublicKey(publicKey: MultiEd25519PublicKey): AuthenticationKey {
-    const pubKeyBytes = publicKey.toBytes();
+    const pubKeyBytes = publicKey.toUint8Array();
 
     const bytes = new Uint8Array(pubKeyBytes.length + 1);
     bytes.set(pubKeyBytes);
@@ -67,7 +51,7 @@ export class AuthenticationKey {
   }
 
   static fromEd25519PublicKey(publicKey: Ed25519PublicKey): AuthenticationKey {
-    const pubKeyBytes = publicKey.value;
+    const pubKeyBytes = publicKey.value.toUint8Array();
 
     const bytes = new Uint8Array(pubKeyBytes.length + 1);
     bytes.set(pubKeyBytes);

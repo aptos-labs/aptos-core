@@ -34,7 +34,7 @@ export class MultiEd25519PublicKey {
   toUint8Array(): Uint8Array {
     const bytes = new Uint8Array(this.public_keys.length * Ed25519PublicKey.LENGTH + 1);
     this.public_keys.forEach((k: Ed25519PublicKey, i: number) => {
-      bytes.set(k.value, i * Ed25519PublicKey.LENGTH);
+      bytes.set(k.value.toUint8Array(), i * Ed25519PublicKey.LENGTH);
     });
 
     bytes[this.public_keys.length * Ed25519PublicKey.LENGTH] = this.threshold;
@@ -43,7 +43,7 @@ export class MultiEd25519PublicKey {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeBytes(this.toUint8Array());
+    serializer.serializeByteVector(this.toUint8Array());
   }
 
   static deserialize(deserializer: Deserializer): MultiEd25519PublicKey {
@@ -140,7 +140,7 @@ export class MultiEd25519Signature {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeBytes(this.toUint8Array());
+    serializer.serializeByteVector(this.toUint8Array());
   }
 
   static deserialize(deserializer: Deserializer): MultiEd25519Signature {
