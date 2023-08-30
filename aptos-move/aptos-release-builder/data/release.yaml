@@ -30,6 +30,16 @@ proposals:
           transaction_shuffler_type:
             deprecated_sender_aware_v1: 32
           block_gas_limit : 35000
+  - name: enable_module_event
+    metadata:
+      title: "Enable module event"
+      description: "AIP-44: The new module event framework associates every event stream with a static struct type instead of an EventHandle of current event system."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/200"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - module_event
   - name: enable_signature_checker_v2_fix
     metadata:
       title: "Enable a fix signature checker v2"
