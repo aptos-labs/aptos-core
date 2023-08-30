@@ -21,6 +21,7 @@ pub mod secp256k1_ecdsa;
 pub mod test_utils;
 pub mod traits;
 pub mod validatable;
+pub mod webauthn;
 pub mod x25519;
 
 #[cfg(test)]
