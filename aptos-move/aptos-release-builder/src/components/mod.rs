@@ -513,12 +513,10 @@ impl ReleaseConfig {
     }
 
     // Fetch all configs from a remote rest endpoint and assert all the configs are the same as the ones specified locally.
-    pub fn validate_upgrade(&self, endpoint: Url) -> Result<()> {
-        let client = Client::new(endpoint);
-        for proposal in &self.proposals {
-            for entry in proposal.consolidated_side_effects() {
-                entry.validate_upgrade(&client)?;
-            }
+    pub fn validate_upgrade(&self, endpoint: &Url, proposal: &Proposal) -> Result<()> {
+        let client = Client::new(endpoint.clone());
+        for entry in proposal.consolidated_side_effects() {
+            entry.validate_upgrade(&client)?;
         }
         Ok(())
     }
