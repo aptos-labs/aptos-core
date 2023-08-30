@@ -3,8 +3,10 @@
 
 use crate::{
     access_path::AccessPath,
-    account_config::{AccountResource, CoinStoreResource},
+    account_config::{AccountResource, CoinInfoResource, CoinStoreResource},
     block_metadata::BlockMetadata,
+    chain_id::ChainId,
+    on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig, TransactionFeeBurnCap},
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{SignedTransaction, Transaction, TransactionPayload},
 };
@@ -131,11 +133,18 @@ impl AnalyzedTransaction {
             // receiver account resource.
             write_hints.push(Self::account_resource_location(receiver_address));
         }
+
+        let read_hints = vec![
+            Self::current_ts_location(),
+            Self::features_location(),
+            Self::aptos_coin_info_location(),
+            Self::chain_id_location(),
+            Self::transaction_fee_burn_cap_location(),
+        ];
         AnalyzedTransaction::new(
             Transaction::UserTransaction(signed_txn),
             // Please note that we omit all the modules we read and the global supply we write to?
-            vec![],
-            // read and write locations are same for coin transfer
+            read_hints,
             write_hints,
         )
     }
@@ -152,6 +161,33 @@ impl AnalyzedTransaction {
             address,
             CoinStoreResource::struct_tag().access_vector(),
         )))
+    }
+
+    pub fn current_ts_location() -> StorageLocation {
+        StorageLocation::Specific(StateKey::access_path(
+            CurrentTimeMicroseconds::access_path().unwrap(),
+        ))
+    }
+
+    pub fn features_location() -> StorageLocation {
+        StorageLocation::Specific(StateKey::access_path(Features::access_path().unwrap()))
+    }
+
+    pub fn aptos_coin_info_location() -> StorageLocation {
+        StorageLocation::Specific(StateKey::access_path(AccessPath::new(
+            AccountAddress::ONE,
+            CoinInfoResource::struct_tag().access_vector(),
+        )))
+    }
+
+    pub fn chain_id_location() -> StorageLocation {
+        StorageLocation::Specific(StateKey::access_path(ChainId::access_path().unwrap()))
+    }
+
+    pub fn transaction_fee_burn_cap_location() -> StorageLocation {
+        StorageLocation::Specific(StateKey::access_path(
+            TransactionFeeBurnCap::access_path().unwrap(),
+        ))
     }
 
     pub fn analyzed_transaction_for_create_account(
