@@ -133,7 +133,7 @@ impl TransactionGenerator {
             let seq_num = get_sequence_number(account.address(), reader.clone());
             if seq_num > 0 {
                 updated += 1;
-                *account.sequence_number_mut() = seq_num;
+                account.set_sequence_number(seq_num);
             }
         }
         if updated > 0 {
@@ -310,7 +310,7 @@ impl TransactionGenerator {
             )
             .into_iter()
             .flat_map(|idx| {
-                let sender = &mut self.main_signer_accounts.as_mut().unwrap().accounts[idx];
+                let sender = &self.main_signer_accounts.as_mut().unwrap().accounts[idx];
                 transaction_generator.generate_transactions(sender, transactions_per_sender)
             })
             .map(Transaction::UserTransaction)
@@ -484,8 +484,7 @@ impl TransactionGenerator {
                     let receiver = self.main_signer_accounts.as_ref().unwrap().accounts
                         [receiver_idx]
                         .address();
-                    let sender =
-                        &mut self.main_signer_accounts.as_mut().unwrap().accounts[sender_idx];
+                    let sender = &self.main_signer_accounts.as_mut().unwrap().accounts[sender_idx];
                     let amount = 1;
                     let txn = sender.sign_with_transaction_builder(
                         self.transaction_factory.transfer(receiver, amount),
@@ -594,7 +593,7 @@ impl TransactionGenerator {
                         [transfer_idx.1]
                         .address();
                     let sender =
-                        &mut self.main_signer_accounts.as_mut().unwrap().accounts[transfer_idx.0];
+                        &self.main_signer_accounts.as_mut().unwrap().accounts[transfer_idx.0];
                     let txn = sender.sign_with_transaction_builder(
                         self.transaction_factory.transfer(receiver, 1),
                     );

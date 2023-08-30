@@ -12,7 +12,7 @@ async fn test_mint_transfer() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
 
-    let mut account1 = info.random_account();
+    let account1 = info.random_account();
     info.create_user_account(account1.public_key())
         .await
         .unwrap();
