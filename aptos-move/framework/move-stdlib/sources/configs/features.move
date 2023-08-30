@@ -239,7 +239,7 @@ module std::features {
 
     /// Whether the fix for a counting bug in the script path of the signature checker pass is enabled.
     /// Lifetime: transient
-    const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 27;
+    const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 29;
 
     // ============================================================================================
     // Feature Flag Implementation

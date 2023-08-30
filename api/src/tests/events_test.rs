@@ -173,7 +173,7 @@ async fn test_module_events() {
         .await;
 
     let events = resp["events"].as_array().unwrap();
-    assert_eq!(events.len(), 7);
+    assert_eq!(events.len(), 8);
     // All events are module events
     assert!(events.iter().all(|c| c.get("guid").map_or(false, |d| d
         .get("account_address")
