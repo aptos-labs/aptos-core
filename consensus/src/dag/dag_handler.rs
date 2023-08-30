@@ -53,8 +53,6 @@ impl NetworkHandler {
     }
 
     pub async fn start(mut self) {
-        self.dag_driver.try_enter_new_round();
-
         // TODO(ibalajiarun): clean up Reliable Broadcast storage periodically.
         loop {
             select! {

@@ -11,8 +11,7 @@ use crate::{
         signing_phase::{SigningPhase, SigningRequest, SigningResponse},
     },
     metrics_safety_rules::MetricsSafetyRules,
-    network::NetworkSender,
-    round_manager::VerifiedEvent,
+    network::{IncomingCommitRequest, NetworkSender},
     state_replication::StateComputer,
 };
 use aptos_channels::aptos_channel::Receiver;
@@ -28,7 +27,7 @@ pub fn prepare_phases_and_buffer_manager(
     execution_proxy: Arc<dyn StateComputer>,
     safety_rules: Arc<Mutex<MetricsSafetyRules>>,
     commit_msg_tx: NetworkSender,
-    commit_msg_rx: Receiver<AccountAddress, VerifiedEvent>,
+    commit_msg_rx: Receiver<AccountAddress, IncomingCommitRequest>,
     persisting_proxy: Arc<dyn StateComputer>,
     block_rx: UnboundedReceiver<OrderedBlocks>,
     sync_rx: UnboundedReceiver<ResetRequest>,
@@ -88,7 +87,7 @@ pub fn prepare_phases_and_buffer_manager(
             execution_phase_response_rx,
             signing_phase_request_tx,
             signing_phase_response_rx,
-            commit_msg_tx,
+            Arc::new(commit_msg_tx),
             commit_msg_rx,
             persisting_phase_request_tx,
             block_rx,
