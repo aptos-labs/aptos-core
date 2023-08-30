@@ -91,16 +91,9 @@ impl OrderRule {
         (r1 ^ r2) & 1 == 0
     }
 
-    pub fn process_new_node(&mut self, node_metadata: &NodeMetadata) {
-        let round = node_metadata.round();
-        // If the node comes from the proposal round in the current instance, it can't trigger any ordering
-        if round <= self.lowest_unordered_anchor_round
-            || Self::check_parity(round, self.lowest_unordered_anchor_round)
-        {
-            return;
-        }
-        // This node's votes can trigger an anchor from previous round to be ordered.
-        let mut start_round = round - 1;
+    /// Find if there's anchors that can be ordered start from `start_round` until `round`,
+    /// if so find next one until nothing can be ordered.
+    fn check_ordering_between(&mut self, mut start_round: Round, round: Round) {
         while start_round <= round {
             if let Some(direct_anchor) =
                 self.find_first_anchor_with_enough_votes(start_round, round)
@@ -116,7 +109,7 @@ impl OrderRule {
     }
 
     /// From the start round until the target_round, try to find if there's any anchor has enough votes to trigger ordering
-    pub fn find_first_anchor_with_enough_votes(
+    fn find_first_anchor_with_enough_votes(
         &self,
         mut start_round: Round,
         target_round: Round,
@@ -141,7 +134,7 @@ impl OrderRule {
     }
 
     /// Follow an anchor with enough votes to find the first anchor that's recursively reachable by its suffix anchor
-    pub fn find_first_anchor_to_order(
+    fn find_first_anchor_to_order(
         &self,
         mut current_anchor: Arc<CertifiedNode>,
     ) -> Arc<CertifiedNode> {
@@ -168,7 +161,7 @@ impl OrderRule {
     }
 
     /// Finalize the ordering with the given anchor node, update anchor election and construct blocks for execution.
-    pub fn finalize_order(&mut self, anchor: Arc<CertifiedNode>) {
+    fn finalize_order(&mut self, anchor: Arc<CertifiedNode>) {
         let failed_authors: Vec<_> = (self.lowest_unordered_anchor_round..anchor.round())
             .step_by(2)
             .map(|failed_round| (failed_round, self.anchor_election.get_anchor(failed_round)))
@@ -195,5 +188,26 @@ impl OrderRule {
         {
             error!("Failed to send ordered nodes {:?}", e);
         }
+    }
+
+    /// Check if this node can trigger anchors to be ordered
+    pub fn process_new_node(&mut self, node_metadata: &NodeMetadata) {
+        let round = node_metadata.round();
+        // If the node comes from the proposal round in the current instance, it can't trigger any ordering
+        if round <= self.lowest_unordered_anchor_round
+            || Self::check_parity(round, self.lowest_unordered_anchor_round)
+        {
+            return;
+        }
+        // This node's votes can trigger an anchor from previous round to be ordered.
+        let start_round = round - 1;
+        self.check_ordering_between(start_round, round)
+    }
+
+    /// Check the whole dag to see if anything can be ordered.
+    pub fn process_all(&mut self) {
+        let start_round = self.lowest_unordered_anchor_round;
+        let round = self.dag.read().highest_round();
+        self.check_ordering_between(start_round, round);
     }
 }
