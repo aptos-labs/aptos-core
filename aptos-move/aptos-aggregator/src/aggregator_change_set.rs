@@ -316,4 +316,45 @@ mod test {
         );
         assert_err!(aggregator_change3.merge_with_previous_aggregator_change(aggregator_change2));
     }
+
+    #[test]
+    fn test_merge_data_into_data() {
+        let aggregator_change1 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Data { value: 20 },
+            base_aggregator: None,
+        };
+
+        let mut aggregator_change2 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Data { value: 50 },
+            base_aggregator: None,
+        };
+
+        let mut aggregator_change3 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Data { value: 70 },
+            base_aggregator: None,
+        };
+        
+        assert_ok!(aggregator_change2.merge_with_previous_aggregator_change(aggregator_change1));
+        assert_eq!(
+            aggregator_change2,
+            AggregatorChange {
+                max_value: 100,
+                state: AggregatorState::Data { value: 50 },
+                base_aggregator: None,
+            }
+        );
+        assert_ok!(aggregator_change3.merge_with_previous_aggregator_change(aggregator_change2));
+        assert_eq!(aggregator_change3, AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Data { value: 70 },
+            base_aggregator: None,
+        });
+    }
+
+    fn test_merge_delta_into_delta() {
+        
+    }
 }
