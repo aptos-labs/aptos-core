@@ -26,6 +26,7 @@ mod execution_config;
 mod gas_schedule;
 mod timed_features;
 mod timestamp;
+mod transaction_fee;
 mod validator_set;
 
 pub use self::{
@@ -45,6 +46,7 @@ pub use self::{
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
     timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures},
     timestamp::CurrentTimeMicroseconds,
+    transaction_fee::TransactionFeeBurnCap,
     validator_set::{ConsensusScheme, ValidatorSet},
 };
 
