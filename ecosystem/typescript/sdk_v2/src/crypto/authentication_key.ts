@@ -3,6 +3,7 @@
 
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import { AccountAddress, Hex } from "../core";
+import { HexInput } from "../types";
 
 /**
  * Each account stores an authentication key. Authentication key enables account owners to rotate
@@ -20,13 +21,13 @@ export class AuthenticationKey {
 
   static readonly DERIVE_RESOURCE_ACCOUNT_SCHEME: number = 255;
 
-  readonly bytes: Bytes;
+  readonly data: Hex;
 
-  constructor(bytes: Bytes) {
-    if (bytes.length !== AuthenticationKey.LENGTH) {
+  constructor(hexInput: HexInput) {
+    if (hexInput.length !== AuthenticationKey.LENGTH) {
       throw new Error("Expected a byte array of length 32");
     }
-    this.bytes = bytes;
+    this.data = Hex.fromHexInput({ hexInput });
   }
 
   /**
@@ -83,6 +84,6 @@ export class AuthenticationKey {
    * AuthenticationKey bytes are directly translated to AccountAddress.
    */
   derivedAddress(): AccountAddress {
-    return new AccountAddress(this.bytes);
+    return new AccountAddress({ data: this.data.toUint8Array() });
   }
 }
