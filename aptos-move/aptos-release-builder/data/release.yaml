@@ -36,6 +36,10 @@ proposals:
       description: "AIP-43: Aggregator snapshots can be used to postpone the read operations on aggregators to the commit phase and improve concurrency of transaction execution."
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
     execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - aggregator_snapshots
   - name: enable_module_event
     metadata:
       title: "Enable module event"
