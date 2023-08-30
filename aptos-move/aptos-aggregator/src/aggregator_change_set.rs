@@ -259,3 +259,61 @@ pub fn subtraction_deltavalue(
         DeltaValue::Negative(value) => addition(base, value, max_value),
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use claims::{assert_ok, assert_err};
+    use crate::aggregator_extension::SpeculativeValueSource;
+    
+    #[test]
+    fn test_merge_aggregator_data_into_delta() {
+        let aggregator_change1 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Data { value: 20 },
+            base_aggregator: None,
+        };
+
+        let mut aggregator_change2 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 10,
+                delta: DeltaValue::Positive(10),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 50,
+                    min_achieved_negative_delta: 5,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+            },
+            base_aggregator: None,
+        };
+        let mut aggregator_change3 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 40,
+                delta: DeltaValue::Positive(10),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 50,
+                    min_achieved_negative_delta: 35,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+            },
+            base_aggregator: None,
+        };
+        
+        assert_ok!(aggregator_change2.merge_with_previous_aggregator_change(aggregator_change1));
+        assert_eq!(
+            aggregator_change2,
+            AggregatorChange {
+                max_value: 100,
+                state: AggregatorState::Data { value: 30 },
+                base_aggregator: None,
+            }
+        );
+        assert_err!(aggregator_change3.merge_with_previous_aggregator_change(aggregator_change2));
+    }
+}
