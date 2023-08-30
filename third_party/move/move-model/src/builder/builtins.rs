@@ -123,160 +123,59 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                                   type_constraints: &BTreeMap<usize, Constraint>,
                                   ty: Type,
                                   visibility: EntryVisibility| {
-            declare_bin_gen(
-                trans,
-                Add,
-                Operation::Add,
-                type_params,
-                type_constraints,
-                &ty,
-                &ty,
-                &ty,
-                visibility,
-            );
-            declare_bin_gen(
-                trans,
-                Sub,
-                Operation::Sub,
-                type_params,
-                type_constraints,
-                &ty,
-                &ty,
-                &ty,
-                visibility,
-            );
-            declare_bin_gen(
-                trans,
-                Mul,
-                Operation::Mul,
-                type_params,
-                type_constraints,
-                &ty,
-                &ty,
-                &ty,
-                visibility,
-            );
-            declare_bin_gen(
-                trans,
-                Mod,
-                Operation::Mod,
-                type_params,
-                type_constraints,
-                &ty,
-                &ty,
-                &ty,
-                visibility,
-            );
-            declare_bin_gen(
-                trans,
-                Div,
-                Operation::Div,
-                type_params,
-                type_constraints,
-                &ty,
-                &ty,
-                &ty,
-                visibility,
-            );
-            declare_bin_gen(
-                trans,
-                BitOr,
-                Operation::BitOr,
-                type_params,
-                type_constraints,
-                &ty,
-                &ty,
-                &ty,
-                visibility,
-            );
-            declare_bin_gen(
-                trans,
-                BitAnd,
-                Operation::BitAnd,
-                type_params,
-                type_constraints,
-                &ty,
-                &ty,
-                &ty,
-                visibility,
-            );
-            declare_bin_gen(
-                trans,
-                Xor,
-                Operation::Xor,
-                type_params,
-                type_constraints,
-                &ty,
-                &ty,
-                &ty,
-                visibility,
-            );
-            declare_bin_gen(
-                trans,
-                Shl,
-                Operation::Shl,
-                type_params,
-                type_constraints,
-                &ty,
-                &u8_ty,
-                &ty,
-                visibility,
-            );
-            declare_bin_gen(
-                trans,
-                Shr,
-                Operation::Shr,
-                type_params,
-                type_constraints,
-                &ty,
-                &u8_ty,
-                &ty,
-                visibility,
-            );
-            declare_bin_gen(
-                trans,
-                Lt,
-                Operation::Lt,
-                type_params,
-                type_constraints,
-                &ty,
-                &ty,
-                bool_t,
-                visibility,
-            );
-            declare_bin_gen(
-                trans,
-                Le,
-                Operation::Le,
-                type_params,
-                type_constraints,
-                &ty,
-                &ty,
-                bool_t,
-                visibility,
-            );
-            declare_bin_gen(
-                trans,
-                Gt,
-                Operation::Gt,
-                type_params,
-                type_constraints,
-                &ty,
-                &ty,
-                bool_t,
-                visibility,
-            );
-            declare_bin_gen(
-                trans,
-                Ge,
-                Operation::Ge,
-                type_params,
-                type_constraints,
-                &ty,
-                &ty,
-                bool_t,
-                visibility,
-            );
+            for (op, oper) in [
+                (Add, Operation::Add),
+                (Sub, Operation::Sub),
+                (Mul, Operation::Mul),
+                (Mod, Operation::Mod),
+                (Div, Operation::Div),
+                (BitOr, Operation::BitOr),
+                (BitAnd, Operation::BitAnd),
+                (Xor, Operation::Xor),
+            ] {
+                declare_bin_gen(
+                    trans,
+                    op,
+                    oper,
+                    type_params,
+                    type_constraints,
+                    &ty,
+                    &ty,
+                    &ty,
+                    visibility,
+                );
+            }
+            for (op, oper) in [(Shl, Operation::Shl), (Shr, Operation::Shr)] {
+                declare_bin_gen(
+                    trans,
+                    op,
+                    oper,
+                    type_params,
+                    type_constraints,
+                    &ty,
+                    &u8_ty,
+                    &ty,
+                    visibility,
+                );
+            }
+            for (op, oper) in [
+                (Lt, Operation::Lt),
+                (Le, Operation::Le),
+                (Ge, Operation::Ge),
+                (Gt, Operation::Gt),
+            ] {
+                declare_bin_gen(
+                    trans,
+                    op,
+                    oper,
+                    type_params,
+                    type_constraints,
+                    &ty,
+                    &ty,
+                    bool_t,
+                    visibility,
+                );
+            }
         };
 
         // Declare the specification arithm ops, based on Num type.
