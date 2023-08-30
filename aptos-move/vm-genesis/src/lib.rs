@@ -426,6 +426,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::STORAGE_DELETION_REFUND,
         FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX,
         FeatureFlag::AGGREGATOR_SNAPSHOTS,
+        FeatureFlag::SAFER_RESOURCE_GROUPS,
     ]
 }
 
