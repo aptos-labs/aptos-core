@@ -229,5 +229,7 @@ pub fn verifier_config(features: &Features, _timed_features: &TimedFeatures) -> 
         max_per_fun_meter_units: Some(1000 * 80000),
         max_per_mod_meter_units: Some(1000 * 80000),
         use_signature_checker_v2: features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2),
+        sig_checker_v2_fix_script_ty_param_count: features
+            .is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX),
     }
 }

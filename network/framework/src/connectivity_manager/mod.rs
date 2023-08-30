@@ -712,6 +712,14 @@ where
         src: DiscoverySource,
         new_discovered_peers: PeerSet,
     ) {
+        info!(
+            NetworkSchema::new(&self.network_context),
+            "{} Received updated list of discovered peers! Source: {:?}, num peers: {:?}",
+            self.network_context,
+            src,
+            new_discovered_peers.len()
+        );
+
         let self_peer_id = self.network_context.peer_id();
         let mut keys_updated = false;
 

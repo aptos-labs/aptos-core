@@ -350,9 +350,11 @@ impl<'t> AccountMinter<'t> {
         coins_for_source: u64,
     ) -> Result<LocalAccount> {
         for i in 0..3 {
-            *self.source_account.sequence_number_mut() = txn_executor
-                .query_sequence_number(self.source_account.address())
-                .await?;
+            self.source_account.set_sequence_number(
+                txn_executor
+                    .query_sequence_number(self.source_account.address())
+                    .await?,
+            );
 
             let new_source_account = LocalAccount::generate(self.rng());
             let txn = create_and_fund_account_request(
