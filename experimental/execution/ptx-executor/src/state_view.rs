@@ -3,11 +3,14 @@
 
 #![forbid(unsafe_code)]
 
-use crate::common::HashMap;
+use crate::{common::HashMap, metrics::PER_WORKER_TIMER};
+use aptos_logger::trace;
+use aptos_metrics_core::TimerHelper;
 use aptos_state_view::{StateView, TStateView};
 use aptos_types::state_store::{
     state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
 };
+
 pub struct OverlayedStateView<'view> {
     base_view: &'view dyn StateView,
     overlay: HashMap<StateKey, Option<StateValue>>,
@@ -40,7 +43,11 @@ impl<'view> TStateView for OverlayedStateView<'view> {
             .get(state_key)
             .cloned()
             .map(Ok)
-            .unwrap_or_else(|| self.base_view.get_state_value(state_key))
+            .unwrap_or_else(|| {
+                let _timer = PER_WORKER_TIMER.timer_with(&["unknown", "fallback_to_base_view"]);
+                trace!("base view read: {:?}", state_key);
+                self.base_view.get_state_value(state_key)
+            })
     }
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {

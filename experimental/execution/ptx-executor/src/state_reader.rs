@@ -5,7 +5,11 @@
 
 //! TODO(aldenhu): doc
 
-use crate::{common::BASE_VERSION, metrics::TIMER, scheduler::PtxSchedulerClient};
+use crate::{
+    common::BASE_VERSION,
+    metrics::{PER_WORKER_TIMER, TIMER},
+    scheduler::PtxSchedulerClient,
+};
 use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
 use aptos_state_view::StateView;
@@ -49,6 +53,7 @@ impl PtxStateReader {
             let scheduler = scheduler.clone();
             match work_rx.recv().expect("Channel closed.") {
                 Command::Read { state_key } => io_scope.spawn(move |_io_scope| {
+                    let _timer = PER_WORKER_TIMER.timer_with(&["unknown_io", "read_base_value"]);
                     let value = state_view.get_state_value(&state_key).unwrap();
                     scheduler.inform_state_value((state_key, BASE_VERSION), value);
                 }),
