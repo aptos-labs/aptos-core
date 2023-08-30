@@ -261,7 +261,7 @@ pub fn make_all(
     )]);
 
     natives.extend([(
-        "write_to_module_event_store",
+        "write_module_event_to_store",
         native_write_module_event_to_store as RawSafeNative,
     )]);
 
