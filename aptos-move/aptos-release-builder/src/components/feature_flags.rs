@@ -79,6 +79,7 @@ pub enum FeatureFlag {
     ModuleEvent,
     EmitFeeStatement,
     StorageDeletionRefund,
+    AggregatorSnapshots,
     SignatureCheckerV2ScriptFix,
 }
 
@@ -207,6 +208,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ModuleEvent => AptosFeatureFlag::MODULE_EVENT,
             FeatureFlag::EmitFeeStatement => AptosFeatureFlag::EMIT_FEE_STATEMENT,
             FeatureFlag::StorageDeletionRefund => AptosFeatureFlag::STORAGE_DELETION_REFUND,
+            FeatureFlag::AggregatorSnapshots => AptosFeatureFlag::AGGREGATOR_SNAPSHOTS,
             FeatureFlag::SignatureCheckerV2ScriptFix => {
                 AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX
             },
@@ -260,6 +262,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::MODULE_EVENT => FeatureFlag::ModuleEvent,
             AptosFeatureFlag::EMIT_FEE_STATEMENT => FeatureFlag::EmitFeeStatement,
             AptosFeatureFlag::STORAGE_DELETION_REFUND => FeatureFlag::StorageDeletionRefund,
+            AptosFeatureFlag::AGGREGATOR_SNAPSHOTS => FeatureFlag::AggregatorSnapshots,
             AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX => {
                 FeatureFlag::SignatureCheckerV2ScriptFix
             },
