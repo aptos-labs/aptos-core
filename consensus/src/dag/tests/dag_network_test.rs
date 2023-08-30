@@ -9,7 +9,7 @@ use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::validator_verifier::random_validator_verifier;
+use aptos_types::{validator_verifier::random_validator_verifier, epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures};
 use async_trait::async_trait;
 use claims::{assert_err, assert_ok};
 use futures::StreamExt;
@@ -84,6 +84,14 @@ impl TDAGNetworkSender for MockDAGNetworkSender {
             Arc::new(self.clone()),
             self.time_service.clone(),
         )
+    }
+
+    async fn send_epoch_change(&self, _proof: EpochChangeProof) {
+        unimplemented!()
+    }
+
+    async fn send_commit_proof(&self, _ledger_info: LedgerInfoWithSignatures) {
+        unimplemented!()
     }
 }
 

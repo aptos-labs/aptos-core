@@ -4,6 +4,7 @@ use super::types::DAGMessage;
 use aptos_consensus_types::common::Author;
 use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_time_service::{Interval, TimeService, TimeServiceTrait};
+use aptos_types::{epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures};
 use async_trait::async_trait;
 use futures::{
     stream::{FusedStream, FuturesUnordered},
@@ -42,6 +43,10 @@ pub trait TDAGNetworkSender: Send + Sync + RBNetworkSender<DAGMessage> {
         retry_interval: Duration,
         rpc_timeout: Duration,
     ) -> RpcWithFallback;
+
+    async fn send_epoch_change(&self, proof: EpochChangeProof);
+
+    async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures);
 }
 
 struct Responders {

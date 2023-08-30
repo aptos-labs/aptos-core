@@ -21,7 +21,7 @@ use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfo, validator_verifier::random_validator_verifier,
+    epoch_state::EpochState, ledger_info::{LedgerInfo, LedgerInfoWithSignatures}, validator_verifier::random_validator_verifier, epoch_change::EpochChangeProof,
 };
 use async_trait::async_trait;
 use claims::{assert_ok, assert_ok_eq};
@@ -63,6 +63,14 @@ impl TDAGNetworkSender for MockNetworkSender {
         _retry_interval: Duration,
         _rpc_timeout: Duration,
     ) -> RpcWithFallback {
+        unimplemented!()
+    }
+
+    async fn send_epoch_change(&self, _proof: EpochChangeProof) {
+        unimplemented!()
+    }
+
+    async fn send_commit_proof(&self, _li: LedgerInfoWithSignatures) {
         unimplemented!()
     }
 }
