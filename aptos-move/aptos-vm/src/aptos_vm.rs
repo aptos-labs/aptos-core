@@ -1076,7 +1076,7 @@ impl AptosVM {
             // TODO(Gas): Do this in a better way in the future, perhaps without forcing the data cache to be flushed.
             // By releasing resource group cache, we start with a fresh slate for resource group
             // cost accounting.
-            resolver.release_resource_group_cache();
+            // resolver.release_resource_group_cache();
             // session = self.0.new_session(resolver, SessionId::txn(txn));
         }
 
