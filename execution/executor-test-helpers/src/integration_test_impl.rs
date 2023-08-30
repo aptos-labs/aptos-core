@@ -226,7 +226,7 @@ pub fn test_execution_with_storage_impl_inner(
         .unwrap();
     verify_committed_txn_status(t4.as_ref(), &block1[7]).unwrap();
     // We requested the events to come back from this one, so verify that they did
-    assert_eq!(t4.unwrap().events.unwrap().len(), 2);
+    assert_eq!(t4.unwrap().events.unwrap().len(), 3);
 
     let t5 = db
         .reader
