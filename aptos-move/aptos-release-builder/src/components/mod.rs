@@ -48,6 +48,33 @@ pub struct Proposal {
     pub update_sequence: Vec<ReleaseEntry>,
 }
 
+impl Proposal {
+    fn consolidated_side_effects(&self) -> Vec<ReleaseEntry> {
+        let mut ret = vec![];
+        let mut features_diff = Features::empty();
+        for entry in &self.update_sequence {
+            match entry {
+                ReleaseEntry::FeatureFlag(feature_flags) => {
+                    features_diff.squash(feature_flags.clone())
+                },
+                ReleaseEntry::Framework(_)
+                | ReleaseEntry::CustomGas(_)
+                | ReleaseEntry::DefaultGas
+                | ReleaseEntry::Version(_)
+                | ReleaseEntry::Consensus(_)
+                | ReleaseEntry::Execution(_)
+                | ReleaseEntry::RawScript(_) => ret.push(entry.clone()),
+            }
+        }
+
+        if !features_diff.is_empty() {
+            ret.push(ReleaseEntry::FeatureFlag(features_diff));
+        }
+
+        ret
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ProposalMetadata {
     title: String,
@@ -486,12 +513,10 @@ impl ReleaseConfig {
     }
 
     // Fetch all configs from a remote rest endpoint and assert all the configs are the same as the ones specified locally.
-    pub fn validate_upgrade(&self, endpoint: Url) -> Result<()> {
-        let client = Client::new(endpoint);
-        for proposal in &self.proposals {
-            for entry in &proposal.update_sequence {
-                entry.validate_upgrade(&client)?;
-            }
+    pub fn validate_upgrade(&self, endpoint: &Url, proposal: &Proposal) -> Result<()> {
+        let client = Client::new(endpoint.clone());
+        for entry in proposal.consolidated_side_effects() {
+            entry.validate_upgrade(&client)?;
         }
         Ok(())
     }

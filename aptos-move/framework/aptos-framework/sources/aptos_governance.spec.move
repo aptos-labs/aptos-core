@@ -712,7 +712,6 @@ spec aptos_framework::aptos_governance {
 
     spec resolve_multi_step_proposal(proposal_id: u64, signer_address: address, next_execution_hash: vector<u8>): signer {
         use aptos_framework::chain_status;
-        pragma verify = false; // TODO: set because of a possible bug in boogie that needs further investigation
         requires chain_status::is_operating();
 
         // verify voting::resolve_proposal_v2
@@ -726,13 +725,11 @@ spec aptos_framework::aptos_governance {
         aborts_if !string::spec_internal_check_utf8(voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         let multi_step_in_execution_key = utf8(voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         let post is_multi_step_proposal_in_execution_value = simple_map::spec_get(post_proposal.metadata, multi_step_in_execution_key);
-        ensures simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key) ==>
-            is_multi_step_proposal_in_execution_value == std::bcs::serialize(true);
 
         aborts_if !string::spec_internal_check_utf8(voting::IS_MULTI_STEP_PROPOSAL_KEY);
         let multi_step_key = utf8(voting::IS_MULTI_STEP_PROPOSAL_KEY);
         aborts_if simple_map::spec_contains_key(proposal.metadata, multi_step_key) &&
-                            aptos_std::from_bcs::deserializable<bool>(simple_map::spec_get(proposal.metadata, multi_step_key));
+            !aptos_std::from_bcs::deserializable<bool>(simple_map::spec_get(proposal.metadata, multi_step_key));
         let is_multi_step = simple_map::spec_contains_key(proposal.metadata, multi_step_key) &&
                             aptos_std::from_bcs::deserialize<bool>(simple_map::spec_get(proposal.metadata, multi_step_key));
         let next_execution_hash_is_empty = len(next_execution_hash) == 0;
@@ -745,12 +742,10 @@ spec aptos_framework::aptos_governance {
                 simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key) ==>
                     is_multi_step_proposal_in_execution_value == std::bcs::serialize(true)
             };
-        ensures !next_execution_hash_is_empty ==> post_proposal.execution_hash == next_execution_hash &&
-            simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key) ==>
-                is_multi_step_proposal_in_execution_value == std::bcs::serialize(true);
+        ensures !next_execution_hash_is_empty ==> post_proposal.execution_hash == next_execution_hash;
 
         // verify remove_approved_hash
-        aborts_if next_execution_hash_is_empty && !exists<ApprovedExecutionHashes>(@aptos_framework);
+        aborts_if !exists<ApprovedExecutionHashes>(@aptos_framework);
         let post post_approved_hashes = global<ApprovedExecutionHashes>(@aptos_framework).hashes;
         ensures next_execution_hash_is_empty ==> !simple_map::spec_contains_key(post_approved_hashes, proposal_id);
         ensures !next_execution_hash_is_empty ==>

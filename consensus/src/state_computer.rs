@@ -331,6 +331,7 @@ async fn test_commit_sync_race() {
         transaction_shuffler::create_transaction_shuffler,
     };
     use aptos_consensus_notifications::Error;
+    use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
         block_executor::partitioner::ExecutableBlock,
@@ -360,6 +361,24 @@ async fn test_commit_sync_race() {
             _maybe_block_gas_limit: Option<u64>,
         ) -> Result<StateComputeResult, ExecutionError> {
             Ok(StateComputeResult::new_dummy())
+        }
+
+        fn execute_and_state_checkpoint(
+            &self,
+            _block: ExecutableBlock,
+            _parent_block_id: HashValue,
+            _maybe_block_gas_limit: Option<u64>,
+        ) -> Result<StateCheckpointOutput, ExecutionError> {
+            todo!()
+        }
+
+        fn ledger_update(
+            &self,
+            _block_id: HashValue,
+            _parent_block_id: HashValue,
+            _state_checkpoint_output: StateCheckpointOutput,
+        ) -> Result<StateComputeResult, ExecutionError> {
+            todo!()
         }
 
         fn commit_blocks_ext(
