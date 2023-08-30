@@ -67,12 +67,13 @@ export class CoinClient {
       createReceiverIfMissing?: boolean;
     },
   ): Promise<string> {
-    // Since we can receive either a fully qualified type tag like "0x1::coin_type::CoinType" or a fungible object address "0x1234...6789"
-    // we first check to see if the raw string value includes "::" to make sure it's not supposed to be a fungible asset object address.
+    // Since we can receive either a fully qualified type tag like "0x1::coin_type::CoinType"
+    // or a fungible object address "0x1234...6789" we first check to see if the raw string value includes "::"
+    // This is to make sure it's not supposed to be a fungible asset object address.
     const isTypeTag = (extraArgs?.coinType ?? "").toString().includes("::");
 
-    // If the coin type exists, definitely isn't a type tag, and is a valid account address, then we enter this if block
-    // under the assumption that it's a fungible asset object address.
+    // If the coin type exists, definitely isn't a type tag, and is a valid account address,
+    // then we enter this if block under the assumption that it's a fungible asset object address.
     if (extraArgs?.coinType && !isTypeTag && AccountAddress.isValid(extraArgs.coinType)) {
       /* eslint-disable no-console */
       console.warn("to transfer a fungible asset, use `FungibleAssetClient()` class for better support");
@@ -138,12 +139,13 @@ export class CoinClient {
       coinType?: string | MaybeHexString;
     },
   ): Promise<bigint> {
-    // Since we can receive either a fully qualified type tag like "0x1::coin_type::CoinType" or a fungible object address "0x1234...6789"
-    // we first check to see if the raw string value includes "::" to make sure it's not supposed to be a fungible asset object address.
+    // Since we can receive either a fully qualified type tag like "0x1::coin_type::CoinType"
+    // or a fungible object address "0x1234...6789" we first check to see if the raw string value includes "::"
+    // This is to make sure it's not supposed to be a fungible asset object address.
     const isTypeTag = (extraArgs?.coinType ?? "").toString().includes("::");
 
-    // If the coin type exists, definitely isn't a type tag, and is a valid account address, then we enter this if block
-    // under the assumption that it's a fungible asset object address.
+    // If the coin type exists, definitely isn't a type tag, and is a valid account address,
+    // then we enter this if block under the assumption that it's a fungible asset object address.
     if (extraArgs?.coinType && !isTypeTag && AccountAddress.isValid(extraArgs.coinType)) {
       /* eslint-disable no-console */
       console.warn("to check balance of a fungible asset, use `FungibleAssetClient()` class for better support");
