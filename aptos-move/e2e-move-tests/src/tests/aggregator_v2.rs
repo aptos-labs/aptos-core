@@ -4,6 +4,7 @@
 use crate::{
     aggregator_v2::{
         initialize, verify_copy_snapshot, verify_copy_string_snapshot, verify_string_concat,
+        verify_string_snapshot_concat,
     },
     assert_success,
     tests::common,
@@ -33,5 +34,12 @@ fn test_copy_string_snapshot() {
 fn test_string_concat() {
     let (mut h, acc) = setup();
     let txn = verify_string_concat(&mut h, &acc);
+    assert_success!(h.run(txn));
+}
+
+#[test]
+fn test_string_snapshot_concat() {
+    let (mut h, acc) = setup();
+    let txn = verify_string_snapshot_concat(&mut h, &acc);
     assert_success!(h.run(txn));
 }
