@@ -18,18 +18,6 @@ proposals:
       - FeatureFlag:
           disabled:
             - module_event
-  - name: enable_block_gas_limit
-    metadata:
-      title: "Enable Block Gas Limit"
-      description: "AIP-33: The block gas limit is a feature that terminates block execution when the gas consumed by the committed prefix of transactions exceeds the limit, thus providing predictable latency."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/132"
-    execution_mode: MultiStep
-    update_sequence:
-    - Execution:
-        V2:
-          transaction_shuffler_type:
-            deprecated_sender_aware_v1: 32
-          block_gas_limit : 35000
   - name: enable_module_event
     metadata:
       title: "Enable module event"
@@ -49,3 +37,18 @@ proposals:
       - FeatureFlag:
           enabled:
             - signature_checker_v2_script_fix
+  - name: enable_block_gas_limit_and_transaction_shuffling
+    metadata:
+      title: "Enable Block Gas Limit and Transaction Shuffling"
+      description: "AIP-33: The block gas limit is a feature that terminates block execution when the gas consumed by the committed prefix of transactions exceeds the limit, thus providing predictable latency.
+                    AIP-27: Sender Aware Transaction Shuffling"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/132
+                       https://github.com/aptos-foundation/AIPs/issues/109"
+    execution_mode: MultiStep
+    update_sequence:
+      - Execution:
+          V3:
+            transaction_shuffler_type:
+              sender_aware_v2: 32
+            block_gas_limit: 35000
+            transaction_deduper_type: txn_hash_and_authenticator_v1
