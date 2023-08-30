@@ -406,4 +406,54 @@ mod test {
         };
         assert_err!(aggregator_change3.merge_with_previous_aggregator_change(aggregator_change1));
     }
+
+    #[test]
+    fn test_merge_delta_into_delta() {
+        let aggregator_change1 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 20,
+                delta: DeltaValue::Positive(10),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 30,
+                    min_achieved_negative_delta: 15,
+                    min_overflow_positive_delta: Some(90),
+                    max_underflow_negative_delta: Some(25),
+                },
+            },
+            base_aggregator: None,
+        };
+        let mut aggregator_change2 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 30,
+                delta: DeltaValue::Positive(20),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 25,
+                    min_achieved_negative_delta: 20,
+                    min_overflow_positive_delta: Some(95),
+                    max_underflow_negative_delta: Some(40),
+                },
+            },
+            base_aggregator: None,
+        };
+        assert_ok!(aggregator_change2.merge_with_previous_aggregator_change(aggregator_change1));
+        assert_eq!(aggregator_change2, AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 20,
+                delta: DeltaValue::Positive(35),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 10,
+                    min_achieved_negative_delta: 20,
+                    min_overflow_positive_delta: Some(105),
+                    max_underflow_negative_delta: Some(30),
+                },
+            },
+            base_aggregator: None,
+        });
+    }
 }
