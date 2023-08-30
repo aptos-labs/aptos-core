@@ -5,304 +5,304 @@
 = prover
 </text>
 <text x="0" y="22" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::genesis
+0x1::gas_schedule
 </text>
 <rect x="0" y="35" width="909" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="918" y="36" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-27.356
+305.945
 </text>
 <text x="0" y="57" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::stake
+0x1::vesting
 </text>
-<rect x="0" y="69" width="410" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="419" y="70" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-12.345
+<rect x="0" y="69" width="809" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="818" y="70" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+272.553
 </text>
 <text x="0" y="91" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::aptos_governance
 </text>
-<rect x="0" y="103" width="362" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="371" y="104" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-10.908
+<rect x="0" y="103" width="146" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="155" y="104" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+49.294
 </text>
 <text x="0" y="125" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::staking_proxy
+0x1::genesis
 </text>
-<rect x="0" y="137" width="273" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="282" y="139" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-8.241
+<rect x="0" y="137" width="113" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="122" y="139" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+38.294
 </text>
 <text x="0" y="159" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::staking_contract
-</text>
-<rect x="0" y="172" width="188" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="197" y="173" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-5.679
-</text>
-<text x="0" y="193" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::multisig_account
-</text>
-<rect x="0" y="206" width="165" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="174" y="207" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-4.978
-</text>
-<text x="0" y="228" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::vesting
-</text>
-<rect x="0" y="240" width="163" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="172" y="241" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-4.906
-</text>
-<text x="0" y="262" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::transaction_validation
-</text>
-<rect x="0" y="274" width="146" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="155" y="275" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-4.414
-</text>
-<text x="0" y="296" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::storage_gas
-</text>
-<rect x="0" y="308" width="120" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="129" y="310" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-3.628
-</text>
-<text x="0" y="330" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::staking_config
-</text>
-<rect x="0" y="343" width="115" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="124" y="344" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-3.486
-</text>
-<text x="0" y="364" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::voting
-</text>
-<rect x="0" y="377" width="102" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="111" y="378" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-3.096
-</text>
-<text x="0" y="399" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::coin
-</text>
-<rect x="0" y="411" width="82" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="91" y="412" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-2.474
-</text>
-<text x="0" y="433" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::aptos_account
-</text>
-<rect x="0" y="445" width="74" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="84" y="446" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-2.256
-</text>
-<text x="0" y="467" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::account
-</text>
-<rect x="0" y="480" width="68" height="7" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="77" y="481" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-2.070
-</text>
-<text x="0" y="501" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::object
-</text>
-<rect x="0" y="514" width="63" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="72" y="515" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-1.911
-</text>
-<text x="0" y="535" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::transaction_fee
-</text>
-<rect x="0" y="548" width="59" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="68" y="549" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-1.796
-</text>
-<text x="0" y="570" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::resource_account
-</text>
-<rect x="0" y="582" width="48" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="57" y="583" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-1.452
-</text>
-<text x="0" y="604" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::block
 </text>
-<rect x="0" y="616" width="42" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="51" y="617" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-1.285
+<rect x="0" y="172" width="70" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="79" y="173" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+23.769
 </text>
-<text x="0" y="638" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::reconfiguration
+<text x="0" y="193" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::stake
 </text>
-<rect x="0" y="651" width="38" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="47" y="652" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-1.168
+<rect x="0" y="206" width="55" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="64" y="207" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+18.708
 </text>
-<text x="0" y="672" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::optional_aggregator
-</text>
-<rect x="0" y="685" width="37" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="46" y="686" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-1.125
-</text>
-<text x="0" y="706" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::code
-</text>
-<rect x="0" y="719" width="35" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="44" y="720" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-1.061
-</text>
-<text x="0" y="741" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::managed_coin
-</text>
-<rect x="0" y="753" width="31" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="40" y="754" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.948
-</text>
-<text x="0" y="775" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::gas_schedule
-</text>
-<rect x="0" y="787" width="29" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="38" y="788" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.873
-</text>
-<text x="0" y="809" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+<text x="0" y="228" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::version
 </text>
-<rect x="0" y="822" width="28" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="37" y="823" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.866
+<rect x="0" y="240" width="48" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="57" y="241" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+16.220
 </text>
-<text x="0" y="843" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+<text x="0" y="262" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::reconfiguration
+</text>
+<rect x="0" y="274" width="37" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="46" y="275" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+12.628
+</text>
+<text x="0" y="296" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::staking_proxy
+</text>
+<rect x="0" y="308" width="29" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="38" y="310" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+9.964
+</text>
+<text x="0" y="330" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::consensus_config
 </text>
-<rect x="0" y="856" width="28" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="37" y="857" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.864
+<rect x="0" y="343" width="28" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="37" y="344" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+9.564
+</text>
+<text x="0" y="364" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::staking_contract
+</text>
+<rect x="0" y="377" width="25" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="34" y="378" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+8.450
+</text>
+<text x="0" y="399" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::storage_gas
+</text>
+<rect x="0" y="411" width="22" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="31" y="412" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+7.519
+</text>
+<text x="0" y="433" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::multisig_account
+</text>
+<rect x="0" y="445" width="22" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="31" y="446" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+7.432
+</text>
+<text x="0" y="467" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::transaction_validation
+</text>
+<rect x="0" y="480" width="21" height="7" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="30" y="481" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+7.149
+</text>
+<text x="0" y="501" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::voting
+</text>
+<rect x="0" y="514" width="18" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="27" y="515" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+6.319
+</text>
+<text x="0" y="535" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::coin
+</text>
+<rect x="0" y="548" width="12" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="21" y="549" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+4.092
+</text>
+<text x="0" y="570" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::aptos_account
+</text>
+<rect x="0" y="582" width="11" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="20" y="583" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+3.867
+</text>
+<text x="0" y="604" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::transaction_fee
+</text>
+<rect x="0" y="616" width="10" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="19" y="617" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+3.622
+</text>
+<text x="0" y="638" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::account
+</text>
+<rect x="0" y="651" width="10" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="19" y="652" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+3.536
+</text>
+<text x="0" y="672" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::object
+</text>
+<rect x="0" y="685" width="9" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="19" y="686" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+3.356
+</text>
+<text x="0" y="706" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::staking_config
+</text>
+<rect x="0" y="719" width="9" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="18" y="720" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+3.246
+</text>
+<text x="0" y="741" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::resource_account
+</text>
+<rect x="0" y="753" width="8" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="17" y="754" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+2.809
+</text>
+<text x="0" y="775" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::code
+</text>
+<rect x="0" y="787" width="6" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="16" y="788" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+2.343
+</text>
+<text x="0" y="809" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::optional_aggregator
+</text>
+<rect x="0" y="822" width="6" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="15" y="823" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+2.309
+</text>
+<text x="0" y="843" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::managed_coin
+</text>
+<rect x="0" y="856" width="6" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="15" y="857" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+2.235
 </text>
 <text x="0" y="877" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::aptos_coin
-</text>
-<rect x="0" y="890" width="28" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="37" y="891" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.846
-</text>
-<text x="0" y="912" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::chain_status
 </text>
-<rect x="0" y="924" width="26" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="35" y="925" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.793
+<rect x="0" y="890" width="6" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="15" y="891" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+2.146
+</text>
+<text x="0" y="912" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::aptos_coin
+</text>
+<rect x="0" y="924" width="6" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="15" y="925" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+2.121
 </text>
 <text x="0" y="946" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::timestamp
 </text>
-<rect x="0" y="958" width="25" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="35" y="960" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.782
+<rect x="0" y="958" width="5" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="14" y="960" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.988
 </text>
 <text x="0" y="980" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::state_storage
-</text>
-<rect x="0" y="993" width="25" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="34" y="994" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.776
-</text>
-<text x="0" y="1014" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::system_addresses
 </text>
-<rect x="0" y="1027" width="24" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="34" y="1028" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.752
+<rect x="0" y="993" width="5" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="14" y="994" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.963
+</text>
+<text x="0" y="1014" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::state_storage
+</text>
+<rect x="0" y="1027" width="5" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="14" y="1028" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.943
 </text>
 <text x="0" y="1048" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::guid
 </text>
-<rect x="0" y="1061" width="22" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="31" y="1062" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.673
+<rect x="0" y="1061" width="5" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="14" y="1062" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.752
 </text>
 <text x="0" y="1083" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::event
 </text>
-<rect x="0" y="1095" width="21" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="30" y="1096" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.647
+<rect x="0" y="1095" width="5" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="14" y="1096" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.728
 </text>
 <text x="0" y="1117" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::aggregator_factory
 </text>
-<rect x="0" y="1129" width="20" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="30" y="1131" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.630
+<rect x="0" y="1129" width="5" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="14" y="1131" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.687
 </text>
 <text x="0" y="1151" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::transaction_context
 </text>
-<rect x="0" y="1164" width="20" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="29" y="1165" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.617
+<rect x="0" y="1164" width="4" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="14" y="1165" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.675
 </text>
 <text x="0" y="1185" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::chain_id
 </text>
-<rect x="0" y="1198" width="19" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="28" y="1199" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.589
+<rect x="0" y="1198" width="4" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="13" y="1199" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.651
 </text>
 <text x="0" y="1219" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::governance_proposal
 </text>
-<rect x="0" y="1232" width="19" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="28" y="1233" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.581
+<rect x="0" y="1232" width="4" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="13" y="1233" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.645
 </text>
 <text x="0" y="1254" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::aggregator
 </text>
-<rect x="0" y="1266" width="19" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="28" y="1267" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.575
+<rect x="0" y="1266" width="4" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="13" y="1267" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.603
 </text>
 <text x="0" y="1288" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::util
 </text>
-<rect x="0" y="1300" width="18" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="27" y="1302" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.569
+<rect x="0" y="1300" width="4" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="13" y="1302" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.595
 </text>
 <text x="0" y="1322" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::fungible_asset
+0x1::execution_config
 </text>
-<rect x="0" y="1335" width="12" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="21" y="1336" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.373
+<rect x="0" y="1335" width="3" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="12" y="1336" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.037
 </text>
 <text x="0" y="1356" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::delegation_pool
 </text>
-<rect x="0" y="1369" width="12" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="21" y="1370" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.372
+<rect x="0" y="1369" width="3" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="12" y="1370" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.034
 </text>
 <text x="0" y="1390" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::create_signer
-</text>
-<rect x="0" y="1403" width="12" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="21" y="1404" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.370
-</text>
-<text x="0" y="1425" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
 0x1::primary_fungible_store
 </text>
-<rect x="0" y="1437" width="12" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="21" y="1438" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.369
+<rect x="0" y="1403" width="3" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="12" y="1404" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.031
+</text>
+<text x="0" y="1425" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+0x1::fungible_asset
+</text>
+<rect x="0" y="1437" width="3" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="12" y="1438" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.023
 </text>
 <text x="0" y="1459" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::execution_config
+0x1::create_signer
 </text>
-<rect x="0" y="1471" width="12" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
-<text x="21" y="1473" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
-0.368
+<rect x="0" y="1471" width="3" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="12" y="1473" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.012
 </text>
 </svg>

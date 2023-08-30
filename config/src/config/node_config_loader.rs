@@ -104,17 +104,11 @@ fn get_local_config_yaml<P: AsRef<Path>>(node_config_path: P) -> Result<Value, E
     Ok(local_config_yaml)
 }
 
-fn config_to_node_type_chain_id(node_config: &NodeConfig) -> Option<(NodeType, ChainId)> {
-    // Get the role and chain_id for the node
+/// Extracts the node type and chain ID from the given node config
+fn extract_node_type_and_chain_id(node_config: &NodeConfig) -> Result<(NodeType, ChainId), Error> {
     let node_type = NodeType::extract_from_config(node_config);
-    let chain_id = match get_chain_id(node_config) {
-        Ok(chain_id) => chain_id,
-        Err(error) => {
-            println!("Failed to get the chain ID from the genesis blob! Skipping config sanitization. Error: {:?}", error);
-            return None;
-        },
-    };
-    Some((node_type, chain_id))
+    let chain_id = get_chain_id(node_config)?;
+    Ok((node_type, chain_id))
 }
 
 /// Optimize and sanitize the node config for the current environment
@@ -122,10 +116,20 @@ fn optimize_and_sanitize_node_config(
     node_config: &mut NodeConfig,
     local_config_yaml: Value,
 ) -> Result<(), Error> {
-    let (node_type, chain_id) = match config_to_node_type_chain_id(node_config) {
-        None => return Ok(()),
-        Some((node_type, chain_id)) => (node_type, chain_id),
+    // Extract the node type and chain ID from the node config
+    let (node_type, chain_id) = match extract_node_type_and_chain_id(node_config) {
+        Ok((node_type, chain_id)) => (node_type, chain_id),
+        Err(error) => {
+            println!("Failed to extract node type and chain ID from node config: {:?}. Skipping config optimization and sanitization!", error);
+            return Ok(());
+        },
     };
+
+    // Print the extracted node type and chain ID
+    println!(
+        "Identified node type ({:?}) and chain ID ({:?}) from node config!",
+        node_type, chain_id
+    );
 
     // Optimize the node config
     NodeConfig::optimize(node_config, &local_config_yaml, node_type, chain_id)?;
@@ -134,11 +138,18 @@ fn optimize_and_sanitize_node_config(
     NodeConfig::sanitize(node_config, node_type, chain_id)
 }
 
+/// Sanitize the node config for the current environment
 pub fn sanitize_node_config(node_config: &mut NodeConfig) -> Result<(), Error> {
-    let (node_type, chain_id) = match config_to_node_type_chain_id(node_config) {
-        None => return Ok(()),
-        Some((node_type, chain_id)) => (node_type, chain_id),
+    // Extract the node type and chain ID from the node config
+    let (node_type, chain_id) = match extract_node_type_and_chain_id(node_config) {
+        Ok((node_type, chain_id)) => (node_type, chain_id),
+        Err(error) => {
+            println!("Failed to extract node type and chain ID from node config: {:?}. Skipping config sanitization!", error);
+            return Ok(());
+        },
     };
+
+    // Sanitize the node config
     NodeConfig::sanitize(node_config, node_type, chain_id)
 }
 

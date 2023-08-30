@@ -7,6 +7,10 @@ Events:
     seq_num: 0
     type:    0x3::token::CreateCollectionEvent
     data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b7300006400000000000000"
+}
+{
+    type:    0x1::transaction_fee::FeeStatement
+    data:    "6c0000000000000007000000000000000200000000000000a0860100000000000000000000000000"
 }mutable inputs after call: local#0: 0
 return values: 0
 
@@ -29,6 +33,10 @@ Events:
     seq_num: 0
     type:    0x3::token::DepositEvent
     data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000a00000000000000"
+}
+{
+    type:    0x1::transaction_fee::FeeStatement
+    data:    "ab0000000000000012000000000000000300000000000000f0490200000000000000000000000000"
 }mutable inputs after call: local#0: 0
 return values: 0
 
@@ -85,6 +93,10 @@ Events:
     seq_num: 0
     type:    0x3::token_transfers::TokenOfferEvent
     data:    "9c3b634ac05d0af393e0f93b9b19b61e7cac1c519f566276aa0c6fd15dac12aaf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000100000000000000"
+}
+{
+    type:    0x1::transaction_fee::FeeStatement
+    data:    "71000000000000000b000000000000000300000000000000a0860100000000000000000000000000"
 }mutable inputs after call: local#0: 0
 return values: 0
 
@@ -101,6 +113,10 @@ Events:
     seq_num: 0
     type:    0x3::token_transfers::TokenClaimEvent
     data:    "9c3b634ac05d0af393e0f93b9b19b61e7cac1c519f566276aa0c6fd15dac12aaf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000100000000000000"
+}
+{
+    type:    0x1::transaction_fee::FeeStatement
+    data:    "71000000000000000b000000000000000300000000000000a08601000000000050c3000000000000"
 }mutable inputs after call: local#0: 0
 return values: 0
 

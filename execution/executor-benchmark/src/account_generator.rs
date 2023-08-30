@@ -104,7 +104,7 @@ impl AccountCache {
     pub fn get_random_transfer_batch(
         &mut self,
         batch_size: usize,
-    ) -> (&mut LocalAccount, Vec<AccountAddress>) {
+    ) -> (&LocalAccount, Vec<AccountAddress>) {
         let indices = rand::seq::index::sample(&mut self.rng, self.accounts.len(), batch_size + 1);
         let sender_idx = indices.index(0);
         let receivers = indices
@@ -112,7 +112,7 @@ impl AccountCache {
             .skip(1)
             .map(|i| self.accounts[i].address())
             .collect();
-        let sender = &mut self.accounts[sender_idx];
+        let sender = &self.accounts[sender_idx];
         (sender, receivers)
     }
 }

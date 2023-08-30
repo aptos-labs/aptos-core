@@ -17,7 +17,7 @@ use aptos_types::{
 use std::{collections::HashMap, sync::Arc};
 
 pub struct MockStorage {
-    node_data: Mutex<HashMap<HashValue, Node>>,
+    node_data: Mutex<Option<Node>>,
     vote_data: Mutex<HashMap<NodeId, Vote>>,
     certified_node_data: Mutex<HashMap<HashValue, CertifiedNode>>,
 }
@@ -25,7 +25,7 @@ pub struct MockStorage {
 impl MockStorage {
     pub fn new() -> Self {
         Self {
-            node_data: Mutex::new(HashMap::new()),
+            node_data: Mutex::new(None),
             vote_data: Mutex::new(HashMap::new()),
             certified_node_data: Mutex::new(HashMap::new()),
         }
@@ -33,13 +33,17 @@ impl MockStorage {
 }
 
 impl DAGStorage for MockStorage {
-    fn save_node(&self, node: &Node) -> anyhow::Result<()> {
-        self.node_data.lock().insert(node.digest(), node.clone());
+    fn save_pending_node(&self, node: &Node) -> anyhow::Result<()> {
+        self.node_data.lock().replace(node.clone());
         Ok(())
     }
 
-    fn delete_node(&self, digest: HashValue) -> anyhow::Result<()> {
-        self.node_data.lock().remove(&digest);
+    fn get_pending_node(&self) -> anyhow::Result<Option<Node>> {
+        Ok(self.node_data.lock().clone())
+    }
+
+    fn delete_pending_node(&self) -> anyhow::Result<()> {
+        self.node_data.lock().take();
         Ok(())
     }
 

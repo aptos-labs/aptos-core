@@ -2144,7 +2144,7 @@ impl Test for TransferCoins {
 impl AptosTest for TransferCoins {
     async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
         let client = ctx.client();
-        let mut payer = ctx.random_account();
+        let payer = ctx.random_account();
         let payee = ctx.random_account();
         ctx.create_user_account(payer.public_key()).await?;
         ctx.create_user_account(payee.public_key()).await?;

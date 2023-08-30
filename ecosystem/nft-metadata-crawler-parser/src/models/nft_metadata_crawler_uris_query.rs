@@ -10,7 +10,6 @@ use diesel::{
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tracing::info;
 
 #[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
 #[diesel(primary_key(token_uri))]
@@ -32,7 +31,7 @@ impl NFTMetadataCrawlerURIsQuery {
     pub fn get_by_token_uri(
         token_uri: String,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
-    ) -> anyhow::Result<Option<Self>> {
+    ) -> Option<Self> {
         let mut op = || {
             parsed_token_uris::table
                 .find(token_uri.clone())
@@ -46,20 +45,14 @@ impl NFTMetadataCrawlerURIsQuery {
             ..Default::default()
         };
 
-        match retry(backoff, &mut op) {
-            Ok(result) => {
-                info!(token_uri = token_uri, "token_uri has been found");
-                Ok(result)
-            },
-            Err(_) => Ok(op()?),
-        }
+        retry(backoff, &mut op).expect("Querying token_uri should not fail")
     }
 
     pub fn get_by_raw_image_uri(
         token_uri: String,
         raw_image_uri: String,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
-    ) -> anyhow::Result<Option<Self>> {
+    ) -> Option<Self> {
         let mut op = || {
             parsed_token_uris::table
                 .filter(parsed_token_uris::raw_image_uri.eq(raw_image_uri.clone()))
@@ -74,23 +67,14 @@ impl NFTMetadataCrawlerURIsQuery {
             ..Default::default()
         };
 
-        match retry(backoff, &mut op) {
-            Ok(result) => {
-                info!(
-                    raw_image_uri = raw_image_uri,
-                    "raw_image_uri has been found"
-                );
-                Ok(result)
-            },
-            Err(_) => Ok(op()?),
-        }
+        retry(backoff, &mut op).expect("Querying raw_image_uri should not fail")
     }
 
     pub fn get_by_raw_animation_uri(
         token_uri: String,
         raw_animation_uri: String,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
-    ) -> anyhow::Result<Option<Self>> {
+    ) -> Option<Self> {
         let mut op = || {
             parsed_token_uris::table
                 .filter(parsed_token_uris::raw_animation_uri.eq(raw_animation_uri.clone()))
@@ -105,15 +89,6 @@ impl NFTMetadataCrawlerURIsQuery {
             ..Default::default()
         };
 
-        match retry(backoff, &mut op) {
-            Ok(result) => {
-                info!(
-                    raw_animation_uri = raw_animation_uri,
-                    "raw_animation_uri has been found"
-                );
-                Ok(result)
-            },
-            Err(_) => Ok(op()?),
-        }
+        retry(backoff, &mut op).expect("Querying raw_animation_uri should not fail")
     }
 }

@@ -98,7 +98,7 @@ Before jumping into writing code, let’s first understand what we want our smar
 3. Let an account mark their task as completed.
 
 :::tip
-Creating an event is not mandatory yet useful if dapps/users want to monitor data, such as how many people create a new task, using the [Aptos Indexer](../../integration/indexing.md).
+Creating an event is not mandatory yet useful if dapps/users want to monitor data, such as how many people create a new task, using the [Aptos Indexer](../../indexer/indexer-landing.md).
 :::
 
 We can start with defining a `TodoList` struct, that holds the:
