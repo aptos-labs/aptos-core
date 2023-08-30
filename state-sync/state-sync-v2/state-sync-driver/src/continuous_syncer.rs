@@ -121,13 +121,15 @@ impl<
         // Initialize a new active data stream
         let active_data_stream = match self.get_continuous_syncing_mode() {
             ContinuousSyncingMode::ApplyTransactionOutputs => {
-                self.streaming_client
+                let responce = self.streaming_client
                     .continuously_stream_transaction_outputs(
                         highest_synced_version,
                         highest_synced_epoch,
-                        sync_request_target,
+                        sync_request_target.clone(),
                     )
-                    .await?
+                    .await?;
+                println!("DKG DEBUG SS highest_synced_version {}, highest_synced_epoch {}, sync_request_target {:?}, responce {:?}", highest_synced_version, highest_synced_epoch, sync_request_target, responce);
+                responce
             },
             ContinuousSyncingMode::ExecuteTransactions => {
                 self.streaming_client

@@ -23,6 +23,7 @@ pub struct DKGStore {
     // store the aggregated node containing the final aggregated transcript
     // will be proposed as payload by proposal generator once the OnceCell is set
     agg_node: OnceCell<DKGAggNode>,
+    agg_node_taken: bool,
     // buffer the nodes received before the DKG locally starts
     buffered_nodes: Vec<DKGNode>,
     buffered_agg_nodes: Vec<DKGAggNode>,
@@ -37,6 +38,7 @@ impl DKGStore {
             nodes: HashMap::new(),
             agg_trx: None,
             agg_node: OnceCell::new(),
+            agg_node_taken: false,
             buffered_nodes: vec![],
             buffered_agg_nodes: vec![],
         }
@@ -74,7 +76,7 @@ impl DKGStore {
         }
         match node.verify(self.dkg_pvss_config.as_ref().unwrap()) {
             Ok(_) => {
-                if self.agg_node.get().is_some() {
+                if self.agg_node.get().is_some() || self.agg_node_taken {
                     debug!("[DKG] Node {:?} adds DKG Node failed due to agg node already available", self.author);
                     return Ok(None);
                 }
@@ -136,7 +138,7 @@ impl DKGStore {
     }
 
     pub fn add_agg_node(&mut self, agg_node: DKGAggNode) -> anyhow::Result<Option<DKGAggNode>> {
-        if self.agg_node.get().is_some() {
+        if self.agg_node.get().is_some() || self.agg_node_taken {
             return Ok(None);
         }
 
@@ -161,6 +163,9 @@ impl DKGStore {
     }
 
     pub fn take_agg_node(&mut self) -> Option<DKGAggNode> {
+        if self.agg_node.initialized() {
+            self.agg_node_taken = true;
+        }
         self.agg_node.take()
     }
 

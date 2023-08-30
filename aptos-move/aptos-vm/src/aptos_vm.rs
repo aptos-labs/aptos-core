@@ -1320,15 +1320,13 @@ impl AptosVM {
             .0
             .new_session(resolver, SessionId::block_meta(&block_metadata));
 
-        // We already verify the validity of the dkg transcript in the state_computer, so it is valid.
-
-        let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
         let reconfigure_with_dkg_enabled = self
             .0
             .get_features()
             .is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG);
         debug!("[DKG] process_block_prologue: reconfigure_with_dkg={}", reconfigure_with_dkg_enabled);
         if reconfigure_with_dkg_enabled {
+            let args = serialize_values(&block_metadata.get_prologue_v2_move_args(txn_data.sender));
             session
                 .execute_function_bypass_visibility(
                     &BLOCK_MODULE,
@@ -1342,6 +1340,7 @@ impl AptosVM {
                     expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)
                 })?;
         } else {
+            let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
             session
                 .execute_function_bypass_visibility(
                     &BLOCK_MODULE,

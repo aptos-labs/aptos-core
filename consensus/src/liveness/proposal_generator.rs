@@ -259,6 +259,7 @@ impl ProposalGenerator {
                 hqc.certified_block().timestamp_usecs(),
             )
         } else if let Some(dkg_agg_node) = self.dkg_manager_wrapper.take_agg_node() {
+            println!("DKG debug: node {} epoch {} generates DKG payload", dkg_agg_node.epoch(), self.author);
             // generate DKG payload
             // the block contains just one DKG aggregate node
             // dkg todo: handle the bad path where the submitted dkg payload does not get committed, i.e., when the validator sees its dkg payload is discarded, it needs to re-propose
@@ -336,6 +337,7 @@ impl ProposalGenerator {
                 )
                 .await
                 .context("Fail to retrieve payload")?;
+            println!("DKG debug: node {} generates QS payload {}", self.author, payload.len());
 
             (payload, timestamp.as_micros() as u64)
         };

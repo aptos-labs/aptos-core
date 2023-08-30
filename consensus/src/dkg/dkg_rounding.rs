@@ -6,8 +6,8 @@ use aptos_crypto::bls12381;
 use aptos_dkg::pvss::WeightedConfig;
 use aptos_types::dkg::StartDKGEvent;
 
-const MAX_NUM_SHARES: usize = 1000;
-const ROUNDING_UNIT: usize = 1_000_000;
+pub const MAX_NUM_SHARES: usize = 1000;
+pub const ROUNDING_UNIT: usize = 1_000_000;
 
 pub struct DKGRounding {
     pub validator_addresses: Vec<Author>,
@@ -45,22 +45,12 @@ impl DKGRounding {
     pub fn weighted_config_2(&self) -> WeightedConfig {
         self.weighted_config_2.clone()
     }
-}
 
-impl From<StartDKGEvent> for DKGRounding {
-    fn from(event: StartDKGEvent) -> Self {
-        let validator_info = event.locked_new_validator_info;
-        let validator_addresses = validator_info.iter().map(|vi| vi.account_address).collect();
-        let validator_stakes: Vec<u64> = validator_info
-            .iter()
-            .map(|vi| vi.consensus_voting_power())
-            .collect();
-        let validator_consensus_keys = validator_info
-            .iter()
-            .map(|vi| vi.consensus_public_key().clone())
-            .collect();
-        // let validator_indexes = validator_info.iter().map(|vi| vi.config().validator_index).collect();
-
+    pub fn new(
+        validator_addresses: Vec<Author>,
+        validator_stakes: Vec<u64>,
+        validator_consensus_keys: Vec<bls12381::PublicKey>,
+    ) -> Self {
         let (validator_weights, weights_of_one_third_stake, weights_of_two_third_stake) =
             rounding_scheme(validator_stakes.clone(), MAX_NUM_SHARES);
 

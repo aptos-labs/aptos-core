@@ -10,7 +10,7 @@ use crate::{
     counters,
     dkg::{
         dkg_handler::DKGNetworkHandler,
-        dkg_manager::{DKGManager, DKGManagerWrapper},
+        dkg_manager::{DKGManager, DKGManagerWrapper}, dkg_rounding::{rounding_scheme, MAX_NUM_SHARES},
     },
     error::{error_kind, DbError},
     experimental::{
@@ -99,7 +99,7 @@ use std::{
 };
 use tokio_retry::strategy::ExponentialBackoff;
 use aptos_crypto::bls12381;
-use aptos_dkg::pvss::{das, Player};
+use aptos_dkg::pvss::{Player, WeightedConfig};
 use aptos_dkg::pvss::traits::Transcript;
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_secure_storage::Storage;
@@ -876,11 +876,30 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 let mut dk_bytes = private_key.to_bytes(); //in big-endian
                 dk_bytes.reverse();// now in small-endian, needed by pvss API.
                 let dk = aptos_dkg::pvss::encryption_dlog::g1::DecryptPrivKey::try_from(dk_bytes.as_slice()).unwrap();
-                // let pvss_config = self.dkg_manager_wrapper.get_pvss_config().unwrap();
-                // let (sk1, pk1) = trxs.trx_one_third.decrypt_own_share(&pvss_config.wc_1, &Player { id: my_index}, &dk);
-                // let (sk2, pk2) = trxs.trx_two_third.decrypt_own_share(&pvss_config.wc_2, &Player { id: my_index}, &dk);
+                let (wc_1, wc_2) = match self.dkg_manager_wrapper.get_pvss_config() {
+                    Some(config) => (config.wc_1, config.wc_2),
+                    None => {
+                        // new validator does not have pvss config yet. create one from the stake distribution.
+                        let validator_addresses = epoch_state.verifier.get_ordered_account_addresses();
+                        let validator_stakes: Vec<_> = validator_addresses
+                            .iter()
+                            .map(|validator| epoch_state.verifier.get_voting_power(&validator).unwrap())
+                            .collect();
+
+                        let (validator_weights, weights_of_one_third_stake, weights_of_two_third_stake) =
+                        rounding_scheme(validator_stakes.clone(), MAX_NUM_SHARES);
+
+                        let weighted_config_1 =
+                            WeightedConfig::new(weights_of_one_third_stake, validator_weights.clone()).unwrap();
+                        let weighted_config_2 =
+                            WeightedConfig::new(weights_of_two_third_stake, validator_weights.clone()).unwrap();
+                        (weighted_config_1, weighted_config_2)
+                    }
+                };
+                let (sk1, pk1) = trxs.trx_one_third.decrypt_own_share(&wc_1, &Player{id: my_index}, &dk);
+                let (sk2, pk2) = trxs.trx_two_third.decrypt_own_share(&wc_2, &Player{id: my_index}, &dk);
                 //dkg todo: start randgen with these keys.
-                debug!("[DKG] starting new epoch with something!");
+                debug!("[DKG] starting new epoch with sk1={:?}, sk2={:?}\n current_epoch={:?}, target_epoch={}", sk1, sk2, self.epoch_state.as_ref().map(|a|a.epoch), epoch_state.epoch);
             }
             _ => {
                 debug!("No trxs in epoch 1. This is expected.");

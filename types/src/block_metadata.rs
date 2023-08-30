@@ -84,7 +84,32 @@ impl BlockMetadata {
             MoveValue::U64(self.timestamp_usecs),
         ];
 
-        //dkg todo: currently assuming the first transcript is valid.
+        ret
+    }
+
+    pub fn get_prologue_v2_move_args(self, signer: AccountAddress) -> Vec<MoveValue> {
+        let mut ret = vec![
+            MoveValue::Signer(signer),
+            MoveValue::Address(AccountAddress::from_bytes(self.id.to_vec()).unwrap()),
+            MoveValue::U64(self.epoch),
+            MoveValue::U64(self.round),
+            MoveValue::Address(self.proposer),
+            MoveValue::Vector(
+                self.failed_proposer_indices
+                    .into_iter()
+                    .map(u64::from)
+                    .map(MoveValue::U64)
+                    .collect(),
+            ),
+            MoveValue::Vector(
+                self.previous_block_votes_bitvec
+                    .into_iter()
+                    .map(MoveValue::U8)
+                    .collect(),
+            ),
+            MoveValue::U64(self.timestamp_usecs),
+        ];
+
         ret.push(MoveValue::Bool(self.maybe_dkg_transcript.is_some()));
         ret.push(MoveValue::Vector(
             self.maybe_dkg_transcript

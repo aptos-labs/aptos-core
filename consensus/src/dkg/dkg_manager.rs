@@ -24,10 +24,8 @@ use aptos_types::{
 use futures::future::{AbortHandle, Abortable};
 use rand::{rngs::StdRng, thread_rng, SeedableRng};
 use std::sync::Arc;
-use itertools::Itertools;
 use tokio_retry::strategy::ExponentialBackoff;
 use aptos_crypto::Uniform;
-use aptos_dkg::pvss::Player;
 
 // the transcript size is 3.25MB
 // const TRANSCRIPT_SIZE: usize = 3_250_000;
@@ -122,10 +120,22 @@ impl DKGManager {
     pub fn start_dkg(&mut self, dkg_events: Vec<ContractEvent>) {
         // thread::sleep(Duration::from_millis(TRANSCRIPT_COMPUTE_TIME_MS));
         debug!("[DKG] start_dkg: liveness check 1");
-        let first_event = StartDKGEvent::try_from(dkg_events
+        let event = StartDKGEvent::try_from(dkg_events
             .first().unwrap()).unwrap();
-        debug!("[DKG] start_dkg: first_event={:?}", first_event);
-        let dkg_rounding = DKGRounding::from(first_event);
+        debug!("[DKG] start_dkg: first_event={:?}", event);
+
+        let validator_info = event.locked_new_validator_info;
+        let validator_addresses = validator_info.iter().map(|vi| vi.account_address).collect();
+        let validator_stakes: Vec<u64> = validator_info
+            .iter()
+            .map(|vi| vi.consensus_voting_power())
+            .collect();
+        let validator_consensus_keys = validator_info
+            .iter()
+            .map(|vi| vi.consensus_public_key().clone())
+            .collect();
+
+        let dkg_rounding = DKGRounding::new(validator_addresses, validator_stakes, validator_consensus_keys);
         debug!(
             "[DKG] Starting DKG with the following parameters: number of validators: {:?}, validator stakes: {:?}, validator weights: {:?}, validator 1/3 weights: {:?}, validator 2/3 weights: {:?}",
             dkg_rounding.validator_stakes().len(),
