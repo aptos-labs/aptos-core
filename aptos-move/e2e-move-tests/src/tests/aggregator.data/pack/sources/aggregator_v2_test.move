@@ -24,6 +24,6 @@ module 0x1::aggregator_v2_test {
     public entry fun verify_string_snapshot_concat() {
         let snapshot = aggregator_v2::create_snapshot(std::string::utf8(b"42"));
         let snapshot2 = aggregator_v2::string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
-        assert!(aggregator_v2::read_snapshot(&snapshot2) == std::string::utf8(b"before42after"), 0);    
+        assert!(aggregator_v2::read_snapshot(&snapshot2) == std::string::utf8(b"before42after"), 0);
     }
 }
