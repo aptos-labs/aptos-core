@@ -22,13 +22,13 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, ops::Deref};
 
-/// The generic type supplied to aggregator snapshots is not supported
-pub const EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE: u64 = 0x02_0005;
+/// The generic type supplied to aggregator snapshots is not supported.
+pub const EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE: u64 = 0x03_0001;
 
-/// The aggregator snapshots feature is not enabled
-pub const EAGGREGATOR_SNAPSHOTS_NOT_ENABLED: u64 = 0x02_0006;
+/// The aggregator snapshots feature is not enabled.
+pub const EAGGREGATOR_SNAPSHOTS_NOT_ENABLED: u64 = 0x03_0002;
 
-/// Checks if the type argument `type_arg` is a string type
+/// Checks if the type argument `type_arg` is a string type.
 fn is_string_type(context: &SafeNativeContext, type_arg: &Type) -> SafeNativeResult<bool> {
     let ty = context.deref().type_to_fully_annotated_layout(type_arg)?;
     if let MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, .. }) = ty {

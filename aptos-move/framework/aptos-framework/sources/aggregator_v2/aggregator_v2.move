@@ -4,8 +4,11 @@
 module aptos_framework::aggregator_v2 {
     use std::string::String;
 
-    /// The generic type supplied to the aggregator snapshot is not supported
+    /// The generic type supplied to the aggregator snapshot is not supported.
     const EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE: u64 = 5;
+
+    /// The aggregator snapshots feature flag is not enabled.
+    const EAGGREGATOR_SNAPSHOTS_NOT_ENABLED: u64 = 6;
 
     struct AggregatorSnapshot<Element> has store, drop {
         value: Element,
@@ -20,10 +23,10 @@ module aptos_framework::aggregator_v2 {
     public native fun string_concat<Element>(before: String, snapshot: &AggregatorSnapshot<Element>, after: String): AggregatorSnapshot<String>;
 
     #[test(fx = @std)]
-    public fun test_correct_read(fx: signer) {
+    public fun test_correct_read(fx: &signer) {
         use std::features;
         let feature = features::get_aggregator_snapshots_feature();
-        features::change_feature_flags(&fx, vector[feature], vector[]);
+        features::change_feature_flags(fx, vector[feature], vector[]);
 
         let snapshot = create_snapshot(42);
         let snapshot2 = copy_snapshot(&snapshot);
@@ -32,10 +35,10 @@ module aptos_framework::aggregator_v2 {
     }
 
     #[test(fx = @std)]
-    public fun test_correct_read_string(fx: signer) {
+    public fun test_correct_read_string(fx: &signer) {
         use std::features;
         let feature = features::get_aggregator_snapshots_feature();
-        features::change_feature_flags(&fx, vector[feature], vector[]);
+        features::change_feature_flags(fx, vector[feature], vector[]);
 
         let snapshot = create_snapshot(std::string::utf8(b"42"));
         let snapshot2 = copy_snapshot(&snapshot);
@@ -44,10 +47,10 @@ module aptos_framework::aggregator_v2 {
     }
 
     #[test(fx = @std)]
-    public fun test_string_concat1(fx: signer) {
+    public fun test_string_concat1(fx: &signer) {
         use std::features;
         let feature = features::get_aggregator_snapshots_feature();
-        features::change_feature_flags(&fx, vector[feature], vector[]);
+        features::change_feature_flags(fx, vector[feature], vector[]);
 
         let snapshot = create_snapshot(42);
         let snapshot2 = string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
@@ -55,10 +58,10 @@ module aptos_framework::aggregator_v2 {
     }
 
     #[test(fx = @std)]
-    public fun test_string_concat2(fx: signer) {
+    public fun test_string_concat2(fx: &signer) {
         use std::features;
         let feature = features::get_aggregator_snapshots_feature();
-        features::change_feature_flags(&fx, vector[feature], vector[]);
+        features::change_feature_flags(fx, vector[feature], vector[]);
 
         let snapshot = create_snapshot<String>(std::string::utf8(b"42"));
         let snapshot2 = string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
@@ -66,8 +69,29 @@ module aptos_framework::aggregator_v2 {
     }
     
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0x030002, location = Self)]
     public fun test_snapshot_feature_not_enabled() {
         create_snapshot(42);
+    }
+
+    #[test(fx = @std)]
+    #[expected_failure(abort_code = 0x030001, location = Self)]
+    public fun test_snpashot_invalid_type1(fx: &signer) {
+        use std::features;
+        use std::option;
+        let feature = features::get_aggregator_snapshots_feature();
+        features::change_feature_flags(fx, vector[feature], vector[]);
+
+        create_snapshot(option::some(42));
+    }
+
+    #[test(fx = @std)]
+    #[expected_failure(abort_code = 0x030001, location = Self)]
+    public fun test_snpashot_invalid_type2(fx: &signer) {
+        use std::features;
+        let feature = features::get_aggregator_snapshots_feature();
+        features::change_feature_flags(fx, vector[feature], vector[]);
+
+        create_snapshot(vector[42]);
     }
 }

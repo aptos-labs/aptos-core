@@ -53,9 +53,19 @@ to allow transition of usages.
 ## Constants
 
 
+<a name="0x1_aggregator_v2_EAGGREGATOR_SNAPSHOTS_NOT_ENABLED"></a>
+
+The aggregator snapshots feature flag is not enabled.
+
+
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_SNAPSHOTS_NOT_ENABLED">EAGGREGATOR_SNAPSHOTS_NOT_ENABLED</a>: u64 = 6;
+</code></pre>
+
+
+
 <a name="0x1_aggregator_v2_EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE"></a>
 
-The generic type supplied to the aggregator snapshot is not supported
+The generic type supplied to the aggregator snapshot is not supported.
 
 
 <pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE">EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE</a>: u64 = 5;
