@@ -3,8 +3,8 @@
 
 use crate::natives::{
     aggregator_natives::helpers_v2::{
-        aggregator_snapshot_string_info, aggregator_snapshot_u128_info,
-        aggregator_snapshot_u64_info, string_value_info,
+        aggregator_snapshot_value_as_bytes, aggregator_snapshot_value_as_u128,
+        aggregator_snapshot_value_as_u64, string_to_bytes,
     },
     AccountAddress,
 };
@@ -51,7 +51,7 @@ fn native_create_snapshot(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    if !context.is_aggregator_snapshots_enabled() {
+    if !context.aggregator_snapshots_enabled() {
         return Err(SafeNativeError::Abort {
             abort_code: EAGGREGATOR_SNAPSHOTS_NOT_ENABLED,
         });
@@ -77,7 +77,7 @@ fn native_create_snapshot(
         _ => {
             // Check if the type is a string
             if is_string_type(context, &ty_args[0])? {
-                let input = string_value_info(safely_pop_arg!(args, Struct))?;
+                let input = string_to_bytes(safely_pop_arg!(args, Struct))?;
                 let move_string_value = Value::struct_(Struct::pack(vec![Value::vector_u8(input)]));
                 let move_snapshot_value = Value::struct_(Struct::pack(vec![move_string_value]));
                 return Ok(smallvec![move_snapshot_value]);
@@ -105,13 +105,13 @@ fn native_copy_snapshot(
 
     match ty_args[0] {
         Type::U128 => {
-            let value = aggregator_snapshot_u128_info(&safely_pop_arg!(args, StructRef))?;
+            let value = aggregator_snapshot_value_as_u128(&safely_pop_arg!(args, StructRef))?;
             Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u128(
                 value
             )]))])
         },
         Type::U64 => {
-            let value = aggregator_snapshot_u64_info(&safely_pop_arg!(args, StructRef))?;
+            let value = aggregator_snapshot_value_as_u64(&safely_pop_arg!(args, StructRef))?;
             Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u64(
                 value
             )]))])
@@ -119,7 +119,7 @@ fn native_copy_snapshot(
         _ => {
             // Check if the type is a string
             if is_string_type(context, &ty_args[0])? {
-                let value = aggregator_snapshot_string_info(&safely_pop_arg!(args, StructRef))?;
+                let value = aggregator_snapshot_value_as_bytes(&safely_pop_arg!(args, StructRef))?;
                 let move_string_value = Value::struct_(Struct::pack(vec![Value::vector_u8(value)]));
                 let move_snapshot_value = Value::struct_(Struct::pack(vec![move_string_value]));
                 return Ok(smallvec![move_snapshot_value]);
@@ -147,17 +147,17 @@ fn native_read_snapshot(
 
     match ty_args[0] {
         Type::U128 => {
-            let value = aggregator_snapshot_u128_info(&safely_pop_arg!(args, StructRef))?;
+            let value = aggregator_snapshot_value_as_u128(&safely_pop_arg!(args, StructRef))?;
             Ok(smallvec![Value::u128(value)])
         },
         Type::U64 => {
-            let value = aggregator_snapshot_u64_info(&safely_pop_arg!(args, StructRef))?;
+            let value = aggregator_snapshot_value_as_u64(&safely_pop_arg!(args, StructRef))?;
             Ok(smallvec![Value::u64(value)])
         },
         _ => {
             // Check if the type is a string
             if is_string_type(context, &ty_args[0])? {
-                let value = aggregator_snapshot_string_info(&safely_pop_arg!(args, StructRef))?;
+                let value = aggregator_snapshot_value_as_bytes(&safely_pop_arg!(args, StructRef))?;
                 let move_string_value = Value::struct_(Struct::pack(vec![Value::vector_u8(value)]));
                 return Ok(smallvec![move_string_value]);
             }
@@ -182,21 +182,21 @@ fn native_string_concat(
     debug_assert_eq!(args.len(), 3);
     context.charge(AGGREGATOR_V2_STRING_CONCAT_BASE)?;
 
-    let after = string_value_info(safely_pop_arg!(args, Struct))?;
+    let after = string_to_bytes(safely_pop_arg!(args, Struct))?;
 
     let snapshot_value = match ty_args[0] {
         Type::U128 => {
-            let value = aggregator_snapshot_u128_info(&safely_pop_arg!(args, StructRef))?;
+            let value = aggregator_snapshot_value_as_u128(&safely_pop_arg!(args, StructRef))?;
             Ok(value.to_string().into_bytes())
         },
         Type::U64 => {
-            let value = aggregator_snapshot_u64_info(&safely_pop_arg!(args, StructRef))?;
+            let value = aggregator_snapshot_value_as_u64(&safely_pop_arg!(args, StructRef))?;
             Ok(value.to_string().into_bytes())
         },
         _ => {
             // Check if the type is a string
             if is_string_type(context, &ty_args[0])? {
-                Ok(aggregator_snapshot_string_info(&safely_pop_arg!(
+                Ok(aggregator_snapshot_value_as_bytes(&safely_pop_arg!(
                     args, StructRef
                 ))?)
             } else {
@@ -206,7 +206,7 @@ fn native_string_concat(
             }
         },
     }?;
-    let before = string_value_info(safely_pop_arg!(args, Struct))?;
+    let before = string_to_bytes(safely_pop_arg!(args, Struct))?;
     let mut result = before.clone();
     result.extend(&snapshot_value);
     result.extend(&after);

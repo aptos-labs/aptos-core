@@ -67,7 +67,7 @@ module aptos_framework::aggregator_v2 {
         let snapshot2 = string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
         assert!(read_snapshot(&snapshot2) == std::string::utf8(b"before42after"), 0);
     }
-    
+
     #[test]
     #[expected_failure(abort_code = 0x030002, location = Self)]
     public fun test_snapshot_feature_not_enabled() {
