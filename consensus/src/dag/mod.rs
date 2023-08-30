@@ -16,6 +16,7 @@ mod storage;
 #[cfg(test)]
 mod tests;
 mod types;
+mod dag_state_sync;
 
 pub use dag_network::{RpcHandler, RpcWithFallback, TDAGNetworkSender};
 pub use types::{CertifiedNode, DAGMessage, DAGNetworkMessage, Extensions, Node, NodeId, Vote};

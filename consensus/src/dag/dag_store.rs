@@ -36,6 +36,12 @@ impl NodeStatus {
         assert!(matches!(self, NodeStatus::Unordered(_)));
         *self = NodeStatus::Ordered(self.as_node().clone());
     }
+
+    pub fn mark_as_committed(&mut self) {
+        assert!(!matches!(self, NodeStatus::Committed(_)));
+        // TODO: try to avoid clone
+        *self = NodeStatus::Committed(self.as_node().clone());
+    }
 }
 
 /// Data structure that stores the DAG representation, it maintains round based index.
@@ -46,6 +52,7 @@ pub struct Dag {
     author_to_index: HashMap<Author, usize>,
     storage: Arc<dyn DAGStorage>,
     initial_round: Round,
+    epoch_state: Arc<EpochState>,
 }
 
 impl Dag {
@@ -83,6 +90,7 @@ impl Dag {
             author_to_index,
             storage,
             initial_round,
+            epoch_state,
         }
     }
 
@@ -112,8 +120,10 @@ impl Dag {
         let round = node.metadata().round();
         ensure!(round >= self.lowest_round(), "round too low");
         ensure!(round <= self.highest_round() + 1, "round too high");
-        for parent in node.parents() {
-            ensure!(self.exists(parent.metadata()), "parent not exist");
+        if round > self.lowest_round() {
+            for parent in node.parents() {
+                ensure!(self.exists(parent.metadata()), "parent not exist");
+            }
         }
         let round_ref = self
             .nodes_by_round
@@ -131,8 +141,19 @@ impl Dag {
         self.get_node_ref_by_metadata(metadata).is_some()
     }
 
+    pub fn exists_by_round_digest(&self, round: Round, digest: HashValue) -> bool {
+        self.get_node_by_round_digest(round, digest).is_some()
+    }
+
     pub fn all_exists<'a>(&self, nodes: impl Iterator<Item = &'a NodeMetadata>) -> bool {
         self.filter_missing(nodes).next().is_none()
+    }
+
+    pub fn all_exists_by_round_author<'a>(
+        &self,
+        mut nodes: impl Iterator<Item = &'a (Round, Author)>,
+    ) -> bool {
+        nodes.all(|(round, author)| self.get_node_ref(*round, author).is_some())
     }
 
     pub fn filter_missing<'a, 'b>(
@@ -142,20 +163,53 @@ impl Dag {
         nodes.filter(|node_metadata| !self.exists(node_metadata))
     }
 
+    pub fn get_node_ref_by_round_digest(
+        &self,
+        round: Round,
+        digest: HashValue,
+    ) -> Option<&NodeStatus> {
+        self.get_round_iter(round)?
+            .find(|node_status| node_status.as_node().digest() == digest)
+    }
+
+    pub fn get_node_ref_mut_by_round_digest(
+        &mut self,
+        round: Round,
+        digest: HashValue,
+    ) -> Option<&mut NodeStatus> {
+        self.get_round_iter_mut(round)?
+            .find(|node_status| node_status.as_node().digest() == digest)
+    }
+
     fn get_node_ref_by_metadata(&self, metadata: &NodeMetadata) -> Option<&NodeStatus> {
         self.get_node_ref(metadata.round(), metadata.author())
     }
 
-    fn get_node_ref(&self, round: Round, author: &Author) -> Option<&NodeStatus> {
+    pub fn get_node_ref(&self, round: Round, author: &Author) -> Option<&NodeStatus> {
         let index = self.author_to_index.get(author)?;
         let round_ref = self.nodes_by_round.get(&round)?;
         round_ref[*index].as_ref()
+    }
+
+    pub fn get_node_ref_mut(&mut self, round: Round, author: &Author) -> Option<&mut NodeStatus> {
+        let index = self.author_to_index.get(author)?;
+        let round_ref = self.nodes_by_round.get_mut(&round)?;
+        round_ref[*index].as_mut()
     }
 
     fn get_round_iter(&self, round: Round) -> Option<impl Iterator<Item = &NodeStatus>> {
         self.nodes_by_round
             .get(&round)
             .map(|round_ref| round_ref.iter().flatten())
+    }
+
+    fn get_round_iter_mut(
+        &mut self,
+        round: Round,
+    ) -> Option<impl Iterator<Item = &mut NodeStatus>> {
+        self.nodes_by_round
+            .get_mut(&round)
+            .map(|round_ref| round_ref.iter_mut().flatten())
     }
 
     pub fn get_node(&self, metadata: &NodeMetadata) -> Option<Arc<CertifiedNode>> {
@@ -169,6 +223,15 @@ impl Dag {
         author: &Author,
     ) -> Option<&Arc<CertifiedNode>> {
         self.get_node_ref(round, author)
+            .map(|node_status| node_status.as_node())
+    }
+
+    pub fn get_node_by_round_digest(
+        &self,
+        round: Round,
+        digest: HashValue,
+    ) -> Option<&Arc<CertifiedNode>> {
+        self.get_node_ref_by_round_digest(round, digest)
             .map(|node_status| node_status.as_node())
     }
 
@@ -295,5 +358,44 @@ impl Dag {
             .collect();
 
         DagSnapshotBitmask::new(lowest_round, bitmask)
+    }
+
+    pub(super) fn prune(&mut self) {
+        let all_nodes = self.storage.get_certified_nodes().unwrap_or_default();
+        let mut expired = vec![];
+        for (digest, certified_node) in all_nodes {
+            if certified_node.metadata().epoch() != self.epoch_state.epoch
+                || certified_node.metadata().round() < self.initial_round
+            {
+                expired.push(digest);
+                self.nodes_by_round
+                    .remove(&certified_node.metadata().round());
+            }
+        }
+        if let Err(e) = self.storage.delete_certified_nodes(expired) {
+            error!("Error deleting expired nodes: {:?}", e);
+        }
+    }
+
+    pub(super) fn highest_ordered_round(&self) -> Option<Round> {
+        for (round, round_nodes) in self.nodes_by_round.iter().rev() {
+            for maybe_node_status in round_nodes {
+                if matches!(maybe_node_status, Some(NodeStatus::Ordered(_))) {
+                    return Some(*round);
+                }
+            }
+        }
+        None
+    }
+
+    pub(super) fn highest_committed_round(&self) -> Option<Round> {
+        for (round, round_nodes) in self.nodes_by_round.iter() {
+            for maybe_node_status in round_nodes {
+                if matches!(maybe_node_status, Some(NodeStatus::Committed(_))) {
+                    return Some(*round);
+                }
+            }
+        }
+        None
     }
 }
