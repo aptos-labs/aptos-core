@@ -47,6 +47,8 @@ impl AggregatorChange {
     /// Applies self on top of previous delta, merging them together. Note
     /// that the strict ordering here is crucial for catching overflows
     /// correctly.
+    /// 
+    /// TODO: What happens if the base aggregator is not none?
     pub fn merge_with_previous_aggregator_change(
         &mut self,
         previous_change: AggregatorChange,
@@ -354,7 +356,54 @@ mod test {
         });
     }
 
-    fn test_merge_delta_into_delta() {
-        
+    #[test]
+    fn test_merge_delta_into_delta_failed_history_validation() {
+        let aggregator_change1 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 10,
+                delta: DeltaValue::Positive(10),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 80,
+                    min_achieved_negative_delta: 5,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+            },
+            base_aggregator: None,
+        };
+        let mut aggregator_change2 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 80,
+                delta: DeltaValue::Positive(10),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 10,
+                    min_achieved_negative_delta: 55,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+            },
+            base_aggregator: None,
+        };
+        assert_err!(aggregator_change2.merge_with_previous_aggregator_change(aggregator_change1));
+        let mut aggregator_change3 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 20,
+                delta: DeltaValue::Positive(10),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 30,
+                    min_achieved_negative_delta: 5,
+                    min_overflow_positive_delta: Some(85),
+                    max_underflow_negative_delta: None,
+                },
+            },
+            base_aggregator: None,
+        };
+        assert_err!(aggregator_change3.merge_with_previous_aggregator_change(aggregator_change1));
     }
 }
