@@ -51,6 +51,7 @@ pub enum IndexKind {
     CodeDefinition,
     TypeParameter,
     MemberCount,
+    VirtualFunction,
 }
 
 impl IndexKind {
@@ -77,6 +78,7 @@ impl IndexKind {
             CodeDefinition,
             TypeParameter,
             MemberCount,
+            VirtualFunction,
         ]
     }
 }
@@ -105,6 +107,7 @@ impl fmt::Display for IndexKind {
             CodeDefinition => "code definition pool",
             TypeParameter => "type parameter",
             MemberCount => "field offset",
+            VirtualFunction => "virtual function table",
         };
 
         f.write_str(desc)

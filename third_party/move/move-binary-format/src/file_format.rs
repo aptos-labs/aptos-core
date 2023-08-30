@@ -160,6 +160,9 @@ define_index! {
     doc: "Index into the `FunctionDefinition` table.",
 }
 
+/// Index into local virtual function table.
+pub type VTableIndex = u8;
+
 /// Index of a local variable in a function.
 ///
 /// Bytecodes that operate on locals carry indexes to the locals of a function.
@@ -295,6 +298,22 @@ pub struct FunctionHandle {
     pub return_: SignatureIndex,
     /// The type formals (identified by their index into the vec) and their constraints
     pub type_parameters: Vec<AbilitySet>,
+    /// vtables for overloading.
+    pub vtables: Vec<FunctionType>,
+}
+
+/// A `FunctionType` is the type of a function pointer.
+///
+/// It's similar to function handle but don't have module names and type parameters. All type parameters will be fully instantiated at type creation time.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(params = "usize"))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+pub struct FunctionType {
+    /// The list of arguments to the function.
+    pub parameters: SignatureIndex,
+    /// The list of return types.
+    pub return_: SignatureIndex,
 }
 
 /// A field access info (owner type and offset)
@@ -346,6 +365,18 @@ pub struct StructDefInstantiation {
 pub struct FunctionInstantiation {
     pub handle: FunctionHandleIndex,
     pub type_parameters: SignatureIndex,
+    pub vtable_instantiation: Vec<VirtualFunctionInstantiation>,
+}
+
+/// Virtual function can be instantiated either from a function from a parent vtable or from an existing function handle.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+pub enum VirtualFunctionInstantiation {
+    Defined(FunctionHandleIndex),
+    Instantiated(FunctionInstantiationIndex),
+    Virtual(VTableIndex),
 }
 
 /// A complete or partial instantiation of a field (or the type of it).
@@ -953,6 +984,13 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIterWithDepth<'a> {
             },
             None => None,
         }
+    }
+}
+
+impl ModuleIndex for VTableIndex {
+    const KIND: IndexKind = IndexKind::VirtualFunction;
+    fn into_index(self) -> usize {
+        self as usize
     }
 }
 
@@ -1653,6 +1691,15 @@ pub enum Bytecode {
     ///
     /// ```..., integer_value -> ..., u256_value```
     CastU256,
+    /// Call a function defined in the current vtable. The stack has the arguments pushed first to last.
+    /// The arguments are consumed and pushed to the locals of the function.
+    /// Return values are pushed on the stack and available to the caller.
+    ///
+    /// Stack transition:
+    ///
+    /// ```..., arg(1), arg(2), ...,  arg(n) -> ..., return_value(1), return_value(2), ...,
+    /// return_value(k)```
+    CallVirtual(VTableIndex),
 }
 
 impl ::std::fmt::Debug for Bytecode {
@@ -1735,6 +1782,7 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::VecPopBack(a) => write!(f, "VecPopBack({})", a),
             Bytecode::VecUnpack(a, n) => write!(f, "VecUnpack({}, {})", a, n),
             Bytecode::VecSwap(a) => write!(f, "VecSwap({})", a),
+            Bytecode::CallVirtual(idx) => write!(f, "CallVirtual({})", idx),
         }
     }
 }
@@ -2045,6 +2093,7 @@ impl CompiledModule {
             | other @ IndexKind::CodeDefinition
             | other @ IndexKind::FieldDefinition
             | other @ IndexKind::TypeParameter
+            | other @ IndexKind::VirtualFunction
             | other @ IndexKind::MemberCount => unreachable!("invalid kind for count: {:?}", other),
         }
     }
@@ -2107,6 +2156,7 @@ pub fn basic_test_module() -> CompiledModule {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(0),
         type_parameters: vec![],
+        vtables: vec![],
     });
     m.identifiers
         .push(Identifier::new("foo".to_string()).unwrap());

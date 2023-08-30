@@ -125,6 +125,10 @@ fn serialize_function_inst_index(
     write_as_uleb128(binary, idx.0, FUNCTION_INST_INDEX_MAX)
 }
 
+fn serialize_virtual_function_index(binary: &mut BinaryData, idx: &VTableIndex) -> Result<()> {
+    write_as_uleb128(binary, *idx, VTABLE_COUNT_MAX)
+}
+
 fn serialize_struct_def_inst_index(
     binary: &mut BinaryData,
     idx: &StructDefInstantiationIndex,
@@ -186,6 +190,10 @@ fn serialize_type_parameter_index(binary: &mut BinaryData, idx: u16) -> Result<(
 
 fn serialize_type_parameter_count(binary: &mut BinaryData, len: usize) -> Result<()> {
     write_as_uleb128(binary, len as u64, TYPE_PARAMETER_COUNT_MAX)
+}
+
+fn serialize_function_type_count(binary: &mut BinaryData, len: usize) -> Result<()> {
+    write_as_uleb128(binary, len as u64, VTABLE_COUNT_MAX)
 }
 
 fn serialize_bytecode_offset(binary: &mut BinaryData, offset: u16) -> Result<()> {
@@ -468,6 +476,7 @@ fn serialize_type_parameter(
 /// - `FunctionHandle.return_` as a ULEB128 (index into the `SignaturePool`)
 /// - `FunctionHandle.type_parameters` as a `Vec<u8>`
 fn serialize_function_handle(
+    major_version: u32,
     binary: &mut BinaryData,
     function_handle: &FunctionHandle,
 ) -> Result<()> {
@@ -475,15 +484,23 @@ fn serialize_function_handle(
     serialize_identifier_index(binary, &function_handle.name)?;
     serialize_signature_index(binary, &function_handle.parameters)?;
     serialize_signature_index(binary, &function_handle.return_)?;
-    serialize_ability_sets(binary, &function_handle.type_parameters)
+    serialize_ability_sets(binary, &function_handle.type_parameters)?;
+    if major_version >= VERSION_7 {
+        serialize_function_types(binary, &function_handle.vtables)?;
+    }
+    Ok(())
 }
 
 fn serialize_function_instantiation(
+    major_version: u32,
     binary: &mut BinaryData,
     func_inst: &FunctionInstantiation,
 ) -> Result<()> {
     serialize_function_handle_index(binary, &func_inst.handle)?;
     serialize_signature_index(binary, &func_inst.type_parameters)?;
+    if major_version >= VERSION_7 {
+        serialize_virtual_function_instantiation(binary, &func_inst.vtable_instantiation)?;
+    }
     Ok(())
 }
 
@@ -712,6 +729,39 @@ fn serialize_ability_sets(binary: &mut BinaryData, sets: &[AbilitySet]) -> Resul
     serialize_type_parameter_count(binary, sets.len())?;
     for set in sets {
         serialize_ability_set(binary, *set)?;
+    }
+    Ok(())
+}
+
+fn serialize_function_types(binary: &mut BinaryData, functions_tys: &[FunctionType]) -> Result<()> {
+    serialize_function_type_count(binary, functions_tys.len())?;
+    for ty in functions_tys {
+        serialize_signature_index(binary, &ty.parameters)?;
+        serialize_signature_index(binary, &ty.return_)?;
+    }
+    Ok(())
+}
+
+fn serialize_virtual_function_instantiation(
+    binary: &mut BinaryData,
+    instantiations: &[VirtualFunctionInstantiation],
+) -> Result<()> {
+    serialize_function_type_count(binary, instantiations.len())?;
+    for instantiation in instantiations {
+        match instantiation {
+            VirtualFunctionInstantiation::Defined(idx) => {
+                binary.push(SerializedVirtualFunctionInstantiation::DEFINED as u8)?;
+                serialize_function_handle_index(binary, idx)?;
+            },
+            VirtualFunctionInstantiation::Instantiated(idx) => {
+                binary.push(SerializedVirtualFunctionInstantiation::INSTANTIATED as u8)?;
+                serialize_function_inst_index(binary, idx)?;
+            },
+            VirtualFunctionInstantiation::Virtual(idx) => {
+                binary.push(SerializedVirtualFunctionInstantiation::VIRTUAL as u8)?;
+                serialize_virtual_function_index(binary, idx)?;
+            },
+        }
     }
     Ok(())
 }
@@ -960,6 +1010,10 @@ fn serialize_instruction_inner(
         Bytecode::CastU16 => binary.push(Opcodes::CAST_U16 as u8),
         Bytecode::CastU32 => binary.push(Opcodes::CAST_U32 as u8),
         Bytecode::CastU256 => binary.push(Opcodes::CAST_U256 as u8),
+        Bytecode::CallVirtual(idx) => {
+            binary.push(Opcodes::CALL_VIRTUAL as u8)?;
+            serialize_virtual_function_index(binary, idx)
+        },
     };
     res?;
     Ok(())
@@ -1133,7 +1187,7 @@ impl CommonSerializer {
             self.table_count += 1;
             self.function_handles.0 = check_index_in_binary(binary.len())?;
             for function_handle in function_handles {
-                serialize_function_handle(binary, function_handle)?;
+                serialize_function_handle(self.major_version, binary, function_handle)?;
             }
             self.function_handles.1 =
                 checked_calculate_table_size(binary, self.function_handles.0)?;
@@ -1151,7 +1205,11 @@ impl CommonSerializer {
             self.table_count += 1;
             self.function_instantiations.0 = check_index_in_binary(binary.len())?;
             for function_instantiation in function_instantiations {
-                serialize_function_instantiation(binary, function_instantiation)?;
+                serialize_function_instantiation(
+                    self.major_version,
+                    binary,
+                    function_instantiation,
+                )?;
             }
             self.function_instantiations.1 =
                 checked_calculate_table_size(binary, self.function_instantiations.0)?;

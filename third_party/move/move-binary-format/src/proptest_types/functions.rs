@@ -7,8 +7,8 @@ use crate::{
         AbilitySet, Bytecode, CodeOffset, CodeUnit, ConstantPoolIndex, FieldHandle,
         FieldHandleIndex, FieldInstantiation, FieldInstantiationIndex, FunctionDefinition,
         FunctionHandle, FunctionHandleIndex, FunctionInstantiation, FunctionInstantiationIndex,
-        IdentifierIndex, LocalIndex, ModuleHandleIndex, Signature, SignatureIndex, SignatureToken,
-        StructDefInstantiation, StructDefInstantiationIndex, StructDefinition,
+        FunctionType, IdentifierIndex, LocalIndex, ModuleHandleIndex, Signature, SignatureIndex,
+        SignatureToken, StructDefInstantiation, StructDefInstantiationIndex, StructDefinition,
         StructDefinitionIndex, StructHandle, TableIndex, Visibility,
     },
     internals::ModuleIndex,
@@ -170,6 +170,7 @@ pub struct FunctionHandleGen {
     parameters: SignatureGen,
     return_: SignatureGen,
     type_parameters: Vec<AbilitySetGen>,
+    vtables: Vec<(SignatureGen, SignatureGen)>,
 }
 
 impl FunctionHandleGen {
@@ -183,17 +184,25 @@ impl FunctionHandleGen {
         (
             any::<PropIndex>(),
             any::<PropIndex>(),
-            SignatureGen::strategy(param_count),
-            SignatureGen::strategy(return_count),
+            SignatureGen::strategy(param_count.clone()),
+            SignatureGen::strategy(return_count.clone()),
             vec(AbilitySetGen::strategy(), type_parameter_count),
+            vec(
+                (
+                    SignatureGen::strategy(param_count),
+                    SignatureGen::strategy(return_count),
+                ),
+                0..10,
+            ),
         )
             .prop_map(
-                |(module, name, parameters, return_, type_parameters)| Self {
+                |(module, name, parameters, return_, type_parameters, vtables)| Self {
                     module,
                     name,
                     parameters,
                     return_,
                     type_parameters,
+                    vtables,
                 },
             )
     }
@@ -219,12 +228,27 @@ impl FunctionHandleGen {
             .into_iter()
             .map(|abilities| abilities.materialize())
             .collect();
+        let vtables = self
+            .vtables
+            .into_iter()
+            .map(|(arg, ret)| {
+                let parameters = arg.materialize(state.struct_handles);
+                let params_idx = state.add_signature(parameters);
+                let return_ = ret.materialize(state.struct_handles);
+                let return_idx = state.add_signature(return_);
+                FunctionType {
+                    parameters: params_idx,
+                    return_: return_idx,
+                }
+            })
+            .collect();
         Some(FunctionHandle {
             module: mod_idx,
             name: iden_idx,
             parameters: params_idx,
             return_: return_idx,
             type_parameters,
+            vtables,
         })
     }
 }
@@ -334,6 +358,7 @@ impl<'a> FnDefnMaterializeState<'a> {
         let fi = FunctionInstantiation {
             handle: FunctionHandleIndex(fh_idx as TableIndex),
             type_parameters: sig_idx,
+            vtable_instantiation: vec![],
         };
         FunctionInstantiationIndex(self.function_instantiations.add_instantiation(fi))
     }
@@ -417,6 +442,7 @@ impl FunctionDefinitionGen {
             parameters: params_idx,
             return_: return_idx,
             type_parameters: vec![],
+            vtables: vec![],
         };
         let function_handle = state.add_function_handle(handle);
         let mut acquires_set = BTreeSet::new();

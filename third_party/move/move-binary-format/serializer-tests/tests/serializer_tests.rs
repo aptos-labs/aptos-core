@@ -6,7 +6,7 @@ use move_binary_format::{
     access::ModuleAccess,
     file_format::{
         empty_module, AbilitySet, CompiledModule, FunctionHandle, IdentifierIndex, Signature,
-        SignatureIndex, SignatureToken,
+        SignatureIndex, SignatureToken, FunctionType,
     },
 };
 use move_core_types::identifier::Identifier;
@@ -66,6 +66,7 @@ fn simple_generic_module_round_trip() {
         parameters: sig_t1_idx,
         return_: sig_unit_idx,
         type_parameters: vec![AbilitySet::EMPTY],
+        vtables: vec![FunctionType { parameters: sig_t1_idx, return_: sig_unit_idx}]
     });
 
     let mut serialized = Vec::with_capacity(2048);

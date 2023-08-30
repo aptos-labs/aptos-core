@@ -13,7 +13,7 @@ use crate::{
         FieldHandle, FieldInstantiation, FunctionDefinition, FunctionDefinitionIndex,
         FunctionHandle, FunctionInstantiation, LocalIndex, ModuleHandle, Signature, SignatureIndex,
         SignatureToken, StructDefInstantiation, StructDefinition, StructFieldInformation,
-        StructHandle, TableIndex, TypeParameterIndex,
+        StructHandle, TableIndex, TypeParameterIndex, FunctionType, VirtualFunctionInstantiation
     },
     internals::ModuleIndex,
     IndexKind,
@@ -63,6 +63,7 @@ impl<'a> BoundsChecker<'a> {
                 .signatures()
                 .get(script.parameters.into_index())
                 .unwrap(),
+            &[],
             CompiledScript::MAIN_INDEX.into_index(),
         )
     }
@@ -254,7 +255,19 @@ impl<'a> BoundsChecker<'a> {
         check_bounds_impl(
             self.view.signatures(),
             function_instantiation.type_parameters,
-        )
+        )?;
+        for virt_func in function_instantiation.vtable_instantiation.iter() {
+            match virt_func {
+                VirtualFunctionInstantiation::Defined(idx) => check_bounds_impl(self.view.function_handles(), *idx)?,
+                VirtualFunctionInstantiation::Instantiated(idx) => check_bounds_impl(self.view.function_instantiations(), *idx)?,
+                VirtualFunctionInstantiation::Virtual(idx) => {
+                    // This is safe because we've already check this index is in bound.
+                    let func_handle = self.view.function_handle_at(function_instantiation.handle);
+                    check_bounds_impl(&func_handle.vtables, *idx)?;
+                }
+            }
+        }
+        Ok(())
     }
 
     fn check_field_instantiation(
@@ -334,6 +347,7 @@ impl<'a> BoundsChecker<'a> {
             code_unit,
             &function_handle.type_parameters,
             parameters,
+            &function_handle.vtables,
             function_def_idx,
         )
     }
@@ -343,6 +357,7 @@ impl<'a> BoundsChecker<'a> {
         code_unit: &CodeUnit,
         type_parameters: &[AbilitySet],
         parameters: &Signature,
+        vtable: &[FunctionType],
         index: usize,
     ) -> PartialVMResult<()> {
         check_bounds_impl(self.view.signatures(), code_unit.locals)?;
@@ -493,6 +508,9 @@ impl<'a> BoundsChecker<'a> {
                     )?;
                     self.check_type_parameters_in_signature(*idx, type_param_count)?;
                 },
+                CallVirtual(idx) => {
+                    self.check_code_unit_bounds_impl(vtable, *idx, bytecode_offset)?;
+                }
 
                 // List out the other options explicitly so there's a compile error if a new
                 // bytecode gets added.

@@ -75,6 +75,8 @@ pub const FIELD_OFFSET_MAX: u64 = 255;
 pub const TYPE_PARAMETER_COUNT_MAX: u64 = 255;
 pub const TYPE_PARAMETER_INDEX_MAX: u64 = 65536;
 
+pub const VTABLE_COUNT_MAX: u64 = 255;
+
 pub const SIGNATURE_TOKEN_DEPTH_MAX: usize = 256;
 
 /// Constants for table types in the binary.
@@ -124,6 +126,16 @@ pub enum SerializedType {
     U16                     = 0xD,
     U32                     = 0xE,
     U256                    = 0xF,
+}
+
+#[rustfmt::skip]
+#[allow(non_camel_case_types)]
+#[repr(u8)]
+#[derive(Clone, Copy, Debug)]
+pub enum SerializedVirtualFunctionInstantiation {
+    DEFINED                    = 0x1,
+    INSTANTIATED               = 0x2,
+    VIRTUAL                    = 0x3,
 }
 
 #[rustfmt::skip]
@@ -218,6 +230,7 @@ pub enum Opcodes {
     CAST_U16                    = 0x4B,
     CAST_U32                    = 0x4C,
     CAST_U256                   = 0x4D,
+    CALL_VIRTUAL                = 0x4E,
 }
 
 /// Upper limit on the binary size
@@ -405,8 +418,12 @@ pub const VERSION_5: u32 = 5;
 ///  + u16, u32, u256 integers and corresponding Ld, Cast bytecodes
 pub const VERSION_6: u32 = 6;
 
+/// Version 6: changes compared with version 5
+///  + bytecode for virtual function calls.
+pub const VERSION_7: u32 = 76;
+
 /// Mark which version is the latest version
-pub const VERSION_MAX: u32 = VERSION_6;
+pub const VERSION_MAX: u32 = VERSION_7;
 
 /// A unique version value which is used for experimental code which is not allowed in
 /// production. The bytecode deserializer accepts modules with this version only when the
@@ -633,6 +650,7 @@ pub fn instruction_key(instruction: &Bytecode) -> u8 {
         CastU16 => Opcodes::CAST_U16,
         CastU32 => Opcodes::CAST_U32,
         CastU256 => Opcodes::CAST_U256,
+        CallVirtual(_) => Opcodes::CALL_VIRTUAL,
     };
     opcode as u8
 }

@@ -230,6 +230,10 @@ fn load_function_inst_index(
     )?))
 }
 
+fn load_vtable_index(cursor: &mut VersionedCursor) -> BinaryLoaderResult<VTableIndex> {
+    Ok(read_uleb_internal(cursor, VTABLE_COUNT_MAX)?)
+}
+
 fn load_struct_def_inst_index(
     cursor: &mut VersionedCursor,
 ) -> BinaryLoaderResult<StructDefInstantiationIndex> {
@@ -264,6 +268,10 @@ fn load_field_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u64> {
 
 fn load_type_parameter_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult<usize> {
     read_uleb_internal(cursor, TYPE_PARAMETER_COUNT_MAX)
+}
+
+fn load_vtable_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult<usize> {
+    read_uleb_internal(cursor, VTABLE_COUNT_MAX)
 }
 
 fn load_signature_size(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u64> {
@@ -752,12 +760,18 @@ fn load_function_handles(
         let type_parameters =
             load_ability_sets(&mut cursor, AbilitySetPosition::FunctionTypeParameters)?;
 
+        let vtables = if binary.version() < VERSION_7 {
+            vec![]
+        } else {
+            load_function_types(&mut cursor)?
+        };
         function_handles.push(FunctionHandle {
             module,
             name,
             parameters,
             return_,
             type_parameters,
+            vtables,
         });
     }
     Ok(())
@@ -796,9 +810,15 @@ fn load_function_instantiations(
     while cursor.position() < table.count as u64 {
         let handle = load_function_handle_index(&mut cursor)?;
         let type_parameters = load_signature_index(&mut cursor)?;
+        let vtable_instantiation = if binary.version() < VERSION_7 {
+            vec![]
+        } else {
+            load_virtual_function_instantiations(&mut cursor)?
+        };
         func_insts.push(FunctionInstantiation {
             handle,
             type_parameters,
+            vtable_instantiation,
         });
     }
     Ok(())
@@ -1188,6 +1208,45 @@ fn load_ability_sets(
         kinds.push(load_ability_set(cursor, pos)?);
     }
     Ok(kinds)
+}
+
+fn load_function_types(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Vec<FunctionType>> {
+    let len = load_vtable_count(cursor)?;
+    let mut tys = vec![];
+    for _ in 0..len {
+        tys.push(FunctionType {
+            parameters: load_signature_index(cursor)?,
+            return_: load_signature_index(cursor)?,
+        });
+    }
+    Ok(tys)
+}
+
+fn load_virtual_function_instantiations(
+    cursor: &mut VersionedCursor,
+) -> BinaryLoaderResult<Vec<VirtualFunctionInstantiation>> {
+    let len = load_vtable_count(cursor)?;
+    let mut insts = vec![];
+    for _ in 0..len {
+        insts.push(
+            match SerializedVirtualFunctionInstantiation::from_u8(
+                cursor
+                    .read_u8()
+                    .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_VIRTUAL_FUNCTION_INST))?,
+            )? {
+                SerializedVirtualFunctionInstantiation::DEFINED => {
+                    VirtualFunctionInstantiation::Defined(load_function_handle_index(cursor)?)
+                },
+                SerializedVirtualFunctionInstantiation::INSTANTIATED => {
+                    VirtualFunctionInstantiation::Instantiated(load_function_inst_index(cursor)?)
+                },
+                SerializedVirtualFunctionInstantiation::VIRTUAL => {
+                    VirtualFunctionInstantiation::Virtual(load_vtable_index(cursor)?)
+                },
+            },
+        );
+    }
+    Ok(insts)
 }
 
 fn load_struct_type_parameters(
@@ -1594,6 +1653,7 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::CAST_U16 => Bytecode::CastU16,
             Opcodes::CAST_U32 => Bytecode::CastU32,
             Opcodes::CAST_U256 => Bytecode::CastU256,
+            Opcodes::CALL_VIRTUAL => Bytecode::CallVirtual(load_vtable_index(cursor)?),
         };
         code.push(bytecode);
     }
@@ -1694,6 +1754,19 @@ impl SerializedNativeStructFlag {
     }
 }
 
+impl SerializedVirtualFunctionInstantiation {
+    fn from_u8(value: u8) -> BinaryLoaderResult<Self> {
+        match value {
+            0x1 => Ok(Self::DEFINED),
+            0x2 => Ok(Self::INSTANTIATED),
+            0x3 => Ok(Self::VIRTUAL),
+            _ => Err(PartialVMError::new(
+                StatusCode::UNKNOWN_VIRTUAL_FUNCTION_INST,
+            )),
+        }
+    }
+}
+
 impl Opcodes {
     fn from_u8(value: u8) -> BinaryLoaderResult<Opcodes> {
         match value {
@@ -1774,6 +1847,7 @@ impl Opcodes {
             0x4B => Ok(Opcodes::CAST_U16),
             0x4C => Ok(Opcodes::CAST_U32),
             0x4D => Ok(Opcodes::CAST_U256),
+            0x4E => Ok(Opcodes::CALL_VIRTUAL),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)),
         }
     }
