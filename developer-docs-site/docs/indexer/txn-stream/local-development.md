@@ -15,7 +15,7 @@ This script sets up the following:
   - [data-service](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/indexer-grpc/indexer-grpc-data-service): Serves transactions via a GRPC stream to downstream clients. It pulls from either the cache or the file store depending on the age of the transaction.
 - Shared volumes and networking to hook it all up.
 
-You can learn more about the Transaction Stream Service architecture [here](./index) (todo update link) and the Docker compose file [here](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/indexer-grpc/docker-compose.yaml).
+You can learn more about the Transaction Stream Service architecture [here](/indexer/txn-stream) and the Docker compose file [here](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/indexer-grpc/docker-compose.yaml).
 
 ## Prerequisites
 In order to use the local development script you must have the following installed:
