@@ -214,3 +214,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [string_utils_per_byte: InternalGasPerByte, { 8.. =>"string_utils.format.per_byte" }, 20],
     ]
 );
+
+crate::gas_schedule::macros::define_dummy_gas_parameters!(
+    bls12381_test_only_sign_base: InternalGas,
+    bls12381_test_only_sign_per_byte_msg: InternalGasPerByte,
+
+    bls12381_test_only_generate_keys: InternalGas,
+
+    bls12381_test_only_generate_proof_of_possession: InternalGas,
+);

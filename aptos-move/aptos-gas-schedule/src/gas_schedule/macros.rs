@@ -1,6 +1,58 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+macro_rules! impl_arithmetic_operations {
+    ($name:ty : $ty:ty) => {
+        impl<T> Add<T> for $name {
+            type Output = GasAdd<Self, T>;
+
+            #[inline]
+            fn add(self, rhs: T) -> Self::Output {
+                GasAdd {
+                    left: self,
+                    right: rhs,
+                }
+            }
+        }
+
+        impl<T> Mul<T> for $name {
+            type Output = GasMul<Self, T>;
+
+            #[inline]
+            fn mul(self, rhs: T) -> Self::Output {
+                GasMul {
+                    left: self,
+                    right: rhs,
+                }
+            }
+        }
+
+        impl Add<$name> for GasQuantity<<$ty as GasQuantityGetUnit>::Unit> {
+            type Output = GasAdd<Self, $name>;
+
+            #[inline]
+            fn add(self, rhs: $name) -> Self::Output {
+                GasAdd {
+                    left: self,
+                    right: rhs,
+                }
+            }
+        }
+
+        impl Mul<$name> for GasQuantity<<$ty as GasQuantityGetUnit>::Unit> {
+            type Output = GasMul<Self, $name>;
+
+            #[inline]
+            fn mul(self, rhs: $name) -> Self::Output {
+                GasMul {
+                    left: self,
+                    right: rhs,
+                }
+            }
+        }
+    };
+}
+
 macro_rules! define_gas_parameters_extract_key_at_version {
     ($key: literal, $cur_ver: expr) => {
         Some($key)
@@ -95,7 +147,7 @@ macro_rules! define_gas_parameters {
             $(
                 paste::paste! {
                     #[derive(Debug)]
-                    #[doc = "Type representing the `" $name "` gas parameter."]
+                    #[doc = "Type representing the `" $name "` gas parameter. This is generated using the macros in the `aptos-gas-schedule` crate."]
                     #[allow(non_camel_case_types)]
                     pub struct [<$name:upper>];
 
@@ -117,43 +169,7 @@ macro_rules! define_gas_parameters {
                         }
                     }
 
-                    impl<T> Add<T> for [<$name:upper>]
-                    {
-                        type Output = GasAdd<Self, T>;
-
-                        #[inline]
-                        fn add(self, rhs: T) -> Self::Output {
-                            GasAdd { left: self, right: rhs }
-                        }
-                    }
-
-                    impl<T> Mul<T> for [<$name:upper>]
-                    {
-                        type Output = GasMul<Self, T>;
-
-                        #[inline]
-                        fn mul(self, rhs: T) -> Self::Output {
-                            GasMul { left: self, right: rhs }
-                        }
-                    }
-
-                    impl Add<[<$name:upper>]> for GasQuantity<<super::$ty as GasQuantityGetUnit>::Unit> {
-                        type Output = GasAdd<Self, [<$name:upper>]>;
-
-                        #[inline]
-                        fn add(self, rhs: [<$name:upper>]) -> Self::Output {
-                            GasAdd { left: self, right: rhs }
-                        }
-                    }
-
-                    impl Mul<[<$name:upper>]> for GasQuantity<<super::$ty as GasQuantityGetUnit>::Unit> {
-                        type Output = GasMul<Self, [<$name:upper>]>;
-
-                        #[inline]
-                        fn mul(self, rhs: [<$name:upper>]) -> Self::Output {
-                            GasMul { left: self, right: rhs }
-                        }
-                    }
+                    $crate::gas_schedule::macros::impl_arithmetic_operations!([<$name:upper>]: super::$ty);
                 }
             )*
         }
@@ -175,5 +191,49 @@ macro_rules! define_gas_parameters {
     };
 }
 
+macro_rules! define_dummy_gas_parameters {
+    ($($name:ident : $ty:ident),* $(,)?) => {
+        #[allow(unused)]
+        pub mod dummy_gas_params {
+            use super::*;
+            use aptos_gas_algebra::{GasExpression, GasExpressionVisitor, GasMul, GasAdd};
+            use std::ops::{Add, Mul};
+            use move_core_types::gas_algebra::{GasQuantity, GasQuantityGetUnit};
+            $(
+                paste::paste! {
+                    #[derive(Debug)]
+                    #[doc = "Type representing the `" $name "` gas parameter. This is generated using the macros in the `aptos-gas-schedule` crate."]
+                    #[doc = "\n\n"]
+                    #[doc = "Note: this is a dummy parameter that always evaluates to 0. It should only be used to denote abstract usage for test-only natives."]
+                    #[allow(non_camel_case_types)]
+                    pub struct [<$name:upper>];
+
+                    impl<E> GasExpression<E> for [<$name:upper>] {
+                        type Unit =  <super::$ty as GasQuantityGetUnit>::Unit;
+
+                        #[inline]
+                        fn evaluate(
+                            &self,
+                            _feature_version: u64,
+                            _env: &E,
+                        ) -> GasQuantity<Self::Unit> {
+                            0.into()
+                        }
+
+                        #[inline]
+                        fn visit(&self, visitor: &mut impl GasExpressionVisitor) {
+                            visitor.gas_param::<Self>();
+                        }
+                    }
+
+                    $crate::gas_schedule::macros::impl_arithmetic_operations!([<$name:upper>]: super::$ty);
+                }
+            )*
+        }
+    };
+}
+
+pub(crate) use define_dummy_gas_parameters;
 pub(crate) use define_gas_parameters;
 pub(crate) use define_gas_parameters_extract_key_at_version;
+pub(crate) use impl_arithmetic_operations;

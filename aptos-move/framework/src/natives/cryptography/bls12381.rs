@@ -609,10 +609,12 @@ pub fn native_bls12381_verify_signature_share(
 
 #[cfg(feature = "testing")]
 pub fn native_generate_keys(
-    _context: &mut SafeNativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut _arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    context.charge(BLS12381_TEST_ONLY_GENERATE_KEYS)?;
+
     let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut OsRng);
     Ok(smallvec![
         Value::vector_u8(key_pair.private_key.to_bytes()),
@@ -622,12 +624,18 @@ pub fn native_generate_keys(
 
 #[cfg(feature = "testing")]
 pub fn native_sign(
-    _context: &mut SafeNativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let msg = safely_pop_arg!(arguments, Vec<u8>);
     let sk_bytes = safely_pop_arg!(arguments, Vec<u8>);
+
+    context.charge(
+        BLS12381_TEST_ONLY_SIGN_BASE
+            + BLS12381_TEST_ONLY_SIGN_PER_BYTE_MSG * NumBytes::new(msg.len() as u64),
+    )?;
+
     let sk = PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
     let sig = sk.sign_arbitrary_message(msg.as_slice());
     Ok(smallvec![Value::vector_u8(sig.to_bytes()),])
@@ -635,10 +643,12 @@ pub fn native_sign(
 
 #[cfg(feature = "testing")]
 pub fn native_generate_proof_of_possession(
-    _context: &mut SafeNativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    context.charge(BLS12381_TEST_ONLY_GENERATE_PROOF_OF_POSSESSION)?;
+
     let sk_bytes = safely_pop_arg!(arguments, Vec<u8>);
     let sk = PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
     let pop = ProofOfPossession::create(&sk);
