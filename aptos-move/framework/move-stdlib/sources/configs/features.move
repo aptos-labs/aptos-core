@@ -243,7 +243,7 @@ module std::features {
 
     /// Whether the aggregator snapshots feature is enabled.
     /// Lifetime: transient
-    const AGGREGATOR_SNAPSHOTS: u64 = 29;
+    const AGGREGATOR_SNAPSHOTS: u64 = 30;
 
     public fun get_aggregator_snapshots_feature(): u64 { AGGREGATOR_SNAPSHOTS }
 

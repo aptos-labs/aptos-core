@@ -132,7 +132,7 @@ Whether the aggregator snapshots feature is enabled.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_SNAPSHOTS">AGGREGATOR_SNAPSHOTS</a>: u64 = 29;
+<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_SNAPSHOTS">AGGREGATOR_SNAPSHOTS</a>: u64 = 30;
 </code></pre>
 
 

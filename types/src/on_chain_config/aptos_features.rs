@@ -36,8 +36,8 @@ pub enum FeatureFlag {
     MODULE_EVENT = 26,
     EMIT_FEE_STATEMENT = 27,
     STORAGE_DELETION_REFUND = 28,
-    AGGREGATOR_SNAPSHOTS = 29,
-    SIGNATURE_CHECKER_V2_SCRIPT_FIX = 30,
+    SIGNATURE_CHECKER_V2_SCRIPT_FIX = 29,
+    AGGREGATOR_SNAPSHOTS = 30,
 }
 
 /// Representation of features on chain as a bitset.

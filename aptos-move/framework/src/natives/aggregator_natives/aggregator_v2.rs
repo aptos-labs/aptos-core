@@ -23,21 +23,18 @@ use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, ops::Deref};
 
 /// The generic type supplied to aggregator snapshots is not supported.
-pub const EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE: u64 = 0x03_0001;
+pub const EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE: u64 = 0x03_0005;
 
 /// The aggregator snapshots feature is not enabled.
-pub const EAGGREGATOR_SNAPSHOTS_NOT_ENABLED: u64 = 0x03_0002;
+pub const EAGGREGATOR_SNAPSHOTS_NOT_ENABLED: u64 = 0x03_0006;
 
 /// Checks if the type argument `type_arg` is a string type.
 fn is_string_type(context: &SafeNativeContext, type_arg: &Type) -> SafeNativeResult<bool> {
     let ty = context.deref().type_to_fully_annotated_layout(type_arg)?;
     if let MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, .. }) = ty {
-        if type_.name.as_str() == "String"
+        return Ok(type_.name.as_str() == "String"
             && type_.module.as_str() == "string"
-            && type_.address == AccountAddress::ONE
-        {
-            return Ok(true);
-        }
+            && type_.address == AccountAddress::ONE);
     }
     Ok(false)
 }
