@@ -10,7 +10,6 @@ use aptos_consensus_types::{
     common::{Author, Payload, Round},
     executed_block::ExecutedBlock,
 };
-use aptos_crypto::HashValue;
 use aptos_executor_types::StateComputeResult;
 use aptos_logger::error;
 use aptos_types::{
@@ -65,7 +64,7 @@ impl Notifier for BufferManagerAdapter {
         Ok(self.executor_channel.unbounded_send(OrderedBlocks {
             ordered_blocks: vec![block],
             ordered_proof: LedgerInfoWithSignatures::new(
-                LedgerInfo::new(block_info, HashValue::zero()),
+                LedgerInfo::new(block_info, anchor.digest()),
                 AggregateSignature::empty(),
             ),
             callback: Box::new(
