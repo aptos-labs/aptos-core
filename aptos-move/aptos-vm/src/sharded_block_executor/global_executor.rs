@@ -40,7 +40,6 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
         &self,
         transactions: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
         state_view: &S,
-        concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         trace!("executing the last round in global executor",);
@@ -55,7 +54,7 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
             None,
             GLOBAL_ROUND_ID,
             state_view,
-            concurrency_level,
+            self.executor_thread_pool.current_num_threads() - 2,
             maybe_block_gas_limit,
         )
     }
