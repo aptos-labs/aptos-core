@@ -326,7 +326,7 @@ fn fetch_and_equals<T: OnChainConfig + PartialEq>(
     match client {
         Some(client) => {
             let config = fetch_config::<T>(client)?;
-            println!("On chain config: {:?}", config);
+            //println!("On chain config: {:?}", config);
             //println!("Expected config: {:?}", expected);
             Ok(&config == expected)
         },
