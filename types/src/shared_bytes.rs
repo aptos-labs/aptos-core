@@ -3,7 +3,6 @@
 
 #![forbid(unsafe_code)]
 
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use bytes::Bytes;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{
@@ -14,7 +13,7 @@ use proptest::{
 use serde::{Deserialize, Serialize, Serializer};
 use std::ops::Deref;
 
-#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SharedBytes(Bytes);
 
 impl SharedBytes {
