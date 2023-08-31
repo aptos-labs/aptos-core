@@ -20,6 +20,7 @@ use crate::{
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
 use aptos_block_executor::counters as block_executor_counters;
+use aptos_block_partitioner::sharded_block_partitioner::counters::BLOCK_PARTITIONING_SECONDS;
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
 use aptos_executor::{
@@ -203,6 +204,7 @@ pub fn run_benchmark<V>(
     let mut start_time = Instant::now();
     let start_gas_measurement = GasMesurement::start();
 
+    let start_partitioning_total = BLOCK_PARTITIONING_SECONDS.get_sample_sum();
     let start_execution_total = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum();
     let start_vm_only = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
     let other_labels = vec![
@@ -277,6 +279,15 @@ pub fn run_benchmark<V>(
     info!(
         "Overall GPT: {} gas/txn",
         delta_gas / (delta_gas_count as f64).max(1.0)
+    );
+
+    let time_in_partitioning =
+        BLOCK_PARTITIONING_SECONDS.get_sample_sum() - start_partitioning_total;
+
+    info!(
+        "Overall fraction of total: {:.3} in partitioning (component TPS: {})",
+        time_in_partitioning / elapsed,
+        delta_v / time_in_partitioning
     );
 
     let time_in_execution =
