@@ -6,10 +6,8 @@ use anyhow::Context;
 use redis::{AsyncCommands, RedisError, RedisResult};
 
 // Configurations for cache.
-// The cache size is estimated to be 3M transactions.
-// For 3M transactions, the cache size is about 25GB.
-// At TPS 20k, it takes about 2.5 minutes to fill up the cache.
-const CACHE_SIZE_ESTIMATION: u64 = 3_000_000_u64;
+// If the entry doesn't exist, fallback to file store.
+const CACHE_SIZE_ESTIMATION: u64 = 500_000_u64;
 
 // Hard limit for cache lower bound. Only used for active eviction.
 // Cache worker actively evicts the cache entries if the cache entry version is
@@ -194,6 +192,7 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
 
         if requested_version >= latest_version {
             Ok(CacheCoverageStatus::DataNotReady)
+                  // 900           + 3_000_000             < 1000
         } else if requested_version + CACHE_SIZE_ESTIMATION < latest_version {
             Ok(CacheCoverageStatus::CacheEvicted)
         } else {
@@ -279,7 +278,16 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
                     self.conn.mget(versions).await;
                 match encoded_transactions {
                     Ok(v) => Ok(CacheBatchGetStatus::Ok(v)),
-                    Err(err) => Err(err.into()),
+                    // Fallback to file store read.
+                    Err(err) => {
+                        match err.kind() {
+                            redis::ErrorKind::TypeError => {
+                                // This happens when entries are evicted from cache and `nil` is not compatible with String.
+                                Ok(CacheBatchGetStatus::EvictedFromCache)
+                            },
+                            _ => Err(err.into()),
+                        }
+                    },
                 }
             },
             Ok(CacheCoverageStatus::CacheEvicted) => Ok(CacheBatchGetStatus::EvictedFromCache),
