@@ -47,7 +47,7 @@ impl AggregatorChange {
     /// Applies self on top of previous delta, merging them together. Note
     /// that the strict ordering here is crucial for catching overflows
     /// correctly.
-    /// 
+    ///
     /// TODO: What happens if the base aggregator is not none?
     pub fn merge_with_previous_aggregator_change(
         &mut self,
@@ -84,15 +84,13 @@ impl AggregatorChange {
                         delta: prev_delta,
                         history: prev_history,
                     } => {
-                        // Check if the history is valid when the speculative_start_value is updated to previous_speculative_start_value + previous delta.
-                        let new_start_value = match prev_delta {
-                            DeltaValue::Positive(prev_delta) => {
-                                addition(prev_speculative_start_value, prev_delta, self.max_value)?
-                            },
-                            DeltaValue::Negative(prev_delta) => {
-                                subtraction(prev_speculative_start_value, prev_delta)?
-                            },
-                        };
+                        println!("before history_validation");
+                        // Check if the history is valid when the speculative_start_value is updated to previous_speculative_start_value + prev_delta.
+                        let new_start_value = addition_deltavalue(
+                            prev_speculative_start_value,
+                            prev_delta,
+                            self.max_value,
+                        )?;
                         validate_history(new_start_value, self.max_value, &self.state)?;
 
                         // Another useful macro, this time for merging deltas with different signs, such
@@ -107,6 +105,7 @@ impl AggregatorChange {
                                 }
                             };
                         }
+                        println!("before new_delta");
                         // History check passed, and we are ready to update the actual values now.
                         let new_delta =
                             match prev_delta {
@@ -128,6 +127,7 @@ impl AggregatorChange {
                                 },
                             };
 
+                        println!("before new_min_underflow");
                         // new_min_overflow = min(prev_min_overflow, prev_delta + min_overflow)
                         let new_min_overflow = match (
                             prev_history.min_overflow_positive_delta,
@@ -136,24 +136,26 @@ impl AggregatorChange {
                             (
                                 Some(prev_min_overflow_positive_delta),
                                 Some(min_overflow_positive_delta),
-                            ) => Some(u128::min(
-                                prev_min_overflow_positive_delta,
-                                addition_deltavalue(
-                                    prev_delta,
-                                    min_overflow_positive_delta,
-                                    self.max_value,
-                                )?,
-                            )),
+                            ) => match addition_deltavalue(
+                                min_overflow_positive_delta,
+                                prev_delta,
+                                self.max_value,
+                            ) {
+                                Ok(val) => Some(u128::min(prev_min_overflow_positive_delta, val)),
+                                Err(_) => Some(prev_min_overflow_positive_delta),
+                            },
                             (Some(prev_min_overflow_positive_delta), None) => {
                                 Some(prev_min_overflow_positive_delta)
                             },
                             (None, Some(min_overflow_positive_delta)) => Some(addition_deltavalue(
-                                prev_delta,
                                 min_overflow_positive_delta,
+                                prev_delta,
                                 self.max_value,
                             )?),
                             (None, None) => None,
                         };
+
+                        println!("before new_max_underflow");
 
                         // new_max_underflow = min(prev_max_underflow, max_underflow - prev_delta)
                         let new_max_underflow = match (
@@ -163,14 +165,14 @@ impl AggregatorChange {
                             (
                                 Some(prev_max_underflow_negative_delta),
                                 Some(max_underflow_negative_delta),
-                            ) => Some(u128::min(
-                                prev_max_underflow_negative_delta,
-                                subtraction_deltavalue(
-                                    max_underflow_negative_delta,
-                                    prev_delta,
-                                    self.max_value,
-                                )?,
-                            )),
+                            ) => match subtraction_deltavalue(
+                                max_underflow_negative_delta,
+                                prev_delta,
+                                self.max_value,
+                            ) {
+                                Ok(val) => Some(u128::min(prev_max_underflow_negative_delta, val)),
+                                Err(_) => Some(prev_max_underflow_negative_delta),
+                            },
                             (Some(prev_max_underflow_negative_delta), None) => {
                                 Some(prev_max_underflow_negative_delta)
                             },
@@ -184,29 +186,61 @@ impl AggregatorChange {
                             (None, None) => None,
                         };
 
+                        println!("before new_max_achieved");
                         // new_max_achieved = max(prev_max_achieved, max_achieved + prev_delta)
-                        let new_max_achieved = u128::max(
-                            prev_history.max_achieved_positive_delta,
-                            addition_deltavalue(
-                                prev_delta,
-                                history.max_achieved_positive_delta,
-                                self.max_value,
-                            )?,
-                        );
+                        let new_max_achieved = match prev_delta {
+                            DeltaValue::Positive(prev_delta) => u128::max(
+                                prev_history.max_achieved_positive_delta,
+                                addition(
+                                    history.max_achieved_positive_delta,
+                                    prev_delta,
+                                    self.max_value,
+                                )?,
+                            ),
+                            DeltaValue::Negative(prev_delta) => {
+                                if history.max_achieved_positive_delta >= prev_delta {
+                                    u128::max(
+                                        prev_history.max_achieved_positive_delta,
+                                        subtraction(
+                                            history.max_achieved_positive_delta,
+                                            prev_delta,
+                                        )?,
+                                    )
+                                } else {
+                                    prev_history.max_achieved_positive_delta
+                                }
+                            },
+                        };
+                        println!("after new_max_achieved");
 
                         // new_min_achieved = max(prev_min_achieved, min_achieved - prev_delta)
-                        let new_min_achieved = u128::max(
-                            prev_history.min_achieved_negative_delta,
-                            subtraction_deltavalue(
-                                history.min_achieved_negative_delta,
-                                prev_delta,
-                                self.max_value,
-                            )?,
-                        );
+                        let new_min_achieved = match prev_delta {
+                            DeltaValue::Positive(prev_delta) => {
+                                if history.min_achieved_negative_delta >= prev_delta {
+                                    u128::max(
+                                        prev_history.min_achieved_negative_delta,
+                                        subtraction(
+                                            history.min_achieved_negative_delta,
+                                            prev_delta,
+                                        )?,
+                                    )
+                                } else {
+                                    prev_history.min_achieved_negative_delta
+                                }
+                            },
+                            DeltaValue::Negative(prev_delta) => u128::max(
+                                prev_history.min_achieved_negative_delta,
+                                addition(
+                                    history.min_achieved_negative_delta,
+                                    prev_delta,
+                                    self.max_value,
+                                )?,
+                            ),
+                        };
 
                         self.state = AggregatorState::Delta {
                             speculative_source: prev_speculative_source,
-                            speculative_start_value: new_start_value,
+                            speculative_start_value: prev_speculative_start_value,
                             delta: new_delta,
                             history: DeltaHistory {
                                 max_achieved_positive_delta: new_max_achieved,
@@ -240,13 +274,13 @@ impl AggregatorChange {
 
 /// Implements base + value
 pub fn addition_deltavalue(
-    base: DeltaValue,
-    value: u128,
+    base: u128,
+    value: DeltaValue,
     max_value: u128,
 ) -> PartialVMResult<u128> {
-    match base {
-        DeltaValue::Positive(base) => addition(base, value, max_value),
-        DeltaValue::Negative(base) => subtraction(base, value),
+    match value {
+        DeltaValue::Positive(value) => addition(base, value, max_value),
+        DeltaValue::Negative(value) => subtraction(base, value),
     }
 }
 
@@ -265,9 +299,9 @@ pub fn subtraction_deltavalue(
 #[cfg(test)]
 mod test {
     use super::*;
-    use claims::{assert_ok, assert_err};
     use crate::aggregator_extension::SpeculativeValueSource;
-    
+    use claims::{assert_err, assert_ok};
+
     #[test]
     fn test_merge_aggregator_data_into_delta() {
         let aggregator_change1 = AggregatorChange {
@@ -306,16 +340,13 @@ mod test {
             },
             base_aggregator: None,
         };
-        
+
         assert_ok!(aggregator_change2.merge_with_previous_aggregator_change(aggregator_change1));
-        assert_eq!(
-            aggregator_change2,
-            AggregatorChange {
-                max_value: 100,
-                state: AggregatorState::Data { value: 30 },
-                base_aggregator: None,
-            }
-        );
+        assert_eq!(aggregator_change2, AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Data { value: 30 },
+            base_aggregator: None,
+        });
         assert_err!(aggregator_change3.merge_with_previous_aggregator_change(aggregator_change2));
     }
 
@@ -338,16 +369,13 @@ mod test {
             state: AggregatorState::Data { value: 70 },
             base_aggregator: None,
         };
-        
+
         assert_ok!(aggregator_change2.merge_with_previous_aggregator_change(aggregator_change1));
-        assert_eq!(
-            aggregator_change2,
-            AggregatorChange {
-                max_value: 100,
-                state: AggregatorState::Data { value: 50 },
-                base_aggregator: None,
-            }
-        );
+        assert_eq!(aggregator_change2, AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Data { value: 50 },
+            base_aggregator: None,
+        });
         assert_ok!(aggregator_change3.merge_with_previous_aggregator_change(aggregator_change2));
         assert_eq!(aggregator_change3, AggregatorChange {
             max_value: 100,
@@ -393,12 +421,12 @@ mod test {
             max_value: 100,
             state: AggregatorState::Delta {
                 speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 20,
+                speculative_start_value: 30,
                 delta: DeltaValue::Positive(10),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 30,
                     min_achieved_negative_delta: 5,
-                    min_overflow_positive_delta: Some(85),
+                    min_overflow_positive_delta: Some(75),
                     max_underflow_negative_delta: None,
                 },
             },
@@ -428,13 +456,13 @@ mod test {
             max_value: 100,
             state: AggregatorState::Delta {
                 speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 30,
+                speculative_start_value: 40,
                 delta: DeltaValue::Positive(20),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 25,
                     min_achieved_negative_delta: 20,
                     min_overflow_positive_delta: Some(95),
-                    max_underflow_negative_delta: Some(40),
+                    max_underflow_negative_delta: Some(45),
                 },
             },
             base_aggregator: None,
@@ -445,12 +473,62 @@ mod test {
             state: AggregatorState::Delta {
                 speculative_source: SpeculativeValueSource::AggregatedValue,
                 speculative_start_value: 20,
-                delta: DeltaValue::Positive(35),
+                delta: DeltaValue::Positive(30),
                 history: DeltaHistory {
-                    max_achieved_positive_delta: 10,
+                    max_achieved_positive_delta: 35,
+                    min_achieved_negative_delta: 15,
+                    min_overflow_positive_delta: Some(90),
+                    max_underflow_negative_delta: Some(25),
+                },
+            },
+            base_aggregator: None,
+        });
+    }
+
+    #[test]
+    fn test_merge_delta_into_delta2() {
+        let aggregator_change1 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 70,
+                delta: DeltaValue::Negative(50),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 20,
+                    min_achieved_negative_delta: 60,
+                    min_overflow_positive_delta: Some(40),
+                    max_underflow_negative_delta: Some(80),
+                },
+            },
+            base_aggregator: None,
+        };
+        let mut aggregator_change2 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 60,
+                delta: DeltaValue::Negative(20),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 35,
                     min_achieved_negative_delta: 20,
-                    min_overflow_positive_delta: Some(105),
-                    max_underflow_negative_delta: Some(30),
+                    min_overflow_positive_delta: Some(85),
+                    max_underflow_negative_delta: Some(75),
+                },
+            },
+            base_aggregator: None,
+        };
+        assert_ok!(aggregator_change2.merge_with_previous_aggregator_change(aggregator_change1));
+        assert_eq!(aggregator_change2, AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 70,
+                delta: DeltaValue::Negative(70),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 20,
+                    min_achieved_negative_delta: 70,
+                    min_overflow_positive_delta: Some(35),
+                    max_underflow_negative_delta: Some(80),
                 },
             },
             base_aggregator: None,
