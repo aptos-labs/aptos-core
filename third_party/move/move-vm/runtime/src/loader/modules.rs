@@ -272,6 +272,7 @@ impl Module {
         let mut function_map = HashMap::new();
         let mut struct_map = HashMap::new();
         let mut single_signature_token_map = BTreeMap::new();
+        let mut signature_table = vec![];
 
         let mut create = || {
             let mut struct_names = vec![];
@@ -303,6 +304,23 @@ impl Module {
                 }))
             }
 
+            // Build signature table
+            for signatures in module.signatures() {
+                signature_table.push(
+                    signatures
+                        .0
+                        .iter()
+                        .map(|sig| {
+                            make_type_internal(
+                                BinaryIndexedView::Module(&module),
+                                sig,
+                                &struct_names,
+                            )
+                        })
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                )
+            }
+
             for (idx, struct_def) in module.struct_defs().iter().enumerate() {
                 let definition_struct_type =
                     Arc::new(cache.make_struct_type(&module, struct_def, &struct_names)?);
@@ -319,17 +337,9 @@ impl Module {
                 let def = struct_inst.def.0 as usize;
                 let struct_def = &structs[def];
                 let field_count = struct_def.field_count;
-                let mut instantiation = vec![];
-                for ty in &module.signature_at(struct_inst.type_parameters).0 {
-                    instantiation.push(make_type_internal(
-                        BinaryIndexedView::Module(&module),
-                        ty,
-                        &struct_names,
-                    )?);
-                }
                 struct_instantiations.push(StructInstantiation {
                     field_count,
-                    instantiation,
+                    instantiation: signature_table[struct_inst.type_parameters.0 as usize].clone(),
                     definition_struct_type: struct_def.definition_struct_type.clone(),
                 });
             }
@@ -337,30 +347,19 @@ impl Module {
             for (idx, func) in module.function_defs().iter().enumerate() {
                 let findex = FunctionDefinitionIndex(idx as TableIndex);
                 let mut function = Function::new(natives, findex, func, &module);
-                function.return_types = function
-                    .return_
-                    .0
-                    .iter()
-                    .map(|tok| {
-                        make_type_internal(BinaryIndexedView::Module(&module), tok, &struct_names)
-                    })
-                    .collect::<PartialVMResult<Vec<_>>>()?;
-                function.local_types = function
-                    .locals
-                    .0
-                    .iter()
-                    .map(|tok| {
-                        make_type_internal(BinaryIndexedView::Module(&module), tok, &struct_names)
-                    })
-                    .collect::<PartialVMResult<Vec<_>>>()?;
-                function.parameter_types = function
-                    .parameters
-                    .0
-                    .iter()
-                    .map(|tok| {
-                        make_type_internal(BinaryIndexedView::Module(&module), tok, &struct_names)
-                    })
-                    .collect::<PartialVMResult<Vec<_>>>()?;
+                let func_handle = module.function_handle_at(func.function);
+
+                function.return_types = signature_table[func_handle.return_.0 as usize].clone();
+                function.local_types = if let Some(code) = &func.code {
+                    let mut locals = signature_table[func_handle.parameters.0 as usize].clone();
+                    locals.append(&mut signature_table[code.locals.0 as usize].clone());
+                    locals
+                } else {
+                    vec![]
+                };
+
+                function.parameter_types =
+                    signature_table[func_handle.parameters.0 as usize].clone();
 
                 function_map.insert(function.name.to_owned(), idx);
                 function_defs.push(Arc::new(function));
@@ -430,17 +429,9 @@ impl Module {
 
             for func_inst in module.function_instantiations() {
                 let handle = function_refs[func_inst.handle.0 as usize].clone();
-                let mut instantiation = vec![];
-                for ty in &module.signature_at(func_inst.type_parameters).0 {
-                    instantiation.push(make_type_internal(
-                        BinaryIndexedView::Module(&module),
-                        ty,
-                        &struct_names,
-                    )?);
-                }
                 function_instantiations.push(FunctionInstantiation {
                     handle,
-                    instantiation,
+                    instantiation: signature_table[func_inst.type_parameters.0 as usize].clone(),
                 });
             }
 
@@ -458,18 +449,10 @@ impl Module {
             for f_inst in module.field_instantiations() {
                 let fh_idx = f_inst.handle;
                 let offset = field_handles[fh_idx.0 as usize].offset;
-                let mut instantiation = vec![];
                 let owner_struct_def = &structs[module.field_handle_at(fh_idx).owner.0 as usize];
-                for ty in &module.signature_at(f_inst.type_parameters).0 {
-                    instantiation.push(make_type_internal(
-                        BinaryIndexedView::Module(&module),
-                        ty,
-                        &struct_names,
-                    )?);
-                }
                 field_instantiations.push(FieldInstantiation {
                     offset,
-                    instantiation,
+                    instantiation: signature_table[f_inst.type_parameters.0 as usize].clone(),
                     definition_struct_type: owner_struct_def.definition_struct_type.clone(),
                 });
             }
