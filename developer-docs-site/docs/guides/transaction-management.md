@@ -8,13 +8,13 @@ In Aptos, transactions are mapped back to an account in terms of the entity that
 
 - The transaction sent from an account must be authorized correctly by that account.
 - The current time as defined by the most recent ledger update must be before the expiration timestamp of the transaction.
-- The transactions sequence number must be equal to or greater than the sequence number on-chain for that account.
+- The transaction's sequence number must be equal to or greater than the sequence number on-chain for that account.
 
 Once the initial node has accepted a transaction, the transaction makes its way through the system by an additional rule. If a transactions sequence number is higher than the current on-chain sequence number, it can only progress toward consensus if every node in the path has seen a transaction with the sequence number between the on-chain state and the current sequence number.
 
 Example:
 
-Alice owns an account who’s current on-chain sequence number is 5.
+Alice owns an account whose current on-chain sequence number is 5.
 
 Alice submits a transaction to node Bob with sequence number 6.
 
@@ -33,7 +33,7 @@ Now that we understand the nuances of transactions, let's dig into building a ro
 
 - A sequence number generator that allocates and manages available sequence numbers for a single account.
 - A transaction manager that receives payloads from an application or a user, sequence numbers from the sequence number generator, and has access to the account key to combine the three pieces together into a viable signed transaction. It then also takes the responsibility for pushing the transaction to the blockchain.
-- An on-chain worker, leader harness that let’s multiple accounts share the signer of a single shared account.
+- An on-chain worker, leader harness that lets multiple accounts share the signer of a single shared account.
 
 Currently this framework assumes that the network builds no substantial queue, that is a transaction that is submitted executes and commits with little to no delay. In order to address high demand, this work needs to be extended with the following components:
 
@@ -104,4 +104,4 @@ In this model, each worker has access to the `SignerCap` of the shared account, 
 
 Another model, if viable, is to decouple the `signer` altogether away from permissions and to make an application specific capability. Then this capability can be given to each worker that let’s them operate on the shared infrastructure.
 
-Note that parallelization on the shared infrastructure can be limited if any transaction would have any read, write or write, write conflicts. This won’t prevent multiple transactions from executing within a block, but can impact maximum blockchain performance.
+Note that parallelization on the shared infrastructure can be limited if any transaction would have any read or write conflicts. This won’t prevent multiple transactions from executing within a block, but can impact maximum blockchain performance.

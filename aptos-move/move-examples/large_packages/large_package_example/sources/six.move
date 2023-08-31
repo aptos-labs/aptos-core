@@ -8,7 +8,7 @@
 ///
 /// - The transaction sent from an account must be authorized correctly by that account.
 /// - The current time as defined by the most recent ledger update must be before the expiration timestamp of the transaction.
-/// - The transactions sequence number must be equal to or greater than the sequence number on-chain for that account.
+/// - The transaction's sequence number must be equal to or greater than the sequence number on-chain for that account.
 ///
 /// Once the initial node has accepted a transaction, the transaction makes its way through the system by an additional rule. If a transactions sequence number is higher than the current on-chain sequence number, it can only progress toward consensus if every node in the path has seen a transaction with the sequence number between the on-chain state and the current sequence number.
 ///
