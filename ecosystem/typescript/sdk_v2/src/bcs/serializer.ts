@@ -21,8 +21,13 @@ export class Serializer {
 
   private offset: number;
 
-  constructor() {
-    this.buffer = new ArrayBuffer(64);
+  // Constructs a serializer with a buffer of size `length` bytes, 64 bytes by default.
+  // `length` must be greater than 0.
+  constructor(length: number = 64) {
+    if (length <= 0) {
+      throw new Error("Length needs to be greater than 0");
+    }
+    this.buffer = new ArrayBuffer(length);
     this.offset = 0;
   }
 

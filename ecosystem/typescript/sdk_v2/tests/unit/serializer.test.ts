@@ -206,4 +206,21 @@ describe("BCS Serializer", () => {
       ]),
     );
   });
+
+  it("serializes values with specified allocated memory", () => {
+    const serializer = new Serializer(128);
+    serializer.serializeBool(true);
+    serializer.serializeU8(254);
+    const serializedBytes = serializer.getBytes();
+    expect(serializedBytes).toEqual(new Uint8Array([0x01, 0xfe]));
+  });
+
+  it("throws when specifying 0 or less than 0 allocated bytes for memory", () => {
+    expect(() => {
+      const serializer = new Serializer(0);
+    }).toThrow();
+    expect(() => {
+      const serializer = new Serializer(-1);
+    }).toThrow();
+  });
 });
