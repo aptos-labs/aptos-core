@@ -101,8 +101,6 @@ pub struct PipelineOpt {
     #[clap(long, default_value = "1")]
     num_executor_shards: usize,
     #[clap(long)]
-    async_partitioning: bool,
-    #[clap(long)]
     use_global_executor: bool,
     #[clap(long, default_value = "4")]
     num_generator_workers: usize,
@@ -127,7 +125,6 @@ impl PipelineOpt {
             allow_discards: self.allow_discards,
             allow_aborts: self.allow_aborts,
             num_executor_shards: self.num_executor_shards,
-            async_partitioning: self.async_partitioning,
             use_global_executor: self.use_global_executor,
             num_generator_workers: self.num_generator_workers,
             partitioner_config: self.partitioner_config(),
