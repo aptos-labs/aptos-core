@@ -1,9 +1,9 @@
 Command `-p p1 sandbox publish --bundle --override-ordering A --override-ordering B -v`:
 Found 2 modules
-Publishing a new module 0000000000000000000000000000000000000000000000000000000000000003::A (wrote 114 bytes)
-Publishing a new module 0000000000000000000000000000000000000000000000000000000000000003::B (wrote 125 bytes)
+Publishing a new module 0x3::A (wrote 114 bytes)
+Publishing a new module 0x3::B (wrote 125 bytes)
 Wrote 239 bytes of module ID's and code
 Command `-p p2 sandbox publish --bundle --override-ordering A --override-ordering C -v`:
 Found 3 modules
-Invalid multi-module publishing: VMError with status INVALID_FRIEND_DECL_WITH_MODULES_IN_DEPENDENCIES at location Module ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000003, name: Identifier("C") } and message At least one module, 0000000000000000000000000000000000000000000000000000000000000003::A, appears in both the dependency set and the friend set
+Invalid multi-module publishing: VMError with status INVALID_FRIEND_DECL_WITH_MODULES_IN_DEPENDENCIES at location Module ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000003, name: Identifier("C") } and message At least one module, 0x3::A, appears in both the dependency set and the friend set
 Publishing failed with unexpected error INVALID_FRIEND_DECL_WITH_MODULES_IN_DEPENDENCIES

@@ -44,7 +44,7 @@ async fn test_basic_client() {
     //            test to pass.
     //            Is this caused by us increasing the default max gas amount in
     //            testsuite/forge/src/interface/aptos.rs?
-    let mut account1 = info
+    let account1 = info
         .create_and_fund_user_account(10_000_000_000)
         .await
         .unwrap();

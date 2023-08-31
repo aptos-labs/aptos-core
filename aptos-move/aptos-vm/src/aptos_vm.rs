@@ -1017,7 +1017,13 @@ impl AptosVM {
             aptos_framework::verify_module_metadata(m, self.0.get_features())
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
-        verifier::resource_groups::validate_resource_groups(session, modules)?;
+        verifier::resource_groups::validate_resource_groups(
+            session,
+            modules,
+            self.0
+                .get_features()
+                .is_enabled(FeatureFlag::SAFER_RESOURCE_GROUPS),
+        )?;
         verifier::event_validation::validate_module_events(session, modules)?;
 
         if !expected_modules.is_empty() {

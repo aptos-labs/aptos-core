@@ -38,6 +38,7 @@ async-trait = { workspace = true }
 bcs = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
+derivative = { workspace = true }
 indicatif = { workspace = true }
 itertools = { workspace = true }
 move-core-types = { workspace = true }

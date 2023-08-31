@@ -141,6 +141,7 @@ GUID
 Gbps
 Grafana
 GraphQL
+hasura
 HSM
 Homebrew
 HotStuff
