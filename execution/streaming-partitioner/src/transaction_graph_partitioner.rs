@@ -11,6 +11,7 @@ use aptos_transaction_orderer::common::PTransaction;
 use aptos_types::batched_stream::{BatchedStream, MapItems};
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
+use itertools::Itertools;
 use aptos_graphs::graph::{EdgeWeight, NodeWeight};
 
 /// Partitions transactions using a streaming graph partitioner on a graph
@@ -123,15 +124,17 @@ where
         self.edges.push(Vec::new());
 
         // Find this transaction's dependencies.
-        let deps: Vec<SerializationIdx> = tx
+        let deps: HashMap<SerializationIdx, Vec<T::Key>> = tx
             .read_set()
-            .filter_map(|key| self.last_write.get(key).copied())
-            .collect();
+            .filter_map(|key| {
+                Some((*self.last_write.get(key)?, key.clone()))
+            })
+            .into_group_map();
 
         let mut new_edges_weight = 0 as EdgeWeight;
 
         // Add edges to the dependency graph based on the dependencies.
-        for &dep in deps.iter() {
+        for &dep in deps.keys() {
             let edge_weight = (self.params.edge_weight_function)(idx, dep);
             new_edges_weight += edge_weight;
             self.edges[idx as usize].push((dep as NodeIndex, edge_weight));
@@ -232,7 +235,7 @@ where
 /// A transaction with its dependencies.
 pub struct TxnWithDeps<T: PTransaction> {
     transaction: T,
-    dependencies: Vec<SerializationIdx>,
+    dependencies: HashMap<SerializationIdx, Vec<T::Key>>,
 }
 
 #[cfg(test)]
@@ -488,7 +491,7 @@ mod tests {
         // Compute the cut edges weight and the total edges weight.
         for (partition_idx, partition) in txns_by_partition.iter().enumerate() {
             for tx in partition {
-                for &dep in tx.dependencies.iter() {
+                for &dep in tx.dependencies.keys() {
                     let edge_weight = edge_weight_function(tx.serialization_idx, dep);
                     total_edges_weight += edge_weight;
                     if partition_by_txn[dep as usize] != partition_idx as PartitionId {

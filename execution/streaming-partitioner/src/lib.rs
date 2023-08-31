@@ -2,6 +2,7 @@
 
 pub mod transaction_graph_partitioner;
 
+use std::collections::HashMap;
 use aptos_graphs::partitioning::PartitionId;
 use aptos_transaction_orderer::common::PTransaction;
 use aptos_types::batched_stream::BatchedStream;
@@ -11,11 +12,11 @@ pub type SerializationIdx = u32;
 
 /// A transaction with its dependencies, serialization index, and partition.
 #[derive(Clone, Debug)]
-pub struct PartitionedTransaction<T> {
+pub struct PartitionedTransaction<T: PTransaction> {
     pub transaction: T,
     pub serialization_idx: SerializationIdx,
     pub partition: PartitionId,
-    pub dependencies: Vec<SerializationIdx>,
+    pub dependencies: HashMap<SerializationIdx, Vec<T::Key>>,
 }
 
 /// A trait for streaming transaction partitioners.
