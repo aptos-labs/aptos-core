@@ -2,6 +2,16 @@
 remote_endpoint: ~
 name: "v1.7"
 proposals:
+  - name: enable_module_event
+    metadata:
+      title: "Enable module event"
+      description: "AIP-44: The new module event framework associates every event stream with a static struct type instead of an EventHandle of current event system."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/200"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - module_event
   - name: upgrade_framework
     metadata:
       title: "Multi-step proposal to upgrade mainnet framework to v1.7"
@@ -11,14 +21,10 @@ proposals:
       - DefaultGas
       - FeatureFlag:
           enabled:
-            - module_event
             - safer_resource_groups
       - Framework:
           bytecode_version: 6
           git_hash: ~
-      - FeatureFlag:
-          disabled:
-            - module_event
   - name: enable_block_gas_limit
     metadata:
       title: "Enable Block Gas Limit"
@@ -41,16 +47,6 @@ proposals:
       - FeatureFlag:
           enabled:
             - aggregator_snapshots
-  - name: enable_module_event
-    metadata:
-      title: "Enable module event"
-      description: "AIP-44: The new module event framework associates every event stream with a static struct type instead of an EventHandle of current event system."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/200"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - module_event
   - name: enable_signature_checker_v2_fix
     metadata:
       title: "Enable a fix signature checker v2"
@@ -75,6 +71,16 @@ proposals:
               sender_aware_v2: 32
             block_gas_limit: 35000
             transaction_deduper_type: txn_hash_and_authenticator_v1
+  - name: enable_bulletproofs
+    metadata:
+      title: "Enable Bulletproofs Module"
+      description: "AIP-46: New modules for ElGamal, Pedersen and Bulletproofs over Ristretto255" 
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/222"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - bulletproofs_natives
   - name: enable_storage_deletion_refund
     metadata:
       title: "Enable Storage Deletion Refund"
