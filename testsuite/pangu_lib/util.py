@@ -92,7 +92,7 @@ def generate_labels(
         dict[str, str]: the labels
     """
     label = {
-        "app.kubernetes.io/name": f"{name}",
+        "app.kubernetes.io/name": type.value,  # this is used by the role
         "app.kubernetes.io/instance": f"{type_specific_name(name, type, custom_suffix)}",
         "managed-by": "pangu",
         "type": type.value,

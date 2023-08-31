@@ -28,7 +28,7 @@ import pangu_lib.util as util
 @click.option(
     "--framework-path",
     required=True,
-    help="Pass in the path to the compiled move framework (head.mrb, or framework.mrb) file.",
+    help="Pass in the path to the compiled move framework (head.mrb, or framework.mrb) file. To compile it, run: $ cargo run --locked --package aptos-framework -- release",
 )
 @click.option(
     "--num-of-validators",

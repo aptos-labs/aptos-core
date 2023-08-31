@@ -9,7 +9,7 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/instance: pfn-name-pfn
-      app.kubernetes.io/name: pfn-name
+      app.kubernetes.io/name: pfn
       managed-by: pangu
       type: pfn
   serviceName: pfn-name-pfn
@@ -17,7 +17,7 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/instance: pfn-name-pfn
-        app.kubernetes.io/name: pfn-name
+        app.kubernetes.io/name: pfn
         managed-by: pangu
         type: pfn
     spec:
