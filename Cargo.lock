@@ -963,6 +963,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-db-indexer",
  "aptos-executor-types",
+ "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-jellyfish-merkle",
  "aptos-logger",
@@ -1171,6 +1172,7 @@ dependencies = [
  "aptos-db",
  "aptos-executor-test-helpers",
  "aptos-executor-types",
+ "aptos-experimental-runtimes",
  "aptos-genesis",
  "aptos-infallible",
  "aptos-logger",
@@ -2155,6 +2157,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-db",
+ "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
@@ -3133,6 +3136,7 @@ name = "aptos-scratchpad"
 version = "0.1.0"
 dependencies = [
  "aptos-crypto",
+ "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-metrics-core",
  "aptos-types",
