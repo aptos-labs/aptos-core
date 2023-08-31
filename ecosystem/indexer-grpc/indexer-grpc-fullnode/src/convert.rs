@@ -18,7 +18,7 @@ use std::time::Duration;
 
 pub fn convert_move_module_id(move_module_id: &MoveModuleId) -> transaction::MoveModuleId {
     transaction::MoveModuleId {
-        address: move_module_id.address.to_string(),
+        address: move_module_id.address.to_standard_string(),
         name: move_module_id.name.to_string(),
     }
 }
@@ -96,7 +96,7 @@ pub fn convert_move_function(move_func: &MoveFunction) -> transaction::MoveFunct
 
 pub fn convert_move_module(move_module: &MoveModule) -> transaction::MoveModule {
     transaction::MoveModule {
-        address: move_module.address.to_string(),
+        address: move_module.address.to_standard_string(),
         name: move_module.name.0.to_string(),
         friends: move_module
             .friends
@@ -288,7 +288,7 @@ pub fn convert_hex_string_to_bytes(hex_string: &str) -> Vec<u8> {
 
 pub fn convert_move_struct_tag(struct_tag: &MoveStructTag) -> transaction::MoveStructTag {
     transaction::MoveStructTag {
-        address: struct_tag.address.to_string(),
+        address: struct_tag.address.to_standard_string(),
         module: struct_tag.module.to_string(),
         name: struct_tag.name.to_string(),
         generic_type_params: struct_tag
@@ -301,10 +301,10 @@ pub fn convert_move_struct_tag(struct_tag: &MoveStructTag) -> transaction::MoveS
 
 pub fn convert_delete_module(delete_module: &DeleteModule) -> transaction::DeleteModule {
     transaction::DeleteModule {
-        address: delete_module.address.to_string(),
+        address: delete_module.address.to_standard_string(),
         state_key_hash: convert_hex_string_to_bytes(&delete_module.state_key_hash),
         module: Some(transaction::MoveModuleId {
-            address: delete_module.module.address.to_string(),
+            address: delete_module.module.address.to_standard_string(),
             name: delete_module.module.name.to_string(),
         }),
     }
@@ -312,7 +312,7 @@ pub fn convert_delete_module(delete_module: &DeleteModule) -> transaction::Delet
 
 pub fn convert_delete_resource(delete_resource: &DeleteResource) -> transaction::DeleteResource {
     transaction::DeleteResource {
-        address: delete_resource.address.to_string(),
+        address: delete_resource.address.to_standard_string(),
         state_key_hash: convert_hex_string_to_bytes(&delete_resource.state_key_hash),
         r#type: Some(convert_move_struct_tag(&delete_resource.resource)),
         type_str: delete_resource.resource.to_string(),
@@ -362,7 +362,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
             r#type: transaction::write_set_change::Type::WriteModule as i32,
             change: Some(transaction::write_set_change::Change::WriteModule(
                 transaction::WriteModule {
-                    address: write_module.address.to_string(),
+                    address: write_module.address.to_standard_string(),
                     state_key_hash: convert_hex_string_to_bytes(&write_module.state_key_hash),
                     data: Some(convert_move_module_bytecode(&write_module.data)),
                 },
@@ -372,7 +372,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
             r#type: transaction::write_set_change::Type::WriteResource as i32,
             change: Some(transaction::write_set_change::Change::WriteResource(
                 transaction::WriteResource {
-                    address: write_resource.address.to_string(),
+                    address: write_resource.address.to_standard_string(),
                     state_key_hash: convert_hex_string_to_bytes(&write_resource.state_key_hash),
                     r#type: Some(convert_move_struct_tag(&write_resource.data.typ)),
                     type_str: write_resource.data.typ.to_string(),
@@ -482,7 +482,7 @@ pub fn convert_multisig_payload(
             },
         });
     transaction::MultisigPayload {
-        multisig_address: multisig_payload.multisig_address.to_string(),
+        multisig_address: multisig_payload.multisig_address.to_standard_string(),
         transaction_payload,
     }
 }
@@ -492,7 +492,7 @@ pub fn convert_event(event: &Event) -> transaction::Event {
     transaction::Event {
         key: Some(transaction::EventKey {
             creation_number: event_key.get_creation_number(),
-            account_address: event_key.get_creator_address().to_string(),
+            account_address: event_key.get_creator_address().to_standard_string(),
         }),
         sequence_number: event.sequence_number.0,
         r#type: Some(convert_move_type(&event.typ)),
@@ -610,7 +610,7 @@ pub fn convert_transaction_signature(
                 secondary_signer_addresses: s
                     .secondary_signer_addresses
                     .iter()
-                    .map(|s| s.to_string())
+                    .map(|s| s.to_standard_string())
                     .collect(),
                 secondary_signers: s
                     .secondary_signers
@@ -625,14 +625,14 @@ pub fn convert_transaction_signature(
                 secondary_signer_addresses: s
                     .secondary_signer_addresses
                     .iter()
-                    .map(|s| s.to_string())
+                    .map(|s| s.to_standard_string())
                     .collect(),
                 secondary_signers: s
                     .secondary_signers
                     .iter()
                     .map(convert_account_signature)
                     .collect(),
-                fee_payer_address: s.fee_payer_address.to_string(),
+                fee_payer_address: s.fee_payer_address.to_standard_string(),
                 fee_payer_signer: Some(convert_account_signature(&s.fee_payer_signer)),
             })
         },

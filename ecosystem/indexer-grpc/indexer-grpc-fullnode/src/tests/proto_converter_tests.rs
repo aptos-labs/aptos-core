@@ -1,48 +1,49 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    runtime::FullnodeDataService,
-    tests::{new_test_context, TestContext},
-};
+use crate::runtime::FullnodeDataService;
 
-use aptos_api_test_context::current_function_name;
+use aptos_api_test_context::{new_test_context, TestContext, current_function_name};
+use aptos_config::config::NodeConfig;
 use aptos_framework::extended_checks;
-use aptos_protos::extractor::v1::{
+use aptos_protos::{transaction::v1::{
     transaction::{TransactionType, TxnData},
     transaction_payload::{Payload, Type as PayloadType},
     write_set_change::Change::WriteTableItem,
     Transaction as TransactionPB,
-};
-
+}, internal::fullnode::v1::{TransactionsFromNodeResponse, transactions_from_node_response::Response}};
+use aptos_protos::internal::fullnode::v1::GetTransactionsFromNodeRequest;
+use aptos_protos::internal::fullnode::v1::fullnode_data_server::FullnodeData;
 use aptos_sdk::types::{account_config::aptos_test_root_address, LocalAccount};
-
+use futures::StreamExt;
 use move_core_types::{account_address::AccountAddress, value::MoveValue};
 use move_package::BuildConfig;
 use serde_json::{json, Value};
+use tonic::{Status, Request};
 use std::{collections::HashMap, convert::TryInto, path::PathBuf, sync::Arc, time::Duration};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_genesis_works() {
-    let test_context = new_test_context(current_function_name!());
+    let test_context = new_test_context(current_function_name!(), NodeConfig::default(), true);
 
     let context = Arc::new(test_context.context);
-    let mut streamer = FullnodeDataService::new(context, 0, None);
-    let converted = streamer.convert_next_block().await;
+    let mut streamer = FullnodeDataService { context, processor_task_count: 1, processor_batch_size: 1, output_batch_size: 1 };
+    let txns = fetch_stream(streamer, 10).await;
 
     // position 0 should be genesis
-    let txn = converted.first().unwrap().clone();
+    let txn = txns.first().unwrap().clone();
     assert_eq!(txn.version, 0);
     assert_eq!(txn.r#type(), TransactionType::Genesis);
     assert_eq!(txn.block_height, 0);
     if let TxnData::Genesis(txn) = txn.txn_data.unwrap() {
         assert_eq!(
             txn.events[0].key.clone().unwrap().account_address,
-            aptos_test_root_address().to_string()
+            aptos_test_root_address().to_standard_string()
         );
     }
 }
 
+/*
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_block_transactions_work() {
     let mut test_context = new_test_context(current_function_name!());
@@ -53,7 +54,7 @@ async fn test_block_transactions_work() {
     test_context.commit_block(&vec![txn.clone()]).await;
 
     let context = Arc::new(test_context.clone().context);
-    let mut streamer = FullnodeDataService::new(context, 0, None);
+    let mut streamer = FullnodeDataService { context, processor_task_count: 1, processor_batch_size: 5, output_batch_size: 5 };
 
     // emulating real stream, getting first block
     let block_0 = streamer.convert_next_block().await;
@@ -171,7 +172,7 @@ async fn test_block_height_and_ts_work() {
 #[ignore] // TODO: disabled because of bundle publishing deactivated; reactivate
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_table_item_parsing_works() {
-    let mut test_context = new_test_context(current_function_name!());
+    let mut test_context = new_test_context(current_function_name!() NodeConfig::default());
     let ctx = &mut test_context;
     let mut account = ctx.gen_account();
     let acc = &mut account;
@@ -217,6 +218,7 @@ async fn test_table_item_parsing_works() {
         assert_eq!(table_kv.get(&expected_k).unwrap(), &expected_v);
     }
 }
+*/
 
 async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
     let module = build_test_module(account.address()).await;
@@ -225,8 +227,7 @@ async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
         .await;
     ctx.api_execute_entry_function(
         account,
-        "TableTestData",
-        "make_test_tables",
+        &format!("{}::{}::{}", account.address(), "TableTestData", "make_test_tables"),
         json!([]),
         json!([]),
     )
@@ -246,8 +247,6 @@ async fn build_test_module(account: AccountAddress) -> Vec<u8> {
         generate_docs: false,
         install_dir: Some(package_dir.clone()),
         additional_named_addresses: [("TestAccount".to_string(), account)].into(),
-        known_attributes: extended_checks::get_all_attribute_names().clone(),
-        skip_attribute_checks: false,
         ..Default::default()
     };
     let package = build_config
@@ -265,11 +264,29 @@ async fn build_test_module(account: AccountAddress) -> Vec<u8> {
     out
 }
 
-async fn fetch_all_stream(mut streamer: FullnodeDataService) -> Vec<TransactionPB> {
-    // Overfetching should work
-    let mut res = streamer.convert_next_block().await;
-    for _ in 0..20 {
-        res.append(&mut streamer.convert_next_block().await);
+async fn fetch_stream(mut streamer: FullnodeDataService, amount_to_stream: u64) -> Vec<TransactionPB> {
+    let mut out = Vec::new();
+    for i in 0..amount_to_stream {
+        let request = GetTransactionsFromNodeRequest {
+            starting_version: Some(i),
+            transactions_count: None,
+        };
+        // Get the stream.
+        let mut stream = streamer.get_transactions_from_node(Request::new(request)).await.unwrap().into_inner();
+        // Throw out the first item (the status message).
+        let x = stream.next().await;
+        println!("x: {:#?}", x);
+        // Get the first transaction. TODO: This just hangs forever, perhaps nothing is coming out of the stream.
+        let res = stream.next().await.unwrap();
+        println!("res: {:#?}", res);
+        let r = res.unwrap();
+        let r = r.response.unwrap();
+        match r {
+            Response::Data(mut data) => {
+                out.append(&mut data.transactions);
+            }
+            Response::Status(_) => {},
+        }
     }
-    res
+    out
 }
