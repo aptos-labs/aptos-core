@@ -136,13 +136,15 @@ impl AggregatorChange {
                             (
                                 Some(prev_min_overflow_positive_delta),
                                 Some(min_overflow_positive_delta),
-                            ) => match addition_deltavalue(
-                                min_overflow_positive_delta,
-                                prev_delta,
-                                self.max_value,
-                            ) {
-                                Ok(val) => Some(u128::min(prev_min_overflow_positive_delta, val)),
-                                Err(_) => Some(prev_min_overflow_positive_delta),
+                            ) => { 
+                                match addition_deltavalue(
+                                    min_overflow_positive_delta,
+                                    prev_delta,
+                                    self.max_value,
+                                ) {
+                                    Ok(val) => Some(u128::min(prev_min_overflow_positive_delta, val)),
+                                    Err(_) => Some(prev_min_overflow_positive_delta),
+                                }
                             },
                             (Some(prev_min_overflow_positive_delta), None) => {
                                 Some(prev_min_overflow_positive_delta)
@@ -492,7 +494,7 @@ mod test {
             state: AggregatorState::Delta {
                 speculative_source: SpeculativeValueSource::AggregatedValue,
                 speculative_start_value: 70,
-                delta: DeltaValue::Negative(50),
+                delta: DeltaValue::Negative(40),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 20,
                     min_achieved_negative_delta: 60,
@@ -523,12 +525,43 @@ mod test {
             state: AggregatorState::Delta {
                 speculative_source: SpeculativeValueSource::AggregatedValue,
                 speculative_start_value: 70,
-                delta: DeltaValue::Negative(70),
+                delta: DeltaValue::Negative(60),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 20,
+                    min_achieved_negative_delta: 60,
+                    min_overflow_positive_delta: Some(40),
+                    max_underflow_negative_delta: Some(80),
+                },
+            },
+            base_aggregator: None,
+        });
+        let mut aggregator_change3 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 80,
+                delta: DeltaValue::Positive(5),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 5,
+                    min_achieved_negative_delta: 5,
+                    min_overflow_positive_delta: Some(91),
+                    max_underflow_negative_delta: Some(95),
+                },
+            },
+            base_aggregator: None,
+        };
+        assert_ok!(aggregator_change3.merge_with_previous_aggregator_change(aggregator_change2));
+        assert_eq!(aggregator_change3, AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 70,
+                delta: DeltaValue::Negative(70),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 25,
                     min_achieved_negative_delta: 70,
                     min_overflow_positive_delta: Some(35),
-                    max_underflow_negative_delta: Some(80),
+                    max_underflow_negative_delta: Some(10),
                 },
             },
             base_aggregator: None,
