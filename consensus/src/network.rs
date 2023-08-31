@@ -363,6 +363,7 @@ impl QuorumStoreSender for NetworkSender {
         recipient: Author,
         timeout: Duration,
     ) -> anyhow::Result<Batch> {
+        let request_digest = request.digest();
         let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
         let response = self
             .consensus_network_client
@@ -370,7 +371,7 @@ impl QuorumStoreSender for NetworkSender {
             .await?;
         match response {
             ConsensusMsg::BatchResponse(batch) => {
-                batch.verify()?;
+                batch.verify_with_digest(request_digest)?;
                 Ok(*batch)
             },
             _ => Err(anyhow!("Invalid batch response")),
