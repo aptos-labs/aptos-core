@@ -8,6 +8,7 @@ use anyhow::Result;
 use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
+    shared_bytes::SharedBytes,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
@@ -42,8 +43,7 @@ impl TStateView for GenesisStateView {
         Ok(self
             .state_data
             .get(state_key)
-            .cloned()
-            .map(StateValue::new_legacy))
+            .map(|bytes| StateValue::new_legacy(SharedBytes::copy(bytes))))
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {

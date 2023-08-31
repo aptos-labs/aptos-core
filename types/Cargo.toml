@@ -19,6 +19,7 @@ aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 chrono = { workspace = true }
 derivative = { workspace = true }
 hex = { workspace = true }

@@ -17,6 +17,7 @@ use crate::{
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
+    shared_bytes::SharedBytes,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
@@ -806,7 +807,7 @@ impl TransactionToCommitGen {
                         (
                             (
                                 state_key.clone(),
-                                Some(StateValue::new_legacy(value.clone())),
+                                Some(StateValue::new_legacy(SharedBytes::copy(&value))),
                             ),
                             (state_key, WriteOp::Modification(value)),
                         )
