@@ -50,7 +50,7 @@ impl FakeDataStore {
         FakeDataStore {
             state_data: data
                 .into_iter()
-                .map(|(k, v)| (k, StateValue::new_legacy(v)))
+                .map(|(k, v)| (k, StateValue::new_legacy(v.into())))
                 .collect(),
         }
     }
@@ -70,7 +70,7 @@ impl FakeDataStore {
     /// Returns the previous data if the key was occupied.
     pub fn set_legacy(&mut self, state_key: StateKey, bytes: Vec<u8>) -> Option<StateValue> {
         self.state_data
-            .insert(state_key, StateValue::new_legacy(bytes))
+            .insert(state_key, StateValue::new_legacy(bytes.into()))
     }
 
     /// Sets a (key, value) pair within this data store.
@@ -107,7 +107,7 @@ impl FakeDataStore {
         let access_path = AccessPath::from(module_id);
         self.set(
             StateKey::access_path(access_path),
-            StateValue::new_legacy(blob),
+            StateValue::new_legacy(blob.into()),
         );
     }
 }

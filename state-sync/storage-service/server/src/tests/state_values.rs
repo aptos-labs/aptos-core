@@ -15,6 +15,7 @@ use aptos_storage_service_types::{
 };
 use aptos_types::{
     proof::definition::SparseMerkleRangeProof,
+    shared_bytes::SharedBytes,
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueChunkWithProof},
@@ -182,9 +183,10 @@ fn create_state_keys_and_values(
 ) -> Vec<(StateKey, StateValue)> {
     // Generate random bytes of the given size
     let mut rng = rand::thread_rng();
-    let random_bytes: Vec<u8> = (0..min_bytes_per_key_value)
+    let random_bytes: SharedBytes = (0..min_bytes_per_key_value)
         .map(|_| rng.gen::<u8>())
-        .collect();
+        .collect::<Vec<_>>()
+        .into();
 
     // Create the requested keys and values
     (0..num_keys_and_values)

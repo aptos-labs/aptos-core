@@ -3,7 +3,7 @@
 
 use crate::{
     on_chain_config::CurrentTimeMicroseconds, proof::SparseMerkleRangeProof,
-    state_store::state_key::StateKey, transaction::Version,
+    shared_bytes::SharedBytes, state_store::state_key::StateKey, transaction::Version,
 };
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -85,10 +85,9 @@ impl Eq for StateValue {}
 )]
 #[serde(rename = "StateValue")]
 pub enum StateValueInner {
-    V0(#[serde(with = "serde_bytes")] Vec<u8>),
+    V0(SharedBytes),
     WithMetadata {
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
+        data: SharedBytes,
         metadata: StateValueMetadata,
     },
 }
@@ -99,7 +98,9 @@ impl Arbitrary for StateValue {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        any::<Vec<u8>>().prop_map(StateValue::new_legacy).boxed()
+        any::<SharedBytes>()
+            .prop_map(StateValue::new_legacy)
+            .boxed()
     }
 }
 
@@ -124,11 +125,11 @@ impl Serialize for StateValue {
 }
 
 impl StateValue {
-    pub fn new_legacy(bytes: Vec<u8>) -> Self {
+    pub fn new_legacy(bytes: SharedBytes) -> Self {
         Self::new_impl(StateValueInner::V0(bytes))
     }
 
-    pub fn new_with_metadata(data: Vec<u8>, metadata: StateValueMetadata) -> Self {
+    pub fn new_with_metadata(data: SharedBytes, metadata: StateValueMetadata) -> Self {
         Self::new_impl(StateValueInner::WithMetadata { data, metadata })
     }
 
@@ -149,7 +150,9 @@ impl StateValue {
 
     pub fn into_bytes(self) -> Vec<u8> {
         match self.inner {
-            StateValueInner::V0(data) | StateValueInner::WithMetadata { data, .. } => data,
+            StateValueInner::V0(data) | StateValueInner::WithMetadata { data, .. } => {
+                data.into_vec()
+            },
         }
     }
 
@@ -164,7 +167,7 @@ impl StateValue {
 #[cfg(any(test, feature = "fuzzing"))]
 impl From<Vec<u8>> for StateValue {
     fn from(bytes: Vec<u8>) -> Self {
-        StateValue::new_legacy(bytes)
+        StateValue::new_legacy(bytes.into())
     }
 }
 

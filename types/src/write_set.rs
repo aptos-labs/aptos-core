@@ -5,9 +5,12 @@
 //! For each transaction the VM executes, the VM will output a `WriteSet` that contains each access
 //! path it updates. For each access path, the VM can either give its new value or delete it.
 
-use crate::state_store::{
-    state_key::StateKey,
-    state_value::{StateValue, StateValueMetadata},
+use crate::{
+    shared_bytes::SharedBytes,
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+    },
 };
 use anyhow::{bail, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -178,8 +181,10 @@ impl TransactionWrite for WriteOp {
 
     fn as_state_value(&self) -> Option<StateValue> {
         self.bytes().map(|bytes| match self.metadata() {
-            None => StateValue::new_legacy(bytes.to_vec()),
-            Some(metadata) => StateValue::new_with_metadata(bytes.to_vec(), metadata.clone()),
+            None => StateValue::new_legacy(SharedBytes::copy(bytes)),
+            Some(metadata) => {
+                StateValue::new_with_metadata(SharedBytes::copy(bytes), metadata.clone())
+            },
         })
     }
 }

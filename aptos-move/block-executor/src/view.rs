@@ -262,7 +262,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
 
                     match mv_value {
                         ReadResult::Value(v) => Ok(v.as_state_value()),
-                        ReadResult::U128(v) => Ok(Some(StateValue::new_legacy(serialize(&v)))),
+                        ReadResult::U128(v) => {
+                            Ok(Some(StateValue::new_legacy(serialize(&v).into())))
+                        },
                         // ExecutionHalted indicates that the parallel execution is halted.
                         // The read should return immediately and log the error.
                         // For now we use STORAGE_ERROR as the VM will not log the speculative eror,
