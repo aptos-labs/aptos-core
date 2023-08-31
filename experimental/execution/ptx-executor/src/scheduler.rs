@@ -80,7 +80,7 @@ impl PtxSchedulerClient {
         &self,
         txn_idx: TxnIdx,
         transaction: Transaction,
-        dependencies: HashSet<(StateKey, TxnIdx)>,
+        dependencies: Vec<VersionedKey>,
     ) {
         trace!("add_txn {}", txn_idx);
         self.send_to_worker(Command::AddTransaction {
@@ -112,7 +112,7 @@ enum Command {
     AddTransaction {
         txn_idx: TxnIdx,
         transaction: Transaction,
-        dependencies: HashSet<(StateKey, TxnIdx)>,
+        dependencies: Vec<VersionedKey>,
     },
     FinishBlock,
     Exit,
@@ -221,7 +221,7 @@ impl Worker {
         &mut self,
         txn_idx: TxnIdx,
         transaction: Transaction,
-        dependencies: HashSet<VersionedKey>,
+        dependencies: Vec<VersionedKey>,
     ) {
         let _timer = TIMER.timer_with(&["scheduler_add_txn"]);
         assert_eq!(txn_idx, self.transactions.len());

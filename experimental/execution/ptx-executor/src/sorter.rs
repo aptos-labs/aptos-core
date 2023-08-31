@@ -6,7 +6,7 @@
 //! TODO(aldenhu): doc
 
 use crate::{
-    common::{Entry, HashMap, HashSet, TxnIdx, VersionedKey, BASE_VERSION, EXPECTANT_BLOCK_KEYS},
+    common::{Entry, HashMap, TxnIdx, VersionedKey, BASE_VERSION, EXPECTANT_BLOCK_KEYS},
     metrics::TIMER,
     scheduler::PtxSchedulerClient,
     state_reader::PtxStateReaderClient,
@@ -96,7 +96,7 @@ impl Worker {
 
         // TODO(ptx): Reorder Non-P-Transactions. (Now we assume all are P-Txns.)
         let (txn, reads, read_writes) = txn.expect_p_txn();
-        let mut dependencies = HashSet::new();
+        let mut dependencies = vec![];
         self.process_txn_dependencies(
             txn_idx,
             reads,
@@ -118,18 +118,18 @@ impl Worker {
         txn_idx: TxnIdx,
         keys: Vec<StateKey>,
         is_write_set: bool,
-        dependencies: &mut HashSet<VersionedKey>,
+        dependencies: &mut Vec<VersionedKey>,
     ) {
         for key in keys {
             match self.latest_writes.entry(key.clone()) {
                 Entry::Occupied(mut entry) => {
-                    dependencies.insert((key.clone(), *entry.get()));
+                    dependencies.push((key.clone(), *entry.get()));
                     if is_write_set {
                         *entry.get_mut() = txn_idx;
                     }
                 },
                 Entry::Vacant(entry) => {
-                    dependencies.insert((key.clone(), BASE_VERSION));
+                    dependencies.push((key.clone(), BASE_VERSION));
 
                     // TODO(ptx): maybe prioritize reads that unblocks execution immediately.
                     self.state_reader.schedule_read(key);
