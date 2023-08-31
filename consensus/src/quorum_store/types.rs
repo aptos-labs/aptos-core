@@ -11,7 +11,10 @@ use aptos_crypto_derive::CryptoHasher;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
+use std::{
+    fmt::{Display, Formatter},
+    ops::Deref,
+};
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
 pub struct PersistedValue {
@@ -202,6 +205,16 @@ pub struct BatchRequest {
     epoch: u64,
     source: PeerId,
     digest: HashValue,
+}
+
+impl Display for BatchRequest {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "BatchRequest: epoch: {}, source: {}, digest {}",
+            self.epoch, self.source, self.digest
+        )
+    }
 }
 
 impl BatchRequest {

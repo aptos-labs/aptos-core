@@ -12,7 +12,7 @@ events emitted to a handle and emit events to the event store.
 -  [Struct `EventHandle`](#0x1_event_EventHandle)
 -  [Constants](#@Constants_0)
 -  [Function `emit`](#0x1_event_emit)
--  [Function `write_to_module_event_store`](#0x1_event_write_to_module_event_store)
+-  [Function `write_module_event_to_store`](#0x1_event_write_module_event_to_store)
 -  [Function `new_event_handle`](#0x1_event_new_event_handle)
 -  [Function `emit_event`](#0x1_event_emit_event)
 -  [Function `guid`](#0x1_event_guid)
@@ -21,7 +21,7 @@ events emitted to a handle and emit events to the event store.
 -  [Function `destroy_handle`](#0x1_event_destroy_handle)
 -  [Specification](#@Specification_1)
     -  [Function `emit`](#@Specification_1_emit)
-    -  [Function `write_to_module_event_store`](#@Specification_1_write_to_module_event_store)
+    -  [Function `write_module_event_to_store`](#@Specification_1_write_module_event_to_store)
     -  [Function `emit_event`](#@Specification_1_emit_event)
     -  [Function `guid`](#@Specification_1_guid)
     -  [Function `counter`](#@Specification_1_counter)
@@ -107,7 +107,7 @@ Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s k
 
 <pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: store + drop&gt;(msg: T) {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_enabled">features::module_event_enabled</a>(), std::error::invalid_state(<a href="event.md#0x1_event_EMODULE_EVENT_NOT_SUPPORTED">EMODULE_EVENT_NOT_SUPPORTED</a>));
-    <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T&gt;(msg);
+    <a href="event.md#0x1_event_write_module_event_to_store">write_module_event_to_store</a>&lt;T&gt;(msg);
 }
 </code></pre>
 
@@ -115,14 +115,14 @@ Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s k
 
 </details>
 
-<a name="0x1_event_write_to_module_event_store"></a>
+<a name="0x1_event_write_module_event_to_store"></a>
 
-## Function `write_to_module_event_store`
+## Function `write_module_event_to_store`
 
 Log <code>msg</code> with the event stream identified by <code>T</code>
 
 
-<pre><code><b>fun</b> <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T: drop, store&gt;(msg: T)
+<pre><code><b>fun</b> <a href="event.md#0x1_event_write_module_event_to_store">write_module_event_to_store</a>&lt;T: drop, store&gt;(msg: T)
 </code></pre>
 
 
@@ -131,7 +131,7 @@ Log <code>msg</code> with the event stream identified by <code>T</code>
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T: drop + store&gt;(msg: T);
+<pre><code><b>native</b> <b>fun</b> <a href="event.md#0x1_event_write_module_event_to_store">write_module_event_to_store</a>&lt;T: drop + store&gt;(msg: T);
 </code></pre>
 
 
@@ -328,12 +328,12 @@ Destroy a unique handle.
 
 
 
-<a name="@Specification_1_write_to_module_event_store"></a>
+<a name="@Specification_1_write_module_event_to_store"></a>
 
-### Function `write_to_module_event_store`
+### Function `write_module_event_to_store`
 
 
-<pre><code><b>fun</b> <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T: drop, store&gt;(msg: T)
+<pre><code><b>fun</b> <a href="event.md#0x1_event_write_module_event_to_store">write_module_event_to_store</a>&lt;T: drop, store&gt;(msg: T)
 </code></pre>
 
 

@@ -186,6 +186,19 @@ CommitDecision:
   STRUCT:
     - ledger_info:
         TYPENAME: LedgerInfoWithSignatures
+CommitMessage:
+  ENUM:
+    0:
+      Vote:
+        NEWTYPE:
+          TYPENAME: CommitVote
+    1:
+      Decision:
+        NEWTYPE:
+          TYPENAME: CommitDecision
+    2:
+      Ack:
+        NEWTYPE: UNIT
 CommitVote:
   STRUCT:
     - author:
@@ -256,6 +269,10 @@ ConsensusMsg:
       DAGMessage:
         NEWTYPE:
           TYPENAME: DAGNetworkMessage
+    15:
+      CommitMessage:
+        NEWTYPE:
+          TYPENAME: CommitMessage
 ContractEvent:
   ENUM:
     0:
