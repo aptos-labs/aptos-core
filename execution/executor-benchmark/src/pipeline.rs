@@ -14,6 +14,7 @@ use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
     transaction::{Transaction, Version},
 };
+use derivative::Derivative;
 use std::{
     marker::PhantomData,
     sync::{
@@ -24,16 +25,20 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
 pub struct PipelineConfig {
     pub delay_execution_start: bool,
     pub split_stages: bool,
     pub skip_commit: bool,
     pub allow_discards: bool,
     pub allow_aborts: bool,
+    #[derivative(Default(value = "1"))]
     pub num_executor_shards: usize,
     pub async_partitioning: bool,
     pub use_global_executor: bool,
+    #[derivative(Default(value = "4"))]
+    pub num_generator_workers: usize,
     pub partitioner_config: PartitionerConfig,
 }
 
@@ -63,7 +68,7 @@ where
             if config.delay_execution_start {
                 (num_blocks.unwrap() + 1).max(50)
             } else {
-                50
+                10
             }, /* bound */
         );
 
