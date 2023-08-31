@@ -553,7 +553,6 @@ mod test {
             })
         );
     }
-
     struct BadStorage;
 
     impl TStateView for BadStorage {

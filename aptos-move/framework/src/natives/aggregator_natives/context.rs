@@ -14,6 +14,8 @@ use std::{
     collections::{btree_map, BTreeMap},
 };
 
+pub type TxnIndex = u32;
+
 /// Represents a single aggregator change.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum AggregatorChange {
@@ -184,17 +186,17 @@ mod test {
         aggregator_data
             .get_aggregator(aggregator_id_for_test(500), 500)
             .unwrap()
-            .add(150)
+            .try_add(150)
             .unwrap();
         aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .unwrap()
-            .add(100)
+            .try_add(100)
             .unwrap();
         aggregator_data
             .get_aggregator(aggregator_id_for_test(700), 700)
             .unwrap()
-            .add(200)
+            .try_add(200)
             .unwrap();
 
         aggregator_data.remove_aggregator(aggregator_id_for_test(100));
