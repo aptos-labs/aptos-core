@@ -26,7 +26,7 @@ Failures in 0x1::A:
 │ 5 │     fun x() {
 │   │         - In this function in 0x1::A
 │ 6 │         abort 0
-│   │         ^^^^^^^ Test was not expected to error, but it aborted with code 0 originating in the module 0000000000000000000000000000000000000000000000000000000000000001::A rooted here
+│   │         ^^^^^^^ Test was not expected to error, but it aborted with code 0 originating in the module 0x1::A rooted here
 │ 
 │ 
 │ ────── Storage state at point of failure ──────
@@ -42,7 +42,7 @@ Failures in 0x1::A:
 │    │         - In this function in 0x1::A
 │ 11 │         move_to(&a, A {});
 │ 12 │         abort 0
-│    │         ^^^^^^^ Test was not expected to error, but it aborted with code 0 originating in the module 0000000000000000000000000000000000000000000000000000000000000001::A rooted here
+│    │         ^^^^^^^ Test was not expected to error, but it aborted with code 0 originating in the module 0x1::A rooted here
 │ 
 │ 
 │ ────── Storage state at point of failure ──────
