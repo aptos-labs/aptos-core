@@ -192,7 +192,6 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
 
         if requested_version >= latest_version {
             Ok(CacheCoverageStatus::DataNotReady)
-                  // 900           + 3_000_000             < 1000
         } else if requested_version + CACHE_SIZE_ESTIMATION < latest_version {
             Ok(CacheCoverageStatus::CacheEvicted)
         } else {
