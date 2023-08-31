@@ -54,9 +54,9 @@ where
 
     /// Gets the state value for a given state key.
     fn get_state_value(&self, _: &K) -> anyhow::Result<Option<StateValue>> {
-        Ok(Some(StateValue::new_legacy(serialize(
-            &STORAGE_AGGREGATOR_VALUE,
-        ))))
+        Ok(Some(StateValue::new_legacy(
+            serialize(&STORAGE_AGGREGATOR_VALUE).into(),
+        )))
     }
 
     fn id(&self) -> StateViewId {
@@ -151,7 +151,8 @@ impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> Transactio
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
-        self.extract_raw_bytes().map(StateValue::new_legacy)
+        self.extract_raw_bytes()
+            .map(|bytes| StateValue::new_legacy(bytes.into()))
     }
 }
 

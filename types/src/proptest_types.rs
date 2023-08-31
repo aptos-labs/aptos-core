@@ -38,6 +38,7 @@ use aptos_crypto::{
     HashValue,
 };
 use arr_macro::arr;
+use bytes::Bytes;
 use move_core_types::language_storage::TypeTag;
 use proptest::{
     collection::{vec, SizeRange},
@@ -806,7 +807,7 @@ impl TransactionToCommitGen {
                         (
                             (
                                 state_key.clone(),
-                                Some(StateValue::new_legacy(value.clone())),
+                                Some(StateValue::new_legacy(Bytes::copy_from_slice(&value))),
                             ),
                             (state_key, WriteOp::Modification(value)),
                         )

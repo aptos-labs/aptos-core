@@ -11,6 +11,7 @@ use crate::state_store::{
 };
 use anyhow::{bail, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{btree_map, BTreeMap},
@@ -178,8 +179,10 @@ impl TransactionWrite for WriteOp {
 
     fn as_state_value(&self) -> Option<StateValue> {
         self.bytes().map(|bytes| match self.metadata() {
-            None => StateValue::new_legacy(bytes.to_vec()),
-            Some(metadata) => StateValue::new_with_metadata(bytes.to_vec(), metadata.clone()),
+            None => StateValue::new_legacy(Bytes::copy_from_slice(bytes)),
+            Some(metadata) => {
+                StateValue::new_with_metadata(Bytes::copy_from_slice(bytes), metadata.clone())
+            },
         })
     }
 }

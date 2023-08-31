@@ -10,6 +10,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use bytes::Bytes;
 use once_cell::sync::OnceCell;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, prelude::*};
@@ -85,10 +86,9 @@ impl Eq for StateValue {}
 )]
 #[serde(rename = "StateValue")]
 pub enum StateValueInner {
-    V0(#[serde(with = "serde_bytes")] Vec<u8>),
+    V0(Bytes),
     WithMetadata {
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
+        data: Bytes,
         metadata: StateValueMetadata,
     },
 }
@@ -99,7 +99,9 @@ impl Arbitrary for StateValue {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        any::<Vec<u8>>().prop_map(StateValue::new_legacy).boxed()
+        any::<Vec<u8>>()
+            .prop_map(|bytes| StateValue::new_legacy(bytes.into()))
+            .boxed()
     }
 }
 
@@ -124,11 +126,11 @@ impl Serialize for StateValue {
 }
 
 impl StateValue {
-    pub fn new_legacy(bytes: Vec<u8>) -> Self {
+    pub fn new_legacy(bytes: Bytes) -> Self {
         Self::new_impl(StateValueInner::V0(bytes))
     }
 
-    pub fn new_with_metadata(data: Vec<u8>, metadata: StateValueMetadata) -> Self {
+    pub fn new_with_metadata(data: Bytes, metadata: StateValueMetadata) -> Self {
         Self::new_impl(StateValueInner::WithMetadata { data, metadata })
     }
 
@@ -148,9 +150,7 @@ impl StateValue {
     }
 
     pub fn into_bytes(self) -> Vec<u8> {
-        match self.inner {
-            StateValueInner::V0(data) | StateValueInner::WithMetadata { data, .. } => data,
-        }
+        self.bytes().to_vec()
     }
 
     pub fn into_metadata(self) -> Option<StateValueMetadata> {
@@ -164,7 +164,7 @@ impl StateValue {
 #[cfg(any(test, feature = "fuzzing"))]
 impl From<Vec<u8>> for StateValue {
     fn from(bytes: Vec<u8>) -> Self {
-        StateValue::new_legacy(bytes)
+        StateValue::new_legacy(bytes.into())
     }
 }
 
