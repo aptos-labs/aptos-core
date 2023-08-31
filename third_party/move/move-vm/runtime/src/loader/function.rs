@@ -11,7 +11,7 @@ use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
         AbilitySet, Bytecode, CompiledModule, FunctionDefinition, FunctionDefinitionIndex,
-        Signature, Visibility,
+        Visibility,
     },
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
@@ -33,9 +33,6 @@ pub(crate) struct Function {
     pub(crate) file_format_version: u32,
     pub(crate) index: FunctionDefinitionIndex,
     pub(crate) code: Vec<Bytecode>,
-    pub(crate) parameters: Signature,
-    pub(crate) return_: Signature,
-    pub(crate) locals: Signature,
     pub(crate) type_parameters: Vec<AbilitySet>,
     pub(crate) native: Option<NativeFunction>,
     pub(crate) def_is_native: bool,
@@ -90,31 +87,16 @@ impl Function {
             (None, false)
         };
         let scope = Scope::Module(module_id);
-        let parameters = module.signature_at(handle.parameters).clone();
         // Native functions do not have a code unit
-        let (code, locals) = match &def.code {
-            Some(code) => (
-                code.code.clone(),
-                Signature(
-                    parameters
-                        .0
-                        .iter()
-                        .chain(module.signature_at(code.locals).0.iter())
-                        .cloned()
-                        .collect(),
-                ),
-            ),
-            None => (vec![], Signature(vec![])),
+        let code = match &def.code {
+            Some(code) => code.code.clone(),
+            None => vec![],
         };
-        let return_ = module.signature_at(handle.return_).clone();
         let type_parameters = handle.type_parameters.clone();
         Self {
             file_format_version: module.version(),
             index,
             code,
-            parameters,
-            return_,
-            locals,
             type_parameters,
             native,
             def_is_native,
@@ -159,15 +141,15 @@ impl Function {
     }
 
     pub(crate) fn local_count(&self) -> usize {
-        self.locals.len()
+        self.local_types.len()
     }
 
     pub(crate) fn arg_count(&self) -> usize {
-        self.parameters.len()
+        self.parameter_types.len()
     }
 
     pub(crate) fn return_type_count(&self) -> usize {
-        self.return_.len()
+        self.return_types.len()
     }
 
     pub(crate) fn name(&self) -> &str {
