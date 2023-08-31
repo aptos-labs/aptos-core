@@ -69,7 +69,7 @@ export class Serializer {
    * ```ts
    * const serializer = new Serializer();
    * serializer.serializeStr("1234abcd");
-   * assert(serializer.getBytes() === new Uint8Array([8, 49, 50, 51, 52, 97, 98, 99, 100]));
+   * assert(serializer.toUint8Array() === new Uint8Array([8, 49, 50, 51, 52, 97, 98, 99, 100]));
    * ```
    */
   serializeStr(value: string) {
@@ -129,7 +129,7 @@ export class Serializer {
    * ```ts
    * const serializer = new Serializer();
    * serializer.serializeU16(4660);
-   * assert(serializer.getBytes() === new Uint8Array([0x34, 0x12]));
+   * assert(serializer.toUint8Array() === new Uint8Array([0x34, 0x12]));
    * ```
    */
   @checkNumberRange(0, MAX_U16_NUMBER)
@@ -145,7 +145,7 @@ export class Serializer {
    * ```ts
    * const serializer = new Serializer();
    * serializer.serializeU32(305419896);
-   * assert(serializer.getBytes() === new Uint8Array([0x78, 0x56, 0x34, 0x12]));
+   * assert(serializer.toUint8Array() === new Uint8Array([0x78, 0x56, 0x34, 0x12]));
    * ```
    */
   @checkNumberRange(0, MAX_U32_NUMBER)
@@ -161,7 +161,7 @@ export class Serializer {
    * ```ts
    * const serializer = new Serializer();
    * serializer.serializeU64(1311768467750121216);
-   * assert(serializer.getBytes() === new Uint8Array([0x00, 0xEF, 0xCD, 0xAB, 0x78, 0x56, 0x34, 0x12]));
+   * assert(serializer.toUint8Array() === new Uint8Array([0x00, 0xEF, 0xCD, 0xAB, 0x78, 0x56, 0x34, 0x12]));
    * ```
    */
   @checkNumberRange(BigInt(0), MAX_U64_BIG_INT)
@@ -224,7 +224,7 @@ export class Serializer {
   /**
    * Returns the buffered bytes
    */
-  getBytes(): Uint8Array {
+  toUint8Array(): Uint8Array {
     return new Uint8Array(this.buffer).slice(0, this.offset);
   }
 }

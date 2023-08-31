@@ -12,7 +12,7 @@ describe("BCS Serializer", () => {
 
   it("serializes a non-empty string", () => {
     serializer.serializeStr("çå∞≠¢õß∂ƒ∫");
-    expect(serializer.getBytes()).toEqual(
+    expect(serializer.toUint8Array()).toEqual(
       new Uint8Array([
         24, 0xc3, 0xa7, 0xc3, 0xa5, 0xe2, 0x88, 0x9e, 0xe2, 0x89, 0xa0, 0xc2, 0xa2, 0xc3, 0xb5, 0xc3, 0x9f, 0xe2, 0x88,
         0x82, 0xc6, 0x92, 0xe2, 0x88, 0xab,
@@ -21,41 +21,41 @@ describe("BCS Serializer", () => {
 
     serializer = new Serializer();
     serializer.serializeStr("abcd1234");
-    expect(serializer.getBytes()).toEqual(new Uint8Array([8, 0x61, 0x62, 0x63, 0x64, 0x31, 0x32, 0x33, 0x34]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([8, 0x61, 0x62, 0x63, 0x64, 0x31, 0x32, 0x33, 0x34]));
   });
 
   it("serializes an empty string", () => {
     serializer.serializeStr("");
-    expect(serializer.getBytes()).toEqual(new Uint8Array([0]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([0]));
   });
 
   it("serializes dynamic length bytes", () => {
     serializer.serializeBytes(new Uint8Array([0x41, 0x70, 0x74, 0x6f, 0x73]));
-    expect(serializer.getBytes()).toEqual(new Uint8Array([5, 0x41, 0x70, 0x74, 0x6f, 0x73]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([5, 0x41, 0x70, 0x74, 0x6f, 0x73]));
   });
 
   it("serializes dynamic length bytes with zero elements", () => {
     serializer.serializeBytes(new Uint8Array([]));
-    expect(serializer.getBytes()).toEqual(new Uint8Array([0]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([0]));
   });
 
   it("serializes fixed length bytes", () => {
     serializer.serializeFixedBytes(new Uint8Array([0x41, 0x70, 0x74, 0x6f, 0x73]));
-    expect(serializer.getBytes()).toEqual(new Uint8Array([0x41, 0x70, 0x74, 0x6f, 0x73]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([0x41, 0x70, 0x74, 0x6f, 0x73]));
   });
 
   it("serializes fixed length bytes with zero element", () => {
     serializer.serializeFixedBytes(new Uint8Array([]));
-    expect(serializer.getBytes()).toEqual(new Uint8Array([]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([]));
   });
 
   it("serializes a boolean value", () => {
     serializer.serializeBool(true);
-    expect(serializer.getBytes()).toEqual(new Uint8Array([0x01]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([0x01]));
 
     serializer = new Serializer();
     serializer.serializeBool(false);
-    expect(serializer.getBytes()).toEqual(new Uint8Array([0x00]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([0x00]));
   });
 
   it("throws when serializing a boolean value with wrong data type", () => {
@@ -67,7 +67,7 @@ describe("BCS Serializer", () => {
 
   it("serializes a uint8", () => {
     serializer.serializeU8(255);
-    expect(serializer.getBytes()).toEqual(new Uint8Array([0xff]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([0xff]));
   });
 
   it("throws when serializing uint8 with out of range value", () => {
@@ -83,11 +83,11 @@ describe("BCS Serializer", () => {
 
   it("serializes a uint16", () => {
     serializer.serializeU16(65535);
-    expect(serializer.getBytes()).toEqual(new Uint8Array([0xff, 0xff]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([0xff, 0xff]));
 
     serializer = new Serializer();
     serializer.serializeU16(4660);
-    expect(serializer.getBytes()).toEqual(new Uint8Array([0x34, 0x12]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([0x34, 0x12]));
   });
 
   it("throws when serializing uint16 with out of range value", () => {
@@ -103,11 +103,11 @@ describe("BCS Serializer", () => {
 
   it("serializes a uint32", () => {
     serializer.serializeU32(4294967295);
-    expect(serializer.getBytes()).toEqual(new Uint8Array([0xff, 0xff, 0xff, 0xff]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([0xff, 0xff, 0xff, 0xff]));
 
     serializer = new Serializer();
     serializer.serializeU32(305419896);
-    expect(serializer.getBytes()).toEqual(new Uint8Array([0x78, 0x56, 0x34, 0x12]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([0x78, 0x56, 0x34, 0x12]));
   });
 
   it("throws when serializing uint32 with out of range value", () => {
@@ -123,11 +123,11 @@ describe("BCS Serializer", () => {
 
   it("serializes a uint64", () => {
     serializer.serializeU64(BigInt("18446744073709551615"));
-    expect(serializer.getBytes()).toEqual(new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]));
 
     serializer = new Serializer();
     serializer.serializeU64(BigInt("1311768467750121216"));
-    expect(serializer.getBytes()).toEqual(new Uint8Array([0x00, 0xef, 0xcd, 0xab, 0x78, 0x56, 0x34, 0x12]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([0x00, 0xef, 0xcd, 0xab, 0x78, 0x56, 0x34, 0x12]));
   });
 
   it("throws when serializing uint64 with out of range value", () => {
@@ -143,13 +143,13 @@ describe("BCS Serializer", () => {
 
   it("serializes a uint128", () => {
     serializer.serializeU128(BigInt("340282366920938463463374607431768211455"));
-    expect(serializer.getBytes()).toEqual(
+    expect(serializer.toUint8Array()).toEqual(
       new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
     );
 
     serializer = new Serializer();
     serializer.serializeU128(BigInt("1311768467750121216"));
-    expect(serializer.getBytes()).toEqual(
+    expect(serializer.toUint8Array()).toEqual(
       new Uint8Array([0x00, 0xef, 0xcd, 0xab, 0x78, 0x56, 0x34, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
     );
   });
@@ -167,7 +167,7 @@ describe("BCS Serializer", () => {
 
   it("serializes a uleb128", () => {
     serializer.serializeU32AsUleb128(104543565);
-    expect(serializer.getBytes()).toEqual(new Uint8Array([0xcd, 0xea, 0xec, 0x31]));
+    expect(serializer.toUint8Array()).toEqual(new Uint8Array([0xcd, 0xea, 0xec, 0x31]));
   });
 
   it("throws when serializing uleb128 with out of range value", () => {
@@ -196,7 +196,7 @@ describe("BCS Serializer", () => {
     serializer.serializeU64(BigInt("1311768467750121216"));
     serializer.serializeU128(BigInt("340282366920938463463374607431768211455"));
     serializer.serializeU128(BigInt("1311768467750121216"));
-    const serializedBytes = serializer.getBytes();
+    const serializedBytes = serializer.toUint8Array();
     expect(serializedBytes).toEqual(
       new Uint8Array([
         5, 0x41, 0x70, 0x74, 0x6f, 0x73, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff, 0x34, 0x12, 0xff, 0xff, 0xff, 0xff, 0x78,
@@ -211,7 +211,7 @@ describe("BCS Serializer", () => {
     const serializer = new Serializer(128);
     serializer.serializeBool(true);
     serializer.serializeU8(254);
-    const serializedBytes = serializer.getBytes();
+    const serializedBytes = serializer.toUint8Array();
     expect(serializedBytes).toEqual(new Uint8Array([0x01, 0xfe]));
   });
 
