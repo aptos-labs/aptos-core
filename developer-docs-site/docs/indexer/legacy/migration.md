@@ -33,11 +33,11 @@ For each processor you're migrating, you'll need to create a config file using t
 health_check_port: 8084
 server_config:
   processor_name: default_processor
-  postgres_connection_string: postgresql://postgres:@localhost:5432/indexer
-  indexer_grpc_data_service_address: 127.0.0.1:50051
+  postgres_connection_string: <postgres_uri, e.g. postgresql://postgres:@localhost:5432/indexer>
+  indexer_grpc_data_service_address: <url_from_api_gateway>
   indexer_grpc_http2_ping_interval_in_secs: 60
   indexer_grpc_http2_ping_timeout_in_secs: 10
-  auth_token: AUTH_TOKEN
+  auth_token: <auto_token_from_api_gateway>
 ```
 
 To connect the processor to the Transaction Stream Service, you need to set the URL for `indexer_grpc_data_service_address`. Choose one of the following options.
