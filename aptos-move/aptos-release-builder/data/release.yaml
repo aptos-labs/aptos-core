@@ -25,18 +25,6 @@ proposals:
       - Framework:
           bytecode_version: 6
           git_hash: ~
-  - name: enable_block_gas_limit
-    metadata:
-      title: "Enable Block Gas Limit"
-      description: "AIP-33: The block gas limit is a feature that terminates block execution when the gas consumed by the committed prefix of transactions exceeds the limit, thus providing predictable latency."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/132"
-    execution_mode: MultiStep
-    update_sequence:
-    - Execution:
-        V2:
-          transaction_shuffler_type:
-            deprecated_sender_aware_v1: 32
-          block_gas_limit : 35000
   - name: enable_aggregator_snapshots
     metadata:
       title: "Enable Aggregator Snapshots"
