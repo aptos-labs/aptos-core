@@ -19,6 +19,7 @@ aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 chrono = { workspace = true }
 derivative = { workspace = true }
 hex = { workspace = true }
@@ -42,6 +43,8 @@ tiny-keccak = { workspace = true }
 [dev-dependencies]
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 claims = { workspace = true }
+criterion = { workspace = true }
+jemallocator = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
@@ -51,3 +54,7 @@ serde_json = { workspace = true }
 [features]
 default = []
 fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "move-core-types/fuzzing"]
+
+[[bench]]
+name = "shared_bytes"
+harness = false
