@@ -55,6 +55,7 @@ dashmap = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 futures-channel = { workspace = true }
+hex = { workspace = true }
 itertools = { workspace = true }
 maplit = { workspace = true }
 mirai-annotations = { workspace = true }

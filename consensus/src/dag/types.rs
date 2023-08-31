@@ -20,7 +20,7 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, ops::Deref, sync::Arc};
+use std::{cmp::min, collections::HashSet, ops::Deref, sync::Arc};
 
 pub trait TDAGMessage: Into<DAGMessage> + TryFrom<DAGMessage> {
     fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()>;
@@ -599,11 +599,20 @@ impl FetchResponse {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct DAGNetworkMessage {
     pub epoch: u64,
     #[serde(with = "serde_bytes")]
     pub data: Vec<u8>,
+}
+
+impl core::fmt::Debug for DAGNetworkMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DAGNetworkMessage")
+            .field("epoch", &self.epoch)
+            .field("data", &hex::encode(&self.data[..min(20, self.data.len())]))
+            .finish()
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, EnumConversion)]
