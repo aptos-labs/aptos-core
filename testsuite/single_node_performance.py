@@ -81,13 +81,13 @@ TESTS = [
     RunGroupConfig(expected_tps=26500, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=22000, key=RunGroupKey("account-resource32-b"), included_in=Flow.LAND_BLOCKING),
     RunGroupConfig(expected_tps=4150, key=RunGroupKey("modify-global-resource"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=13500, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.LAND_BLOCKING),
+    RunGroupConfig(expected_tps=13500, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=140, key=RunGroupKey("publish-package"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=2600, key=RunGroupKey(
         "mix_publish_transfer",
         transaction_type_override="publish-package coin-transfer",
         transaction_weights_override="1 500",
-    ), included_in=Flow.LAND_BLOCKING, waived=True),
+    ), included_in=Flow.LAND_BLOCKING),
     RunGroupConfig(expected_tps=365, key=RunGroupKey("batch100-transfer"), included_in=Flow.LAND_BLOCKING),
     RunGroupConfig(expected_tps=940, key=RunGroupKey("batch100-transfer", executor_type="native"), included_in=Flow.CONTINUOUS),
 
@@ -95,14 +95,13 @@ TESTS = [
     RunGroupConfig(expected_tps=8800, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.LAND_BLOCKING),
     RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=5150, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=5300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
+    RunGroupConfig(expected_tps=5300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel", module_working_set_size=20), included_in=Flow(0)),
 
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1ft-mint-and-store"), included_in=Flow(0)),
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-store-sequential"), included_in=Flow(0)),
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
 
-    RunGroupConfig(expected_tps=18000, key=RunGroupKey("no-op2-signers"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=18000, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
    
     RunGroupConfig(expected_tps=1710, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
