@@ -150,7 +150,7 @@ pub enum Type {
     },
     StructInstantiation {
         name: Arc<StructName>,
-        ty_args: Vec<Type>,
+        ty_args: Arc<Vec<Type>>,
         #[derivative(PartialEq = "ignore", Hash = "ignore")]
         base_ability_set: AbilitySet,
         #[derivative(PartialEq = "ignore", Hash = "ignore")]
@@ -206,12 +206,12 @@ impl Type {
                 phantom_ty_args_mask: is_phantom_params,
             } => {
                 let mut inst = vec![];
-                for ty in instantiation {
+                for ty in instantiation.iter() {
                     inst.push(ty.apply_subst(subst, depth + 1)?)
                 }
                 Type::StructInstantiation {
                     name: name.clone(),
-                    ty_args: inst,
+                    ty_args: Arc::new(inst),
                     base_ability_set: *base_ability,
                     phantom_ty_args_mask: is_phantom_params.clone(),
                 }

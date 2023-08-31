@@ -53,7 +53,7 @@ pub fn make_type_internal(
             Type::StructInstantiation {
                 name: struct_name_table[sh_idx.0 as usize].clone(),
                 base_ability_set: struct_handle.abilities,
-                ty_args: type_parameters,
+                ty_args: Arc::new(type_parameters),
                 phantom_ty_args_mask: struct_handle
                     .type_parameters
                     .iter()

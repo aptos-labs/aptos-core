@@ -760,7 +760,7 @@ impl Loader {
                         .map_err(|e| e.finish(Location::Undefined))?;
                     Type::StructInstantiation {
                         name: struct_type.name.clone(),
-                        ty_args: type_params,
+                        ty_args: Arc::new(type_params),
                         base_ability_set: struct_type.abilities,
                         phantom_ty_args_mask: struct_type.phantom_ty_args_mask.clone(),
                     }
@@ -1317,11 +1317,13 @@ impl<'a> Resolver<'a> {
         let struct_ = &struct_inst.definition_struct_type;
         Ok(Type::StructInstantiation {
             name: struct_.name.clone(),
-            ty_args: struct_inst
-                .instantiation
-                .iter()
-                .map(|ty| self.subst(ty, ty_args))
-                .collect::<PartialVMResult<_>>()?,
+            ty_args: Arc::new(
+                struct_inst
+                    .instantiation
+                    .iter()
+                    .map(|ty| self.subst(ty, ty_args))
+                    .collect::<PartialVMResult<_>>()?,
+            ),
             base_ability_set: struct_.abilities,
             phantom_ty_args_mask: struct_.phantom_ty_args_mask.clone(),
         })
@@ -1469,11 +1471,13 @@ impl<'a> Resolver<'a> {
                 let struct_ = &module.field_instantiations[idx.0 as usize].definition_struct_type;
                 Ok(Type::StructInstantiation {
                     name: struct_.name.clone(),
-                    ty_args: module.field_instantiations[idx.0 as usize]
-                        .instantiation
-                        .iter()
-                        .map(|ty| ty.subst(args))
-                        .collect::<PartialVMResult<Vec<_>>>()?,
+                    ty_args: Arc::new(
+                        module.field_instantiations[idx.0 as usize]
+                            .instantiation
+                            .iter()
+                            .map(|ty| ty.subst(args))
+                            .collect::<PartialVMResult<Vec<_>>>()?,
+                    ),
                     base_ability_set: struct_.abilities,
                     phantom_ty_args_mask: struct_.phantom_ty_args_mask.clone(),
                 })
