@@ -823,6 +823,16 @@ impl WideningOrder {
             WideningOrder::Join => WideningOrder::Join,
         }
     }
+
+    /// Combine two orders. If they are the same or Join, self is returned, otherwise swapped
+    /// order.
+    pub fn combine(self, other: Self) -> Self {
+        if self == other || self == WideningOrder::Join {
+            self
+        } else {
+            self.swap()
+        }
+    }
 }
 
 impl Substitution {
@@ -887,12 +897,20 @@ impl Substitution {
     /// Binds the type variable. If there are constraints associated with the
     /// variable, those are evaluated, possibly leading into unification
     /// errors.
-    pub fn bind(&mut self, var: u32, ty: Type) -> Result<(), TypeUnificationError> {
+    pub fn bind(
+        &mut self,
+        var: u32,
+        order: WideningOrder,
+        ty: Type,
+    ) -> Result<(), TypeUnificationError> {
         // Specialize the type before binding, to maximize groundness of type terms.
         let ty = self.specialize(&ty);
         if let Some(constrs) = self.constraints.remove(&var) {
-            for (loc, order, c) in constrs {
-                self.eval_constraint(&loc, &ty, order, c)?
+            for (loc, o, c) in constrs {
+                // The effective order is the one combining the constraint order with the
+                // context order. The result needs to be swapped because the constraint
+                // of the variable is evaluated against the given type.
+                self.eval_constraint(&loc, &ty, o.combine(order).swap(), c)?
             }
         }
         self.subs.insert(var, ty);
@@ -920,12 +938,15 @@ impl Substitution {
             match &c {
                 Constraint::SomeNumber(options) => match ty {
                     Type::Primitive(prim) if options.contains(prim) => Ok(()),
-                    _ => Err(TypeUnificationError::ConstraintUnsatisfied(
-                        loc.clone(),
-                        ty.clone(),
-                        order,
-                        c,
-                    )),
+                    _ => {
+                        println!("mismatch {:?} {:?} {:?}", ty, order, c);
+                        Err(TypeUnificationError::ConstraintUnsatisfied(
+                            loc.clone(),
+                            ty.clone(),
+                            order,
+                            c,
+                        ))
+                    },
                 },
                 Constraint::SomeReference(inner_type) => match ty {
                     Type::Reference(_, target_type) => {
@@ -1208,7 +1229,7 @@ impl Substitution {
             }
             // Cycle check.
             if !self.occurs_check(&t2, *v1) {
-                self.bind(*v1, t2.clone())?;
+                self.bind(*v1, order, t2.clone())?;
                 Ok(Some(t2))
             } else {
                 Err(TypeUnificationError::CyclicSubstitution(
@@ -1439,11 +1460,8 @@ impl TypeUnificationAdapter {
 impl TypeUnificationError {
     /// If this error is associated with a specific location, return this.
     pub fn specific_loc(&self) -> Option<Loc> {
-        match self {
-            TypeUnificationError::ConstraintUnsatisfied(loc, ..)
-            | TypeUnificationError::RedirectedError(loc, ..) => Some(loc.clone()),
-            _ => None,
-        }
+        // Not used for now
+        None
     }
 
     /// Return the message for this error.

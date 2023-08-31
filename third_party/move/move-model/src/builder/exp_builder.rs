@@ -1197,7 +1197,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 &loc,
                 &Type::Tuple(vars.clone()),
                 &expected_type,
-                "",
+                "from assignment or declaration context",
             );
             vars
         };
@@ -1266,7 +1266,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 loc,
                                 &local_ty,
                                 expected_type,
-                                "",
+                                "from assignment or declaration context",
                             );
                         } else {
                             self.error(
@@ -2277,9 +2277,19 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &arg_ty,
                     &instantiated,
                 ) {
+                    let arg_loc = if i < translated_args.len() {
+                        Some(
+                            self.parent
+                                .parent
+                                .env
+                                .get_node_loc(translated_args[i].node_id()),
+                        )
+                    } else {
+                        None
+                    };
                     outruled.push((
                         cand,
-                        err.specific_loc(),
+                        arg_loc,
                         format!(
                             "{} for argument {}",
                             err.message(&self.type_display_context()),
