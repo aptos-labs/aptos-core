@@ -15,7 +15,7 @@ use move_package::{
         manifest_parser as MP,
         parsed_manifest::{CustomDepInfo, PackageDigest},
     },
-    BuildConfig, ModelConfig,
+    BuildConfig, CompilerConfig, ModelConfig,
 };
 use move_symbol_pool::Symbol;
 use std::{
@@ -72,7 +72,7 @@ pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
                 .into())
             },
             (true, _) => match BuildPlan::create(resolved_package)
-                .and_then(|bp| bp.compile(None, &mut Vec::new()))
+                .and_then(|bp| bp.compile(&CompilerConfig::default(), &mut Vec::new()))
             {
                 Ok(mut pkg) => {
                     pkg.compiled_package_info.source_digest =

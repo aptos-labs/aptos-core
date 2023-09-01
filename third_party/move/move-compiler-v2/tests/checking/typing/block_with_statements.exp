@@ -14,7 +14,7 @@ module 0x8675309::M {
         };
         {
           let y: u64 = 0;
-          Borrow(Mutable)(Add(y, 1))
+          Borrow(Mutable)(Add<u64>(y, 1))
         };
         M::R{ dummy_field: _ } = {
           let r: M::R = {

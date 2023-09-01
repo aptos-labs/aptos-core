@@ -29,7 +29,7 @@ use move_model::{
     },
     ty::{PrimitiveType, Type},
 };
-use move_stackless_bytecode::mono_analysis;
+use move_prover_bytecode_pipeline::mono_analysis;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use tera::{Context, Tera};

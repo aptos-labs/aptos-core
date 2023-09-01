@@ -18,7 +18,7 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{AccountResource, CORE_CODE_ADDRESS},
+    account_config::{AccountResource, CoinStoreResource, CORE_CODE_ADDRESS},
     contract_event::ContractEvent,
     on_chain_config::{FeatureFlag, GasScheduleV2, OnChainConfig},
     state_store::{
@@ -77,6 +77,15 @@ impl MoveHarness {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor: FakeExecutor::from_head_genesis(),
+            txn_seq_no: BTreeMap::default(),
+            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+        }
+    }
+
+    pub fn new_with_executor(executor: FakeExecutor) -> Self {
+        register_package_hooks(Box::new(AptosPackageHooks {}));
+        Self {
+            executor,
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
         }
@@ -509,6 +518,12 @@ impl MoveHarness {
         self.read_resource_raw(addr, struct_tag).is_some()
     }
 
+    pub fn read_aptos_balance(&self, addr: &AccountAddress) -> u64 {
+        self.read_resource::<CoinStoreResource>(addr, CoinStoreResource::struct_tag())
+            .unwrap()
+            .coin()
+    }
+
     /// Write the resource data `T`.
     pub fn set_resource<T: Serialize>(
         &mut self,
@@ -610,7 +625,7 @@ impl MoveHarness {
     }
 
     pub fn new_vm(&self) -> AptosVM {
-        AptosVM::new(self.executor.data_store())
+        AptosVM::new_from_state_view(self.executor.data_store())
     }
 
     pub fn set_default_gas_unit_price(&mut self, gas_unit_price: u64) {

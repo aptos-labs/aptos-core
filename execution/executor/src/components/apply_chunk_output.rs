@@ -12,17 +12,19 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::{
-    hash::{CryptoHash, EventAccumulatorHasher},
+    hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher},
     HashValue,
 };
 use aptos_executor_types::{
-    in_memory_state_calculator::InMemoryStateCalculator, ExecutedBlock, ExecutedChunk,
-    ParsedTransactionOutput, TransactionData,
+    in_memory_state_calculator::InMemoryStateCalculator,
+    state_checkpoint_output::{StateCheckpointOutput, TransactionsByStatus},
+    ExecutedChunk, LedgerUpdateOutput, ParsedTransactionOutput, TransactionData,
 };
 use aptos_logger::error;
-use aptos_storage_interface::ExecutedTrees;
+use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
 use aptos_types::{
     contract_event::ContractEvent,
+    epoch_state::EpochState,
     proof::accumulator::InMemoryAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue, ShardedStateUpdates},
     transaction::{
@@ -41,11 +43,11 @@ use std::{
 pub struct ApplyChunkOutput;
 
 impl ApplyChunkOutput {
-    pub fn apply_block(
+    pub fn calculate_state_checkpoint(
         chunk_output: ChunkOutput,
-        base_view: &ExecutedTrees,
+        parent_state: &StateDelta,
         append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> Result<(ExecutedBlock, Vec<Transaction>, Vec<Transaction>)> {
+    ) -> Result<(StateDelta, Option<EpochState>, StateCheckpointOutput)> {
         let ChunkOutput {
             state_cache,
             transactions,
@@ -79,12 +81,39 @@ impl ApplyChunkOutput {
                 .with_label_values(&["calculate_for_transaction_block"])
                 .start_timer();
             InMemoryStateCalculatorV2::calculate_for_transaction_block(
-                base_view.state(),
+                parent_state,
                 state_cache,
                 &to_keep,
                 new_epoch,
             )?
         };
+
+        Ok((
+            result_state,
+            next_epoch_state,
+            StateCheckpointOutput::new(
+                TransactionsByStatus::new(status, to_keep, to_discard, to_retry),
+                state_updates_vec,
+                state_checkpoint_hashes,
+                block_state_updates,
+                sharded_state_cache,
+            ),
+        ))
+    }
+
+    pub fn calculate_ledger_update(
+        state_checkpoint_output: StateCheckpointOutput,
+        base_txn_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
+    ) -> Result<(LedgerUpdateOutput, Vec<Transaction>, Vec<Transaction>)> {
+        let (
+            txns,
+            state_updates_vec,
+            state_checkpoint_hashes,
+            block_state_updates,
+            sharded_state_cache,
+        ) = state_checkpoint_output.into_inner();
+
+        let (status, to_keep, to_discard, to_retry) = txns.into_inner();
 
         // Calculate TransactionData and TransactionInfo, i.e. the ledger history diff.
         let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
@@ -96,21 +125,17 @@ impl ApplyChunkOutput {
                 state_updates_vec,
                 state_checkpoint_hashes,
             );
-        let result_view = ExecutedTrees::new(
-            result_state,
-            Arc::new(base_view.txn_accumulator().append(&transaction_info_hashes)),
-        );
-
+        let transaction_accumulator =
+            Arc::new(base_txn_accumulator.append(&transaction_info_hashes));
         Ok((
-            ExecutedBlock {
+            LedgerUpdateOutput {
                 status,
                 to_commit,
-                result_view,
-                next_epoch_state,
                 reconfig_events,
                 transaction_info_hashes,
                 block_state_updates,
                 sharded_state_cache,
+                transaction_accumulator,
             },
             to_discard,
             to_retry,

@@ -160,7 +160,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
     assert!(
-        change_set.aggregator_delta_set().is_empty(),
+        change_set.aggregator_v1_delta_set().is_empty(),
         "non-empty delta change set in genesis"
     );
     assert!(!change_set.write_set_iter().any(|(_, op)| op.is_deletion()));
@@ -270,7 +270,7 @@ pub fn encode_genesis_change_set(
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
     assert!(
-        change_set.aggregator_delta_set().is_empty(),
+        change_set.aggregator_v1_delta_set().is_empty(),
         "non-empty delta change set in genesis"
     );
 
@@ -410,15 +410,23 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::RESOURCE_GROUPS,
         FeatureFlag::MULTISIG_ACCOUNTS,
         FeatureFlag::DELEGATION_POOLS,
-        FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
-        FeatureFlag::STRUCT_CONSTRUCTORS,
         FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
         FeatureFlag::BLS12_381_STRUCTURES,
+        FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
+        FeatureFlag::STRUCT_CONSTRUCTORS,
+        FeatureFlag::SIGNATURE_CHECKER_V2,
         FeatureFlag::STORAGE_SLOT_METADATA,
         FeatureFlag::CHARGE_INVARIANT_VIOLATION,
         FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
         FeatureFlag::GAS_PAYER_ENABLED,
         FeatureFlag::BULLETPROOFS_NATIVES,
+        FeatureFlag::SIGNER_NATIVE_FORMAT_FIX,
+        FeatureFlag::MODULE_EVENT,
+        FeatureFlag::EMIT_FEE_STATEMENT,
+        FeatureFlag::STORAGE_DELETION_REFUND,
+        FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX,
+        FeatureFlag::AGGREGATOR_SNAPSHOTS,
+        FeatureFlag::SAFER_RESOURCE_GROUPS,
     ]
 }
 

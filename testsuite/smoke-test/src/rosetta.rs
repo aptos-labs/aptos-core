@@ -2507,10 +2507,10 @@ async fn test_delegation_pool_operations() {
         .into_inner()
         .sequence_number();
 
-    *swarm
+    swarm
         .aptos_public_info()
         .root_account()
-        .sequence_number_mut() = root_sequence_number;
+        .set_sequence_number(root_sequence_number);
 
     let mut delegation_pool_creator_account = swarm
         .aptos_public_info()

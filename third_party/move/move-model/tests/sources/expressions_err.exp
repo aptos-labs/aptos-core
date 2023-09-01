@@ -20,7 +20,7 @@ error: invalid call of `>`: expected `num` but found `vector<num>` for argument 
    ┌─ tests/sources/expressions_err.move:27:7
    │
 27 │       x > y
-   │       ^^^^^
+   │       ^
 
 error: expected `(num, bool)` but found `bool`
    ┌─ tests/sources/expressions_err.move:32:7
@@ -29,10 +29,10 @@ error: expected `(num, bool)` but found `bool`
    │       ^^^^^
 
 error: invalid call of `M::wrongly_typed_callee`: expected `bool` but found `u256` for argument 2
-   ┌─ tests/sources/expressions_err.move:37:39
+   ┌─ tests/sources/expressions_err.move:37:63
    │
 37 │     fun wrongly_typed_caller(): num { wrongly_typed_callee(1, 1) }
-   │                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                                                               ^
 
 error: expected `num` but found `bool`
    ┌─ tests/sources/expressions_err.move:41:80

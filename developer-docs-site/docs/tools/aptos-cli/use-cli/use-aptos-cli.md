@@ -874,9 +874,9 @@ The `aptos` tool supports bootstrapping new blockchains through what is known as
 - The genesis organizer constructs a `Layout` and distributes it.
 - The genesis organizer prepares the Aptos framework's bytecode and distributes it.
 - Each participant generates their `ValidatorConfiguration` and distributes it.
-- Each participant generates a `genesis.blob` from the resulting contributions
+- Each participant generates a `genesis.blob` from the resulting contributions.
 - The genesis organizer executes the `genesis.blob` to derive the initial waypoint and distributes it.
-- Each participant begins their `aptos-node`. The `aptos-node` verifies upon startup that the `genesis.blob` with the waypoint provided by the genesis organizer .
+- Each participant begins their `aptos-node`. The `aptos-node` verifies upon startup that the `genesis.blob` with the waypoint provided by the genesis organizer.
 - The blockchain will begin consensus after a quorum of stake is available.
 
 ### Prepare aptos-core

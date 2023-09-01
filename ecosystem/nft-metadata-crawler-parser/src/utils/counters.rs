@@ -1,0 +1,200 @@
+// Copyright © Aptos Foundation
+
+use aptos_metrics_core::{
+    register_int_counter, register_int_counter_vec, IntCounter, IntCounterVec,
+};
+use once_cell::sync::Lazy;
+
+// OVERALL METRICS
+
+/// Number of times a given processor has been invoked
+pub static PARSER_INVOCATIONS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_processor_invocation_count",
+        "Number of times the parser has been invoked",
+    )
+    .unwrap()
+});
+
+/// Number of times the NFT Metadata Crawler Parser has completed successfully
+pub static PARSER_SUCCESSES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_processor_success_count",
+        "Number of times the parser has completed successfully",
+    )
+    .unwrap()
+});
+
+/// Number of times the NFT Metadata Crawler Parser has failed
+pub static PARSER_FAIL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_processor_fail_count",
+        "Number of times the parser has failed",
+    )
+    .unwrap()
+});
+
+/// Number of times the PubSub subscription stream has been reset
+pub static PUBSUB_STREAM_RESET_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_pubsub_stream_reset_count",
+        "Number of times the PubSub subscription stream has been reset",
+    )
+    .unwrap()
+});
+
+/// Number of times a PubSub message has successfully been ACK'd
+pub static PUBSUB_ACK_SUCCESS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_pubsub_ack_success_count",
+        "Number of times a PubSub message has successfully been ACK'd",
+    )
+    .unwrap()
+});
+
+/// Number of times the connection pool has timed out when trying to get a connection
+pub static UNABLE_TO_GET_CONNECTION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "indexer_connection_pool_err",
+        "Number of times the connection pool has timed out when trying to get a connection"
+    )
+    .unwrap()
+});
+
+/// Number of times the connection pool got a connection
+pub static GOT_CONNECTION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "indexer_connection_pool_ok",
+        "Number of times the connection pool got a connection"
+    )
+    .unwrap()
+});
+
+// DEDUPLICATION METRICS
+
+/// Number of times the NFT Metadata Crawler Parser has found a duplicate token URI
+pub static DUPLICATE_TOKEN_URI_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_duplicate_token_uri_count",
+        "Number of times the NFT Metadata Crawler Parser has found a duplicate token URI"
+    )
+    .unwrap()
+});
+
+/// Number of times the NFT Metadata Crawler Parser has found a duplicate raw image URI
+pub static DUPLICATE_RAW_IMAGE_URI_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_duplicate_raw_image_uri_count",
+        "Number of times the NFT Metadata Crawler Parser has found a duplicate raw image URI"
+    )
+    .unwrap()
+});
+
+/// Number of times the NFT Metadata Crawler Parser has found a duplicate raw animation URI
+pub static DUPLICATE_RAW_ANIMATION_URI_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_duplicate_raw_animation_uri_count",
+        "Number of times the NFT Metadata Crawler Parser has found a duplicate raw animation URI"
+    )
+    .unwrap()
+});
+
+// URI PARSER METRICS
+
+/// Number of URIs skipped because of matches on the URI skip list
+pub static SKIP_URI_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_skip_uri_count",
+        "Number of URIs skipped because of matches on the URI skip list",
+    )
+    .unwrap()
+});
+
+/// Number of times the NFT Metadata Crawler Parser has invocated the URI Parser
+pub static PARSE_URI_INVOCATION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_parse_uri_invocation_count",
+        "Number of times the NFT Metadata Crawler Parser has invocated the URI Parser"
+    )
+    .unwrap()
+});
+
+/// Number of times a given URI type has been parsed
+pub static PARSE_URI_TYPE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "nft_metadata_crawler_parser_parse_uri_type_count",
+        "Number of times a given URI type has been parsed",
+        &["uri_type"]
+    )
+    .unwrap()
+});
+
+// JSON PARSER METRICS
+
+/// Number of times the NFT Metadata Crawler has invocated the JSON Parser
+pub static PARSE_JSON_INVOCATION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_parse_json_invocation_count",
+        "Number of times the NFT Metadata Crawler Parser has invocated the JSON Parser"
+    )
+    .unwrap()
+});
+
+/// Number of times the NFT Metadata Crawler Parser has been able to parse a JSON
+pub static SUCCESSFULLY_PARSED_JSON_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_successfully_parsed_json_count",
+        "Number of times the NFT Metadata Crawler Parser has been able to parse a JSON"
+    )
+    .unwrap()
+});
+
+/// Number of times the NFT Metadata Crawler Parser has failed to parse a JSON and the error type
+pub static FAILED_TO_PARSE_JSON_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "nft_metadata_crawler_parser_failed_to_parse_json_count",
+        "Number of times the NFT Metadata Crawler Parser has failed to parse a JSON",
+        &["error_type"]
+    )
+    .unwrap()
+});
+
+// IMAGE OPTIMIZER METRICS
+
+/// Number of times the NFT Metadata Crawler Parser has invocated the Image Optimizer for an image
+pub static OPTIMIZE_IMAGE_INVOCATION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_optimize_image_invocation_count",
+        "Number of times the NFT Metadata Crawler Parser has invocated the Image Optimizer for an image"
+    )
+    .unwrap()
+});
+
+/// Number of times a given image type has been optimized
+pub static OPTIMIZE_IMAGE_TYPE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "nft_metadata_crawler_parser_optimize_image_type_count",
+        "Number of times a given image type has been optimized",
+        &["image_type"]
+    )
+    .unwrap()
+});
+
+/// Number of times the Image Optimizer has been able to optimize an image
+pub static SUCCESSFULLY_OPTIMIZED_IMAGE_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_successfully_optimized_image_count",
+        "Number of times the Image Optimizer has been able to optimize an image"
+    )
+    .unwrap()
+});
+
+/// Number of times the Image Optimizer has failed to optimize an image and the error type
+pub static FAILED_TO_OPTIMIZE_IMAGE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "nft_metadata_crawler_parser_failed_to_optimize_image_count",
+        "Number of times the NFT Metadata Crawler Parser has failed to optimize an image and the error type",
+        &["error_type"]
+    )
+    .unwrap()
+});

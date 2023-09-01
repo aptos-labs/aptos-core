@@ -12,19 +12,26 @@ use crate::pipeline::livevar_analysis_processor::LiveVarAnalysisProcessor;
 use anyhow::anyhow;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
 pub use experiments::*;
-use move_binary_format::{file_format as FF, file_format::CompiledScript, CompiledModule};
-use move_compiler::shared::known_attributes::KnownAttribute;
+use move_compiler::{
+    compiled_unit::{
+        AnnotatedCompiledModule, AnnotatedCompiledScript, AnnotatedCompiledUnit, CompiledUnit,
+        FunctionInfo,
+    },
+    diagnostics::FilesSourceText,
+    shared::{known_attributes::KnownAttribute, unique_map::UniqueMap},
+};
 use move_model::{model::GlobalEnv, PackageInfo};
 use move_stackless_bytecode::function_target_pipeline::{
     FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant,
 };
+use move_symbol_pool::Symbol;
 pub use options::*;
 use std::{collections::BTreeSet, path::Path};
 
 /// Run Move compiler and print errors to stderr.
 pub fn run_move_compiler_to_stderr(
     options: Options,
-) -> anyhow::Result<(Vec<CompiledModule>, Vec<CompiledScript>)> {
+) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)> {
     let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
     run_move_compiler(&mut error_writer, options)
 }
@@ -33,7 +40,7 @@ pub fn run_move_compiler_to_stderr(
 pub fn run_move_compiler(
     error_writer: &mut impl WriteColor,
     options: Options,
-) -> anyhow::Result<(Vec<CompiledModule>, Vec<CompiledScript>)> {
+) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)> {
     // Run context check.
     let env = run_checker(options.clone())?;
     check_errors(&env, error_writer, "checking errors")?;
@@ -60,7 +67,8 @@ pub fn run_move_compiler(
     }
     let modules_and_scripts = run_file_format_gen(&env, &targets);
     check_errors(&env, error_writer, "assembling errors")?;
-    Ok(modules_and_scripts)
+    let annotated = annotate_units(&env, modules_and_scripts);
+    Ok((env, annotated))
 }
 
 /// Run the type checker and return the global env (with errors if encountered). The result
@@ -117,10 +125,7 @@ pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
     targets
 }
 
-pub fn run_file_format_gen(
-    env: &GlobalEnv,
-    targets: &FunctionTargetsHolder,
-) -> (Vec<FF::CompiledModule>, Vec<FF::CompiledScript>) {
+pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> Vec<CompiledUnit> {
     file_format_generator::generate_file_format(env, targets)
 }
 
@@ -144,4 +149,48 @@ pub fn check_errors<W: WriteColor>(
     } else {
         Ok(())
     }
+}
+
+/// Annotate the given compiled units.
+/// TODO: this currently only fills in defaults. The annotations are only used in
+/// the prover, and compiler v2 is not yet connected to the prover.
+pub fn annotate_units(env: &GlobalEnv, units: Vec<CompiledUnit>) -> Vec<AnnotatedCompiledUnit> {
+    let loc = env.unknown_move_ir_loc();
+    units
+        .into_iter()
+        .map(|u| match u {
+            CompiledUnit::Module(named_module) => {
+                AnnotatedCompiledUnit::Module(AnnotatedCompiledModule {
+                    loc,
+                    module_name_loc: loc,
+                    address_name: None,
+                    named_module,
+                    function_infos: UniqueMap::new(),
+                })
+            },
+            CompiledUnit::Script(named_script) => {
+                AnnotatedCompiledUnit::Script(AnnotatedCompiledScript {
+                    loc,
+                    named_script,
+                    function_info: FunctionInfo {
+                        spec_info: Default::default(),
+                    },
+                })
+            },
+        })
+        .collect()
+}
+
+/// Computes the `FilesSourceText` from the global environment, which maps IR loc file hashes
+/// into files and sources. This value is used for the package system only.
+pub fn make_files_source_text(env: &GlobalEnv) -> FilesSourceText {
+    let mut result = FilesSourceText::new();
+    for fid in env.get_source_file_ids() {
+        if let Some(hash) = env.get_file_hash(fid) {
+            let file_name = Symbol::from(env.get_file(fid).to_string_lossy().to_string());
+            let file_content = env.get_file_source(fid).to_owned();
+            result.insert(hash, (file_name, file_content));
+        }
+    }
+    result
 }

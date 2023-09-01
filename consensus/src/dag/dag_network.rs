@@ -25,7 +25,7 @@ pub trait RpcHandler {
 }
 
 #[async_trait]
-pub trait DAGNetworkSender: Send + Sync + RBNetworkSender<DAGMessage> {
+pub trait TDAGNetworkSender: Send + Sync + RBNetworkSender<DAGMessage> {
     async fn send_rpc(
         &self,
         receiver: Author,
@@ -80,7 +80,7 @@ pub struct RpcWithFallback {
     futures: Pin<
         Box<FuturesUnordered<Pin<Box<dyn Future<Output = anyhow::Result<DAGMessage>> + Send>>>>,
     >,
-    sender: Arc<dyn DAGNetworkSender>,
+    sender: Arc<dyn TDAGNetworkSender>,
     interval: Pin<Box<Interval>>,
 }
 
@@ -90,7 +90,7 @@ impl RpcWithFallback {
         message: DAGMessage,
         retry_interval: Duration,
         rpc_timeout: Duration,
-        sender: Arc<dyn DAGNetworkSender>,
+        sender: Arc<dyn TDAGNetworkSender>,
         time_service: TimeService,
     ) -> Self {
         Self {
@@ -107,7 +107,7 @@ impl RpcWithFallback {
 }
 
 async fn send_rpc(
-    sender: Arc<dyn DAGNetworkSender>,
+    sender: Arc<dyn TDAGNetworkSender>,
     peer: Author,
     message: DAGMessage,
     timeout: Duration,

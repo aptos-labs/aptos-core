@@ -44,6 +44,7 @@ pub use logger_config::*;
 pub use mempool_config::*;
 pub use network_config::*;
 pub use node_config::*;
+pub use node_config_loader::sanitize_node_config;
 pub use peer_monitoring_config::*;
 pub use persistable_config::*;
 pub use quorum_store_config::*;

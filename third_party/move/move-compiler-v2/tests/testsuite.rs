@@ -5,6 +5,7 @@
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use move_binary_format::{binary_views::BinaryIndexedView, file_format as FF};
 use move_command_line_common::files::FileHash;
+use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
     pipeline::livevar_analysis_processor::LiveVarAnalysisProcessor, run_file_format_gen, Options,
 };
@@ -163,13 +164,15 @@ impl TestConfig {
                 );
                 let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
                 if ok && self.generate_file_format {
-                    let (mods, _) = run_file_format_gen(&env, &targets);
+                    let units = run_file_format_gen(&env, &targets);
                     let out = &mut test_output.borrow_mut();
                     out.push_str("\n============ disassembled file-format ==================\n");
                     Self::check_diags(out, &env);
-                    for compiled_mod in mods {
-                        let cont = Self::disassemble(&compiled_mod)?;
-                        out.push_str(&cont)
+                    for compiled_unit in units {
+                        if let CompiledUnit::Module(compiled_mod) = compiled_unit {
+                            let cont = Self::disassemble(&compiled_mod.module)?;
+                            out.push_str(&cont)
+                        }
                     }
                 }
             }

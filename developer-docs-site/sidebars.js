@@ -216,7 +216,7 @@ const sidebars = {
         "standards/aptos-object",
         "standards/aptos-coin",
         "standards/fungible-asset",
-        "standards/aptos-token-v2",
+        "standards/digital-asset",
         "standards/aptos-token",
         "standards/wallets",
       ],
@@ -229,7 +229,6 @@ const sidebars = {
       collapsed: true,
       items: [
         "integration/aptos-apis",
-        "integration/indexing",
         {
           type: "category",
           label: "Integrate with Wallets",
@@ -277,6 +276,7 @@ const sidebars = {
               ],
             },
             "tools/aptos-cli/use-cli/use-aptos-cli",
+            "tools/aptos-cli/use-cli/use-aptos-ledger",
           ],
         },
         {
@@ -327,12 +327,7 @@ const sidebars = {
         slug: "/category/nft",
         keywords: ["nft"],
       },
-      items: [
-        "guides/nfts/aptos-token-comparison",
-        "guides/nfts/mint-nft-cli",
-        "guides/nfts/mint-onchain-data",
-        "guides/nfts/nft-minting-tool",
-      ],
+      items: ["guides/nfts/aptos-token-comparison", "guides/nfts/mint-nft-cli", "guides/nfts/mint-onchain-data"],
     },
     {
       type: "category",
@@ -389,6 +384,55 @@ const sidebars = {
           ],
         },
         "guides/transaction-management",
+        {
+          type: "category",
+          label: "Learn about the Aptos Indexer",
+          collapsible: true,
+          collapsed: true,
+          link: { type: "doc", id: "indexer/indexer-landing" },
+          items: [
+            {
+              type: "category",
+              label: "Indexer API",
+              link: { type: "doc", id: "indexer/api/index" },
+              collapsible: true,
+              collapsed: true,
+              items: ["indexer/api/labs-hosted", "indexer/api/self-hosted", "indexer/api/example-queries"],
+            },
+            {
+              type: "category",
+              label: "Custom Processors",
+              link: { type: "doc", id: "indexer/custom-processors/index" },
+              collapsible: true,
+              collapsed: true,
+              items: ["indexer/custom-processors/e2e-tutorial", "indexer/custom-processors/parsing-txns"],
+            },
+            {
+              type: "category",
+              label: "Transaction Stream Service",
+              link: { type: "doc", id: "indexer/txn-stream/index" },
+              collapsible: true,
+              collapsed: true,
+              items: [
+                "indexer/txn-stream/labs-hosted",
+                "indexer/txn-stream/self-hosted",
+                "indexer/txn-stream/local-development",
+              ],
+            },
+            {
+              type: "category",
+              label: "Legacy Indexer",
+              link: { type: "doc", id: "indexer/legacy/index" },
+              collapsible: true,
+              collapsed: true,
+              items: [
+                "indexer/legacy/indexer-fullnode",
+                "indexer/legacy/custom-data-model",
+                "indexer/legacy/migration",
+              ],
+            },
+          ],
+        },
       ],
     },
   ],
@@ -453,7 +497,6 @@ const sidebars = {
         "nodes/full-node/run-a-fullnode-on-gcp",
       ],
     },
-    "nodes/indexer-fullnode",
     {
       type: "category",
       label: "Monitor Nodes",

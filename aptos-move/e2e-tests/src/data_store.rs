@@ -7,13 +7,11 @@
 use crate::account::AccountData;
 use anyhow::Result;
 use aptos_state_view::{in_memory_state_view::InMemoryStateView, TStateView};
-use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
     account_config::CoinInfoResource,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-        table::TableHandle as AptosTableHandle,
     },
     transaction::ChangeSet,
     write_set::{TransactionWrite, WriteSet},
@@ -132,17 +130,5 @@ impl TStateView for FakeDataStore {
 
     fn as_in_memory_state_view(&self) -> InMemoryStateView {
         InMemoryStateView::new(self.state_data.clone())
-    }
-}
-
-// This is used by aggregator tests.
-impl TableResolver for FakeDataStore {
-    fn resolve_table_entry(
-        &self,
-        handle: &TableHandle,
-        key: &[u8],
-    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
-        let state_key = StateKey::table_item(AptosTableHandle::from(*handle), key.to_vec());
-        self.get_state_value_bytes(&state_key)
     }
 }

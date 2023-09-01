@@ -4,7 +4,7 @@ module 0x42::tuple_invalid {
         f: u64,
     }
     private fun tuple(x: u64) {
-        Tuple(x, pack tuple_invalid::S(Add(x, 1)))
+        Tuple(x, pack tuple_invalid::S(Add<u64>(x, 1)))
     }
     private fun use_tuple1(x: u64) {
         {

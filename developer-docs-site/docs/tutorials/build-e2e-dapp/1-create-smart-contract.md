@@ -98,7 +98,7 @@ Before jumping into writing code, let’s first understand what we want our smar
 3. Let an account mark their task as completed.
 
 :::tip
-Creating an event is not mandatory yet useful if dapps/users want to monitor data, such as how many people create a new task, using the [Aptos Indexer](../../integration/indexing.md).
+Creating an event is not mandatory yet useful if dapps/users want to monitor data, such as how many people create a new task, using the [Aptos Indexer](../../indexer/indexer-landing.md).
 :::
 
 We can start with defining a `TodoList` struct, that holds the:
@@ -163,7 +163,7 @@ Let’s try to compile what we have now:
 
 **Seeing errors?!** Let’s understand them.
 
-We have some errors on `Unbound type`- this is happening because we used some types but never imported them, and the compiler doesnt know where to get them from.
+We have some errors on `Unbound type`- this is happening because we used some types but never imported them, and the compiler doesn't know where to get them from.
 
 3. On the top of the module, import those types by adding:
 
@@ -497,7 +497,7 @@ Additionally, the function itself now accepts a signer argument.
 
 **Let’s understand our tests.**
 
-Since our tests runs outside of an account scope, we need to _create_ accounts to use in our tests. The `#[test]` annotation gives us the option to declare those accounts. We use an `admin` account and set it to a random account address (`@0x123`). The function accepts this signer (account) and creates it by using a built-in function to create an account for test.
+Since our tests run outside of an account scope, we need to _create_ accounts to use in our tests. The `#[test]` annotation gives us the option to declare those accounts. We use an `admin` account and set it to a random account address (`@0x123`). The function accepts this signer (account) and creates it by using a built-in function to create an account for test.
 
 Then we simply go through the flow by:
 
@@ -581,7 +581,7 @@ use std::string; // add this
 2. Run: `aptos move test` and `aptos move compile` - all should work without errors.
 3. Run: `aptos move publish`
 4. Enter `yes` in the prompt.
-5. That will compile, simulate and finally publish you module into devnet. You should see a success message:
+5. That will compile, simulate and finally publish your module into devnet. You should see a success message:
 
 ```rust
 {

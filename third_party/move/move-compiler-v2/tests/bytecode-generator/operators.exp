@@ -1,10 +1,10 @@
 // ---- Model Dump
 module 0x42::operators {
     private fun arithm(x: u64,y: u64) {
-        Add(x, Mod(Mul(Div(y, Sub(x, y)), y), x))
+        Add<u64>(x, Mod<u64>(Mul<u64>(Div<u64>(y, Sub<u64>(x, y)), y), x))
     }
     private fun bits(x: u64,y: u8) {
-        BitAnd(Shl(x, y), x)
+        BitAnd<u64>(Shl<u64>(x, y), x)
     }
     private fun bools(x: bool,y: bool) {
         Or(Or(Or(And(x, y), And(x, Not(y))), And(Not(x), y)), And(Not(x), Not(y)))
@@ -16,7 +16,7 @@ module 0x42::operators {
         Neq<T>(x, y)
     }
     private fun order(x: u64,y: u64) {
-        And(And(And(Lt(x, y), Le(x, y)), Not(Gt(x, y))), Not(Ge(x, y)))
+        And(And(And(Lt<u64>(x, y), Le<u64>(x, y)), Not(Gt<u64>(x, y))), Not(Ge<u64>(x, y)))
     }
 } // end 0x42::operators
 
