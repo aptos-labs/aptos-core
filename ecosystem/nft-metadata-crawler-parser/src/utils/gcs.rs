@@ -25,6 +25,7 @@ pub async fn write_json_to_gcs(
     json: Value,
     client: &Client,
 ) -> anyhow::Result<String> {
+    GCS_UPLOAD_INVOCATION_COUNT.inc();
     let filename = format!("cdn/{}.json", id);
     let json_string = json.to_string();
     let json_bytes = json_string.into_bytes();
