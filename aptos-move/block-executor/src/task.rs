@@ -11,6 +11,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
+use bytes::Bytes;
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -73,7 +74,7 @@ pub trait ExecutorTask: Sync {
         &self,
         view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
         key: &<Self::Txn as Transaction>::Key,
-        maybe_blob: Option<Vec<u8>>,
+        maybe_blob: Option<Bytes>,
         creation: bool,
     ) -> anyhow::Result<<Self::Txn as Transaction>::Value>;
 }

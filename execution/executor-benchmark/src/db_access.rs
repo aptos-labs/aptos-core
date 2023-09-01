@@ -124,7 +124,7 @@ impl DbAccessUtil {
     ) -> Result<Option<T>> {
         let value = state_view
             .get_state_value_bytes(state_key)?
-            .map(move |value| bcs::from_bytes(value.as_slice()));
+            .map(move |value| bcs::from_bytes(&value));
         value.transpose().map_err(anyhow::Error::msg)
     }
 

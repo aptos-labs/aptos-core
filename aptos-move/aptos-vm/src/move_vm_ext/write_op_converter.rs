@@ -8,6 +8,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     write_set::WriteOp,
 };
+use bytes::Bytes;
 use move_core_types::{
     effects::Op as MoveStorageOp,
     vm_status::{err_msg, StatusCode, VMStatus},
@@ -41,7 +42,7 @@ impl<'r> WriteOpConverter<'r> {
     pub(crate) fn convert(
         &self,
         state_key: &StateKey,
-        move_storage_op: MoveStorageOp<Vec<u8>>,
+        move_storage_op: MoveStorageOp<Bytes>,
         legacy_creation_as_modification: bool,
     ) -> Result<WriteOp, VMStatus> {
         use MoveStorageOp::*;
@@ -112,7 +113,7 @@ impl<'r> WriteOpConverter<'r> {
             .remote
             .get_state_value_metadata(state_key)
             .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
-        let data = serialize(&value);
+        let data = serialize(&value).into();
 
         let op = match maybe_existing_metadata {
             None => {

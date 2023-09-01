@@ -154,7 +154,7 @@ mod test {
     }
 
     fn write(v: u128) -> WriteOp {
-        WriteOp::Modification(serialize(&v))
+        WriteOp::Modification(serialize(&v).into())
     }
 
     fn read(view: &ChangeSetStateView, s: impl ToString) -> u128 {

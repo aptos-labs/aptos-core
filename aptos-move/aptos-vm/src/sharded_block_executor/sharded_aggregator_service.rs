@@ -18,7 +18,7 @@ pub fn get_state_value<S: StateView, T: DeserializeOwned>(
     let value = state_view
         .get_state_value_bytes(state_key)
         .ok()?
-        .map(move |value| bcs::from_bytes(value.as_slice()));
+        .map(move |value| bcs::from_bytes(&value));
     value.transpose().map_err(anyhow::Error::msg).unwrap()
 }
 

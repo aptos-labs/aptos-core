@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata};
+use bytes::Bytes;
 use move_core_types::language_storage::StructTag;
 
 /// Allows to query storage metadata in the VM session. Needed for storage refunds.
@@ -26,7 +27,7 @@ pub trait TResourceGroupResolver {
         key: &Self::Key,
         resource_tag: &Self::Tag,
         return_group_size: bool,
-    ) -> anyhow::Result<(Option<Vec<u8>>, Option<usize>)>;
+    ) -> anyhow::Result<(Option<Bytes>, Option<usize>)>;
 
     /// Needed for backwards compatibility with the additional safety mechanism for resource
     /// groups, where the violation of the following invariant causes transaction failure:
