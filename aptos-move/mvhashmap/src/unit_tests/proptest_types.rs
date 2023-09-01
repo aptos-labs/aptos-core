@@ -15,6 +15,7 @@ use aptos_types::{
     executable::ExecutableTestType, state_store::state_value::StateValue,
     write_set::TransactionWrite,
 };
+use bytes::Bytes;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -46,7 +47,7 @@ enum ExpectedOutput<V: Debug + Clone + PartialEq> {
 struct Value<V>(Option<V>);
 
 impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+    fn extract_raw_bytes(&self) -> Option<Bytes> {
         if self.0.is_none() {
             None
         } else {
@@ -56,7 +57,7 @@ impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
             };
 
             bytes.resize(16, 0);
-            Some(bytes)
+            Some(bytes.into())
         }
     }
 

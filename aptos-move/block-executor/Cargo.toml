@@ -24,6 +24,7 @@ aptos-types = { workspace = true }
 aptos-vm-logging = { workspace = true }
 arc-swap = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 claims = { workspace = true }
 criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }

@@ -56,7 +56,7 @@ use std::{
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
-        vec(any::<u8>(), 0..64).prop_map(WriteOp::Modification)
+        vec(any::<u8>(), 0..64).prop_map(|bytes| WriteOp::Modification(bytes.into()))
     }
 
     pub fn deletion_strategy() -> impl Strategy<Value = Self> {
@@ -809,7 +809,7 @@ impl TransactionToCommitGen {
                                 state_key.clone(),
                                 Some(StateValue::new_legacy(Bytes::copy_from_slice(&value))),
                             ),
-                            (state_key, WriteOp::Modification(value)),
+                            (state_key, WriteOp::Modification(value.into())),
                         )
                     })
             })

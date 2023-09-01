@@ -117,11 +117,11 @@ impl NativeExecutor {
         let write_set = vec![
             (
                 sender_account_key,
-                WriteOp::Modification(bcs::to_bytes(&sender_account)?),
+                WriteOp::Modification(bcs::to_bytes(&sender_account)?.into()),
             ),
             (
                 sender_coin_store_key,
-                WriteOp::Modification(bcs::to_bytes(&sender_coin_store)?),
+                WriteOp::Modification(bcs::to_bytes(&sender_coin_store)?.into()),
             ),
             // (
             //     TOTAL_SUPPLY_STATE_KEY.clone(),
@@ -179,7 +179,7 @@ impl NativeExecutor {
 
                 write_set.push((
                     recipient_coin_store_key,
-                    WriteOp::Modification(bcs::to_bytes(&recipient_coin_store)?),
+                    WriteOp::Modification(bcs::to_bytes(&recipient_coin_store)?.into()),
                 ));
             }
         } else {
@@ -215,11 +215,11 @@ impl NativeExecutor {
 
             write_set.push((
                 recipient_account_key,
-                WriteOp::Creation(bcs::to_bytes(&recipient_account)?),
+                WriteOp::Creation(bcs::to_bytes(&recipient_account)?.into()),
             ));
             write_set.push((
                 recipient_coin_store_key,
-                WriteOp::Creation(bcs::to_bytes(&recipient_coin_store)?),
+                WriteOp::Creation(bcs::to_bytes(&recipient_coin_store)?.into()),
             ));
         }
 

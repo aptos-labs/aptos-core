@@ -1193,10 +1193,11 @@ async fn parse_operations_from_write_set(
         },
     };
 
-    let data = match write_op.bytes() {
+    let bytes = match write_op.bytes() {
         Some(bytes) => bytes,
         None => return Ok(vec![]),
     };
+    let data = &bytes;
 
     // Determine operation
     match (
@@ -1525,7 +1526,7 @@ async fn parse_staking_contract_resource_changes(
                             struct_tag.module.as_str(),
                             struct_tag.name.as_str(),
                         ) {
-                            if let Ok(pool) = bcs::from_bytes::<StakePool>(data) {
+                            if let Ok(pool) = bcs::from_bytes::<StakePool>(&data) {
                                 ret = Some((path.address, pool))
                             }
                         }

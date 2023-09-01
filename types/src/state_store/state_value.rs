@@ -163,6 +163,13 @@ impl From<Vec<u8>> for StateValue {
     }
 }
 
+#[cfg(any(test, feature = "fuzzing"))]
+impl From<Bytes> for StateValue {
+    fn from(bytes: Bytes) -> Self {
+        StateValue::new_legacy(bytes)
+    }
+}
+
 impl CryptoHash for StateValue {
     type Hasher = StateValueHasher;
 

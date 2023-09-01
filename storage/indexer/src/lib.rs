@@ -29,6 +29,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use aptos_vm::data_cache::{AsMoveResolver, StorageAdapter};
+use bytes::Bytes;
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
@@ -39,7 +40,6 @@ use std::{
     convert::TryInto,
     sync::{atomic::Ordering, Arc},
 };
-
 #[derive(Debug)]
 pub struct Indexer {
     db: DB,
@@ -154,7 +154,7 @@ struct TableInfoParser<'a> {
     indexer: &'a Indexer,
     annotator: &'a MoveValueAnnotator<'a, StorageAdapter<'a, DbStateView>>,
     result: HashMap<TableHandle, TableInfo>,
-    pending_on: HashMap<TableHandle, Vec<&'a [u8]>>,
+    pending_on: HashMap<TableHandle, Vec<Bytes>>,
 }
 
 impl<'a> TableInfoParser<'a> {
@@ -188,27 +188,27 @@ impl<'a> TableInfoParser<'a> {
         Ok(())
     }
 
-    fn parse_struct(&mut self, struct_tag: StructTag, bytes: &[u8]) -> Result<()> {
+    fn parse_struct(&mut self, struct_tag: StructTag, bytes: Bytes) -> Result<()> {
         self.parse_move_value(
             &self
                 .annotator
-                .view_value(&TypeTag::Struct(Box::new(struct_tag)), bytes)?,
+                .view_value(&TypeTag::Struct(Box::new(struct_tag)), &bytes)?,
         )
     }
 
-    fn parse_resource_group(&mut self, bytes: &[u8]) -> Result<()> {
+    fn parse_resource_group(&mut self, bytes: Bytes) -> Result<()> {
         type ResourceGroup = BTreeMap<StructTag, Vec<u8>>;
 
-        for (struct_tag, bytes) in bcs::from_bytes::<ResourceGroup>(bytes)? {
-            self.parse_struct(struct_tag, &bytes)?;
+        for (struct_tag, bytes) in bcs::from_bytes::<ResourceGroup>(&bytes)? {
+            self.parse_struct(struct_tag, bytes.into())?;
         }
         Ok(())
     }
 
-    fn parse_table_item(&mut self, handle: TableHandle, bytes: &'a [u8]) -> Result<()> {
+    fn parse_table_item(&mut self, handle: TableHandle, bytes: Bytes) -> Result<()> {
         match self.get_table_info(handle)? {
             Some(table_info) => {
-                self.parse_move_value(&self.annotator.view_value(&table_info.value_type, bytes)?)?;
+                self.parse_move_value(&self.annotator.view_value(&table_info.value_type, &bytes)?)?;
             },
             None => {
                 self.pending_on

@@ -456,24 +456,20 @@ impl<'r> WriteOpConverter<'r> {
                     err_msg("When converting write op: Recreating existing value."),
                 ));
             },
-            (None, New(data)) => {
-                let data = data.to_vec();
-                match &self.new_slot_metadata {
-                    None => {
-                        if legacy_creation_as_modification {
-                            Modification(data)
-                        } else {
-                            Creation(data)
-                        }
-                    },
-                    Some(metadata) => CreationWithMetadata {
-                        data,
-                        metadata: metadata.clone(),
-                    },
-                }
+            (None, New(data)) => match &self.new_slot_metadata {
+                None => {
+                    if legacy_creation_as_modification {
+                        Modification(data)
+                    } else {
+                        Creation(data)
+                    }
+                },
+                Some(metadata) => CreationWithMetadata {
+                    data,
+                    metadata: metadata.clone(),
+                },
             },
             (Some(existing_metadata), Modify(data)) => {
-                let data = data.to_vec();
                 // Inherit metadata even if the feature flags is turned off, for compatibility.
                 match existing_metadata {
                     None => Modification(data),
@@ -500,7 +496,7 @@ impl<'r> WriteOpConverter<'r> {
             .remote
             .get_state_value_metadata(state_key)
             .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
-        let data = serialize(&value);
+        let data = serialize(&value).into();
 
         let op = match maybe_existing_metadata {
             None => {

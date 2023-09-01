@@ -22,6 +22,7 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{Features, TimedFeatures},
 };
+#[cfg(feature = "testing")]
 use bytes::Bytes;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]

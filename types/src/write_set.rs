@@ -17,20 +17,17 @@ use std::{
     collections::{btree_map, BTreeMap},
     ops::Deref,
 };
-
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
-    Creation(#[serde(with = "serde_bytes")] Vec<u8>),
-    Modification(#[serde(with = "serde_bytes")] Vec<u8>),
+    Creation(Bytes),
+    Modification(Bytes),
     Deletion,
     CreationWithMetadata {
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
+        data: Bytes,
         metadata: StateValueMetadata,
     },
     ModificationWithMetadata {
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
+        data: Bytes,
         metadata: StateValueMetadata,
     },
     DeletionWithMetadata {
@@ -130,26 +127,14 @@ impl WriteOp {
         Ok(true)
     }
 
-    pub fn into_bytes(self) -> Option<Vec<u8>> {
+    pub fn bytes(&self) -> Option<Bytes> {
         use WriteOp::*;
 
         match self {
             Creation(data)
             | CreationWithMetadata { data, .. }
             | Modification(data)
-            | ModificationWithMetadata { data, .. } => Some(data),
-            Deletion | DeletionWithMetadata { .. } => None,
-        }
-    }
-
-    pub fn bytes(&self) -> Option<&[u8]> {
-        use WriteOp::*;
-
-        match self {
-            Creation(data)
-            | CreationWithMetadata { data, .. }
-            | Modification(data)
-            | ModificationWithMetadata { data, .. } => Some(data),
+            | ModificationWithMetadata { data, .. } => Some(data.clone()),
             Deletion | DeletionWithMetadata { .. } => None,
         }
     }
@@ -167,22 +152,20 @@ impl WriteOp {
 }
 
 pub trait TransactionWrite {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>>;
+    fn extract_raw_bytes(&self) -> Option<Bytes>;
 
     fn as_state_value(&self) -> Option<StateValue>;
 }
 
 impl TransactionWrite for WriteOp {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
-        self.clone().into_bytes()
+    fn extract_raw_bytes(&self) -> Option<Bytes> {
+        self.bytes()
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
         self.bytes().map(|bytes| match self.metadata() {
-            None => StateValue::new_legacy(Bytes::copy_from_slice(bytes)),
-            Some(metadata) => {
-                StateValue::new_with_metadata(Bytes::copy_from_slice(bytes), metadata.clone())
-            },
+            None => StateValue::new_legacy(bytes),
+            Some(metadata) => StateValue::new_with_metadata(bytes, metadata.clone()),
         })
     }
 }

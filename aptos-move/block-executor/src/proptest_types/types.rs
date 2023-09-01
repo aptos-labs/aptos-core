@@ -19,6 +19,7 @@ use aptos_types::{
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
+use bytes::Bytes;
 use claims::assert_ok;
 use move_core_types::language_storage::TypeTag;
 use once_cell::sync::OnceCell;
@@ -35,7 +36,6 @@ use std::{
         Arc,
     },
 };
-
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
 // TODO: extend to delta failures.
 pub(crate) const STORAGE_AGGREGATOR_VALUE: u128 = 100001;
@@ -140,19 +140,18 @@ pub struct ValueType<V: Into<Vec<u8>> + Debug + Clone + Eq + Arbitrary>(
 impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> TransactionWrite
     for ValueType<V>
 {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+    fn extract_raw_bytes(&self) -> Option<Bytes> {
         if self.1 {
             let mut v = self.0.clone().into();
             v.resize(16, 1);
-            Some(v)
+            Some(v.into())
         } else {
             None
         }
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
-        self.extract_raw_bytes()
-            .map(|bytes| StateValue::new_legacy(bytes.into()))
+        self.extract_raw_bytes().map(StateValue::new_legacy)
     }
 }
 
