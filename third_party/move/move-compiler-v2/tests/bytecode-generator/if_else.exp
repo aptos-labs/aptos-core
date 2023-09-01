@@ -2,20 +2,20 @@
 module 0x42::if_else {
     private fun if_else(cond: bool,x: u64) {
         if cond {
-          Add(x, 1)
+          Add<u64>(x, 1)
         } else {
-          Sub(x, 1)
+          Sub<u64>(x, 1)
         }
     }
     private fun if_else_nested(cond: bool,x: u64) {
-        if Gt(if cond {
-          Add(x, 1)
+        if Gt<u64>(if cond {
+          Add<u64>(x, 1)
         } else {
-          Sub(x, 1)
+          Sub<u64>(x, 1)
         }, 10) {
-          Mul(x, 2)
+          Mul<u64>(x, 2)
         } else {
-          Div(x, 2)
+          Div<u64>(x, 2)
         }
     }
 } // end 0x42::if_else

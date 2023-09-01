@@ -31,10 +31,10 @@ error: no function named `X::f_private` found
    │         ^^^^^^^^^^^^^^^^^^^^
 
 error: invalid call of `move_to`: expected `&signer` but found `signer` for argument 1
-   ┌─ tests/checking/typing/constant_unsupported_exps.move:30:9
+   ┌─ tests/checking/typing/constant_unsupported_exps.move:30:17
    │
 30 │         move_to(s, R{});
-   │         ^^^^^^^^^^^^^^^
+   │                 ^
 
 error: The type argument to `exists` and `global` must be a struct type but `?25` is not
    ┌─ tests/checking/typing/constant_unsupported_exps.move:31:15

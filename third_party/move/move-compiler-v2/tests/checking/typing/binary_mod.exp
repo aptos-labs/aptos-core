@@ -4,17 +4,17 @@ module 0x8675309::M {
         f: u64,
     }
     private fun t0(x: u64,r: M::R) {
-        Mod(0, 0);
-        Mod(1, 0);
-        Mod(0, 1);
-        Mod(0, 1);
-        Mod(0, 1);
-        Mod(0, 1);
-        Mod(0, 1);
-        Mod(0, 1);
-        Mod(x, x);
-        Mod(select M::R.f(r), select M::R.f(r));
-        Mod(Mod(Mod(1, select M::R.f(r)), select M::R.f(r)), 0);
+        Mod<u64>(0, 0);
+        Mod<u64>(1, 0);
+        Mod<u64>(0, 1);
+        Mod<u8>(0, 1);
+        Mod<u8>(0, 1);
+        Mod<u128>(0, 1);
+        Mod<u128>(0, 1);
+        Mod<u64>(0, 1);
+        Mod<u64>(x, x);
+        Mod<u64>(select M::R.f(r), select M::R.f(r));
+        Mod<u64>(Mod<u64>(Mod<u64>(1, select M::R.f(r)), select M::R.f(r)), 0);
         {
           let M::R{ f: _ } = r;
           Tuple()

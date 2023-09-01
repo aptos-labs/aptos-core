@@ -4,17 +4,17 @@ module 0x8675309::M {
         f: u64,
     }
     private fun t0(x: u64,r: M::R) {
-        Le(0, 0);
-        Le(1, 0);
-        Le(0, 1);
-        Le(0, 1);
-        Le(0, 1);
-        Le(0, 1);
-        Le(0, 1);
-        Le(0, 1);
-        Le(x, x);
-        Le(select M::R.f(r), select M::R.f(r));
-        And(Le(1, select M::R.f(r)), Le(select M::R.f(r), 0));
+        Le<u64>(0, 0);
+        Le<u64>(1, 0);
+        Le<u64>(0, 1);
+        Le<u8>(0, 1);
+        Le<u8>(0, 1);
+        Le<u128>(0, 1);
+        Le<u128>(0, 1);
+        Le<u64>(0, 1);
+        Le<u64>(x, x);
+        Le<u64>(select M::R.f(r), select M::R.f(r));
+        And(Le<u64>(1, select M::R.f(r)), Le<u64>(select M::R.f(r), 0));
         {
           let M::R{ f: _ } = r;
           Tuple()

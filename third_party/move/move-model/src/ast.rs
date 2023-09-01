@@ -1209,7 +1209,7 @@ impl Operation {
         )
     }
 
-    /// Whether the operation alllows to take reference parameters instead of values. This applies
+    /// Whether the operation allows to take reference parameters instead of values. This applies
     /// currently to equality which can be used on `(T, T)`, `(T, &T)`, etc.
     pub fn allows_ref_param_for_value(&self) -> bool {
         matches!(self, Operation::Eq | Operation::Neq)

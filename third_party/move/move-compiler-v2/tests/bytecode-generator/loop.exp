@@ -2,17 +2,17 @@
 module 0x42::loops {
     private fun nested_loop(x: u64) {
         loop {
-          if Gt(x, 0) {
+          if Gt<u64>(x, 0) {
             loop {
-              if Gt(x, 10) {
-                x: u64 = Sub(x, 1);
+              if Gt<u64>(x, 10) {
+                x: u64 = Sub<u64>(x, 1);
                 break;
                 Tuple()
               } else {
                 break
               }
             };
-            x: u64 = Sub(x, 1);
+            x: u64 = Sub<u64>(x, 1);
             continue;
             Tuple()
           } else {
@@ -23,8 +23,8 @@ module 0x42::loops {
     }
     private fun while_loop(x: u64) {
         loop {
-          if Gt(x, 0) {
-            x: u64 = Sub(x, 1);
+          if Gt<u64>(x, 0) {
+            x: u64 = Sub<u64>(x, 1);
             Tuple()
           } else {
             break
@@ -34,7 +34,7 @@ module 0x42::loops {
     }
     private fun while_loop_with_break_and_continue(x: u64) {
         loop {
-          if Gt(x, 0) {
+          if Gt<u64>(x, 0) {
             if Eq<u64>(x, 42) {
               break
             } else {
@@ -45,7 +45,7 @@ module 0x42::loops {
             } else {
               Tuple()
             };
-            x: u64 = Sub(x, 1);
+            x: u64 = Sub<u64>(x, 1);
             Tuple()
           } else {
             break

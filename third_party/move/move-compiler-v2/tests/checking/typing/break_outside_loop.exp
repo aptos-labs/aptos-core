@@ -5,7 +5,7 @@ module 0x8675309::M {
         Tuple()
     }
     private fun baz(x: u64) {
-        if Ge(x, 5) {
+        if Ge<u64>(x, 5) {
           break
         } else {
           Tuple()
