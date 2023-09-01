@@ -41,7 +41,7 @@ jobs:
           mv "$TARNAME" ../../
 
       - name: Upload Binary
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
+        uses: actions/upload-artifact@v3
         with:
           name: aptos-node-${{ matrix.os }}
           path: aptos-node-*.tgz
