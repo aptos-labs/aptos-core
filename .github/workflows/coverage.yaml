@@ -64,10 +64,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # pin@v3
+      - uses: actions/download-artifact@v3
         with:
           name: lcov_unit
-      - uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # pin@v3
+      - uses: actions/download-artifact@v3
         with:
           name: lcov_smoke
       - name: Upload coverage to Codecov

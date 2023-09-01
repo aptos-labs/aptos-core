@@ -97,7 +97,7 @@ jobs:
     if: ${{ inputs.dry_run }} == 'false'
     steps:
       - name: Download prebuilt binaries
-        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # pin@v3
+        uses: actions/download-artifact@v3
         with:
           name: cli-builds
       - name: Create GitHub Release
