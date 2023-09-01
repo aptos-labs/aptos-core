@@ -30,6 +30,7 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
+bytes = { workspace = true }
 move-core-types = { workspace = true }
 move-resource-viewer = { workspace = true }
 num-derive = { workspace = true }

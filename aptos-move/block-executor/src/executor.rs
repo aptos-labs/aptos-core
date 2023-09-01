@@ -396,7 +396,7 @@ where
                 });
 
             // Must contain committed value as we set the base value above.
-            delta_writes.push((k, WriteOp::Modification(serialize(&committed_delta))));
+            delta_writes.push((k, WriteOp::Modification(serialize(&committed_delta).into())));
         }
         last_input_output.record_delta_writes(txn_idx, delta_writes);
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {

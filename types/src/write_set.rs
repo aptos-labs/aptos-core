@@ -11,6 +11,7 @@ use crate::state_store::{
 };
 use anyhow::{bail, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use bytes::Bytes;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -31,19 +32,18 @@ pub static TOTAL_SUPPLY_STATE_KEY: Lazy<StateKey> = Lazy::new(|| {
         ],
     )
 });
+
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
-    Creation(#[serde(with = "serde_bytes")] Vec<u8>),
-    Modification(#[serde(with = "serde_bytes")] Vec<u8>),
+    Creation(Bytes),
+    Modification(Bytes),
     Deletion,
     CreationWithMetadata {
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
+        data: Bytes,
         metadata: StateValueMetadata,
     },
     ModificationWithMetadata {
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
+        data: Bytes,
         metadata: StateValueMetadata,
     },
     DeletionWithMetadata {
@@ -143,19 +143,7 @@ impl WriteOp {
         Ok(true)
     }
 
-    pub fn into_bytes(self) -> Option<Vec<u8>> {
-        use WriteOp::*;
-
-        match self {
-            Creation(data)
-            | CreationWithMetadata { data, .. }
-            | Modification(data)
-            | ModificationWithMetadata { data, .. } => Some(data),
-            Deletion | DeletionWithMetadata { .. } => None,
-        }
-    }
-
-    pub fn bytes(&self) -> Option<&[u8]> {
+    pub fn bytes(&self) -> Option<&Bytes> {
         use WriteOp::*;
 
         match self {
@@ -180,20 +168,20 @@ impl WriteOp {
 }
 
 pub trait TransactionWrite {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>>;
+    fn extract_raw_bytes(&self) -> Option<Bytes>;
 
     fn as_state_value(&self) -> Option<StateValue>;
 }
 
 impl TransactionWrite for WriteOp {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
-        self.clone().into_bytes()
+    fn extract_raw_bytes(&self) -> Option<Bytes> {
+        self.bytes().cloned()
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
         self.bytes().map(|bytes| match self.metadata() {
-            None => StateValue::new_legacy(bytes.to_vec()),
-            Some(metadata) => StateValue::new_with_metadata(bytes.to_vec(), metadata.clone()),
+            None => StateValue::new_legacy(bytes.clone()),
+            Some(metadata) => StateValue::new_with_metadata(bytes.clone(), metadata.clone()),
         })
     }
 }
@@ -308,7 +296,7 @@ impl WriteSetV0 {
             .0
             .get(&TOTAL_SUPPLY_STATE_KEY)
             .and_then(|op| op.bytes())
-            .map(bcs::from_bytes);
+            .map(|bytes| bcs::from_bytes::<u128>(bytes));
         value.transpose().map_err(anyhow::Error::msg).unwrap()
     }
 
@@ -322,7 +310,7 @@ impl WriteSetV0 {
             .write_set
             .insert(
                 TOTAL_SUPPLY_STATE_KEY.clone(),
-                WriteOp::Modification(bcs::to_bytes(&value).unwrap())
+                WriteOp::Modification(bcs::to_bytes(&value).unwrap().into())
             )
             .is_some());
     }

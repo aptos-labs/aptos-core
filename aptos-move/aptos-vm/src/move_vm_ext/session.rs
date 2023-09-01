@@ -21,6 +21,7 @@ use aptos_types::{
     state_store::state_key::StateKey, transaction::SignatureCheckedTransaction,
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
+use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -210,7 +211,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         remote: &dyn AptosMoveResolver,
         change_set: MoveChangeSet,
         ap_cache: &mut C,
-    ) -> VMResult<(MoveChangeSet, HashMap<StateKey, MoveStorageOp<Vec<u8>>>)> {
+    ) -> VMResult<(MoveChangeSet, HashMap<StateKey, MoveStorageOp<Bytes>>)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
         let common_error = || {
@@ -280,9 +281,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let op = if source_data.is_empty() {
                     MoveStorageOp::Delete
                 } else if create {
-                    MoveStorageOp::New(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
+                    MoveStorageOp::New(
+                        bcs::to_bytes(&source_data)
+                            .map_err(|_| common_error())?
+                            .into(),
+                    )
                 } else {
-                    MoveStorageOp::Modify(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
+                    MoveStorageOp::Modify(
+                        bcs::to_bytes(&source_data)
+                            .map_err(|_| common_error())?
+                            .into(),
+                    )
                 };
                 resource_group_change_set.insert(state_key, op);
             }
@@ -294,7 +303,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     pub(crate) fn convert_change_set<C: AccessPathCache>(
         woc: &WriteOpConverter,
         change_set: MoveChangeSet,
-        resource_group_change_set: HashMap<StateKey, MoveStorageOp<Vec<u8>>>,
+        resource_group_change_set: HashMap<StateKey, MoveStorageOp<Bytes>>,
         events: Vec<ContractEvent>,
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,

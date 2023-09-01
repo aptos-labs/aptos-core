@@ -35,6 +35,7 @@ aptos-vm-genesis = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 goldenfile = { workspace = true }
 hex = { workspace = true }
 move-binary-format = { workspace = true }

@@ -15,6 +15,7 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use bytes::Bytes;
 use move_core_types::{
     effects::Op as MoveStorageOp,
     ident_str,
@@ -119,7 +120,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         &self,
         view: &impl StateView,
         key: &StateKey,
-        maybe_blob: Option<Vec<u8>>,
+        maybe_blob: Option<Bytes>,
         creation: bool,
     ) -> anyhow::Result<WriteOp> {
         let storage_adapter = self.vm.as_move_resolver(view);

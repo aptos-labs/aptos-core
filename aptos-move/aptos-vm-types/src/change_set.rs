@@ -259,7 +259,7 @@ impl VMChangeSet {
                         let value = additional_delta_op
                             .apply_to(base)
                             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-                        *data = serialize(&value);
+                        *data = serialize(&value).into();
                     },
                     Deletion | DeletionWithMetadata { .. } => {
                         // This case (applying a delta to deleted item) should
