@@ -77,7 +77,7 @@ pub enum SchedulerTask {
 /// just notify the suspended execution via the dependency condition variable.
 ///
 /// 'Executing' status of an incarnation turns into 'Executed' if the execution task finishes, or
-/// if a dependency is encountered, it becomes 'Ready(incarnation + 1)' once the
+/// if a dependency is encountered, it becomes 'Ready(incarnation)' once the
 /// dependency is resolved. An 'Executed' status allows creation of validation tasks for the
 /// corresponding incarnation, and a validation failure leads to an abort. The scheduler ensures
 /// that there is exactly one abort, changing the status to 'Aborting' in the process. Once the
