@@ -10,7 +10,7 @@ module 0x8675309::M {
     private fun t0() {
         loop {
           if true {
-            Add(0, continue);
+            Add<u64>(0, continue);
             Tuple()
           } else {
             break

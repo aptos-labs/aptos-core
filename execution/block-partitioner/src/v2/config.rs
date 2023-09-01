@@ -51,7 +51,7 @@ impl PartitionerV2Config {
 impl Default for PartitionerV2Config {
     fn default() -> Self {
         Self {
-            num_threads: 8,
+            num_threads: 4,
             max_partitioning_rounds: 4,
             cross_shard_dep_avoid_threshold: 0.9,
             dashmap_num_shards: 64,

@@ -17,7 +17,7 @@ module 0x42::assign {
     }
     private fun assign_pattern(s: assign::S,f: u64,h: u64) {
         assign::S{ f: f: u64, g: assign::T{ h: h: u64 } } = s;
-        Add(f, h)
+        Add<u64>(f, h)
     }
     private fun assign_struct(s: &mut assign::S) {
         s = pack assign::S(42, pack assign::T(42));

@@ -8,7 +8,7 @@ module 0x8675309::M {
         Tuple()
     }
     private fun t0() {
-        Add(0, return Tuple());
+        Add<u64>(0, return Tuple());
         Tuple()
     }
     private fun t1() {

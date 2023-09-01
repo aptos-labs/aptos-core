@@ -198,10 +198,19 @@ proptest! {
                 });
             }
         });
+        // order produced by process_all
+        let dag = Arc::new(RwLock::new(dag.clone()));
+        let (mut order_rule, mut receiver) = create_order_rule(epoch_state.clone(), dag);
+        order_rule.process_all();
+        let mut ordered = vec![];
+        while let Ok(Some(mut ordered_nodes)) = receiver.try_next() {
+            ordered.append(&mut ordered_nodes);
+        }
         let display = |node: &Arc<CertifiedNode>| {
             (node.metadata().round(), *author_indexes.get(node.metadata().author()).unwrap())
         };
-        let longest: Vec<_> = all_ordered.lock().iter().max_by(|v1, v2| v1.len().cmp(&v2.len())).unwrap().iter().map(display).collect();
+        let longest: Vec<_> = ordered.iter().map(display).collect();
+
         for ordered in all_ordered.lock().iter() {
             let a: Vec<_> = ordered.iter().map(display).collect();
             assert_eq!(a, longest[..a.len()]);

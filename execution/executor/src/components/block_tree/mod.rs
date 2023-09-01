@@ -15,6 +15,7 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_consensus_types::block::Block as ConsensusBlock;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{execution_output::ExecutionOutput, Error, LedgerUpdateOutput};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
 use aptos_storage_interface::DbReader;
@@ -285,7 +286,7 @@ impl BlockTree {
         // This should be the last reference to old root, spawning a drop to a different thread
         // guarantees that the drop will not happen in the current thread
         let (tx, rx) = channel::<()>();
-        rayon::spawn(move || {
+        THREAD_MANAGER.get_non_exe_cpu_pool().spawn(move || {
             let _timeer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                 .with_label_values(&["drop_old_root"])
                 .start_timer();

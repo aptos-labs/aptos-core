@@ -5,16 +5,16 @@ module 0x8675309::M {
         b: u8,
     }
     private fun t0(x: u64,b: u8,r: M::R) {
-        Shl(0, 0);
-        Shl(1, 0);
-        Shl(0, 1);
-        Shl(0, 1);
-        Add(0, 1);
-        Shl(0, 1);
-        Shl(0, 1);
-        Shl(x, b);
-        Shl(select M::R.f(r), select M::R.b(r));
-        Shl(Shl(Shl(1, select M::R.b(r)), select M::R.b(r)), 0);
+        Shl<u64>(0, 0);
+        Shl<u64>(1, 0);
+        Shl<u64>(0, 1);
+        Shl<u64>(0, 1);
+        Add<u8>(0, 1);
+        Shl<u128>(0, 1);
+        Shl<u64>(0, 1);
+        Shl<u64>(x, b);
+        Shl<u64>(select M::R.f(r), select M::R.b(r));
+        Shl<u64>(Shl<u64>(Shl<u64>(1, select M::R.b(r)), select M::R.b(r)), 0);
         M::R{ f: _, b: _ } = r
     }
 } // end 0x8675309::M

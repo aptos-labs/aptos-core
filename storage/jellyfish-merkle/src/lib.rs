@@ -86,6 +86,7 @@ pub mod test_helper;
 use crate::metrics::{APTOS_JELLYFISH_LEAF_COUNT, APTOS_JELLYFISH_LEAF_DELETION_COUNT};
 use anyhow::{bail, ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleProofExt, SparseMerkleRangeProof},
@@ -94,12 +95,11 @@ use aptos_types::{
 };
 use arr_macro::arr;
 use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey, NodeType};
-use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::arbitrary::Arbitrary;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
-use rayon::{prelude::*, ThreadPool, ThreadPoolBuilder};
+use rayon::prelude::*;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -109,18 +109,9 @@ use std::{
 use thiserror::Error;
 
 const MAX_PARALLELIZABLE_DEPTH: usize = 2;
-const NUM_IO_THREADS: usize = 32;
 
 // Assumes 16 shards here.
 const MIN_LEAF_DEPTH: usize = 1;
-
-pub static IO_POOL: Lazy<ThreadPool> = Lazy::new(|| {
-    ThreadPoolBuilder::new()
-        .num_threads(NUM_IO_THREADS)
-        .thread_name(|index| format!("jmt-io-{}", index))
-        .build()
-        .unwrap()
-});
 
 #[derive(Error, Debug)]
 #[error("Missing state root node at version {version}, probably pruned.")]
@@ -397,7 +388,7 @@ where
 
         let mut shard_batch = TreeUpdateBatch::new();
         let shard_root_node_opt = if let Some(persisted_version) = persisted_version {
-            IO_POOL.install(|| {
+            THREAD_MANAGER.get_io_pool().install(|| {
                 self.batch_insert_at(
                     &NodeKey::new(persisted_version, shard_root_nibble_path),
                     version,

@@ -183,6 +183,16 @@ impl Batch {
         Ok(())
     }
 
+    /// Verify the batch, and that it matches the requested digest
+    pub fn verify_with_digest(&self, requested_digest: HashValue) -> anyhow::Result<()> {
+        ensure!(
+            requested_digest == *self.digest(),
+            "Response digest doesn't match the request"
+        );
+        self.verify()?;
+        Ok(())
+    }
+
     pub fn into_transactions(self) -> Vec<SignedTransaction> {
         self.payload.txns
     }

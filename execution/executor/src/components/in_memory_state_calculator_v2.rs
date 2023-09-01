@@ -5,6 +5,7 @@ use crate::metrics::APTOS_EXECUTOR_OTHER_TIMERS_SECONDS;
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_executor_types::{ParsedTransactionOutput, ProofReader};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     cached_state_view::{ShardedStateCache, StateCache},
@@ -102,7 +103,7 @@ impl InMemoryStateCalculatorV2 {
         let StateCache {
             // This makes sure all in-mem nodes seen while proofs were fetched stays in mem during the
             // calculation
-            frozen_base: _,
+            frozen_base,
             sharded_state_cache,
             proofs,
         } = state_cache;
@@ -134,6 +135,10 @@ impl InMemoryStateCalculatorV2 {
             )?;
             (new_checkpoint, new_checkpoint_version)
         };
+
+        THREAD_MANAGER.get_non_exe_cpu_pool().spawn(move || {
+            drop(frozen_base);
+        });
 
         let state_checkpoint_hashes = std::iter::repeat(None)
             .take(num_txns - 1)

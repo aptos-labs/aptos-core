@@ -36,7 +36,7 @@ use std::{
 
 pub mod config;
 mod conflict_detector;
-mod counters;
+pub mod counters;
 mod cross_shard_messages;
 mod dependency_analysis;
 mod dependent_edges;
