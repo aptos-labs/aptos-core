@@ -23,7 +23,7 @@ jobs:
         with:
           ref: ${{ inputs.branch }}
 
-      - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
+      - uses: actions/setup-python@v4
 
       - name: Bump aptos-node version
         uses: aptos-labs/aptos-core/.github/actions/release-aptos-node@main
