@@ -4,8 +4,9 @@
 use crate::natives::{
     aggregator_natives::{
         helpers_v2::{
-            aggregator_info_u128, aggregator_info_u64, aggregator_snapshot_value_as_bytes,
-            aggregator_snapshot_value_as_u128, aggregator_snapshot_value_as_u64, string_to_bytes,
+            aggregator_snapshot_value_as_bytes, aggregator_snapshot_value_as_u128,
+            aggregator_snapshot_value_as_u64, aggregator_value_as_u128, aggregator_value_as_u64,
+            string_to_bytes,
         },
         NativeAggregatorContext,
     },
@@ -27,6 +28,26 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, ops::Deref};
+
+/// The generic type supplied to aggregator snapshots is not supported.
+pub const EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE: u64 = 0x03_0005;
+
+/// The aggregator snapshots feature is not enabled.
+pub const EAGGREGATOR_SNAPSHOTS_NOT_ENABLED: u64 = 0x03_0006;
+
+/// The generic type supplied to the aggregators is not supported.
+pub const EUNSUPPORTED_AGGREGATOR_TYPE: u64 = 0x03_0007;
+
+/// Checks if the type argument `type_arg` is a string type.
+fn is_string_type(context: &SafeNativeContext, type_arg: &Type) -> SafeNativeResult<bool> {
+    let ty = context.deref().type_to_fully_annotated_layout(type_arg)?;
+    if let MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, .. }) = ty {
+        return Ok(type_.name.as_str() == "String"
+            && type_.module.as_str() == "string"
+            && type_.address == AccountAddress::ONE);
+    }
+    Ok(false)
+}
 
 /***************************************************************************************************
  * native fun create_aggregator<Element>(limit: Element): Aggregator<Element>;
@@ -62,10 +83,9 @@ fn native_create_aggregator(
                 Value::u64(limit),
             ]))])
         },
-        _ => Err(PartialVMError::new(StatusCode::ABORTED)
-            .with_message("Unsupported type supplied to aggregator".to_string())
-            .with_sub_status(0x02_0005)
-            .into()),
+        _ => Err(SafeNativeError::Abort {
+            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
+        }),
     }
 }
 
@@ -87,23 +107,22 @@ fn native_try_add(
         Type::U128 => {
             // Get aggregator information and a value to add.
             let value = safely_pop_arg!(args, u128);
-            let (id, limit) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
+            let (id, limit) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
             let aggregator = aggregator_data.get_aggregator(id, limit)?;
             Ok(smallvec![Value::bool(aggregator.try_add(value).is_ok())])
         },
         Type::U64 => {
             // Get aggregator information and a value to add.
             let value = safely_pop_arg!(args, u64);
-            let (id, limit) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
+            let (id, limit) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
             let aggregator = aggregator_data.get_aggregator(id, limit as u128)?;
             Ok(smallvec![Value::bool(
                 aggregator.try_add(value as u128).is_ok()
             )])
         },
-        _ => Err(PartialVMError::new(StatusCode::ABORTED)
-            .with_message("Unsupported type supplied to aggregator".to_string())
-            .with_sub_status(0x02_0005)
-            .into()),
+        _ => Err(SafeNativeError::Abort {
+            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
+        }),
     }
 }
 
@@ -125,23 +144,22 @@ fn native_try_sub(
         Type::U128 => {
             // Get aggregator information and a value to subtract.
             let value = safely_pop_arg!(args, u128);
-            let (id, limit) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
+            let (id, limit) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
             let aggregator = aggregator_data.get_aggregator(id, limit)?;
             Ok(smallvec![Value::bool(aggregator.try_sub(value).is_ok())])
         },
         Type::U64 => {
             // Get aggregator information and a value to subtract.
             let value = safely_pop_arg!(args, u64);
-            let (id, limit) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
+            let (id, limit) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
             let aggregator = aggregator_data.get_aggregator(id, limit as u128)?;
             Ok(smallvec![Value::bool(
                 aggregator.try_sub(value as u128).is_ok()
             )])
         },
-        _ => Err(PartialVMError::new(StatusCode::ABORTED)
-            .with_message("Unsupported type supplied to aggregator".to_string())
-            .with_sub_status(0x02_0005)
-            .into()),
+        _ => Err(SafeNativeError::Abort {
+            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
+        }),
     }
 }
 
@@ -163,13 +181,13 @@ fn native_read(
     match ty_args[0] {
         Type::U128 => {
             // Extract information from aggregator struct reference.
-            let (id, limit) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
+            let (id, limit) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
             let aggregator = aggregator_data.get_aggregator(id, limit)?;
             let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
             Ok(smallvec![Value::u128(value)])
         },
         Type::U64 => {
-            let (id, limit) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
+            let (id, limit) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
             let aggregator = aggregator_data.get_aggregator(id, limit as u128)?;
             let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
             if value > u64::MAX as u128 {
@@ -180,28 +198,10 @@ fn native_read(
             }
             Ok(smallvec![Value::u64(value as u64)])
         },
-        _ => Err(PartialVMError::new(StatusCode::ABORTED)
-            .with_message("Unsupported type supplied to aggregator".to_string())
-            .with_sub_status(0x02_0005)
-            .into()),
+        _ => Err(SafeNativeError::Abort {
+            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
+        }),
     }
-}
-
-/// The generic type supplied to aggregator snapshots is not supported.
-pub const EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE: u64 = 0x03_0005;
-
-/// The aggregator snapshots feature is not enabled.
-pub const EAGGREGATOR_SNAPSHOTS_NOT_ENABLED: u64 = 0x03_0006;
-
-/// Checks if the type argument `type_arg` is a string type.
-fn is_string_type(context: &SafeNativeContext, type_arg: &Type) -> SafeNativeResult<bool> {
-    let ty = context.deref().type_to_fully_annotated_layout(type_arg)?;
-    if let MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, .. }) = ty {
-        return Ok(type_.name.as_str() == "String"
-            && type_.module.as_str() == "string"
-            && type_.address == AccountAddress::ONE);
-    }
-    Ok(false)
 }
 
 /***************************************************************************************************

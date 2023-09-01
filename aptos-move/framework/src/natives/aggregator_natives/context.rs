@@ -14,8 +14,6 @@ use std::{
     collections::{btree_map, BTreeMap},
 };
 
-pub type TxnIndex = u32;
-
 /// Represents a single aggregator change.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum AggregatorChange {

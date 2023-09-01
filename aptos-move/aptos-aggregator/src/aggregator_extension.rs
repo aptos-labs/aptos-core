@@ -311,7 +311,7 @@ pub struct AggregatorData {
     destroyed_aggregators: BTreeSet<AggregatorID>,
     // All aggregator instances that exist in the current transaction.
     aggregators: BTreeMap<AggregatorID, Aggregator>,
-    // Counter for generating identifiers for AggregatorSnapshots.
+    // Counter for generating identifiers for Aggregators and AggregatorSnapshots.
     pub id_counter: u64,
 }
 

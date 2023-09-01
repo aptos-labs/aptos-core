@@ -16,7 +16,7 @@ use aptos_language_e2e_tests::account::Account;
 use aptos_types::transaction::SignedTransaction;
 
 fn setup() -> (MoveHarness, Account) {
-    initialize(common::test_dir_path("aggregator.data/pack"))
+    initialize(common::test_dir_path("aggregator_v2.data/pack"))
 }
 
 #[test]

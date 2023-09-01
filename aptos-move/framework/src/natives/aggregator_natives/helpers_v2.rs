@@ -12,7 +12,7 @@ const VALUE_FIELD_INDEX: usize = 0;
 const LIMIT_FIELD_INDEX: usize = 1;
 
 /// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
-pub(crate) fn aggregator_info_u128(
+pub(crate) fn aggregator_value_as_u128(
     aggregator: &StructRef,
 ) -> PartialVMResult<(AggregatorID, u128)> {
     let (value, limit) = get_aggregator_fields_u128(aggregator)?;
@@ -24,7 +24,9 @@ pub(crate) fn aggregator_info_u128(
 }
 
 /// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
-pub(crate) fn aggregator_info_u64(aggregator: &StructRef) -> PartialVMResult<(AggregatorID, u64)> {
+pub(crate) fn aggregator_value_as_u64(
+    aggregator: &StructRef,
+) -> PartialVMResult<(AggregatorID, u64)> {
     let (value, limit) = get_aggregator_fields_u64(aggregator)?;
     Ok((AggregatorID::ephemeral(value), limit))
 }
