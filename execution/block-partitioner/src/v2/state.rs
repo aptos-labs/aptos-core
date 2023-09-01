@@ -33,10 +33,12 @@ use std::{
     },
 };
 
-/// All the parameters, indexes, temporary states needed in a `PartitionerV2` session wrapped in a single struct
-/// to make async drop easy.
+/// All the parameters, indexes, temporary states needed in a `PartitionerV2` session,
+/// wrapped in a single struct, so we don't forget to async drop any large states.
 pub struct PartitionState {
-    // Params/utils from partitioner.
+    //
+    // Initial params/utils begin.
+    //
     pub(crate) num_executor_shards: ShardId,
     pub(crate) num_rounds_limit: usize,
     pub(crate) dashmap_num_shards: usize,
@@ -46,21 +48,15 @@ pub struct PartitionState {
     /// TxnIdx0 -> the actual txn.
     /// Wrapped in `RwLock` to allow being taking in parallel in `add_edges` phase and parallel reads in other phases.
     pub(crate) txns: Vec<RwLock<Option<AnalyzedTransaction>>>,
+    //
+    // Initial params/utils ends.
+    //
+    /// A `ConflictingTxnTracker` for each key that helps resolve conflicts and speed-up edge creation.
+    /// Updated in multiple stages of partitioning.
+    pub(crate) trackers: DashMap<StorageKeyIdx, RwLock<ConflictingTxnTracker>>,
 
     //
-    // Pre-partitioning results.
-    //
-    /// For shard i, the `TxnIdx0`s of the txns pre-partitioned into shard i.
-    pub(crate) pre_partitioned_idx0s: Vec<Vec<TxnIdx0>>,
-
-    /// For shard i, the `TxnIdx1`s of the txns pre-partitioned into shard i.
-    pub(crate) pre_partitioned: Vec<Vec<TxnIdx1>>,
-
-    /// For shard i, the num of txns pre-partitioned into shard 0..=i-1.
-    pub(crate) start_txn_idxs_by_shard: Vec<TxnIdx1>,
-
-    //
-    // The discretized txn info, populated in `init()`.
+    // States computed in `init()` begin.
     //
     /// For txn of TxnIdx0 i, the sender index.
     pub(crate) sender_idxs: Vec<RwLock<Option<SenderIdx>>>,
@@ -71,20 +67,21 @@ pub struct PartitionState {
     /// For txn of TxnIdx0 i, the read set.
     pub(crate) read_sets: Vec<RwLock<HashSet<StorageKeyIdx>>>,
 
-    //
-    // Used in `init()` to discretize senders.
-    //
     pub(crate) sender_counter: AtomicUsize,
     pub(crate) sender_idx_table: DashMap<Sender, SenderIdx>,
 
-    //
-    // Used in `init()` to discretize storage locations.
-    //
     pub(crate) storage_key_counter: AtomicUsize,
     pub(crate) key_idx_table: DashMap<StateKey, StorageKeyIdx>,
 
-    // A `ConflictingTxnTracker` for each key that helps resolve conflicts and speed-up edge creation.
-    pub(crate) trackers: DashMap<StorageKeyIdx, RwLock<ConflictingTxnTracker>>,
+    //
+    // States computed in `init()` end.
+    // States computed in `pre_partition()` begin.
+    //
+    /// For shard i, the `TxnIdx1`s of the txns pre-partitioned into shard i.
+    pub(crate) pre_partitioned: Vec<Vec<TxnIdx1>>,
+
+    /// For shard i, the num of txns pre-partitioned into shard 0..=i-1.
+    pub(crate) start_txn_idxs_by_shard: Vec<TxnIdx1>,
 
     /// Map the `TxnIdx1` of a transaction to its `TxnIdx0`.
     ///
@@ -93,7 +90,10 @@ pub struct PartitionState {
     /// `TxnIdx1` refers to the txn positions after pre-partitioning but before discarding.
     pub(crate) idx1_to_idx0: Vec<TxnIdx0>,
 
-    // Results of `remove_cross_shard_dependencies()`.
+    //
+    // States computed in `pre_partition()` end.
+    // States computed in `remove_cross_shard_dependencies()` begin.
+    //
     pub(crate) finalized_txn_matrix: Vec<Vec<Vec<TxnIdx1>>>,
     pub(crate) start_index_matrix: Vec<Vec<TxnIdx1>>,
 
@@ -103,12 +103,15 @@ pub struct PartitionState {
     /// `TxnIdx1` refers to the txn positions after pre-partitioning but before discarding.
     /// `TxnIdx2` refers to the txn positions after discarding, which is also the finalized txn idx.
     pub(crate) idx1_to_idx2: Vec<RwLock<TxnIdx2>>,
+    //
+    // States computed in `remove_cross_shard_dependencies()` end.
+    //
 
     // Temporary sub-block matrix used in `add_edges()`.
     pub(crate) sub_block_matrix: Vec<Vec<Mutex<Option<SubBlock<AnalyzedTransaction>>>>>,
 }
 
-/// Some small operations.
+/// Some utils.
 impl PartitionState {
     pub fn new(
         thread_pool: Arc<ThreadPool>,
@@ -168,7 +171,6 @@ impl PartitionState {
             txns: takable_txns,
             sub_block_matrix: vec![],
             idx1_to_idx0: vec![0; num_txns],
-            pre_partitioned_idx0s: vec![],
         }
     }
 

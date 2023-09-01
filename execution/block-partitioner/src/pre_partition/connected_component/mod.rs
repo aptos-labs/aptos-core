@@ -55,13 +55,13 @@ impl PrePartitioner for ConnectedComponentPartitioner {
         //      \  |  /               \    \   |     |     |   /    /
         //       \ | /                  \   |  |     |     |  |  /
         // conflicting-set-0                conflicting-set-1
-        //      /      \                 /   |       |       \
-        //     /        \              /     |       |        \
+        //      /      \                  /  |         |     \
+        //     /        \               /    |         |      \
         // txn-grp-0 txn-grp-1  txn-grp-2 txn-grp-3 txn-grp-4 txn-grp-5
-        //         \        \          \    /       /         /
-        //          \        \          \ /        /       /
-        //            \       \        / \        /     /
-        //               \     \     /     \     /  /
+        //         \        \         \  /          /         /
+        //          \        \         \/          /       /
+        //            \       \        /\         /     /
+        //               \     \     /    \      /  /
         //                  Shard-0         Shard-1
 
         // Prepare `txns_by_set`: a mapping from a conflicting set to its txns.
@@ -110,24 +110,24 @@ impl PrePartitioner for ConnectedComponentPartitioner {
 
         // Prepare `groups_by_shard`: a mapping from a shard to the txn groups assigned to it.
         let mut groups_by_shard: Vec<Vec<usize>> = vec![vec![]; state.num_executor_shards];
-        for (group_id, &shard_id) in shards_by_group.iter().enumerate() {
+        for (group_id, shard_id) in shards_by_group.into_iter().enumerate() {
             groups_by_shard[shard_id].push(group_id);
         }
 
-        state.pre_partitioned_idx0s = vec![vec![]; state.num_executor_shards];
-        for (shard_id, group_ids) in groups_by_shard.iter().enumerate() {
-            for &group_id in group_ids.iter() {
+        let mut pre_partitioned_idx0s: Vec<Vec<TxnIdx0>> = vec![vec![]; state.num_executor_shards];
+        for (shard_id, group_ids) in groups_by_shard.into_iter().enumerate() {
+            for group_id in group_ids.into_iter() {
                 let (set_id, amount) = group_metadata[group_id];
                 for _ in 0..amount {
                     let txn_idx0 = txns_by_set[set_id].pop_front().unwrap();
-                    state.pre_partitioned_idx0s[shard_id].push(txn_idx0);
+                    pre_partitioned_idx0s[shard_id].push(txn_idx0);
                 }
             }
         }
 
         // Prepare `state.idx1_to_idx0` and `state.start_txn_idxs_by_shard`.
         let mut i1 = 0;
-        for (shard_id, txn_idxs) in state.pre_partitioned_idx0s.iter().enumerate() {
+        for (shard_id, txn_idxs) in pre_partitioned_idx0s.iter().enumerate() {
             state.start_txn_idxs_by_shard[shard_id] = i1;
             for &i0 in txn_idxs {
                 state.idx1_to_idx0[i1] = i0;
@@ -147,6 +147,14 @@ impl PrePartitioner for ConnectedComponentPartitioner {
                 (start..end).collect()
             })
             .collect();
+
+        state.thread_pool.spawn(move || {
+            drop(txns_by_set);
+            drop(set_idx_registry);
+            drop(group_metadata);
+            drop(tasks);
+            drop(pre_partitioned_idx0s);
+        });
     }
 }
 

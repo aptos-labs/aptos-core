@@ -7,18 +7,22 @@ use std::fmt::Debug;
 /// The initial partitioning phase for `ShardedBlockPartitioner`/`PartitionerV2` to divide a block into `num_shards` sub-blocks.
 /// See `PartitionerV2::partition()` for more details.
 ///
-/// TODO: the exact parameter set needed by a generic PrePartitioner is currently a moving part, since more PrePartitioner are to be experimented and they may need different preprocessing.
-/// Currently passing in the whole `PartitionState`, where:
-/// some states that are available for implementations to leverage:
-/// - `state.write_sets`
-/// - `state.read_sets`
-/// - `state.sender_idxs`
-/// - `state.num_executor_shards`
-/// - `state.txns`
-/// Also an implementation must populate the following states:
-/// - `state.idx1_to_idx0`
-/// - `state.start_txn_idxs_by_shard`
-/// - `state.pre_partitioned`
+/// TODO: the exact parameter set needed by a generic PrePartitioner is currently a moving part, since more PrePartitioners are to be experimented and they may need different indices.
+/// Currently passing in the whole `PartitionState`.
+///
+/// NOTES for new implementations.
+///
+/// The following states that are available and can be useful. (see comments on `PartitionState` for a full list of available resources).
+/// - `state.txns`: the original block.
+/// - `state.sender_idxs`: maps a txn index to its sender index.
+/// - `state.read_sets`: maps a txn index to its read set (a state key index set).
+/// - `state.write_sets`: maps a txn index to its write set (a state key index set).
+/// - `state.num_executor_shards`: the number of shards.
+///
+/// An implementation must populate the following states.
+/// - `state.idx1_to_idx0`: maps a txn's new index to its original index.
+/// - `state.start_txn_idxs_by_shard`: maps a shard to the starting new index of the txns assigned to itself.
+/// - `state.pre_partitioned`: maps a shard to the new indices of the txns assigned to itself.
 pub trait PrePartitioner: Send {
     fn pre_partition(&self, state: &mut PartitionState);
 }
