@@ -25,6 +25,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
     },
 };
+use bytes::Bytes;
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
@@ -53,7 +54,7 @@ pub struct StorageAdapter<'a, S> {
     accurate_byte_count: bool,
     max_binary_format_version: u32,
     resource_group_cache:
-        RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
+        RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Bytes>>>>,
 }
 
 impl<'a, S> StorageAdapter<'a, S> {
@@ -93,7 +94,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         s
     }
 
-    pub fn get(&self, access_path: AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
+    pub fn get(&self, access_path: AccessPath) -> PartialVMResult<Option<Bytes>> {
         self.state_store
             .get_state_value_bytes(&StateKey::access_path(access_path))
             .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
@@ -104,7 +105,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<(Option<Vec<u8>>, usize), VMError> {
+    ) -> Result<(Option<Bytes>, usize), VMError> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             let mut cache = self.resource_group_cache.borrow_mut();
@@ -123,8 +124,8 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
                 } else {
                     0
                 };
-                let group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&group_data)
-                    .map_err(|_| {
+                let group_data: BTreeMap<StructTag, Bytes> =
+                    bcs::from_bytes(&group_data).map_err(|_| {
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                             .finish(Location::Undefined)
                     })?;
@@ -149,7 +150,7 @@ impl<'a, S: StateView> AptosMoveResolver for StorageAdapter<'a, S> {
         &self,
         address: &AccountAddress,
         resource_group: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
+    ) -> Result<Option<Bytes>, VMError> {
         let ap = AccessPath::resource_group_access_path(*address, resource_group.clone());
         self.get(ap).map_err(|e| e.finish(Location::Undefined))
     }
@@ -158,7 +159,7 @@ impl<'a, S: StateView> AptosMoveResolver for StorageAdapter<'a, S> {
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
+    ) -> Result<Option<Bytes>, VMError> {
         let ap = AccessPath::resource_access_path(*address, struct_tag.clone()).map_err(|_| {
             PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Undefined)
         })?;
@@ -167,7 +168,7 @@ impl<'a, S: StateView> AptosMoveResolver for StorageAdapter<'a, S> {
 
     fn release_resource_group_cache(
         &self,
-    ) -> BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>> {
+    ) -> BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Bytes>>> {
         self.resource_group_cache.take()
     }
 }
@@ -178,7 +179,7 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
+    ) -> anyhow::Result<(Option<Bytes>, usize)> {
         Ok(self.get_any_resource(address, struct_tag, metadata)?)
     }
 }
@@ -199,7 +200,7 @@ impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
         module.metadata
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Error> {
         // REVIEW: cache this?
         let ap = AccessPath::from(module_id);
         Ok(self.get(ap).map_err(|e| e.finish(Location::Undefined))?)
@@ -211,7 +212,7 @@ impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
         &self,
         handle: &TableHandle,
         key: &[u8],
-    ) -> Result<Option<Vec<u8>>, Error> {
+    ) -> Result<Option<Bytes>, Error> {
         self.get_state_value_bytes(&StateKey::table_item((*handle).into(), key.to_vec()))
     }
 }
@@ -238,7 +239,7 @@ impl<'a, S: StateView> AggregatorResolver for StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> ConfigStorage for StorageAdapter<'a, S> {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
+    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes> {
         self.get(access_path).ok()?
     }
 }

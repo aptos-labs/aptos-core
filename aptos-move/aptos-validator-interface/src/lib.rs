@@ -151,7 +151,7 @@ async fn handler_thread<'a>(
                     .get_state_value_by_version(&key, version - 1)
                     .await
                     .ok()
-                    .and_then(|v| v.map(|s| s.into_bytes()));
+                    .and_then(|v| v.map(|s| s.bytes().to_vec()));
                 cache.lock().unwrap().put((key, version), val.clone());
                 sender.send(val)
             });

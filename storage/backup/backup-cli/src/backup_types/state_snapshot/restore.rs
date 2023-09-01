@@ -241,7 +241,7 @@ impl StateSnapshotRestoreController {
         for (key, value) in blob {
             if let StateKeyInner::AccessPath(p) = key.inner() {
                 if let Path::Code(module_id) = p.get_path() {
-                    if let Ok(module) = CompiledModule::deserialize(value.bytes()) {
+                    if let Ok(module) = CompiledModule::deserialize(&value.bytes()) {
                         if let Err(err) = verify_module_with_config(&config, &module) {
                             error!("Module {:?} failed validation: {:?}", module_id, err);
                         }

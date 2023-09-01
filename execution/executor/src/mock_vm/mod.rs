@@ -245,6 +245,7 @@ fn read_state_value_from_storage(
     state_view
         .get_state_value_bytes(&StateKey::access_path(access_path.clone()))
         .expect("Failed to query storage.")
+        .map(|bytes| bytes.to_vec())
 }
 
 fn decode_bytes(bytes: &[u8]) -> u64 {

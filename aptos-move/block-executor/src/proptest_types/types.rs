@@ -530,19 +530,19 @@ where
                 let behavior = &incarnation_behaviors[idx % incarnation_behaviors.len()];
 
                 // Reads
-                let mut reads_result = vec![];
+                let mut read_results = vec![];
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
                     match view.get_state_value_bytes(k) {
-                        Ok(v) => reads_result.push(v),
-                        Err(_) => reads_result.push(None),
+                        Ok(v) => read_results.push(v.map(Into::into)),
+                        Err(_) => read_results.push(None),
                     }
                 }
                 ExecutionStatus::Success(MockOutput {
                     writes: behavior.writes.clone(),
                     deltas: behavior.deltas.clone(),
                     events: behavior.events.to_vec(),
-                    read_results: reads_result,
+                    read_results,
                     materialized_delta_writes: OnceCell::new(),
                     total_gas: behavior.gas,
                 })

@@ -23,6 +23,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
+use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -280,9 +281,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let op = if source_data.is_empty() {
                     MoveStorageOp::Delete
                 } else if create {
-                    MoveStorageOp::New(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
+                    MoveStorageOp::New(
+                        bcs::to_bytes(&source_data)
+                            .map_err(|_| common_error())?
+                            .into(),
+                    )
                 } else {
-                    MoveStorageOp::Modify(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
+                    MoveStorageOp::Modify(
+                        bcs::to_bytes(&source_data)
+                            .map_err(|_| common_error())?
+                            .into(),
+                    )
                 };
                 resource_group_change_set
                     .add_resource_op(addr, resource_group_tag, op)
@@ -416,7 +425,7 @@ impl<'r> WriteOpConverter<'r> {
     fn convert(
         &self,
         state_key: &StateKey,
-        move_storage_op: MoveStorageOp<Vec<u8>>,
+        move_storage_op: MoveStorageOp<Bytes>,
         legacy_creation_as_modification: bool,
     ) -> Result<WriteOp, VMStatus> {
         use MoveStorageOp::*;
@@ -447,20 +456,24 @@ impl<'r> WriteOpConverter<'r> {
                     err_msg("When converting write op: Recreating existing value."),
                 ));
             },
-            (None, New(data)) => match &self.new_slot_metadata {
-                None => {
-                    if legacy_creation_as_modification {
-                        Modification(data)
-                    } else {
-                        Creation(data)
-                    }
-                },
-                Some(metadata) => CreationWithMetadata {
-                    data,
-                    metadata: metadata.clone(),
-                },
+            (None, New(data)) => {
+                let data = data.to_vec();
+                match &self.new_slot_metadata {
+                    None => {
+                        if legacy_creation_as_modification {
+                            Modification(data)
+                        } else {
+                            Creation(data)
+                        }
+                    },
+                    Some(metadata) => CreationWithMetadata {
+                        data,
+                        metadata: metadata.clone(),
+                    },
+                }
             },
             (Some(existing_metadata), Modify(data)) => {
+                let data = data.to_vec();
                 // Inherit metadata even if the feature flags is turned off, for compatibility.
                 match existing_metadata {
                     None => Modification(data),

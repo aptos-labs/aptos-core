@@ -9,6 +9,7 @@ use aptos_types::{
     on_chain_config::ConfigStorage,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
 };
+use bytes::Bytes;
 use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, resolver::MoveResolver,
@@ -42,17 +43,17 @@ pub trait AptosMoveResolver:
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> VMResult<Option<Vec<u8>>>;
+    ) -> VMResult<Option<Bytes>>;
 
     fn get_standard_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> VMResult<Option<Vec<u8>>>;
+    ) -> VMResult<Option<Bytes>>;
 
     fn release_resource_group_cache(
         &self,
-    ) -> BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>;
+    ) -> BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Bytes>>>;
 }
 
 // TODO: Remove dependency on StateView.

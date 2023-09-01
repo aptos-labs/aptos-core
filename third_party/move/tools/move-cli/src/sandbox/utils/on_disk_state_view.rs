@@ -4,6 +4,7 @@
 
 use crate::{BCS_EXTENSION, DEFAULT_BUILD_DIR, DEFAULT_STORAGE_DIR};
 use anyhow::{anyhow, bail, Result};
+use bytes::Bytes;
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
@@ -133,12 +134,12 @@ impl OnDiskStateView {
         &self,
         addr: AccountAddress,
         tag: StructTag,
-    ) -> Result<Option<Vec<u8>>> {
+    ) -> Result<Option<Bytes>> {
         Self::get_bytes(&self.get_resource_path(addr, tag))
     }
 
     /// Read the resource bytes stored on-disk at `addr`/`tag`
-    fn get_module_bytes(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>> {
+    fn get_module_bytes(&self, module_id: &ModuleId) -> Result<Option<Bytes>> {
         Self::get_bytes(&self.get_module_path(module_id))
     }
 
@@ -162,9 +163,9 @@ impl OnDiskStateView {
         }
     }
 
-    fn get_bytes(path: &Path) -> Result<Option<Vec<u8>>> {
+    fn get_bytes(path: &Path) -> Result<Option<Bytes>> {
         Ok(if path.exists() {
-            Some(fs::read(path)?)
+            Some(fs::read(path)?.into())
         } else {
             None
         })
@@ -281,7 +282,7 @@ impl OnDiskStateView {
     /// Save all the modules in the local cache, re-generate mv_interfaces if required.
     pub fn save_modules<'a>(
         &self,
-        modules: impl IntoIterator<Item = &'a (ModuleId, Vec<u8>)>,
+        modules: impl IntoIterator<Item = &'a (ModuleId, Bytes)>,
     ) -> Result<()> {
         for (module_id, module_bytes) in modules {
             self.save_module(module_id, module_bytes)?;
@@ -338,7 +339,7 @@ impl ModuleResolver for OnDiskStateView {
         vec![]
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, anyhow::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, anyhow::Error> {
         self.get_module_bytes(module_id)
     }
 }
@@ -349,7 +350,7 @@ impl ResourceResolver for OnDiskStateView {
         address: &AccountAddress,
         struct_tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<(Option<Vec<u8>>, usize)> {
+    ) -> Result<(Option<Bytes>, usize)> {
         let buf = self.get_resource_bytes(*address, struct_tag.clone())?;
         let buf_size = resource_size(&buf);
         Ok((buf, buf_size))

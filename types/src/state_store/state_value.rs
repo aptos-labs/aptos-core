@@ -15,7 +15,6 @@ use once_cell::sync::OnceCell;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, prelude::*};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
 #[derive(
     BCSCryptoHash,
     Clone,
@@ -143,14 +142,10 @@ impl StateValue {
         self.bytes().len()
     }
 
-    pub fn bytes(&self) -> &[u8] {
+    pub fn bytes(&self) -> Bytes {
         match &self.inner {
-            StateValueInner::V0(data) | StateValueInner::WithMetadata { data, .. } => data,
+            StateValueInner::V0(data) | StateValueInner::WithMetadata { data, .. } => data.clone(),
         }
-    }
-
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.bytes().to_vec()
     }
 
     pub fn into_metadata(self) -> Option<StateValueMetadata> {
