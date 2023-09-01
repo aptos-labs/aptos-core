@@ -18,8 +18,6 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
-use aptos_types::vm_status::StatusCode;
-use move_binary_format::errors::PartialVMError;
 use move_core_types::value::{MoveStructLayout, MoveTypeLayout};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
@@ -38,6 +36,9 @@ pub const EAGGREGATOR_SNAPSHOTS_NOT_ENABLED: u64 = 0x03_0006;
 /// The generic type supplied to the aggregators is not supported.
 pub const EUNSUPPORTED_AGGREGATOR_TYPE: u64 = 0x03_0007;
 
+/// The read value is out of bounds for Aggregator<u64>
+pub const EREAD_OUT_OF_BOUNDS: u64 = 0x02_0009;
+
 /// Checks if the type argument `type_arg` is a string type.
 fn is_string_type(context: &SafeNativeContext, type_arg: &Type) -> SafeNativeResult<bool> {
     let ty = context.deref().type_to_fully_annotated_layout(type_arg)?;
@@ -47,6 +48,31 @@ fn is_string_type(context: &SafeNativeContext, type_arg: &Type) -> SafeNativeRes
             && type_.address == AccountAddress::ONE);
     }
     Ok(false)
+}
+
+/// Given the list of native function arguments, returns a tuple of its
+/// fields: (`aggregator id`, `value`, `limit`).
+pub fn get_aggregator_fields(
+    ty_arg: &Type,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<(AggregatorID, u128, u128)> {
+    match ty_arg {
+        Type::U128 => {
+            // Get aggregator information and a value to add.
+            let value = safely_pop_arg!(args, u128);
+            let (id, limit) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
+            Ok((id, value, limit))
+        },
+        Type::U64 => {
+            // Get aggregator information and a value to add.
+            let value = safely_pop_arg!(args, u64);
+            let (id, limit) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
+            Ok((id, value as u128, limit as u128))
+        },
+        _ => Err(SafeNativeError::Abort {
+            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
+        }),
+    }
 }
 
 /***************************************************************************************************
@@ -64,22 +90,23 @@ fn native_create_aggregator(
     // Get the current aggregator data.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let id = AggregatorID::ephemeral(aggregator_data.generate_id());
+    let id = aggregator_data.generate_id();
+    let aggregator_id = AggregatorID::ephemeral(aggregator_data.generate_id());
 
     match ty_args[0] {
         Type::U128 => {
             let limit = safely_pop_arg!(args, u128);
-            aggregator_data.create_new_aggregator(id, limit);
+            aggregator_data.create_new_aggregator(aggregator_id, limit);
             Ok(smallvec![Value::struct_(Struct::pack(vec![
-                Value::u128(0),
+                Value::u128(id as u128),
                 Value::u128(limit),
             ]))])
         },
         Type::U64 => {
             let limit = safely_pop_arg!(args, u64);
-            aggregator_data.create_new_aggregator(id, limit as u128);
+            aggregator_data.create_new_aggregator(aggregator_id, limit as u128);
             Ok(smallvec![Value::struct_(Struct::pack(vec![
-                Value::u64(0),
+                Value::u64(id),
                 Value::u64(limit),
             ]))])
         },
@@ -95,35 +122,16 @@ fn native_create_aggregator(
 fn native_try_add(
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
+    args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);
 
     context.charge(AGGREGATOR_V2_TRY_ADD_BASE)?;
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-
-    match ty_args[0] {
-        Type::U128 => {
-            // Get aggregator information and a value to add.
-            let value = safely_pop_arg!(args, u128);
-            let (id, limit) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, limit)?;
-            Ok(smallvec![Value::bool(aggregator.try_add(value).is_ok())])
-        },
-        Type::U64 => {
-            // Get aggregator information and a value to add.
-            let value = safely_pop_arg!(args, u64);
-            let (id, limit) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, limit as u128)?;
-            Ok(smallvec![Value::bool(
-                aggregator.try_add(value as u128).is_ok()
-            )])
-        },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
-        }),
-    }
+    let (id, value, limit) = get_aggregator_fields(&ty_args[0], args)?;
+    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    Ok(smallvec![Value::bool(aggregator.try_add(value).is_ok())])
 }
 
 /***************************************************************************************************
@@ -132,35 +140,16 @@ fn native_try_add(
 fn native_try_sub(
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
+    args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);
 
     context.charge(AGGREGATOR_V2_TRY_SUB_BASE)?;
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-
-    match ty_args[0] {
-        Type::U128 => {
-            // Get aggregator information and a value to subtract.
-            let value = safely_pop_arg!(args, u128);
-            let (id, limit) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, limit)?;
-            Ok(smallvec![Value::bool(aggregator.try_sub(value).is_ok())])
-        },
-        Type::U64 => {
-            // Get aggregator information and a value to subtract.
-            let value = safely_pop_arg!(args, u64);
-            let (id, limit) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
-            let aggregator = aggregator_data.get_aggregator(id, limit as u128)?;
-            Ok(smallvec![Value::bool(
-                aggregator.try_sub(value as u128).is_ok()
-            )])
-        },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
-        }),
-    }
+    let (id, value, limit) = get_aggregator_fields(&ty_args[0], args)?;
+    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    Ok(smallvec![Value::bool(aggregator.try_sub(value).is_ok())])
 }
 
 /***************************************************************************************************
@@ -191,10 +180,9 @@ fn native_read(
             let aggregator = aggregator_data.get_aggregator(id, limit as u128)?;
             let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
             if value > u64::MAX as u128 {
-                return Err(PartialVMError::new(StatusCode::ABORTED)
-                    .with_message("Aggregator<u64>::read() output exceeds u64::MAX".to_string())
-                    .with_sub_status(0x02_0001)
-                    .into());
+                return Err(SafeNativeError::Abort {
+                    abort_code: EREAD_OUT_OF_BOUNDS,
+                });
             }
             Ok(smallvec![Value::u64(value as u64)])
         },

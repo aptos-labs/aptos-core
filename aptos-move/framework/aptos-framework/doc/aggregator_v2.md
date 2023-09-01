@@ -128,6 +128,26 @@ The aggregator snapshots feature flag is not enabled.
 
 
 
+<a name="0x1_aggregator_v2_EINVALID_AGGREGATOR_IDENTIFIER"></a>
+
+The aggregator identifier is out of bounds (above U64::MAX).
+
+
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EINVALID_AGGREGATOR_IDENTIFIER">EINVALID_AGGREGATOR_IDENTIFIER</a>: u64 = 8;
+</code></pre>
+
+
+
+<a name="0x1_aggregator_v2_EREAD_OUT_OF_BOUNDS"></a>
+
+The aggregator<u64> read is out of bounds (above U64::MAX).
+
+
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EREAD_OUT_OF_BOUNDS">EREAD_OUT_OF_BOUNDS</a>: u64 = 9;
+</code></pre>
+
+
+
 <a name="0x1_aggregator_v2_EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE"></a>
 
 The generic type supplied to the aggregator snapshot is not supported.
