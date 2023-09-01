@@ -794,8 +794,7 @@ impl Scheduler {
         }
     }
 
-    /// When a dependency is resolved, mark the transaction as Ready with an
-    /// incremented incarnation number.
+    /// When a dependency is resolved, mark the transaction as Ready.
     /// The caller must ensure that the transaction is in the Suspended state.
     fn resume(&self, txn_idx: TxnIndex) {
         let mut status = self.txn_status[txn_idx as usize].0.write();
