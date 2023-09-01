@@ -1,7 +1,7 @@
 processed 6 tasks
 
 task 1 'publish'. lines 11-17:
-Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::Priv'. Got VMError: {
+Error: Unable to publish module '0x42::Priv'. Got VMError: {
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
     sub_status: None,
     location: undefined,
@@ -10,7 +10,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
 }
 
 task 3 'publish'. lines 27-33:
-Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::Pub'. Got VMError: {
+Error: Unable to publish module '0x42::Pub'. Got VMError: {
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
     sub_status: None,
     location: undefined,
@@ -19,7 +19,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
 }
 
 task 5 'publish'. lines 43-49:
-Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::Fr'. Got VMError: {
+Error: Unable to publish module '0x42::Fr'. Got VMError: {
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
     sub_status: None,
     location: undefined,

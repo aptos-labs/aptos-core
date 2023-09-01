@@ -1,9 +1,9 @@
 Command `sandbox publish -v`:
 Found 1 modules
-Publishing a new module 0000000000000000000000000000000000000000000000000000000000000001::Module (wrote 98 bytes)
+Publishing a new module 0x1::Module (wrote 98 bytes)
 Wrote 98 bytes of module ID's and code
 Command `-d sandbox publish -v`:
 Found 2 modules
-Publishing a new module 0000000000000000000000000000000000000000000000000000000000000001::Example (wrote 100 bytes)
-Updating an existing module 0000000000000000000000000000000000000000000000000000000000000001::Module (wrote 98 bytes)
+Publishing a new module 0x1::Example (wrote 100 bytes)
+Updating an existing module 0x1::Module (wrote 98 bytes)
 Wrote 198 bytes of module ID's and code

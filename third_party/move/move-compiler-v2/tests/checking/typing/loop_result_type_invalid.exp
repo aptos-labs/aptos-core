@@ -13,10 +13,10 @@ error: expected `u64` but found `()`
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: invalid call of `M::foo`: expected `u64` but found `()` for argument 1
-   ┌─ tests/checking/typing/loop_result_type_invalid.move:19:9
+   ┌─ tests/checking/typing/loop_result_type_invalid.move:19:13
    │
 19 │         foo(loop { break })
-   │         ^^^^^^^^^^^^^^^^^^^
+   │             ^^^^^^^^^^^^^^
 
 error: expected 0 item(s), found 2
    ┌─ tests/checking/typing/loop_result_type_invalid.move:26:13

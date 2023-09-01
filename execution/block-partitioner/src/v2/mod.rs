@@ -2,6 +2,7 @@
 
 use crate::{
     pre_partition::{uniform_partitioner::UniformPartitioner, PrePartitioner},
+    sharded_block_partitioner::counters::BLOCK_PARTITIONING_SECONDS,
     v2::counters::MISC_TIMERS_SECONDS,
     BlockPartitioner,
 };
@@ -77,10 +78,7 @@ impl BlockPartitioner for PartitionerV2 {
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> PartitionedTransactions {
-        let _timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["total"])
-            .start_timer();
-
+        let _timer = BLOCK_PARTITIONING_SECONDS.start_timer();
         // Step 0: pre-partition. Divide a list of transactions into `num_executor_shards` chunks.
         let pre_partitioned = self.pre_partition(txns.as_slice(), num_executor_shards);
 
