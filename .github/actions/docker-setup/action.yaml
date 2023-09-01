@@ -74,7 +74,7 @@ runs:
 
     - id: auth
       name: "Authenticate to Google Cloud"
-      uses: "google-github-actions/auth@dac4e13deb3640f22e3ffe758fd3f95e6e89f712" # pin@v0
+      uses: "google-github-actions/auth@v1"
       with:
         create_credentials_file: false
         token_format: "access_token"
