@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 
-use crate::v2::{counters::MISC_TIMERS_SECONDS, state::PartitionState, PartitionerV2};
+use crate::v2::{
+    counters::MISC_TIMERS_SECONDS, state::PartitionState, PartitionerV2,
+};
 use aptos_types::{
     block_executor::partitioner::{
         PartitionedTransactions, SubBlock, SubBlocksForShard, TransactionWithDependencies,

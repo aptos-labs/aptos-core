@@ -6,7 +6,9 @@
 #[macro_use]
 extern crate criterion;
 
-use aptos_block_partitioner::{test_utils::P2PBlockGenerator, v2::PartitionerV2, BlockPartitioner};
+use aptos_block_partitioner::{
+    v2::PartitionerV2, test_utils::P2PBlockGenerator, BlockPartitioner,
+};
 use criterion::Criterion;
 use rand::thread_rng;
 

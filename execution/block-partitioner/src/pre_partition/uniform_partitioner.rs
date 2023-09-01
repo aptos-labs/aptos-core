@@ -2,7 +2,9 @@
 
 #[cfg(test)]
 use crate::test_utils::P2PBlockGenerator;
-use crate::{pre_partition::PrePartitioner, v2::types::PrePartitionedTxnIdx};
+use crate::{
+    pre_partition::PrePartitioner, v2::types::PrePartitionedTxnIdx,
+};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 #[cfg(test)]
 use rand::thread_rng;
