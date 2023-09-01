@@ -588,7 +588,7 @@ impl BufferManager {
                     // We'll try to re-initiate the broadcast after 30s.
                     Some((start_time, _)) => {
                         start_time.elapsed()
-                            < Duration::from_millis(COMMIT_VOTE_REBROADCAST_INTERVAL_MS)
+                            >= Duration::from_millis(COMMIT_VOTE_REBROADCAST_INTERVAL_MS)
                     },
                 };
                 if re_broadcast {
