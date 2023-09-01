@@ -165,6 +165,8 @@ impl Compatibility {
                 || !is_entry_compatible
                 || old_func.parameters != new_func.parameters
                 || old_func.return_ != new_func.return_
+                // TODO: Is this the correct compatobility rule?
+                || old_func.vtables != new_func.vtables
                 || !fun_type_parameters_compatibile(
                     &old_func.type_parameters,
                     &new_func.type_parameters,

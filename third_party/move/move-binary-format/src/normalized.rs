@@ -90,6 +90,7 @@ pub struct Function {
     pub type_parameters: Vec<AbilitySet>,
     pub parameters: Vec<Type>,
     pub return_: Vec<Type>,
+    pub vtables: Vec<(Vec<Type>, Vec<Type>)>,
 }
 
 /// Normalized version of a `CompiledModule`: its address, name, struct declarations, and public
@@ -339,6 +340,17 @@ impl Function {
                 .iter()
                 .map(|s| Type::new(m, s))
                 .collect(),
+            vtables: fhandle.vtables.iter().map(|func_ty| {
+                (m.signature_at(func_ty.parameters)
+                    .0
+                    .iter()
+                    .map(|s| Type::new(m, s))
+                    .collect(), m.signature_at(func_ty.return_)
+                    .0
+                    .iter()
+                    .map(|s| Type::new(m, s))
+                    .collect())
+            }).collect()
         };
         (name, f)
     }
