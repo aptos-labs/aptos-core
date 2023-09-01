@@ -2,8 +2,7 @@
 
 use crate::{
     pre_partition::{
-        connected_component::config::ConnectedComponentPartitionerConfig,
-        uniform_partitioner::UniformPartitioner, PrePartitionerConfig,
+        connected_component::config::ConnectedComponentPartitionerConfig, PrePartitionerConfig,
     },
     v2::PartitionerV2,
     BlockPartitioner, PartitionerConfig,
@@ -16,7 +15,7 @@ pub struct PartitionerV2Config {
     pub cross_shard_dep_avoid_threshold: f32,
     pub dashmap_num_shards: usize,
     pub partition_last_round: bool,
-    pub pre_partition_config: Box<dyn PrePartitionerConfig>,
+    pub pre_partitioner_config: Box<dyn PrePartitionerConfig>,
 }
 
 impl PartitionerV2Config {
@@ -44,6 +43,11 @@ impl PartitionerV2Config {
         self.partition_last_round = val;
         self
     }
+
+    pub fn pre_partitioner_config(mut self, val: Box<dyn PrePartitionerConfig>) -> Self {
+        self.pre_partitioner_config = val;
+        self
+    }
 }
 
 impl Default for PartitionerV2Config {
@@ -54,14 +58,14 @@ impl Default for PartitionerV2Config {
             cross_shard_dep_avoid_threshold: 0.9,
             dashmap_num_shards: 64,
             partition_last_round: false,
-            pre_partition_config: Box::<ConnectedComponentPartitionerConfig>::default(),
+            pre_partitioner_config: Box::<ConnectedComponentPartitionerConfig>::default(),
         }
     }
 }
 
 impl PartitionerConfig for PartitionerV2Config {
     fn build(&self) -> Box<dyn BlockPartitioner> {
-        let pre_partitioner = Box::new(UniformPartitioner {});
+        let pre_partitioner = self.pre_partitioner_config.build();
         Box::new(PartitionerV2::new(
             self.num_threads,
             self.max_partitioning_rounds,

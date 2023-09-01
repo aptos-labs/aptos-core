@@ -83,7 +83,7 @@ impl PrePartitioner for ConnectedComponentPartitioner {
             / (state.num_executor_shards as f32))
             .ceil() as usize;
 
-        // Prepare `group_metadata`, the a metadata (i, r) will later be converted to a real group that takes `r` txns from set `i`.
+        // Prepare `group_metadata`, a group_metadata (i, r) will later be converted to a real group that takes `r` txns from set `i`.
         // NOTE: If we create actual txn groups now and then do load-balanced scheduling, we break the relative order of txns from the same sender.
         // The workaround is to only fix the group set and their sizes for now, then schedule, and materialize the txn groups at the very end (when assigning groups to shards).
         let group_metadata: Vec<(usize, usize)> = txns_by_set

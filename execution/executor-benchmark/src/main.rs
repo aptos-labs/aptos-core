@@ -167,7 +167,7 @@ impl PipelineOpt {
                 cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
                 dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
                 partition_last_round: !self.use_global_executor,
-                pre_partition_config: self.pre_partitioner_config(),
+                pre_partitioner_config: self.pre_partitioner_config(),
             }),
             None => default_partitioner_config(),
             _ => panic!(
