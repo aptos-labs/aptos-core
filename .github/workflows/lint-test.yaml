@@ -73,7 +73,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984
+      - uses: actions/setup-python@v4
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
