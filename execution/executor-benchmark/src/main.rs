@@ -132,7 +132,7 @@ impl PipelineOpt {
             max_partitioning_rounds: self.max_partitioning_rounds,
             cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
             dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
-            partition_last_round: self.use_global_executor,
+            partition_last_round: !self.use_global_executor,
         })
     }
 }
