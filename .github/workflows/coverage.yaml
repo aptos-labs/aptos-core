@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 120
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
@@ -41,7 +41,7 @@ jobs:
     timeout-minutes: 120
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
@@ -63,7 +63,7 @@ jobs:
     needs: [ rust-unit-coverage, rust-smoke-coverage ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
       - uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # pin@v3
         with:
           name: lcov_unit
