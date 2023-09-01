@@ -2,9 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_block_partitioner::{
-    v2::config::PartitionerV2Config, PartitionerConfig,
-};
+use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };

@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 
-use aptos_block_partitioner::{
-    v2::config::PartitionerV2Config, test_utils::P2PBlockGenerator,
-};
+use aptos_block_partitioner::{test_utils::P2PBlockGenerator, v2::config::PartitionerV2Config};
 use aptos_logger::info;
 use clap::Parser;
 use rand::thread_rng;

@@ -2,8 +2,7 @@
 
 use crate::{
     pre_partition::{uniform_partitioner::UniformPartitioner, PrePartitioner},
-    sharded_block_partitioner::counters::BLOCK_PARTITIONING_SECONDS,
-    v2::counters::MISC_TIMERS_SECONDS,
+    v2::counters::{BLOCK_PARTITIONING_SECONDS, MISC_TIMERS_SECONDS},
     BlockPartitioner,
 };
 use aptos_types::{
@@ -18,7 +17,7 @@ use types::PrePartitionedTxnIdx;
 mod build_edge;
 pub mod config;
 mod conflicting_txn_tracker;
-mod counters;
+pub mod counters;
 mod init;
 mod partition_to_matrix;
 pub(crate) mod state;
@@ -183,8 +182,8 @@ impl BlockPartitioner for PartitionerV2 {
 #[cfg(test)]
 mod tests {
     use crate::{
-        v2::PartitionerV2,
         test_utils::{assert_deterministic_result, P2PBlockGenerator},
+        v2::PartitionerV2,
         BlockPartitioner,
     };
     use rand::{thread_rng, Rng};

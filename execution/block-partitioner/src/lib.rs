@@ -11,11 +11,11 @@ use aptos_types::{
     transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
 };
 use move_core_types::account_address::AccountAddress;
-use v2::config::PartitionerV2Config;
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
 };
+use v2::config::PartitionerV2Config;
 mod pre_partition;
 #[cfg(test)]
 mod tests;

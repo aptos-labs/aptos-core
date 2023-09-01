@@ -20,7 +20,7 @@ use crate::{
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
 use aptos_block_executor::counters as block_executor_counters;
-use aptos_block_partitioner::sharded_block_partitioner::counters::BLOCK_PARTITIONING_SECONDS;
+use aptos_block_partitioner::v2::counters::BLOCK_PARTITIONING_SECONDS;
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
 use aptos_executor::{
