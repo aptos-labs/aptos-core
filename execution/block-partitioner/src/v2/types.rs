@@ -69,8 +69,7 @@ impl Ord for ShardedTxnIndexV2 {
 
 impl PartialOrd for ShardedTxnIndexV2 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        (self.sub_block_idx, self.txn_idx1)
-            .partial_cmp(&(other.sub_block_idx, other.txn_idx1))
+        (self.sub_block_idx, self.txn_idx1).partial_cmp(&(other.sub_block_idx, other.txn_idx1))
     }
 }
 

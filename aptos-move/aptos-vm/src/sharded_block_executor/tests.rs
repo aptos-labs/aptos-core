@@ -9,6 +9,7 @@ use crate::{
 };
 use aptos_block_partitioner::{
     sharded_block_partitioner::config::PartitionerV1Config, v2::config::PartitionerV2Config,
+    PartitionerConfig,
 };
 use aptos_state_view::StateView;
 use rand::{rngs::OsRng, Rng};
@@ -173,7 +174,7 @@ fn test_partitioner_v2_sharded_block_executor_with_random_transfers_parallel() {
             .max_partitioning_rounds(4)
             .cross_shard_dep_avoid_threshold(0.9)
             .dashmap_num_shards(64)
-            .partition_last_round(merge_discard)
+            .partition_last_round(!merge_discard)
             .build();
         test_utils::sharded_block_executor_with_random_transfers(
             partitioner,

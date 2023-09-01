@@ -1,5 +1,7 @@
 // Copyright © Aptos Foundation
 
+use std::cmp::Ordering;
+
 pub struct UnionFind {
     parent_of: Vec<usize>,
     depth_of: Vec<usize>,
@@ -20,23 +22,27 @@ impl UnionFind {
         }
         let ppa = self.find(pa);
         self.parent_of[a] = ppa;
-        return ppa;
+        ppa
     }
 
     pub fn union(&mut self, x: usize, y: usize) {
         let px = self.find(x);
         let py = self.find(y);
-        if px==py {
+        if px == py {
             return;
         }
 
-        if self.depth_of[px] < self.depth_of[py] {
-            self.parent_of[px] = py;
-        } else if self.depth_of[px] > self.depth_of[py]{
-            self.parent_of[px] = py;
-        } else {
-            self.parent_of[px] = py;
-            self.depth_of[py] += 1;
+        match self.depth_of[px].cmp(&self.depth_of[py]) {
+            Ordering::Less => {
+                self.parent_of[py] = px;
+            },
+            Ordering::Greater => {
+                self.parent_of[px] = py;
+            },
+            Ordering::Equal => {
+                self.parent_of[px] = py;
+                self.depth_of[py] += 1;
+            },
         }
     }
 }

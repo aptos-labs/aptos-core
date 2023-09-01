@@ -6,14 +6,16 @@ use crate::{
     v2::{
         conflicting_txn_tracker::ConflictingTxnTracker,
         counters::MISC_TIMERS_SECONDS,
-        types::{SenderIdx, ShardedTxnIndexV2, StorageKeyIdx, SubBlockIdx},
+        types::{
+            SenderIdx, ShardedTxnIndexV2, StorageKeyIdx, SubBlockIdx, TxnIdx0, TxnIdx1, TxnIdx2,
+        },
     },
     Sender,
 };
 use aptos_types::{
     block_executor::partitioner::{
         CrossShardDependencies, RoundId, ShardId, ShardedTxnIndex, SubBlock,
-        TransactionWithDependencies, TxnIndex,
+        TransactionWithDependencies,
     },
     state_store::state_key::StateKey,
     transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
@@ -30,7 +32,6 @@ use std::{
         Arc, Mutex, RwLock,
     },
 };
-use crate::v2::types::{TxnIdx0, TxnIdx1, TxnIdx2};
 
 /// All the parameters, indexes, temporary states needed in a `PartitionerV2` session wrapped in a single struct
 /// to make async drop easy.
@@ -42,7 +43,6 @@ pub struct PartitionState {
     pub(crate) cross_shard_dep_avoid_threshold: f32,
     pub(crate) partition_last_round: bool,
     pub(crate) thread_pool: Arc<ThreadPool>,
-    pub(crate) load_imbalance_tolerance: f32,
     /// TxnIdx0 -> the actual txn.
     /// Wrapped in `RwLock` to allow being taking in parallel in `add_edges` phase and parallel reads in other phases.
     pub(crate) txns: Vec<RwLock<Option<AnalyzedTransaction>>>,
@@ -50,7 +50,7 @@ pub struct PartitionState {
     //
     // Pre-partitioning results.
     //
-    /// For shard i, the `TxnIdx1`s of the txns pre-partitioned into shard i.
+    /// For shard i, the `TxnIdx0`s of the txns pre-partitioned into shard i.
     pub(crate) pre_partitioned_idx0s: Vec<Vec<TxnIdx0>>,
 
     /// For shard i, the `TxnIdx1`s of the txns pre-partitioned into shard i.
@@ -118,7 +118,6 @@ impl PartitionState {
         num_rounds_limit: usize,
         cross_shard_dep_avoid_threshold: f32,
         partition_last_round: bool,
-        load_imbalance_tolerance: f32,
     ) -> Self {
         let _timer = MISC_TIMERS_SECONDS
             .with_label_values(&["new"])
@@ -169,7 +168,6 @@ impl PartitionState {
             txns: takable_txns,
             sub_block_matrix: vec![],
             idx1_to_idx0: vec![0; num_txns],
-            load_imbalance_tolerance,
             pre_partitioned_idx0s: vec![],
         }
     }
@@ -177,9 +175,11 @@ impl PartitionState {
     pub(crate) fn num_txns(&self) -> usize {
         self.txns.len()
     }
+
     pub(crate) fn num_keys(&self) -> usize {
         self.storage_key_counter.load(Ordering::SeqCst)
     }
+
     pub(crate) fn num_senders(&self) -> usize {
         self.sender_counter.load(Ordering::SeqCst)
     }
@@ -335,9 +335,7 @@ impl PartitionState {
                     let final_sub_blk_idx =
                         self.final_sub_block_idx(follower_txn_idx.sub_block_idx);
                     let dst_txn_idx = ShardedTxnIndex {
-                        txn_index: *self.idx1_to_idx2[follower_txn_idx.txn_idx1]
-                            .read()
-                            .unwrap(),
+                        txn_index: *self.idx1_to_idx2[follower_txn_idx.txn_idx1].read().unwrap(),
                         shard_id: final_sub_blk_idx.shard_id,
                         round_id: final_sub_blk_idx.round_id,
                     };

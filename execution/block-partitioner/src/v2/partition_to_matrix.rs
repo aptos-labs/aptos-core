@@ -4,7 +4,7 @@ use crate::v2::{
     counters::MISC_TIMERS_SECONDS,
     extract_and_sort,
     state::PartitionState,
-    types::{SenderIdx},
+    types::{SenderIdx, TxnIdx1},
     PartitionerV2,
 };
 use aptos_logger::trace;
@@ -21,7 +21,6 @@ use std::{
         RwLock,
     },
 };
-use crate::v2::types::TxnIdx1;
 
 impl PartitionerV2 {
     /// Populate `state.finalized_txn_matrix` with txns flattened into a matrix (num_rounds by num_shards),
@@ -54,8 +53,7 @@ impl PartitionerV2 {
 
         if !state.partition_last_round {
             trace!("Merging txns after discarding stopped.");
-            let last_round_txns: Vec<TxnIdx1> =
-                remaining_txns.into_iter().flatten().collect();
+            let last_round_txns: Vec<TxnIdx1> = remaining_txns.into_iter().flatten().collect();
             remaining_txns = vec![vec![]; state.num_executor_shards];
             remaining_txns[state.num_executor_shards - 1] = last_round_txns;
         }
@@ -65,15 +63,9 @@ impl PartitionerV2 {
             (0..state.num_executor_shards)
                 .into_par_iter()
                 .for_each(|shard_id| {
-                    remaining_txns[shard_id]
-                        .par_iter()
-                        .for_each(|&txn_idx1| {
-                            state.update_trackers_on_accepting(
-                                txn_idx1,
-                                last_round_id,
-                                shard_id,
-                            );
-                        });
+                    remaining_txns[shard_id].par_iter().for_each(|&txn_idx1| {
+                        state.update_trackers_on_accepting(txn_idx1, last_round_id, shard_id);
+                    });
                 });
         });
         state.finalized_txn_matrix.push(remaining_txns);
@@ -85,10 +77,7 @@ impl PartitionerV2 {
         state: &mut PartitionState,
         round_id: RoundId,
         remaining_txns: Vec<Vec<TxnIdx1>>,
-    ) -> (
-        Vec<Vec<TxnIdx1>>,
-        Vec<Vec<TxnIdx1>>,
-    ) {
+    ) -> (Vec<Vec<TxnIdx1>>, Vec<Vec<TxnIdx1>>) {
         let _timer = MISC_TIMERS_SECONDS
             .with_label_values(&[format!("round_{round_id}").as_str()])
             .start_timer();
@@ -99,10 +88,8 @@ impl PartitionerV2 {
         // 1. Key conflicts are analyzed and a txn from `remaining_txns` either goes to `discarded` or `tentatively_accepted`.
         // 2. Relative orders of txns from the same sender are analyzed and a txn from `tentatively_accepted` either goes to `finally_accepted` or `discarded`.
         let mut discarded: Vec<RwLock<Vec<TxnIdx1>>> = Vec::with_capacity(num_shards);
-        let mut tentatively_accepted: Vec<RwLock<Vec<TxnIdx1>>> =
-            Vec::with_capacity(num_shards);
-        let mut finally_accepted: Vec<RwLock<Vec<TxnIdx1>>> =
-            Vec::with_capacity(num_shards);
+        let mut tentatively_accepted: Vec<RwLock<Vec<TxnIdx1>>> = Vec::with_capacity(num_shards);
+        let mut finally_accepted: Vec<RwLock<Vec<TxnIdx1>>> = Vec::with_capacity(num_shards);
 
         for txns in remaining_txns.iter() {
             tentatively_accepted.push(RwLock::new(Vec::with_capacity(txns.len())));
@@ -169,10 +156,7 @@ impl PartitionerV2 {
                             .unwrap_or(usize::MAX);
                         if txn_idx1 < min_discarded {
                             state.update_trackers_on_accepting(txn_idx1, round_id, shard_id);
-                            finally_accepted[shard_id]
-                                .write()
-                                .unwrap()
-                                .push(txn_idx1);
+                            finally_accepted[shard_id].write().unwrap().push(txn_idx1);
                         } else {
                             discarded[shard_id].write().unwrap().push(txn_idx1);
                         }

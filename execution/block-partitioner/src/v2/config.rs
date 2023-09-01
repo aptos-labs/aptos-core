@@ -1,29 +1,25 @@
 // Copyright © Aptos Foundation
 
-use crate::{v2::PartitionerV2, BlockPartitioner};
+use crate::{
+    pre_partition::{
+        connected_component::config::ConnectedComponentPartitionerConfig,
+        uniform_partitioner::UniformPartitioner, PrePartitionerConfig,
+    },
+    v2::PartitionerV2,
+    BlockPartitioner, PartitionerConfig,
+};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub struct PartitionerV2Config {
     pub num_threads: usize,
     pub max_partitioning_rounds: usize,
     pub cross_shard_dep_avoid_threshold: f32,
     pub dashmap_num_shards: usize,
     pub partition_last_round: bool,
-    pub load_imbalance_tolerance: f32,
+    pub pre_partition_config: Box<dyn PrePartitionerConfig>,
 }
 
 impl PartitionerV2Config {
-    pub fn build(self) -> Box<dyn BlockPartitioner> {
-        Box::new(PartitionerV2::new(
-            self.num_threads,
-            self.max_partitioning_rounds,
-            self.cross_shard_dep_avoid_threshold,
-            self.dashmap_num_shards,
-            self.partition_last_round,
-            self.load_imbalance_tolerance,
-        ))
-    }
-
     pub fn num_threads(mut self, val: usize) -> Self {
         self.num_threads = val;
         self
@@ -48,11 +44,6 @@ impl PartitionerV2Config {
         self.partition_last_round = val;
         self
     }
-
-    pub fn load_imbalance_tolerance(mut self, val: f32) -> Self {
-        self.load_imbalance_tolerance = val;
-        self
-    }
 }
 
 impl Default for PartitionerV2Config {
@@ -63,7 +54,21 @@ impl Default for PartitionerV2Config {
             cross_shard_dep_avoid_threshold: 0.9,
             dashmap_num_shards: 64,
             partition_last_round: false,
-            load_imbalance_tolerance: 2.0,
+            pre_partition_config: Box::<ConnectedComponentPartitionerConfig>::default(),
         }
+    }
+}
+
+impl PartitionerConfig for PartitionerV2Config {
+    fn build(&self) -> Box<dyn BlockPartitioner> {
+        let pre_partitioner = Box::new(UniformPartitioner {});
+        Box::new(PartitionerV2::new(
+            self.num_threads,
+            self.max_partitioning_rounds,
+            self.cross_shard_dep_avoid_threshold,
+            self.dashmap_num_shards,
+            self.partition_last_round,
+            pre_partitioner,
+        ))
     }
 }

@@ -24,7 +24,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub struct PipelineConfig {
     pub delay_execution_start: bool,
     pub split_stages: bool,
@@ -34,7 +34,7 @@ pub struct PipelineConfig {
     pub num_executor_shards: usize,
     pub async_partitioning: bool,
     pub use_global_executor: bool,
-    pub partitioner_config: PartitionerConfig,
+    pub partitioner_config: Box<dyn PartitionerConfig>,
 }
 
 pub struct Pipeline<V> {
@@ -50,7 +50,7 @@ where
     pub fn new(
         executor: BlockExecutor<V>,
         version: Version,
-        config: PipelineConfig,
+        config: &PipelineConfig,
         // Need to specify num blocks, to size queues correctly, when delay_execution_start, split_stages or skip_commit are used
         num_blocks: Option<usize>,
     ) -> (Self, mpsc::SyncSender<Vec<Transaction>>) {
@@ -104,7 +104,7 @@ where
         let mut join_handles = vec![];
 
         let mut partitioning_stage =
-            BlockPartitioningStage::new(num_partitioner_shards, config.partitioner_config);
+            BlockPartitioningStage::new(num_partitioner_shards, config.partitioner_config.as_ref());
 
         let mut exe = TransactionExecutor::new(executor_1, parent_block_id, ledger_update_sender);
 

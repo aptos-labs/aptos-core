@@ -50,12 +50,7 @@ impl ConflictingTxnTracker {
     }
 
     /// Partitioner has finalized the position of a txn. Remove it from the pending txn list.
-    pub fn mark_txn_ordered(
-        &mut self,
-        txn_id: TxnIdx1,
-        round_id: RoundId,
-        shard_id: ShardId,
-    ) {
+    pub fn mark_txn_ordered(&mut self, txn_id: TxnIdx1, round_id: RoundId, shard_id: ShardId) {
         let sharded_txn_idx = ShardedTxnIndexV2::new(round_id, shard_id, txn_id);
         if self.pending_writes.remove(&txn_id) {
             self.finalized_writes.insert(sharded_txn_idx);
@@ -66,11 +61,7 @@ impl ConflictingTxnTracker {
     }
 
     /// Check if there is a txn writing to the current storage location and its txn_id in the given wrapped range [start, end).
-    pub fn has_write_in_range(
-        &self,
-        start_txn_id: TxnIdx1,
-        end_txn_id: TxnIdx1,
-    ) -> bool {
+    pub fn has_write_in_range(&self, start_txn_id: TxnIdx1, end_txn_id: TxnIdx1) -> bool {
         if start_txn_id <= end_txn_id {
             self.pending_writes
                 .range(start_txn_id..end_txn_id)

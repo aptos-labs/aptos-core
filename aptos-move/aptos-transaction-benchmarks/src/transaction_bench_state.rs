@@ -4,7 +4,7 @@ use crate::{transactions, transactions::RAYON_EXEC_POOL};
 use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_block_partitioner::{
-    sharded_block_partitioner::config::PartitionerV1Config, BlockPartitioner,
+    sharded_block_partitioner::config::PartitionerV1Config, BlockPartitioner, PartitionerConfig,
 };
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{

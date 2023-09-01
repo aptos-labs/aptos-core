@@ -20,7 +20,7 @@ use crate::{
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
 use aptos_block_executor::counters as block_executor_counters;
-use aptos_block_partitioner::PartitionerConfig;
+use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
 use aptos_executor::{
@@ -166,7 +166,7 @@ pub fn run_benchmark<V>(
             db.clone(),
             // Initialization pipeline is temporary, so needs to be fully committed.
             // No discards/aborts allowed during initialization, even if they are allowed later.
-            PipelineConfig {
+            &PipelineConfig {
                 delay_execution_start: false,
                 split_stages: false,
                 skip_commit: false,
@@ -175,7 +175,7 @@ pub fn run_benchmark<V>(
                 num_executor_shards: 1,
                 async_partitioning: false,
                 use_global_executor: false,
-                partitioner_config: PartitionerConfig::default(),
+                partitioner_config: Box::<PartitionerV2Config>::default(),
             },
         )
     });
@@ -183,7 +183,7 @@ pub fn run_benchmark<V>(
     let version = db.reader.get_latest_version().unwrap();
 
     let (pipeline, block_sender) =
-        Pipeline::new(executor, version, pipeline_config, Some(num_blocks));
+        Pipeline::new(executor, version, &pipeline_config, Some(num_blocks));
 
     let mut num_accounts_to_load = num_main_signer_accounts;
     if let Some(mix) = &transaction_mix {
@@ -345,7 +345,7 @@ fn init_workload<V>(
     mut main_signer_accounts: Vec<LocalAccount>,
     burner_accounts: Vec<LocalAccount>,
     db: DbReaderWriter,
-    pipeline_config: PipelineConfig,
+    pipeline_config: &PipelineConfig,
 ) -> Box<dyn TransactionGeneratorCreator>
 where
     V: TransactionBlockExecutor + 'static,
@@ -451,7 +451,7 @@ fn add_accounts_impl<V>(
     let (pipeline, block_sender) = Pipeline::new(
         executor,
         version,
-        pipeline_config,
+        &pipeline_config,
         Some(1 + num_new_accounts / block_size * 101 / 100),
     );
 
@@ -557,6 +557,7 @@ impl GasMesurement {
 #[cfg(test)]
 mod tests {
     use crate::{native_executor::NativeExecutor, pipeline::PipelineConfig};
+    use aptos_block_partitioner::default_partitioner_config;
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_executor::block_executor::TransactionBlockExecutor;
     use aptos_temppath::TempPath;
@@ -596,7 +597,7 @@ mod tests {
                 num_executor_shards: 1,
                 async_partitioning: false,
                 use_global_executor: false,
-                partitioner_config: Default::default(),
+                partitioner_config: default_partitioner_config(),
             },
         );
 
@@ -628,7 +629,7 @@ mod tests {
                 num_executor_shards: 1,
                 async_partitioning: false,
                 use_global_executor: false,
-                partitioner_config: Default::default(),
+                partitioner_config: default_partitioner_config(),
             },
         );
     }

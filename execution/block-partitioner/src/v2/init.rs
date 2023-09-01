@@ -1,15 +1,14 @@
 // Copyright © Aptos Foundation
 
-use std::collections::HashMap;
-use std::sync::atomic::Ordering;
-use crate::{get_anchor_shard_id, Sender, v2::{
-    conflicting_txn_tracker::ConflictingTxnTracker, counters::MISC_TIMERS_SECONDS,
-    state::PartitionState, PartitionerV2,
-}};
+use crate::{
+    get_anchor_shard_id,
+    v2::{
+        conflicting_txn_tracker::ConflictingTxnTracker, counters::MISC_TIMERS_SECONDS,
+        state::PartitionState, types::TxnIdx0, PartitionerV2,
+    },
+};
 use rayon::{iter::ParallelIterator, prelude::IntoParallelIterator};
 use std::sync::RwLock;
-use rayon::prelude::IntoParallelRefIterator;
-use crate::v2::types::{SenderIdx, TxnIdx0};
 
 impl PartitionerV2 {
     pub(crate) fn init(state: &mut PartitionState) {
@@ -37,7 +36,7 @@ impl PartitionerV2 {
                             } else {
                                 state.read_sets[txn_idx0].write().unwrap().insert(key_idx);
                             }
-                            let tracker_ref = state.trackers.entry(key_idx).or_insert_with(|| {
+                            state.trackers.entry(key_idx).or_insert_with(|| {
                                 let anchor_shard_id = get_anchor_shard_id(
                                     storage_location,
                                     state.num_executor_shards,

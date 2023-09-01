@@ -1,15 +1,19 @@
 // Copyright © Aptos Foundation
 
-use std::collections::BinaryHeap;
 use itertools::Itertools;
+use std::collections::BinaryHeap;
 
-/// Assign a list of tasks to a set of workers in a way that minimize the longest pole.
+/// The longest-processing-time-first scheduling.
 ///
 /// Time complexity: O(num_tasks * log2(num_workers))
-pub fn assign_tasks_to_workers(tasks: &Vec<u64>, num_workers: usize) -> (u64, Vec<usize>) {
+pub fn longest_processing_time_first(tasks: &Vec<u64>, num_workers: usize) -> (u64, Vec<usize>) {
     assert!(num_workers >= 1);
     let num_tasks = tasks.len();
-    let mut cost_tid_pairs: Vec<(u64, usize)> = tasks.iter().enumerate().map(|(tid, cost)| (*cost, tid)).collect();
+    let mut cost_tid_pairs: Vec<(u64, usize)> = tasks
+        .iter()
+        .enumerate()
+        .map(|(tid, cost)| (*cost, tid))
+        .collect();
     cost_tid_pairs.sort_by(|a, b| b.cmp(a));
     let mut worker_prio_heap: BinaryHeap<(u64, usize)> =
         BinaryHeap::from((0..num_workers).map(|wid| (u64::MAX, wid)).collect_vec());
@@ -29,20 +33,20 @@ pub fn assign_tasks_to_workers(tasks: &Vec<u64>, num_workers: usize) -> (u64, Ve
 }
 
 #[test]
-fn test_assign_tasks_to_workers() {
-    let (actual, assignment) = assign_tasks_to_workers(&vec![1, 2, 3, 4, 5], 1);
+fn test_longest_processing_time_first() {
+    let (actual, assignment) = longest_processing_time_first(&vec![1, 2, 3, 4, 5], 1);
     assert_eq!(15, actual);
     println!("{:?}", assignment);
-    let (actual, assignment) = assign_tasks_to_workers(&vec![1, 2, 3, 4, 5], 2);
+    let (actual, assignment) = longest_processing_time_first(&vec![1, 2, 3, 4, 5], 2);
     assert_eq!(8, actual);
     println!("{:?}", assignment);
-    let (actual, assignment) = assign_tasks_to_workers(&vec![1, 2, 3, 4, 5], 3);
+    let (actual, assignment) = longest_processing_time_first(&vec![1, 2, 3, 4, 5], 3);
     assert_eq!(5, actual);
     println!("{:?}", assignment);
-    let (actual, assignment) = assign_tasks_to_workers(&vec![1, 2, 3, 4, 5], 4);
+    let (actual, assignment) = longest_processing_time_first(&vec![1, 2, 3, 4, 5], 4);
     assert_eq!(5, actual);
     println!("{:?}", assignment);
-    let (actual, assignment) = assign_tasks_to_workers(&vec![1, 2, 3, 4, 5], 5);
+    let (actual, assignment) = longest_processing_time_first(&vec![1, 2, 3, 4, 5], 5);
     assert_eq!(5, actual);
     println!("{:?}", assignment);
 }

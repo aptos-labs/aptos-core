@@ -1,11 +1,6 @@
 // Copyright © Aptos Foundation
 
-use std::collections::{HashMap, VecDeque};
-use crate::{
-    pre_partition::{uniform_partitioner::UniformPartitioner, PrePartitioner},
-    v2::counters::MISC_TIMERS_SECONDS,
-    BlockPartitioner,
-};
+use crate::{pre_partition::PrePartitioner, v2::counters::MISC_TIMERS_SECONDS, BlockPartitioner};
 use aptos_types::{
     block_executor::partitioner::{PartitionedTransactions, RoundId},
     transaction::analyzed_transaction::AnalyzedTransaction,
@@ -13,26 +8,31 @@ use aptos_types::{
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use state::PartitionState;
 use std::sync::{Arc, RwLock};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use crate::v2::load_balance::assign_tasks_to_workers;
-use crate::v2::types::{TxnIdx0, TxnIdx1};
-use crate::v2::union_find::UnionFind;
 
 mod build_edge;
 pub mod config;
 mod conflicting_txn_tracker;
 mod counters;
 mod init;
-mod pre_partition;
+pub(crate) mod load_balance;
 mod partition_to_matrix;
 pub(crate) mod state;
+#[cfg(test)]
+mod tests;
 pub mod types;
-mod union_find;
-mod load_balance;
+pub(crate) mod union_find;
 
-/// Basically `ShardedBlockPartitioner` but:
-/// - Not pre-partitioned by txn sender.
-/// - implemented more efficiently.
+/// A block partitioner that works as follows.
+/// - Use a given pre-partitioner to partition a given block into some shards.
+/// - Discard some txns from each shard, so the remaining txns has 0 cross-shard dependencies.
+/// - Use the discarded txns to form a new round (but keep the partitioned status), and do the same discarding work.
+/// - Repeating the work until we have enough number of rounds, or the number of discarded txns is lower than a threshold. We now have a txn matrix.
+/// - Optionally, merge the txns in the last round and mark them to be executed in a special global executor.
+/// - Calculate cross-shard dependencies for each txn.
+///
+/// Note that this is essentially `ShardedBlockPartitioner` but:
+/// - with configurable PrePartitioner.
+/// - implemented more efficiently (~2.5x faster).
 pub struct PartitionerV2 {
     pre_partitioner: Box<dyn PrePartitioner>,
     thread_pool: Arc<ThreadPool>,
@@ -40,7 +40,6 @@ pub struct PartitionerV2 {
     cross_shard_dep_avoid_threshold: f32,
     dashmap_num_shards: usize,
     partition_last_round: bool,
-    load_imbalance_tolerance: f32,
 }
 
 impl PartitionerV2 {
@@ -50,7 +49,7 @@ impl PartitionerV2 {
         cross_shard_dep_avoid_threshold: f32,
         dashmap_num_shards: usize,
         partition_last_round: bool,
-        load_imbalance_tolerance: f32,
+        pre_partitioner: Box<dyn PrePartitioner>,
     ) -> Self {
         let thread_pool = Arc::new(
             ThreadPoolBuilder::new()
@@ -59,96 +58,13 @@ impl PartitionerV2 {
                 .unwrap(),
         );
         Self {
-            pre_partitioner: Box::new(UniformPartitioner {}), //TODO: parameterize it.
+            pre_partitioner,
             thread_pool,
             max_partitioning_rounds: num_rounds_limit,
             cross_shard_dep_avoid_threshold,
             dashmap_num_shards,
             partition_last_round,
-            load_imbalance_tolerance,
         }
-    }
-
-    fn pre_partition(
-        state: &mut PartitionState,
-    ) {
-        // Union-find.
-        let num_senders = state.num_senders();
-        let num_keys = state.num_keys();
-        let mut uf = UnionFind::new(num_senders + num_keys);
-        for txn_idx0 in 0..state.num_txns() {
-            let sender_idx = state.sender_idx(txn_idx0);
-            let write_set = state.write_sets[txn_idx0].read().unwrap();
-            let read_set = state.read_sets[txn_idx0].read().unwrap();
-            for &key_idx in write_set.iter().chain(read_set.iter()) {
-                let key_idx_in_uf = num_senders + key_idx;
-                uf.union(key_idx_in_uf, sender_idx);
-            }
-        }
-
-        let mut txns_by_set: Vec<VecDeque<TxnIdx0>> = Vec::new();
-        let mut set_idx_registry: HashMap<usize, usize> = HashMap::new();
-        let set_idx_counter = AtomicUsize::new(0);
-        for txn_idx0 in 0..state.num_txns() {
-            let sender_idx = state.sender_idx(txn_idx0);
-            let uf_set_idx = uf.find(sender_idx);
-            let set_idx = set_idx_registry.entry(uf_set_idx).or_insert_with(||{
-                txns_by_set.push(VecDeque::new());
-                set_idx_counter.fetch_add(1, Ordering::SeqCst)
-            });
-            txns_by_set[*set_idx].push_back(txn_idx0);
-        }
-
-        let group_size_limit = ((state.num_txns() as f32) * state.load_imbalance_tolerance / (state.num_executor_shards as f32)).ceil() as usize;
-
-        // Prepare groups.
-        let mut groups: Vec<(usize,usize)> = txns_by_set.iter().enumerate().flat_map(|(set_idx, txns)|{
-            let num_big_chunks = txns.len() / group_size_limit;
-            let reminder_chunk_size = txns.len() % group_size_limit;
-            let mut ret = vec![(set_idx, group_size_limit); num_big_chunks];
-            if reminder_chunk_size >= 1 {
-                ret.push((set_idx, reminder_chunk_size));
-            }
-            ret
-        }).collect();
-
-        // Assign groups to shards in a way that minimize the longest pole.
-        let tasks: Vec<u64> = groups.iter().map(|(_, size)|(*size) as u64).collect();
-        let (_longest_pole, group_destinations) = assign_tasks_to_workers(&tasks, state.num_executor_shards);
-
-        let mut groups_by_shard: Vec<Vec<usize>> = vec![vec![]; state.num_executor_shards];
-        for (group_id, group_dest) in group_destinations.iter().enumerate() {
-            let shard_id = group_destinations[group_id];
-            groups_by_shard[shard_id].push(group_id);
-        }
-
-        state.pre_partitioned_idx0s = vec![vec![]; state.num_executor_shards];
-        for shard_id in (0..state.num_executor_shards) {
-            for &group_id in groups_by_shard[shard_id].iter() {
-                let (set_id, amount) = groups[group_id];
-                for _ in 0..amount {
-                    let txn_idx0 = txns_by_set[set_id].pop_front().unwrap();
-                    state.pre_partitioned_idx0s[shard_id].push(txn_idx0);
-                }
-            }
-        }
-
-        // Prepare `state.i1_to_i0` and `state.start_txn_idxs_by_shard`.
-        let mut i1 = 0;
-        for (shard_id, txn_idxs) in state.pre_partitioned_idx0s.iter().enumerate() {
-            state.start_txn_idxs_by_shard[shard_id] = i1;
-            for &i0 in txn_idxs {
-                state.idx1_to_idx0[i1] = i0;
-                i1 += 1;
-            }
-        }
-
-        // Prepare `state.pre_partitioned`.
-        state.pre_partitioned = (0..state.num_executor_shards).into_iter().map(|shard_id|{
-            let start = state.start_txn_idxs_by_shard[shard_id];
-            let end: TxnIdx1 = if shard_id == state.num_executor_shards - 1 { state.num_txns() } else { state.start_txn_idxs_by_shard[shard_id + 1] };
-            (start..end).collect()
-        }).collect();
     }
 }
 
@@ -170,21 +86,20 @@ impl BlockPartitioner for PartitionerV2 {
             self.max_partitioning_rounds,
             self.cross_shard_dep_avoid_threshold,
             self.partition_last_round,
-            self.load_imbalance_tolerance,
         );
         // Step 1: build some necessary indices for txn senders/storage locations.
         Self::init(&mut state);
 
         // Step 2: pre-partition.
-        Self::pre_partition(&mut state);
+        self.pre_partitioner.pre_partition(&mut state);
 
         // Step 3: update trackers.
         for txn_idx1 in 0..state.num_txns() {
             let txn_idx0 = state.idx1_to_idx0[txn_idx1];
             let wset_guard = state.write_sets[txn_idx0].read().unwrap();
             let rset_guard = state.read_sets[txn_idx0].read().unwrap();
-            let writes = wset_guard.iter().map(|key_idx|(key_idx, true));
-            let reads = rset_guard.iter().map(|key_idx|(key_idx, false));;
+            let writes = wset_guard.iter().map(|key_idx| (key_idx, true));
+            let reads = rset_guard.iter().map(|key_idx| (key_idx, false));
             for (key_idx, is_write) in writes.chain(reads) {
                 let tracker_ref = state.trackers.get(key_idx).unwrap();
                 let mut tracker = tracker_ref.write().unwrap();
@@ -193,7 +108,6 @@ impl BlockPartitioner for PartitionerV2 {
                 } else {
                     tracker.add_read_candidate(txn_idx1);
                 }
-
             }
         }
 
@@ -213,42 +127,6 @@ impl BlockPartitioner for PartitionerV2 {
             drop(state);
         });
         ret
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        test_utils::{assert_deterministic_result, P2PBlockGenerator},
-        v2::PartitionerV2,
-        BlockPartitioner,
-    };
-    use rand::{thread_rng, Rng};
-    use std::sync::Arc;
-
-    #[test]
-    fn test_partitioner_v2_correctness() {
-        for merge_discarded in [false, true] {
-            let block_generator = P2PBlockGenerator::new(100);
-            let partitioner = PartitionerV2::new(8, 4, 0.9, 64, merge_discarded, 2.0);
-            let mut rng = thread_rng();
-            for _run_id in 0..20 {
-                let block_size = 10_u64.pow(rng.gen_range(0, 4)) as usize;
-                let num_shards = rng.gen_range(1, 10);
-                let block = block_generator.rand_block(&mut rng, block_size);
-                let block_clone = block.clone();
-                let partitioned = partitioner.partition(block, num_shards);
-                crate::test_utils::verify_partitioner_output(&block_clone, &partitioned);
-            }
-        }
-    }
-
-    #[test]
-    fn test_partitioner_v2_determinism() {
-        for merge_discarded in [false, true] {
-            let partitioner = Arc::new(PartitionerV2::new(4, 4, 0.9, 64, merge_discarded, 2.0));
-            assert_deterministic_result(partitioner);
-        }
     }
 }
 

@@ -12,13 +12,22 @@ use aptos_types::{
     transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
 };
 use move_core_types::account_address::AccountAddress;
-use sharded_block_partitioner::config::PartitionerV1Config;
 use std::{
     collections::hash_map::DefaultHasher,
+    fmt::Debug,
     hash::{Hash, Hasher},
 };
 use v2::config::PartitionerV2Config;
-mod pre_partition;
+pub mod pre_partition;
+
+pub trait PartitionerConfig: Debug {
+    fn build(&self) -> Box<dyn BlockPartitioner>;
+}
+
+/// Create a default `PartitionerConfig`.
+pub fn default_partitioner_config() -> Box<dyn PartitionerConfig> {
+    Box::<PartitionerV2Config>::default()
+}
 
 pub trait BlockPartitioner: Send {
     fn partition(
@@ -38,24 +47,3 @@ fn get_anchor_shard_id(storage_location: &StorageLocation, num_shards: usize) ->
 }
 
 type Sender = Option<AccountAddress>;
-
-#[derive(Clone, Copy, Debug)]
-pub enum PartitionerConfig {
-    V1(PartitionerV1Config),
-    V2(PartitionerV2Config),
-}
-
-impl Default for PartitionerConfig {
-    fn default() -> Self {
-        PartitionerConfig::V2(PartitionerV2Config::default())
-    }
-}
-
-impl PartitionerConfig {
-    pub fn build(self) -> Box<dyn BlockPartitioner> {
-        match self {
-            PartitionerConfig::V1(c) => c.build(),
-            PartitionerConfig::V2(c) => c.build(),
-        }
-    }
-}
