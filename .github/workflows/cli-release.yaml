@@ -32,7 +32,7 @@ jobs:
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Ubuntu"
       - name: Upload Binary
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
+        uses: actions/upload-artifact@v3
         with:
           name: cli-builds
           path: aptos-cli-*.zip
@@ -48,7 +48,7 @@ jobs:
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Ubuntu-22.04"
       - name: Upload Binary
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
+        uses: actions/upload-artifact@v3
         with:
           name: cli-builds
           path: aptos-cli-*.zip
@@ -63,7 +63,7 @@ jobs:
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "MacOSX"
       - name: Upload Binary
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
+        uses: actions/upload-artifact@v3
         with:
           name: cli-builds
           path: aptos-cli-*.zip
@@ -78,7 +78,7 @@ jobs:
       - name: Build CLI
         run: scripts\cli\build_cli_release.ps1
       - name: Upload Binary
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
+        uses: actions/upload-artifact@v3
         with:
           name: cli-builds
           path: aptos-cli-*.zip
