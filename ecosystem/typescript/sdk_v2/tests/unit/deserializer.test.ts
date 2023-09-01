@@ -130,6 +130,52 @@ describe("BCS Deserializer", () => {
     }).toThrow("Reached to the end of buffer");
   });
 
+  it("deserializes a single deserializable class", () => {
+    // Define the MoveStruct class that implements the Deserializable interface
+    class MoveStruct implements Serializable {
+      constructor(
+        public name: string,
+        public description: string,
+        public enabled: boolean,
+        public vectorU8: Array<number>,
+      ) {}
+
+      serialize(serializer: Serializer): void {
+        serializer.serializeStr(this.name);
+        serializer.serializeStr(this.description);
+        serializer.serializeBool(this.enabled);
+        serializer.serializeU32AsUleb128(this.vectorU8.length);
+        this.vectorU8.forEach((n) => serializer.serializeU8(n));
+      }
+
+      static deserialize(deserializer: Deserializer): MoveStruct {
+        const name = deserializer.deserializeStr();
+        const description = deserializer.deserializeStr();
+        const enabled = deserializer.deserializeBool();
+        const length = deserializer.deserializeUleb128AsU32();
+        const vectorU8 = new Array<number>();
+        for (let i = 0; i < length; i++) {
+          vectorU8.push(deserializer.deserializeU8());
+        }
+        return new MoveStruct(name, description, enabled, vectorU8);
+      }
+    }
+    // Construct a MoveStruct
+    const moveStruct = new MoveStruct("abc", "123", false, [1, 2, 3, 4]);
+    // Serialize a MoveStruct instance.
+    const serializer = new Serializer();
+    serializer.serialize(moveStruct);
+    const moveStructBcsBytes = serializer.toUint8Array();
+    // Load the bytes into the Deserializer buffer
+    const deserializer = new Deserializer(moveStructBcsBytes);
+    // Deserialize the buffered bytes into an instance of MoveStruct
+    const deserializedMoveStruct = deserializer.deserialize(MoveStruct);
+    expect(deserializedMoveStruct.name).toEqual(moveStruct.name);
+    expect(deserializedMoveStruct.description).toEqual(moveStruct.description);
+    expect(deserializedMoveStruct.enabled).toEqual(moveStruct.enabled);
+    expect(deserializedMoveStruct.vectorU8).toEqual(moveStruct.vectorU8);
+  });
+
   it("deserializes and composes an abstract Deserializable class instance from composed deserialize calls", () => {
     abstract class MoveStruct {
       abstract serialize(serializer: Serializer): void;

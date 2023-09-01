@@ -191,7 +191,7 @@ export class Deserializer {
 
   /**
    * This function deserializes a Deserializable value. The bytes must be loaded into the Serializer already.
-   * Note that it does NOT take in the value, it takes in the class type of the value that implements Serializable.
+   * Note that it does not take in the value, it takes in the class type of the value that implements Serializable.
    *
    * The process of using this function is as follows:
    * 1. Serialize the value of class type T using its `serialize` function.
@@ -202,29 +202,37 @@ export class Deserializer {
    *
    * @example
    * // Define the MoveStruct class that implements the Deserializable interface
-   * class MoveStruct implements Deserializable {
-   *     constructor(
-   *         public creatorAddress: AccountAddress, // where AccountAddress implements Serializable
-   *         public collectionName: string,
-   *         public tokenName: string
-   *     ) {}
+   *  class MoveStruct implements Serializable {
+   *    constructor(
+   *      public name: string,
+   *      public description: string,
+   *      public enabled: boolean,
+   *      public vectorU8: Array<number>,
+   *    ) {}
    *
    *    serialize(serializer: Serializer): void {
-   *         serializer.serialize(this.creatorAddress);
-   *         serializer.serializeStr(this.collectionName);
-   *         serializer.serializeStr(this.tokenName);
+   *      serializer.serializeStr(this.name);
+   *      serializer.serializeStr(this.description);
+   *      serializer.serializeBool(this.enabled);
+   *      serializer.serializeU32AsUleb128(this.vectorU8.length);
+   *      this.vectorU8.forEach((n) => serializer.serializeU8(n));
    *    }
    *
-   *     static deserialize(deserializer: Deserializer): MoveStruct {
-   *         deserializer.deserialize(this.creatorAddress);
-   *         deserializer.deserializeStr(this.collectionName);
-   *         deserializer.deserializeStr(this.tokenName);
-   *         return new MoveStruct(this.creatorAddress, this.collectionName, this.tokenName);
-   *     }
-   * }
+   *    static deserialize(deserializer: Deserializer): MoveStruct {
+   *      const name = deserializer.deserializeStr();
+   *      const description = deserializer.deserializeStr();
+   *      const enabled = deserializer.deserializeBool();
+   *      const length = deserializer.deserializeUleb128AsU32();
+   *      const vectorU8 = new Array<number>();
+   *      for (let i = 0; i < length; i++) {
+   *        vectorU8.push(deserializer.deserializeU8());
+   *      }
+   *      return new MoveStruct(name, description, enabled, vectorU8);
+   *    }
+   *  }
    *
    * // Construct a MoveStruct
-   * const moveStruct = new MoveStruct(new AccountAddress(...), "MyCollection", "TokenA");
+   * const moveStruct = new MoveStruct("abc", "123", false, [1, 2, 3, 4]);
    *
    * // Serialize a MoveStruct instance.
    * const serializer = new Serializer();
@@ -236,9 +244,11 @@ export class Deserializer {
    *
    * // Deserialize the buffered bytes into an instance of MoveStruct
    * const deserializedMoveStruct = deserializer.deserialize(MoveStruct);
-   * assert(deserializedMoveStruct.creatorAddress === moveStruct.creatorAddress);
-   * assert(deserializedMoveStruct.collectionName === moveStruct.collectionName);
-   * assert(deserializedMoveStruct.tokenName === moveStruct.tokenName);
+   * assert(deserializedMoveStruct.name === moveStruct.name);
+   * assert(deserializedMoveStruct.description === moveStruct.description);
+   * assert(deserializedMoveStruct.enabled === moveStruct.enabled);
+   * assert(deserializedMoveStruct.vectorU8.length === moveStruct.vectorU8.length);
+   * deserializeMoveStruct.vectorU8.forEach((n, i) => assert(n === moveStruct.vectorU8[i]));
    *
    * @returns the deserialized value of class type T
    */
