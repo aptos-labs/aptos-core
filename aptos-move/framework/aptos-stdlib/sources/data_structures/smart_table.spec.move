@@ -15,7 +15,7 @@ spec aptos_std::smart_table {
             map_spec_set = spec_set,
             map_spec_del = spec_remove,
             map_spec_len = spec_len,
-            map_spec_has_key = spec_contains;
+        map_spec_has_key = spec_contains;
     }
 
     spec new_with_config<K: copy + drop + store, V: store>(num_initial_buckets: u64, split_load_threshold: u8, target_bucket_size: u64): SmartTable<K, V> {
@@ -26,8 +26,12 @@ spec aptos_std::smart_table {
         pragma verify = false;
     }
 
+    spec clear<K: drop, V: drop>(table: &mut SmartTable<K, V>) {
+        pragma verify = false;
+    }
+
     spec split_one_bucket<K, V>(table: &mut SmartTable<K, V>) {
-        pragma verify= false;
+        pragma verify = false;
     }
 
     spec bucket_index(level: u8, num_buckets: u64, hash: u64): u64 {
@@ -42,11 +46,41 @@ spec aptos_std::smart_table {
         pragma verify = false;
     }
 
+    spec to_simple_map<K: store + copy + drop, V: store + copy>(
+    table: &SmartTable<K, V>,
+    ): SimpleMap<K, V> {
+        pragma verify = false;
+    }
+
+    spec add_all<K, V>(table: &mut SmartTable<K, V>, keys: vector<K>, values: vector<V>) {
+        pragma verify = false;
+    }
+
     spec update_split_load_threshold<K, V>(table: &mut SmartTable<K, V>, split_load_threshold: u8) {
         pragma verify = false;
     }
 
     spec update_target_bucket_size<K, V>(table: &mut SmartTable<K, V>, target_bucket_size: u64) {
+        pragma verify = false;
+    }
+
+    spec borrow_kv<K, V>(e: &Entry<K, V>): (&K, &V) {
+        pragma verify = false;
+    }
+
+    spec borrow_kv_mut<K, V>(e: &mut Entry<K, V>): (&mut K, &mut V) {
+        pragma verify = false;
+    }
+
+    spec num_buckets<K, V>(table: &SmartTable<K, V>): u64 {
+        pragma verify = false;
+    }
+
+    spec borrow_buckets<K, V>(table: &SmartTable<K, V>): &TableWithLength<u64, vector<Entry<K, V>>> {
+        pragma verify = false;
+    }
+
+    spec borrow_buckets_mut<K, V>(table: &mut SmartTable<K, V>): &mut TableWithLength<u64, vector<Entry<K, V>>> {
         pragma verify = false;
     }
 

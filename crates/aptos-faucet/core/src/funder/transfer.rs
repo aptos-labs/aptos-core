@@ -234,6 +234,7 @@ impl FunderTrait for TransferFunder {
         amount: Option<u64>,
         receiver_address: AccountAddress,
         check_only: bool,
+        did_bypass_checkers: bool,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
         // Confirm the funder has sufficient balance, return a 500 if not. This
         // will only happen briefly, soon after we get into this state the LB
@@ -244,7 +245,7 @@ impl FunderTrait for TransferFunder {
         let client = self.get_api_client();
 
         // Determine amount to fund.
-        let amount = self.get_amount(amount);
+        let amount = self.get_amount(amount, did_bypass_checkers);
 
         // Update the sequence numbers of the accounts.
         let (_funder_seq_num, receiver_seq_num) = update_sequence_numbers(
@@ -295,7 +296,13 @@ impl FunderTrait for TransferFunder {
         Ok(transactions)
     }
 
-    fn get_amount(&self, amount: Option<u64>) -> u64 {
+    fn get_amount(
+        &self,
+        amount: Option<u64>,
+        // Ignored for now with TransferFunder, since generally we don't use Bypassers
+        // when using the TransferFunder.
+        _did_bypass_checkers: bool,
+    ) -> u64 {
         match amount {
             Some(amount) => std::cmp::min(amount, self.amount_to_fund.0),
             None => self.amount_to_fund.0,

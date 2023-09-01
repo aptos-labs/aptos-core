@@ -1,4 +1,4 @@
-module token_objects::hero {
+module hero::hero {
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
@@ -72,7 +72,7 @@ module token_objects::hero {
         );
 
         let on_chain_config = OnChainConfig {
-            collection: string::utf8(b"Hero Quest!"),
+            collection,
         };
         move_to(account, on_chain_config);
     }

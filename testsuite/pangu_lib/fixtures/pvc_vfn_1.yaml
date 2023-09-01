@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app.kubernetes.io/instance: test_username-vfn-pvc
+    app.kubernetes.io/name: test_username
+    managed-by: pangu
+    type: vfn
+  name: test_username-vfn-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

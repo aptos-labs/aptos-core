@@ -6,8 +6,11 @@ use anyhow::{format_err, Context, Result};
 use aptos_config::config::{ChainHealthBackoffValues, ConsensusConfig, PipelineBackpressureValues};
 use aptos_forge::{
     args::TransactionTypeArg,
-    success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria},
-    system_metrics::{MetricsThreshold, SystemMetricsThreshold},
+    prometheus_metrics::LatencyBreakdownSlice,
+    success_criteria::{
+        LatencyBreakdownThreshold, LatencyType, MetricsThreshold, StateProgressThreshold,
+        SuccessCriteria, SystemMetricsThreshold,
+    },
     ForgeConfig, Options, *,
 };
 use aptos_logger::{info, Level};
@@ -41,7 +44,7 @@ use aptos_testcases::{
     validator_reboot_stress_test::ValidatorRebootStressTest,
     CompositeNetworkTest,
 };
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, __derive_refs::once_cell::sync::Lazy};
 use futures::stream::{FuturesUnordered, StreamExt};
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
@@ -215,6 +218,24 @@ struct Resize {
     #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
 }
+
+// common metrics thresholds:
+static SYSTEM_12_CORES_5GB_THRESHOLD: Lazy<SystemMetricsThreshold> = Lazy::new(|| {
+    SystemMetricsThreshold::new(
+        // Check that we don't use more than 12 CPU cores for 30% of the time.
+        MetricsThreshold::new(12.0, 30),
+        // Check that we don't use more than 5 GB of memory for 30% of the time.
+        MetricsThreshold::new_gb(5.0, 30),
+    )
+});
+static SYSTEM_12_CORES_10GB_THRESHOLD: Lazy<SystemMetricsThreshold> = Lazy::new(|| {
+    SystemMetricsThreshold::new(
+        // Check that we don't use more than 12 CPU cores for 30% of the time.
+        MetricsThreshold::new(12.0, 30),
+        // Check that we don't use more than 10 GB of memory for 30% of the time.
+        MetricsThreshold::new_gb(10.0, 30),
+    )
+});
 
 /// Make an easy to remember random namespace for your testnet
 fn random_namespace<R: Rng>(dictionary: Vec<String>, rng: &mut R) -> Result<String> {
@@ -506,6 +527,7 @@ fn single_test_suite(
         // Rest of the tests:
         "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
+        "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
         "epoch_changer_performance" => epoch_changer_performance(),
@@ -679,12 +701,7 @@ fn twin_validator_test() -> ForgeConfig {
             SuccessCriteria::new(5500)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
-                .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
-                    // Check that we don't use more than 5 GB of memory for 30% of the time.
-                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
-                ))
+                .add_system_metrics_threshold(SYSTEM_12_CORES_5GB_THRESHOLD.clone())
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
@@ -781,31 +798,19 @@ fn consensus_stress_test() -> ForgeConfig {
     })
 }
 
-fn realistic_env_load_sweep_test() -> ForgeConfig {
+fn realistic_env_sweep_wrap(
+    num_validators: usize,
+    num_fullnodes: usize,
+    test: LoadVsPerfBenchmark,
+) -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
-        .add_network_test(wrap_with_realistic_env(LoadVsPerfBenchmark {
-            test: Box::new(PerformanceBenchmark),
-            workloads: Workloads::TPS(&[10, 100, 1000, 3000, 5000]),
-            criteria: [
-                (9, 1.5, 3., 4.),
-                (95, 1.5, 3., 4.),
-                (950, 2., 3., 4.),
-                (2750, 2.5, 3.5, 4.5),
-                (4600, 3., 4., 5.),
-            ]
-            .into_iter()
-            .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
-                SuccessCriteria::new(min_tps)
-                    .add_max_expired_tps(0)
-                    .add_max_failed_submission_tps(0)
-                    .add_latency_threshold(max_lat_p50, LatencyType::P50)
-                    .add_latency_threshold(max_lat_p90, LatencyType::P90)
-                    .add_latency_threshold(max_lat_p99, LatencyType::P99)
-            })
-            .collect(),
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_fullnodes)
+        .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["validator"]["config"]["execution"]
+                ["processed_transactions_detailed_counters"] = true.into();
         }))
+        .add_network_test(wrap_with_realistic_env(test))
         // Test inherits the main EmitJobRequest, so update here for more precise latency measurements
         .with_emit_job(
             EmitJobRequest::default().latency_polling_interval(Duration::from_millis(100)),
@@ -823,6 +828,98 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
                     max_round_gap: 10,
                 }),
         )
+}
+
+fn realistic_env_load_sweep_test() -> ForgeConfig {
+    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
+        test: Box::new(PerformanceBenchmark),
+        workloads: Workloads::TPS(&[10, 100, 1000, 3000, 5000]),
+        criteria: [
+            (9, 1.5, 3., 4.),
+            (95, 1.5, 3., 4.),
+            (950, 2., 3., 4.),
+            (2750, 2.5, 3.5, 4.5),
+            (4600, 3., 4., 5.),
+        ]
+        .into_iter()
+        .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
+            SuccessCriteria::new(min_tps)
+                .add_max_expired_tps(0)
+                .add_max_failed_submission_tps(0)
+                .add_latency_threshold(max_lat_p50, LatencyType::P50)
+                .add_latency_threshold(max_lat_p90, LatencyType::P90)
+                .add_latency_threshold(max_lat_p99, LatencyType::P99)
+        })
+        .collect(),
+    })
+}
+
+fn realistic_env_workload_sweep_test() -> ForgeConfig {
+    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+        test: Box::new(PerformanceBenchmark),
+        workloads: Workloads::TRANSACTIONS(&[
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::CoinTransfer,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 20000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::NoOp,
+                num_modules: 100,
+                unique_senders: false,
+                mempool_backlog: 20000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::ModifyGlobalResource,
+                num_modules: 1,
+                unique_senders: true,
+                mempool_backlog: 20000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
+                num_modules: 1,
+                unique_senders: true,
+                mempool_backlog: 10000,
+            },
+            // transactions get rejected, to fix.
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::PublishPackage,
+            //     num_modules: 1,
+            //     unique_senders: true,
+            //     mempool_backlog: 1000,
+            // },
+        ]),
+        // Investigate/improve to make latency more predictable on different workloads
+        criteria: [
+            (3700, 0.35, 0.5, 0.8, 0.65),
+            (2800, 0.35, 0.5, 1.2, 1.2),
+            (1800, 0.35, 0.5, 1.5, 2.7),
+            (950, 0.35, 0.65, 1.5, 2.7),
+            // (150, 0.5, 1.0, 1.5, 0.65),
+        ]
+        .into_iter()
+        .map(
+            |(min_tps, batch_to_pos, pos_to_proposal, proposal_to_ordered, ordered_to_commit)| {
+                SuccessCriteria::new(min_tps)
+                    .add_max_expired_tps(200)
+                    .add_max_failed_submission_tps(200)
+                    .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
+                        (LatencyBreakdownSlice::QsBatchToPos, batch_to_pos),
+                        (LatencyBreakdownSlice::QsPosToProposal, pos_to_proposal),
+                        (
+                            LatencyBreakdownSlice::ConsensusProposalToOrdered,
+                            proposal_to_ordered,
+                        ),
+                        (
+                            LatencyBreakdownSlice::ConsensusOrderedToCommit,
+                            ordered_to_commit,
+                        ),
+                    ]))
+            },
+        )
+        .collect(),
+    })
 }
 
 fn load_vs_perf_benchmark() -> ForgeConfig {
@@ -859,9 +956,6 @@ fn workload_vs_perf_benchmark() -> ForgeConfig {
             helm_values["validator"]["config"]["execution"]
                 ["processed_transactions_detailed_counters"] = true.into();
         }))
-        // .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-        //     mempool_backlog: 10000,
-        // }))
         .add_network_test(LoadVsPerfBenchmark {
             test: Box::new(PerformanceBenchmark),
             workloads: Workloads::TRANSACTIONS(&[
@@ -869,41 +963,49 @@ fn workload_vs_perf_benchmark() -> ForgeConfig {
                     transaction_type: TransactionTypeArg::NoOp,
                     num_modules: 1,
                     unique_senders: false,
+                    mempool_backlog: 20000,
                 },
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::NoOp,
                     num_modules: 1,
                     unique_senders: true,
+                    mempool_backlog: 20000,
                 },
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::NoOp,
                     num_modules: 1000,
                     unique_senders: false,
+                    mempool_backlog: 20000,
                 },
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::CoinTransfer,
                     num_modules: 1,
                     unique_senders: true,
+                    mempool_backlog: 20000,
                 },
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::CoinTransfer,
                     num_modules: 1,
                     unique_senders: true,
+                    mempool_backlog: 20000,
                 },
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::AccountResource32B,
                     num_modules: 1,
                     unique_senders: true,
+                    mempool_backlog: 20000,
                 },
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::AccountResource1KB,
                     num_modules: 1,
                     unique_senders: true,
+                    mempool_backlog: 20000,
                 },
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::PublishPackage,
                     num_modules: 1,
                     unique_senders: true,
+                    mempool_backlog: 20000,
                 },
             ]),
             criteria: Vec::new(),
@@ -958,9 +1060,9 @@ fn graceful_overload() -> ForgeConfig {
                 .add_wait_for_catchup_s(120)
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 40),
+                    MetricsThreshold::new(12.0, 40),
                     // Check that we don't use more than 5 GB of memory for 30% of the time.
-                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                    MetricsThreshold::new_gb(5.0, 30),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -1009,9 +1111,9 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // overload test uses more CPUs than others, so increase the limit
                     // Check that we don't use more than 18 CPU cores for 30% of the time.
-                    MetricsThreshold::new(18, 40),
+                    MetricsThreshold::new(18.0, 40),
                     // Check that we don't use more than 5 GB of memory for 30% of the time.
-                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                    MetricsThreshold::new_gb(5.0, 30),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -1417,12 +1519,7 @@ fn validators_join_and_leave() -> ForgeConfig {
             SuccessCriteria::new(5000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
-                .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
-                    // Check that we don't use more than 10 GB of memory for 30% of the time.
-                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-                ))
+                .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
@@ -1452,12 +1549,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig {
                 // Give at least 60s for catchup, give 10% of the run for longer durations.
                 (duration.as_secs() / 10).max(60),
             )
-            .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                // Check that we don't use more than 12 CPU cores for 30% of the time.
-                MetricsThreshold::new(12, 30),
-                // Check that we don't use more than 10 GB of memory for 30% of the time.
-                MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-            ))
+            .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
             .add_chain_progress(StateProgressThreshold {
                 max_no_progress_secs: 10.0,
                 max_round_gap: 4,
@@ -1496,15 +1588,7 @@ fn realistic_env_max_load_test(
                     mempool_backlog: 40000,
                 })
                 .init_gas_price_multiplier(20),
-            inner_success_criteria: SuccessCriteria::new(
-                if ha_proxy {
-                    4700
-                } else if long_running {
-                    5500
-                } else {
-                    5000
-                },
-            ),
+            inner_success_criteria: SuccessCriteria::new(if ha_proxy { 4600 } else { 5500 }),
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
@@ -1526,13 +1610,25 @@ fn realistic_env_max_load_test(
                     (duration.as_secs() / 10).max(60),
                 )
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(14, max_cpu_threshold),
+                    // Check that we don't use more than 14 CPU cores for 30% of the time.
+                    MetricsThreshold::new(14.0, max_cpu_threshold),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
-                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+                    MetricsThreshold::new_gb(10.0, 30),
                 ))
-                .add_latency_threshold(3.0, LatencyType::P50)
-                .add_latency_threshold(5.0, LatencyType::P90)
+                .add_latency_threshold(3.4, LatencyType::P50)
+                .add_latency_threshold(4.5, LatencyType::P90)
+                .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
+                    (LatencyBreakdownSlice::QsBatchToPos, 0.35),
+                    (
+                        LatencyBreakdownSlice::QsPosToProposal,
+                        if ha_proxy { 0.6 } else { 0.5 },
+                    ),
+                    (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.8),
+                    (
+                        LatencyBreakdownSlice::ConsensusOrderedToCommit,
+                        if ha_proxy { 1.2 } else { 0.65 },
+                    ),
+                ]))
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
@@ -1588,9 +1684,9 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     // Tuned for throughput uses more cores than regular tests,
                     // as it achieves higher throughput.
                     // Check that we don't use more than 14 CPU cores for 30% of the time.
-                    MetricsThreshold::new(14, 30),
+                    MetricsThreshold::new(14.0, 30),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
-                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+                    MetricsThreshold::new_gb(10.0, 30),
                 ))
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
@@ -1620,12 +1716,7 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig {
                 },
             )
             .add_no_restarts()
-            .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                // Check that we don't use more than 12 CPU cores for 30% of the time.
-                MetricsThreshold::new(12, 30),
-                // Check that we don't use more than 5 GB of memory for 30% of the time.
-                MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
-            )),
+            .add_system_metrics_threshold(SYSTEM_12_CORES_5GB_THRESHOLD.clone()),
         )
 }
 
@@ -1799,12 +1890,7 @@ fn quorum_store_reconfig_enable_test() -> ForgeConfig {
             SuccessCriteria::new(5000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
-                .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
-                    // Check that we don't use more than 10 GB of memory for 30% of the time.
-                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-                ))
+                .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
@@ -1871,12 +1957,7 @@ fn multiregion_benchmark_test() -> ForgeConfig {
                     // Give at least 60s for catchup, give 10% of the run for longer durations.
                     180,
                 )
-                .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
-                    // Check that we don't use more than 10 GB of memory for 30% of the time.
-                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-                ))
+                .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
@@ -1899,14 +1980,20 @@ fn pfn_const_tps(
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
-        .add_network_test(PFNPerformance::new(add_cpu_chaos, add_network_emulation))
+        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Require frequent epoch changes
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(50)
+            SuccessCriteria::new(95)
                 .add_no_restarts()
+                .add_max_expired_tps(0)
+                .add_max_failed_submission_tps(0)
+                // Percentile thresholds are set to +1 second of non-PFN tests. Should be revisited.
+                .add_latency_threshold(2.5, LatencyType::P50)
+                .add_latency_threshold(4., LatencyType::P90)
+                .add_latency_threshold(5., LatencyType::P99)
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup and at most 10% of the run
                     (duration.as_secs() / 10).max(60),
@@ -1942,7 +2029,7 @@ fn pfn_performance(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .add_network_test(PFNPerformance::new(add_cpu_chaos, add_network_emulation))
+        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Require frequent epoch changes
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
@@ -2057,7 +2144,7 @@ impl Test for TransferCoins {
 impl AptosTest for TransferCoins {
     async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
         let client = ctx.client();
-        let mut payer = ctx.random_account();
+        let payer = ctx.random_account();
         let payee = ctx.random_account();
         ctx.create_user_account(payer.public_key()).await?;
         ctx.create_user_account(payee.public_key()).await?;

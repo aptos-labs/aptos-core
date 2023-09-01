@@ -9,7 +9,7 @@ use aptos_types::{
         CrossShardDependencies, CrossShardEdges, ShardId, ShardedTxnIndex, SubBlocksForShard,
         TxnIndex,
     },
-    transaction::Transaction,
+    transaction::analyzed_transaction::AnalyzedTransaction,
 };
 use itertools::Itertools;
 use std::{collections::HashMap, sync::Arc};
@@ -17,7 +17,7 @@ use std::{collections::HashMap, sync::Arc};
 pub struct DependentEdgeCreator {
     shard_id: ShardId,
     cross_shard_client: Arc<dyn CrossShardClientInterface>,
-    froze_sub_blocks: SubBlocksForShard<Transaction>,
+    froze_sub_blocks: SubBlocksForShard<AnalyzedTransaction>,
     num_shards: usize,
     round_id: usize,
 }
@@ -34,7 +34,7 @@ impl DependentEdgeCreator {
     pub fn new(
         shard_id: ShardId,
         cross_shard_client: Arc<dyn CrossShardClientInterface>,
-        froze_sub_blocks: SubBlocksForShard<Transaction>,
+        froze_sub_blocks: SubBlocksForShard<AnalyzedTransaction>,
         num_shards: usize,
         round_id: usize,
     ) -> Self {
@@ -159,7 +159,7 @@ impl DependentEdgeCreator {
         }
     }
 
-    pub fn into_frozen_sub_blocks(self) -> SubBlocksForShard<Transaction> {
+    pub fn into_frozen_sub_blocks(self) -> SubBlocksForShard<AnalyzedTransaction> {
         self.froze_sub_blocks
     }
 }
@@ -254,7 +254,7 @@ mod tests {
                 .iter()
                 .map(|txn_with_deps| {
                     TransactionWithDependencies::new(
-                        txn_with_deps.txn.transaction().clone(),
+                        txn_with_deps.txn.clone(),
                         txn_with_deps.cross_shard_dependencies.clone(),
                     )
                 })

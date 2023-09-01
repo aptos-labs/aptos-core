@@ -5,7 +5,6 @@
 use crate::{
     access_path::AccessPath,
     account_config::CORE_CODE_ADDRESS,
-    chain_id::ChainId,
     event::{EventHandle, EventKey},
 };
 use anyhow::{format_err, Result};
@@ -16,7 +15,7 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, fmt, sync::Arc};
+use std::{collections::HashMap, fmt, fmt::Debug, sync::Arc};
 
 mod approved_execution_hashes;
 mod aptos_features;
@@ -72,30 +71,43 @@ impl fmt::Display for ConfigID {
     }
 }
 
-/// This registry contains the list of on-chain configs that state sync
-/// uses to notify components (e.g., consensus, mempool and networking)
-/// on a reconfiguration event. New configs should be added here.
-///
-/// Note: if state sync is unable to find a config in storage (this is possible
-/// if a node only has old state), the notification will not contain the
-/// config value and the component will need to decide how to handle this.
-pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
-    ApprovedExecutionHashes::CONFIG_ID,
-    ValidatorSet::CONFIG_ID,
-    Version::CONFIG_ID,
-    OnChainConsensusConfig::CONFIG_ID,
-    ChainId::CONFIG_ID,
-];
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OnChainConfigPayload {
-    epoch: u64,
-    configs: Arc<HashMap<ConfigID, Vec<u8>>>,
+pub trait OnChainConfigProvider: Debug + Clone + Send + Sync + 'static {
+    fn get<T: OnChainConfig>(&self) -> Result<T>;
 }
 
-impl OnChainConfigPayload {
-    pub fn new(epoch: u64, configs: Arc<HashMap<ConfigID, Vec<u8>>>) -> Self {
-        Self { epoch, configs }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InMemoryOnChainConfig {
+    configs: HashMap<ConfigID, Vec<u8>>,
+}
+
+impl InMemoryOnChainConfig {
+    pub fn new(configs: HashMap<ConfigID, Vec<u8>>) -> Self {
+        Self { configs }
+    }
+}
+
+impl OnChainConfigProvider for InMemoryOnChainConfig {
+    fn get<T: OnChainConfig>(&self) -> Result<T> {
+        let bytes = self
+            .configs
+            .get(&T::CONFIG_ID)
+            .ok_or_else(|| format_err!("[on-chain cfg] config not in payload"))?;
+        T::deserialize_into_config(bytes)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct OnChainConfigPayload<P: OnChainConfigProvider> {
+    epoch: u64,
+    provider: Arc<P>,
+}
+
+impl<P: OnChainConfigProvider> OnChainConfigPayload<P> {
+    pub fn new(epoch: u64, provider: P) -> Self {
+        Self {
+            epoch,
+            provider: Arc::new(provider),
+        }
     }
 
     pub fn epoch(&self) -> u64 {
@@ -103,29 +115,7 @@ impl OnChainConfigPayload {
     }
 
     pub fn get<T: OnChainConfig>(&self) -> Result<T> {
-        let bytes = self
-            .configs
-            .get(&T::CONFIG_ID)
-            .ok_or_else(|| format_err!("[on-chain cfg] config not in payload"))?;
-        T::deserialize_into_config(bytes)
-    }
-
-    pub fn configs(&self) -> &HashMap<ConfigID, Vec<u8>> {
-        &self.configs
-    }
-}
-
-impl fmt::Display for OnChainConfigPayload {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut config_ids = "".to_string();
-        for id in self.configs.keys() {
-            config_ids += &id.to_string();
-        }
-        write!(
-            f,
-            "OnChainConfigPayload [epoch: {}, configs: {}]",
-            self.epoch, config_ids
-        )
+        self.provider.get()
     }
 }
 

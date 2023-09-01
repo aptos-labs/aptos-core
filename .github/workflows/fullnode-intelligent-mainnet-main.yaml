@@ -1,0 +1,35 @@
+# This workflow runs a public fullnode using the `main` branch,
+# connects the public fullnode to `mainnet` and synchronizes the
+# node using execution or output syncing to verify that nothing
+# has been broken.
+
+name: "fullnode-intelligent-mainnet-main"
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 4 */3 * *" # Once every three days, at 04:30 (UTC)
+
+permissions:
+  contents: read
+  id-token: write
+  actions: write #required for workflow cancellation via check-aptos-core
+
+jobs:
+  check-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
+        with:
+          cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
+
+  fullnode-intelligent-mainnet-main:
+    needs: check-repo
+    uses: ./.github/workflows/run-fullnode-sync.yaml
+    secrets: inherit
+    with:
+      TEST_NAME: fullnode-intelligent-mainnet-main
+      GIT_REF: main
+      NETWORK: mainnet
+      BOOTSTRAPPING_MODE: DownloadLatestStates
+      CONTINUOUS_SYNCING_MODE: ExecuteTransactionsOrApplyOutputs

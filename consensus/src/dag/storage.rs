@@ -3,61 +3,85 @@
 
 use super::{types::Vote, NodeId};
 use crate::{
-    consensusdb::ConsensusDB,
+    consensusdb::{
+        CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema, OrderedAnchorIdSchema,
+    },
     dag::{CertifiedNode, Node},
 };
-use anyhow::Ok;
 use aptos_crypto::HashValue;
-use std::collections::HashMap;
 
-pub trait DAGStorage {
-    fn save_node(&self, node: &Node) -> anyhow::Result<()>;
+pub trait DAGStorage: Send + Sync {
+    fn save_pending_node(&self, node: &Node) -> anyhow::Result<()>;
 
-    fn delete_node(&self, digest: HashValue) -> anyhow::Result<()>;
+    fn get_pending_node(&self) -> anyhow::Result<Option<Node>>;
+
+    fn delete_pending_node(&self) -> anyhow::Result<()>;
 
     fn save_vote(&self, node_id: &NodeId, vote: &Vote) -> anyhow::Result<()>;
 
-    fn get_votes(&self) -> anyhow::Result<HashMap<NodeId, Vote>>;
+    fn get_votes(&self) -> anyhow::Result<Vec<(NodeId, Vote)>>;
 
     fn delete_votes(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()>;
 
     fn save_certified_node(&self, node: &CertifiedNode) -> anyhow::Result<()>;
 
-    fn get_certified_nodes(&self) -> anyhow::Result<HashMap<HashValue, CertifiedNode>>;
+    fn get_certified_nodes(&self) -> anyhow::Result<Vec<(HashValue, CertifiedNode)>>;
 
     fn delete_certified_nodes(&self, digests: Vec<HashValue>) -> anyhow::Result<()>;
+
+    fn save_ordered_anchor_id(&self, node_id: &NodeId) -> anyhow::Result<()>;
+
+    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>>;
+
+    fn delete_ordered_anchor_ids(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()>;
 }
 
 impl DAGStorage for ConsensusDB {
-    fn save_node(&self, node: &Node) -> anyhow::Result<()> {
-        Ok(self.save_node(node)?)
+    fn save_pending_node(&self, node: &Node) -> anyhow::Result<()> {
+        Ok(self.put::<NodeSchema>(&(), node)?)
     }
 
-    fn delete_node(&self, digest: HashValue) -> anyhow::Result<()> {
-        Ok(self.delete_node(digest)?)
+    fn get_pending_node(&self) -> anyhow::Result<Option<Node>> {
+        Ok(self.get::<NodeSchema>(&())?)
+    }
+
+    fn delete_pending_node(&self) -> anyhow::Result<()> {
+        Ok(self.delete::<NodeSchema>(vec![()])?)
     }
 
     fn save_vote(&self, node_id: &NodeId, vote: &Vote) -> anyhow::Result<()> {
-        Ok(self.save_dag_vote(node_id, vote)?)
+        Ok(self.put::<DagVoteSchema>(node_id, vote)?)
     }
 
-    fn get_votes(&self) -> anyhow::Result<HashMap<NodeId, Vote>> {
-        Ok(self.get_dag_votes()?)
+    fn get_votes(&self) -> anyhow::Result<Vec<(NodeId, Vote)>> {
+        Ok(self.get_all::<DagVoteSchema>()?)
     }
 
     fn delete_votes(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()> {
-        Ok(self.delete_dag_votes(node_ids)?)
+        Ok(self.delete::<DagVoteSchema>(node_ids)?)
     }
 
     fn save_certified_node(&self, node: &CertifiedNode) -> anyhow::Result<()> {
-        Ok(self.save_certified_node(node)?)
+        Ok(self.put::<CertifiedNodeSchema>(&node.digest(), node)?)
     }
 
-    fn get_certified_nodes(&self) -> anyhow::Result<HashMap<HashValue, CertifiedNode>> {
-        Ok(self.get_certified_nodes()?)
+    fn get_certified_nodes(&self) -> anyhow::Result<Vec<(HashValue, CertifiedNode)>> {
+        Ok(self.get_all::<CertifiedNodeSchema>()?)
     }
 
     fn delete_certified_nodes(&self, digests: Vec<HashValue>) -> anyhow::Result<()> {
-        Ok(self.delete_certified_nodes(digests)?)
+        Ok(self.delete::<CertifiedNodeSchema>(digests)?)
+    }
+
+    fn save_ordered_anchor_id(&self, node_id: &NodeId) -> anyhow::Result<()> {
+        Ok(self.put::<OrderedAnchorIdSchema>(node_id, &())?)
+    }
+
+    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>> {
+        Ok(self.get_all::<OrderedAnchorIdSchema>()?)
+    }
+
+    fn delete_ordered_anchor_ids(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()> {
+        Ok(self.delete::<OrderedAnchorIdSchema>(node_ids)?)
     }
 }

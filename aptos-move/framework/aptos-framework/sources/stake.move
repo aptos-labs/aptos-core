@@ -1351,6 +1351,11 @@ module aptos_framework::stake {
         assert!(exists<OwnerCapability>(owner), error::not_found(EOWNER_CAP_NOT_FOUND));
     }
 
+    // Will be deleted after transaction_fee has its own MintCap for storage refunds.
+    public(friend) fun copy_aptos_coin_mint_cap_for_storage_refund(): MintCapability<AptosCoin> acquires AptosCoinCapabilities {
+        borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap
+    }
+
     #[test_only]
     use aptos_framework::aptos_coin;
     use aptos_std::bls12381::proof_of_possession_from_bytes;

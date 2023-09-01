@@ -3,10 +3,52 @@
 All notable changes to the Aptos Node SDK will be captured in this file. This changelog is written by hand for now. It adheres to the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+## 1.19.0 (2023-08-24)
+
+- Add fungible asset queries support - `getAccountCoinsData`, `getAccountCoinsDataCount`
+
+## 1.18.0 (2023-08-10)
+
+- Fix default behavior for coin client to transfer and create account by default
+- Filter amount > 0 on `getTokenOwnersData`
+- Include missing fields for all Indexer queries
+
+## 1.17.0 (2023-08-04)
+
+- Add support for a fee payer transaction
+- Return transaction message error when transaction has failed when `checkSuccess` is set to true
+
+## 1.16.0 (2023-08-02)
+
+- Export all remaining types and functions in TS SDK
+- Add improvements for `IndexerClient`
+  - Export indexer types - `export * from "/indexer/generated/types"`
+  - Support for token v2 activities - `getTokenActivities`, response structure has changed
+  - Aggregate query suports token v2 activities - `getTokenActivitiesCount`
+  - Support for sorting indexer queries - `orderBy` optional argument in `extraArgs` arguments
+  - Support for get owned tokens by token address or token data id - `getOwnedTokensByTokenData`
+- Add support for local/custom networks without an indexer client
+- Move to use `account_transactions` query in `getAccountTransactionsData` on `IndexerClient`
+- Move to use `account_transaction_aggregate` query in `getAccountTransactionsCount` on `IndexerClient`
+- Optional `startVersion` argument on `getUserTransactions` is not positional and part of the object param
+
+## 1.15.0 (2023-07-28)
+
+- Implementing `TransactionWorker` - a layer for managing and submitting as many transactions from a single account at once
+- Memoize account modules by adding `memoize` decorator to `getAccountModules`
+
+## 1.14.0 (2023-07-20)
+
+- Introduce and use `@aptos-labs/aptos-client` package to manage and handle the client used in the SDK
+
+## 1.13.3 (2023-07-19)
+
 - Add support for `null` or `undefined` as absense of an Option
 - Fix `Option<LongerType>` for input arguments in entry functions
 
 ## 1.13.2 (2023-07-12)
+
 - Add support for `Option<T>` and `vector<Object<T>>` in the SDK
 
 ## 1.13.1 (2023-07-06)
@@ -232,7 +274,7 @@ const aptosCoin = const aptosCoin = {
 - To help work with these different formats, functions for converting between them have been added to `utils`.
 - A new function, `waitForTransactionWithResult`, has been added to help wait for a transaction and then get access to the response from the server once the function exits.
 
-For help with migration, we recommend you see the updated examples under `examples/`, they demonstrate how to deal with some of these changes, such as the more structured responses. We are also available to assist in the [Aptos Discord](https://discord.com/invite/aptoslabs).
+For help with migration, we recommend you see the updated examples under `examples/`, they demonstrate how to deal with some of these changes, such as the more structured responses. We are also available to assist in the [Aptos Discord](https://discord.gg/aptosnetwork).
 
 **Deprecation Notice**: On September 1st we will remove the v0 API from the running nodes. As a user of the TS SDK, the best way you can migrate prior to this is by upgrading to version 1.3.2 or higher of the SDK. We will repeatedly remind developers of this upcoming deprecation as we approach that date.
 

@@ -3,43 +3,38 @@
 
 use crate::{
     access_path_cache::AccessPathCache, data_cache::get_resource_group_from_metadata,
-    move_vm_ext::MoveResolverExt, transaction_metadata::TransactionMetadata,
+    move_vm_ext::AptosMoveResolver, transaction_metadata::TransactionMetadata,
 };
-use aptos_aggregator::{
-    aggregator_extension::AggregatorID,
-    delta_change_set::{serialize, DeltaChangeSet},
-};
+use aptos_aggregator::{aggregator_extension::AggregatorID, delta_change_set::serialize};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
     aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
+    event::NativeEventContext,
 };
-use aptos_gas::ChangeSetConfigs;
+use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
-    state_store::{state_key::StateKey, state_value::StateValueMetadata, table::TableHandle},
+    state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::SignatureCheckedTransaction,
-    write_set::{WriteOp, WriteSetMut},
+    write_set::WriteOp,
 };
-use aptos_vm_types::change_set::VMChangeSet;
+use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{
-        AccountChangeSet, ChangeSet as MoveChangeSet, Event as MoveEvent, Op as MoveStorageOp,
-    },
+    effects::{AccountChangeSet, ChangeSet as MoveChangeSet, Op as MoveStorageOp},
     language_storage::{ModuleId, StructTag},
     vm_status::{err_msg, StatusCode, VMStatus},
 };
-use move_table_extension::{NativeTableContext, TableChangeSet};
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::BorrowMut,
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -127,35 +122,23 @@ impl SessionId {
     pub fn as_uuid(&self) -> HashValue {
         self.hash()
     }
-
-    pub fn sender(&self) -> Option<AccountAddress> {
-        match self {
-            SessionId::Txn { sender, .. }
-            | SessionId::Prologue { sender, .. }
-            | SessionId::Epilogue { sender, .. } => Some(*sender),
-            SessionId::BlockMeta { .. } | SessionId::Genesis { .. } | SessionId::Void => None,
-        }
-    }
 }
 
 pub struct SessionExt<'r, 'l> {
     inner: Session<'r, 'l>,
-    remote: &'r dyn MoveResolverExt,
-    new_slot_payer: Option<AccountAddress>,
+    remote: &'r dyn AptosMoveResolver,
     features: Arc<Features>,
 }
 
 impl<'r, 'l> SessionExt<'r, 'l> {
     pub fn new(
         inner: Session<'r, 'l>,
-        remote: &'r dyn MoveResolverExt,
-        new_slot_payer: Option<AccountAddress>,
+        remote: &'r dyn AptosMoveResolver,
         features: Arc<Features>,
     ) -> Self {
         Self {
             inner,
             remote,
-            new_slot_payer,
             features,
         }
     }
@@ -166,7 +149,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         configs: &ChangeSetConfigs,
     ) -> VMResult<VMChangeSet> {
         let move_vm = self.inner.get_move_vm();
-        let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
+        let (change_set, mut extensions) = self.inner.finish_with_extensions()?;
 
         let (change_set, resource_group_change_set) =
             Self::split_and_merge_resource_groups(move_vm, self.remote, change_set)?;
@@ -180,9 +163,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let aggregator_context: NativeAggregatorContext = extensions.remove();
         let aggregator_change_set = aggregator_context.into_change_set();
 
+        let event_context: NativeEventContext = extensions.remove();
+        let events = event_context.into_events();
+
         let change_set = Self::convert_change_set(
             self.remote,
-            self.new_slot_payer,
             self.features.is_storage_slot_metadata_enabled(),
             current_time.as_ref(),
             change_set,
@@ -223,7 +208,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///   * Otherwise delete
     fn split_and_merge_resource_groups(
         runtime: &MoveVM,
-        remote: &dyn MoveResolverExt,
+        remote: &dyn AptosMoveResolver,
         change_set: MoveChangeSet,
     ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
@@ -309,32 +294,34 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     }
 
     pub fn convert_change_set<C: AccessPathCache>(
-        remote: &dyn MoveResolverExt,
-        new_slot_payer: Option<AccountAddress>,
+        remote: &dyn AptosMoveResolver,
         is_storage_slot_metadata_enabled: bool,
         current_time: Option<&CurrentTimeMicroseconds>,
         change_set: MoveChangeSet,
         resource_group_change_set: MoveChangeSet,
-        events: Vec<MoveEvent>,
+        events: Vec<ContractEvent>,
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
-        let mut write_set_mut = WriteSetMut::new(Vec::new());
-        let mut delta_change_set = DeltaChangeSet::empty();
         let mut new_slot_metadata: Option<StateValueMetadata> = None;
         if is_storage_slot_metadata_enabled {
-            if let Some(payer) = new_slot_payer {
-                if let Some(current_time) = current_time {
-                    new_slot_metadata = Some(StateValueMetadata::new(payer, 0, current_time));
-                }
+            if let Some(current_time) = current_time {
+                // The deposit on the metadata is a placeholder (0), it will be updated later when
+                // storage fee is charged.
+                new_slot_metadata = Some(StateValueMetadata::new(0, current_time));
             }
         }
         let woc = WriteOpConverter {
             remote,
             new_slot_metadata,
         };
+
+        let mut resource_write_set = HashMap::new();
+        let mut module_write_set = HashMap::new();
+        let mut aggregator_write_set = HashMap::new();
+        let mut aggregator_delta_set = HashMap::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
@@ -346,14 +333,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     configs.legacy_resource_creation_as_modification(),
                 )?;
 
-                write_set_mut.insert((state_key, op))
+                resource_write_set.insert(state_key, op);
             }
 
             for (name, blob_op) in modules {
                 let state_key =
                     StateKey::access_path(ap_cache.get_module_path(ModuleId::new(addr, name)));
                 let op = woc.convert(&state_key, blob_op, false)?;
-                write_set_mut.insert((state_key, op))
+                module_write_set.insert(state_key, op);
             }
         }
 
@@ -363,7 +350,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let state_key =
                     StateKey::access_path(ap_cache.get_resource_group_path(addr, struct_tag));
                 let op = woc.convert(&state_key, blob_op, false)?;
-                write_set_mut.insert((state_key, op))
+                resource_write_set.insert(state_key, op);
             }
         }
 
@@ -371,41 +358,38 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             for (key, value_op) in change.entries {
                 let state_key = StateKey::table_item(handle.into(), key);
                 let op = woc.convert(&state_key, value_op, false)?;
-                write_set_mut.insert((state_key, op))
+                resource_write_set.insert(state_key, op);
             }
         }
 
         for (id, change) in aggregator_change_set.changes {
             let AggregatorID { handle, key } = id;
             let key_bytes = key.0.to_vec();
-            let state_key = StateKey::table_item(TableHandle::from(handle), key_bytes);
+            let state_key = StateKey::table_item(handle, key_bytes);
 
             match change {
                 AggregatorChange::Write(value) => {
                     let write_op = woc.convert_aggregator_mod(&state_key, value)?;
-                    write_set_mut.insert((state_key, write_op));
+                    aggregator_write_set.insert(state_key, write_op);
                 },
-                AggregatorChange::Merge(delta_op) => delta_change_set.insert((state_key, delta_op)),
+                AggregatorChange::Merge(delta_op) => {
+                    aggregator_delta_set.insert(state_key, delta_op);
+                },
                 AggregatorChange::Delete => {
                     let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
-                    write_set_mut.insert((state_key, write_op));
+                    aggregator_write_set.insert(state_key, write_op);
                 },
             }
         }
 
-        let write_set = write_set_mut
-            .freeze()
-            .map_err(|_| VMStatus::error(StatusCode::DATA_FORMAT_ERROR, None))?;
-
-        let events = events
-            .into_iter()
-            .map(|(guid, seq_num, ty_tag, blob)| {
-                let key = bcs::from_bytes(guid.as_slice())
-                    .map_err(|_| VMStatus::error(StatusCode::EVENT_KEY_MISMATCH, None))?;
-                Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
-            })
-            .collect::<Result<Vec<_>, VMStatus>>()?;
-        VMChangeSet::new(write_set, delta_change_set, events, configs)
+        VMChangeSet::new(
+            resource_write_set,
+            module_write_set,
+            aggregator_write_set,
+            aggregator_delta_set,
+            events,
+            configs,
+        )
     }
 }
 
@@ -424,7 +408,7 @@ impl<'r, 'l> DerefMut for SessionExt<'r, 'l> {
 }
 
 struct WriteOpConverter<'r> {
-    remote: &'r dyn MoveResolverExt,
+    remote: &'r dyn AptosMoveResolver,
     new_slot_metadata: Option<StateValueMetadata>,
 }
 
@@ -438,14 +422,17 @@ impl<'r> WriteOpConverter<'r> {
         use MoveStorageOp::*;
         use WriteOp::*;
 
-        let existing_value_opt = self.remote.get_state_value(state_key).map_err(|_| {
-            VMStatus::error(
-                StatusCode::STORAGE_ERROR,
-                err_msg("Storage read failed when converting change set."),
-            )
-        })?;
+        let maybe_existing_metadata =
+            self.remote
+                .get_state_value_metadata(state_key)
+                .map_err(|_| {
+                    VMStatus::error(
+                        StatusCode::STORAGE_ERROR,
+                        err_msg("Storage read failed when converting change set."),
+                    )
+                })?;
 
-        let write_op = match (existing_value_opt, move_storage_op) {
+        let write_op = match (maybe_existing_metadata, move_storage_op) {
             (None, Modify(_) | Delete) => {
                 return Err(VMStatus::error(
                     // Possible under speculative execution, returning storage error waiting for re-execution
@@ -473,16 +460,16 @@ impl<'r> WriteOpConverter<'r> {
                     metadata: metadata.clone(),
                 },
             },
-            (Some(existing_value), Modify(data)) => {
+            (Some(existing_metadata), Modify(data)) => {
                 // Inherit metadata even if the feature flags is turned off, for compatibility.
-                match existing_value.into_metadata() {
+                match existing_metadata {
                     None => Modification(data),
                     Some(metadata) => ModificationWithMetadata { data, metadata },
                 }
             },
-            (Some(existing_value), Delete) => {
+            (Some(existing_metadata), Delete) => {
                 // Inherit metadata even if the feature flags is turned off, for compatibility.
-                match existing_value.into_metadata() {
+                match existing_metadata {
                     None => Deletion,
                     Some(metadata) => DeletionWithMetadata { metadata },
                 }
@@ -496,13 +483,13 @@ impl<'r> WriteOpConverter<'r> {
         state_key: &StateKey,
         value: u128,
     ) -> Result<WriteOp, VMStatus> {
-        let existing_value_opt = self
+        let maybe_existing_metadata = self
             .remote
-            .get_state_value(state_key)
+            .get_state_value_metadata(state_key)
             .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         let data = serialize(&value);
 
-        let op = match existing_value_opt {
+        let op = match maybe_existing_metadata {
             None => {
                 match &self.new_slot_metadata {
                     // n.b. Aggregator writes historically did not distinguish Create vs Modify.
@@ -513,7 +500,7 @@ impl<'r> WriteOpConverter<'r> {
                     },
                 }
             },
-            Some(existing_value) => match existing_value.into_metadata() {
+            Some(existing_metadata) => match existing_metadata {
                 None => WriteOp::Modification(data),
                 Some(metadata) => WriteOp::ModificationWithMetadata { data, metadata },
             },

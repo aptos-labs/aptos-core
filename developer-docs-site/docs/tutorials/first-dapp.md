@@ -18,7 +18,7 @@ We will use the:
 
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Petra Wallet](https://petra.app)
-* [Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md)
+* [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md)
 
 :::tip Full source code
 
@@ -51,7 +51,7 @@ Ensure your account has sufficient funds to perform transactions by clicking the
 
 We will also be installing the Aptos CLI so that we can publish 
 
-1. Install the [Aptos CLI](../tools/install-cli/index.md).
+1. Install the [Aptos CLI](../tools/aptos-cli/install-cli/index.md).
 
 2. Run `aptos init --profile my-first-nft`.
 
@@ -840,6 +840,6 @@ This concludes the tutorial.
 
 ## Supporting documentation
 
-* [Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md)
+* [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md)
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Wallet Standard](../standards/wallets.md)

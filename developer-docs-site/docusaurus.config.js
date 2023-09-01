@@ -159,6 +159,10 @@ const config = {
               to: "/category/nft",
             },
             {
+              label: "Examples",
+              to: "/category/examples",
+            },
+            {
               label: "Build E2E Dapp on Aptos",
               to: "tutorials/build-e2e-dapp/e2e-dapp-index",
             },
@@ -186,10 +190,6 @@ const config = {
             {
               label: "Run a Fullnode",
               to: "nodes/full-node/public-fullnode",
-            },
-            {
-              label: "Run an Indexer",
-              to: "nodes/indexer-fullnode",
             },
             {
               label: "Monitor a Node",
@@ -321,6 +321,14 @@ const config = {
       {
         redirects: [
           {
+            to: "/indexer/indexer-landing",
+            from: "/integration/indexing",
+          },
+          {
+            to: "/indexer/indexer-landing",
+            from: "/nodes/indexer-fullnode",
+          },
+          {
             to: "/integration/creating-a-signed-transaction",
             from: "/tutorials/your-first-transaction-sdk",
           },
@@ -343,6 +351,10 @@ const config = {
           {
             to: "/move/move-on-aptos",
             from: "/guides/move-guides/aptos-move-guides",
+          },
+          {
+            to: "/tools/aptos-cli/install-cli",
+            from: "/tools/install-cli",
           },
         ],
         createRedirects(existingPath) {

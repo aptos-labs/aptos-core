@@ -7,6 +7,7 @@ use crate::{
 };
 
 use aptos_api_test_context::current_function_name;
+use aptos_framework::extended_checks;
 use aptos_protos::extractor::v1::{
     transaction::{TransactionType, TxnData},
     transaction_payload::{Payload, Type as PayloadType},
@@ -245,6 +246,8 @@ async fn build_test_module(account: AccountAddress) -> Vec<u8> {
         generate_docs: false,
         install_dir: Some(package_dir.clone()),
         additional_named_addresses: [("TestAccount".to_string(), account)].into(),
+        known_attributes: extended_checks::get_all_attribute_names().clone(),
+        skip_attribute_checks: false,
         ..Default::default()
     };
     let package = build_config

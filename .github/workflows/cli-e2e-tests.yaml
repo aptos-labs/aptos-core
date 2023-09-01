@@ -11,7 +11,14 @@ on:
         required: true
         type: string
         description: Use this to override the git SHA1, branch name (e.g. devnet) or tag
+      SKIP_JOB:
+        required: false
+        default: false
+        type: boolean
+        description: Set to true to skip this job. Useful for PRs that don't require this workflow.
 
+# TODO: should we migrate this to a composite action, so that we can skip it
+# at the call site, and don't need to wrap each step in an if statement?
 jobs:
   # Run the Aptos CLI examples. We run the CLI on this commit / PR against a
   # local testnet using the devnet, testnet, and mainnet branches. This way
@@ -24,10 +31,12 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v3
+        if: ${{ !inputs.SKIP_JOB }}
         with:
           ref: ${{ inputs.GIT_SHA }}
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        if: ${{ !inputs.SKIP_JOB }}
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
@@ -37,11 +46,13 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - uses: ./.github/actions/python-setup
+        if: ${{ !inputs.SKIP_JOB }}
         with:
           pyproject_directory: crates/aptos/e2e
 
       # Run CLI tests against local testnet built from devnet branch.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+        if: ${{ !inputs.SKIP_JOB }}
         name: devnet-tests
         with:
           max_attempts: 5
@@ -50,6 +61,7 @@ jobs:
 
       # Run CLI tests against local testnet built from testnet branch.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+        if: ${{ !inputs.SKIP_JOB }}
         name: testnet-tests
         with:
           max_attempts: 5
@@ -58,6 +70,7 @@ jobs:
 
       # Run CLI tests against local testnet built from mainnet branch.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+        if: ${{ !inputs.SKIP_JOB }}
         name: mainnet-tests
         with:
           max_attempts: 5
@@ -65,6 +78,10 @@ jobs:
           command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network mainnet --image-repo-with-project ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-mainnet
 
       - name: Print local testnet logs on failure
-        if: ${{ failure() }}
+        if: ${{ !inputs.SKIP_JOB && failure() }}
         working-directory: docker/compose/validator-testnet
         run: docker logs aptos-tools-devnet && docker logs aptos-tools-testnet && docker logs aptos-tools-mainnet
+
+      # Print out whether the job was skipped.
+      - run: echo "Skipping CLI E2E tests!"
+        if: ${{ inputs.SKIP_JOB }}
