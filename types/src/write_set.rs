@@ -127,14 +127,14 @@ impl WriteOp {
         Ok(true)
     }
 
-    pub fn bytes(&self) -> Option<Bytes> {
+    pub fn bytes(&self) -> Option<&Bytes> {
         use WriteOp::*;
 
         match self {
             Creation(data)
             | CreationWithMetadata { data, .. }
             | Modification(data)
-            | ModificationWithMetadata { data, .. } => Some(data.clone()),
+            | ModificationWithMetadata { data, .. } => Some(data),
             Deletion | DeletionWithMetadata { .. } => None,
         }
     }
@@ -159,13 +159,13 @@ pub trait TransactionWrite {
 
 impl TransactionWrite for WriteOp {
     fn extract_raw_bytes(&self) -> Option<Bytes> {
-        self.bytes()
+        self.bytes().cloned()
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
         self.bytes().map(|bytes| match self.metadata() {
-            None => StateValue::new_legacy(bytes),
-            Some(metadata) => StateValue::new_with_metadata(bytes, metadata.clone()),
+            None => StateValue::new_legacy(bytes.clone()),
+            Some(metadata) => StateValue::new_with_metadata(bytes.clone(), metadata.clone()),
         })
     }
 }

@@ -1526,7 +1526,7 @@ async fn parse_staking_contract_resource_changes(
                             struct_tag.module.as_str(),
                             struct_tag.name.as_str(),
                         ) {
-                            if let Ok(pool) = bcs::from_bytes::<StakePool>(&data) {
+                            if let Ok(pool) = bcs::from_bytes::<StakePool>(data) {
                                 ret = Some((path.address, pool))
                             }
                         }

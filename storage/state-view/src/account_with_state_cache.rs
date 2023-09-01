@@ -26,7 +26,10 @@ impl<'a> AccountWithStateCache<'a> {
 
 impl<'a> AccountView for AccountWithStateCache<'a> {
     fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Bytes>> {
-        Ok(self.state_cache.get(state_key).map(StateValue::bytes))
+        Ok(self
+            .state_cache
+            .get(state_key)
+            .map(|val| val.bytes().clone()))
     }
 
     fn get_account_address(&self) -> anyhow::Result<Option<AccountAddress>> {

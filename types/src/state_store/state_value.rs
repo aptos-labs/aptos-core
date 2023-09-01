@@ -142,9 +142,9 @@ impl StateValue {
         self.bytes().len()
     }
 
-    pub fn bytes(&self) -> Bytes {
+    pub fn bytes(&self) -> &Bytes {
         match &self.inner {
-            StateValueInner::V0(data) | StateValueInner::WithMetadata { data, .. } => data.clone(),
+            StateValueInner::V0(data) | StateValueInner::WithMetadata { data, .. } => data,
         }
     }
 

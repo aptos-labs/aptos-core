@@ -188,33 +188,33 @@ impl<'a> TableInfoParser<'a> {
         Ok(())
     }
 
-    fn parse_struct(&mut self, struct_tag: StructTag, bytes: Bytes) -> Result<()> {
+    fn parse_struct(&mut self, struct_tag: StructTag, bytes: &Bytes) -> Result<()> {
         self.parse_move_value(
             &self
                 .annotator
-                .view_value(&TypeTag::Struct(Box::new(struct_tag)), &bytes)?,
+                .view_value(&TypeTag::Struct(Box::new(struct_tag)), bytes)?,
         )
     }
 
-    fn parse_resource_group(&mut self, bytes: Bytes) -> Result<()> {
-        type ResourceGroup = BTreeMap<StructTag, Vec<u8>>;
+    fn parse_resource_group(&mut self, bytes: &Bytes) -> Result<()> {
+        type ResourceGroup = BTreeMap<StructTag, Bytes>;
 
-        for (struct_tag, bytes) in bcs::from_bytes::<ResourceGroup>(&bytes)? {
-            self.parse_struct(struct_tag, bytes.into())?;
+        for (struct_tag, bytes) in bcs::from_bytes::<ResourceGroup>(bytes)? {
+            self.parse_struct(struct_tag, &bytes)?;
         }
         Ok(())
     }
 
-    fn parse_table_item(&mut self, handle: TableHandle, bytes: Bytes) -> Result<()> {
+    fn parse_table_item(&mut self, handle: TableHandle, bytes: &Bytes) -> Result<()> {
         match self.get_table_info(handle)? {
             Some(table_info) => {
-                self.parse_move_value(&self.annotator.view_value(&table_info.value_type, &bytes)?)?;
+                self.parse_move_value(&self.annotator.view_value(&table_info.value_type, bytes)?)?;
             },
             None => {
                 self.pending_on
                     .entry(handle)
                     .or_insert_with(Vec::new)
-                    .push(bytes);
+                    .push(bytes.clone());
             },
         }
         Ok(())
@@ -269,7 +269,7 @@ impl<'a> TableInfoParser<'a> {
             self.result.insert(handle, info);
             if let Some(pending_items) = self.pending_on.remove(&handle) {
                 for bytes in pending_items {
-                    self.parse_table_item(handle, bytes)?;
+                    self.parse_table_item(handle, &bytes)?;
                 }
             }
         }

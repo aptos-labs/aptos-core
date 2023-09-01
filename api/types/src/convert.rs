@@ -360,10 +360,10 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 Path::Resource(typ) => vec![WriteSetChange::WriteResource(WriteResource {
                     address: access_path.address.into(),
                     state_key_hash,
-                    data: self.try_into_resource(&typ, &bytes)?,
+                    data: self.try_into_resource(&typ, bytes)?,
                 })],
                 Path::ResourceGroup(_) => self
-                    .try_into_resources_from_resource_group(&bytes)?
+                    .try_into_resources_from_resource_group(bytes)?
                     .into_iter()
                     .map(|data| {
                         WriteSetChange::WriteResource(WriteResource {
@@ -400,7 +400,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             },
             Some(bytes) => {
                 let data =
-                    self.try_write_table_item_into_decoded_table_data(handle, &key.0, &bytes)?;
+                    self.try_write_table_item_into_decoded_table_data(handle, &key.0, bytes)?;
 
                 WriteSetChange::WriteTableItem(WriteTableItem {
                     state_key_hash,
