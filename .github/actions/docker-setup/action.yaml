@@ -1,11 +1,13 @@
 name: "Docker build setup"
 description: |
   Runs an opinionated and unified docker build setup action. It does the following:
-  * Logs in to docker image registries (AWS ECR and GCP GAR)
+  * Logs in to docker image registries
+    * The GCP args are required because we always want to login and upload images to GAR.
+    * Only if the AWS args are provided will we log into ECR.
   * Setup for buildx and other dependencies (crane)
   * Sets git credentials for private builds
 inputs:
-  # GCP auth
+  # GCP auth. These are mandatory.
   GCP_WORKLOAD_IDENTITY_PROVIDER:
     required: true
     description: "GCP Workload Identity provider"
@@ -16,16 +18,18 @@ inputs:
     required: false
     description: "Whether to export GCP credentials to the environment. Useful for running gcloud commands"
     default: "true"
-  # AWS auth
+
+  # AWS auth. These are optional, we will only log into ECR if these are provided.
   AWS_ACCESS_KEY_ID:
-    required: true
+    required: false
     description: "AWS access key id"
   AWS_SECRET_ACCESS_KEY:
-    required: true
+    required: false
     description: "AWS secret access key"
   AWS_DOCKER_ARTIFACT_REPO:
-    required: true
+    required: false
     description: "AWS ECR repo to authenticate to"
+
   # Optional git auth
   GIT_CREDENTIALS:
     description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
@@ -36,6 +40,7 @@ inputs:
     # setting this to 1.5h since sometimes docker builds (special performance
     # builds etc.) take that long. Default is 1h.
     default: 5400
+
 outputs:
   CLOUDSDK_AUTH_ACCESS_TOKEN:
     description: "GCP access token"
@@ -44,6 +49,27 @@ outputs:
 runs:
   using: composite
   steps:
+    # There is no way to declare an input as required conditionally with Github Actions
+    # so we do it ourselves here. If the user is trying to setup AWS, we ensure that
+    # they have provided all of the required args.
+    - name: Check AWS args
+      shell: bash
+      if: inputs.AWS_ACCESS_KEY_ID != '' || inputs.AWS_SECRET_ACCESS_KEY != '' || inputs.AWS_DOCKER_ARTIFACT_REPO != ''
+      run: |
+        if [[ -z "${{ inputs.AWS_ACCESS_KEY_ID }}" ]]; then
+          echo "AWS_ACCESS_KEY_ID is required if AWS_SECRET_ACCESS_KEY or AWS_DOCKER_ARTIFACT_REPO is provided"
+          exit 1
+        fi
+        if [[ -z "${{ inputs.AWS_SECRET_ACCESS_KEY }}" ]]; then
+          echo "AWS_SECRET_ACCESS_KEY is required if AWS_ACCESS_KEY_ID or AWS_DOCKER_ARTIFACT_REPO is provided"
+          exit 1
+        fi
+        if [[ -z "${{ inputs.AWS_DOCKER_ARTIFACT_REPO }}" ]]; then
+          echo "AWS_DOCKER_ARTIFACT_REPO is required if AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY is provided"
+          exit 1
+        fi
+        echo "AWS args were supplied and are vaild, we will log into ECR"
+
     - name: setup docker context for buildx
       id: buildx-context
       shell: bash
@@ -99,6 +125,7 @@ runs:
 
     - name: Login to ECR
       uses: docker/login-action@v2
+      if: inputs.AWS_ACCESS_KEY_ID != ''
       with:
         registry: ${{ inputs.AWS_DOCKER_ARTIFACT_REPO }}
         username: ${{ inputs.AWS_ACCESS_KEY_ID }}
