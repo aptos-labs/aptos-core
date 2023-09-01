@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sharded_block_executor::{
-    local_executor_shard::GlobalCrossShardClient, sharded_executor_service::ShardedExecutorService,
+    local_executor_shard::GlobalCrossShardClient, sharded_aggregator_service,
+    sharded_executor_service::ShardedExecutorService,
 };
 use aptos_logger::trace;
 use aptos_state_view::StateView;
@@ -59,5 +60,18 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
             self.concurrency_level,
             maybe_block_gas_limit,
         )
+    }
+
+    pub fn aggregate_results(
+        &self,
+        sharded_output: &mut Vec<Vec<Vec<TransactionOutput>>>,
+        global_output: &mut [TransactionOutput],
+        state_view: &S,
+    ) {
+        sharded_aggregator_service::aggregate_and_update_total_supply(
+            sharded_output,
+            global_output,
+            state_view,
+        );
     }
 }

@@ -1057,6 +1057,10 @@ impl TransactionOutput {
         &self.write_set
     }
 
+    pub fn update_total_supply(&mut self, value: u128) {
+        self.write_set.update_total_supply(value);
+    }
+
     pub fn events(&self) -> &[ContractEvent] {
         &self.events
     }

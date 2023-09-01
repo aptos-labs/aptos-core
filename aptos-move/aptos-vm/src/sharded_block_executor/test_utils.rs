@@ -12,7 +12,6 @@ use aptos_language_e2e_tests::{
 };
 use aptos_types::{
     block_executor::partitioner::PartitionedTransactions,
-    state_store::state_key::StateKeyInner,
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput},
 };
 use move_core_types::account_address::AccountAddress;
@@ -77,27 +76,13 @@ pub fn compare_txn_outputs(
             unsharded_txn_output[i].gas_used(),
             sharded_txn_output[i].gas_used()
         );
-        //assert_eq!(unsharded_txn_output[i].write_set(), sharded_txn_output[i].write_set());
+        assert_eq!(
+            unsharded_txn_output[i].write_set(),
+            sharded_txn_output[i].write_set()
+        );
         assert_eq!(
             unsharded_txn_output[i].events(),
             sharded_txn_output[i].events()
-        );
-        // Global supply tracking for coin is not supported in sharded execution yet, so we filter
-        // out the table item from the write set, which has the global supply. This is a hack until
-        // we support global supply tracking in sharded execution.
-        let unsharded_write_set_without_table_item = unsharded_txn_output[i]
-            .write_set()
-            .into_iter()
-            .filter(|(k, _)| matches!(k.inner(), &StateKeyInner::AccessPath(_)))
-            .collect::<Vec<_>>();
-        let sharded_write_set_without_table_item = sharded_txn_output[i]
-            .write_set()
-            .into_iter()
-            .filter(|(k, _)| matches!(k.inner(), &StateKeyInner::AccessPath(_)))
-            .collect::<Vec<_>>();
-        assert_eq!(
-            unsharded_write_set_without_table_item,
-            sharded_write_set_without_table_item
         );
     }
 }
