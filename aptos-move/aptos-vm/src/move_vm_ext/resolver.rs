@@ -34,7 +34,6 @@ pub trait AptosMoveResolver:
     MoveResolver
     + TableResolver
     + AggregatorResolver
-   
     + StateStorageUsageResolver
     + StateValueMetadataResolver
     + ConfigStorage

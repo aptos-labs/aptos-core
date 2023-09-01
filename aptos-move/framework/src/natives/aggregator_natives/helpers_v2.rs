@@ -1,11 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::aggregator_extension::{extension_error, AggregatorID};
 use crate::natives::aggregator_natives::helpers_v1::get_aggregator_field;
+use aptos_aggregator::aggregator_extension::{extension_error, AggregatorID};
 use move_binary_format::errors::PartialVMResult;
-use move_vm_types::values::{Reference, StructRef, Value};
-
+use move_vm_types::values::{Struct, StructRef, Value};
 
 /// Indices of `value` and `limit` fields in the `Aggregator` Move
 /// struct.

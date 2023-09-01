@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aggregator_v2::{    
+    aggregator_v2::{
         check, initialize, materialize, materialize_and_try_add, materialize_and_try_sub, new,
         try_add, try_add_and_materialize, try_sub, try_sub_add, try_sub_and_materialize,
         verify_copy_snapshot, verify_copy_string_snapshot, verify_string_concat,
