@@ -4,3 +4,8 @@ module 0x2::X {
         Tuple()
     }
 } // end 0x2::X
+module <SELF> {
+    private fun main() {
+        X::foo()
+    }
+} // end <SELF>

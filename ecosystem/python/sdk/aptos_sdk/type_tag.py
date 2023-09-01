@@ -320,7 +320,7 @@ class StructTag:
                 name += letter
 
         split = name.split("::")
-        return StructTag(AccountAddress.from_hex(split[0]), split[1], split[2], [])
+        return StructTag(AccountAddress.from_str(split[0]), split[1], split[2], [])
 
     def variant(self):
         return TypeTag.STRUCT

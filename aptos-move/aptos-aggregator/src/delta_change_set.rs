@@ -10,10 +10,9 @@ use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
     vm_status::{StatusCode, VMStatus},
-    write_set::{WriteOp, WriteSet, WriteSetMut},
+    write_set::WriteOp,
 };
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
-use std::collections::{btree_map::Entry, BTreeMap};
 
 /// When `Addition` operation overflows the `limit`.
 const EADD_OVERFLOW: u64 = 0x02_0001;
@@ -188,13 +187,12 @@ impl DeltaOp {
     ) -> anyhow::Result<WriteOp, VMStatus> {
         // In case storage fails to fetch the value, return immediately.
         let maybe_value = state_view
-            .get_state_value_bytes(state_key)
+            .get_state_value_u128(state_key)
             .map_err(|e| VMStatus::error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?;
 
         // Otherwise we have to apply delta to the storage value.
         match maybe_value {
-            Some(bytes) => {
-                let base = deserialize(&bytes);
+            Some(base) => {
                 self.apply_to(base)
                     .map_err(|partial_error| {
                         // If delta application fails, transform partial VM
@@ -273,11 +271,6 @@ pub fn serialize(value: &u128) -> Vec<u8> {
     bcs::to_bytes(value).expect("unexpected serialization error in aggregator")
 }
 
-/// Deserializes value for delta application.
-pub fn deserialize(value_bytes: &[u8]) -> u128 {
-    bcs::from_bytes(value_bytes).expect("unexpected deserialization error in aggregator")
-}
-
 // Helper for tests, #[cfg(test)] doesn't work for cross-crate.
 pub fn delta_sub(v: u128, limit: u128) -> DeltaOp {
     DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v)
@@ -288,119 +281,10 @@ pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
     DeltaOp::new(DeltaUpdate::Plus(v), limit, v, 0)
 }
 
-/// `DeltaChangeSet` contains all access paths that one transaction wants to update with deltas.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct DeltaChangeSet {
-    delta_change_set: BTreeMap<StateKey, DeltaOp>,
-}
-
-impl DeltaChangeSet {
-    pub fn empty() -> Self {
-        DeltaChangeSet {
-            delta_change_set: BTreeMap::new(),
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.delta_change_set.len()
-    }
-
-    pub fn new(delta_change_set: impl IntoIterator<Item = (StateKey, DeltaOp)>) -> Self {
-        DeltaChangeSet {
-            delta_change_set: delta_change_set.into_iter().collect(),
-        }
-    }
-
-    pub fn get(&self, key: &StateKey) -> Option<&DeltaOp> {
-        self.delta_change_set.get(key)
-    }
-
-    pub fn insert(&mut self, delta: (StateKey, DeltaOp)) {
-        self.delta_change_set.insert(delta.0, delta.1);
-    }
-
-    pub fn remove(&mut self, key: &StateKey) -> Option<DeltaOp> {
-        self.delta_change_set.remove(key)
-    }
-
-    #[inline]
-    pub fn iter(&self) -> ::std::collections::btree_map::Iter<'_, StateKey, DeltaOp> {
-        self.into_iter()
-    }
-
-    #[inline]
-    pub fn entry(&mut self, key: StateKey) -> Entry<StateKey, DeltaOp> {
-        self.delta_change_set.entry(key)
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.delta_change_set.is_empty()
-    }
-
-    pub fn as_inner_mut(&mut self) -> &mut BTreeMap<StateKey, DeltaOp> {
-        &mut self.delta_change_set
-    }
-
-    /// Converts deltas to a vector of write ops. In case conversion to a write op
-    /// failed, the error is propagated to the caller.
-    pub fn try_materialize(
-        self,
-        state_view: &dyn StateView,
-    ) -> anyhow::Result<Vec<(StateKey, WriteOp)>, VMStatus> {
-        // Converts every item of DeltaChangeSet into an item of a WriteSet. If
-        // conversion fails, error is returned.
-        let into_write_set_item =
-            |item: (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
-                let write_op = item.1.try_into_write_op(state_view, &item.0)?;
-                Ok((item.0, write_op))
-            };
-
-        self.delta_change_set
-            .into_iter()
-            .map(into_write_set_item)
-            .collect()
-    }
-
-    /// Consumes the delta change set and tries to materialize it into a write set.
-    pub fn try_into_write_set(
-        self,
-        state_view: &dyn StateView,
-    ) -> anyhow::Result<WriteSet, VMStatus> {
-        let materialized_write_set = self.try_materialize(state_view)?;
-        WriteSetMut::new(materialized_write_set)
-            .freeze()
-            .map_err(|_err| {
-                VMStatus::error(
-                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                    Some("Error when freezing materialized deltas.".to_string()),
-                )
-            })
-    }
-}
-
-impl<'a> IntoIterator for &'a DeltaChangeSet {
-    type IntoIter = ::std::collections::btree_map::Iter<'a, StateKey, DeltaOp>;
-    type Item = (&'a StateKey, &'a DeltaOp);
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.delta_change_set.iter()
-    }
-}
-
-impl ::std::iter::IntoIterator for DeltaChangeSet {
-    type IntoIter = ::std::collections::btree_map::IntoIter<StateKey, DeltaOp>;
-    type Item = (StateKey, DeltaOp);
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.delta_change_set.into_iter()
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_language_e2e_tests::data_store::FakeDataStore;
+    use crate::AggregatorStore;
     use aptos_state_view::TStateView;
     use aptos_types::state_store::{
         state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -653,7 +537,7 @@ mod test {
 
     #[test]
     fn test_failed_write_op_conversion_because_of_empty_storage() {
-        let state_view = FakeDataStore::default();
+        let state_view = AggregatorStore::default();
         let delta_op = delta_add(10, 1000);
         assert_matches!(
             delta_op.try_into_write_op(&state_view, &KEY),
@@ -663,14 +547,6 @@ mod test {
                 sub_status: None
             })
         );
-    }
-
-    #[test]
-    fn test_empty_storage_error_propagated() {
-        let state_view = FakeDataStore::default();
-        let deltas = vec![(KEY.clone(), delta_add(10, 100))];
-        let delta_change_set = DeltaChangeSet::new(deltas);
-        assert_err!(delta_change_set.try_into_write_set(&state_view));
     }
 
     struct BadStorage;
@@ -683,10 +559,6 @@ mod test {
                 StatusCode::STORAGE_ERROR,
                 Some("Error message from BadStorage.".to_string()),
             )))
-        }
-
-        fn is_genesis(&self) -> bool {
-            unreachable!()
         }
 
         fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
@@ -709,37 +581,9 @@ mod test {
     }
 
     #[test]
-    fn test_storage_error_propagated() {
-        let state_view = BadStorage;
-        let deltas = vec![(KEY.clone(), delta_add(10, 100))];
-        let delta_change_set = DeltaChangeSet::new(deltas);
-        assert_matches!(
-            delta_change_set.try_into_write_set(&state_view),
-            Err(VMStatus::Error {
-                status_code: StatusCode::STORAGE_ERROR,
-                message: Some(_),
-                sub_status: None
-            })
-        );
-    }
-
-    #[test]
-    fn test_delta_materialization_failure() {
-        let mut state_view = FakeDataStore::default();
-        state_view.set_legacy(KEY.clone(), serialize(&99));
-
-        let deltas = vec![(KEY.clone(), delta_add(10, 100))];
-        let delta_change_set = DeltaChangeSet::new(deltas);
-        assert_matches!(
-            delta_change_set.try_into_write_set(&state_view),
-            Err(VMStatus::MoveAbort(_, EADD_OVERFLOW))
-        );
-    }
-
-    #[test]
     fn test_successful_write_op_conversion() {
-        let mut state_view = FakeDataStore::default();
-        state_view.set_legacy(KEY.clone(), serialize(&100));
+        let mut state_view = AggregatorStore::default();
+        state_view.set_from_state_key(KEY.clone(), 100);
 
         // Both addition and subtraction should succeed!
         let add_op = delta_add(100, 200);
@@ -754,8 +598,8 @@ mod test {
 
     #[test]
     fn test_unsuccessful_write_op_conversion() {
-        let mut state_view = FakeDataStore::default();
-        state_view.set_legacy(KEY.clone(), serialize(&100));
+        let mut state_view = AggregatorStore::default();
+        state_view.set_from_state_key(KEY.clone(), 100);
 
         // Both addition and subtraction should fail!
         let add_op = delta_add(15, 100);

@@ -1,7 +1,7 @@
 processed 4 tasks
 
 task 3 'publish'. lines 15-18:
-Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::A'. Got VMError: {
+Error: Unable to publish module '0x42::A'. Got VMError: {
     major_status: CYCLIC_MODULE_FRIENDSHIP,
     sub_status: None,
     location: 0x42::A,

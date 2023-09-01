@@ -104,6 +104,7 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Function `configure_allowed_validators`](#0x1_stake_configure_allowed_validators)
 -  [Function `is_allowed`](#0x1_stake_is_allowed)
 -  [Function `assert_owner_cap_exists`](#0x1_stake_assert_owner_cap_exists)
+-  [Function `copy_aptos_coin_mint_cap_for_storage_refund`](#0x1_stake_copy_aptos_coin_mint_cap_for_storage_refund)
 -  [Specification](#@Specification_1)
     -  [Function `initialize_validator_fees`](#@Specification_1_initialize_validator_fees)
     -  [Function `add_transaction_fee`](#@Specification_1_add_transaction_fee)
@@ -3514,6 +3515,30 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_assert_owner_cap_exists">assert_owner_cap_exists</a>(owner: <b>address</b>) {
     <b>assert</b>!(<b>exists</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>&gt;(owner), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="stake.md#0x1_stake_EOWNER_CAP_NOT_FOUND">EOWNER_CAP_NOT_FOUND</a>));
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_stake_copy_aptos_coin_mint_cap_for_storage_refund"></a>
+
+## Function `copy_aptos_coin_mint_cap_for_storage_refund`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_copy_aptos_coin_mint_cap_for_storage_refund">copy_aptos_coin_mint_cap_for_storage_refund</a>(): <a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_copy_aptos_coin_mint_cap_for_storage_refund">copy_aptos_coin_mint_cap_for_storage_refund</a>(): MintCapability&lt;AptosCoin&gt; <b>acquires</b> <a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a> {
+    <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).mint_cap
 }
 </code></pre>
 

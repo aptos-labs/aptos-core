@@ -186,6 +186,19 @@ CommitDecision:
   STRUCT:
     - ledger_info:
         TYPENAME: LedgerInfoWithSignatures
+CommitMessage:
+  ENUM:
+    0:
+      Vote:
+        NEWTYPE:
+          TYPENAME: CommitVote
+    1:
+      Decision:
+        NEWTYPE:
+          TYPENAME: CommitDecision
+    2:
+      Ack:
+        NEWTYPE: UNIT
 CommitVote:
   STRUCT:
     - author:
@@ -256,17 +269,30 @@ ConsensusMsg:
       DAGMessage:
         NEWTYPE:
           TYPENAME: DAGNetworkMessage
+    15:
+      CommitMessage:
+        NEWTYPE:
+          TYPENAME: CommitMessage
 ContractEvent:
   ENUM:
     0:
-      V0:
+      V1:
         NEWTYPE:
-          TYPENAME: ContractEventV0
-ContractEventV0:
+          TYPENAME: ContractEventV1
+    1:
+      V2:
+        NEWTYPE:
+          TYPENAME: ContractEventV2
+ContractEventV1:
   STRUCT:
     - key:
         TYPENAME: EventKey
     - sequence_number: U64
+    - type_tag:
+        TYPENAME: TypeTag
+    - event_data: BYTES
+ContractEventV2:
+  STRUCT:
     - type_tag:
         TYPENAME: TypeTag
     - event_data: BYTES
@@ -469,8 +495,6 @@ StateValueMetadata:
     0:
       V0:
         STRUCT:
-          - payer:
-              TYPENAME: AccountAddress
           - deposit: U64
           - creation_time_usecs: U64
 StructTag:

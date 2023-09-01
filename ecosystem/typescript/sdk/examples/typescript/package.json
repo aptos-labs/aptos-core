@@ -15,7 +15,8 @@
     "your_fungible_asset": "ts-node your_fungible_asset.ts",
     "call_aptos_cli": "ts-node call_aptos_cli.ts",
     "ambassador": "ts-node ambassador",
-    "knight": "ts-node knight"
+    "knight": "ts-node knight",
+    "gas_fee_payer": "ts-node gas_fee_payer"
   },
   "keywords": [],
   "author": "",

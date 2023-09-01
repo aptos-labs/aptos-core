@@ -49,14 +49,23 @@ ChangeSet:
 ContractEvent:
   ENUM:
     0:
-      V0:
+      V1:
         NEWTYPE:
-          TYPENAME: ContractEventV0
-ContractEventV0:
+          TYPENAME: ContractEventV1
+    1:
+      V2:
+        NEWTYPE:
+          TYPENAME: ContractEventV2
+ContractEventV1:
   STRUCT:
     - key:
         TYPENAME: EventKey
     - sequence_number: U64
+    - type_tag:
+        TYPENAME: TypeTag
+    - event_data: BYTES
+ContractEventV2:
+  STRUCT:
     - type_tag:
         TYPENAME: TypeTag
     - event_data: BYTES
@@ -166,8 +175,6 @@ StateValueMetadata:
     0:
       V0:
         STRUCT:
-          - payer:
-              TYPENAME: AccountAddress
           - deposit: U64
           - creation_time_usecs: U64
 StructTag:

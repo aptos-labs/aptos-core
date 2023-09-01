@@ -31,6 +31,14 @@ pub enum FeatureFlag {
     DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING = 21,
     GAS_PAYER_ENABLED = 22,
     APTOS_UNIQUE_IDENTIFIERS = 23,
+    BULLETPROOFS_NATIVES = 24,
+    SIGNER_NATIVE_FORMAT_FIX = 25,
+    MODULE_EVENT = 26,
+    EMIT_FEE_STATEMENT = 27,
+    STORAGE_DELETION_REFUND = 28,
+    SIGNATURE_CHECKER_V2_SCRIPT_FIX = 29,
+    AGGREGATOR_SNAPSHOTS = 30,
+    SAFER_RESOURCE_GROUPS = 31,
 }
 
 /// Representation of features on chain as a bitset.
@@ -43,7 +51,7 @@ pub struct Features {
 impl Default for Features {
     fn default() -> Self {
         Features {
-            features: vec![0b00100000, 0b00100000, 0b00000100],
+            features: vec![0b00100000, 0b00100000, 0b00001100, 0b00100000],
         }
     }
 }
@@ -67,6 +75,25 @@ impl Features {
 
     pub fn is_storage_slot_metadata_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
+    }
+
+    pub fn is_module_event_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::MODULE_EVENT)
+    }
+
+    pub fn is_emit_fee_statement_enabled(&self) -> bool {
+        // requires module events
+        self.is_module_event_enabled() && self.is_enabled(FeatureFlag::EMIT_FEE_STATEMENT)
+    }
+
+    pub fn is_storage_deletion_refund_enabled(&self) -> bool {
+        // requires emit fee statement
+        self.is_emit_fee_statement_enabled()
+            && self.is_enabled(FeatureFlag::STORAGE_DELETION_REFUND)
+    }
+
+    pub fn is_aggregator_snapshots_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::AGGREGATOR_SNAPSHOTS)
     }
 }
 

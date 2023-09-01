@@ -1309,4 +1309,27 @@ module aptos_framework::account {
         account_state.guid_creation_num = MAX_GUID_CREATION_NUM - 1;
         create_guid(account);
     }
+
+    #[test_only]
+    struct FakeCoin { }
+    #[test_only]
+    struct SadFakeCoin { }
+
+    #[test(account = @0x1234)]
+    fun test_events(account: &signer) acquires Account {
+        let addr = signer::address_of(account);
+        create_account_unchecked(addr);
+        register_coin<FakeCoin>(addr);
+
+        let eventhandle = &borrow_global<Account>(addr).coin_register_events;
+        let event = CoinRegisterEvent { type_info: type_info::type_of<FakeCoin>() };
+
+        let events = event::emitted_events_by_handle(eventhandle);
+        assert!(vector::length(&events) == 1, 0);
+        assert!(vector::borrow(&events, 0) == &event, 1);
+        assert!(event::was_event_emitted_by_handle(eventhandle, &event), 2);
+
+        let event = CoinRegisterEvent { type_info: type_info::type_of<SadFakeCoin>() };
+        assert!(!event::was_event_emitted_by_handle(eventhandle, &event), 3);
+    }
 }

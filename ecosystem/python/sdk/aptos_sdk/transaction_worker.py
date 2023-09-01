@@ -182,7 +182,7 @@ class TransactionQueue:
 class Test(unittest.IsolatedAsyncioTestCase):
     async def test_common_path(self):
         transaction_arguments = [
-            TransactionArgument(AccountAddress.from_hex("b0b"), Serializer.struct),
+            TransactionArgument(AccountAddress.from_str("b0b"), Serializer.struct),
             TransactionArgument(100, Serializer.u64),
         ]
         payload = EntryFunction.natural(

@@ -7,7 +7,7 @@ slug: "cli-release"
 
 ### How to install
 
-Read [Install the Aptos CLI](../tools/install-cli/index.md) and follow the instructions for your preferred installation method.
+Read [Install the Aptos CLI](../tools/aptos-cli/install-cli/index.md) and follow the instructions for your preferred installation method.
 
 If you have already installed the CLI, you can upgrade to the latest version using a command:
 * With brew: `brew upgrade aptos`

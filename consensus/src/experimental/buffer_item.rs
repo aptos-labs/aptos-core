@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{experimental::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
+use crate::{
+    experimental::{commit_reliable_broadcast::DropGuard, hashable::Hashable},
+    state_replication::StateComputerCommitCallBackType,
+};
 use anyhow::anyhow;
 use aptos_consensus_types::{
     common::Author, executed_block::ExecutedBlock, experimental::commit_vote::CommitVote,
@@ -16,6 +19,7 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use itertools::zip_eq;
+use tokio::time::Instant;
 
 fn generate_commit_ledger_info(
     commit_info: &BlockInfo,
@@ -105,6 +109,7 @@ pub struct SignedItem {
     pub partial_commit_proof: LedgerInfoWithPartialSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub commit_vote: CommitVote,
+    pub rb_handle: Option<(Instant, DropGuard)>,
 }
 
 pub struct AggregatedItem {
@@ -187,7 +192,7 @@ impl BufferItem {
 
                     let verified_signatures =
                         verify_signatures(unverified_signatures, validator, &commit_ledger_info);
-                    if (validator.check_voting_power(verified_signatures.signatures().keys()))
+                    if (validator.check_voting_power(verified_signatures.signatures().keys(), true))
                         .is_ok()
                     {
                         let commit_proof = aggregate_commit_proof(
@@ -244,6 +249,7 @@ impl BufferItem {
                     callback,
                     partial_commit_proof,
                     commit_vote,
+                    rb_handle: None,
                 }))
             },
             _ => {
@@ -321,7 +327,7 @@ impl BufferItem {
         match self {
             Self::Signed(signed_item) => {
                 if validator
-                    .check_voting_power(signed_item.partial_commit_proof.signatures().keys())
+                    .check_voting_power(signed_item.partial_commit_proof.signatures().keys(), true)
                     .is_ok()
                 {
                     Self::Aggregated(Box::new(AggregatedItem {
@@ -339,7 +345,10 @@ impl BufferItem {
             },
             Self::Executed(executed_item) => {
                 if validator
-                    .check_voting_power(executed_item.partial_commit_proof.signatures().keys())
+                    .check_voting_power(
+                        executed_item.partial_commit_proof.signatures().keys(),
+                        true,
+                    )
                     .is_ok()
                 {
                     Self::Aggregated(Box::new(AggregatedItem {
@@ -435,9 +444,9 @@ impl BufferItem {
         matches!(self, Self::Aggregated(_))
     }
 
-    pub fn unwrap_signed_ref(&self) -> &SignedItem {
+    pub fn unwrap_signed_mut(&mut self) -> &mut SignedItem {
         match self {
-            BufferItem::Signed(item) => item.as_ref(),
+            BufferItem::Signed(item) => item.as_mut(),
             _ => panic!("Not signed item"),
         }
     }

@@ -17,7 +17,7 @@ use aptos_api_types::{
 };
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
-use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
+use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::error;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::TStateView;
@@ -43,9 +43,10 @@ use aptos_types::{
     },
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
+use aptos_utils::aptos_try;
 use aptos_vm::{
     data_cache::{AsMoveResolver, StorageAdapter},
-    move_vm_ext::MoveResolverExt,
+    move_vm_ext::AptosMoveResolver,
 };
 use futures::{channel::oneshot, SinkExt};
 use move_core_types::language_storage::{ModuleId, StructTag};
@@ -347,7 +348,23 @@ impl Context {
         let kvs = kvs
             .into_iter()
             .map(|(key, value)| {
-                if state_view.as_move_resolver().is_resource_group(&key) {
+                let is_resource_group =
+                    |resolver: &dyn AptosMoveResolver, struct_tag: &StructTag| -> bool {
+                        aptos_try!({
+                            let md = aptos_framework::get_metadata(
+                                &resolver.get_module_metadata(&struct_tag.module_id()),
+                            )?;
+                            md.struct_attributes
+                                .get(struct_tag.name.as_ident_str().as_str())?
+                                .iter()
+                                .find(|attr| attr.is_resource_group())?;
+                            Some(())
+                        })
+                        .is_some()
+                    };
+
+                let resolver = state_view.as_move_resolver();
+                if is_resource_group(&resolver, &key) {
                     // An error here means a storage invariant has been violated
                     bcs::from_bytes::<ResourceGroup>(&value)
                         .map(|map| {
@@ -1092,7 +1109,7 @@ impl Context {
 
     fn min_gas_unit_price<E: InternalError>(&self, ledger_info: &LedgerInfo) -> Result<u64, E> {
         let (_, gas_schedule) = self.get_gas_schedule(ledger_info)?;
-        Ok(gas_schedule.txn.min_price_per_gas_unit.into())
+        Ok(gas_schedule.vm.txn.min_price_per_gas_unit.into())
     }
 
     pub fn get_gas_schedule<E: InternalError>(
