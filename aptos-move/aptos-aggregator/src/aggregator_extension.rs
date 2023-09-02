@@ -54,7 +54,7 @@ pub enum AggregatorState {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AggregatorHandle(pub AccountAddress);
 
-/// Uniquely identifies each aggregator instance in storage.
+/// Uniquely identifies each an aggregator or aggregator snapshot instance in storage.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AggregatorID {
     // Aggregator V1 is implemented as a Table item, and so can be queried by the
@@ -91,12 +91,6 @@ impl AggregatorID {
             AggregatorID::Ephemeral(_) => None,
         }
     }
-}
-
-/// Uniquely identifies each aggregator snapshot instance during the block execution.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct AggregatorSnapshotID {
-    pub id: u64,
 }
 
 /// Tracks values seen by aggregator. In particular, stores information about
@@ -200,12 +194,9 @@ impl DeltaHistory {
 #[allow(dead_code)]
 pub struct AggregatorSnapshot {
     // The identifier used to identify the aggregator snapshot.
-    id: AggregatorSnapshotID,
+    id: AggregatorID,
     // Describes an upper bound of an aggregator. If value of the aggregator
     // exceeds it, the aggregator overflows.
-    // TODO: Currently this is a single u128 value since we use 0 as a trivial
-    // lower bound. If we want to support custom lower bounds, or have more
-    // complex postconditions, we should factor this out in its own struct.
     max_value: u128,
     // Describes a state of an aggregator.
     state: AggregatorState,
@@ -673,7 +664,7 @@ pub struct AggregatorData {
     // All aggregator instances that exist in the current transaction.
     aggregators: BTreeMap<AggregatorID, Aggregator>,
     // All aggregatorsnapshot instances that exist in the current transaction.
-    aggregator_snapshots: BTreeMap<AggregatorSnapshotID, AggregatorSnapshot>,
+    aggregator_snapshots: BTreeMap<AggregatorID, AggregatorSnapshot>,
     // Counter for generating identifiers for AggregatorSnapshots.
     pub id_counter: u64,
 }
@@ -742,10 +733,9 @@ impl AggregatorData {
         }
     }
 
-    pub fn snapshot(&mut self, id: &AggregatorID) -> AggregatorSnapshotID {
-        let snapshot_id = AggregatorSnapshotID {
-            id: self.generate_id(),
-        };
+    pub fn snapshot(&mut self, id: &AggregatorID) -> u64 {
+        let new_id = self.generate_id();
+        let snapshot_id = AggregatorID::ephemeral(new_id);
         let aggregator = self.aggregators.get(id).expect("Aggregator doesn't exist");
         self.aggregator_snapshots
             .insert(snapshot_id, AggregatorSnapshot {
@@ -754,10 +744,10 @@ impl AggregatorData {
                 max_value: aggregator.max_value,
                 base_aggregator: *id,
             });
-        snapshot_id
+        new_id
     }
 
-    pub fn read_snapshot(&self, id: AggregatorSnapshotID) -> u128 {
+    pub fn read_snapshot(&self, id: AggregatorID) -> u128 {
         let snapshot = self
             .aggregator_snapshots
             .get(&id)
