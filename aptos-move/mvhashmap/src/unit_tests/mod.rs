@@ -8,7 +8,8 @@ use super::{
     *,
 };
 use aptos_aggregator::{
-    delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate},
+    aggregator_extension::{DeltaHistory, DeltaValue},
+    delta_change_set::{delta_add, delta_sub, DeltaOp},
     transaction::AggregatorValue,
 };
 use aptos_types::{
@@ -61,7 +62,7 @@ fn u128_for(txn_idx: TxnIndex, incarnation: Incarnation) -> u128 {
 
 fn match_unresolved(
     read_result: anyhow::Result<MVDataOutput<Value>, MVDataError>,
-    update: DeltaUpdate,
+    update: DeltaValue,
 ) {
     match read_result {
         Err(MVDataError::Unresolved(delta)) => assert_eq!(delta.get_update(), update),
@@ -182,7 +183,7 @@ fn create_write_read_placeholder_struct() {
     // Reads from ap1 and ap3 go to db.
     match_unresolved(
         mvtbl.fetch_data(&ap1, 30),
-        DeltaUpdate::Minus((61 + 13) - 11),
+        DeltaValue::Negative((61 + 13) - 11),
     );
     let r_db = mvtbl.fetch_data(&ap3, 30);
     assert_eq!(Err(NotFound), r_db);
@@ -218,10 +219,15 @@ fn materialize_delta_shortcut() {
     vd.add_delta(ap.clone(), 8, delta_add(20, limit));
     vd.add_delta(ap.clone(), 11, delta_add(30, limit));
 
-    match_unresolved(vd.fetch_data(&ap, 10), DeltaUpdate::Plus(30));
+    match_unresolved(vd.fetch_data(&ap, 10), DeltaValue::Positive(30));
     assert_err_eq!(
         vd.materialize_delta(&ap, 8),
-        DeltaOp::new(DeltaUpdate::Plus(30), limit, 30, 0)
+        DeltaOp::new(DeltaValue::Positive(30), limit, DeltaHistory {
+            max_achieved_positive_delta: 30,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        })
     );
     vd.set_aggregator_base_value(&ap, 5);
     // Multiple calls are idempotent.

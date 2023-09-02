@@ -131,7 +131,11 @@ fn native_try_add(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let (id, value, limit) = get_aggregator_fields(&ty_args[0], args)?;
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
-    Ok(smallvec![Value::bool(aggregator.try_add(value).is_ok())])
+    Ok(smallvec![Value::bool(
+        aggregator
+            .try_add(aggregator_context.resolver, value)
+            .is_ok()
+    )])
 }
 
 /***************************************************************************************************
@@ -149,7 +153,11 @@ fn native_try_sub(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let (id, value, limit) = get_aggregator_fields(&ty_args[0], args)?;
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
-    Ok(smallvec![Value::bool(aggregator.try_sub(value).is_ok())])
+    Ok(smallvec![Value::bool(
+        aggregator
+            .try_sub(aggregator_context.resolver, value)
+            .is_ok()
+    )])
 }
 
 /***************************************************************************************************
@@ -172,13 +180,15 @@ fn native_read(
             // Extract information from aggregator struct reference.
             let (id, limit) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
             let aggregator = aggregator_data.get_aggregator(id, limit)?;
-            let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
+            let value =
+                aggregator.read_most_recent_aggregator_value(aggregator_context.resolver)?;
             Ok(smallvec![Value::u128(value)])
         },
         Type::U64 => {
             let (id, limit) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
             let aggregator = aggregator_data.get_aggregator(id, limit as u128)?;
-            let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
+            let value =
+                aggregator.read_most_recent_aggregator_value(aggregator_context.resolver)?;
             if value > u64::MAX as u128 {
                 return Err(SafeNativeError::Abort {
                     abort_code: EREAD_OUT_OF_BOUNDS,
@@ -188,6 +198,42 @@ fn native_read(
         },
         _ => Err(SafeNativeError::Abort {
             abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
+        }),
+    }
+}
+
+/***************************************************************************************************
+ * native fun snapshot(aggregator: &Aggregator): AggregatorSnapshot<u128>;
+ **************************************************************************************************/
+
+fn native_snapshot(
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(args.len(), 1);
+
+    context.charge(AGGREGATOR_V2_SNAPSHOT_BASE)?;
+    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+
+    match ty_args[0] {
+        Type::U128 => {
+            let (aggregator_id, _) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
+            let id = aggregator_data.snapshot(&aggregator_id);
+            Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u128(
+                id as u128
+            )]))])
+        },
+        Type::U64 => {
+            let (aggregator_id, _) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
+            let id = aggregator_data.snapshot(&aggregator_id);
+            Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u64(
+                id
+            )]))])
+        },
+        _ => Err(SafeNativeError::Abort {
+            abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
         }),
     }
 }
@@ -380,6 +426,7 @@ pub fn make_all(
         ("try_add", native_try_add),
         ("read", native_read),
         ("try_sub", native_try_sub),
+        ("snapshot", native_snapshot),
         ("create_snapshot", native_create_snapshot),
         ("copy_snapshot", native_copy_snapshot),
         ("read_snapshot", native_read_snapshot),
