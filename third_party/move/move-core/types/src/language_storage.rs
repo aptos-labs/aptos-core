@@ -245,7 +245,9 @@ impl ModuleId {
 
 impl Display for ModuleId {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "0x{}::{}", self.address.short_str_lossless(), self.name)
+        // Can't change, because it can be part of TransactionExecutionFailedEvent
+        // which is emitted on chain.
+        write!(f, "{}::{}", self.address, self.name)
     }
 }
 
