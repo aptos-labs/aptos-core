@@ -1,57 +1,42 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    common::{new_cpu_set, pin_cpu_set},
-    thread_manager::ThreadManager,
-};
+use crate::{common::set_thread_nice_value, thread_manager::ThreadManager};
 use aptos_runtimes::spawn_rayon_thread_pool_with_start_hook;
-use libc::CPU_SET;
 use rayon::ThreadPool;
 
-pub(crate) struct PinExeThreadsToCoresThreadManager {
+pub(crate) struct ThreadsPriorityThreadManager {
     exe_threads: ThreadPool,
     non_exe_threads: ThreadPool,
     high_pri_io_threads: ThreadPool,
     io_threads: ThreadPool,
 }
 
-impl PinExeThreadsToCoresThreadManager {
-    pub(crate) fn new(num_exe_cpu: usize) -> Self {
-        let core_ids = core_affinity::get_core_ids().unwrap();
-        assert!(core_ids.len() > num_exe_cpu);
-
-        let mut exe_cpu_set = new_cpu_set();
-        let mut non_exe_cpu_set = new_cpu_set();
-        for core_id in core_ids.iter().take(num_exe_cpu) {
-            unsafe { CPU_SET(core_id.id, &mut exe_cpu_set) };
-        }
-        for core_id in core_ids.iter().skip(num_exe_cpu) {
-            unsafe { CPU_SET(core_id.id, &mut non_exe_cpu_set) };
-        }
-
+impl ThreadsPriorityThreadManager {
+    pub(crate) fn new(num_exe_threads: usize) -> Self {
+        // TODO(grao): Make priorities and thread numbers configurable.
         let exe_threads = spawn_rayon_thread_pool_with_start_hook(
             "exe".into(),
-            Some(num_exe_cpu),
-            pin_cpu_set(exe_cpu_set),
+            Some(num_exe_threads),
+            set_thread_nice_value(-20),
         );
 
         let non_exe_threads = spawn_rayon_thread_pool_with_start_hook(
             "non_exe".into(),
-            Some(core_ids.len() - num_exe_cpu),
-            pin_cpu_set(non_exe_cpu_set),
+            Some(16),
+            set_thread_nice_value(-10),
         );
 
         let high_pri_io_threads = spawn_rayon_thread_pool_with_start_hook(
             "io_high".into(),
             Some(32),
-            pin_cpu_set(exe_cpu_set),
+            set_thread_nice_value(-20),
         );
 
         let io_threads = spawn_rayon_thread_pool_with_start_hook(
             "io_low".into(),
             Some(64),
-            pin_cpu_set(non_exe_cpu_set),
+            set_thread_nice_value(1),
         );
 
         Self {
@@ -63,7 +48,7 @@ impl PinExeThreadsToCoresThreadManager {
     }
 }
 
-impl<'a> ThreadManager<'a> for PinExeThreadsToCoresThreadManager {
+impl<'a> ThreadManager<'a> for ThreadsPriorityThreadManager {
     fn get_exe_cpu_pool(&'a self) -> &'a ThreadPool {
         &self.exe_threads
     }

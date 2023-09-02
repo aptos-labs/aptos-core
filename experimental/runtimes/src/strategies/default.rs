@@ -36,4 +36,8 @@ impl<'a> ThreadManager<'a> for DefaultThreadManager {
     fn get_io_pool(&'a self) -> &'a ThreadPool {
         &self.io_threads
     }
+
+    fn get_high_pri_io_pool(&'a self) -> &'a ThreadPool {
+        &self.io_threads
+    }
 }

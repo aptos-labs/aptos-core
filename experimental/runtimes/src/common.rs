@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(target_os = "linux")]
-use libc::{cpu_set_t, sched_setaffinity};
+use libc::{cpu_set_t, sched_setaffinity, setpriority, PRIO_PROCESS};
 
 #[cfg(target_os = "linux")]
 pub(crate) fn new_cpu_set() -> cpu_set_t {
@@ -19,5 +19,12 @@ pub(crate) fn pin_cpu_set(cpu_set: cpu_set_t) -> impl Fn() + Send + Sync + 'stat
                 &cpu_set,
             );
         };
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn set_thread_nice_value(nice_value: i32) -> impl Fn() + Send + Sync + 'static {
+    move || unsafe {
+        setpriority(PRIO_PROCESS, 0, nice_value);
     }
 }
