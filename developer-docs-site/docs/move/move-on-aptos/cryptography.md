@@ -5,6 +5,8 @@ slug: "cryptography"
 
 # Cryptography in Move
 
+Cryptography plays an integral role in ensuring the security, integrity, confidentiality, and immutability of data in blockchain systems. The Aptos adapter for Move provides developers with an array of cryptographic primitives to cater to this need. This document delves into the cryptographic functionalities offered by Move on Aptos and elucidates the principles that drive their design.
+
 The Aptos adapter for Move has introduced many useful cryptographic primitives:
 
 1. Cryptographic hash functions (e.g., SHA2-256, SHA3-256, Keccak256, Blake2b-256)
