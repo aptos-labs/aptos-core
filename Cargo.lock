@@ -12710,6 +12710,7 @@ dependencies = [
  "aptos-global-constants",
  "aptos-indexer",
  "aptos-infallible",
+ "aptos-inspection-service",
  "aptos-keygen",
  "aptos-logger",
  "aptos-release-builder",
