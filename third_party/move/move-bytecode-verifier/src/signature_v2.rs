@@ -803,7 +803,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 | BitOr | BitAnd | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le
                 | Ge | CopyLoc(_) | MoveLoc(_) | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_)
                 | MutBorrowField(_) | ImmBorrowField(_) | MutBorrowGlobal(_)
-                | ImmBorrowGlobal(_) | Exists(_) | MoveTo(_) | MoveFrom(_) | Abort | Nop => (),
+                | ImmBorrowGlobal(_) | Exists(_) | MoveTo(_) | MoveFrom(_) | Abort | Nop | CallVirtual(_) => (),
             }
         }
 

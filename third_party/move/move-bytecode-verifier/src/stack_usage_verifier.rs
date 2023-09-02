@@ -221,6 +221,9 @@ impl<'a> StackUsageVerifier<'a> {
                 let return_count = self.resolver.signature_at(function_handle.return_).len() as u64;
                 (arg_count, return_count)
             },
+            Bytecode::CallVirtual(idx) => {
+
+            }
 
             // Pack performs `num_fields` pops and one push
             Bytecode::Pack(idx) => {
