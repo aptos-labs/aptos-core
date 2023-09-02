@@ -5,8 +5,8 @@ use crate::{
     delta_change_set::{addition, subtraction},
 };
 use aptos_state_view::StateView;
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::vm_status::VMStatus;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::vm_status::{StatusCode, VMStatus};
 
 /// Represents a single aggregator change.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -57,6 +57,13 @@ impl AggregatorChange {
             self.max_value, previous_change.max_value,
             "Cannot merge aggregator changes with different max_values",
         );
+        // When the previous aggregator change is a snapshot, we cannot merge it with the current.
+        if previous_change.base_aggregator.is_some() {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Cannot merge aggregator snapshots".to_string()),
+            );
+        }
         match self.state {
             AggregatorState::Data { .. } => {
                 // If the current state is Data, then merging with previous state won't change anything.
@@ -84,7 +91,6 @@ impl AggregatorChange {
                         delta: prev_delta,
                         history: prev_history,
                     } => {
-                        println!("before history_validation");
                         // Check if the history is valid when the speculative_start_value is updated to previous_speculative_start_value + prev_delta.
                         let new_start_value = addition_deltavalue(
                             prev_speculative_start_value,
@@ -105,7 +111,6 @@ impl AggregatorChange {
                                 }
                             };
                         }
-                        println!("before new_delta");
                         // History check passed, and we are ready to update the actual values now.
                         let new_delta =
                             match prev_delta {
@@ -127,7 +132,6 @@ impl AggregatorChange {
                                 },
                             };
 
-                        println!("before new_min_underflow");
                         // new_min_overflow = min(prev_min_overflow, prev_delta + min_overflow)
                         let new_min_overflow = match (
                             prev_history.min_overflow_positive_delta,
@@ -136,34 +140,57 @@ impl AggregatorChange {
                             (
                                 Some(prev_min_overflow_positive_delta),
                                 Some(min_overflow_positive_delta),
-                            ) => { 
+                            ) => {
+                                // We know that previous_speculative_value + prev_delta + min_overflow_positive_delta is
+                                // greater than max_value. Otherwise, valiate_history function should have returned an error.
+                                // Therefore delta = prev_delta + min_overflow_positive_delta still results in an overflow.
+                                // We are assured that prev_delta + min_overflow_positive_delta is positive. But in case
+                                // prev_delta + min_overflow_positive_delta is greater than max_value, then adding
+                                // delta = prev_delta + min_overflow_positive_delta to any start value will always result in
+                                // an overflow. By our convention, we consider this overflow as None.
                                 match addition_deltavalue(
                                     min_overflow_positive_delta,
                                     prev_delta,
                                     self.max_value,
                                 ) {
-                                    Ok(val) => Some(u128::min(prev_min_overflow_positive_delta, val)),
+                                    Ok(val) => {
+                                        Some(u128::min(prev_min_overflow_positive_delta, val))
+                                    },
                                     Err(_) => Some(prev_min_overflow_positive_delta),
                                 }
                             },
                             (Some(prev_min_overflow_positive_delta), None) => {
                                 Some(prev_min_overflow_positive_delta)
                             },
-                            (None, Some(min_overflow_positive_delta)) => Some(addition_deltavalue(
-                                min_overflow_positive_delta,
-                                prev_delta,
-                                self.max_value,
-                            )?),
+                            (None, Some(min_overflow_positive_delta)) => {
+                                // We know that previous_speculative_value + prev_delta + min_overflow_positive_delta is
+                                // greater than max_value. Otherwise, valiate_history function should have returned an error.
+                                // Therefore delta = prev_delta + min_overflow_positive_delta still results in an overflow.
+                                // We are assured that prev_delta + min_overflow_positive_delta is positive.
+                                // But if prev_delta + min_overflow_positive_delta exceeds max_value, by our convention the
+                                // overflow is considered as None, as any possible start value will always result in an overflow.
+                                addition_deltavalue(
+                                    min_overflow_positive_delta,
+                                    prev_delta,
+                                    self.max_value,
+                                )
+                                .ok()
+                            },
                             (None, None) => None,
                         };
-
-                        println!("before new_max_underflow");
 
                         // new_max_underflow = min(prev_max_underflow, max_underflow - prev_delta)
                         let new_max_underflow = match (
                             prev_history.max_underflow_negative_delta,
                             history.max_underflow_negative_delta,
                         ) {
+                            // We know that previous_speculative_value + prev_delta - max_underflow_negative_delta is
+                            // less than 0. Otherwise, valiate_history function should have returned an error.
+                            // Therefore delta = prev_delta - max_underflow_negative_delta still results in an underflow.
+                            // We are assured that max_underflow_negative_delta - prev_delta is positive. But in case
+                            // max_underflow_negative_delta - prev_delta exceeds max_value, then adding delta =
+                            // prev_delta - max_underflow_negative_delta to any start value will always result in
+                            // an underflow. By our convention, we consider this underflow as None.
                             (
                                 Some(prev_max_underflow_negative_delta),
                                 Some(max_underflow_negative_delta),
@@ -179,16 +206,23 @@ impl AggregatorChange {
                                 Some(prev_max_underflow_negative_delta)
                             },
                             (None, Some(max_underflow_negative_delta)) => {
-                                Some(subtraction_deltavalue(
+                                // We know that previous_speculative_value + prev_delta - max_underflow_negative_delta is
+                                // less than 0. Otherwise, valiate_history function should have returned an error.
+                                // Therefore delta = prev_delta - max_underflow_negative_delta still results in an underflow.
+                                // We are assured that max_underflow_negative_delta - prev_delta is positive. But in case
+                                // max_underflow_negative_delta - prev_delta exceeds max_value, then adding delta =
+                                // prev_delta - max_underflow_negative_delta to any start value will always result in
+                                // an underflow. By our convention, we consider this underflow as None.
+                                subtraction_deltavalue(
                                     max_underflow_negative_delta,
                                     prev_delta,
                                     self.max_value,
-                                )?)
+                                )
+                                .ok()
                             },
                             (None, None) => None,
                         };
 
-                        println!("before new_max_achieved");
                         // new_max_achieved = max(prev_max_achieved, max_achieved + prev_delta)
                         let new_max_achieved = match prev_delta {
                             DeltaValue::Positive(prev_delta) => u128::max(
@@ -213,7 +247,6 @@ impl AggregatorChange {
                                 }
                             },
                         };
-                        println!("after new_max_achieved");
 
                         // new_min_achieved = max(prev_min_achieved, min_achieved - prev_delta)
                         let new_min_achieved = match prev_delta {
@@ -438,6 +471,41 @@ mod test {
     }
 
     #[test]
+    fn test_merge_delta_into_delta_failed_history_validation2() {
+        let aggregator_change1 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 70,
+                delta: DeltaValue::Negative(60),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 20,
+                    min_achieved_negative_delta: 60,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+            },
+            base_aggregator: None,
+        };
+        let mut aggregator_change2 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 60,
+                delta: DeltaValue::Negative(10),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 10,
+                    min_achieved_negative_delta: 25,
+                    min_overflow_positive_delta: Some(50),
+                    max_underflow_negative_delta: Some(45),
+                },
+            },
+            base_aggregator: None,
+        };
+        assert_err!(aggregator_change2.merge_with_previous_aggregator_change(aggregator_change1));
+    }
+
+    #[test]
     fn test_merge_delta_into_delta() {
         let aggregator_change1 = AggregatorChange {
             max_value: 100,
@@ -556,12 +624,112 @@ mod test {
             state: AggregatorState::Delta {
                 speculative_source: SpeculativeValueSource::AggregatedValue,
                 speculative_start_value: 70,
-                delta: DeltaValue::Negative(70),
+                delta: DeltaValue::Negative(55),
                 history: DeltaHistory {
-                    max_achieved_positive_delta: 25,
-                    min_achieved_negative_delta: 70,
-                    min_overflow_positive_delta: Some(35),
-                    max_underflow_negative_delta: Some(10),
+                    max_achieved_positive_delta: 20,
+                    min_achieved_negative_delta: 65,
+                    min_overflow_positive_delta: Some(31),
+                    max_underflow_negative_delta: Some(80),
+                },
+            },
+            base_aggregator: None,
+        });
+    }
+
+    #[test]
+    fn test_merge_delta_into_delta3() {
+        let aggregator_change1 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 70,
+                delta: DeltaValue::Positive(20),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 20,
+                    min_achieved_negative_delta: 60,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+            },
+            base_aggregator: None,
+        };
+        let mut aggregator_change2 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 10,
+                delta: DeltaValue::Negative(5),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 10,
+                    min_achieved_negative_delta: 5,
+                    min_overflow_positive_delta: Some(95),
+                    max_underflow_negative_delta: None,
+                },
+            },
+            base_aggregator: None,
+        };
+        assert_ok!(aggregator_change2.merge_with_previous_aggregator_change(aggregator_change1));
+        assert_eq!(aggregator_change2, AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 70,
+                delta: DeltaValue::Positive(15),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 30,
+                    min_achieved_negative_delta: 60,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+            },
+            base_aggregator: None,
+        });
+    }
+
+    #[test]
+    fn test_merge_delta_into_delta4() {
+        let aggregator_change1 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 70,
+                delta: DeltaValue::Negative(20),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 20,
+                    min_achieved_negative_delta: 60,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+            },
+            base_aggregator: None,
+        };
+        let mut aggregator_change2 = AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::LastCommittedValue,
+                speculative_start_value: 70,
+                delta: DeltaValue::Positive(5),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 10,
+                    min_achieved_negative_delta: 5,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: Some(90),
+                },
+            },
+            base_aggregator: None,
+        };
+        assert_ok!(aggregator_change2.merge_with_previous_aggregator_change(aggregator_change1));
+        assert_eq!(aggregator_change2, AggregatorChange {
+            max_value: 100,
+            state: AggregatorState::Delta {
+                speculative_source: SpeculativeValueSource::AggregatedValue,
+                speculative_start_value: 70,
+                delta: DeltaValue::Negative(15),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 20,
+                    min_achieved_negative_delta: 60,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
                 },
             },
             base_aggregator: None,
