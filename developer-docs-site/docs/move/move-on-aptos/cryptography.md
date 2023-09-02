@@ -7,13 +7,14 @@ slug: "cryptography"
 
 Cryptography plays an integral role in ensuring the security, integrity, confidentiality, and immutability of data in blockchain systems. The Aptos adapter for Move provides developers with an array of cryptographic primitives to cater to this need. This document delves into the cryptographic functionalities offered by Move on Aptos and elucidates the principles that drive their design.
 
-The Aptos adapter for Move has introduced many useful cryptographic primitives:
+## Cryptographic primitives
 
-1. Cryptographic hash functions (e.g., SHA2-256, SHA3-256, Keccak256, Blake2b-256)
-2. Digital signature verification (e.g., Ed25519, ECDSA, BLS)
-3. Elliptic curve arithmetic (e.g., Ristretto255, BLS12-381)
-4. Groth16 zero-knowledge proof (ZKP) verification
-5. Bulletproofs zero-knowledge range proof (ZKRP) verification
+Move, through the Aptos adapter, encompasses several fundamental cryptographic tools:
+
+1. [Cryptographic Hash Functions](#cryptographic-hash-functions-in-move) – Algorithms that produce a fixed-size output (hash) from variable-sized input data. Supported functions include SHA2-256, SHA3-256, Keccak256, and Blake2b-256.
+2. [Digital Signature Verification](#digital-signature-verification-in-move) – Algorithms for signing a message so as to ensure its integrity, authenticate its sender, ensure non-repudiation, or any combination thereof. Supported signature schemes include Ed25519, ECDSA, and BLS.
+3. [Elliptic Curve Arithmetic](#elliptic-curve-arithmetic-in-move) – Elliptic curves are one of the building blocks of advanced cryptographic primitives, such as digital signatures, public-key encryption or verifiable secret sharing. Supported curves include Ristretto255 and BLS12-381.
+4. [Zero-Knowledge Proofs (ZKP)](#building-powerful-cryptographic-applications-in-move) – These cryptographic techniques enable a party to prove that a relation $\mathsf{R}(x; w)$ is satisfied on a public statement $x$ without leaking the secret witness $w$ that makes it hold. Currently, we support Groth16 ZKP verification and Bulletproofs ZK range proof verification.
 
 The **key guiding principles** behind these cryptographic extensions are:
 
