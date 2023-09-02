@@ -179,8 +179,11 @@ struct Opt {
     #[clap(long, conflicts_with_all = &["connected_tx_grps", "transactions_per_sender"])]
     hotspot_probability: Option<f32>,
 
-    #[clap(long)]
-    concurrency_level: Option<usize>,
+    #[clap(
+        long,
+        help = "Number of threads to use for execution. Generally replaces --concurrency-level flag (directly for default case, and as a total across all shards for sharded case)"
+    )]
+    execution_threads: Option<usize>,
 
     #[clap(flatten)]
     pruner_opt: PrunerOpt,
@@ -212,18 +215,14 @@ struct Opt {
 }
 
 impl Opt {
-    fn concurrency_level(&self) -> usize {
-        match self.concurrency_level {
+    fn execution_threads(&self) -> usize {
+        match self.execution_threads {
             None => {
-                let level = (num_cpus::get() as f64 / self.pipeline_opt.num_executor_shards as f64)
-                    .ceil() as usize;
-                println!(
-                    "\nVM concurrency level defaults to {} for number of shards {} \n",
-                    level, self.pipeline_opt.num_executor_shards
-                );
-                level
+                let cores = num_cpus::get();
+                println!("\nExecution threads defaults to number of cores: {}", cores,);
+                cores
             },
-            Some(level) => level,
+            Some(threads) => threads,
         }
     }
 }
@@ -401,9 +400,19 @@ fn main() {
     aptos_node_resource_metrics::register_node_metrics_collector();
     let _mp = MetricsPusher::start_for_local_run("executor-benchmark");
 
-    AptosVM::set_concurrency_level_once(opt.concurrency_level());
-    AptosVM::set_num_shards_once(opt.pipeline_opt.num_executor_shards);
-    NativeExecutor::set_concurrency_level_once(opt.concurrency_level());
+    let execution_threads = opt.execution_threads();
+    let execution_shards = opt.pipeline_opt.num_executor_shards;
+    assert!(
+        execution_threads % execution_shards == 0,
+        "Execution threads ({}) must be divisible by the number of execution shards ({}).",
+        execution_threads,
+        execution_shards
+    );
+    let execution_threads_per_shard = execution_threads / execution_shards;
+
+    AptosVM::set_num_shards_once(execution_shards);
+    AptosVM::set_concurrency_level_once(execution_threads_per_shard);
+    NativeExecutor::set_concurrency_level_once(execution_threads_per_shard);
 
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
