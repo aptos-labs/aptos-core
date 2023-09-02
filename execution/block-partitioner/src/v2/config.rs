@@ -12,6 +12,16 @@ pub struct PartitionerV2Config {
 }
 
 impl PartitionerV2Config {
+    pub fn new() -> Self {
+        Self {
+            num_threads: 4,
+            max_partitioning_rounds: 4,
+            cross_shard_dep_avoid_threshold: 0.9,
+            dashmap_num_shards: 64,
+            partition_last_round: false,
+        }
+    }
+
     pub fn build(self) -> Box<dyn BlockPartitioner> {
         Box::new(PartitionerV2::new(
             self.num_threads,
@@ -50,12 +60,6 @@ impl PartitionerV2Config {
 
 impl Default for PartitionerV2Config {
     fn default() -> Self {
-        Self {
-            num_threads: 4,
-            max_partitioning_rounds: 4,
-            cross_shard_dep_avoid_threshold: 0.9,
-            dashmap_num_shards: 64,
-            partition_last_round: false,
-        }
+        Self::new()
     }
 }
