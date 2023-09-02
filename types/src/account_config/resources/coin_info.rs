@@ -112,7 +112,7 @@ impl CoinInfoResource {
     /// This can be passed to data store for testing total supply.
     pub fn to_writeset(&self) -> anyhow::Result<WriteSet> {
         let ap =
-            AccessPath::resource_access_path(AccountAddress::ONE, CoinInfoResource::struct_tag())?;
+            AccessPath::resource_access_path(AccountAddress::ONE, &CoinInfoResource::struct_tag())?;
 
         let value_state_key = self
             .supply

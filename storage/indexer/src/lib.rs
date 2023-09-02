@@ -174,7 +174,7 @@ impl<'a> TableInfoParser<'a> {
         if let Some(bytes) = write_op.bytes() {
             match state_key.inner() {
                 StateKeyInner::AccessPath(access_path) => {
-                    let path: Path = (&access_path.path).try_into()?;
+                    let path: Path = (&access_path.path.to_vec()).try_into()?;
                     match path {
                         Path::Code(_) => (),
                         Path::Resource(struct_tag) => self.parse_struct(struct_tag, bytes)?,

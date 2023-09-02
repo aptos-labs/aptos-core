@@ -150,7 +150,7 @@ impl<'a, S: StateView> AptosMoveResolver for StorageAdapter<'a, S> {
         address: &AccountAddress,
         resource_group: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError> {
-        let ap = AccessPath::resource_group_access_path(*address, resource_group.clone());
+        let ap = AccessPath::resource_group_access_path(*address, resource_group);
         self.get(ap).map_err(|e| e.finish(Location::Undefined))
     }
 
@@ -159,7 +159,7 @@ impl<'a, S: StateView> AptosMoveResolver for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError> {
-        let ap = AccessPath::resource_access_path(*address, struct_tag.clone()).map_err(|_| {
+        let ap = AccessPath::resource_access_path(*address, struct_tag).map_err(|_| {
             PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Undefined)
         })?;
         self.get(ap).map_err(|e| e.finish(Location::Undefined))

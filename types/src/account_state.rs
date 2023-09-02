@@ -195,7 +195,7 @@ impl TryFrom<(AccountAddress, &HashMap<StateKey, StateValue>)> for AccountState 
         for (key, value) in key_value_map {
             match key.inner() {
                 StateKeyInner::AccessPath(access_path) => {
-                    btree_map.insert(access_path.path.clone(), value.bytes().to_vec());
+                    btree_map.insert(access_path.path.clone().to_vec(), value.bytes().to_vec());
                 },
                 _ => return Err(anyhow!("Encountered unexpected key type {:?}", key.inner())),
             }

@@ -25,7 +25,7 @@ impl AccessPathCache for () {
     }
 
     fn get_resource_path(&mut self, address: AccountAddress, struct_tag: StructTag) -> AccessPath {
-        AccessPath::resource_access_path(address, struct_tag)
+        AccessPath::resource_access_path(address, &struct_tag)
             .unwrap_or_else(|_| AccessPath::undefined())
     }
 
@@ -34,7 +34,7 @@ impl AccessPathCache for () {
         address: AccountAddress,
         struct_tag: StructTag,
     ) -> AccessPath {
-        AccessPath::resource_group_access_path(address, struct_tag)
+        AccessPath::resource_group_access_path(address, &struct_tag)
     }
 }
 

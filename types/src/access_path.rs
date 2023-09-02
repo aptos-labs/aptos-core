@@ -44,18 +44,39 @@ use crate::{
 };
 use anyhow::{Error, Result};
 use aptos_crypto::hash::HashValue;
+use bytes::Bytes;
 use move_core_types::language_storage::{ModuleId, StructTag};
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest::prelude::{Arbitrary, BoxedStrategy, Just, Strategy};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, fmt, fmt::Formatter};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, HashMap},
+    convert::TryFrom,
+    fmt,
+    fmt::Formatter,
+};
 
 #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct AccessPath {
     pub address: AccountAddress,
-    #[serde(with = "serde_bytes")]
-    pub path: Vec<u8>,
+    pub path: Bytes,
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl Arbitrary for AccessPath {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        Just(AccessPath {
+            address: AccountAddress::ZERO,
+            path: vec![].into(),
+        })
+        .boxed()
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
@@ -81,6 +102,8 @@ impl fmt::Display for Path {
     }
 }
 
+thread_local!(static AP_CACHE: RefCell<HashMap<StructTag, Bytes>> = RefCell::new(HashMap::new()));
+
 pub enum PathType {
     Code,
     Resource,
@@ -89,14 +112,17 @@ pub enum PathType {
 
 impl AccessPath {
     pub fn new(address: AccountAddress, path: Vec<u8>) -> Self {
-        AccessPath { address, path }
+        AccessPath {
+            address,
+            path: path.into(),
+        }
     }
 
     /// An access path which has no valid target, used for representing failure of computing one.
     pub fn undefined() -> Self {
         AccessPath {
             address: AccountAddress::ZERO,
-            path: vec![],
+            path: vec![].into(),
         }
     }
 
@@ -107,11 +133,20 @@ impl AccessPath {
 
     /// Convert Accesses into a byte offset which would be used by the storage layer to resolve
     /// where fields are stored.
-    pub fn resource_access_path(address: AccountAddress, type_: StructTag) -> Result<AccessPath> {
-        Ok(AccessPath {
+    pub fn resource_access_path(address: AccountAddress, type_: &StructTag) -> Result<AccessPath> {
+        if let Some(result) = AP_CACHE.with(|cache| cache.borrow_mut().get(type_).cloned()) {
+            return Ok(AccessPath {
+                address,
+                path: result,
+            });
+        };
+        let path: Bytes = AccessPath::resource_path_vec(type_.clone())?.into();
+        let ap = AccessPath {
             address,
-            path: AccessPath::resource_path_vec(type_)?,
-        })
+            path: path.clone(),
+        };
+        AP_CACHE.with(|cache| cache.borrow_mut().insert(type_.clone(), path));
+        Ok(ap)
     }
 
     pub fn resource_group_path_vec(tag: StructTag) -> Vec<u8> {
@@ -120,11 +155,20 @@ impl AccessPath {
 
     /// Convert Accesses into a byte offset which would be used by the storage layer to resolve
     /// where fields are stored.
-    pub fn resource_group_access_path(address: AccountAddress, type_: StructTag) -> AccessPath {
-        AccessPath {
+    pub fn resource_group_access_path(address: AccountAddress, type_: &StructTag) -> AccessPath {
+        if let Some(result) = AP_CACHE.with(|cache| cache.borrow_mut().get(type_).cloned()) {
+            return AccessPath {
+                address,
+                path: result,
+            };
+        };
+        let path: Bytes = AccessPath::resource_group_path_vec(type_.clone()).into();
+        let ap = AccessPath {
             address,
-            path: AccessPath::resource_group_path_vec(type_),
-        }
+            path: path.clone(),
+        };
+        AP_CACHE.with(|cache| cache.borrow_mut().insert(type_.clone(), path));
+        ap
     }
 
     pub fn code_path_vec(key: ModuleId) -> Vec<u8> {
@@ -133,7 +177,7 @@ impl AccessPath {
 
     pub fn code_access_path(key: ModuleId) -> Self {
         let address = *key.address();
-        let path = AccessPath::code_path_vec(key);
+        let path = AccessPath::code_path_vec(key).into();
         AccessPath { address, path }
     }
 
@@ -203,7 +247,7 @@ impl From<&ModuleId> for AccessPath {
     fn from(id: &ModuleId) -> AccessPath {
         AccessPath {
             address: *id.address(),
-            path: id.access_vector(),
+            path: id.access_vector().into(),
         }
     }
 }
