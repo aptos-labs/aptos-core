@@ -8,7 +8,7 @@ use crate::natives::aggregator_natives::{
     },
     NativeAggregatorContext,
 };
-use aptos_aggregator::aggregator_extension::AggregatorSnapshotID;
+use aptos_aggregator::aggregator_extension::AggregatorID;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::{
     AGGREGATOR_V2_READ_SNAPSHOT_BASE, AGGREGATOR_V2_SNAPSHOT_BASE,
 };
@@ -43,14 +43,14 @@ fn native_snapshot(
     match ty_args[0] {
         Type::U128 => {
             let (aggregator_id, _) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
-            let AggregatorSnapshotID { id } = aggregator_data.snapshot(&aggregator_id);
+            let id = aggregator_data.snapshot(&aggregator_id);
             Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u128(
                 id as u128
             )]))])
         },
         Type::U64 => {
             let (aggregator_id, _) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
-            let AggregatorSnapshotID { id } = aggregator_data.snapshot(&aggregator_id);
+            let id = aggregator_data.snapshot(&aggregator_id);
             Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u64(
                 id
             )]))])
@@ -85,14 +85,12 @@ fn native_read_snapshot(
                 snapshot_id <= u64::MAX as u128,
                 "Snapshot ID can't exceed u64::MAX"
             );
-            let value = aggregator_data.read_snapshot(AggregatorSnapshotID {
-                id: snapshot_id as u64,
-            });
+            let value = aggregator_data.read_snapshot(AggregatorID::ephemeral(snapshot_id as u64));
             Ok(smallvec![Value::u128(value)])
         },
         Type::U64 => {
             let snapshot_id = aggregator_snapshot_u64_info(&safely_pop_arg!(args, StructRef))?;
-            let value = aggregator_data.read_snapshot(AggregatorSnapshotID { id: snapshot_id });
+            let value = aggregator_data.read_snapshot(AggregatorID::ephemeral(snapshot_id));
             assert!(
                 value <= u64::MAX as u128,
                 "Snapshot value can't exceed u64::MAX"
