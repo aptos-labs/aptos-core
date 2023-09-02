@@ -252,6 +252,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                             state.named_address_mapping.clone(),
                             &state.source_files().cloned().collect::<Vec<_>>(),
                             data_path.to_owned(),
+                            self.known_attributes(),
                         )?;
                         if let Some(module) = module {
                             (None, module, warning_opt)
@@ -351,6 +352,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                             state.named_address_mapping.clone(),
                             &state.source_files().cloned().collect::<Vec<_>>(),
                             data_path.to_owned(),
+                            self.known_attributes(),
                         )?;
                         if let Some(script) = script {
                             (script, warning_opt)
@@ -647,6 +649,7 @@ fn compile_source_unit_v2(
     named_address_mapping: BTreeMap<String, NumericalAddress>,
     deps: &[String],
     path: String,
+    known_attributes: &BTreeSet<String>,
 ) -> Result<(
     (Option<CompiledModule>, Option<CompiledScript>),
     Option<String>,
@@ -675,6 +678,7 @@ fn compile_source_unit_v2(
             .into_iter()
             .map(|(alias, addr)| format!("{}={}", alias, addr))
             .collect(),
+        known_attributes: known_attributes.clone(),
         ..move_compiler_v2::Options::default()
     };
     let mut error_writer = termcolor::Buffer::no_color();
