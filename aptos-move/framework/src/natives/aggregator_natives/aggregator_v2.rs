@@ -6,9 +6,7 @@ use crate::natives::aggregator_natives::{
     NativeAggregatorContext,
 };
 use aptos_aggregator::aggregator_extension::AggregatorID;
-use aptos_gas_schedule::gas_params::natives::aptos_framework::{
-    AGGREGATOR_V2_READ_BASE, AGGREGATOR_V2_TRY_ADD_BASE, AGGREGATOR_V2_TRY_SUB_BASE, *,
-};
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
@@ -82,7 +80,11 @@ fn native_try_add(
             let value = safely_pop_arg!(args, u128);
             let (id, max_value) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
             let aggregator = aggregator_data.get_aggregator(id, max_value)?;
-            Ok(smallvec![Value::bool(aggregator.try_add(value).is_ok())])
+            Ok(smallvec![Value::bool(
+                aggregator
+                    .try_add(aggregator_context.resolver, value)
+                    .is_ok()
+            )])
         },
         Type::U64 => {
             // Get aggregator information and a value to add.
@@ -90,7 +92,9 @@ fn native_try_add(
             let (id, max_value) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
             let aggregator = aggregator_data.get_aggregator(id, max_value as u128)?;
             Ok(smallvec![Value::bool(
-                aggregator.try_add(value as u128).is_ok()
+                aggregator
+                    .try_add(aggregator_context.resolver, value as u128)
+                    .is_ok()
             )])
         },
         _ => Err(PartialVMError::new(StatusCode::ABORTED)
@@ -113,14 +117,17 @@ fn native_try_sub(
     context.charge(AGGREGATOR_V2_TRY_SUB_BASE)?;
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-
     match ty_args[0] {
         Type::U128 => {
             // Get aggregator information and a value to subtract.
             let value = safely_pop_arg!(args, u128);
             let (id, max_value) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
             let aggregator = aggregator_data.get_aggregator(id, max_value)?;
-            Ok(smallvec![Value::bool(aggregator.try_sub(value).is_ok())])
+            Ok(smallvec![Value::bool(
+                aggregator
+                    .try_sub(aggregator_context.resolver, value)
+                    .is_ok()
+            )])
         },
         Type::U64 => {
             // Get aggregator information and a value to subtract.
@@ -128,7 +135,9 @@ fn native_try_sub(
             let (id, max_value) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
             let aggregator = aggregator_data.get_aggregator(id, max_value as u128)?;
             Ok(smallvec![Value::bool(
-                aggregator.try_sub(value as u128).is_ok()
+                aggregator
+                    .try_sub(aggregator_context.resolver, value as u128)
+                    .is_ok()
             )])
         },
         _ => Err(PartialVMError::new(StatusCode::ABORTED)
@@ -158,13 +167,15 @@ fn native_read(
             // Extract information from aggregator struct reference.
             let (id, max_value) = aggregator_info_u128(&safely_pop_arg!(args, StructRef))?;
             let aggregator = aggregator_data.get_aggregator(id, max_value)?;
-            let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
+            let value =
+                aggregator.read_most_recent_aggregator_value(aggregator_context.resolver)?;
             Ok(smallvec![Value::u128(value)])
         },
         Type::U64 => {
             let (id, max_value) = aggregator_info_u64(&safely_pop_arg!(args, StructRef))?;
             let aggregator = aggregator_data.get_aggregator(id, max_value as u128)?;
-            let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
+            let value =
+                aggregator.read_most_recent_aggregator_value(aggregator_context.resolver)?;
             if value > u64::MAX as u128 {
                 return Err(PartialVMError::new(StatusCode::ABORTED)
                     .with_message("Aggregator<u64>::read() output exceeds u64::MAX".to_string())

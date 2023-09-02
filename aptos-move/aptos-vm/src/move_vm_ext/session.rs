@@ -9,7 +9,7 @@ use aptos_aggregator::{aggregator_extension::AggregatorID, delta_change_set::ser
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
-    aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
+    aggregator_natives::{AggregatorChangeSet, AggregatorChangeV1, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
     event::NativeEventContext,
 };
@@ -320,8 +320,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let mut resource_write_set = HashMap::new();
         let mut module_write_set = HashMap::new();
-        let mut aggregator_write_set = HashMap::new();
-        let mut aggregator_delta_set = HashMap::new();
+        let mut aggregator_v1_write_set = HashMap::new();
+        let mut aggregator_v1_delta_set = HashMap::new();
+        let mut aggregator_v2_change_set = HashMap::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
@@ -362,7 +363,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
         }
 
-        for (id, change) in aggregator_change_set.changes {
+        for (id, change) in aggregator_change_set.aggregator_v1_changes {
             match id {
                 // Process Aggregator V1.
                 AggregatorID::Legacy { handle, key } => {
@@ -370,31 +371,42 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     let state_key = StateKey::table_item(TableHandle::from(handle), key_bytes);
 
                     match change {
-                        AggregatorChange::Write(value) => {
+                        AggregatorChangeV1::Write(value) => {
                             let write_op = woc.convert_aggregator_mod(&state_key, value)?;
-                            aggregator_write_set.insert(state_key, write_op);
+                            aggregator_v1_write_set.insert(state_key, write_op);
                         },
-                        AggregatorChange::Merge(delta_op) => {
-                            aggregator_delta_set.insert(state_key, delta_op);
+                        AggregatorChangeV1::Merge(delta_op) => {
+                            aggregator_v1_delta_set.insert(state_key, delta_op);
                         },
-                        AggregatorChange::Delete => {
+                        AggregatorChangeV1::Delete => {
                             let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
-                            aggregator_write_set.insert(state_key, write_op);
+                            aggregator_v1_write_set.insert(state_key, write_op);
                         },
                     }
                 },
                 // Process Aggregator V2.
                 AggregatorID::Ephemeral(_) => {
-                    unreachable!("Ephemeral IDs for aggregators are not used.")
+                    unreachable!(
+                        "Aggregator V1 change set should contain only Legacy AggregatorIDs"
+                    )
                 },
             }
+        }
+
+        for (id, change) in aggregator_change_set.aggregator_v2_changes {
+            assert!(
+                matches!(id, AggregatorID::Ephemeral(_)),
+                "Aggregator V1 should not be in the V2 change set."
+            );
+            aggregator_v2_change_set.insert(id, change);
         }
 
         VMChangeSet::new(
             resource_write_set,
             module_write_set,
-            aggregator_write_set,
-            aggregator_delta_set,
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set,
+            aggregator_v2_change_set,
             events,
             configs,
         )

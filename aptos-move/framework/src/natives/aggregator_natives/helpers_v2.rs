@@ -34,6 +34,22 @@ pub(crate) fn aggregator_info_u64(aggregator: &StructRef) -> PartialVMResult<(Ag
     Ok((AggregatorID::ephemeral(value), max_value))
 }
 
+/// Returns ID of aggrgegator snapshot based on a reference to `AggregatorSnapshot` Move struct.
+pub(crate) fn aggregator_snapshot_u128_info(
+    aggregator_snapshot: &StructRef,
+) -> PartialVMResult<u128> {
+    let value = get_aggregator_field(aggregator_snapshot, VALUE_FIELD_INDEX)?.value_as::<u128>()?;
+    Ok(value)
+}
+
+/// Returns ID of aggrgegator snapshot based on a reference to `AggregatorSnapshot` Move struct.
+pub(crate) fn aggregator_snapshot_u64_info(
+    aggregator_snapshot: &StructRef,
+) -> PartialVMResult<u64> {
+    let value = get_aggregator_field(aggregator_snapshot, VALUE_FIELD_INDEX)?.value_as::<u64>()?;
+    Ok(value)
+}
+
 /// Given a reference to `Aggregator` Move struct, returns a tuple of its
 /// fields: (`value`, `max_value`).
 pub fn get_aggregator_fields_u128(aggregator: &StructRef) -> PartialVMResult<(u128, u128)> {

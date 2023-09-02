@@ -4,6 +4,7 @@
 use crate::{assert_success, harness::MoveHarness};
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
+use move_core_types::language_storage::TypeTag;
 use std::path::PathBuf;
 
 pub fn initialize(path: PathBuf) -> (MoveHarness, Account) {
@@ -175,6 +176,71 @@ pub fn try_sub_and_materialize(
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_v2_test::try_sub_and_materialize").unwrap(),
+        vec![],
+        vec![
+            bcs::to_bytes(&index).unwrap(),
+            bcs::to_bytes(&value).unwrap(),
+        ],
+    )
+}
+
+pub fn snapshot(harness: &mut MoveHarness, account: &Account, index: u64) -> SignedTransaction {
+    harness.create_entry_function(
+        account,
+        str::parse("0x1::aggregator_v2_test::snapshot").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&index).unwrap()],
+    )
+}
+
+pub fn snapshot_with_u64_limit(
+    harness: &mut MoveHarness,
+    account: &Account,
+    index: u64,
+) -> SignedTransaction {
+    harness.create_entry_function(
+        account,
+        str::parse("0x1::aggregator_v2_test::snapshot_with_u64_limit").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&index).unwrap()],
+    )
+}
+
+pub fn read_snapshot_u128(
+    harness: &mut MoveHarness,
+    account: &Account,
+    index: u64,
+) -> SignedTransaction {
+    harness.create_entry_function(
+        account,
+        str::parse("0x1::aggregator_v2_test::read_snapshot").unwrap(),
+        vec![TypeTag::U128],
+        vec![bcs::to_bytes(&index).unwrap()],
+    )
+}
+
+pub fn read_snapshot_u64(
+    harness: &mut MoveHarness,
+    account: &Account,
+    index: u64,
+) -> SignedTransaction {
+    harness.create_entry_function(
+        account,
+        str::parse("0x1::aggregator_v2_test::read_snapshot_with_u64_limit").unwrap(),
+        vec![TypeTag::U64],
+        vec![bcs::to_bytes(&index).unwrap()],
+    )
+}
+
+pub fn try_add_and_read_snapshot_u128(
+    harness: &mut MoveHarness,
+    account: &Account,
+    index: u64,
+    value: u128,
+) -> SignedTransaction {
+    harness.create_entry_function(
+        account,
+        str::parse("0x1::aggregator_v2_test::try_add_and_read_snapshot").unwrap(),
         vec![],
         vec![
             bcs::to_bytes(&index).unwrap(),

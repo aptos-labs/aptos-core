@@ -238,7 +238,25 @@ impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> AggregatorResolver for StorageAdapter<'a, S> {
-    fn resolve_aggregator_value(&self, id: &AggregatorID) -> Result<u128, Error> {
+    fn resolve_last_committed_aggregator_value(&self, id: &AggregatorID) -> Result<u128, Error> {
+        match id {
+            AggregatorID::Legacy { handle, key } => {
+                // Table-based aggregator is a separate state item.
+                let state_key = StateKey::table_item((*handle).into(), key.0.to_vec());
+                match self.get_state_value_bytes(&state_key)? {
+                    Some(bytes) => Ok(deserialize(&bytes)),
+                    None => {
+                        bail!("Could not find the value of the aggregator")
+                    },
+                }
+            },
+            AggregatorID::Ephemeral(_) => {
+                unreachable!("Ephemeral identifiers are not yet implemented.")
+            },
+        }
+    }
+
+    fn resolve_most_recent_aggregator_value(&self, id: &AggregatorID) -> Result<u128, Error> {
         match id {
             AggregatorID::Legacy { handle, key } => {
                 // Table-based aggregator is a separate state item.
