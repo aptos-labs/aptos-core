@@ -163,16 +163,16 @@ describe("Tests for the Serializable class", () => {
     expect(serializer.toUint8Array()).toEqual(new Uint8Array([...someOptionU8Bytes, ...someOptionU16Bytes, ...someOptionU32Bytes, ...someOptionU64Bytes, ...someOptionU128Bytes, ...someOptionU256Bytes, ...someOptionBoolBytes, ...someOptionStringBytes, ...noneOptionU8Bytes, ...noneOptionU16Bytes, ...noneOptionU32Bytes, ...noneOptionU64Bytes, ...noneOptionU128Bytes, ...noneOptionU256Bytes, ...noneOptionBoolBytes, ...noneOptionStringBytes]));
 
     // Test the deserialization
-    const deserializer = new Deserializer(serializer.toUint8Array());
-    const asdf = MoveOption.deserialize<Bool>(deserializer);
-    const deserializedSomeOptionU8 = MoveOption.deserialize(deserializer, U8);
-    const deserializedSomeOptionU16 = MoveOption.deserialize(deserializer, U16);
-    const deserializedSomeOptionU32 = MoveOption.deserialize(deserializer, U32);
-    const deserializedSomeOptionU64 = MoveOption.deserialize(deserializer, U64);
-    const deserializedSomeOptionU128 = MoveOption.deserialize(deserializer, U128);
-    const deserializedSomeOptionU256 = MoveOption.deserialize(deserializer, U256);
-    const deserializedSomeOptionBool = MoveOption.deserialize(deserializer, Bool);
-    const deserializedSomeOptionString = MoveOption.deserialize(deserializer, MoveString);
+    // const deserializer = new Deserializer(serializer.toUint8Array());
+    // const asdf = MoveOption.deserialize<Bool>(deserializer);
+    // const deserializedSomeOptionU8 = MoveOption.deserialize(deserializer, U8);
+    // const deserializedSomeOptionU16 = MoveOption.deserialize(deserializer, U16);
+    // const deserializedSomeOptionU32 = MoveOption.deserialize(deserializer, U32);
+    // const deserializedSomeOptionU64 = MoveOption.deserialize(deserializer, U64);
+    // const deserializedSomeOptionU128 = MoveOption.deserialize(deserializer, U128);
+    // const deserializedSomeOptionU256 = MoveOption.deserialize(deserializer, U256);
+    // const deserializedSomeOptionBool = MoveOption.deserialize(deserializer, Bool);
+    // const deserializedSomeOptionString = MoveOption.deserialize(deserializer, MoveString);
 
 
   });

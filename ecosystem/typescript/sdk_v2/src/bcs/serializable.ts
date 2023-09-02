@@ -4,12 +4,42 @@ import { AnyNumber, Uint16, Uint32, Uint64, Uint128, Uint256 } from "./types";
 import { HexInput } from "../types";
 import { Hex } from "../core";
 
-export type SerializableInput = string | Uint8Array | AnyNumber | Array<SerializableInput>;
+// Before, we had TypeTags with enum variant indexes, but since the primitives here aren't enums in Rust,
+// they aren't actually serialized like this with the native Rust BCS/Serde implementation.
+//
+// To emulate the Rust-like BCS serialization, we can use classes that implement Serializable, and then
+// serialize them by fetching the runtime metadata, stored initially at runtime with the Serialize() decorator.
+// This will facilitate serializing vectors and nested objects/types.
+// Normally this wouldn't be possible because typescript doesn't have runtime reflection, but we can use the Serialize() decorator for this.
+//
+// To ensure type safety, always extend Serializable whenever you use the @Serialize() decorator, or you will likely get runtime errors.
+// 
+// The bcsTypeRegistry is the metadata storage for all runtime type reflection of serialize and deserialize functions.
+const bcsTypeRegistry = new Map<string, { serialize?: Function, deserialize?: Function }>();
+
+// This is the decorator that will register the serialize functions for each class that implements Serializable.
+export function Serialize(): ClassDecorator {
+  return (target: Function) => {
+    const entry = bcsTypeRegistry.get(target.name) || {};
+    entry.serialize = target.prototype.serialize;
+    bcsTypeRegistry.set(target.name, entry);
+  };
+}
+
+// This is the decorator that will register the deserialize functions for each class that implements Deserializable.
+export function Deserialize(): ClassDecorator {
+  return (target: Function) => {
+    const entry = bcsTypeRegistry.get(target.name) || {};
+    entry.deserialize = target.prototype.deserialize;
+    bcsTypeRegistry.set(target.name, entry);
+  };
+}
 
 // Instead of enums, we can use classes that implement Serializable, to facilitate composable serialization.
 // This lets us serialize vectors and nested objects/types very easily. They will all implement the
 // Serializable interface, so we can just call serialize on them.
-
+// This abstract class handles the consistency of each subclass, whereas the decorators will handle the extra concerns like type registration.
+// To ensure type safety, always extend a class with Serializable whenever you use the @Serialize() decorator, or you will likely get runtime errors.
 export abstract class Serializable {
   abstract serialize(serializer: Serializer): void;
 
@@ -20,10 +50,22 @@ export abstract class Serializable {
   }
 }
 
-// Before, we had TypeTags with enum variant indexes, but since the primitives here aren't enums in Rust,
-// they aren't actually serialized like this with the native Rust BCS/Serde implementation. Instead, they are
-// 
-// Assuming the Serializer and Deserializer interfaces are defined somewhere
+@Serialize()
+@Deserialize()
+export class Bool extends Serializable {
+  constructor(public value: boolean) {
+    super();
+  }
+
+  serialize(serializer: Serializer): void {
+      serializer.serializeBool(this.value);
+  }
+
+  static deserialize(deserializer: Deserializer): Bool {
+      return new Bool(deserializer.deserializeBool());
+  }
+}
+
 
 export class Vector<T extends Serializable> extends Serializable {
   constructor(public value: Array<T>) {
@@ -137,20 +179,6 @@ export class U256 extends Serializable {
   }
 }
 
-export class Bool extends Serializable {
-  constructor(public value: boolean) {
-    super();
-  }
-
-  serialize(serializer: Serializer): void {
-      serializer.serializeBool(this.value);
-  }
-
-  static deserialize(deserializer: Deserializer): Bool {
-      return new Bool(deserializer.deserializeBool());
-  }
-}
-
 export class MoveString extends Serializable {
   constructor(public value: string) {
     super();
@@ -180,8 +208,8 @@ export class MoveOption<T extends Serializable> extends Serializable {
   static deserialize<T extends Serializable>(deserializer: Deserializer): MoveOption<T> | null {
     const isSome = deserializer.deserializeUleb128AsU32() === 1;
     if (isSome) {
+      const 
       const value = deserializer.deserialize(T);
-      const value = T.deserialize(deserializer); // Note: This will require a change in your Serializable design to work correctly
       return new MoveOption<U>(value);
     } else {
       return null;
