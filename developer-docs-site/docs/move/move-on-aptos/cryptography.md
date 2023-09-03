@@ -125,7 +125,7 @@ This module has proven useful for implementing several cryptographic primitives:
 Need ideas for a cryptosystem to build on top of `ristretto255`?
 A popular primitive that you could easily build would be the [schnorrkel](https://github.com/w3f/schnorrkel) signature scheme, which is a hardended version of Schnorr signatures over Ristretto255 groups.
 
-### Generic elliptic curve arithmetic in Move
+### Generic elliptic curve arithmetic
 
 What is better than one curve? More curves!
 
