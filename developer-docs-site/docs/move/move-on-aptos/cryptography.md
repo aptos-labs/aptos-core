@@ -109,7 +109,7 @@ Examples of powerful applications that can be built on top include:
  2. **Randomness-based games**; see the [`drand` verifier example](#verifying-randomness-from-the-drand-beacon)
  3. **Privacy-preserving applications**; see the [`veiled_coin` example](#veiled-coins) 
 
-### Ristretto255 arithmetic in Move
+### Ristretto255 arithmetic
 
 The [`aptos_std::ristretto255`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ristretto255.move) module provides support for elliptic curve arithmetic on the popular [Ristretto255 curve](https://ristretto.group/).
 One of the main advantages of Ristretto255 is that it is a prime order group (unlike the Edwards 25519 curve), which obviates small-subgroup attacks on higher-level cryptosystems built on top of it.
