@@ -10,9 +10,9 @@ Cryptography plays an integral role in ensuring the security, integrity, confide
 
 Move, through the Aptos adapter, encompasses several fundamental cryptographic tools:
 
-1. [Cryptographic Hash Functions](#cryptographic-hash-functions-in-move) – Algorithms that produce a fixed-size output (hash) from variable-sized input data. Supported functions include SHA2-256, SHA3-256, Keccak256, and Blake2b-256.
-2. [Digital Signature Verification](#digital-signature-verification-in-move) – Algorithms for signing a message so as to ensure its integrity, authenticate its sender, ensure non-repudiation, or any combination thereof. Supported signature schemes include Ed25519, ECDSA, and BLS.
-3. [Elliptic Curve Arithmetic](#elliptic-curve-arithmetic-in-move) – Elliptic curves are one of the building blocks of advanced cryptographic primitives, such as digital signatures, public-key encryption or verifiable secret sharing. Supported curves include Ristretto255 and BLS12-381.
+1. [Cryptographic Hash Functions](#cryptographic-hash-functions) – Algorithms that produce a fixed-size output (hash) from variable-sized input data. Supported functions include SHA2-256, SHA3-256, Keccak256, and Blake2b-256.
+2. [Digital Signature Verification](#digital-signature-verification) – Algorithms for signing a message so as to ensure its integrity, authenticate its sender, ensure non-repudiation, or any combination thereof. Supported signature schemes include Ed25519, ECDSA, and BLS.
+3. [Elliptic Curve Arithmetic](#elliptic-curve-arithmetic) – Elliptic curves are one of the building blocks of advanced cryptographic primitives, such as digital signatures, public-key encryption or verifiable secret sharing. Supported curves include Ristretto255 and BLS12-381.
 4. [Zero-Knowledge Proofs (ZKP)](#building-powerful-cryptographic-applications) – These cryptographic techniques enable a party to prove that a relation $\mathsf{R}(x; w)$ is satisfied on a public statement $x$ without leaking the secret witness $w$ that makes it hold. Currently, we support Groth16 ZKP verification and Bulletproofs ZK range proof verification.
 
 Three fundamental principles guide the design and integration of the Aptos cryptographic extensions into Move:
@@ -84,7 +84,7 @@ This module for [MinPK BLS](https://datatracker.ietf.org/doc/html/draft-irtf-cfr
 
 ## Elliptic curve arithmetic
 
-While the [hash function](#cryptographic-hash-functions-in-move) and [digital signature](#digital-signature-verification-in-move) modules should provide enough functionality for most applications, some applications will require more powerful cryptography.
+While the [hash function](#cryptographic-hash-functions) and [digital signature](#digital-signature-verification) modules should provide enough functionality for most applications, some applications will require more powerful cryptography.
 Normally, developers of such applications would have to wait until their desired crytographic functionality is implemented efficiently as a [Move native function](./move/book/functions#native-functions) in the [Aptos Move framework](/reference/move).
 Instead, we expose basic building blocks that developers can use to implement their own cryptographic primitives directly in the Move language and do so **efficiently**.  
 
@@ -131,7 +131,7 @@ What is better than one curve? More curves!
 
 The [`aptos_std::crypto_algebra`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/crypto_algebra.move) provides elliptic curve arithmetic operations for **any** supported elliptic curve, including pairing-friendly curves.
 As a consequence, Move developers can implement a cryptosystem generically over **any** curve that is or will be supported in the future.
-Compared to fixing a particular curve in the code (e.g., by implementing against the [Ristretto255 module](#ristretto255-arithmetic-in-move)), this approach provides more flexibility and lowers development time when migrating to a different curve.
+Compared to fixing a particular curve in the code (e.g., by implementing against the [Ristretto255 module](#ristretto255-arithmetic)), this approach provides more flexibility and lowers development time when migrating to a different curve.
 
 Although currently the `crypto_algebra` module only supports arithmetic over BLS12-381 curves (via the marker types declared in [`aptos_std::bls12381_algebra`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381_algebra.move)), more curves will be supported into the future (e.g., BN254, Ristretto255, BLS12-377, BW6-761, secp256k1, secp256r1).
 
@@ -191,7 +191,7 @@ For more use cases of the `crypto_algebra` module, check out some Move examples:
 
 ### Veiled coins
 
-The [`veiled_coin` example](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/veiled_coin/sources) demonstrates how to use [the Ristretto255 modules from above](#ristretto255-arithmetic-in-move) to add a reasonable layer of confidentiality to coin balances and transactions.
+The [`veiled_coin` example](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/veiled_coin/sources) demonstrates how to use [the Ristretto255 modules from above](#ristretto255-arithmetic) to add a reasonable layer of confidentiality to coin balances and transactions.
 
 Specifically, users can **veil** their balance, keeping it hidden from everyone, including validators.
 Furthermore, a user can send a **veiled transaction** that hides the transaction amount from everybody, including validators.
@@ -204,7 +204,7 @@ This module is educational. It is **not** production-ready. Using it could lead 
 ### Groth16 zkSNARK verifier
 
 The [`groth16` example](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/groth16_example/sources) demonstrates how to verify Groth16 zkSNARK proofs[^groth16], which are the shortest, fastest-to-verify, general-purpose zero-knowledge proofs.
-Importantly, as explained [above](#generic-elliptic-curve-arithmetic-in-move), this implementation is *generic* over **any** curve, making it very easy for Move developers to use it with their favorite (supported) curves.
+Importantly, as explained [above](#generic-elliptic-curve-arithmetic), this implementation is *generic* over **any** curve, making it very easy for Move developers to use it with their favorite (supported) curves.
 
 :::caution
 This code has not been audited by a third-party organization. If using it in a production system, proceed at your own risk.
