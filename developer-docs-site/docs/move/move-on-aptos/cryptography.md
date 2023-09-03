@@ -23,7 +23,7 @@ Three fundamental principles guide the design and integration of the Aptos crypt
 
 Continue reading to delve a bit deeper and uncover some of the intricacies behind these extensions, as well as the range of applications they empower. For the most comprehensive understanding of this subject, refer to the [cryptography Move modules code](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/framework/aptos-stdlib/sources/cryptography).
 
-## Cryptographic hash functions in Move
+## Cryptographic hash functions
 
 Developers can now use more cryptographic hash functions in Move via the [`aptos_std::aptos_hash`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/hash.move) module:
 
