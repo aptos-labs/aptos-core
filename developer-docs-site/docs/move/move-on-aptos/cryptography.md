@@ -52,7 +52,7 @@ Developers can now use a *type-safe* API for verifying many types of digital sig
 | Signature scheme                                                                                                                                          | Curve         | Sig. size (bytes) | PK size (bytes) | Malleability | Assumptions | Pros          | Cons                |
 |-----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------|-----------------|--------------|-------------|---------------|---------------------|
 | [ECDSA](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/secp256k1.move)                         | secp256k1     | 64                | 64              | Yes          | GGM         | Wide adoption | Security proof      |
-| [Ed25519](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ed25519.move)                         | Edwards 25519 | 64                | 32              | No           | DLA, ROM    | Fast          |                     |
+| [Ed25519](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ed25519.move)                         | Edwards 25519 | 64                | 32              | No           | DLA, ROM    | Fast          | Subtleties          |
 | [MultiEd25519](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/multi_ed25519.move)              | Edwards 25519 | $4 + t \cdot 64$  | $n \cdot 32$    | No           | DLA, ROM    | Easy-to-adopt | Large sig. size     |
 | [MinPK BLS](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move)                      | BLS12-381     | 96                | 48              | No           | CDH, ROM    | Versatile     | Slower verification |
 | [MinSig BLS](https://github.com/aptos-labs/aptos-core/blob/7d4fb98c6604c67e526a96f55668e7add7aaebf6/aptos-move/move-examples/drand/sources/drand.move#L57) | BLS12-381     | 48                | 96              | No           | CDH, ROM    | Versatile     | Slower verification |
@@ -85,6 +85,10 @@ The right choice of a signature scheme in your dapp could depend on many factors
 5. **Versatility**
    - The adaptability and flexibility of signature schemes are important to consider so you may properly accommodate the cryptographic needs of your dapp.
      - Example: $t$-out-of-$n$ threshold BLS signatures are very simple to implement.
+
+:::caution
+Despite its careful, principled design[^ed25519], Ed25519 has known implementation subtleties. For example, different implementations could easily disagree on the validity of signatures, especially when batch verification is employed[^devalence]$^,$[^eddsa].
+:::
 
 :::tip [`aptos_std::bls12381`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move)
 This module for [MinPK BLS](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-05#name-variants) supports verification of individual signatures, **multi**-signatures, **aggregate** signatures and **threshold** signatures.
@@ -232,5 +236,8 @@ Another application that can be built on top of `drand` is time-lock encryption[
 We do not currently have an implementation but the reader is encouraged to write one!
 
 [^bulletproofs]: _bulletproofs:_ **Bulletproofs: Short Proofs for Confidential Transactions and More**; by B. Bünz and J. Bootle and D. Boneh and A. Poelstra and P. Wuille and G. Maxwell; in 2018 IEEE Symposium on Security and Privacy
+[^devalence]: _devalence:_ **It’s 255:19AM. Do you know what your validation criteria are?**, by Henry de Valence, [https://hdevalence.ca/blog/2020-10-04-its-25519am](https://hdevalence.ca/blog/2020-10-04-its-25519am)
+[^ed25519]: _ed25519:_ **Ed25519: high-speed high-security signatures**, by Daniel J. Bernstein, Niels Duif, Tanja Lange, Peter Schwabe, Bo-Yin Yang, [https://ed25519.cr.yp.to/](https://ed25519.cr.yp.to/)
+[^eddsa]: _eddsa:_ **Taming the Many EdDSAs**, by Konstantinos Chalkias, François Garillot, Valeria Nikolaenko, in SSR 2020, [https://dl.acm.org/doi/abs/10.1007/978-3-030-64357-7_4](https://dl.acm.org/doi/abs/10.1007/978-3-030-64357-7_4)
 [^groth16]: _groth16:_ **On the Size of Pairing-Based Non-interactive Arguments**; by Groth, Jens; in EUROCRYPT 2016
-[^tlock]: _tlock:_ tlock: Practical Timelock Encryption from Threshold BLS; by Nicolas Gailly and Kelsey Melissaris and Yolan Romailler; in Cryptology ePrint Archive, Paper 2023/189; [https://eprint.iacr.org/2023/189](https://eprint.iacr.org/2023/189)
+[^tlock]: _tlock:_ **tlock: Practical Timelock Encryption from Threshold BLS**; by Nicolas Gailly and Kelsey Melissaris and Yolan Romailler; [https://eprint.iacr.org/2023/189](https://eprint.iacr.org/2023/189)
