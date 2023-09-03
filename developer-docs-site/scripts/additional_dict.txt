@@ -17,7 +17,6 @@ AUTH
 AWS
 Ait
 AlertManager
-allowfullscreen
 Ansible
 ApiExplorer
 Aptos
@@ -30,7 +29,6 @@ AptosNet
 AptosRelease
 AptosToken
 AptosWalletAdapterProvider
-asia
 BCS
 BFT
 BIP
@@ -66,6 +64,7 @@ DAOs
 DApps
 DDoS
 DECL
+DFA
 DLA
 DM
 DNS
@@ -78,7 +77,7 @@ Destructuring
 Dev
 DevEx
 Devnet
-DFA
+Diffie
 DoS
 DocGen
 EACCOUNT
@@ -86,6 +85,7 @@ EALREADY
 EBS
 ECANNOT
 ECDSA
+ECDSA's
 ECOIN
 ECOLLECTION
 ECOLLECTIONS
@@ -150,8 +150,6 @@ Gailly
 Gbps
 Grafana
 GraphQL
-grpcurl
-hasura
 Groth
 HSM
 Hasura
@@ -159,7 +157,6 @@ Homebrew
 HotStuff
 IDE
 IDEs
-iframe
 IMCODING
 IOPS
 IPFS
@@ -172,6 +169,7 @@ Jens
 Jetbrains
 Jolteon
 Keccak
+KiB
 Kubernetes
 LLVM
 Labs's
@@ -234,12 +232,10 @@ PropertyMap
 Prover
 PureEdDSA
 PyPi
-px
 Quickstart
 RBAC
 README
 READMEs
-rgba
 RESTful
 RIPEMD
 RPC
@@ -260,7 +256,9 @@ STM
 SYNACK
 Samundra
 Scalable
+Schnorr
 SeaLevel
+Shacham
 Sig
 SignMessagePayload
 SignedTransaction
@@ -319,6 +317,7 @@ Xeon
 YAML
 YAMLs
 Yolan
+ZK
 ZKP
 ZKRP
 Zxing
@@ -327,6 +326,7 @@ accountHasList
 acount
 addr
 ait
+allowfullscreen
 allowlist
 analytics
 api
@@ -336,6 +336,7 @@ aptosbot
 aptoslabs
 arity
 arweave
+asia
 atomicity
 auth
 authenticator
@@ -376,10 +377,12 @@ cryptographic
 cryptographically
 cryptosystem
 cryptosystems
+crytographic
 customizable
 dApp
 dApps
 dapp
+dapp's
 dapps
 data's
 deallocate
@@ -430,9 +433,12 @@ getAddressByName
 getPrimaryNameByAddress
 groth
 groupId
+grpcurl
 guid
 haproxy
 hardcoded
+hardended
+hasura
 hippospace
 hotfix
 hotfixes
@@ -441,6 +447,7 @@ href
 http
 ide
 ie
+iframe
 illiquid
 img
 incrementing
@@ -529,11 +536,13 @@ prover
 proxied
 pseudocode
 pvc
+px
 quickstart
 quickstarts
 repo
 repos
 requiers
+rgba
 ristretto
 rpc
 ruleset
@@ -627,18 +636,5 @@ xFD
 xlarge
 yaml
 yamls
-mintAptosName
-getAddressByName
-getPrimaryNameByAddress
-acount
-fundAccount
-extensibility
-MultiSig
-IndexerClient
-Hasura
-AptosClient
-ANSClient
-FaucetClient
-CoinClient
-RESTful
-FungibleAssetsClient
+zkSNARK
+zksnark
