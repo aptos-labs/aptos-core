@@ -27,16 +27,19 @@ Continue reading to delve a bit deeper and uncover some of the intricacies behin
 
 Developers can now use more cryptographic hash functions in Move via the [`aptos_std::aptos_hash`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/hash.move) module:
 
-| Hash function | Hash size (bits) | Collision-resistance security (bits) |
-|---------------|------------------|--------------------------------------|
-| Keccak256     | 256              | 128                                  |
-| SHA2-512      | 512              | 256                                  |
-| SHA3-512      | 512              | 256                                  |
-| RIPEMD160     | 160              | 80 (**weak**)                        |
-| Blake2b-256   | 256              | 128                                  |
+| Hash function | Hash size (bits) | Cost for hashing 1KiB (in internal gas units) | Collision-resistance security (bits) |
+|---------------|------------------|-----------------------------------------------|--------------------------------------|
+| Keccak256     | 256              | 1,001,600                                     | 128                                  |
+| SHA2-512      | 512              | 1,293,600                                     | 256                                  |
+| SHA3-512      | 512              | 1,114,000                                     | 256                                  |
+| RIPEMD160     | 160              | 1,084,000                                     | 80 (**weak**)                        |
+| Blake2b-256   | 256              | 342,200                                       | 128                                  |
 
 All hash functions have the same security properties (e.g., one-wayness, collision resistance, etc.), but their security levels are different.
-In particular, RIPEMD160 should be used **with caution** as a collision-resistant function due to its 80-bit security level. 
+
+:::caution
+RIPEMD160 should be avoided as a collision-resistant function due to its 80-bit security level. It is mainly supported for backward-compatibility reasons: e.g., Bitcoin address derivation relies on RIPEMD160.
+:::
 
 Some of these functions can be used for interoperability with other chains (e.g., verifying Ethereum Merkle proofs via [`aptos_std::aptos_hash::keccak256`](https://github.com/aptos-labs/aptos-core/blob/137acee4c6dddb1c86398dce25b041d78a3028d3/aptos-move/framework/aptos-stdlib/sources/hash.move#L35)).
 Others, have lower gas costs, such as [`aptos_std::aptos_hash::blake2b_256`](https://github.com/aptos-labs/aptos-core/blob/137acee4c6dddb1c86398dce25b041d78a3028d3/aptos-move/framework/aptos-stdlib/sources/hash.move#L69).
