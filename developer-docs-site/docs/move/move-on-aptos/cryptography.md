@@ -16,14 +16,13 @@ Move, through the Aptos adapter, encompasses several fundamental cryptographic t
 3. [Elliptic Curve Arithmetic](#elliptic-curve-arithmetic-in-move) – Elliptic curves are one of the building blocks of advanced cryptographic primitives, such as digital signatures, public-key encryption or verifiable secret sharing. Supported curves include Ristretto255 and BLS12-381.
 4. [Zero-Knowledge Proofs (ZKP)](#building-powerful-cryptographic-applications-in-move) – These cryptographic techniques enable a party to prove that a relation $\mathsf{R}(x; w)$ is satisfied on a public statement $x$ without leaking the secret witness $w$ that makes it hold. Currently, we support Groth16 ZKP verification and Bulletproofs ZK range proof verification.
 
-The **key guiding principles** behind these cryptographic extensions are:
+Three fundamental principles guide the design and integration of the Aptos cryptographic extensions into Move:
 
-1. **Minimize gas costs** for Move developers by implementing key primitives as [Move native functions](./move/book/functions#native-functions) (e.g., see the [BLS signatures over BLS12-381 elliptic curves](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move) module)
-2. Type-safe APIs (e.g., see the [Ed25519 signature module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ed25519.move))
-3. When native functions are not available, **empower developers** to implement their own cryptographic primitives on top of abstract cryptographic building blocks such as _finite fields_ and _Abelian groups_ (e.g., via the [`aptos_std::crypto_algebra`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/crypto_algebra.move) module).
+1. **Economic Gas Usage** – Striving to minimize gas costs for Move developers by implementing key primitives as [Move native functions](./move/book/functions#native-functions). For example, see the module for [BLS signatures over BLS12-381 elliptic curves](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move).
+2. **Type-Safe APIs** – Ensuring that APIs are resistant to common mistakes, type-safety enhances code reliability and promotes an efficient development process. For an example, see the [Ed25519 signature module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ed25519.move))
+3. **Empowerment of Developers** – In instances where native functions are unavailable, we empower developers to build their own cryptographic primitives on top of abstract cryptographic building blocks such as `_finite fields_` and `_Abelian groups_`. Refer to the [`aptos_std::crypto_algebra`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/crypto_algebra.move) module for more insights.
 
-An overview of these features and (some of) the applications they enable follows below. 
-For a detailed view, see the [cryptography Move modules code](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/framework/aptos-stdlib/sources/cryptography).
+Continue reading to delve a bit deeper and uncover some of the intricacies behind these extensions, as well as the range of applications they empower. For the most comprehensive understanding of this subject, refer to the [cryptography Move modules code](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/framework/aptos-stdlib/sources/cryptography).
 
 ## Cryptographic hash functions in Move
 
