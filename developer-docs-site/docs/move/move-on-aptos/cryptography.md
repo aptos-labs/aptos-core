@@ -66,17 +66,22 @@ The digital signature modules above can be used to build smart contract-based wa
 
 The right choice of a signature scheme in your dapp could depend on many factors:
 1. **Backwards-compatibility** 
-   - e.g., perhaps the dapp's users only sign using Ed25519
+   - If your dapp's user base predominantly uses a particular signing mechanism, it would be prudent to support that mechanism for ease of transition and adoption.
+     - Example: If users mainly sign using Ed25519, it becomes a logical choice.
 2. **Ease-of-implementation**
-   - e.g., while there exist $t$-out-of-$n$ threshold protocols for Ed25519, they are complex to implement on the signer side. As a result, MultiEd25519 could be adopted due to how easily signing can be implemented.
+   - While theoretically sound, complex protocols may be challenging to implement in practice.
+     - Example: Even though $t$-out-of-$n$ threshold protocols for Ed25519 exist, their intricacy on the signer's side might push developers toward MultiEd25519 due to its more straightforward signing implementation.
 3. **Efficiency** 
-   - e.g., some applications are more sensitive to signature size, while others to PK size
-   - e.g., some applications are more sensitive to signing time, while others to signature verification time
+   - Depending on the dapp's requirements, you might prioritize one aspect of efficiency over another.
+     - Signature size vs. public key size: Some applications might prioritize a smaller signature footprint, while others might emphasize a compact PK.
+     - Signing time vs. verification time: For certain dapps, the signing speed might be more crucial, while for others, rapid signature verification could be the priority.
 4. **Security analysis**
-   - e.g., ECDSA's security is proven under strong assumptions such as the Generic Group Model (GGM)
-   - e.g., some signature schemes have malleability issues: a valid signature $\sigma$ can be mauled into a _different_ yet-still-valid signature $\sigma'$ on the same message $m$
+   - It is essential to consider the underlying assumptions and potential vulnerabilities of a signature scheme.
+     - Example: ECDSA's security is proven under strong assumptions such as the Generic Group Model (GGM).
+     - Malleability concerns: Some signature schemes are susceptible to malleability, where a valid signature, `$\sigma$`, can be mauled into a different yet still valid signature, `$\sigma'$`, for the same message, `$m$`.
 5. **Versatility**
-   - e.g., $t$-out-of-$n$ threshold BLS is very simple to implement 
+   - The adaptability and flexibility of signature schemes are important to consider so you may properly accommodate the cryptographic needs of your dapp.
+     - Example: $t$-out-of-$n$ threshold BLS signatures are very simple to implement.
 
 :::tip [`aptos_std::bls12381`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move)
 This module for [MinPK BLS](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-05#name-variants) supports verification of individual signatures, **multi**-signatures, **aggregate** signatures and **threshold** signatures.
