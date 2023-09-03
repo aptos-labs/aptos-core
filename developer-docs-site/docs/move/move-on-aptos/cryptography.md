@@ -149,43 +149,43 @@ Although currently the `crypto_algebra` module only supports arithmetic over BLS
 
 As an example, a Move developer can implement the popular Boneh-Lynn-Shacham (BLS) signature scheme generically over **any** curve by using [type arguments](../../../move/book/functions#type-parameters) for the curve type in their implementation:
 
-```move
+```rust title="Generic BLS signature verification over any curve"
 use std::option;
 use aptos_std::crypto_algebra::{eq, pairing, one, deserialize, hash_to};
 
 /// Example of a BLS signature verification function that works over any pairing-friendly
-/// group triple `G1`, `G2`, `Gt` where signatures are in `G1` and PKs in `G2. Points are
-/// serialized using the format in `FormatG1` and `FormatG2` and the hashing method is 
-/// `HashMethod`.
+/// group triple `Gr1`, `Gr2`, `GrT` where signatures are in `Gr1` and PKs in `Gr2.
+/// Points are serialized using the format in `FormatG1` and `FormatG2` and the hashing 
+/// method is `HashMethod`.
 /// 
 /// WARNING: This example is type-unsafe and probably not a great fit for production code.
-public fun bls_verify_sig<G1, G2, Gt, FormatG1, FormatG2, HashMethod>(
+public fun bls_verify_sig<Gr1, Gr2, GrT, FormatG1, FormatG2, HashMethod>(
     dst:        vector<u8>,
     signature:  vector<u8>,
     message:    vector<u8>,
     public_key: vector<u8>): bool
 {
-    let pk   = option::extract(&mut deserialize<G2, FormatG2>(&public_key));
-    let sig  = option::extract(&mut deserialize<G1, FormatG1>(&signature));
-    let hash = hash_to<G1, HashMethod>(&dst, &message);
+    let sig  = option::extract(&mut deserialize<Gr1, FormatG1>(&signature));
+    let pk   = option::extract(&mut deserialize<Gr2, FormatG2>(&public_key));
+    let hash = hash_to<Gr1, HashMethod>(&dst, &message);
     
     // Checks if $e(H(m), pk) = e(sig, g_2)$, where $g_2$ generates $\mathbb{G}_2$
     return eq(
-        &pairing<G1, G2, Gt>(&msg_hash, &pk), 
-        &pairing<G1, G2, Gt>(&sig, &one<G2>())
+        &pairing<Gr1, Gr2, GrT>(&msg_hash, &pk), 
+        &pairing<Gr1, Gr2, GrT>(&sig, &one<Gr2>())
     );
 }
 ```
 
 Using the `bls_verify_sig` _generic_ function from above, developers can verify BLS signatures over **any** of the supported (pairing-friendly) curves.
-For example, one can verify BLS signatures over BLS12-381 curves by calling the function above with the BLS12-381 marker types as its type arguments:
+For example, one can verify [MinSig BLS](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-05#name-variants) signatures over BLS12-381 curves by calling the function above with the right BLS12-381 marker types as its type arguments:
 
-```move
+```rust title="MinSig BLS signature verification over BLS12-381"
 use aptos_std::bls12381_algebra::{
     G1, G2, Gt, FormatG1Compr, FormatG2Compr, HashG1XmdSha256SswuRo
 };
 
-// Aborts with code 1 if the BLS signature over the BLS12-381 curve fails to verify. 
+// Aborts with code 1 if the MinSig BLS signature over the BLS12-381 curve fails to verify. 
 assert(
     bls_verify_sig<G1, G2, Gt, FormatG1Compr, FormatG2Compr, HashG1XmdSha256SswuRo>(
         dst, signature, message, public_key
