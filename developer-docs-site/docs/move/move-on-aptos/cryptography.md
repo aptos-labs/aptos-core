@@ -82,7 +82,7 @@ The right choice of a signature scheme in your dapp could depend on many factors
 This module for [MinPK BLS](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-05#name-variants) supports verification of individual signatures, **multi**-signatures, **aggregate** signatures and **threshold** signatures.
 :::
 
-## Elliptic curve arithmetic in Move
+## Elliptic curve arithmetic
 
 While the [hash function](#cryptographic-hash-functions-in-move) and [digital signature](#digital-signature-verification-in-move) modules should provide enough functionality for most applications, some applications will require more powerful cryptography.
 Normally, developers of such applications would have to wait until their desired crytographic functionality is implemented efficiently as a [Move native function](./move/book/functions#native-functions) in the [Aptos Move framework](/reference/move).
