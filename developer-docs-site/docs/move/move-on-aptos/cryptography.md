@@ -117,10 +117,10 @@ Furthermore, Ristretto255 serialization is canonical and deserialization only ac
 
 This module has proven useful for implementing several cryptographic primitives:
 
- 1. **Zero-knowledge $\Sigma$-protocols**, as demonstrated in the [`veiled_coin` example](#veiled-coins).
- 2. **ElGamal** encryption; see [`aptos_std::ristretto255_elgamal`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ristretto255_elgamal.move)
- 3. **Pedersen** commitments; see [`aptos_std::ristretto255_pedersen`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ristretto255_pedersen.move)
- 4. **Bulletproofs** ZK range proofs[^bulletproofs]; see [`aptos_std::ristretto255_bulletproofs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.move)
+ 1. **Zero-knowledge $\Sigma$-protocols** – See the [`veiled_coin` example](#veiled-coins).
+ 2. **ElGamal** encryption – See [`aptos_std::ristretto255_elgamal`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ristretto255_elgamal.move)
+ 3. **Pedersen** commitments – See [`aptos_std::ristretto255_pedersen`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ristretto255_pedersen.move)
+ 4. **Bulletproofs** ZK range proofs[^bulletproofs] – See [`aptos_std::ristretto255_bulletproofs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.move)
 
 Need ideas for a cryptosystem to build on top of `ristretto255`?
 A popular primitive that you could easily build would be the [schnorrkel](https://github.com/w3f/schnorrkel) signature scheme, which is a hardended version of Schnorr signatures over Ristretto255 groups.
