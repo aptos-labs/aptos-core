@@ -46,15 +46,21 @@ In general, a wider variety of hash functions give developers additional freedom
 
 Developers can now use a *type-safe* API for verifying many types of digital signatures in Move:
 
-| Signature scheme                                                                                                                                           | Curve         | Sig. size (bytes) | PK size (bytes) | Malleability | Assumptions | Pros          | Cons              |
-|------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------|-----------------|--------------|-------------|---------------|-------------------|
-| [ECDSA](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/secp256k1.move)                          | secp256k1     | 64                | 64              | Yes          | GGM         | Wide adoption | Security proof    |
-| [Ed25519](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ed25519.move)                          | Edwards 25519 | 64                | 32              | No           | DLA, ROM    | Fast          |                   |
-| [MultiEd25519](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/multi_ed25519.move)               | Edwards 25519 | $4 + t \cdot 64$  | $n \cdot 32$    | No           | DLA, ROM    | Easy-to-adopt | Large sig. size   |
-| MinPK [BLS](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move)                       | BLS12-381     | 96                | 48              | No           | CDH, ROM    | Versatile     | Slow verification |
-| MinSig [BLS](https://github.com/aptos-labs/aptos-core/blob/7d4fb98c6604c67e526a96f55668e7add7aaebf6/aptos-move/move-examples/drand/sources/drand.move#L57) | BLS12-381     | 48                | 96              | No           | CDH, ROM    | Versatile     | Slow verification |
+| Signature scheme                                                                                                                                          | Curve         | Sig. size (bytes) | PK size (bytes) | Malleability | Assumptions | Pros          | Cons                |
+|-----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------|-----------------|--------------|-------------|---------------|---------------------|
+| [ECDSA](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/secp256k1.move)                         | secp256k1     | 64                | 64              | Yes          | GGM         | Wide adoption | Security proof      |
+| [Ed25519](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ed25519.move)                         | Edwards 25519 | 64                | 32              | No           | DLA, ROM    | Fast          |                     |
+| [MultiEd25519](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/multi_ed25519.move)              | Edwards 25519 | $4 + t \cdot 64$  | $n \cdot 32$    | No           | DLA, ROM    | Easy-to-adopt | Large sig. size     |
+| [MinPK BLS](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move)                      | BLS12-381     | 96                | 48              | No           | CDH, ROM    | Versatile     | Slower verification |
+| [MinSig BLS](https://github.com/aptos-labs/aptos-core/blob/7d4fb98c6604c67e526a96f55668e7add7aaebf6/aptos-move/move-examples/drand/sources/drand.move#L57) | BLS12-381     | 48                | 96              | No           | CDH, ROM    | Versatile     | Slower verification |
 
-**Note:** The [`aptos_std::bls12381`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move) module for [MinPK BLS](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-05#name-variants) signatures is rather **versatile**: it supports verification of individual signatures, **multi**-signatures, **aggregate** signatures and **threshold** signatures.
+
+:::note
+ - CDH stands for the _"Computational Diffie-Hellman Assumption"_
+ - DLA stands for the _"Discrete Log Assumption"_
+ - GGM stands for the _"Generic Group Model"_
+ - ROM stands for the _"Random Oracle Model"_
+:::
 
 The digital signature modules above can be used to build smart contract-based wallets, secure claiming mechanisms for airdrops, or any digital-signature-based access-control mechanism for dapps.
 
@@ -71,6 +77,10 @@ The right choice of a signature scheme in your dapp could depend on many factors
    - e.g., some signature schemes have malleability issues: a valid signature $\sigma$ can be mauled into a _different_ yet-still-valid signature $\sigma'$ on the same message $m$
 5. **Versatility**
    - e.g., $t$-out-of-$n$ threshold BLS is very simple to implement 
+
+:::tip [`aptos_std::bls12381`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move)
+This module for [MinPK BLS](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-05#name-variants) supports verification of individual signatures, **multi**-signatures, **aggregate** signatures and **threshold** signatures.
+:::
 
 ## Elliptic curve arithmetic in Move
 
