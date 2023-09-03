@@ -42,7 +42,7 @@ Some of these functions can be used for interoperability with other chains (e.g.
 Others, have lower gas costs, such as [`aptos_std::aptos_hash::blake2b_256`](https://github.com/aptos-labs/aptos-core/blob/137acee4c6dddb1c86398dce25b041d78a3028d3/aptos-move/framework/aptos-stdlib/sources/hash.move#L69).
 In general, a wider variety of hash functions give developers additional freedom in terms of both security and interoperability with other off-chain cryptographic system.
 
-## Digital signature verification in Move
+## Digital signature verification
 
 Developers can now use a *type-safe* API for verifying many types of digital signatures in Move:
 
