@@ -105,9 +105,9 @@ These modules support low-level operations such as:
 
 Examples of powerful applications that can be built on top include:  
 
- 1. **Validity rollups**; see the [`groth16` zkSNARK verifier example](#groth16-zksnark-verifier)
- 2. **Randomness-based games**; see the [`drand` verifier example](#verifying-randomness-from-the-drand-beacon)
- 3. **Privacy-preserving applications**; see the [`veiled_coin` example](#veiled-coins) 
+ 1. **Validity rollups** – See the [`groth16` zkSNARK verifier example](#groth16-zksnark-verifier).
+ 2. **Randomness-based games** – See the [`drand` verifier example](#verifying-randomness-from-the-drand-beacon).
+ 3. **Privacy-preserving applications** – See the [`veiled_coin` example](#veiled-coins).
 
 ### Ristretto255 arithmetic
 
