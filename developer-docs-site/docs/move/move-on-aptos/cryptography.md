@@ -1,6 +1,5 @@
 ---
 title: "Cryptography"
-slug: "cryptography"
 ---
 
 # Cryptography in Move
