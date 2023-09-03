@@ -38,16 +38,19 @@ module aptos_token_objects::token {
     struct Token has key {
         /// The collection from which this token resides.
         collection: Object<Collection>,
-        /// Deprecated in favor of index inside TokenAppendix1.
+        /// Deprecated in favor of `index` inside TokenConcurrentFieldsAppendix.
         /// Will be populated until concurrent_token_v2_enabled feature flag is enabled.
         ///
         /// Unique identifier within the collection, optional, 0 means unassigned
-        deprecated_index: u64,
+        index: u64, // DEPRECATED
         /// A brief description of the token.
         description: String,
+        /// Deprecated in favor of `name` inside TokenConcurrentFieldsAppendix.
+        /// Will be populated until concurrent_token_v2_enabled feature flag is enabled.
+        ///
         /// The name of the token, which should be unique within the collection; the length of name
         /// should be smaller than 128, characters, eg: "Aptos Animal #1234"
-        name: String,
+        name: String,  // DEPRECATED
         /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
         /// storage; the URL length will likely need a maximum any suggestions?
         uri: String,
@@ -57,9 +60,12 @@ module aptos_token_objects::token {
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents first addition to the common fields for all tokens
-    struct TokenAppendix1 has key {
+    struct TokenConcurrentFieldsAppendix has key {
         /// Unique identifier within the collection, optional, 0 means unassigned
         index: AggregatorSnapshot<u64>,
+        /// The name of the token, which should be unique within the collection; the length of name
+        /// should be smaller than 128, characters, eg: "Aptos Animal #1234"
+        name: AggregatorSnapshot<String>,
     }
 
     /// This enables burning an NFT, if possible, it will also delete the object. Note, the data
@@ -83,16 +89,23 @@ module aptos_token_objects::token {
         new_value: String
     }
 
+    // If name_with_index_suffix is set, name is appended with index, and then with suffix, for a final name.
     inline fun create_common(
         constructor_ref: &ConstructorRef,
         creator_address: address,
         collection_name: String,
         description: String,
-        name: String,
+        name_prefix: String,
+        name_with_index_suffix: Option<String>,
         royalty: Option<Royalty>,
         uri: String,
     ) {
-        assert!(string::length(&name) <= MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
+        if (option::is_some(&name_with_index_suffix)) {
+            // Be conservative, as we don't know what length the index will be, and assume worst case (20 chars in MAX_U64)
+            assert!(string::length(&name_prefix) + 20 + string::length(option::borrow(&name_with_index_suffix)) <= MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
+        } else {
+            assert!(string::length(&name_prefix) <= MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
+        };
         assert!(string::length(&description) <= MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
         assert!(string::length(&uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
 
@@ -102,21 +115,29 @@ module aptos_token_objects::token {
         let collection = object::address_to_object<Collection>(collection_addr);
         let id = collection::increment_supply(&collection, signer::address_of(&object_signer));
 
-        let index = option::get_with_default(&mut id, 0);
+        let index = aggregator_v2::create_snapshot(option::get_with_default(&mut id, 0));
+
+        let name = if (option::is_some(&name_with_index_suffix)) {
+            aggregator_v2::string_concat(name_prefix, &index, option::extract(&mut name_with_index_suffix))
+        } else {
+            aggregator_v2::create_snapshot(name_prefix)
+        };
+
         let token = Token {
             collection,
-            deprecated_index: index,
+            index: aggregator_v2::read_snapshot(&index),
             description,
-            name,
+            name: aggregator_v2::read_snapshot(&name),
             uri,
             mutation_events: object::new_event_handle(&object_signer),
         };
         move_to(&object_signer, token);
 
-        let token_appendix_1 = TokenAppendix1 {
-            index: aggregator_v2::create_snapshot(index),
+        let token_concurrent = TokenConcurrentFieldsAppendix {
+            index,
+            name,
         };
-        move_to(&object_signer, token_appendix_1);
+        move_to(&object_signer, token_concurrent);
 
         if (option::is_some(&royalty)) {
             royalty::init(constructor_ref, option::extract(&mut royalty))
@@ -135,7 +156,27 @@ module aptos_token_objects::token {
     ): ConstructorRef {
         let creator_address = signer::address_of(creator);
         let constructor_ref = object::create_object(creator_address);
-        create_common(&constructor_ref, creator_address, collection_name, description, name, royalty, uri);
+        create_common(&constructor_ref, creator_address, collection_name, description, name, option::none(), royalty, uri);
+        constructor_ref
+    }
+
+    /// Creates a new token object with a unique address and returns the ConstructorRef
+    /// for additional specialization.
+    /// The name is created by concatenating the (name_prefix, index, name_suffix).
+    /// After flag concurrent_token_v2_enabled is enabled, this function will allow
+    /// creating tokens in parallel, from the same collection, with providing sequential names.
+    public fun create_with_index_in_name(
+        creator: &signer,
+        collection_name: String,
+        description: String,
+        name_with_index_preffix: String,
+        name_with_index_suffix: String,
+        royalty: Option<Royalty>,
+        uri: String,
+    ): ConstructorRef {
+        let creator_address = signer::address_of(creator);
+        let constructor_ref = object::create_object(creator_address);
+        create_common(&constructor_ref, creator_address, collection_name, description, name_with_index_preffix, option::some(name_with_index_suffix), royalty, uri);
         constructor_ref
     }
 
@@ -153,7 +194,7 @@ module aptos_token_objects::token {
         let seed = create_token_seed(&collection_name, &name);
 
         let constructor_ref = object::create_named_object(creator, seed);
-        create_common(&constructor_ref, creator_address, collection_name, description, name, royalty, uri);
+        create_common(&constructor_ref, creator_address, collection_name, description, name, option::none(), royalty, uri);
         constructor_ref
     }
 
@@ -170,7 +211,7 @@ module aptos_token_objects::token {
     ): ConstructorRef {
         let creator_address = signer::address_of(creator);
         let constructor_ref = object::create_object_from_account(creator);
-        create_common(&constructor_ref, creator_address, collection_name, description, name, royalty, uri);
+        create_common(&constructor_ref, creator_address, collection_name, description, name, option::none(), royalty, uri);
         constructor_ref
     }
 
@@ -246,7 +287,19 @@ module aptos_token_objects::token {
         borrow(&token).description
     }
 
+    /// This method allows minting to happen in parallel, making it efficient.
+    fun name_snapshot<T: key>(token: &Object<T>): AggregatorSnapshot<String> acquires Token, TokenConcurrentFieldsAppendix {
+        let token_address = object::object_address(token);
+        if (exists<TokenConcurrentFieldsAppendix>(token_address)) {
+            aggregator_v2::copy_snapshot(&borrow_global<TokenConcurrentFieldsAppendix>(token_address).name)
+        } else {
+            aggregator_v2::create_snapshot(borrow(token).name)
+        }
+    }
+
     #[view]
+    /// Avoid this method in the same transaction as the token is minted
+    /// as that would prohibit transactions to be executed in parallel.
     public fun name<T: key>(token: Object<T>): String acquires Token {
         borrow(&token).name
     }
@@ -272,19 +325,19 @@ module aptos_token_objects::token {
     }
 
     /// This method allows minting to happen in parallel, making it efficient.
-    public fun index_snapshot<T: key>(token: &Object<T>): AggregatorSnapshot<u64> acquires Token, TokenAppendix1 {
+    fun index_snapshot<T: key>(token: &Object<T>): AggregatorSnapshot<u64> acquires Token, TokenConcurrentFieldsAppendix {
         let token_address = object::object_address(token);
-        if (exists<TokenAppendix1>(token_address)) {
-            aggregator_v2::copy_snapshot(&borrow_global<TokenAppendix1>(token_address).index)
+        if (exists<TokenConcurrentFieldsAppendix>(token_address)) {
+            aggregator_v2::copy_snapshot(&borrow_global<TokenConcurrentFieldsAppendix>(token_address).index)
         } else {
-            aggregator_v2::create_snapshot(borrow(token).deprecated_index)
+            aggregator_v2::create_snapshot(borrow(token).index)
         }
     }
 
     #[view]
     /// Avoid this method in the same transaction as the token is minted
     /// as that would prohibit transactions to be executed in parallel.
-    public fun index_view<T: key>(token: Object<T>): u64 acquires Token, TokenAppendix1 {
+    public fun index<T: key>(token: Object<T>): u64 acquires Token, TokenConcurrentFieldsAppendix {
         aggregator_v2::read_snapshot(&index_snapshot(&token))
     }
 
@@ -298,7 +351,7 @@ module aptos_token_objects::token {
         borrow_global_mut<Token>(mutator_ref.self)
     }
 
-    public fun burn(burn_ref: BurnRef) acquires Token, TokenAppendix1 {
+    public fun burn(burn_ref: BurnRef) acquires Token, TokenConcurrentFieldsAppendix {
         let addr = if (option::is_some(&burn_ref.inner)) {
             let delete_ref = option::extract(&mut burn_ref.inner);
             let addr = object::address_from_delete_ref(&delete_ref);
@@ -314,17 +367,18 @@ module aptos_token_objects::token {
 
         let Token {
             collection,
-            deprecated_index,
+            index: deprecated_index,
             description: _,
             name: _,
             uri: _,
             mutation_events,
         } = move_from<Token>(addr);
 
-        let index = if (exists<TokenAppendix1>(addr)) {
-            let TokenAppendix1 {
+        let index = if (exists<TokenConcurrentFieldsAppendix>(addr)) {
+            let TokenConcurrentFieldsAppendix {
                 index,
-            } = move_from<TokenAppendix1>(addr);
+                name: _,
+            } = move_from<TokenConcurrentFieldsAppendix>(addr);
             aggregator_v2::read_snapshot(&index)
         } else {
             deprecated_index
