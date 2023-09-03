@@ -187,7 +187,7 @@ For more use cases of the `crypto_algebra` module, check out some Move examples:
 1. [Verifying Groth16 zkSNARK proofs](#groth16-zksnark-verifier) over **any** curve 
 2. [Verifying randomness from the `drand` beacon](#verifying-randomness-from-the-drand-beacon)
 
-## Building powerful cryptographic applications in Move
+## Building powerful cryptographic applications
 
 ### Veiled coins
 
@@ -197,14 +197,14 @@ Specifically, users can **veil** their balance, keeping it hidden from everyone,
 Furthermore, a user can send a **veiled transaction** that hides the transaction amount from everybody, including validators.
 An important caveat is that veiled transactions do NOT hide the identities of the sender or the recipient.
 
-**WARNING:** This module is educational. It is **NOT** production-ready. Using it could lead to loss of funds.
+:::danger This module is educational. It is **NOT** production-ready. Using it could lead to loss of funds. :::
 
 ### Groth16 zkSNARK verifier
 
 The [`groth16` example](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/groth16_example/sources) demonstrates how to verify Groth16 zkSNARK proofs[^groth16], which are the shortest and fastest-to-verify zero-knowledge proofs for arbitrary computations.
 Importantly, as explained [above](#generic-elliptic-curve-arithmetic-in-move), this implementation is *generic* over **any** curve, making it very easy for Move developers to use it with their favorite (supported) curves.
 
-**WARNING:** This code has not been audited by a third-party organization. If using it in a production system, proceed at your own risk.
+:::caution This code has not been audited by a third-party organization. If using it in a production system, proceed at your own risk. :::
 
 ### Verifying randomness from the `drand` beacon
 
@@ -212,7 +212,7 @@ The [`drand` example](https://github.com/aptos-labs/aptos-core/tree/main/aptos-m
 This randomness can be used in games or any other chance-based smart contract.
 We give a simple example of a lottery implemented on top of `drand` randomness in [`lottery.move`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/drand/sources/lottery.move).
 
-**WARNING:** This code has not been audited by a third-party organization. If using it in a production system, proceed at your own risk.
+:::caution  This code has not been audited by a third-party organization. If using it in a production system, proceed at your own risk. :::
 
 Another application that can be built on top of `drand` is time-lock encryption[^tlock], which allows users to encrypt information such that it can only be decrypted in a future block.
 We do not currently have an implementation but the reader is encouraged to write one!
