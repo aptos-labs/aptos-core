@@ -13,7 +13,7 @@ Move, through the Aptos adapter, encompasses several fundamental cryptographic t
 1. [Cryptographic Hash Functions](#cryptographic-hash-functions-in-move) – Algorithms that produce a fixed-size output (hash) from variable-sized input data. Supported functions include SHA2-256, SHA3-256, Keccak256, and Blake2b-256.
 2. [Digital Signature Verification](#digital-signature-verification-in-move) – Algorithms for signing a message so as to ensure its integrity, authenticate its sender, ensure non-repudiation, or any combination thereof. Supported signature schemes include Ed25519, ECDSA, and BLS.
 3. [Elliptic Curve Arithmetic](#elliptic-curve-arithmetic-in-move) – Elliptic curves are one of the building blocks of advanced cryptographic primitives, such as digital signatures, public-key encryption or verifiable secret sharing. Supported curves include Ristretto255 and BLS12-381.
-4. [Zero-Knowledge Proofs (ZKP)](#building-powerful-cryptographic-applications-in-move) – These cryptographic techniques enable a party to prove that a relation $\mathsf{R}(x; w)$ is satisfied on a public statement $x$ without leaking the secret witness $w$ that makes it hold. Currently, we support Groth16 ZKP verification and Bulletproofs ZK range proof verification.
+4. [Zero-Knowledge Proofs (ZKP)](#building-powerful-cryptographic-applications) – These cryptographic techniques enable a party to prove that a relation $\mathsf{R}(x; w)$ is satisfied on a public statement $x$ without leaking the secret witness $w$ that makes it hold. Currently, we support Groth16 ZKP verification and Bulletproofs ZK range proof verification.
 
 Three fundamental principles guide the design and integration of the Aptos cryptographic extensions into Move:
 
@@ -195,16 +195,20 @@ The [`veiled_coin` example](https://github.com/aptos-labs/aptos-core/tree/main/a
 
 Specifically, users can **veil** their balance, keeping it hidden from everyone, including validators.
 Furthermore, a user can send a **veiled transaction** that hides the transaction amount from everybody, including validators.
-An important caveat is that veiled transactions do NOT hide the identities of the sender or the recipient.
+An important caveat is that veiled transactions do **not** hide the identities of the sender or the recipient.
 
-:::danger This module is educational. It is **NOT** production-ready. Using it could lead to loss of funds. :::
+:::danger
+This module is educational. It is **not** production-ready. Using it could lead to loss of funds.
+:::
 
 ### Groth16 zkSNARK verifier
 
-The [`groth16` example](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/groth16_example/sources) demonstrates how to verify Groth16 zkSNARK proofs[^groth16], which are the shortest and fastest-to-verify zero-knowledge proofs for arbitrary computations.
+The [`groth16` example](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/groth16_example/sources) demonstrates how to verify Groth16 zkSNARK proofs[^groth16], which are the shortest, fastest-to-verify, general-purpose zero-knowledge proofs.
 Importantly, as explained [above](#generic-elliptic-curve-arithmetic-in-move), this implementation is *generic* over **any** curve, making it very easy for Move developers to use it with their favorite (supported) curves.
 
-:::caution This code has not been audited by a third-party organization. If using it in a production system, proceed at your own risk. :::
+:::caution
+This code has not been audited by a third-party organization. If using it in a production system, proceed at your own risk.
+:::
 
 ### Verifying randomness from the `drand` beacon
 
@@ -212,7 +216,9 @@ The [`drand` example](https://github.com/aptos-labs/aptos-core/tree/main/aptos-m
 This randomness can be used in games or any other chance-based smart contract.
 We give a simple example of a lottery implemented on top of `drand` randomness in [`lottery.move`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/drand/sources/lottery.move).
 
-:::caution  This code has not been audited by a third-party organization. If using it in a production system, proceed at your own risk. :::
+:::caution
+This code has not been audited by a third-party organization. If using it in a production system, proceed at your own risk.
+:::
 
 Another application that can be built on top of `drand` is time-lock encryption[^tlock], which allows users to encrypt information such that it can only be decrypted in a future block.
 We do not currently have an implementation but the reader is encouraged to write one!
