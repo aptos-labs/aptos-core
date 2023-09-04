@@ -350,7 +350,7 @@ See [Resource accounts](../move/move-on-aptos/resource-accounts.md) for instruct
 
 ### REST Service
 
-- The **REST Service** component is the external interface of a Aptos node. Any incoming client request, such as submitted transactions or queries, must first go through the REST Service. A client needs to go through the REST Service component to access storage or any other component in the system. This filters requests and protects the system.
+- The **REST Service** component is the external interface of an Aptos node. Any incoming client request, such as submitted transactions or queries, must first go through the REST Service. A client needs to go through the REST Service component to access storage or any other component in the system. This filters requests and protects the system.
 - Whenever a client submits a new transaction, the REST Service passes it to [mempool](#mempool).
 
 ### Round
