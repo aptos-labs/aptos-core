@@ -9,6 +9,7 @@ use aptos_config::config::{
 use aptos_executor::block_executor::TransactionBlockExecutor;
 use aptos_executor_benchmark::{native_executor::NativeExecutor, pipeline::PipelineConfig};
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
+#[cfg(target_os = "linux")]
 use aptos_experimental_runtimes::thread_manager::{ThreadConfigStrategy, ThreadManagerBuilder};
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_profiler::{ProfilerConfig, ProfilerHandler};
@@ -433,6 +434,7 @@ fn main() {
     if opt.vm_selection_opt.use_native_executor {
         run::<NativeExecutor>(opt);
     } else if opt.vm_selection_opt.use_ptx_executor {
+        #[cfg(target_os = "linux")]
         ThreadManagerBuilder::set_thread_config_strategy(ThreadConfigStrategy::ThreadsPriority(48));
         run::<PtxBlockExecutor>(opt);
     } else {
