@@ -1,27 +1,21 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    graph::NodeIndex,
-    graph_stream::{GraphStream, StreamNode},
+    graph::{EdgeWeight, NodeIndex, NodeWeight},
+    graph_stream::{BatchInfo, GraphStream, StreamNode},
     partitioning::{PartitionId, StreamingGraphPartitioner},
 };
 use aptos_types::batched_stream::BatchedStream;
-use crate::graph::{EdgeWeight, NodeWeight};
-use crate::graph_stream::BatchInfo;
 
 /// The type used to represent real numbers in this implementation.
 /// For simplicity, it is a fixed type and not a generic parameter.
 pub type Real = f64;
 
 /// Compile-time assertion that `NodeWeight` can be converted to [`Real`].
-pub const NODE_WEIGHT_MUST_BE_CONVERTIBLE_TO_FENNEL_REAL: () = {
-     assert_into::<NodeWeight, Real>()
-};
+pub const NODE_WEIGHT_MUST_BE_CONVERTIBLE_TO_FENNEL_REAL: () = assert_into::<NodeWeight, Real>();
 
 /// Compile-time assertion that `EdgeWeight` can be converted to [`Real`].
-pub const EDGE_WEIGHT_MUST_BE_CONVERTIBLE_TO_FENNEL_REAL: () = {
-    assert_into::<EdgeWeight, Real>()
-};
+pub const EDGE_WEIGHT_MUST_BE_CONVERTIBLE_TO_FENNEL_REAL: () = assert_into::<EdgeWeight, Real>();
 
 const fn assert_into<From: Into<To>, To>() {}
 
@@ -317,7 +311,8 @@ where
             let total_node_weight = self.partitioned_node_weight + batch_node_weight;
 
             max_load = Some(
-                self.params.max_load(total_node_weight, self.params.n_partitions),
+                self.params
+                    .max_load(total_node_weight, self.params.n_partitions),
             );
         }
 
@@ -386,9 +381,7 @@ where
                                 true
                             }
                         })
-                        .map(|(partition, (delta_e, load))| {
-                            (partition, score(delta_e, load))
-                        })
+                        .map(|(partition, (delta_e, load))| (partition, score(delta_e, load)))
                         .max_by(|(_, score1), (_, score2)| score1.partial_cmp(score2).unwrap())
                         .map(|(partition, _)| partition)
                 };

@@ -1,6 +1,10 @@
 // Copyright © Aptos Foundation
 
-use crate::{graph, graph::NodeIndex, WeightedGraph};
+use crate::{
+    graph,
+    graph::{EdgeWeight, NodeIndex, NodeWeight},
+    WeightedGraph,
+};
 use aptos_types::{
     closuretools::{ClosureTools, MapClosure},
     no_error,
@@ -8,7 +12,6 @@ use aptos_types::{
 };
 use namable_closures::{closure, Closure};
 use rand::seq::SliceRandom;
-use crate::graph::{EdgeWeight, NodeWeight};
 
 /// Convenience type alias for a node in a graph stream.
 pub type StreamNode<S> = graph::Node<<S as GraphStream>::NodeData>;
@@ -37,9 +40,7 @@ pub trait GraphStream: Sized {
     /// Advances the stream and returns the next value.
     ///
     /// Returns [`None`] when stream is finished.
-    fn next_batch(
-        &mut self,
-    ) -> Option<Result<(Self::Batch<'_>, BatchInfo), Self::Error>>;
+    fn next_batch(&mut self) -> Option<Result<(Self::Batch<'_>, BatchInfo), Self::Error>>;
 
     /// Borrows a stream, rather than consuming it.
     ///
@@ -149,9 +150,7 @@ where
     type NodeEdges<'b> = S::NodeEdges<'b>
     where Self: 'b;
 
-    fn next_batch(
-        &mut self,
-    ) -> Option<Result<(Self::Batch<'_>, BatchInfo), Self::Error>> {
+    fn next_batch(&mut self) -> Option<Result<(Self::Batch<'_>, BatchInfo), Self::Error>> {
         (**self).next_batch()
     }
 
@@ -391,9 +390,7 @@ where
     type NodeEdges<'a> = S::NodeEdges<'a>
     where Self: 'a;
 
-    fn next_batch(
-        &mut self,
-    ) -> Option<Result<(Self::Batch<'_>, BatchInfo), Self::Error>> {
+    fn next_batch(&mut self) -> Option<Result<(Self::Batch<'_>, BatchInfo), Self::Error>> {
         self.inner
             .next_batch()
             .map(|res| res.map(|(batch, info)| (batch.into_iter().collect(), info)))
@@ -454,9 +451,7 @@ where
     type NodeEdges<'a> = S::NodeEdges<'a>
     where Self: 'a;
 
-    fn next_batch(
-        &mut self,
-    ) -> Option<Result<(Self::Batch<'_>, BatchInfo), Self::Error>> {
+    fn next_batch(&mut self) -> Option<Result<(Self::Batch<'_>, BatchInfo), Self::Error>> {
         self.inner.next_batch().map(|res| {
             res.map(|(mut batch, info)| {
                 batch.shuffle(self.rng);

@@ -18,10 +18,12 @@ aptos-block-partitioner = { workspace = true }
 aptos-graphs = { workspace = true }
 aptos-transaction-orderer = { workspace = true }
 aptos-types = { workspace = true }
+clap = { workspace = true }
 itertools = { workspace = true }
 namable_closures = { workspace = true }
 nonmax = { workspace = true }
 rand = { workspace = true }
+rayon = { workspace = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
 

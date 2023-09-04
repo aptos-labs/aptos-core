@@ -279,6 +279,7 @@ where
 // Wrapper types:
 
 /// A batched stream that wraps an iterator over `Result`s of batches.
+#[derive(Debug, Clone, Copy)]
 pub struct IterIntoBatchedStream<I: IntoIterator> {
     iter: I::IntoIter,
 }
@@ -307,6 +308,7 @@ where
 }
 
 /// A batched stream that wraps an iterator over batches of items, with no errors.
+#[derive(Debug, Clone, Copy)]
 pub struct IterIntoNoErrorBatchedStream<I: IntoIterator> {
     iter: I::IntoIter,
 }
@@ -336,6 +338,7 @@ where
 
 /// An adapter for a batched stream that materializes batches before returning them.
 /// Usually zero-cost if the underlying stream already has `Vec` batch type.
+#[derive(Debug, Clone, Copy)]
 pub struct Materialize<S> {
     inner: S,
 }
@@ -374,6 +377,7 @@ impl<S: BatchedStream> BatchedStream for Materialize<S> {
 }
 
 /// An iterator over batches of a batched stream.
+#[derive(Debug, Clone, Copy)]
 pub struct BatchIterator<S> {
     inner: S,
 }
@@ -407,6 +411,7 @@ impl<S: ExactBatchCountBatchedStream> ExactSizeIterator for BatchIterator<S> {
 }
 
 /// An iterator over batches of a `NoErrorBatchedStream`.
+#[derive(Debug, Clone, Copy)]
 pub struct NoErrorBatchIterator<S> {
     inner: S,
 }
@@ -520,6 +525,7 @@ where
 }
 
 /// A wrapper around an iterator that groups its elements into batches of size `batch_size`.
+#[derive(Debug, Clone, Copy)]
 pub struct BatchedIter<I> {
     iter: I,
     batch_size: usize,
@@ -531,7 +537,7 @@ impl<I> BatchedIter<I> {
     }
 }
 
-impl<'a, I> BatchedStream for &'a mut BatchedIter<I>
+impl<I> BatchedStream for BatchedIter<I>
 where
     I: Iterator,
 {
@@ -567,6 +573,7 @@ where
 }
 
 /// A batched stream that returns a single batch or a single error.
+#[derive(Debug, Clone, Copy)]
 pub struct Once<B, E> {
     result: Option<Result<B, E>>,
 }
@@ -598,6 +605,7 @@ where
 
 /// A batched stream adapter that applies [`Result::and_then`] to the result of computation
 /// of each batch of the stream.
+#[derive(Debug, Clone, Copy)]
 pub struct AndThen<S, F> {
     stream: S,
     op: F,
@@ -635,6 +643,7 @@ where
 }
 
 /// A batched stream adapter that maps results with the given function.
+#[derive(Debug, Clone, Copy)]
 pub struct MapResults<S, F> {
     stream: S,
     f: F,
@@ -672,6 +681,7 @@ where
 }
 
 /// A batched stream that maps batches with the given function.
+#[derive(Debug, Clone, Copy)]
 pub struct MapBatches<S, F> {
     stream: S,
     f: F,
@@ -709,6 +719,7 @@ where
 }
 
 /// A batched stream adapter that maps items with the given function.
+#[derive(Debug, Clone, Copy)]
 pub struct MapItems<S, F> {
     stream: S,
     f: F,
@@ -745,6 +756,7 @@ where
 }
 
 /// A batched stream adapter that maps errors with the given function.
+#[derive(Debug, Clone, Copy)]
 pub struct MapErrors<S, F> {
     stream: S,
     f: F,
@@ -781,6 +793,7 @@ where
 }
 
 /// A `NoErrorBatchedStream` that unwraps the batches of the original stream.
+#[derive(Debug, Clone, Copy)]
 pub struct UnwrapBatches<S> {
     stream: S,
 }

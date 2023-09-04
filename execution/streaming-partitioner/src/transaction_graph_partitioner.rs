@@ -2,17 +2,16 @@
 
 use crate::{PartitionedTransaction, SerializationIdx, StreamingTransactionPartitioner};
 use aptos_graphs::{
-    graph::Node,
+    graph::{EdgeWeight, Node, NodeWeight},
     graph_stream::{BatchInfo, StreamNode},
     partitioning::{PartitionId, StreamingGraphPartitioner},
     GraphStream, NodeIndex,
 };
 use aptos_transaction_orderer::common::PTransaction;
 use aptos_types::batched_stream::{BatchedStream, MapItems};
+use itertools::Itertools;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
-use itertools::Itertools;
-use aptos_graphs::graph::{EdgeWeight, NodeWeight};
 
 /// Partitions transactions using a streaming graph partitioner on a graph
 /// where the nodes are transactions and the edges are dependencies with
@@ -23,6 +22,15 @@ pub struct TransactionGraphPartitioner<P, NF, EF> {
 
     /// The parameters of the transaction graph partitioner.
     pub params: Params<NF, EF>,
+}
+
+impl<P, NF, EF> TransactionGraphPartitioner<P, NF, EF> {
+    pub fn new(graph_partitioner: P, params: Params<NF, EF>) -> Self {
+        Self {
+            graph_partitioner,
+            params,
+        }
+    }
 }
 
 /// The parameters of the transaction graph partitioner.
@@ -126,9 +134,7 @@ where
         // Find this transaction's dependencies.
         let deps: HashMap<SerializationIdx, Vec<T::Key>> = tx
             .read_set()
-            .filter_map(|key| {
-                Some((*self.last_write.get(key)?, key.clone()))
-            })
+            .filter_map(|key| Some((*self.last_write.get(key)?, key.clone())))
             .into_group_map();
 
         let mut new_edges_weight = 0 as EdgeWeight;
@@ -179,9 +185,7 @@ where
     type NodeEdges<'a> = std::iter::Copied<std::slice::Iter<'a, (NodeIndex, EdgeWeight)>>
     where Self: 'a;
 
-    fn next_batch(
-        &mut self,
-    ) -> Option<Result<(Self::Batch<'_>, BatchInfo), Self::Error>> {
+    fn next_batch(&mut self) -> Option<Result<(Self::Batch<'_>, BatchInfo), Self::Error>> {
         let batch = match self.transactions.next_batch()? {
             Ok(batch) => batch,
             Err(err) => return Some(Err(err)),

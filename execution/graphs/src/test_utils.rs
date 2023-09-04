@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::graph::{EdgeWeight, NodeWeight};
-use crate::simple_graph::SimpleUndirectedGraph;
+use crate::{
+    graph::{EdgeWeight, NodeWeight},
+    simple_graph::SimpleUndirectedGraph,
+};
 
 /// Creates a simple graph with four nodes that is useful for testing partitioning algorithms.
 pub fn simple_four_nodes_two_partitions_graph() -> SimpleUndirectedGraph<&'static str> {

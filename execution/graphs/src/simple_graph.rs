@@ -1,11 +1,10 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    graph::{GraphNode, GraphNodeRef, Node, NodeIndex, NodeRef},
+    graph::{EdgeWeight, GraphNode, GraphNodeRef, Node, NodeIndex, NodeRef, NodeWeight},
     graph_stream::{FromGraphStream, GraphStream},
     WeightedGraph,
 };
-use crate::graph::{EdgeWeight, NodeWeight};
 
 /// A weighted undirected graph represented in a simple format, where for each node
 /// we store its weight and a list of its neighbours with the corresponding edge weights.

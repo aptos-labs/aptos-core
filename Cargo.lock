@@ -3450,10 +3450,12 @@ dependencies = [
  "aptos-graphs",
  "aptos-transaction-orderer",
  "aptos-types",
+ "clap 4.3.21",
  "itertools",
  "namable_closures",
  "nonmax",
  "rand 0.7.3",
+ "rayon",
  "smallvec",
  "thiserror",
 ]

@@ -33,9 +33,7 @@ where
     type ResultStream = batched_stream::Once<Vec<(StreamNode<S>, PartitionId)>, Self::Error>;
 
     fn partition_stream(&self, graph_stream: S) -> Result<Self::ResultStream, Self::Error> {
-        let graph = graph_stream
-            .collect()
-            .map_err(Error::GraphStreamError)?;
+        let graph = graph_stream.collect().map_err(Error::GraphStreamError)?;
 
         let partitioning = self
             .graph_partitioner

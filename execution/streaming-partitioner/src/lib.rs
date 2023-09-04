@@ -2,10 +2,10 @@
 
 pub mod transaction_graph_partitioner;
 
-use std::collections::HashMap;
 use aptos_graphs::partitioning::PartitionId;
 use aptos_transaction_orderer::common::PTransaction;
 use aptos_types::batched_stream::BatchedStream;
+use std::collections::HashMap;
 
 /// Indicates the position of the transaction in the serialization order of the block.
 pub type SerializationIdx = u32;
