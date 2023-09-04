@@ -359,6 +359,7 @@ async fn execute_release(
     release_config: ReleaseConfig,
     network_config: NetworkConfig,
     output_dir: Option<PathBuf>,
+    validate_release: bool,
 ) -> Result<()> {
     let scripts_path = TempPath::new();
     scripts_path.create_as_dir()?;
@@ -370,7 +371,7 @@ async fn execute_release(
     };
     release_config.generate_release_proposal_scripts(proposal_folder)?;
 
-    for proposal in release_config.proposals {
+    for proposal in &release_config.proposals {
         let mut proposal_path = proposal_folder.to_path_buf();
         proposal_path.push("sources");
         proposal_path.push(&release_config.name);
@@ -439,6 +440,9 @@ async fn execute_release(
                 }
             },
         };
+        if validate_release {
+            release_config.validate_upgrade(&network_config.endpoint, proposal)?;
+        }
     }
     Ok(())
 }
@@ -455,6 +459,11 @@ pub async fn validate_config_and_generate_release(
     network_config: NetworkConfig,
     output_dir: Option<PathBuf>,
 ) -> Result<()> {
-    execute_release(release_config.clone(), network_config.clone(), output_dir).await?;
-    release_config.validate_upgrade(network_config.endpoint)
+    execute_release(
+        release_config.clone(),
+        network_config.clone(),
+        output_dir,
+        true,
+    )
+    .await
 }

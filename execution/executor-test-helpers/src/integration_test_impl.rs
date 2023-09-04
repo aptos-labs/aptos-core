@@ -48,7 +48,7 @@ pub fn test_execution_with_storage_impl_inner(
     let (genesis, validators) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
 
-    let mut core_resources_account: LocalAccount = LocalAccount::new(
+    let core_resources_account: LocalAccount = LocalAccount::new(
         aptos_test_root_address(),
         AccountKey::from_private_key(aptos_vm_genesis::GENESIS_KEYPAIR.0.clone()),
         0,
@@ -67,8 +67,8 @@ pub fn test_execution_with_storage_impl_inner(
     let seed = [3u8; 32];
     let mut rng = ::rand::rngs::StdRng::from_seed(seed);
 
-    let mut account1 = LocalAccount::generate(&mut rng);
-    let mut account2 = LocalAccount::generate(&mut rng);
+    let account1 = LocalAccount::generate(&mut rng);
+    let account2 = LocalAccount::generate(&mut rng);
     let account3 = LocalAccount::generate(&mut rng);
     let account4 = LocalAccount::generate(&mut rng);
 
@@ -226,7 +226,7 @@ pub fn test_execution_with_storage_impl_inner(
         .unwrap();
     verify_committed_txn_status(t4.as_ref(), &block1[7]).unwrap();
     // We requested the events to come back from this one, so verify that they did
-    assert_eq!(t4.unwrap().events.unwrap().len(), 2);
+    assert_eq!(t4.unwrap().events.unwrap().len(), 3);
 
     let t5 = db
         .reader
@@ -495,7 +495,11 @@ pub fn test_execution_with_storage_impl_inner(
     assert_eq!(account3_received_events_batch1.len(), 10);
     // Account3 has one extra deposit event from being minted to.
     assert_eq!(
-        account3_received_events_batch1[0].event.sequence_number(),
+        account3_received_events_batch1[0]
+            .event
+            .v1()
+            .unwrap()
+            .sequence_number(),
         16
     );
 
@@ -511,7 +515,11 @@ pub fn test_execution_with_storage_impl_inner(
         .unwrap();
     assert_eq!(account3_received_events_batch2.len(), 7);
     assert_eq!(
-        account3_received_events_batch2[0].event.sequence_number(),
+        account3_received_events_batch2[0]
+            .event
+            .v1()
+            .unwrap()
+            .sequence_number(),
         6
     );
 

@@ -79,6 +79,29 @@ pub static APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| 
     .unwrap()
 });
 
+pub static APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_executor_ledger_update_seconds",
+        // metric description
+        "The total time spent in ledger update in the block executor.",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static APTOS_EXECUTOR_LEDGER_UPDATE_OTHER_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        // metric name
+        "aptos_executor_ledger_update_other_seconds",
+        // metric description
+        "The time spent in seconds of others in ledger update stage in Aptos executor",
+        &["name"],
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
 pub static APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name

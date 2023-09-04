@@ -43,6 +43,12 @@ impl StateValueMetadata {
         }
     }
 
+    pub fn deposit(&self) -> u64 {
+        match self {
+            StateValueMetadata::V0 { deposit, .. } => *deposit,
+        }
+    }
+
     pub fn set_deposit(&mut self, amount: u64) {
         match self {
             StateValueMetadata::V0 { deposit, .. } => *deposit = amount,

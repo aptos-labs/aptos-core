@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    types::{MVDataError, MVDataOutput, MVModulesError, MVModulesOutput, TxnIndex, Version},
+    types::{MVDataError, MVDataOutput, MVModulesError, MVModulesOutput, TxnIndex},
     versioned_data::VersionedData,
     versioned_modules::VersionedModules,
 };
@@ -55,31 +55,12 @@ impl<K: ModulePath + Hash + Clone + Eq + Debug, V: TransactionWrite, X: Executab
         (self.data, self.modules)
     }
 
-    /// Mark an entry from transaction 'txn_idx' at access path 'key' as an estimated write
-    /// (for future incarnation). Will panic if the entry is not in the data-structure.
-    pub fn mark_estimate(&self, key: &K, txn_idx: TxnIndex) {
-        match key.module_path() {
-            Some(_) => self.modules.mark_estimate(key, txn_idx),
-            None => self.data.mark_estimate(key, txn_idx),
-        }
+    pub fn data(&self) -> &VersionedData<K, V> {
+        &self.data
     }
 
-    /// Delete an entry from transaction 'txn_idx' at access path 'key'. Will panic
-    /// if the corresponding entry does not exist.
-    pub fn delete(&self, key: &K, txn_idx: TxnIndex) {
-        // This internally deserializes the path, TODO: fix.
-        match key.module_path() {
-            Some(_) => self.modules.delete(key, txn_idx),
-            None => self.data.delete(key, txn_idx),
-        };
-    }
-
-    /// Add a versioned write at a specified key, in data or modules map according to the key.
-    pub fn write(&self, key: K, version: Version, value: V) {
-        match key.module_path() {
-            Some(_) => self.modules.write(key, version.0, value),
-            None => self.data.write(key, version, value),
-        }
+    pub fn modules(&self) -> &VersionedModules<K, V, X> {
+        &self.modules
     }
 
     // -----------------------------------------------

@@ -3,17 +3,19 @@
 use super::{
     anchor_election::RoundRobinAnchorElection,
     dag_driver::DagDriver,
-    dag_fetcher::{DagFetcher, FetchRequestHandler},
+    dag_fetcher::{DagFetcherService, FetchRequestHandler},
     dag_handler::NetworkHandler,
-    dag_network::DAGNetworkSender,
+    dag_network::TDAGNetworkSender,
     dag_store::Dag,
     order_rule::OrderRule,
     rb_handler::NodeBroadcastHandler,
     storage::DAGStorage,
     types::DAGMessage,
-    CertifiedNode,
 };
-use crate::{network::IncomingDAGRequest, state_replication::PayloadClient};
+use crate::{
+    dag::adapter::BufferManagerAdapter, experimental::buffer_manager::OrderedBlocks,
+    network::IncomingDAGRequest, state_replication::PayloadClient,
+};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
@@ -22,7 +24,7 @@ use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
 };
 use futures::stream::{AbortHandle, Abortable};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub fn bootstrap_dag(
@@ -32,19 +34,20 @@ pub fn bootstrap_dag(
     latest_ledger_info: LedgerInfo,
     storage: Arc<dyn DAGStorage>,
     rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
-    dag_network_sender: Arc<dyn DAGNetworkSender>,
+    dag_network_sender: Arc<dyn TDAGNetworkSender>,
     time_service: aptos_time_service::TimeService,
     payload_client: Arc<dyn PayloadClient>,
 ) -> (
     AbortHandle,
     AbortHandle,
     aptos_channel::Sender<Author, IncomingDAGRequest>,
-    futures_channel::mpsc::UnboundedReceiver<Vec<Arc<CertifiedNode>>>,
+    futures_channel::mpsc::UnboundedReceiver<OrderedBlocks>,
 ) {
     let validators = epoch_state.verifier.get_ordered_account_addresses();
     let current_round = latest_ledger_info.round();
 
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
+    let adapter = Box::new(BufferManagerAdapter::new(ordered_nodes_tx, storage.clone()));
     let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
 
     // A backoff policy that starts at 100ms and doubles each iteration.
@@ -54,9 +57,15 @@ pub fn bootstrap_dag(
         rb_network_sender,
         rb_backoff_policy,
         time_service.clone(),
+        // TODO: add to config
+        Duration::from_millis(500),
     ));
 
-    let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage.clone())));
+    let dag = Arc::new(RwLock::new(Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        current_round,
+    )));
 
     let anchor_election = Box::new(RoundRobinAnchorElection::new(validators));
     let order_rule = OrderRule::new(
@@ -64,11 +73,12 @@ pub fn bootstrap_dag(
         latest_ledger_info,
         dag.clone(),
         anchor_election,
-        ordered_nodes_tx,
+        adapter,
+        storage.clone(),
     );
 
     let (dag_fetcher, fetch_requester, node_fetch_waiter, certified_node_fetch_waiter) =
-        DagFetcher::new(
+        DagFetcherService::new(
             epoch_state.clone(),
             dag_network_sender,
             dag.clone(),
@@ -82,14 +92,18 @@ pub fn bootstrap_dag(
         dag.clone(),
         payload_client,
         rb,
-        current_round,
         time_service,
         storage.clone(),
         order_rule,
+        fetch_requester.clone(),
+    );
+    let rb_handler = NodeBroadcastHandler::new(
+        dag.clone(),
+        signer,
+        epoch_state.clone(),
+        storage.clone(),
         fetch_requester,
     );
-    let rb_handler =
-        NodeBroadcastHandler::new(dag.clone(), signer, epoch_state.clone(), storage.clone());
     let fetch_handler = FetchRequestHandler::new(dag, epoch_state.clone());
 
     let dag_handler = NetworkHandler::new(

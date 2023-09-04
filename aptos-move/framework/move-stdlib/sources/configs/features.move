@@ -34,6 +34,7 @@ module std::features {
     /// available. This is needed because of introduction of a new native function.
     /// Lifetime: transient
     const CODE_DEPENDENCY_CHECK: u64 = 1;
+
     public fun code_dependency_check_enabled(): bool acquires Features {
         is_enabled(CODE_DEPENDENCY_CHECK)
     }
@@ -42,6 +43,7 @@ module std::features {
     /// private functions.
     /// Lifetime: permanent
     const TREAT_FRIEND_AS_PRIVATE: u64 = 2;
+
     public fun treat_friend_as_private(): bool acquires Features {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
     }
@@ -50,9 +52,7 @@ module std::features {
     /// This is needed because of the introduction of new native functions.
     /// Lifetime: transient
     const SHA_512_AND_RIPEMD_160_NATIVES: u64 = 3;
-
     public fun get_sha_512_and_ripemd_160_feature(): u64 { SHA_512_AND_RIPEMD_160_NATIVES }
-
     public fun sha_512_and_ripemd_160_enabled(): bool acquires Features {
         is_enabled(SHA_512_AND_RIPEMD_160_NATIVES)
     }
@@ -61,9 +61,7 @@ module std::features {
     /// This is needed because of the introduction of a new native function.
     /// Lifetime: transient
     const APTOS_STD_CHAIN_ID_NATIVES: u64 = 4;
-
     public fun get_aptos_stdlib_chain_id_feature(): u64 { APTOS_STD_CHAIN_ID_NATIVES }
-
     public fun aptos_stdlib_chain_id_enabled(): bool acquires Features {
         is_enabled(APTOS_STD_CHAIN_ID_NATIVES)
     }
@@ -71,9 +69,7 @@ module std::features {
     /// Whether to allow the use of binary format version v6.
     /// Lifetime: transient
     const VM_BINARY_FORMAT_V6: u64 = 5;
-
     public fun get_vm_binary_format_v6(): u64 { VM_BINARY_FORMAT_V6 }
-
     public fun allow_vm_binary_format_v6(): bool acquires Features {
         is_enabled(VM_BINARY_FORMAT_V6)
     }
@@ -81,9 +77,7 @@ module std::features {
     /// Whether gas fees are collected and distributed to the block proposers.
     /// Lifetime: transient
     const COLLECT_AND_DISTRIBUTE_GAS_FEES: u64 = 6;
-
     public fun get_collect_and_distribute_gas_fees_feature(): u64 { COLLECT_AND_DISTRIBUTE_GAS_FEES }
-
     public fun collect_and_distribute_gas_fees(): bool acquires Features {
         is_enabled(COLLECT_AND_DISTRIBUTE_GAS_FEES)
     }
@@ -92,9 +86,7 @@ module std::features {
     /// This is needed because of the introduction of a new native function.
     /// Lifetime: transient
     const MULTI_ED25519_PK_VALIDATE_V2_NATIVES: u64 = 7;
-
     public fun multi_ed25519_pk_validate_v2_feature(): u64 { MULTI_ED25519_PK_VALIDATE_V2_NATIVES }
-
     public fun multi_ed25519_pk_validate_v2_enabled(): bool acquires Features {
         is_enabled(MULTI_ED25519_PK_VALIDATE_V2_NATIVES)
     }
@@ -103,9 +95,7 @@ module std::features {
     /// This is needed because of the introduction of new native function(s).
     /// Lifetime: transient
     const BLAKE2B_256_NATIVE: u64 = 8;
-
     public fun get_blake2b_256_feature(): u64 { BLAKE2B_256_NATIVE }
-
     public fun blake2b_256_enabled(): bool acquires Features {
         is_enabled(BLAKE2B_256_NATIVE)
     }
@@ -113,18 +103,14 @@ module std::features {
     /// Whether resource groups are enabled.
     /// This is needed because of new attributes for structs and a change in storage representation.
     const RESOURCE_GROUPS: u64 = 9;
-
     public fun get_resource_groups_feature(): u64 { RESOURCE_GROUPS }
-
     public fun resource_groups_enabled(): bool acquires Features {
         is_enabled(RESOURCE_GROUPS)
     }
 
     /// Whether multisig accounts (different from accounts with multi-ed25519 auth keys) are enabled.
     const MULTISIG_ACCOUNTS: u64 = 10;
-
     public fun get_multisig_accounts_feature(): u64 { MULTISIG_ACCOUNTS }
-
     public fun multisig_accounts_enabled(): bool acquires Features {
         is_enabled(MULTISIG_ACCOUNTS)
     }
@@ -132,9 +118,7 @@ module std::features {
     /// Whether delegation pools are enabled.
     /// Lifetime: transient
     const DELEGATION_POOLS: u64 = 11;
-
     public fun get_delegation_pools_feature(): u64 { DELEGATION_POOLS }
-
     public fun delegation_pools_enabled(): bool acquires Features {
         is_enabled(DELEGATION_POOLS)
     }
@@ -143,7 +127,9 @@ module std::features {
     ///
     /// Lifetime: transient
     const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
+
     public fun get_cryptography_algebra_natives_feature(): u64 { CRYPTOGRAPHY_ALGEBRA_NATIVES }
+
     public fun cryptography_algebra_enabled(): bool acquires Features {
         is_enabled(CRYPTOGRAPHY_ALGEBRA_NATIVES)
     }
@@ -152,7 +138,9 @@ module std::features {
     ///
     /// Lifetime: transient
     const BLS12_381_STRUCTURES: u64 = 13;
+
     public fun get_bls12_381_strutures_feature(): u64 { BLS12_381_STRUCTURES }
+
     public fun bls12_381_structures_enabled(): bool acquires Features {
         is_enabled(BLS12_381_STRUCTURES)
     }
@@ -169,7 +157,9 @@ module std::features {
     /// Whether reward rate decreases periodically.
     /// Lifetime: transient
     const PERIODICAL_REWARD_RATE_DECREASE: u64 = 16;
+
     public fun get_periodical_reward_rate_decrease_feature(): u64 { PERIODICAL_REWARD_RATE_DECREASE }
+
     public fun periodical_reward_rate_decrease_enabled(): bool acquires Features {
         is_enabled(PERIODICAL_REWARD_RATE_DECREASE)
     }
@@ -177,7 +167,9 @@ module std::features {
     /// Whether enable paritial governance voting on aptos_governance.
     /// Lifetime: transient
     const PARTIAL_GOVERNANCE_VOTING: u64 = 17;
+
     public fun get_partial_governance_voting(): u64 { PARTIAL_GOVERNANCE_VOTING }
+
     public fun partial_governance_voting_enabled(): bool acquires Features {
         is_enabled(PARTIAL_GOVERNANCE_VOTING)
     }
@@ -189,7 +181,9 @@ module std::features {
     /// Whether enable paritial governance voting on delegation_pool.
     /// Lifetime: transient
     const DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING: u64 = 21;
+
     public fun get_delegation_pool_partial_governance_voting(): u64 { DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING }
+
     public fun delegation_pool_partial_governance_voting_enabled(): bool acquires Features {
         is_enabled(DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING)
     }
@@ -197,6 +191,7 @@ module std::features {
     /// Whether alternate gas payer is supported
     /// Lifetime: transient
     const FEE_PAYER_ENABLED: u64 = 22;
+
     public fun fee_payer_enabled(): bool acquires Features {
         is_enabled(FEE_PAYER_ENABLED)
     }
@@ -204,7 +199,9 @@ module std::features {
     /// Whether enable MOVE functions to call create_auid method to create AUIDs.
     /// Lifetime: transient
     const APTOS_UNIQUE_IDENTIFIERS: u64 = 23;
+
     public fun get_auids(): u64 { APTOS_UNIQUE_IDENTIFIERS }
+
     public fun auids_enabled(): bool acquires Features {
         is_enabled(APTOS_UNIQUE_IDENTIFIERS)
     }
@@ -213,11 +210,45 @@ module std::features {
     /// available. This is needed because of the introduction of a new native function.
     /// Lifetime: transient
     const BULLETPROOFS_NATIVES: u64 = 24;
-
     public fun get_bulletproofs_feature(): u64 { BULLETPROOFS_NATIVES }
 
     public fun bulletproofs_enabled(): bool acquires Features {
         is_enabled(BULLETPROOFS_NATIVES)
+    }
+
+    /// Fix the native formatter for signer.
+    /// Lifetime: transient
+    const SIGNER_NATIVE_FORMAT_FIX: u64 = 25;
+
+    public fun get_signer_native_format_fix_feature(): u64 { SIGNER_NATIVE_FORMAT_FIX }
+
+    public fun signer_native_format_fix_enabled(): bool acquires Features {
+        is_enabled(SIGNER_NATIVE_FORMAT_FIX)
+    }
+
+    /// Whether emit function in `event.move` are enabled for module events.
+    ///
+    /// Lifetime: transient
+    const MODULE_EVENT: u64 = 26;
+
+    public fun get_module_event_feature(): u64 { MODULE_EVENT }
+
+    public fun module_event_enabled(): bool acquires Features {
+        is_enabled(MODULE_EVENT)
+    }
+
+    /// Whether the fix for a counting bug in the script path of the signature checker pass is enabled.
+    /// Lifetime: transient
+    const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 29;
+
+    /// Whether the aggregator snapshots feature is enabled.
+    /// Lifetime: transient
+    const AGGREGATOR_SNAPSHOTS: u64 = 30;
+
+    public fun get_aggregator_snapshots_feature(): u64 { AGGREGATOR_SNAPSHOTS }
+
+    public fun aggregator_snapshots_enabled(): bool acquires Features {
+        is_enabled(AGGREGATOR_SNAPSHOTS)
     }
 
     // ============================================================================================
@@ -236,7 +267,7 @@ module std::features {
     acquires Features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
         if (!exists<Features>(@std)) {
-            move_to<Features>(framework, Features{features: vector[]})
+            move_to<Features>(framework, Features { features: vector[] })
         };
         let features = &mut borrow_global_mut<Features>(@std).features;
         vector::for_each_ref(&enable, |feature| {
@@ -250,7 +281,7 @@ module std::features {
     /// Check whether the feature is enabled.
     fun is_enabled(feature: u64): bool acquires Features {
         exists<Features>(@std) &&
-        contains(&borrow_global<Features>(@std).features, feature)
+            contains(&borrow_global<Features>(@std).features, feature)
     }
 
     /// Helper to include or exclude a feature flag.
