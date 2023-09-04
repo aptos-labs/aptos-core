@@ -46,7 +46,7 @@ Google Cloud offers a [90 day $300 free trial for every new user](https://cloud.
 #### Create a new GCP project
 
 - Create a new project on the GCP Console or using the gcloud command from the Google Cloud CLI. Before you do that, familiarize yourself with the [resource hierarchy on GCP](https://cloud.google.com/resource-manager/docs/cloud-platform-resource-hierarchy).
-- [Follow these instructions to setup a new project.](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project).
+- [Follow these instructions to setup a new project](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project).
 
 #### Enable billing, upgrade your account
 
