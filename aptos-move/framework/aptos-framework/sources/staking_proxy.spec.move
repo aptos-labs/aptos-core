@@ -22,7 +22,30 @@ spec aptos_framework::staking_proxy {
     spec set_vesting_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
         // TODO: Can't verify `update_voter` in while loop.
         pragma aborts_if_is_partial;
+
+        let owner_address = signer::address_of(owner);
+        let vesting_contracts = global<vesting::AdminStore>(owner_address).vesting_contracts;
+        let post post_vesting_contracts = global<vesting::AdminStore>(owner_address).vesting_contracts;
+        ensures exists i in 0..len(vesting_contracts): (global<vesting::VestingContract>(vesting_contracts[i])).staking.operator == old_operator
+            ==>
+            {
+                let operator_addr = find_vesting_contract(post_vesting_contracts, old_operator, 0);
+                global<vesting::VestingContract>(operator_addr).staking.operator == new_operator
+            };
     }
+
+    spec fun find_vesting_contract(vesting_contracts: vector<address>, old_operator: address, count: num): address {
+        let operator = global<vesting::VestingContract>(vesting_contracts[count]).staking.operator;
+        if (operator == old_operator) {
+            vesting_contracts[count]
+        } else {
+            find_vesting_contract(vesting_contracts, old_operator, count + 1)
+        }
+    }
+
+    // spec fun find_count(vesting_contracts: vector<address>, old_operator: address, count: num): count {
+    //     let counts = 
+    // }
 
     spec set_staking_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
         use aptos_std::simple_map;
