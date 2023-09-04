@@ -215,6 +215,8 @@ pub struct PrintBytecodeCommand {
     /// The kind of input: either a script, or a module.
     #[clap(long = "input", value_enum, ignore_case = true, default_value_t = PrintBytecodeInputChoice::Script)]
     pub input: PrintBytecodeInputChoice,
+    #[clap(long = "syntax")]
+    pub syntax: Option<SyntaxChoice>,
 }
 
 #[derive(Debug, Parser)]
