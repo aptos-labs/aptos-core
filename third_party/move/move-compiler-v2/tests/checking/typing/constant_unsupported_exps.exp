@@ -1,5 +1,11 @@
 
 Diagnostics:
+bug: unresolved spec anchor
+   ┌─ tests/checking/typing/constant_unsupported_exps.move:17:9
+   │
+17 │         spec { };
+   │         ^^^^^^^^
+
 error: no function named `f_script` found
    ┌─ tests/checking/typing/constant_unsupported_exps.move:21:9
    │
@@ -36,7 +42,7 @@ error: invalid call of `move_to`: expected `&signer` but found `signer` for argu
 30 │         move_to(s, R{});
    │                 ^
 
-error: The type argument to `exists` and `global` must be a struct type but `?25` is not
+error: The type argument to `exists` and `global` must be a struct type but `?26` is not
    ┌─ tests/checking/typing/constant_unsupported_exps.move:31:15
    │
 31 │         R{} = move_from(@0x42);
