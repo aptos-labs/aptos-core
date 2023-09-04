@@ -9,6 +9,9 @@ use aptos_types::{
     transaction::Transaction,
 };
 use std::time::Instant;
+use aptos_transaction_orderer::batch_orderer_with_window::SequentialDynamicWindowOrderer;
+use aptos_transaction_orderer::block_orderer::{BatchedBlockOrdererWithWindow, BlockOrderer};
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 
 pub(crate) struct BlockPartitioningStage {
     num_executor_shards: usize,
@@ -41,7 +44,30 @@ impl BlockPartitioningStage {
         );
         let block_id = HashValue::random();
         let block: ExecutableBlock = match &self.maybe_partitioner {
-            None => (block_id, txns).into(),
+            // None => (block_id, txns).into(),
+            None => {
+                let n_txns = txns.len();
+                let last_txn = txns.pop().unwrap();
+                let analyzed_transactions = txns.into_iter().map(|t| t.into()).collect();
+                let block_orderer = BatchedBlockOrdererWithWindow::new(
+                    SequentialDynamicWindowOrderer::default(),
+                    n_txns,
+                    1000,
+                );
+
+                let mut ordered_txns: Vec<Transaction> = vec![];
+                block_orderer
+                    .order_transactions(
+                        analyzed_transactions,
+                        |txns: Vec<AnalyzedTransaction>| -> Result<(), ()> {
+                            ordered_txns.extend(txns.into_iter().map(|t| t.into()));
+                            Ok(())
+                        }
+                    )
+                    .unwrap();
+                ordered_txns.push(last_txn);
+                (block_id, ordered_txns).into()
+            },
             Some(partitioner) => {
                 let last_txn = txns.pop().unwrap();
                 let analyzed_transactions = txns.into_iter().map(|t| t.into()).collect();
