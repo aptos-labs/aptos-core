@@ -277,16 +277,16 @@ If you created your Aptos fullnode from source, you should similarly upgrade fro
   cargo run -p aptos-node --release -- -f ./fullnode.yaml
   ```
 
-  ### Upgrading with Docker
+### Upgrading with Docker
 
-  If you created your Aptos fullnode with Docker, you should similarly upgrade with Docker:
-  1. Stop your local public fullnode by running the below command:
+If you created your Aptos fullnode with Docker, you should similarly upgrade with Docker:
+1. Stop your local public fullnode by running the below command:
     ```bash
     docker-compose down --volumes
     ```
-  1. Delete the `waypoint.txt`, `genesis.blob` and `fullnode.yaml` files previously downloaded, installed and configured.
-  1. Re-install and configure those files as during setup.
-  1. Restart your local public fullnode by running the same start (`run`) command as before:
+1. Delete the `waypoint.txt`, `genesis.blob` and `fullnode.yaml` files previously downloaded, installed and configured.
+1. Re-install and configure those files as during setup.
+1. Restart your local public fullnode by running the same start (`run`) command as before:
   ```bash
   docker run --pull=always \
       --rm -p 8080:8080 \
