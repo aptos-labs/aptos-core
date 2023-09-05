@@ -14,8 +14,8 @@ use std::collections::{BTreeMap, HashMap};
 /// top of storage, e.g. get resources from resource groups, etc.
 pub trait AptosMoveResolver:
     MoveResolver
-    + AggregatorResolver
     + TableResolver
+    + AggregatorResolver
     + StateStorageUsageResolver
     + StateValueMetadataResolver
     + ConfigStorage

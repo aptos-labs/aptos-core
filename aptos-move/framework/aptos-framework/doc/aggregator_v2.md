@@ -118,17 +118,6 @@ The value of aggregator underflows (goes below zero). Raised by uncoditional sub
 
 
 
-<a name="0x1_aggregator_v2_EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED"></a>
-
-Element type of the aggregator not supported. Raised by create_aggregator() call,
-if Element type is not supported (currently u64 or u128).
-
-
-<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED">EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED</a>: u64 = 3;
-</code></pre>
-
-
-
 <a name="0x1_aggregator_v2_EAGGREGATOR_SNAPSHOTS_NOT_ENABLED"></a>
 
 The aggregator snapshots feature flag is not enabled.
@@ -145,6 +134,16 @@ The generic type supplied to the aggregator snapshot is not supported.
 
 
 <pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE">EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE</a>: u64 = 5;
+</code></pre>
+
+
+
+<a name="0x1_aggregator_v2_EUNSUPPORTED_AGGREGATOR_TYPE"></a>
+
+The generic type supplied to the aggregator is not supported.
+
+
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EUNSUPPORTED_AGGREGATOR_TYPE">EUNSUPPORTED_AGGREGATOR_TYPE</a>: u64 = 7;
 </code></pre>
 
 
