@@ -78,6 +78,7 @@ use std::{
         Arc,
     },
 };
+use aptos_block_executor::sharding::ShardingProvider;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -1524,12 +1525,14 @@ impl VMExecutor for AptosVM {
         );
 
         let count = transactions.len();
+        let pre_processed_txns = RAYON_EXEC_POOL.install(||{BlockAptosVM::verify_transactions(transactions)});
+        let txn_provider = ShardingProvider::new_unsharded(pre_processed_txns);
         let ret = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
             Arc::clone(&RAYON_EXEC_POOL),
-            transactions,
+            txn_provider,
             state_view,
             Self::get_concurrency_level(),
             maybe_block_gas_limit,

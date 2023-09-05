@@ -37,6 +37,7 @@ use std::{
         Arc,
     },
 };
+use crate::sharding::ShardingProvider;
 
 struct CommitGuard<'a> {
     post_commit_txs: &'a Vec<Sender<u32>>,
@@ -112,7 +113,7 @@ where
 
     fn execute(
         version: Version,
-        signature_verified_block: &[T],
+        sharding_provider: &ShardingProvider<T, E::Output, E::Error>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
@@ -122,7 +123,8 @@ where
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let (idx_to_execute, incarnation) = version;
-        let txn = &signature_verified_block[idx_to_execute as usize];
+        sharding_provider.wait_for_remote_deps(idx_to_execute);
+        let txn = sharding_provider.txn_by_global_idx(idx_to_execute);
 
         // VM execution.
         let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), idx_to_execute);
@@ -365,6 +367,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         base_view: &S,
+        sharding_provider: &ShardingProvider<T, E::Output, E::Error>,
     ) {
         let delta_keys = last_input_output.delta_keys(txn_idx);
         let _events = last_input_output.events(txn_idx);
@@ -399,6 +402,7 @@ where
             delta_writes.push((k, WriteOp::Modification(serialize(&committed_delta))));
         }
         last_input_output.record_delta_writes(txn_idx, delta_writes);
+        sharding_provider.on_local_commit(txn_idx, last_input_output);
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             let txn_output = last_input_output.txn_output(txn_idx).unwrap();
             let execution_status = txn_output.output_status();
@@ -417,7 +421,7 @@ where
     fn work_task_with_scope(
         &self,
         executor_arguments: &E::Argument,
-        block: &[T],
+        sharding_provider: &ShardingProvider<T, E::Output, E::Error>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
@@ -438,7 +442,7 @@ where
         let mut worker_idx = 0;
 
         let mut accumulated_fee_statement = FeeStatement::zero();
-        let mut txn_fee_statements = Vec::with_capacity(block.len());
+        let mut txn_fee_statements = Vec::with_capacity(sharding_provider.num_local_txns());
         loop {
             // Only one thread does try_commit to avoid contention.
             match &role {
@@ -461,6 +465,7 @@ where
                             versioned_cache,
                             last_input_output,
                             base_view,
+                            sharding_provider,
                         );
                     }
                 },
@@ -477,7 +482,7 @@ where
                 SchedulerTask::ExecutionTask(version_to_execute, ExecutionTaskType::Execution) => {
                     Self::execute(
                         version_to_execute,
-                        block,
+                        sharding_provider,
                         last_input_output,
                         versioned_cache,
                         scheduler,
@@ -506,6 +511,7 @@ where
                                 versioned_cache,
                                 last_input_output,
                                 base_view,
+                                sharding_provider,
                             );
                         }
                     }
@@ -518,7 +524,7 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        signature_verified_block: &Vec<T>,
+        sharding_provider: &ShardingProvider<T, E::Output, E::Error>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
@@ -529,13 +535,14 @@ where
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_cache = MVHashMap::new();
+
         let shared_counter = AtomicU32::new(0);
 
-        if signature_verified_block.is_empty() {
+        if sharding_provider.num_local_txns() == 0 {
             return Ok(vec![]);
         }
 
-        let num_txns = signature_verified_block.len() as u32;
+        let num_txns = sharding_provider.num_local_txns() as u32;
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
@@ -555,12 +562,17 @@ where
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
+            s.spawn(|_| {
+                sharding_provider.run_sharding_msg_loop(&versioned_cache);
+            });
+
+            // The rest BlockSTM threads.
             for _ in 0..self.concurrency_level {
                 let role = roles.pop().expect("Role must be set for all threads");
                 s.spawn(|_| {
                     self.work_task_with_scope(
                         &executor_initial_arguments,
-                        signature_verified_block,
+                        sharding_provider,
                         &last_input_output,
                         &versioned_cache,
                         &scheduler,
@@ -618,10 +630,10 @@ where
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: &Vec<T>,
+        sharding_provider: &ShardingProvider<T, E::Output, E::Error>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
-        let num_txns = signature_verified_block.len();
+        let num_txns = sharding_provider.num_local_txns();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(executor_arguments);
         drop(init_timer);
@@ -632,7 +644,7 @@ where
 
         let mut accumulated_fee_statement = FeeStatement::zero();
 
-        for (idx, txn) in signature_verified_block.iter().enumerate() {
+        for (idx, txn) in sharding_provider.txns.iter().enumerate() {
             let unsync_view = LatestView::<T, S, X>::new(
                 base_view,
                 ViewState::Unsync(SequentialState {
@@ -728,19 +740,19 @@ where
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: Vec<T>,
+        sharding_provider: ShardingProvider<T, E::Output, E::Error>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
-                &signature_verified_block,
+                &sharding_provider,
                 base_view,
             )
         } else {
             self.execute_transactions_sequential(
                 executor_arguments,
-                &signature_verified_block,
+                &sharding_provider,
                 base_view,
             )
         };
@@ -750,17 +762,17 @@ where
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_block.len());
+            init_speculative_logs(sharding_provider.num_local_txns());
 
             ret = self.execute_transactions_sequential(
                 executor_arguments,
-                &signature_verified_block,
+                &sharding_provider,
                 base_view,
             )
         }
         self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
-            drop(signature_verified_block);
+            drop(sharding_provider);
         });
         ret
     }

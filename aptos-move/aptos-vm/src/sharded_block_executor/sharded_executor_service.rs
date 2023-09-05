@@ -23,6 +23,8 @@ use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
+use aptos_block_executor::sharding::ShardingProvider;
+use crate::counters::BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS;
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
@@ -97,56 +99,29 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let (callback, callback_receiver) = oneshot::channel();
+        let txns = transactions
+            .into_iter()
+            .map(|txn| txn.into_txn().into_txn())
+            .collect();
 
-        let cross_shard_state_view = Arc::new(CrossShardStateView::create_cross_shard_state_view(
-            state_view,
-            &transactions,
-        ));
-
-        let cross_shard_state_view_clone = cross_shard_state_view.clone();
-        let cross_shard_client_clone = cross_shard_client.clone();
-        executor_thread_pool.clone().scope(|s| {
-            s.spawn(move |_| {
-                CrossShardCommitReceiver::start(
-                    cross_shard_state_view_clone,
-                    cross_shard_client,
-                    round,
-                );
-            });
-            s.spawn(move |_| {
-                let ret = BlockAptosVM::execute_block(
-                    executor_thread_pool,
-                    transactions
-                        .into_iter()
-                        .map(|txn| txn.into_txn().into_txn())
-                        .collect(),
-                    cross_shard_state_view.as_ref(),
-                    concurrency_level,
-                    maybe_block_gas_limit,
-                    cross_shard_commit_sender,
-                );
-                if let Some(shard_id) = shard_id {
-                    trace!(
-                        "executed sub block for shard {} and round {}",
-                        shard_id,
-                        round
-                    );
-                    // Send a self message to stop the cross-shard commit receiver.
-                    cross_shard_client_clone.send_cross_shard_msg(
-                        shard_id,
-                        round,
-                        CrossShardMsg::StopMsg,
-                    );
-                } else {
-                    trace!("executed block for global shard and round {}", round);
-                    // Send a self message to stop the cross-shard commit receiver.
-                    cross_shard_client_clone.send_global_msg(CrossShardMsg::StopMsg);
-                }
-                callback.send(ret).unwrap();
-            });
+        let signature_verification_timer =
+            BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
+        let pre_processed_txns = executor_thread_pool.install(||{
+            BlockAptosVM::verify_transactions(txns)
         });
-        block_on(callback_receiver).unwrap()
+        drop(signature_verification_timer);
+
+        let sharding_provider = ShardingProvider::new_unsharded(pre_processed_txns); //TODO: new_sharded()
+
+        let ret = BlockAptosVM::execute_block(
+            executor_thread_pool,
+            sharding_provider,
+            state_view,
+            concurrency_level,
+            maybe_block_gas_limit,
+            cross_shard_commit_sender,
+        );
+        ret
     }
 
     fn execute_block(

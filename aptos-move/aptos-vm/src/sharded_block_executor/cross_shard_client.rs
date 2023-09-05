@@ -21,22 +21,25 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
+use aptos_block_executor::sharding::ShardingProvider;
+use crate::adapter_common::PreprocessedTransaction;
+use crate::block_executor::vm_wrapper::AptosExecutorTask;
 
 pub struct CrossShardCommitReceiver {}
 
 impl CrossShardCommitReceiver {
     pub fn start<S: StateView + Sync + Send>(
-        cross_shard_state_view: Arc<CrossShardStateView<S>>,
         cross_shard_client: Arc<dyn CrossShardClient>,
         round: RoundId,
     ) {
         loop {
-            let msg = cross_shard_client.receive_cross_shard_msg(round);
+            let msg: CrossShardMsg = cross_shard_client.receive_cross_shard_msg(round);
             match msg {
                 RemoteTxnWriteMsg(txn_commit_msg) => {
                     let (state_key, write_op) = txn_commit_msg.take();
-                    cross_shard_state_view
-                        .set_value(&state_key, write_op.and_then(|w| w.as_state_value()));
+                    // TODO:
+                    // cross_shard_state_view
+                    //     .set_value(&state_key, write_op.and_then(|w| w.as_state_value()));
                 },
                 CrossShardMsg::StopMsg => {
                     trace!("Cross shard commit receiver stopped for round {}", round);

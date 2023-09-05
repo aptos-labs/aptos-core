@@ -39,6 +39,7 @@ use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::{collections::HashMap, sync::Arc};
+use aptos_block_executor::sharding::ShardingProvider;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
@@ -180,7 +181,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 pub struct BlockAptosVM();
 
 impl BlockAptosVM {
-    fn verify_transactions(transactions: Vec<Transaction>) -> Vec<PreprocessedTransaction> {
+    pub fn verify_transactions(transactions: Vec<Transaction>) -> Vec<PreprocessedTransaction> {
         transactions
             .into_par_iter()
             .with_min_len(25)
@@ -193,7 +194,7 @@ impl BlockAptosVM {
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
         executor_thread_pool: Arc<ThreadPool>,
-        transactions: Vec<Transaction>,
+        sharding_provider: ShardingProvider<PreprocessedTransaction, AptosTransactionOutput, VMStatus>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
@@ -204,13 +205,8 @@ impl BlockAptosVM {
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
         // TODO: state sync runs this code but doesn't need to verify signatures
-        let signature_verification_timer =
-            BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
-        let signature_verified_block =
-            executor_thread_pool.install(|| Self::verify_transactions(transactions));
-        drop(signature_verification_timer);
 
-        let num_txns = signature_verified_block.len();
+        let num_txns = sharding_provider.num_local_txns();
         if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.
@@ -230,8 +226,7 @@ impl BlockAptosVM {
             maybe_block_gas_limit,
             transaction_commit_listener,
         );
-
-        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
+        let ret = executor.execute_block(state_view, sharding_provider, state_view);
         match ret {
             Ok(outputs) => {
                 let output_vec: Vec<TransactionOutput> = outputs

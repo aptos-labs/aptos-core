@@ -2,6 +2,7 @@
 
 use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 use serde::{Deserialize, Serialize};
+use aptos_mvhashmap::types::TxnIndex;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum CrossShardMsg {
