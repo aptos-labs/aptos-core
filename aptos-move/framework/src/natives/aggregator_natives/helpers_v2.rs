@@ -12,17 +12,16 @@ use move_vm_types::values::{Struct, StructRef, Value};
 const VALUE_FIELD_INDEX: usize = 0;
 const LIMIT_FIELD_INDEX: usize = 1;
 
-pub const EINVALID_AGGREGATOR_IDENTIFIER: u64 = 0x02_0008;
-
 /// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
 pub(crate) fn aggregator_value_as_u128(
     aggregator: &StructRef,
 ) -> PartialVMResult<(AggregatorID, u128)> {
     let (value, limit) = get_aggregator_fields_u128(aggregator)?;
     if value > u64::MAX as u128 {
-        return Err(PartialVMError::new(StatusCode::ABORTED)
-            .with_message("Aggregator identifier is too small".to_string())
-            .with_sub_status(EINVALID_AGGREGATOR_IDENTIFIER));
+        return Err(
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("Aggregator identifier is too small".to_string()),
+        );
     }
     Ok((AggregatorID::ephemeral(value as u64), limit))
 }

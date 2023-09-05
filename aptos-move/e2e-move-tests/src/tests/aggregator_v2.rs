@@ -47,6 +47,7 @@ fn test_string_snapshot_concat() {
     assert_success!(h.run(txn));
 }
 
+// TODO: This test is copied from aggregator v1 tests. Check to see what modifications are required.
 #[test]
 fn test_aggregators_e2e() {
     let (mut h, acc) = setup();
@@ -99,6 +100,7 @@ fn test_aggregators_e2e() {
     }
 }
 
+// TODO: This test is copied from aggregator v1 tests. Check to see what modifications are required.
 #[test]
 fn test_aggregator_lifetime() {
     let (mut h, acc) = setup();
