@@ -16,8 +16,6 @@ to synchronize configuration changes for the validators.
 -  [Function `enable_reconfiguration`](#0x1_reconfiguration_enable_reconfiguration)
 -  [Function `reconfiguration_enabled`](#0x1_reconfiguration_reconfiguration_enabled)
 -  [Function `reconfigure`](#0x1_reconfiguration_reconfigure)
--  [Function `reconfigure_a`](#0x1_reconfiguration_reconfigure_a)
--  [Function `reconfigure_b`](#0x1_reconfiguration_reconfigure_b)
 -  [Function `last_reconfiguration_time`](#0x1_reconfiguration_last_reconfiguration_time)
 -  [Function `current_epoch`](#0x1_reconfiguration_current_epoch)
 -  [Function `emit_genesis_reconfiguration_event`](#0x1_reconfiguration_emit_genesis_reconfiguration_event)
@@ -338,8 +336,10 @@ Signal validators to start using new configuration. Must be called from friend c
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfigure</a>() <b>acquires</b> <a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a> {
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>() started."));
     // Do not do anything <b>if</b> <a href="genesis.md#0x1_genesis">genesis</a> <b>has</b> not finished.
     <b>if</b> (<a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>() || <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() == 0 || !<a href="reconfiguration.md#0x1_reconfiguration_reconfiguration_enabled">reconfiguration_enabled</a>()) {
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>() returned: <a href="genesis.md#0x1_genesis">genesis</a> not finished."));
         <b>return</b>
     };
 
@@ -359,6 +359,7 @@ Signal validators to start using new configuration. Must be called from friend c
     // one <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> <a href="event.md#0x1_event">event</a>.
     //
     <b>if</b> (current_time == config_ref.last_reconfiguration_time) {
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>() returned: already emitted."));
         <b>return</b>
     };
 
@@ -395,81 +396,7 @@ Signal validators to start using new configuration. Must be called from friend c
             epoch: config_ref.epoch,
         },
     );
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_reconfiguration_reconfigure_a"></a>
-
-## Function `reconfigure_a`
-
-Calculate new valicator set and lock it.
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_a">reconfigure_a</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="stake.md#0x1_stake_ValidatorInfo">stake::ValidatorInfo</a>&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_a">reconfigure_a</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorInfo&gt; {
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="reconfiguration.md#0x1_reconfiguration_reconfigure_a">reconfiguration::reconfigure_a</a>() started."));
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
-        <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">transaction_fee::process_collected_fees</a>();
-    };
-    <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
-    <b>let</b> ret = <a href="stake.md#0x1_stake_get_active_validator_set">stake::get_active_validator_set</a>(); //<a href="dkg.md#0x1_dkg">dkg</a> todo: still need <b>to</b> lock the new validator set! Better have a read-only function <b>to</b> compute the new validator set, store it somewhere, then <b>apply</b> during <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_b">reconfigure_b</a>().
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="reconfiguration.md#0x1_reconfiguration_reconfigure_a">reconfiguration::reconfigure_a</a>() finished."));
-    ret
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_reconfiguration_reconfigure_b"></a>
-
-## Function `reconfigure_b`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_b">reconfigure_b</a>()
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_b">reconfigure_b</a>()<b>acquires</b> <a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a> {
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="reconfiguration.md#0x1_reconfiguration_reconfigure_b">reconfiguration::reconfigure_b</a>() started."));
-    <b>let</b> config_ref = <b>borrow_global_mut</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework);
-    <b>let</b> current_time = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>();
-
-    <a href="storage_gas.md#0x1_storage_gas_on_reconfig">storage_gas::on_reconfig</a>();
-
-    <b>assert</b>!(current_time &gt; config_ref.last_reconfiguration_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_EINVALID_BLOCK_TIME">EINVALID_BLOCK_TIME</a>));
-    config_ref.last_reconfiguration_time = current_time;
-    <b>spec</b> {
-        <b>assume</b> config_ref.epoch + 1 &lt;= MAX_U64;
-    };
-    config_ref.epoch = config_ref.epoch + 1;
-
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a>&gt;(
-        &<b>mut</b> config_ref.events,
-        <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {
-            epoch: config_ref.epoch,
-        },
-    );
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="reconfiguration.md#0x1_reconfiguration_reconfigure_b">reconfiguration::reconfigure_b</a>() finished."));
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>() returned: did a lot of real work."));
 }
 </code></pre>
 

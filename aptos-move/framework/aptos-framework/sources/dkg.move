@@ -68,7 +68,7 @@ module aptos_framework::dkg {
         if (target_epoch == dkg_state.target_epoch + 1 && dkg_state.state_id == 0) {
             dkg_state.target_epoch = target_epoch;
             dkg_state.state_id = 1;
-            dkg_state.countdown = 999999999; //TODO: for debugging
+            dkg_state.countdown = 999999999;
             event::emit_event<StartDKGEvent>(
                 &mut dkg_state.events,
                 StartDKGEvent {

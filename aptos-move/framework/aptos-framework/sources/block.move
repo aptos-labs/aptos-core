@@ -14,6 +14,7 @@ module aptos_framework::block {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
+    use aptos_framework::staking_config;
     use aptos_framework::state_storage;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -228,7 +229,8 @@ module aptos_framework::block {
             debug::print(&status);
             if (target_epoch == cur_epoch && status == dkg::state_inactive()) {
                 debug::print(&std::string::utf8(b"case 0."));
-                let validator_set_and_stake_dist = reconfiguration::reconfigure_a();
+                staking_config::lock();
+                let validator_set_and_stake_dist = stake::next_validator_set();
                 dkg::start(cur_epoch + 1, validator_set_and_stake_dist);
             } else if (target_epoch == cur_epoch + 1 && status == dkg::state_active()) {
                 debug::print(&std::string::utf8(b"case 1."));
@@ -239,7 +241,8 @@ module aptos_framework::block {
                 };
                 let proceed_to_new_epoch = dkg::on_potential_transcript(maybe_transcript);
                 if (proceed_to_new_epoch) {
-                    reconfiguration::reconfigure_b();
+                    staking_config::unlock();
+                    reconfiguration::reconfigure();
                 };
             } else {
                 debug::print(&utf8(b"case 2. This should not happen."));
