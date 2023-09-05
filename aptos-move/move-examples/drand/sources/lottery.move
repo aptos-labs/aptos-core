@@ -1,7 +1,7 @@
 /// An example of a decentralized lottery that picks its winner based on randomness generated in the future
 /// by the drand randomnes beacon.
 ///
-/// WARNING #1: This example has not been audited and should thus NOT be relied upon as an authoritative guide on
+/// **WARNING #1:** This example has not been audited and should thus NOT be relied upon as an authoritative guide on
 /// using `drand` randomness safely in Move.
 ///
 /// WARNING #2: This code makes a STRONG assumption that the Aptos clock and the drand clock are synchronized.
