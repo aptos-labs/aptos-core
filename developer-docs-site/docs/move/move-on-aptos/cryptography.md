@@ -18,7 +18,7 @@ Move, through the Aptos adapter, encompasses several fundamental cryptographic t
 Three fundamental principles guide the design and integration of the Aptos cryptographic extensions into Move:
 
 1. **Economic Gas Usage** – Striving to minimize gas costs for Move developers by implementing key primitives as [Move native functions](./move/book/functions#native-functions). For example, see the module for [BLS signatures over BLS12-381 elliptic curves](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move).
-2. **Type-Safe APIs** – Ensuring that APIs are resistant to common mistakes, type-safety enhances code reliability and promotes an efficient development process. For an example, see the [Ed25519 signature module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ed25519.move))
+2. **Type-Safe APIs** – Ensuring that APIs are resistant to common mistakes, type-safety enhances code reliability and promotes an efficient development process. For an example, see the [Ed25519 signature module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ed25519.move).
 3. **Empowerment of Developers** – In instances where native functions are unavailable, we empower developers to build their own cryptographic primitives on top of abstract cryptographic building blocks such as _finite fields_ and _Abelian groups_. Refer to the [`aptos_std::crypto_algebra`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/crypto_algebra.move) module for more insights.
 
 Continue reading to delve a bit deeper and uncover some of the intricacies behind these extensions, as well as the range of applications they empower. For the most comprehensive understanding of this subject, refer to the [cryptography Move modules code](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/framework/aptos-stdlib/sources/cryptography).
@@ -43,11 +43,11 @@ RIPEMD160 should be avoided as a collision-resistant function due to its 80-bit 
 
 Some of these functions can be used for interoperability with other chains (e.g., verifying Ethereum Merkle proofs via [`aptos_std::aptos_hash::keccak256`](https://github.com/aptos-labs/aptos-core/blob/137acee4c6dddb1c86398dce25b041d78a3028d3/aptos-move/framework/aptos-stdlib/sources/hash.move#L35)).
 Others, have lower gas costs, such as [`aptos_std::aptos_hash::blake2b_256`](https://github.com/aptos-labs/aptos-core/blob/137acee4c6dddb1c86398dce25b041d78a3028d3/aptos-move/framework/aptos-stdlib/sources/hash.move#L69).
-In general, a wider variety of hash functions give developers additional freedom in terms of both security and interoperability with other off-chain cryptographic system.
+In general, a wider variety of hash functions give developers additional freedom in terms of both security and interoperability with other off-chain cryptographic systems.
 
 ## Digital signature verification
 
-Developers can now use a *type-safe* API for verifying many types of digital signatures in Move:
+Developers can now use a *type-safe* API for verifying many kinds of digital signatures in Move:
 
 | Signature scheme                                                                                                                                          | Curve         | Sig. size (bytes) | PK size (bytes) | Malleability | Assumptions | Pros          | Cons                |
 |-----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------|-----------------|--------------|-------------|---------------|---------------------|
@@ -81,7 +81,7 @@ The right choice of a signature scheme in your dapp could depend on many factors
 4. **Security analysis**
    - It is essential to consider the underlying assumptions and potential vulnerabilities of a signature scheme.
      - Example: ECDSA's security is proven under strong assumptions such as the Generic Group Model (GGM).
-     - Malleability concerns: Some signature schemes are susceptible to malleability, where a valid signature, `$\sigma$`, can be mauled into a different yet still valid signature, `$\sigma'$`, for the same message, `$m$`.
+     - Malleability concerns: Some signature schemes are susceptible to malleability, where a valid signature, $\sigma$, can be mauled into a different yet still valid signature, $\sigma'$, for the same message $m$.
 5. **Versatility**
    - The adaptability and flexibility of signature schemes are important to consider so you may properly accommodate the cryptographic needs of your dapp.
      - Example: $t$-out-of-$n$ threshold BLS signatures are very simple to implement.
@@ -90,8 +90,8 @@ The right choice of a signature scheme in your dapp could depend on many factors
 Despite its careful, principled design[^ed25519], Ed25519 has known implementation subtleties. For example, different implementations could easily disagree on the validity of signatures, especially when batch verification is employed[^devalence]$^,$[^eddsa].
 :::
 
-:::tip [`aptos_std::bls12381`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move)
-This module for [MinPK BLS](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-05#name-variants) supports verification of individual signatures, **multi**-signatures, **aggregate** signatures and **threshold** signatures.
+:::tip 
+Our [`aptos_std::bls12381`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move) module for [MinPK BLS](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-05#name-variants) supports verification of individual signatures, **multi**-signatures, **aggregate** signatures and **threshold** signatures.
 :::
 
 ## Elliptic curve arithmetic
@@ -154,7 +154,7 @@ use std::option;
 use aptos_std::crypto_algebra::{eq, pairing, one, deserialize, hash_to};
 
 /// Example of a BLS signature verification function that works over any pairing-friendly
-/// group triple `Gr1`, `Gr2`, `GrT` where signatures are in `Gr1` and PKs in `Gr2.
+/// group triple `Gr1`, `Gr2`, `GrT` where signatures are in `Gr1` and PKs in `Gr2`.
 /// Points are serialized using the format in `FormatG1` and `FormatG2` and the hashing 
 /// method is `HashMethod`.
 /// 
