@@ -1818,6 +1818,20 @@ name = "aptos-global-constants"
 version = "0.1.0"
 
 [[package]]
+name = "aptos-graphs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-types",
+ "itertools",
+ "metis",
+ "namable_closures",
+ "nonmax",
+ "rand 0.7.3",
+ "thiserror",
+]
+
+[[package]]
 name = "aptos-id-generator"
 version = "0.1.0"
 
@@ -3434,6 +3448,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-streaming-partitioner"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-block-executor",
+ "aptos-block-partitioner",
+ "aptos-graphs",
+ "aptos-transaction-orderer",
+ "aptos-types",
+ "clap 4.3.21",
+ "itertools",
+ "namable_closures",
+ "nonmax",
+ "rand 0.7.3",
+ "rayon",
+ "smallvec",
+ "thiserror",
+]
+
+[[package]]
 name = "aptos-table-natives"
 version = "0.1.0"
 dependencies = [
@@ -3675,6 +3709,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-transaction-orderer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-block-executor",
+ "aptos-block-partitioner",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-types",
+ "bcs 0.1.4",
+ "clap 4.3.21",
+ "dashmap",
+ "itertools",
+ "move-core-types",
+ "once_cell",
+ "rand 0.7.3",
+ "rayon",
+]
+
+[[package]]
 name = "aptos-transactional-test-harness"
 version = "0.1.0"
 dependencies = [
@@ -3723,6 +3778,7 @@ dependencies = [
  "itertools",
  "move-core-types",
  "move-table-extension",
+ "namable_closures",
  "num-derive",
  "num-traits 0.2.15",
  "once_cell",
@@ -4666,6 +4722,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindgen"
+version = "0.66.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2b84e06fc203107bfbad243f4aba2af864eb7db3b1cf46ea0a023b0b433d2a7"
+dependencies = [
+ "bitflags 2.4.0",
+ "cexpr",
+ "clang-sys",
+ "lazy_static 1.4.0",
+ "lazycell",
+ "peeking_take_while",
+ "proc-macro2 1.0.64",
+ "quote 1.0.29",
+ "regex",
+ "rustc-hash",
+ "shlex",
+ "syn 2.0.25",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4694,9 +4770,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
-version = "2.0.2"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "487f1e0fcbe47deb8b0574e646def1c903389d95241dd1bbcc6ce4a715dfc0c1"
+checksum = "b4682ae6287fcf752ecaabbfcc7b6f9b72aa33933dc23a554d853aea8eea8635"
 
 [[package]]
 name = "bitmaps"
@@ -5963,7 +6039,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7a532c1f99a0f596f6960a60d1e119e91582b24b39e2d83a190e61262c3ef0c"
 dependencies = [
  "bigdecimal",
- "bitflags 2.0.2",
+ "bitflags 2.4.0",
  "byteorder",
  "chrono",
  "diesel_derives",
@@ -8354,7 +8430,7 @@ version = "0.11.0+8.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3386f101bcb4bd252d8e9d2fb41ec3b0862a15a62b478c355b2982efa469e3e"
 dependencies = [
- "bindgen",
+ "bindgen 0.65.1",
  "bzip2-sys",
  "cc",
  "glob",
@@ -8673,6 +8749,24 @@ dependencies = [
  "keccak",
  "rand_core 0.6.4",
  "zeroize",
+]
+
+[[package]]
+name = "metis"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62d65169fd55c134e5498444453fe968349421e7248e4d6547c6846e0082c397"
+dependencies = [
+ "metis-sys",
+]
+
+[[package]]
+name = "metis-sys"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc898b11f9da2e428afa54b5f092dac7edd3f87281084d789b9a9a15b6f81853"
+dependencies = [
+ "bindgen 0.66.1",
 ]
 
 [[package]]
@@ -9823,6 +9917,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "namable_closures"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3692f03a721113e0b493831f0ca52d589f694b1b6225ebef34a0edfa8561956f"
+
+[[package]]
 name = "named-lock"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9913,6 +10013,12 @@ dependencies = [
  "memchr",
  "minimal-lexical",
 ]
+
+[[package]]
+name = "nonmax"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99756f5493e135528f0cd660ac67b4c3a542bb65a3565efe92bb2c2317eb3669"
 
 [[package]]
 name = "normalize-line-endings"
