@@ -9,15 +9,14 @@ module aptos_framework::aggregator_v2 {
     /// The value of aggregator underflows (goes below zero). Raised by uncoditional sub() call
     const EAGGREGATOR_UNDERFLOW: u64 = 2;
 
-    /// Element type of the aggregator not supported. Raised by create_aggregator() call,
-    /// if Element type is not supported (currently u64 or u128).
-    const EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED: u64 = 3;
-
     /// The generic type supplied to the aggregator snapshot is not supported.
     const EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE: u64 = 5;
 
     /// The aggregator snapshots feature flag is not enabled.
     const EAGGREGATOR_SNAPSHOTS_NOT_ENABLED: u64 = 6;
+
+    /// The generic type supplied to the aggregator is not supported.
+    const EUNSUPPORTED_AGGREGATOR_TYPE: u64 = 7;
 
     /// Represents an integer which supports parallel additions and subtractions
     /// across multiple transactions. See the module description for more details.
