@@ -30,6 +30,7 @@
     -  [Function `empty`](#@Specification_1_empty)
     -  [Function `singleton`](#@Specification_1_singleton)
     -  [Function `destroy_empty`](#@Specification_1_destroy_empty)
+    -  [Function `destroy`](#@Specification_1_destroy)
     -  [Function `borrow`](#@Specification_1_borrow)
     -  [Function `borrow_mut`](#@Specification_1_borrow_mut)
     -  [Function `append`](#@Specification_1_append)
@@ -329,7 +330,10 @@ Disclaimer: This function is costly. Use it at your own discretion.
     <b>let</b> other_len = <a href="big_vector.md#0x1_big_vector_length">length</a>(&other);
     <b>let</b> half_other_len = other_len / 2;
     <b>let</b> i = 0;
-    <b>while</b> (i &lt; half_other_len) {
+    <b>while</b> ({<b>spec</b> {
+        <b>invariant</b> <b>true</b>;
+    };
+        (i &lt; half_other_len)}) {
         <a href="big_vector.md#0x1_big_vector_push_back">push_back</a>(lhs, <a href="big_vector.md#0x1_big_vector_swap_remove">swap_remove</a>(&<b>mut</b> other, i));
         i = i + 1;
     };
@@ -446,6 +450,8 @@ Disclaimer: This function is costly. Use it at your own discretion.
         <b>spec</b> {
             <b>invariant</b> cur_bucket_index &lt;= num_buckets;
             <b>invariant</b> <a href="table_with_length.md#0x1_table_with_length_spec_len">table_with_length::spec_len</a>(v.buckets) == num_buckets;
+            <b>invariant</b> cur_bucket_index &gt; 0;
+            // <b>assert</b> i != 0 ==&gt; (<a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, 0) == <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(<b>old</b>(v), 0));
         };
         (cur_bucket_index &lt; num_buckets)
     }) {
@@ -645,13 +651,39 @@ Disclaimer: This function is costly. Use it at your own discretion.
 <pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_index_of">index_of</a>&lt;T&gt;(v: &<a href="big_vector.md#0x1_big_vector_BigVector">BigVector</a>&lt;T&gt;, val: &T): (bool, u64) {
     <b>let</b> num_buckets = <a href="table_with_length.md#0x1_table_with_length_length">table_with_length::length</a>(&v.buckets);
     <b>let</b> bucket_index = 0;
-    <b>while</b> (bucket_index &lt; num_buckets) {
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> bucket_index &lt;= num_buckets;
+            <b>assert</b> v.end_index &gt;= (bucket_index - 1) * v.bucket_size;
+            <b>assert</b> v.end_index &lt;= num_buckets * v.bucket_size;
+            // <b>assert</b> <b>forall</b> j in 0..((bucket_index - 1) * v.bucket_size) : <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, j) != val;
+        };
+        (bucket_index &lt; num_buckets)
+    }) {
         <b>let</b> cur = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&v.buckets, bucket_index);
+        <b>spec</b>{
+            <b>assert</b> (bucket_index &lt; num_buckets - 1) ==&gt; <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(cur) == v.bucket_size;
+            <b>assert</b> (bucket_index == num_buckets - 1) ==&gt; <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(cur) &lt;= v.bucket_size;
+        };
         <b>let</b> (found, i) = <a href="../../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(cur, val);
         <b>if</b> (found) {
+            <b>spec</b>{
+                <b>assert</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(cur, i) == val;
+                <b>assert</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(cur, i) == <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, bucket_index * v.bucket_size + i);
+                <b>assert</b> <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, bucket_index * v.bucket_size + i) == val;
+            };
             <b>return</b> (<b>true</b>, bucket_index * v.bucket_size + i)
         };
+        <b>spec</b>{
+            <b>assert</b> <b>forall</b> j in 0..<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(cur): <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(cur, i) != val;
+            <b>assert</b> <b>forall</b> j in 0..<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(cur): <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, bucket_index * v.bucket_size + j) == <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(cur, j);
+        };
         bucket_index = bucket_index + 1;
+    };
+    <b>spec</b>{
+        <b>assert</b> bucket_index == num_buckets;
+        // <b>assert</b> v.end_index &lt;= v.bucket_size * num_buckets;
+        // <b>assert</b> <b>forall</b> i in 0..v.end_index: <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, i) != val;
     };
     (<b>false</b>, 0)
 }
@@ -886,6 +918,22 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 
 
+<a name="@Specification_1_destroy"></a>
+
+### Function `destroy`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_destroy">destroy</a>&lt;T: drop&gt;(v: <a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
 <a name="@Specification_1_borrow"></a>
 
 ### Function `borrow`
@@ -988,7 +1036,8 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 
 
-<pre><code><b>pragma</b> verify=<b>false</b>;
+<pre><code><b>aborts_if</b> i &gt;= <a href="big_vector.md#0x1_big_vector_length">length</a>(v);
+<b>ensures</b> result == <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(<b>old</b>(v), i);
 </code></pre>
 
 
@@ -1063,6 +1112,7 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 
 <pre><code><b>pragma</b> verify=<b>false</b>;
+<b>ensures</b> !(result_1 == <b>true</b>) || (<a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, result_2) == val);
 </code></pre>
 
 

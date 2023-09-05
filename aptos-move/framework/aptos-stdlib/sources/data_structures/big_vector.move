@@ -81,7 +81,10 @@ module aptos_std::big_vector {
         let other_len = length(&other);
         let half_other_len = other_len / 2;
         let i = 0;
-        while (i < half_other_len) {
+        while ({spec {
+            invariant true;
+        };
+            (i < half_other_len)}) {
             push_back(lhs, swap_remove(&mut other, i));
             i = i + 1;
         };
@@ -138,6 +141,8 @@ module aptos_std::big_vector {
             spec {
                 invariant cur_bucket_index <= num_buckets;
                 invariant table_with_length::spec_len(v.buckets) == num_buckets;
+                invariant cur_bucket_index > 0;
+                // assert i != 0 ==> (spec_at(v, 0) == spec_at(old(v), 0));
             };
             (cur_bucket_index < num_buckets)
         }) {
@@ -257,13 +262,25 @@ module aptos_std::big_vector {
     public fun index_of<T>(v: &BigVector<T>, val: &T): (bool, u64) {
         let num_buckets = table_with_length::length(&v.buckets);
         let bucket_index = 0;
-        while (bucket_index < num_buckets) {
+        while ({
+            spec {
+                invariant bucket_index <= num_buckets;
+            };
+            (bucket_index < num_buckets)
+        }) {
             let cur = table_with_length::borrow(&v.buckets, bucket_index);
             let (found, i) = vector::index_of(cur, val);
             if (found) {
+                spec{
+                    assert vector::borrow(cur, i) == val;
+                    assert spec_at(v, bucket_index * v.bucket_size + i) == val;
+                };
                 return (true, bucket_index * v.bucket_size + i)
             };
             bucket_index = bucket_index + 1;
+        };
+        spec{
+            assert bucket_index == num_buckets;
         };
         (false, 0)
     }
