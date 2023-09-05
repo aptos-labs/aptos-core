@@ -81,10 +81,7 @@ module aptos_std::big_vector {
         let other_len = length(&other);
         let half_other_len = other_len / 2;
         let i = 0;
-        while ({spec {
-            invariant true;
-        };
-            (i < half_other_len)}) {
+        while (i < half_other_len) {
             push_back(lhs, swap_remove(&mut other, i));
             i = i + 1;
         };
