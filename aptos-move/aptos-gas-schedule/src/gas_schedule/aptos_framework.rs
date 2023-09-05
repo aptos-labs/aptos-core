@@ -206,6 +206,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [aggregator_v2_read_snapshot_base: InternalGas, {11.. => "aggregator_v2.read_snapshot.base"}, 6000],
         [aggregator_v2_string_concat_base: InternalGas, {11.. => "aggregator_v2.string_concat.base"}, 6000],
 
+        [aggregator_v2_create_aggregator_base: InternalGas, {12.. => "aggregator_v2.create_aggregator.base"}, 10000],
+        [aggregator_v2_try_add_base: InternalGas, {12.. => "aggregator_v2.try_add.base"}, 6000],
+        [aggregator_v2_read_base: InternalGas, {12.. => "aggregator_v2.read.base"}, 6000],
+        [aggregator_v2_try_sub_base: InternalGas, {12.. => "aggregator_v2.try_sub.base"}, 6000],
+
         [object_exists_at_base: InternalGas, { 7.. => "object.exists_at.base" }, 5000],
         // These are dummy value, they copied from storage gas in aptos-core/aptos-vm/src/aptos_vm_impl.rs
         [object_exists_at_per_byte_loaded: InternalGasPerByte, { 7.. => "object.exists_at.per_byte_loaded" }, 1000],
