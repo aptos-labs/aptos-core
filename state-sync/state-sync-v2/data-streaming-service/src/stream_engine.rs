@@ -8,21 +8,26 @@ use crate::{
         DataClientRequest::{
             EpochEndingLedgerInfos, NewTransactionOutputsWithProof,
             NewTransactionsOrOutputsWithProof, NewTransactionsWithProof, NumberOfStates,
-            StateValuesWithProof, TransactionOutputsWithProof, TransactionsOrOutputsWithProof,
-            TransactionsWithProof,
+            StateValuesWithProof, SubscribeTransactionOutputsWithProof,
+            SubscribeTransactionsOrOutputsWithProof, SubscribeTransactionsWithProof,
+            TransactionOutputsWithProof, TransactionsOrOutputsWithProof, TransactionsWithProof,
         },
         DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
         NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
         NewTransactionsWithProofRequest, NumberOfStatesRequest, StateValuesWithProofRequest,
+        SubscribeTransactionOutputsWithProofRequest,
+        SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
         TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
         TransactionsWithProofRequest,
     },
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
+    metrics,
     streaming_client::{
         Epoch, GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, StreamRequest,
     },
 };
+use aptos_config::config::DataStreamingServiceConfig;
 use aptos_data_client::{
     global_summary::{AdvertisedData, GlobalDataSummary},
     interface::ResponsePayload,
@@ -69,6 +74,7 @@ pub trait DataStreamEngine {
         &mut self,
         max_number_of_requests: u64,
         global_data_summary: &GlobalDataSummary,
+        unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error>;
 
     /// Returns true iff all remaining data required to satisfy the stream is
@@ -78,17 +84,20 @@ pub trait DataStreamEngine {
     /// Returns true iff the stream has sent all data to the stream listener.
     fn is_stream_complete(&self) -> bool;
 
-    /// Notifies the data stream engine that a timeout was encountered when
-    /// trying to send the optimistic fetch request.
+    /// Notifies the data stream engine that an error was encountered when
+    /// trying to send an optimistic fetch or subscription request.
     ///
-    /// Note: Most engines shouldn't process these notifications, so a default
-    /// implementation that returns an error is provided. If an optimistic fetch
-    /// request does exist, there should only ever be a single request in-flight.
-    fn notify_optimistic_fetch_timeout(
+    /// Note: Most engines shouldn't process these notifications, so a
+    /// default implementation that returns an error is provided.
+    fn notify_new_data_request_error(
         &mut self,
         client_request: &DataClientRequest,
+        request_error: aptos_data_client::error::Error,
     ) -> Result<(), Error> {
-        Err(Error::UnexpectedErrorEncountered(format!("Received an optimistic fetch request timeout but no request was sent! Reported request: {:?}", client_request)))
+        Err(Error::UnexpectedErrorEncountered(format!(
+            "Received a new data request error notification but no request was sent! Reported error: {:?}, request: {:?}",
+            request_error, client_request
+        )))
     }
 
     /// Transforms a given data client response (for the previously sent
@@ -117,19 +126,20 @@ pub enum StreamEngine {
 
 impl StreamEngine {
     pub fn new(
+        data_stream_config: DataStreamingServiceConfig,
         stream_request: &StreamRequest,
         advertised_data: &AdvertisedData,
     ) -> Result<Self, Error> {
         match stream_request {
-            StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
-                Ok(ContinuousTransactionStreamEngine::new(stream_request)?.into())
-            },
-            StreamRequest::ContinuouslyStreamTransactions(_) => {
-                Ok(ContinuousTransactionStreamEngine::new(stream_request)?.into())
-            },
-            StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => {
-                Ok(ContinuousTransactionStreamEngine::new(stream_request)?.into())
-            },
+            StreamRequest::ContinuouslyStreamTransactionOutputs(_) => Ok(
+                ContinuousTransactionStreamEngine::new(data_stream_config, stream_request)?.into(),
+            ),
+            StreamRequest::ContinuouslyStreamTransactions(_) => Ok(
+                ContinuousTransactionStreamEngine::new(data_stream_config, stream_request)?.into(),
+            ),
+            StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => Ok(
+                ContinuousTransactionStreamEngine::new(data_stream_config, stream_request)?.into(),
+            ),
             StreamRequest::GetAllStates(request) => Ok(StateStreamEngine::new(request)?.into()),
             StreamRequest::GetAllEpochEndingLedgerInfos(request) => {
                 Ok(EpochEndingStreamEngine::new(request, advertised_data)?.into())
@@ -216,6 +226,7 @@ impl DataStreamEngine for StateStreamEngine {
         &mut self,
         max_number_of_requests: u64,
         global_data_summary: &GlobalDataSummary,
+        _unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error> {
         if self.number_of_states.is_none() && self.state_num_requested {
             return Ok(vec![]); // Wait for the number of states to be returned
@@ -227,7 +238,7 @@ impl DataStreamEngine for StateStreamEngine {
                 .ok_or_else(|| Error::IntegerOverflow("End state index has overflown!".into()))?;
 
             // Create the client requests
-            let client_requests = create_data_client_requests(
+            let client_requests = create_data_client_request_batch(
                 self.next_request_index,
                 end_state_index,
                 max_number_of_requests,
@@ -337,6 +348,9 @@ impl DataStreamEngine for StateStreamEngine {
 
 #[derive(Clone, Debug)]
 pub struct ContinuousTransactionStreamEngine {
+    // The data streaming service config
+    pub data_streaming_config: DataStreamingServiceConfig,
+
     // The original stream request made by the client (i.e., a continuous
     // transaction or transaction output stream request).
     pub request: StreamRequest,
@@ -349,6 +363,9 @@ pub struct ContinuousTransactionStreamEngine {
 
     // True iff a request has been created to optimistically fetch data
     pub optimistic_fetch_requested: bool,
+
+    // The active subscription stream (if it exists)
+    active_subscription_stream: Option<SubscriptionStream>,
 
     // The next version and epoch that we're waiting to send to the
     // client along the stream. All versions before this have been sent.
@@ -364,7 +381,10 @@ pub struct ContinuousTransactionStreamEngine {
 }
 
 impl ContinuousTransactionStreamEngine {
-    fn new(stream_request: &StreamRequest) -> Result<Self, Error> {
+    fn new(
+        data_streaming_config: DataStreamingServiceConfig,
+        stream_request: &StreamRequest,
+    ) -> Result<Self, Error> {
         let (next_version, next_epoch) = match stream_request {
             StreamRequest::ContinuouslyStreamTransactions(request) => {
                 Self::calculate_next_version_and_epoch(request.known_version, request.known_epoch)?
@@ -379,10 +399,12 @@ impl ContinuousTransactionStreamEngine {
         };
 
         Ok(ContinuousTransactionStreamEngine {
+            data_streaming_config,
             request: stream_request.clone(),
             current_target_ledger_info: None,
             end_of_epoch_requested: false,
             optimistic_fetch_requested: false,
+            active_subscription_stream: None,
             next_stream_version_and_epoch: (next_version, next_epoch),
             next_request_version_and_epoch: (next_version, next_epoch),
             stream_is_complete: false,
@@ -465,49 +487,22 @@ impl ContinuousTransactionStreamEngine {
         Ok(data_notification)
     }
 
-    fn create_notification_for_optimistic_fetch_data(
+    /// Creates a data notification for new transaction data
+    /// starting at the specified first version.
+    fn create_notification_for_new_data(
         &mut self,
-        known_version: Version,
+        first_version: u64,
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<DataNotification, Error> {
-        // Calculate the first version
-        let first_version = known_version
-            .checked_add(1)
-            .ok_or_else(|| Error::IntegerOverflow("First version has overflown!".into()))?;
-        let (num_versions, target_ledger_info) = match &client_response_payload {
-            ResponsePayload::NewTransactionsWithProof((
-                transactions_with_proof,
-                target_ledger_info,
-            )) => (
-                transactions_with_proof.transactions.len(),
-                target_ledger_info.clone(),
-            ),
-            ResponsePayload::NewTransactionOutputsWithProof((
-                outputs_with_proof,
-                target_ledger_info,
-            )) => (
-                outputs_with_proof.transactions_and_outputs.len(),
-                target_ledger_info.clone(),
-            ),
-            response_payload => {
-                // TODO(joshlind): eventually we want to notify the data client of the bad response
-                return Err(Error::AptosDataClientResponseIsInvalid(format!(
-                    "Expected new transactions or outputs but got: {:?}",
-                    response_payload
-                )));
-            },
-        };
+        // Calculate the number of data items and target ledger info
+        let (num_versions, target_ledger_info) =
+            extract_new_versions_and_target(&client_response_payload)?;
 
-        // Calculate the last version
-        if num_versions == 0 {
-            // TODO(joshlind): eventually we want to notify the data client of the bad response
-            return Err(Error::AptosDataClientResponseIsInvalid(
-                "Received an empty transaction or output list!".into(),
-            ));
-        }
-        let last_version = known_version
+        // Calculate the last version (last_version = first_version + num_versions - 1)
+        let last_version = first_version
             .checked_add(num_versions as u64)
+            .and_then(|v| v.checked_sub(1))
             .ok_or_else(|| Error::IntegerOverflow("Last version has overflown!".into()))?;
 
         // Update the request and stream versions
@@ -521,15 +516,61 @@ impl ContinuousTransactionStreamEngine {
             Some(target_ledger_info.clone()),
             self.clone().into(),
         )?;
+
         Ok(data_notification)
     }
 
-    fn create_optimistic_fetch_request(&mut self) -> Result<DataClientRequest, Error> {
-        let (next_request_version, known_epoch) = self.next_request_version_and_epoch;
-        let known_version = next_request_version
-            .checked_sub(1)
-            .ok_or_else(|| Error::IntegerOverflow("Last version has overflown!".into()))?;
+    fn create_notification_for_optimistic_fetch_data(
+        &mut self,
+        known_version: Version,
+        client_response_payload: ResponsePayload,
+        notification_id_generator: Arc<U64IdGenerator>,
+    ) -> Result<DataNotification, Error> {
+        // Calculate the first version
+        let first_version = known_version
+            .checked_add(1)
+            .ok_or_else(|| Error::IntegerOverflow("First version has overflown!".into()))?;
 
+        // Create the data notification
+        self.create_notification_for_new_data(
+            first_version,
+            client_response_payload,
+            notification_id_generator,
+        )
+    }
+
+    /// Creates a notification for subscription data by
+    /// transforming the given client response payload.
+    fn create_notification_for_subscription_data(
+        &mut self,
+        subscription_stream_index: u64,
+        client_response_payload: ResponsePayload,
+        notification_id_generator: Arc<U64IdGenerator>,
+    ) -> Result<DataNotification, Error> {
+        // If there's an active subscription and this is the
+        // last expected response then terminate the stream.
+        if let Some(active_subscription_stream) = &self.active_subscription_stream {
+            if subscription_stream_index
+                >= active_subscription_stream.get_max_subscription_stream_index()
+            {
+                self.active_subscription_stream = None;
+            }
+        }
+
+        // Get the first version
+        let (first_version, _) = self.next_request_version_and_epoch;
+
+        // Create the data notification
+        self.create_notification_for_new_data(
+            first_version,
+            client_response_payload,
+            notification_id_generator,
+        )
+    }
+
+    /// Creates an optimistic fetch request for the current stream state
+    fn create_optimistic_fetch_request(&mut self) -> Result<DataClientRequest, Error> {
+        let (known_version, known_epoch) = self.get_known_version_and_epoch()?;
         let data_client_request = match &self.request {
             StreamRequest::ContinuouslyStreamTransactions(request) => {
                 NewTransactionsWithProof(NewTransactionsWithProofRequest {
@@ -553,7 +594,99 @@ impl ContinuousTransactionStreamEngine {
             },
             request => invalid_stream_request!(request),
         };
+
         Ok(data_client_request)
+    }
+
+    /// Creates a new set of subscription stream requests to extend
+    /// the currently active subscription stream. The number of requests
+    /// created will be bound by the specified `max_number_of_requests`.
+    ///
+    /// Note: if the stream has already send out the maximum number of
+    /// requests then no new requests will be created and the stream
+    /// will be marked for termination.
+    fn create_subscription_stream_requests(
+        &mut self,
+        max_number_of_requests: u64,
+    ) -> Result<Vec<DataClientRequest>, Error> {
+        // Get the active subscription stream
+        let mut active_subscription_stream = match self.active_subscription_stream.take() {
+            Some(active_subscription_stream) => active_subscription_stream,
+            None => {
+                // We don't have an active subscription stream!
+                return Err(Error::UnexpectedErrorEncountered(
+                    "No active subscription stream found! Unable to create requests!".into(),
+                ));
+            },
+        };
+
+        // Get the highest known version and epoch at stream start
+        let (known_version, known_epoch) =
+            active_subscription_stream.get_known_version_and_epoch_at_stream_start();
+
+        // Create the subscription stream requests
+        let mut subscription_stream_requests = vec![];
+        for _ in 0..max_number_of_requests {
+            // Get the current subscription stream ID and index
+            let subscription_stream_id = active_subscription_stream.get_subscription_stream_id();
+            let subscription_stream_index =
+                active_subscription_stream.get_next_subscription_stream_index();
+
+            // If the stream has reached the maximum number of requests
+            // then don't send any more requests.
+            if subscription_stream_index
+                > active_subscription_stream.get_max_subscription_stream_index()
+            {
+                break;
+            }
+
+            // Create the request based on the stream type
+            let data_client_request = match &self.request {
+                StreamRequest::ContinuouslyStreamTransactions(request) => {
+                    SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest {
+                        known_version,
+                        known_epoch,
+                        include_events: request.include_events,
+                        subscription_stream_id,
+                        subscription_stream_index,
+                    })
+                },
+                StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
+                    SubscribeTransactionOutputsWithProof(
+                        SubscribeTransactionOutputsWithProofRequest {
+                            known_version,
+                            known_epoch,
+                            subscription_stream_id,
+                            subscription_stream_index,
+                        },
+                    )
+                },
+                StreamRequest::ContinuouslyStreamTransactionsOrOutputs(request) => {
+                    SubscribeTransactionsOrOutputsWithProof(
+                        SubscribeTransactionsOrOutputsWithProofRequest {
+                            known_version,
+                            known_epoch,
+                            include_events: request.include_events,
+                            subscription_stream_id,
+                            subscription_stream_index,
+                        },
+                    )
+                },
+                request => invalid_stream_request!(request),
+            };
+
+            // Update the next subscription stream index
+            active_subscription_stream.increment_subscription_stream_index();
+
+            // Add the request to the active list
+            subscription_stream_requests.push(data_client_request);
+        }
+
+        // Update the active subscription stream state
+        self.active_subscription_stream = Some(active_subscription_stream);
+
+        // Return the subscription stream requests
+        Ok(subscription_stream_requests)
     }
 
     fn handle_epoch_ending_response(
@@ -592,6 +725,180 @@ impl ContinuousTransactionStreamEngine {
                 response_payload
             )))
         }
+    }
+
+    /// Returns the known version and epoch for the stream
+    fn get_known_version_and_epoch(&mut self) -> Result<(u64, Epoch), Error> {
+        let (next_request_version, known_epoch) = self.next_request_version_and_epoch;
+        let known_version = next_request_version
+            .checked_sub(1)
+            .ok_or_else(|| Error::IntegerOverflow("Last version has overflown!".into()))?;
+
+        Ok((known_version, known_epoch))
+    }
+
+    /// Handles an optimistic fetch timeout for the specified client request
+    fn handle_optimistic_fetch_error(
+        &mut self,
+        client_request: &DataClientRequest,
+        request_error: aptos_data_client::error::Error,
+    ) -> Result<(), Error> {
+        // We should only receive an error notification if we sent an optimistic fetch request
+        if !self.optimistic_fetch_requested {
+            return Err(Error::UnexpectedErrorEncountered(format!(
+                "Received an optimistic fetch notification error but no request is in-flight! Error: {:?}, request: {:?}",
+                request_error, client_request
+            )));
+        }
+
+        // Reset the optimistic fetch request
+        self.optimistic_fetch_requested = false;
+
+        // Log the error based on the request type
+        if matches!(
+            self.request,
+            StreamRequest::ContinuouslyStreamTransactions(_)
+        ) && matches!(
+            client_request,
+            DataClientRequest::NewTransactionsWithProof(_)
+        ) {
+            info!(
+                (LogSchema::new(LogEntry::RequestError).message(&format!(
+                    "Optimistic fetch error for new transactions: {:?}",
+                    request_error
+                )))
+            );
+        } else if matches!(
+            self.request,
+            StreamRequest::ContinuouslyStreamTransactionOutputs(_)
+        ) && matches!(
+            client_request,
+            DataClientRequest::NewTransactionOutputsWithProof(_)
+        ) {
+            info!(
+                (LogSchema::new(LogEntry::RequestError).message(&format!(
+                    "Optimistic fetch error for new transaction outputs: {:?}",
+                    request_error
+                )))
+            );
+        } else if matches!(
+            self.request,
+            StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_)
+        ) && matches!(
+            client_request,
+            DataClientRequest::NewTransactionsOrOutputsWithProof(_)
+        ) {
+            info!(
+                (LogSchema::new(LogEntry::RequestError).message(&format!(
+                    "Optimistic fetch error for new transactions or outputs: {:?}",
+                    request_error
+                )))
+            );
+        } else {
+            return Err(Error::UnexpectedErrorEncountered(format!(
+                "Received an optimistic fetch error but the request did not match the expected type for the stream! \
+                Error: {:?}, request: {:?}, stream: {:?}", request_error, client_request, self.request
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Handles a subscription error for the specified client request
+    fn handle_subscription_error(
+        &mut self,
+        client_request: &DataClientRequest,
+        request_error: aptos_data_client::error::Error,
+    ) -> Result<(), Error> {
+        // We should only receive an error notification if we have an active stream
+        if self.active_subscription_stream.is_none() {
+            return Err(Error::UnexpectedErrorEncountered(format!(
+                "Received a subscription notification error but no active subscription stream exists! Error: {:?}, request: {:?}",
+                request_error, client_request
+            )));
+        }
+
+        // Reset the active subscription stream
+        self.active_subscription_stream = None;
+
+        // Log the error based on the request type
+        if matches!(
+            self.request,
+            StreamRequest::ContinuouslyStreamTransactions(_)
+        ) && matches!(
+            client_request,
+            DataClientRequest::SubscribeTransactionsWithProof(_)
+        ) {
+            info!(
+                (LogSchema::new(LogEntry::RequestError).message(&format!(
+                    "Subscription error for new transactions: {:?}",
+                    request_error
+                )))
+            );
+        } else if matches!(
+            self.request,
+            StreamRequest::ContinuouslyStreamTransactionOutputs(_)
+        ) && matches!(
+            client_request,
+            DataClientRequest::SubscribeTransactionOutputsWithProof(_)
+        ) {
+            info!(
+                (LogSchema::new(LogEntry::RequestError).message(&format!(
+                    "Subscription error for new transaction outputs: {:?}",
+                    request_error
+                )))
+            );
+        } else if matches!(
+            self.request,
+            StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_)
+        ) && matches!(
+            client_request,
+            DataClientRequest::SubscribeTransactionsOrOutputsWithProof(_)
+        ) {
+            info!(
+                (LogSchema::new(LogEntry::RequestError).message(&format!(
+                    "Subscription error for new transactions or outputs: {:?}",
+                    request_error
+                )))
+            );
+        } else {
+            return Err(Error::UnexpectedErrorEncountered(format!(
+                "Received a subscription request error but the request did not match the expected type for the stream! \
+                Error: {:?}, request: {:?}, stream: {:?}", request_error, client_request, self.request
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Starts a new active subscription stream
+    fn start_active_subscription_stream(
+        &mut self,
+        unique_id_generator: Arc<U64IdGenerator>,
+    ) -> Result<(), Error> {
+        // Verify that we don't already have an active subscription stream
+        if self.active_subscription_stream.is_some() {
+            return Err(Error::UnexpectedErrorEncountered(
+                "Unable to start a new subscription stream when one is already active!".into(),
+            ));
+        }
+
+        // Get the highest known version and epoch
+        let (known_version, known_epoch) = self.get_known_version_and_epoch()?;
+
+        // Create and save a new subscription stream
+        let subscription_stream = SubscriptionStream::new(
+            self.data_streaming_config,
+            unique_id_generator,
+            known_version,
+            known_epoch,
+        );
+        self.active_subscription_stream = Some(subscription_stream);
+
+        // Update the metrics counter
+        metrics::CREATE_SUBSCRIPTION_STREAM.inc();
+
+        Ok(())
     }
 
     fn update_stream_version_and_epoch(
@@ -736,9 +1043,15 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         &mut self,
         max_number_of_requests: u64,
         global_data_summary: &GlobalDataSummary,
+        unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error> {
         if self.end_of_epoch_requested || self.optimistic_fetch_requested {
             return Ok(vec![]); // We are waiting for a blocking response type
+        }
+
+        // If there's an active subscription stream we should utilize it
+        if self.active_subscription_stream.is_some() {
+            return self.create_subscription_stream_requests(max_number_of_requests);
         }
 
         // If we don't have a syncing target, try to select one
@@ -807,7 +1120,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                 },
                 request => invalid_stream_request!(request),
             };
-            let client_requests = create_data_client_requests(
+            let client_requests = create_data_client_request_batch(
                 next_request_version,
                 target_ledger_info.ledger_info().version(),
                 max_number_of_requests,
@@ -817,10 +1130,18 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             self.update_request_tracking(&client_requests, &target_ledger_info)?;
             client_requests
         } else {
-            // We don't have a target, send a single optimistic fetch request
-            let optimistic_fetch_request = self.create_optimistic_fetch_request()?;
-            self.optimistic_fetch_requested = true;
-            vec![optimistic_fetch_request]
+            // We don't have a target. We should either send an optimistic
+            // fetch request or start a new subscription stream.
+            if self.data_streaming_config.enable_subscription_streaming {
+                // Start a new subscription stream and send the first set of requests
+                self.start_active_subscription_stream(unique_id_generator)?;
+                self.create_subscription_stream_requests(max_number_of_requests)?
+            } else {
+                // Send a single optimistic fetch request
+                let optimistic_fetch_request = self.create_optimistic_fetch_request()?;
+                self.optimistic_fetch_requested = true;
+                vec![optimistic_fetch_request]
+            }
         };
 
         Ok(client_requests)
@@ -851,58 +1172,18 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         self.stream_is_complete
     }
 
-    fn notify_optimistic_fetch_timeout(
+    fn notify_new_data_request_error(
         &mut self,
         client_request: &DataClientRequest,
+        request_error: aptos_data_client::error::Error,
     ) -> Result<(), Error> {
-        if !self.optimistic_fetch_requested {
-            return Err(Error::UnexpectedErrorEncountered(format!(
-                "Received an optimistic fetch timeout but no request is in-flight! Request: {:?}",
-                client_request
-            )));
-        }
-
-        // Reset the optimistic fetch request and handle the timeout
-        self.optimistic_fetch_requested = false;
-        if matches!(
-            self.request,
-            StreamRequest::ContinuouslyStreamTransactions(_)
-        ) && matches!(
-            client_request,
-            DataClientRequest::NewTransactionsWithProof(_)
-        ) {
-            info!(
-                (LogSchema::new(LogEntry::RequestTimeout)
-                    .message("Optimistic fetch request for new transactions timed out!"))
-            );
-        } else if matches!(
-            self.request,
-            StreamRequest::ContinuouslyStreamTransactionOutputs(_)
-        ) && matches!(
-            client_request,
-            DataClientRequest::NewTransactionOutputsWithProof(_)
-        ) {
-            info!(
-                (LogSchema::new(LogEntry::RequestTimeout)
-                    .message("Optimistic fetch request for new transaction outputs timed out!"))
-            );
-        } else if matches!(
-            self.request,
-            StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_)
-        ) && matches!(
-            client_request,
-            DataClientRequest::NewTransactionsOrOutputsWithProof(_)
-        ) {
-            info!(
-                (LogSchema::new(LogEntry::RequestTimeout).message(
-                    "Optimistic fetch request for new transactions or outputs timed out!"
-                ))
-            );
+        // If subscription streaming is enabled, the timeout should be for
+        // subscription data. Otherwise, it should be for optimistic fetch data.
+        if self.data_streaming_config.enable_subscription_streaming {
+            self.handle_subscription_error(client_request, request_error)
         } else {
-            return Err(Error::UnexpectedErrorEncountered(format!("Received an optimistic fetch request timeout but the request did not match the expected type for the stream! Request: {:?}, Stream: {:?}", client_request, self.request)));
+            self.handle_optimistic_fetch_error(client_request, request_error)
         }
-
-        Ok(())
     }
 
     fn transform_client_response_into_notification(
@@ -911,7 +1192,8 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
-        // We reset the pending requests to prevent malicious responses from blocking the streams
+        // Reset the pending requests to prevent malicious
+        // responses from blocking the streams.
         if self.end_of_epoch_requested {
             self.end_of_epoch_requested = false;
         } else if self.optimistic_fetch_requested {
@@ -950,6 +1232,39 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                 StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => {
                     let data_notification = self.create_notification_for_optimistic_fetch_data(
                         request.known_version,
+                        client_response_payload,
+                        notification_id_generator,
+                    )?;
+                    Ok(Some(data_notification))
+                },
+                request => invalid_stream_request!(request),
+            },
+            SubscribeTransactionOutputsWithProof(request) => match &self.request {
+                StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
+                    let data_notification = self.create_notification_for_subscription_data(
+                        request.subscription_stream_index,
+                        client_response_payload,
+                        notification_id_generator,
+                    )?;
+                    Ok(Some(data_notification))
+                },
+                request => invalid_stream_request!(request),
+            },
+            SubscribeTransactionsOrOutputsWithProof(request) => match &self.request {
+                StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => {
+                    let data_notification = self.create_notification_for_subscription_data(
+                        request.subscription_stream_index,
+                        client_response_payload,
+                        notification_id_generator,
+                    )?;
+                    Ok(Some(data_notification))
+                },
+                request => invalid_stream_request!(request),
+            },
+            SubscribeTransactionsWithProof(request) => match &self.request {
+                StreamRequest::ContinuouslyStreamTransactions(_) => {
+                    let data_notification = self.create_notification_for_subscription_data(
+                        request.subscription_stream_index,
                         client_response_payload,
                         notification_id_generator,
                     )?;
@@ -1081,9 +1396,10 @@ impl DataStreamEngine for EpochEndingStreamEngine {
         &mut self,
         max_number_of_requests: u64,
         global_data_summary: &GlobalDataSummary,
+        _unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error> {
         // Create the client requests
-        let client_requests = create_data_client_requests(
+        let client_requests = create_data_client_request_batch(
             self.next_request_epoch,
             self.end_epoch,
             max_number_of_requests,
@@ -1269,6 +1585,7 @@ impl DataStreamEngine for TransactionStreamEngine {
         &mut self,
         max_number_of_requests: u64,
         global_data_summary: &GlobalDataSummary,
+        _unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error> {
         let (request_end_version, optimal_chunk_sizes) = match &self.request {
             StreamRequest::GetAllTransactions(request) => (
@@ -1293,7 +1610,7 @@ impl DataStreamEngine for TransactionStreamEngine {
         };
 
         // Create the client requests
-        let client_requests = create_data_client_requests(
+        let client_requests = create_data_client_request_batch(
             self.next_request_version,
             request_end_version,
             max_number_of_requests,
@@ -1383,6 +1700,78 @@ impl DataStreamEngine for TransactionStreamEngine {
     }
 }
 
+/// A simple struct that tracks the state of a subscription stream.
+#[derive(Clone, Debug)]
+struct SubscriptionStream {
+    known_version_at_stream_start: u64, // The highest known transaction version at stream start
+    known_epoch_at_stream_start: u64,   // The highest known epoch at stream start
+    subscription_stream_id: u64,        // The unique id of the subscription stream
+
+    next_subscription_stream_index: u64, // The next request index to send for the stream
+    max_subscription_stream_index: u64,  // The maximum request index to send for the stream
+}
+
+impl SubscriptionStream {
+    pub fn new(
+        data_streaming_config: DataStreamingServiceConfig,
+        unique_id_generator: Arc<U64IdGenerator>,
+        known_version_at_stream_start: u64,
+        known_epoch_at_stream_start: u64,
+    ) -> Self {
+        // Generate a new subscription stream ID
+        let subscription_stream_id = unique_id_generator.next();
+
+        // Log the creation of the subscription stream
+        debug!(
+            (LogSchema::new(LogEntry::CreatedSubscriptionStream).message(&format!(
+                "Created new subscription stream. Stream ID: {:?}",
+                subscription_stream_id
+            )))
+        );
+
+        // Calculate the maximum subscription stream index
+        let max_subscription_stream_index = data_streaming_config
+            .max_num_consecutive_subscriptions
+            .saturating_sub(1);
+
+        Self {
+            known_version_at_stream_start,
+            known_epoch_at_stream_start,
+            subscription_stream_id,
+            next_subscription_stream_index: 0,
+            max_subscription_stream_index,
+        }
+    }
+
+    /// Returns the known version and epoch at stream start
+    pub fn get_known_version_and_epoch_at_stream_start(&self) -> (u64, u64) {
+        (
+            self.known_version_at_stream_start,
+            self.known_epoch_at_stream_start,
+        )
+    }
+
+    /// Returns the maximum subscription stream index
+    pub fn get_max_subscription_stream_index(&self) -> u64 {
+        self.max_subscription_stream_index
+    }
+
+    /// Returns the next subscription stream index
+    pub fn get_next_subscription_stream_index(&self) -> u64 {
+        self.next_subscription_stream_index
+    }
+
+    /// Returns the subscription stream ID
+    pub fn get_subscription_stream_id(&self) -> u64 {
+        self.subscription_stream_id
+    }
+
+    /// Increments the next subscription stream index
+    pub fn increment_subscription_stream_index(&mut self) {
+        self.next_subscription_stream_index += 1;
+    }
+}
+
 /// Verifies that the `expected_next_index` matches the `start_index` and that
 /// the `end_index` is greater than or equal to `expected_next_index`.
 fn verify_client_request_indices(
@@ -1408,7 +1797,7 @@ fn verify_client_request_indices(
 }
 
 /// Creates a batch of data client requests for the given stream engine
-fn create_data_client_requests(
+fn create_data_client_request_batch(
     start_index: u64,
     end_index: u64,
     max_number_of_requests: u64,
@@ -1623,4 +2012,45 @@ fn create_data_notification(
         notification_id,
         data_payload,
     })
+}
+
+/// Extracts the number of new versions and target
+/// ledger info for the given client response payload.
+fn extract_new_versions_and_target(
+    client_response_payload: &ResponsePayload,
+) -> Result<(usize, LedgerInfoWithSignatures), Error> {
+    // Extract the number of new versions and the target ledger info
+    let (num_versions, target_ledger_info) = match &client_response_payload {
+        ResponsePayload::NewTransactionsWithProof((
+            transactions_with_proof,
+            target_ledger_info,
+        )) => (
+            transactions_with_proof.transactions.len(),
+            target_ledger_info.clone(),
+        ),
+        ResponsePayload::NewTransactionOutputsWithProof((
+            outputs_with_proof,
+            target_ledger_info,
+        )) => (
+            outputs_with_proof.transactions_and_outputs.len(),
+            target_ledger_info.clone(),
+        ),
+        response_payload => {
+            // TODO(joshlind): eventually we want to notify the data client of the bad response
+            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                "Expected new transactions or outputs but got: {:?}",
+                response_payload
+            )));
+        },
+    };
+
+    // Ensure that we have at least one data item
+    if num_versions == 0 {
+        // TODO(joshlind): eventually we want to notify the data client of the bad response
+        return Err(Error::AptosDataClientResponseIsInvalid(
+            "Received an empty transaction or output list!".into(),
+        ));
+    }
+
+    Ok((num_versions, target_ledger_info))
 }

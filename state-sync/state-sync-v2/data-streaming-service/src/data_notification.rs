@@ -46,6 +46,9 @@ pub enum DataClientRequest {
     TransactionOutputsWithProof(TransactionOutputsWithProofRequest),
     NewTransactionsOrOutputsWithProof(NewTransactionsOrOutputsWithProofRequest),
     TransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest),
+    SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest),
+    SubscribeTransactionOutputsWithProof(SubscribeTransactionOutputsWithProofRequest),
+    SubscribeTransactionsOrOutputsWithProof(SubscribeTransactionsOrOutputsWithProofRequest),
 }
 
 impl DataClientRequest {
@@ -61,6 +64,13 @@ impl DataClientRequest {
             Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
             Self::NewTransactionsOrOutputsWithProof(_) => "new_transactions_or_outputs_with_proof",
             Self::TransactionsOrOutputsWithProof(_) => "transactions_or_outputs_with_proof",
+            Self::SubscribeTransactionsWithProof(_) => "subscribe_transactions_with_proof",
+            Self::SubscribeTransactionOutputsWithProof(_) => {
+                "subscribe_transaction_outputs_with_proof"
+            },
+            Self::SubscribeTransactionsOrOutputsWithProof(_) => {
+                "subscribe_transactions_or_outputs_with_proof"
+            },
         }
     }
 }
@@ -107,6 +117,35 @@ pub struct NewTransactionOutputsWithProofRequest {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NumberOfStatesRequest {
     pub version: Version,
+}
+
+/// A client request for subscribing to transactions with proofs.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SubscribeTransactionsWithProofRequest {
+    pub known_version: Version,
+    pub known_epoch: Epoch,
+    pub include_events: bool,
+    pub subscription_stream_id: u64,
+    pub subscription_stream_index: u64,
+}
+
+/// A client request for subscribing to transaction outputs with proofs.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SubscribeTransactionOutputsWithProofRequest {
+    pub known_version: Version,
+    pub known_epoch: Epoch,
+    pub subscription_stream_id: u64,
+    pub subscription_stream_index: u64,
+}
+
+/// A client request for subscribing to transactions or outputs with proofs.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SubscribeTransactionsOrOutputsWithProofRequest {
+    pub known_version: Version,
+    pub known_epoch: Epoch,
+    pub include_events: bool,
+    pub subscription_stream_id: u64,
+    pub subscription_stream_index: u64,
 }
 
 /// A client request for fetching transactions with proofs.

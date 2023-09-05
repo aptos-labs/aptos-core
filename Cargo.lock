@@ -3453,6 +3453,7 @@ dependencies = [
  "aptos-compression",
  "aptos-config",
  "aptos-crypto",
+ "aptos-time-service",
  "aptos-types",
  "bcs 0.1.4",
  "claims",

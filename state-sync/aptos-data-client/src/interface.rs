@@ -129,6 +129,52 @@ pub trait AptosDataClientInterface {
         include_events: bool,
         request_timeout_ms: u64,
     ) -> error::Result<Response<TransactionOrOutputListWithProof>>;
+
+    /// Subscribes to new transaction output lists with proofs. Subscriptions
+    /// start at `known_version + 1` and `known_epoch` (inclusive), as
+    /// specified by the stream metadata. The end version and proof version
+    /// are specified by the server. If the data cannot be fetched, an
+    /// error is returned.
+    async fn subscribe_to_transaction_outputs_with_proof(
+        &self,
+        subscription_request_metadata: SubscriptionRequestMetadata,
+        request_timeout_ms: u64,
+    ) -> error::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+
+    /// Subscribes to new transaction lists with proofs. Subscriptions start
+    /// at `known_version + 1` and `known_epoch` (inclusive), as specified
+    /// by the subscription metadata. If `include_events` is true,
+    /// events are included in the proof. The end version and proof version
+    /// are specified by the server. If the data cannot be fetched, an error
+    /// is returned.
+    async fn subscribe_to_transactions_with_proof(
+        &self,
+        subscription_request_metadata: SubscriptionRequestMetadata,
+        include_events: bool,
+        request_timeout_ms: u64,
+    ) -> error::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+
+    /// Subscribes to new transaction or output lists with proofs. Subscriptions
+    /// start at `known_version + 1` and `known_epoch` (inclusive), as
+    /// specified by the subscription metadata. If `include_events` is true,
+    /// events are included in the proof. The end version and proof version
+    /// are specified by the server. If the data cannot be fetched, an error
+    /// is returned.
+    async fn subscribe_to_transactions_or_outputs_with_proof(
+        &self,
+        subscription_request_metadata: SubscriptionRequestMetadata,
+        include_events: bool,
+        request_timeout_ms: u64,
+    ) -> error::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
+}
+
+/// Subscription stream metadata associated with each subscription request
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct SubscriptionRequestMetadata {
+    pub known_version_at_stream_start: u64, // The highest known transaction version at stream start
+    pub known_epoch_at_stream_start: u64,   // The highest known epoch at stream start
+    pub subscription_stream_id: u64,        // The unique id of the subscription stream
+    pub subscription_stream_index: u64,     // The index of the request in the subscription stream
 }
 
 /// A response error that users of the Aptos Data Client can use to notify
