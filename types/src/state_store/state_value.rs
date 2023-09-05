@@ -159,6 +159,19 @@ impl StateValue {
             StateValueInner::WithMetadata { metadata, .. } => Some(metadata),
         }
     }
+
+    pub fn try_transform_bytes<F: FnOnce(Vec<u8>) -> anyhow::Result<Vec<u8>>>(
+        self,
+        f: F,
+    ) -> anyhow::Result<StateValue> {
+        Ok(StateValue::new_impl(match self.inner {
+            StateValueInner::V0(data) => StateValueInner::V0(f(data)?),
+            StateValueInner::WithMetadata { data, metadata } => StateValueInner::WithMetadata {
+                data: f(data)?,
+                metadata,
+            },
+        }))
+    }
 }
 
 #[cfg(any(test, feature = "fuzzing"))]

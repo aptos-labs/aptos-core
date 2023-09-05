@@ -139,6 +139,7 @@ subsequent incarnation to finish.
 pub mod counters;
 pub mod errors;
 pub mod executor;
+mod liftings;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
 mod scheduler;

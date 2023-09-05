@@ -31,7 +31,7 @@ use std::{
     collections::HashMap,
     marker::PhantomData,
     sync::{
-        atomic::AtomicU32,
+        atomic::AtomicU64,
         mpsc,
         mpsc::{Receiver, Sender},
         Arc,
@@ -423,7 +423,7 @@ where
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
         base_view: &S,
-        shared_counter: &AtomicU32,
+        shared_counter: &AtomicU64,
         role: CommitRole,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
@@ -529,7 +529,7 @@ where
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_cache = MVHashMap::new();
-        let shared_counter = AtomicU32::new(0);
+        let shared_counter = AtomicU64::new(0);
 
         if signature_verified_block.is_empty() {
             return Ok(vec![]);
@@ -635,10 +635,7 @@ where
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let unsync_view = LatestView::<T, S, X>::new(
                 base_view,
-                ViewState::Unsync(SequentialState {
-                    unsync_map: &data_map,
-                    _counter: &0,
-                }),
+                ViewState::Unsync(SequentialState::new(&data_map, 0)),
                 idx as TxnIndex,
             );
             let res = executor.execute_transaction(&unsync_view, txn, idx as TxnIndex, true);

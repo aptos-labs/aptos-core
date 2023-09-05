@@ -3,6 +3,7 @@
 
 use crate::{
     counters,
+    liftings::{SyncLiftings, UnsyncLiftings},
     scheduler::{DependencyResult, DependencyStatus, Scheduler},
     task::Transaction,
     txn_last_input_output::ReadDescriptor,
@@ -23,10 +24,18 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use move_core_types::value::MoveTypeLayout;
+use move_vm_types::{
+    value_transformation::{
+        deserialize_and_exchange, AsIdentifier, IdentifierBuilder, TransformationError,
+        TransformationResult, ValueExchange,
+    },
+    values::Value,
+};
 use std::{
     cell::RefCell,
     fmt::Debug,
-    sync::{atomic::AtomicU32, Arc},
+    sync::{atomic::AtomicU64, Arc},
 };
 
 /// A struct which describes the result of the read from the proxy. The client
@@ -48,7 +57,7 @@ pub(crate) enum ReadResult<V> {
 pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
     versioned_map: &'a MVHashMap<T::Key, T::Value, X>,
     scheduler: &'a Scheduler,
-    _counter: &'a AtomicU32,
+    liftings: SyncLiftings<'a>,
     captured_reads: RefCell<Vec<ReadDescriptor<T::Key>>>,
 }
 
@@ -56,12 +65,12 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     pub(crate) fn new(
         shared_map: &'a MVHashMap<T::Key, T::Value, X>,
         shared_scheduler: &'a Scheduler,
-        shared_counter: &'a AtomicU32,
+        shared_counter: &'a AtomicU64,
     ) -> Self {
         Self {
             versioned_map: shared_map,
             scheduler: shared_scheduler,
-            _counter: shared_counter,
+            liftings: SyncLiftings::new(shared_counter),
             captured_reads: RefCell::new(Vec::new()),
         }
     }
@@ -162,7 +171,16 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
 
 pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Value, X>,
-    pub(crate) _counter: &'a u32,
+    pub(crate) unsync_liftings: RefCell<UnsyncLiftings>,
+}
+
+impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
+    pub(crate) fn new(unsync_map: &'a UnsyncMap<T::Key, T::Value, X>, counter: u64) -> Self {
+        Self {
+            unsync_map,
+            unsync_liftings: RefCell::new(UnsyncLiftings::new(counter)),
+        }
+    }
 }
 
 pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
@@ -219,6 +237,30 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         }
         ret
     }
+
+    #[allow(unused)]
+    fn get_base_value_with_layout(
+        &self,
+        layout: &MoveTypeLayout,
+        state_key: &T::Key,
+    ) -> anyhow::Result<Option<StateValue>> {
+        let maybe_state_value = self.get_base_value(state_key)?;
+        match maybe_state_value {
+            None => Ok(None),
+            Some(state_value) => {
+                let process_lifting = |bytes: Vec<u8>| -> anyhow::Result<Vec<u8>> {
+                    let patched_value =
+                        deserialize_and_exchange(&bytes, layout, self).ok_or_else(|| {
+                            anyhow::anyhow!("Failed to deserialize for {:?}", state_key)
+                        })?;
+                    patched_value.simple_serialize(layout).ok_or_else(|| {
+                        anyhow::anyhow!("Failed to serialize value {}", patched_value)
+                    })
+                };
+                Ok(Some(state_value.try_transform_bytes(process_lifting)?))
+            },
+        }
+    }
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
@@ -265,7 +307,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
                         ReadResult::U128(v) => Ok(Some(StateValue::new_legacy(serialize(&v)))),
                         // ExecutionHalted indicates that the parallel execution is halted.
                         // The read should return immediately and log the error.
-                        // For now we use STORAGE_ERROR as the VM will not log the speculative eror,
+                        // For now we use STORAGE_ERROR as the VM will not log the speculative error,
                         // so no actual error will be logged once the execution is halted and
                         // the speculative logging is flushed.
                         ReadResult::ExecutionHalted => Err(anyhow::Error::new(VMStatus::error(
@@ -292,5 +334,52 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         self.base_view.get_usage()
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueExchange
+    for LatestView<'a, T, S, X>
+{
+    fn try_exchange(
+        &self,
+        layout: &MoveTypeLayout,
+        value_to_exchange: Value,
+    ) -> TransformationResult<Value> {
+        let identifier = match &self.latest_view {
+            ViewState::Sync(state) => state.liftings.insert(value_to_exchange),
+            ViewState::Unsync(state) => {
+                let mut liftings = state.unsync_liftings.borrow_mut();
+                liftings.insert(value_to_exchange)
+            },
+        };
+        Value::embed_identifier(layout, identifier).ok_or_else(|| {
+            TransformationError::new(&format!("Cannot embed identifier for {}", layout))
+        })
+    }
+
+    fn try_claim_back(&self, value_to_exchange: Value) -> TransformationResult<Value> {
+        let identifier = value_to_exchange.as_identifier().ok_or_else(|| {
+            TransformationError::new(&format!(
+                "Value {} cannot be an identifier",
+                value_to_exchange,
+            ))
+        })?;
+
+        let post_process = |maybe_value: Option<&Value>| -> TransformationResult<Value> {
+            let value = maybe_value.ok_or_else(|| {
+                TransformationError::new(&format!("Identifier {} does not exist", identifier))
+            })?;
+            value
+                .copy_value()
+                .map_err(|_| TransformationError::new(&format!("Failed to copy value {}", value)))
+        };
+
+        match &self.latest_view {
+            ViewState::Sync(state) => post_process(state.liftings.get(identifier).as_deref()),
+            ViewState::Unsync(state) => {
+                let liftings = state.unsync_liftings.borrow();
+                post_process(liftings.get(identifier))
+            },
+        }
     }
 }
