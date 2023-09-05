@@ -55,6 +55,10 @@ spec aptos_std::big_vector {
         aborts_if !is_empty(v);
     }
 
+    spec destroy<T: drop>(v: BigVector<T>) {
+        pragma verify=false;
+    }
+
     spec borrow<T>(v: &BigVector<T>, i: u64): &T {
         aborts_if i >= length(v);
         ensures result == spec_at(v, i);
@@ -63,6 +67,12 @@ spec aptos_std::big_vector {
     spec borrow_mut<T>(v: &mut BigVector<T>, i: u64): &mut T {
         aborts_if i >= length(v);
         ensures result == spec_at(v, i);
+    }
+
+    spec append<T: store>(lhs: &mut BigVector<T>, other: BigVector<T>) {
+        pragma verify=false;
+        // ensures forall i in 0..old(lhs).end_index: spec_at(old(lhs), i) == spec_at(lhs, i);
+        // ensures forall i in 0..other.end_index: spec_at(other, i) == spec_at(lhs, i + old(lhs).end_index);
     }
 
     spec push_back<T: store>(v: &mut BigVector<T>, val: T) {
@@ -80,6 +90,13 @@ spec aptos_std::big_vector {
         ensures length(v) == length(old(v)) - 1;
         ensures result == old(spec_at(v, v.end_index-1));
         ensures forall i in 0..v.end_index: spec_at(v, i) == spec_at(old(v), i);
+    }
+
+    spec remove<T>(v: &mut BigVector<T>, i: u64): T {
+        aborts_if i >= length(v);
+        ensures result == spec_at(old(v), i);
+        // ensures forall j in 0..(i): spec_at(v, j) == spec_at(old(v), j);
+        // ensures forall j in (i+1)..old(v).end_index: spec_at(v, j - 1) == spec_at(old(v), j);
     }
 
     spec swap_remove<T>(v: &mut BigVector<T>, i: u64): T {
@@ -100,20 +117,14 @@ spec aptos_std::big_vector {
             spec_at(v, idx) == spec_at(old(v), idx);
     }
 
-    spec append<T: store>(lhs: &mut BigVector<T>, other: BigVector<T>) {
-        pragma verify=false;
-    }
-
-    spec remove<T>(v: &mut BigVector<T>, i: u64): T {
-        pragma verify=false;
-    }
-
     spec reverse<T>(v: &mut BigVector<T>) {
         pragma verify=false;
+        // ensures forall i in 0..v.end_index: spec_at(v, i) == spec_at(old(v), v.end_index - (i + 1));
     }
 
     spec index_of<T>(v: &BigVector<T>, val: &T): (bool, u64) {
-        pragma verify=false;
+        ensures (result_1 == true) ==> (spec_at(v, result_2) == val);
+        // ensures (result_1 == false) ==> (forall i in 0..v.end_index: spec_at(v, i) != val);
     }
 
     // ---------------------
