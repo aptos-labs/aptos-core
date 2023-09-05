@@ -65,6 +65,7 @@ pub fn bootstrap_dag(
         epoch_state.clone(),
         storage.clone(),
         current_round,
+        0,
     )));
 
     let anchor_election = Box::new(RoundRobinAnchorElection::new(validators));

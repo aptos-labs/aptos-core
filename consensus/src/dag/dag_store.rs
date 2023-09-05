@@ -20,15 +20,12 @@ use std::{
 pub enum NodeStatus {
     Unordered(Arc<CertifiedNode>),
     Ordered(Arc<CertifiedNode>),
-    Committed(Arc<CertifiedNode>),
 }
 
 impl NodeStatus {
     pub fn as_node(&self) -> &Arc<CertifiedNode> {
         match self {
-            NodeStatus::Unordered(node)
-            | NodeStatus::Ordered(node)
-            | NodeStatus::Committed(node) => node,
+            NodeStatus::Unordered(node) | NodeStatus::Ordered(node) => node,
         }
     }
 
@@ -36,14 +33,7 @@ impl NodeStatus {
         assert!(matches!(self, NodeStatus::Unordered(_)));
         *self = NodeStatus::Ordered(self.as_node().clone());
     }
-
-    pub fn mark_as_committed(&mut self) {
-        assert!(!matches!(self, NodeStatus::Committed(_)));
-        // TODO: try to avoid clone
-        *self = NodeStatus::Committed(self.as_node().clone());
-    }
 }
-
 /// Data structure that stores the DAG representation, it maintains round based index.
 #[derive(Clone)]
 pub struct Dag {
@@ -53,6 +43,8 @@ pub struct Dag {
     storage: Arc<dyn DAGStorage>,
     initial_round: Round,
     epoch_state: Arc<EpochState>,
+
+    highest_committed_anchor_round: Round,
 }
 
 impl Dag {
@@ -60,6 +52,7 @@ impl Dag {
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         initial_round: Round,
+        highest_committed_anchor_round: Round,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
@@ -91,6 +84,7 @@ impl Dag {
             storage,
             initial_round,
             epoch_state,
+            highest_committed_anchor_round,
         }
     }
 
@@ -98,6 +92,7 @@ impl Dag {
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         initial_round: Round,
+        highest_committed_anchor_round: Round,
     ) -> Self {
         let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
         let nodes_by_round = BTreeMap::new();
@@ -107,6 +102,7 @@ impl Dag {
             storage,
             initial_round,
             epoch_state,
+            highest_committed_anchor_round,
         }
     }
 
@@ -175,15 +171,6 @@ impl Dag {
         nodes.filter(|node_metadata| !self.exists(node_metadata))
     }
 
-    pub fn get_node_ref_mut_by_round_digest(
-        &mut self,
-        round: Round,
-        digest: HashValue,
-    ) -> Option<&mut NodeStatus> {
-        self.get_round_iter_mut(round)?
-            .find(|node_status| node_status.as_node().digest() == digest)
-    }
-
     fn get_node_ref_by_metadata(&self, metadata: &NodeMetadata) -> Option<&NodeStatus> {
         self.get_node_ref(metadata.round(), metadata.author())
     }
@@ -204,15 +191,6 @@ impl Dag {
         self.nodes_by_round
             .get(&round)
             .map(|round_ref| round_ref.iter().flatten())
-    }
-
-    fn get_round_iter_mut(
-        &mut self,
-        round: Round,
-    ) -> Option<impl Iterator<Item = &mut NodeStatus>> {
-        self.nodes_by_round
-            .get_mut(&round)
-            .map(|round_ref| round_ref.iter_mut().flatten())
     }
 
     pub fn get_node(&self, metadata: &NodeMetadata) -> Option<Arc<CertifiedNode>> {
@@ -382,14 +360,7 @@ impl Dag {
         None
     }
 
-    pub(super) fn highest_committed_anchor_round(&self) -> Option<Round> {
-        for (round, round_nodes) in self.nodes_by_round.iter().rev() {
-            for maybe_node_status in round_nodes {
-                if matches!(maybe_node_status, Some(NodeStatus::Committed(_))) {
-                    return Some(*round);
-                }
-            }
-        }
-        None
+    pub(super) fn highest_committed_anchor_round(&self) -> Round {
+        self.highest_committed_anchor_round
     }
 }

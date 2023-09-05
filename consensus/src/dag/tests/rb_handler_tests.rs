@@ -44,6 +44,7 @@ async fn test_node_broadcast_receiver_succeed() {
         epoch_state.clone(),
         storage.clone(),
         1,
+        0
     )));
 
     let wellformed_node = new_node(1, 10, signers[0].author(), vec![]);
@@ -87,6 +88,7 @@ async fn test_node_broadcast_receiver_failure() {
                 epoch_state.clone(),
                 storage.clone(),
                 1,
+                0
             )));
 
             NodeBroadcastHandler::new(
@@ -162,6 +164,7 @@ fn test_node_broadcast_receiver_storage() {
         epoch_state.clone(),
         storage.clone(),
         1,
+        0
     )));
 
     let node = new_node(1, 10, signers[0].author(), vec![]);

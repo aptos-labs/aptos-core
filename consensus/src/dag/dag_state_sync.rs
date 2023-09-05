@@ -8,7 +8,6 @@ use super::{
     TDAGNetworkSender,
 };
 use crate::state_replication::StateComputer;
-use anyhow::anyhow;
 use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_time_service::TimeService;
@@ -75,10 +74,7 @@ impl StateSyncManager {
 
         // if the anchor exists between ledger info round and highest ordered round
         // Note: ledger info round <= highest ordered round
-        if dag_reader
-            .highest_committed_anchor_round()
-            .unwrap_or_default()
-            < ledger_info.commit_info().round()
+        if dag_reader.highest_committed_anchor_round() < ledger_info.commit_info().round()
             && dag_reader
                 .highest_ordered_anchor_round()
                 .unwrap_or_default()
@@ -94,14 +90,15 @@ impl StateSyncManager {
     /// This ensures that the block referred by the ledger info is not in buffer manager.
     pub fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
         let dag_reader = self.dag_store.read();
+        // check whether if DAG order round is behind the given ledger info round 
+        // (meaning consensus is behind) or 
+        // the highest committed anchor round is 2*DAG_WINDOW behind the given ledger info round
+        // (meaning execution is behind the DAG window)
         (dag_reader
             .highest_ordered_anchor_round()
             .unwrap_or_default()
             < li.commit_info().round())
-            || dag_reader
-                .highest_committed_anchor_round()
-                .unwrap_or_default()
-                + 2 * DAG_WINDOW
+            || dag_reader.highest_committed_anchor_round() + 2 * DAG_WINDOW
                 < li.commit_info().round()
     }
 
@@ -153,6 +150,7 @@ impl StateSyncManager {
             self.epoch_state.clone(),
             self.storage.clone(),
             start_round,
+            commit_li.commit_info().round(),
         )));
         let bitmask = { sync_dag_store.read().bitmask(target_round) };
         let request = RemoteFetchRequest::new(
@@ -180,22 +178,7 @@ impl StateSyncManager {
         // State sync
         self.state_computer.sync_to(commit_li.clone()).await?;
 
-        {
-            let mut dag_writer = sync_dag_store.write();
-            dag_writer.prune();
-            if let Some(node_status) = dag_writer.get_node_ref_mut_by_round_digest(
-                commit_li.ledger_info().round(),
-                commit_li.ledger_info().consensus_data_hash(),
-            ) {
-                node_status.mark_as_committed();
-            } else {
-                error!(
-                    "node for commit ledger info does not exist in DAG: {}",
-                    commit_li
-                );
-                return Err(anyhow!("commit ledger info node not found"));
-            }
-        }
+        // TODO: the caller should rebootstrap the order rule
 
         Ok(Some(sync_dag_store))
     }

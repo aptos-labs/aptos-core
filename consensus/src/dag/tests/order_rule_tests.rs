@@ -174,7 +174,7 @@ proptest! {
             epoch: 1,
             verifier: validator_verifier,
         });
-        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 1);
+        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 1, 0);
         for round_nodes in &nodes {
             for node in round_nodes.iter().flatten() {
                 dag.add_node(node.clone()).unwrap();
@@ -261,7 +261,7 @@ fn test_order_rule_basic() {
         epoch: 1,
         verifier: validator_verifier,
     });
-    let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 1);
+    let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 1, 0);
     for round_nodes in &nodes {
         for node in round_nodes.iter().flatten() {
             dag.add_node(node.clone()).unwrap();
