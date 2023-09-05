@@ -17,17 +17,21 @@ use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::{BlockExecutorTrait, ExecutorError, ExecutorResult, StateComputeResult};
+use aptos_executor_types::{
+    state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
+    ExecutorResult, StateComputeResult,
+};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
+    account_address::AccountAddress, block_executor::partitioner::ExecutableBlock,
+    contract_event::ContractEvent, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    transaction::Transaction,
 };
 use fail::fail_point;
-use futures::{SinkExt, StreamExt};
+use futures::{future::BoxFuture, SinkExt, StreamExt};
 use std::{boxed::Box, sync::Arc};
-use tokio::sync::Mutex as AsyncMutex;
+use tokio::sync::{mpsc, oneshot, Mutex as AsyncMutex};
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
@@ -60,6 +64,7 @@ pub struct ExecutionProxy {
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
     maybe_block_gas_limit: Mutex<Option<u64>>,
     transaction_deduper: Mutex<Option<Arc<dyn TransactionDeduper>>>,
+    execution_pipeline: ExecutionPipeline,
 }
 
 impl ExecutionProxy {
@@ -84,6 +89,7 @@ impl ExecutionProxy {
                 callback();
             }
         });
+        let execution_pipeline = ExecutionPipeline::spawn(executor.clone(), handle);
         Self {
             executor,
             txn_notifier,
@@ -95,6 +101,7 @@ impl ExecutionProxy {
             transaction_shuffler: Mutex::new(None),
             maybe_block_gas_limit: Mutex::new(None),
             transaction_deduper: Mutex::new(None),
+            execution_pipeline,
         }
     }
 }
@@ -102,18 +109,13 @@ impl ExecutionProxy {
 // TODO: filter duplicated transaction before executing
 #[async_trait::async_trait]
 impl StateComputer for ExecutionProxy {
-    async fn compute(
+    async fn schedule_compute(
         &self,
         // The block to be executed.
         block: &Block,
         // The parent block id.
         parent_block_id: HashValue,
-    ) -> ExecutorResult<StateComputeResult> {
-        fail_point!("consensus::compute", |_| {
-            Err(ExecutorError::InternalError {
-                error: "Injected error in compute".into(),
-            })
-        });
+    ) -> StateComputeResultFut {
         let block_id = block.id();
         debug!(
             block = %block,
@@ -124,48 +126,54 @@ impl StateComputer for ExecutionProxy {
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
         let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
-        let txns = payload_manager.get_transactions(block).await?;
+        let txn_notifier = self.txn_notifier.clone();
+        let txns = match payload_manager.get_transactions(block).await {
+            Ok(txns) => txns,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
 
         let deduped_txns = txn_deduper.dedup(txns);
         let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
-        let block_gas_limit = *self.maybe_block_gas_limit.lock();
+        let maybe_block_gas_limit = *self.maybe_block_gas_limit.lock();
 
         // TODO: figure out error handling for the prologue txn
-        let executor = self.executor.clone();
-
+        let timestamp = block.timestamp_usecs();
         let transactions_to_execute = block.transactions_to_execute(
             &self.validators.lock(),
             shuffled_txns.clone(),
-            block_gas_limit,
+            maybe_block_gas_limit,
         );
 
-        let compute_result = monitor!(
-            "execute_block",
-            tokio::task::spawn_blocking(move || {
-                executor.execute_block(
-                    (block_id, transactions_to_execute).into(),
-                    parent_block_id,
-                    block_gas_limit,
-                )
-            })
-            .await
-        )
-        .expect("spawn_blocking failed")?;
+        let fut = self
+            .execution_pipeline
+            .queue(
+                (block_id, transactions_to_execute).into(),
+                parent_block_id,
+                maybe_block_gas_limit,
+            )
+            .await;
 
-        observe_block(block.timestamp_usecs(), BlockStage::EXECUTED);
-
-        // notify mempool about failed transaction
-        if let Err(e) = self
-            .txn_notifier
-            .notify_failed_txn(shuffled_txns, &compute_result)
-            .await
-        {
-            error!(
-                error = ?e, "Failed to notify mempool of rejected txns",
+        Box::pin(async move {
+            debug!(
+                block_id = %block_id,
+                "Got state compute result, post processing."
             );
-        }
-        Ok(compute_result)
+            let compute_result = fut.await?;
+            observe_block(timestamp, BlockStage::EXECUTED);
+
+            // notify mempool about failed transaction
+            if let Err(e) = txn_notifier
+                .notify_failed_txn(shuffled_txns, &compute_result)
+                .await
+            {
+                error!(
+                    error = ?e, "Failed to notify mempool of rejected txns",
+                );
+            }
+
+            Ok(compute_result)
+        })
     }
 
     /// Send a successful commit. A future is fulfilled when the state is finalized.
@@ -472,4 +480,150 @@ async fn test_commit_sync_race() {
     assert_eq!(*recorded_commit.time.lock(), LogicalTime::new(1, 10));
     assert!(executor.sync_to(generate_li(2, 8)).await.is_ok());
     assert_eq!(*recorded_commit.time.lock(), LogicalTime::new(2, 8));
+}
+
+const PIPELINE_DEPTH: usize = 8;
+
+struct ExecutionPipeline {
+    block_tx: mpsc::Sender<ExecuteBlockCommand>,
+}
+
+impl ExecutionPipeline {
+    pub fn spawn(executor: Arc<dyn BlockExecutorTrait>, runtime: &tokio::runtime::Handle) -> Self {
+        let (block_tx, block_rx) = mpsc::channel(PIPELINE_DEPTH);
+        let (ledger_apply_tx, ledger_apply_rx) = mpsc::channel(PIPELINE_DEPTH);
+        runtime.spawn(Self::execute_stage(
+            block_rx,
+            ledger_apply_tx,
+            executor.clone(),
+        ));
+        runtime.spawn(Self::ledger_apply_stage(ledger_apply_rx, executor));
+        Self { block_tx }
+    }
+
+    pub async fn queue(
+        &self,
+        block: ExecutableBlock,
+        parent_block_id: HashValue,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> StateComputeResultFut {
+        let (result_tx, result_rx) = oneshot::channel();
+        let block_id = block.block_id;
+        self.block_tx
+            .send(ExecuteBlockCommand {
+                block,
+                parent_block_id,
+                maybe_block_gas_limit,
+                result_tx,
+            })
+            .await
+            .expect("Failed to send block to execution pipeline.");
+
+        Box::pin(async move {
+            result_rx
+                .await
+                .map_err(|err| ExecutorError::InternalError {
+                    error: format!(
+                        "Failed to receive execution result for block {}: {:?}.",
+                        block_id, err
+                    ),
+                })?
+        })
+    }
+
+    async fn execute_stage(
+        mut block_rx: mpsc::Receiver<ExecuteBlockCommand>,
+        ledger_apply_tx: mpsc::Sender<LedgerApplyCommand>,
+        executor: Arc<dyn BlockExecutorTrait>,
+    ) {
+        while let Some(ExecuteBlockCommand {
+            block,
+            parent_block_id,
+            maybe_block_gas_limit,
+            result_tx,
+        }) = block_rx.recv().await
+        {
+            let block_id = block.block_id;
+            debug!("execute_stage received block {}.", block_id);
+            let executor = executor.clone();
+            let state_checkpoint_output = monitor!(
+                "execute_block",
+                tokio::task::spawn_blocking(move || {
+                    fail_point!("consensus::compute", |_| {
+                        Err(ExecutorError::InternalError {
+                            error: "Injected error in compute".into(),
+                        })
+                    });
+                    executor.execute_and_state_checkpoint(
+                        block,
+                        parent_block_id,
+                        maybe_block_gas_limit,
+                    )
+                })
+                .await
+            )
+            .expect("Failed to spawn_blocking.");
+
+            ledger_apply_tx
+                .send(LedgerApplyCommand {
+                    block_id,
+                    parent_block_id,
+                    state_checkpoint_output,
+                    result_tx,
+                })
+                .await
+                .expect("Failed to send block to ledger_apply stage.");
+        }
+        debug!("execute_stage quitting.");
+    }
+
+    async fn ledger_apply_stage(
+        mut block_rx: mpsc::Receiver<LedgerApplyCommand>,
+        executor: Arc<dyn BlockExecutorTrait>,
+    ) {
+        while let Some(LedgerApplyCommand {
+            block_id,
+            parent_block_id,
+            state_checkpoint_output,
+            result_tx,
+        }) = block_rx.recv().await
+        {
+            debug!("ledger_apply stage received block {}.", block_id);
+            let res = async {
+                let executor = executor.clone();
+                monitor!(
+                    "ledger_apply",
+                    tokio::task::spawn_blocking(move || {
+                        executor.ledger_update(block_id, parent_block_id, state_checkpoint_output?)
+                    })
+                )
+                .await
+                .expect("Failed to spawn_blocking().")
+            }
+            .await;
+            result_tx.send(res).unwrap_or_else(|err| {
+                error!(
+                    block_id = block_id,
+                    "Failed to send back execution result for block {}: {:?}", block_id, err,
+                );
+            });
+        }
+        debug!("ledger_apply stage quitting.");
+    }
+}
+
+pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<StateComputeResult>>;
+
+struct ExecuteBlockCommand {
+    block: ExecutableBlock,
+    parent_block_id: HashValue,
+    maybe_block_gas_limit: Option<u64>,
+    result_tx: oneshot::Sender<ExecutorResult<StateComputeResult>>,
+}
+
+struct LedgerApplyCommand {
+    block_id: HashValue,
+    parent_block_id: HashValue,
+    state_checkpoint_output: ExecutorResult<StateCheckpointOutput>,
+    result_tx: oneshot::Sender<ExecutorResult<StateComputeResult>>,
 }
