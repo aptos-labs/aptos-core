@@ -1556,7 +1556,7 @@ impl GlobalEnv {
     /// Converts a storage module id into an AST module name.
     pub fn to_module_name(&self, storage_id: &language_storage::ModuleId) -> ModuleName {
         ModuleName::from_str(
-            &storage_id.address().to_string(),
+            &storage_id.address().to_hex(),
             self.symbol_pool.make(storage_id.name().as_str()),
         )
     }
