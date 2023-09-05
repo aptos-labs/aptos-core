@@ -9,6 +9,7 @@ use aptos_data_client::{
     global_summary::{AdvertisedData, GlobalDataSummary, OptimalChunkSizes},
     interface::{
         AptosDataClientInterface, Response, ResponseCallback, ResponseContext, ResponseError,
+        SubscriptionRequestMetadata,
     },
 };
 use aptos_infallible::Mutex;
@@ -611,6 +612,38 @@ impl AptosDataClientInterface for MockAptosDataClient {
             (None, Some(outputs_with_proof.payload))
         };
         Ok(create_data_client_response(transactions_or_outputs))
+    }
+
+    async fn subscribe_to_transaction_outputs_with_proof(
+        &self,
+        _subscription_request_metadata: SubscriptionRequestMetadata,
+        _request_timeout_ms: u64,
+    ) -> aptos_data_client::error::Result<
+        Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>,
+    > {
+        unimplemented!("TODO: Support me when we add unit tests!")
+    }
+
+    async fn subscribe_to_transactions_with_proof(
+        &self,
+        _subscription_request_metadata: SubscriptionRequestMetadata,
+        _include_events: bool,
+        _request_timeout_ms: u64,
+    ) -> aptos_data_client::error::Result<
+        Response<(TransactionListWithProof, LedgerInfoWithSignatures)>,
+    > {
+        unimplemented!("TODO: Support me when we add unit tests!")
+    }
+
+    async fn subscribe_to_transactions_or_outputs_with_proof(
+        &self,
+        _subscription_request_metadata: SubscriptionRequestMetadata,
+        _include_events: bool,
+        _request_timeout_ms: u64,
+    ) -> aptos_data_client::error::Result<
+        Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>,
+    > {
+        unimplemented!("TODO: Support me when we add unit tests!")
     }
 }
 

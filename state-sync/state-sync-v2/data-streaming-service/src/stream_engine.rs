@@ -601,10 +601,6 @@ impl ContinuousTransactionStreamEngine {
     /// Creates a new set of subscription stream requests to extend
     /// the currently active subscription stream. The number of requests
     /// created will be bound by the specified `max_number_of_requests`.
-    ///
-    /// Note: if the stream has already send out the maximum number of
-    /// requests then no new requests will be created and the stream
-    /// will be marked for termination.
     fn create_subscription_stream_requests(
         &mut self,
         max_number_of_requests: u64,
@@ -632,8 +628,10 @@ impl ContinuousTransactionStreamEngine {
             let subscription_stream_index =
                 active_subscription_stream.get_next_subscription_stream_index();
 
-            // If the stream has reached the maximum number of requests
-            // then don't send any more requests.
+            // Note: if the stream hits the total max subscription stream index,
+            // then no new requests should be created. The stream will eventually
+            // be marked for termination once a response is received for
+            // the last subscription request.
             if subscription_stream_index
                 > active_subscription_stream.get_max_subscription_stream_index()
             {
@@ -1192,8 +1190,9 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
-        // Reset the pending requests to prevent malicious
-        // responses from blocking the streams.
+        // Reset the pending requests to prevent malicious responses from
+        // blocking the streams. Note: these request types are mutually
+        // exclusive and only a single request will exist at any given time.
         if self.end_of_epoch_requested {
             self.end_of_epoch_requested = false;
         } else if self.optimistic_fetch_requested {

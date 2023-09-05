@@ -360,6 +360,8 @@ pub struct StorageServerSummary {
     pub data_summary: DataSummary,
 }
 
+// TODO: it probably makes sense to move this logic to the data client,
+// instead of having it attached to the storage server summary.
 impl StorageServerSummary {
     pub fn can_service(
         &self,
