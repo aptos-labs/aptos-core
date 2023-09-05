@@ -1,17 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::aggregator_natives::{helpers::get_handle, NativeAggregatorContext};
-use aptos_aggregator::aggregator_extension::extension_error;
+use crate::natives::aggregator_natives::{helpers_v1::get_handle, NativeAggregatorContext};
+use aptos_aggregator::aggregator_extension::{extension_error, AggregatorHandle, AggregatorID};
 use aptos_crypto::hash::DefaultHasher;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
-use aptos_types::{
-    account_address::AccountAddress,
-    aggregator::{AggregatorHandle, AggregatorID},
-};
+use aptos_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,

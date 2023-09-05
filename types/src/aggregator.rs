@@ -25,6 +25,10 @@ impl AggregatorID {
         AggregatorID::Legacy(state_key)
     }
 
+    pub fn ephemeral(id: u64) -> Self {
+        AggregatorID::Ephemeral(id)
+    }
+
     pub fn as_state_key(&self) -> Option<&StateKey> {
         match self {
             Self::Legacy(state_key) => Some(state_key),
