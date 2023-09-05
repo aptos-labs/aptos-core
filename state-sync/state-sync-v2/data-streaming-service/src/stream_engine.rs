@@ -553,7 +553,12 @@ impl ContinuousTransactionStreamEngine {
             if subscription_stream_index
                 >= active_subscription_stream.get_max_subscription_stream_index()
             {
+                // Terminate the stream and update the metrics
                 self.active_subscription_stream = None;
+                metrics::increment_counter(
+                    &metrics::TERMINATE_SUBSCRIPTION_STREAM,
+                    metrics::MAX_CONSECUTIVE_REQUESTS_LABEL,
+                );
             }
         }
 
@@ -816,8 +821,12 @@ impl ContinuousTransactionStreamEngine {
             )));
         }
 
-        // Reset the active subscription stream
+        // Reset the active subscription stream and update the metrics
         self.active_subscription_stream = None;
+        metrics::increment_counter(
+            &metrics::TERMINATE_SUBSCRIPTION_STREAM,
+            request_error.get_label(),
+        );
 
         // Log the error based on the request type
         if matches!(

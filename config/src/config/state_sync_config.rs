@@ -191,7 +191,7 @@ impl Default for StorageServiceConfig {
             max_num_active_subscriptions: 30,
             max_optimistic_fetch_period_ms: 5000, // 5 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_period_ms: 30_000, // 30 seconds
+            max_subscription_period_ms: 60_000, // 60 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             min_time_to_ignore_peers_secs: 300, // 5 minutes
@@ -240,14 +240,14 @@ pub struct DataStreamingServiceConfig {
 impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
-            enable_subscription_streaming: false,
+            enable_subscription_streaming: true,
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,
             max_data_stream_channel_sizes: 300,
             max_request_retry: 5,
             max_notification_id_mappings: 300,
-            max_num_consecutive_subscriptions: 50,
+            max_num_consecutive_subscriptions: 100,
             progress_check_interval_ms: 50,
         }
     }
@@ -307,7 +307,7 @@ impl Default for AptosDataClientConfig {
             optimistic_fetch_timeout_ms: 5000, // 5 seconds
             response_timeout_ms: 10_000,       // 10 seconds
             summary_poll_loop_interval_ms: 200,
-            subscription_response_timeout_ms: 20_000, // 20 seconds (must be longer than a regular timeout because of pre-fetching)
+            subscription_response_timeout_ms: 40_000, // 40 seconds (must be longer than a regular timeout because of pre-fetching)
             use_compression: true,
         }
     }
