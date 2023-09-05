@@ -2,6 +2,7 @@
 
 use crate::{metrics::TIMER, pipeline::ExecuteBlockMessage};
 use aptos_block_partitioner::{BlockPartitioner, PartitionerConfig};
+use aptos_streaming_partitioner;
 use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_types::{
