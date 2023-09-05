@@ -167,7 +167,10 @@ fn create_and_add_pfns(ctx: &mut NetworkContext, num_pfns: u64) -> Result<Vec<Pe
 
     // Identify the version for the PFNs
     let swarm = ctx.swarm();
-    let pfn_version = swarm.versions().max().unwrap();
+
+    // HACK! This is a hack because we're actually getting two versions and
+    // the validators/VFNs are running the first version!
+    let pfn_version = swarm.versions().min().unwrap();
 
     // Create the PFN swarm
     let runtime = Runtime::new().unwrap();
