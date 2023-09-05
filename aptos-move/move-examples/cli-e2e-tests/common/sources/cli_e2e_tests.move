@@ -206,6 +206,20 @@ module addr::cli_e2e_tests {
         create_hero(account, description, gender, name, race, uri);
     }
 
+    public entry fun test_move_run(
+        _account: &signer,
+        _input_u8: vector<u8>,
+        _input_u16: vector<u16>,
+        _input_u32: vector<u32>,
+        _input_u64: vector<u64>,
+        _input_u128: vector<u128>,
+        _input_u256: vector<u256>,
+        _input_addr: vector<address>,
+        _input_bool: vector<bool>,
+        _input_string: vector<String>,
+    ) {
+    }
+
     public entry fun set_hero_description(
         creator: &signer,
         collection: String,

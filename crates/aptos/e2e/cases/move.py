@@ -178,6 +178,34 @@ def test_move_run(run_helper: RunHelper, test_name=None):
             "Data on chain (view_hero) does not match expected data from (mint_hero)"
         )
 
+    # Run test_move_run to entry function with default profile
+    # Make sure other parameters are able to be called using "move run"
+    # Notice the entry function is not running anything but just testing the parameters
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "run",
+            "--assume-yes",
+            "--function-id",
+            "default::cli_e2e_tests::test_move_run",
+            "--args",
+            "string:1234",  # Notice this is testing u8 vector instead of actual string
+            "u16:[1,2]",
+            "u32:[1,2]",
+            "u64:[1,2]",
+            "u128:[1,2]",
+            "u256:[1,2]",
+            'address:["0x123","0x456"]',
+            "bool:[true,false]",
+            'string:["abc","efg"]',
+        ],
+    )
+
+    if '"success": true' not in response.stdout:
+        raise TestError("Move run did not execute successfully")
+
 
 @test_case
 def test_move_view(run_helper: RunHelper, test_name=None):
