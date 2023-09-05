@@ -654,36 +654,22 @@ Disclaimer: This function is costly. Use it at your own discretion.
     <b>while</b> ({
         <b>spec</b> {
             <b>invariant</b> bucket_index &lt;= num_buckets;
-            <b>assert</b> v.end_index &gt;= (bucket_index - 1) * v.bucket_size;
-            <b>assert</b> v.end_index &lt;= num_buckets * v.bucket_size;
-            // <b>assert</b> <b>forall</b> j in 0..((bucket_index - 1) * v.bucket_size) : <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, j) != val;
         };
         (bucket_index &lt; num_buckets)
     }) {
         <b>let</b> cur = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&v.buckets, bucket_index);
-        <b>spec</b>{
-            <b>assert</b> (bucket_index &lt; num_buckets - 1) ==&gt; <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(cur) == v.bucket_size;
-            <b>assert</b> (bucket_index == num_buckets - 1) ==&gt; <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(cur) &lt;= v.bucket_size;
-        };
         <b>let</b> (found, i) = <a href="../../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(cur, val);
         <b>if</b> (found) {
             <b>spec</b>{
                 <b>assert</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(cur, i) == val;
-                <b>assert</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(cur, i) == <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, bucket_index * v.bucket_size + i);
                 <b>assert</b> <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, bucket_index * v.bucket_size + i) == val;
             };
             <b>return</b> (<b>true</b>, bucket_index * v.bucket_size + i)
-        };
-        <b>spec</b>{
-            <b>assert</b> <b>forall</b> j in 0..<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(cur): <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(cur, i) != val;
-            <b>assert</b> <b>forall</b> j in 0..<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(cur): <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, bucket_index * v.bucket_size + j) == <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(cur, j);
         };
         bucket_index = bucket_index + 1;
     };
     <b>spec</b>{
         <b>assert</b> bucket_index == num_buckets;
-        // <b>assert</b> v.end_index &lt;= v.bucket_size * num_buckets;
-        // <b>assert</b> <b>forall</b> i in 0..v.end_index: <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, i) != val;
     };
     (<b>false</b>, 0)
 }
@@ -1111,8 +1097,7 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 
 
-<pre><code><b>pragma</b> verify=<b>false</b>;
-<b>ensures</b> !(result_1 == <b>true</b>) || (<a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, result_2) == val);
+<pre><code><b>ensures</b> (result_1 == <b>true</b>) ==&gt; (<a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, result_2) == val);
 </code></pre>
 
 
