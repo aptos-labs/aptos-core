@@ -511,20 +511,26 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.buffer_manager_msg_tx = Some(commit_msg_tx);
         self.buffer_manager_reset_tx = Some(reset_tx.clone());
 
-        let (execution_phase, signing_phase, persisting_phase, buffer_manager) =
-            prepare_phases_and_buffer_manager(
-                self.author,
-                self.commit_state_computer.clone(),
-                commit_signer_provider,
-                network_sender,
-                commit_msg_rx,
-                self.commit_state_computer.clone(),
-                block_rx,
-                reset_rx,
-                verifier,
-            );
+        let (
+            execution_schedule_phase,
+            execution_wait_phase,
+            signing_phase,
+            persisting_phase,
+            buffer_manager,
+        ) = prepare_phases_and_buffer_manager(
+            self.author,
+            self.commit_state_computer.clone(),
+            commit_signer_provider,
+            network_sender,
+            commit_msg_rx,
+            self.commit_state_computer.clone(),
+            block_rx,
+            reset_rx,
+            verifier,
+        );
 
-        tokio::spawn(execution_phase.start());
+        tokio::spawn(execution_schedule_phase.start());
+        tokio::spawn(execution_wait_phase.start());
         tokio::spawn(signing_phase.start());
         tokio::spawn(persisting_phase.start());
         tokio::spawn(buffer_manager.start());

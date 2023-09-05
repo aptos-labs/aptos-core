@@ -11,6 +11,7 @@ use aptos_consensus_types::{
     common::Author, executed_block::ExecutedBlock, experimental::commit_vote::CommitVote,
 };
 use aptos_crypto::{bls12381, HashValue};
+use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
@@ -18,6 +19,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
     validator_verifier::ValidatorVerifier,
 };
+use futures::future::BoxFuture;
 use itertools::zip_eq;
 use tokio::time::Instant;
 
@@ -130,6 +132,8 @@ impl Hashable for BufferItem {
         self.block_id()
     }
 }
+
+pub type ExecutionFut = BoxFuture<'static, ExecutorResult<Vec<ExecutedBlock>>>;
 
 impl BufferItem {
     pub fn new_ordered(
