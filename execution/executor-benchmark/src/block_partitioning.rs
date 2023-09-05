@@ -10,6 +10,12 @@ use aptos_types::{
     transaction::Transaction,
 };
 use std::time::Instant;
+use aptos_streaming_partitioner::{SerializationIdx, StreamingTransactionPartitioner, transaction_graph_partitioner};
+use aptos_streaming_partitioner::transaction_graph_partitioner::TransactionGraphPartitioner;
+use aptos_transaction_orderer::transaction_compressor::compress_transactions;
+use aptos_types::batched_stream::BatchedStream;
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
+use aptos_transaction_orderer::transaction_compressor::CompressedPTransaction;
 
 pub(crate) struct BlockPartitioningStage {
     num_executor_shards: usize,
@@ -35,12 +41,39 @@ impl BlockPartitioningStage {
 
     pub fn process(&mut self, mut txns: Vec<Transaction>) -> ExecuteBlockMessage {
         let current_block_start_time = Instant::now();
+        let block_size = txns.len();
         info!(
             "In iteration {}, received {:?} transactions.",
             self.num_blocks_processed,
-            txns.len()
+            block_size
         );
         let block_id = HashValue::random();
+        // let mut params = transaction_graph_partitioner::Params {
+        //     node_weight_function: |_: &CompressedPTransaction<AnalyzedTransaction>| 1 as NodeWeight,
+        //     edge_weight_function,
+        //     shuffle_batches: false,
+        // };
+        // let mut fennel = FennelGraphPartitioner::new(self.num_executor_shards);
+        // fennel.balance_constraint_mode = BalanceConstraintMode::Batched;
+        // fennel.alpha_computation_mode = AlphaComputationMode::Batched;
+        // params.shuffle_batches = true;
+        // let mut partitioner = TransactionGraphPartitioner::new(fennel, params);
+        // let analyzed_transactions: Vec<AnalyzedTransaction> = txns.clone().into_iter().map(|t| t.into()).collect();
+        // let compressed_transactions = compress_transactions(analyzed_transactions);
+        // let batched = compressed_transactions.into_iter().batched(block_size);
+        // let stream = partitioner.partition_transactions(batched).unwrap();
+        // let mut txns_by_partition = vec![vec![]; self.num_executor_shards];
+        // let mut partition_by_txn = vec![0; block_size];
+        //
+        // for batch in stream.unwrap_batches().into_no_error_batch_iter() {
+        //     for tx in batch {
+        //         partition_by_txn[tx.serialization_idx as usize] = tx.partition;
+        //         txns_by_partition[tx.partition as usize].push(tx);
+        //     }
+        // }
+
+        //TODO: wrap partition_by_txn as the block.
+
         let block: ExecutableBlock = match &self.maybe_partitioner {
             None => (block_id, txns).into(),
             Some(partitioner) => {
@@ -62,3 +95,10 @@ impl BlockPartitioningStage {
         }
     }
 }
+
+pub fn edge_weight_function(idx1: SerializationIdx, idx2: SerializationIdx) -> EdgeWeight {
+    ((1. / (1. + idx1 as f64 - idx2 as f64)) * 100000.) as EdgeWeight
+}
+
+pub type NodeWeight = i32;
+pub type EdgeWeight = i32;

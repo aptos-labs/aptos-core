@@ -1227,6 +1227,7 @@ dependencies = [
  "aptos-streaming-partitioner",
  "aptos-temppath",
  "aptos-transaction-generator-lib",
+ "aptos-transaction-orderer",
  "aptos-types",
  "aptos-vm",
  "async-trait",

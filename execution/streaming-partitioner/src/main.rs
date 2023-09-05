@@ -188,6 +188,6 @@ fn main() {
     };
 }
 
-fn edge_weight_function(idx1: SerializationIdx, idx2: SerializationIdx) -> EdgeWeight {
+pub fn edge_weight_function(idx1: SerializationIdx, idx2: SerializationIdx) -> EdgeWeight {
     ((1. / (1. + idx1 as f64 - idx2 as f64)) * 100000.) as EdgeWeight
 }
