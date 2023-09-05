@@ -11,6 +11,7 @@ use crate::{
     },
     network_id::NetworkId,
 };
+use anyhow::bail;
 use aptos_crypto::x25519;
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress as PeerId;
@@ -246,9 +247,140 @@ pub fn merge_node_config(
         ))
     })
 }
+
+/// Diff a config yaml with a base config yaml. Returns None if there is no diff.
+pub fn diff_override_config_yaml(
+    override_config: serde_yaml::Value,
+    base_config: serde_yaml::Value,
+) -> anyhow::Result<Option<serde_yaml::Value>> {
+    match override_config.clone() {
+        serde_yaml::Value::Mapping(override_mapping) => match base_config {
+            serde_yaml::Value::Mapping(base_mapping) => {
+                let mut overrides = serde_yaml::Mapping::new();
+                for (override_key, override_value) in override_mapping {
+                    match base_mapping.get(&override_key) {
+                        Some(base_value) => {
+                            if let Some(diff_value) =
+                                diff_override_config_yaml(override_value, base_value.clone())?
+                            {
+                                overrides.insert(override_key, diff_value);
+                            }
+                        },
+                        None => bail!("base_config missing for override_key: {:?}", override_key),
+                    }
+                }
+                if overrides.is_empty() {
+                    Ok(None)
+                } else {
+                    Ok(Some(serde_yaml::Value::Mapping(overrides)))
+                }
+            },
+            _ => bail!(
+                "base_mapping unavailable for override_mapping: {:?}",
+                override_mapping
+            ),
+        },
+        serde_yaml::Value::Null => match base_config {
+            serde_yaml::Value::Null => Ok(None),
+            _ => bail!("base does not match override: Null"),
+        },
+        serde_yaml::Value::Bool(override_value) => match base_config {
+            serde_yaml::Value::Bool(base_value) => {
+                if override_value == base_value {
+                    Ok(None)
+                } else {
+                    Ok(Some(override_config))
+                }
+            },
+            _ => bail!(
+                "base does not match override: Bool({}), {:?}",
+                override_value,
+                base_config
+            ),
+        },
+        serde_yaml::Value::Number(override_value) => match base_config {
+            serde_yaml::Value::Number(base_value) => {
+                if override_value == base_value {
+                    Ok(None)
+                } else {
+                    Ok(Some(override_config))
+                }
+            },
+            _ => bail!(
+                "base does not match override: Number({}), {:?}",
+                override_value,
+                base_config
+            ),
+        },
+        serde_yaml::Value::String(override_value) => match base_config {
+            serde_yaml::Value::String(base_value) => {
+                if override_value == base_value {
+                    Ok(None)
+                } else {
+                    Ok(Some(override_config))
+                }
+            },
+            _ => bail!(
+                "base does not match override: String({}), {:?}",
+                override_value,
+                base_config
+            ),
+        },
+        serde_yaml::Value::Sequence(override_value) => match base_config {
+            serde_yaml::Value::Sequence(base_value) => {
+                if override_value == base_value {
+                    Ok(None)
+                } else {
+                    Ok(Some(override_config))
+                }
+            },
+            _ => bail!(
+                "base does not match override: {:?}, {:?}",
+                override_config,
+                base_config
+            ),
+        },
+    }
+}
+
+pub struct OverrideNodeConfig {
+    config: NodeConfig,
+    base: NodeConfig,
+}
+
+impl OverrideNodeConfig {
+    pub fn new(config: NodeConfig, base: NodeConfig) -> Self {
+        Self { config, base }
+    }
+
+    pub fn new_with_default_base(config: NodeConfig) -> Self {
+        Self {
+            config,
+            base: NodeConfig::default(),
+        }
+    }
+
+    pub fn update(&mut self, f: impl FnOnce(&mut NodeConfig)) {
+        f(&mut self.config);
+    }
+
+    pub fn update_base(&mut self, f: impl FnOnce(&mut NodeConfig)) {
+        f(&mut self.base);
+    }
+
+    pub fn get_yaml(&self) -> anyhow::Result<serde_yaml::Value> {
+        let config_yaml = serde_yaml::to_value(&self.config)?;
+        let base_yaml = serde_yaml::to_value(&self.base)?;
+        diff_override_config_yaml(config_yaml, base_yaml)
+            .map(|diff_yaml| diff_yaml.unwrap_or(serde_yaml::Value::Null))
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use crate::config::{merge_node_config, Error, NodeConfig, SafetyRulesConfig};
+    use crate::config::{
+        merge_node_config, Error, NodeConfig, OverrideNodeConfig, SafetyRulesConfig,
+    };
 
     #[test]
     fn verify_config_defaults() {
@@ -287,5 +419,48 @@ mod test {
         .unwrap();
         let merged_node_config = merge_node_config(node_config, override_node_config);
         assert!(matches!(merged_node_config, Err(Error::Unexpected(_))));
+    }
+
+    #[test]
+    fn test_override_node_config_no_diff() {
+        let override_config = OverrideNodeConfig::new(NodeConfig::default(), NodeConfig::default());
+        let diff_yaml = override_config.get_yaml().unwrap();
+        assert_eq!(diff_yaml, serde_yaml::Value::Null);
+    }
+
+    #[test]
+    fn test_override_node_config_with_config_change() {
+        let mut override_config =
+            OverrideNodeConfig::new(NodeConfig::default(), NodeConfig::default());
+        override_config.update(|config| {
+            config.api.enabled = false;
+        });
+        let diff_yaml = override_config.get_yaml().unwrap();
+        let expected_yaml: serde_yaml::Value = serde_yaml::from_str(
+            r#"
+                api:
+                    enabled: false
+                "#,
+        )
+        .unwrap();
+        assert_eq!(diff_yaml, expected_yaml);
+    }
+
+    #[test]
+    fn test_override_node_config_with_base_change() {
+        let mut override_config =
+            OverrideNodeConfig::new(NodeConfig::default(), NodeConfig::default());
+        override_config.update_base(|config| {
+            config.api.enabled = false;
+        });
+        let diff_yaml = override_config.get_yaml().unwrap();
+        let expected_yaml: serde_yaml::Value = serde_yaml::from_str(
+            r#"
+                api:
+                    enabled: true
+                "#,
+        )
+        .unwrap();
+        assert_eq!(diff_yaml, expected_yaml);
     }
 }
