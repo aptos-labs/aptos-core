@@ -833,7 +833,6 @@ impl FakeExecutor {
                     println!("Should error, but ignoring for now... {}", err);
                 }
             }
-
             let change_set = session
                 .finish(
                     &mut (),
