@@ -1014,8 +1014,12 @@ impl AptosVM {
                     }
                 }
             }
-            aptos_framework::verify_module_metadata(m, self.0.get_features())
-                .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
+            aptos_framework::verify_module_metadata(
+                m,
+                self.0.get_features(),
+                self.0.get_timed_features(),
+            )
+            .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
         verifier::resource_groups::validate_resource_groups(
             session,
