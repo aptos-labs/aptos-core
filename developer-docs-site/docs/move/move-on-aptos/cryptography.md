@@ -30,7 +30,9 @@ Developers can now use more cryptographic hash functions in Move via the [`aptos
 | Hash function | Hash size (bits) | Cost for hashing 1KiB (in internal gas units) | Collision-resistance security (bits) |
 |---------------|------------------|-----------------------------------------------|--------------------------------------|
 | Keccak256     | 256              | 1,001,600                                     | 128                                  |
+| SHA2-256      | 256              | 1,084,000                                     | 128                                  |
 | SHA2-512      | 512              | 1,293,600                                     | 256                                  |
+| SHA3-256      | 256              | 1,001,600                                     | 128                                  |
 | SHA3-512      | 512              | 1,114,000                                     | 256                                  |
 | RIPEMD160     | 160              | 1,084,000                                     | 80 (**weak**)                        |
 | Blake2b-256   | 256              | 342,200                                       | 128                                  |
