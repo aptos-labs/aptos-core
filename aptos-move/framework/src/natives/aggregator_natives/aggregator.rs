@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::aggregator_natives::{
-    helpers::{aggregator_info, unpack_aggregator_struct},
+    helpers_v1::{aggregator_info, unpack_aggregator_struct},
     NativeAggregatorContext,
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
@@ -42,7 +42,7 @@ fn native_add(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
 
-    aggregator.add(value)?;
+    aggregator.try_add(value)?;
 
     Ok(smallvec![])
 }
@@ -100,7 +100,7 @@ fn native_sub(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
 
-    aggregator.sub(value)?;
+    aggregator.try_sub(value)?;
 
     Ok(smallvec![])
 }
