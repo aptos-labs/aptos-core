@@ -16,6 +16,7 @@ use std::{
         Arc, Condvar,
     },
 };
+use crate::sharding::ShardingProvider;
 
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
 

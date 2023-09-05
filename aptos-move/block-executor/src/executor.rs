@@ -123,12 +123,13 @@ where
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let (idx_to_execute, incarnation) = version;
+        let global_txn_idx = sharding_provider.global_idx_from_local(idx_to_execute);
         sharding_provider.wait_for_remote_deps(idx_to_execute);
         let txn = sharding_provider.txn_by_global_idx(idx_to_execute);
 
         // VM execution.
-        let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), idx_to_execute);
-        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute, false);
+        let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), global_txn_idx);
+        let execute_result = executor.execute_transaction(&sync_view, txn, global_txn_idx, false);
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute)
@@ -138,7 +139,7 @@ where
         let mut updates_outside = false;
         let mut apply_updates = |output: &E::Output| {
             // First, apply writes.
-            let write_version = (idx_to_execute, incarnation);
+            let write_version = (global_txn_idx, incarnation);
             for (k, v) in output
                 .resource_write_set()
                 .into_iter()
@@ -154,7 +155,7 @@ where
                 if prev_modified_keys.remove(&k).is_none() {
                     updates_outside = true;
                 }
-                versioned_cache.modules().write(k, idx_to_execute, v);
+                versioned_cache.modules().write(k, global_txn_idx, v);
             }
 
             // Then, apply deltas.
@@ -162,7 +163,7 @@ where
                 if prev_modified_keys.remove(&k).is_none() {
                     updates_outside = true;
                 }
-                versioned_cache.add_delta(k, idx_to_execute, d);
+                versioned_cache.add_delta(k, global_txn_idx, d);
             }
         };
 
@@ -190,9 +191,9 @@ where
         // Remove entries from previous write/delta set that were not overwritten.
         for (k, is_module) in prev_modified_keys {
             if is_module {
-                versioned_cache.modules().delete(&k, idx_to_execute);
+                versioned_cache.modules().delete(&k, global_txn_idx);
             } else {
-                versioned_cache.data().delete(&k, idx_to_execute);
+                versioned_cache.data().delete(&k, global_txn_idx);
             }
         }
 
@@ -209,6 +210,7 @@ where
     }
 
     fn validate(
+        sharding_provider: &ShardingProvider<T, E::Output, E::Error>,
         version_to_validate: Version,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
@@ -220,12 +222,13 @@ where
 
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let (idx_to_validate, incarnation) = version_to_validate;
+        let global_idx = sharding_provider.global_idx_from_local(idx_to_validate);
         let read_set = last_input_output
             .read_set(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
 
         let valid = read_set.iter().all(|r| {
-            match versioned_cache.fetch_data(r.path(), idx_to_validate) {
+            match versioned_cache.fetch_data(r.path(), global_idx) {
                 Ok(Versioned(version, _)) => r.validate_version(version),
                 Ok(Resolved(value)) => r.validate_resolved(value),
                 // Dependency implies a validation failure, and if the original read were to
@@ -255,9 +258,9 @@ where
             if let Some(keys) = last_input_output.modified_keys(idx_to_validate) {
                 for (k, is_module_path) in keys {
                     if is_module_path {
-                        versioned_cache.modules().mark_estimate(&k, idx_to_validate);
+                        versioned_cache.modules().mark_estimate(&k, global_idx);
                     } else {
-                        versioned_cache.data().mark_estimate(&k, idx_to_validate);
+                        versioned_cache.data().mark_estimate(&k, global_idx);
                     }
                 }
             }
@@ -369,6 +372,7 @@ where
         base_view: &S,
         sharding_provider: &ShardingProvider<T, E::Output, E::Error>,
     ) {
+        let global_idx = sharding_provider.global_idx_from_local(txn_idx);
         let delta_keys = last_input_output.delta_keys(txn_idx);
         let _events = last_input_output.events(txn_idx);
         let mut delta_writes = Vec::with_capacity(delta_keys.len());
@@ -384,7 +388,7 @@ where
             // single materialized aggregator. If needed, the contention may be further
             // mitigated by batching consecutive commit_hooks.
             let committed_delta = versioned_cache
-                .materialize_delta(&k, txn_idx)
+                .materialize_delta(&k, global_idx)
                 .unwrap_or_else(|op| {
                     // TODO: this logic should improve with the new AGGR data structure
                     // TODO: and the ugly base_view parameter will also disappear.
@@ -473,6 +477,7 @@ where
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(version_to_validate, wave) => Self::validate(
+                    sharding_provider,
                     version_to_validate,
                     wave,
                     last_input_output,
