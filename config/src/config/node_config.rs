@@ -343,6 +343,7 @@ pub fn diff_override_config_yaml(
     }
 }
 
+#[derive(Deserialize, Serialize, PartialEq, Debug)]
 pub struct OverrideNodeConfig {
     config: NodeConfig,
     base: NodeConfig,
@@ -376,11 +377,32 @@ impl OverrideNodeConfig {
     }
 }
 
+impl PersistableConfig for OverrideNodeConfig {
+    fn load_config<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        let config = NodeConfig::load_config(path)?;
+        Ok(Self::new_with_default_base(config))
+    }
+
+    fn save_config<P: AsRef<Path>>(&self, output_file: P) -> Result<(), Error> {
+        let yaml_value = self.get_yaml()?;
+        let yaml_string = serde_yaml::to_string(&yaml_value).map_err(|e| {
+            Error::Yaml(
+                "Unable to serialize override config to yaml. Error: {}".to_string(),
+                e,
+            )
+        })?;
+        let yaml_bytes = yaml_string.as_bytes().to_vec();
+        Self::write_file(yaml_bytes, output_file)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::config::{
-        merge_node_config, Error, NodeConfig, OverrideNodeConfig, SafetyRulesConfig,
+        merge_node_config, persistable_config::PersistableConfig, Error, NodeConfig,
+        OverrideNodeConfig, SafetyRulesConfig,
     };
+    use std::env::temp_dir;
 
     #[test]
     fn verify_config_defaults() {
@@ -462,5 +484,18 @@ mod test {
         )
         .unwrap();
         assert_eq!(diff_yaml, expected_yaml);
+    }
+
+    #[test]
+    fn test_override_config_load_save() {
+        let mut override_config =
+            OverrideNodeConfig::new(NodeConfig::default(), NodeConfig::default());
+        override_config.update(|config| {
+            config.api.enabled = false;
+        });
+        let temp_file = temp_dir().join("override_config.yaml");
+        override_config.save_config(temp_file.as_path()).unwrap();
+        let loaded_config = OverrideNodeConfig::load_config(temp_file.as_path()).unwrap();
+        assert_eq!(override_config, loaded_config);
     }
 }
