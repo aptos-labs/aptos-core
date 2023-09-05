@@ -310,7 +310,6 @@ export class Serializer {
   }
 }
 
-
 /**
  * A decorator that ensures the input argument for a function is within a range.
  * @param minValue The input argument must be >= minValue
