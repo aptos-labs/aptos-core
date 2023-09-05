@@ -159,7 +159,8 @@ fn execute_inner(
         | Bytecode::VecPushBack(_)
         | Bytecode::VecPopBack(_)
         | Bytecode::VecUnpack(..)
-        | Bytecode::VecSwap(_) => (),
+        | Bytecode::VecSwap(_)
+        | Bytecode::CallVirtual(_) => (),
     };
     Ok(())
 }

@@ -14,6 +14,7 @@ use move_binary_format::{
         AbilitySet, Bytecode, CodeOffset, FieldHandleIndex, FunctionDefinitionIndex,
         FunctionHandle, LocalIndex, Signature, SignatureToken, SignatureToken as ST,
         StructDefinition, StructDefinitionIndex, StructFieldInformation, StructHandleIndex,
+        VTableIndex,
     },
     safe_unwrap,
 };
@@ -249,6 +250,31 @@ fn call(
     }
     for return_type in &verifier.resolver.signature_at(function_handle.return_).0 {
         verifier.push(meter, instantiate(return_type, type_actuals))?
+    }
+    Ok(())
+}
+
+fn call_virtual(
+    verifier: &mut TypeSafetyChecker,
+    meter: &mut impl Meter,
+    offset: CodeOffset,
+    virtual_index: VTableIndex,
+) -> PartialVMResult<()> {
+    let func_ty = &verifier.function_view.vtables()[virtual_index as usize];
+    for parameter in verifier
+        .resolver
+        .signature_at(func_ty.parameters)
+        .0
+        .iter()
+        .rev()
+    {
+        let arg = safe_unwrap!(verifier.stack.pop());
+        if &arg != parameter {
+            return Err(verifier.error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset));
+        }
+    }
+    for return_type in &verifier.resolver.signature_at(func_ty.return_).0 {
+        verifier.push(meter, return_type.clone())?
     }
     Ok(())
 }
@@ -909,6 +935,9 @@ fn verify_instr(
             }
             verifier.push(meter, ST::U256)?;
         },
+        Bytecode::CallVirtual(idx) => {
+            call_virtual(verifier, meter, offset, *idx)?;
+        },
     };
     Ok(())
 }
@@ -925,7 +954,7 @@ fn materialize_type(struct_handle: StructHandleIndex, type_args: &Signature) -> 
     }
 }
 
-fn instantiate(token: &SignatureToken, subst: &Signature) -> SignatureToken {
+pub(crate) fn instantiate(token: &SignatureToken, subst: &Signature) -> SignatureToken {
     use SignatureToken::*;
 
     if subst.0.is_empty() {

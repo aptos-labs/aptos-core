@@ -13,6 +13,7 @@ use crate::{
     stack_usage_verifier::StackUsageVerifier,
     type_safety,
     verifier::VerifierConfig,
+    virtual_instantiation_verifier,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -111,6 +112,10 @@ impl<'a> CodeUnitVerifier<'a> {
             function_view,
             name_def_map: &name_def_map,
         };
+        virtual_instantiation_verifier::verify_function(
+            &resolver,
+            &code_unit_verifier.function_view,
+        )?;
         code_unit_verifier.verify_common(verifier_config, &mut meter)
     }
 
@@ -170,6 +175,10 @@ impl<'a> CodeUnitVerifier<'a> {
         };
         code_unit_verifier.verify_common(verifier_config, meter)?;
         AcquiresVerifier::verify(module, index, function_definition, meter)?;
+        virtual_instantiation_verifier::verify_function(
+            &resolver,
+            &code_unit_verifier.function_view,
+        )?;
 
         meter.transfer(Scope::Function, Scope::Module, 1.0)?;
 
@@ -184,6 +193,7 @@ impl<'a> CodeUnitVerifier<'a> {
         StackUsageVerifier::verify(verifier_config, &self.resolver, &self.function_view, meter)?;
         type_safety::verify(&self.resolver, &self.function_view, meter)?;
         locals_safety::verify(&self.resolver, &self.function_view, meter)?;
+        virtual_instantiation_verifier::verify_common(&self.resolver)?;
         reference_safety::verify(
             &self.resolver,
             &self.function_view,

@@ -47,3 +47,4 @@ mod reference_safety;
 mod regression_tests;
 mod stack_usage_verifier;
 mod type_safety;
+mod virtual_instantiation_verifier;

@@ -12,7 +12,8 @@ use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Bytecode, CodeOffset, CodeUnit, CompiledModule, CompiledScript, FieldHandleIndex,
-        FunctionDefinitionIndex, FunctionHandleIndex, StructDefinitionIndex, TableIndex,
+        FunctionDefinitionIndex, FunctionHandleIndex, FunctionInstantiation, StructDefinitionIndex,
+        TableIndex, VirtualFunctionInstantiation,
     },
 };
 use move_core_types::vm_status::StatusCode;
@@ -42,6 +43,13 @@ impl<'a> InstructionConsistency<'a> {
                 },
             }
         }
+        for (idx, inst) in module.function_instantiations().iter().enumerate() {
+            let checker = Self {
+                resolver,
+                current_function: Some(FunctionDefinitionIndex(idx as TableIndex)),
+            };
+            checker.check_function_instantiation(inst)?
+        }
         Ok(())
     }
 
@@ -54,7 +62,30 @@ impl<'a> InstructionConsistency<'a> {
             resolver: BinaryIndexedView::Script(script),
             current_function: None,
         };
-        checker.check_instructions(&script.code)
+        checker.check_instructions(&script.code)?;
+        for inst in script.function_instantiations.iter() {
+            checker.check_function_instantiation(inst)?;
+        }
+        Ok(())
+    }
+
+    fn check_function_instantiation(
+        &self,
+        func_inst: &FunctionInstantiation,
+    ) -> PartialVMResult<()> {
+        for func_inst in func_inst.vtable_instantiation.iter() {
+            match func_inst {
+                VirtualFunctionInstantiation::Defined(handle) => {
+                    self.check_function_op(0, *handle, false)?
+                },
+                VirtualFunctionInstantiation::Instantiated(handle) => {
+                    let inst = self.resolver.function_instantiation_at(*handle);
+                    self.check_function_op(0, inst.handle, true)?
+                },
+                VirtualFunctionInstantiation::Virtual(_) => (),
+            }
+        }
+        Ok(())
     }
 
     fn check_instructions(&self, code: &CodeUnit) -> PartialVMResult<()> {
@@ -148,7 +179,8 @@ impl<'a> InstructionConsistency<'a> {
                 | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Shl | Shr
                 | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | CopyLoc(_) | MoveLoc(_)
                 | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_) | VecLen(_) | VecImmBorrow(_)
-                | VecMutBorrow(_) | VecPushBack(_) | VecPopBack(_) | VecSwap(_) | Abort | Nop => (),
+                | VecMutBorrow(_) | VecPushBack(_) | VecPopBack(_) | VecSwap(_) | Abort | Nop
+                | CallVirtual(_) => (),
             }
         }
         Ok(())

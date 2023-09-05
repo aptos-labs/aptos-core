@@ -13,7 +13,7 @@ use crate::{
         FunctionInstantiation, FunctionInstantiationIndex, IdentifierIndex, ModuleHandle,
         ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, StructDefInstantiation,
         StructDefInstantiationIndex, StructDefinition, StructDefinitionIndex, StructHandle,
-        StructHandleIndex,
+        StructHandleIndex, FunctionType
     },
     CompiledModule,
 };
@@ -332,6 +332,7 @@ pub struct FunctionView<'a> {
     locals: &'a Signature,
     type_parameters: &'a [AbilitySet],
     cfg: VMControlFlowGraph,
+    vtables: &'a [FunctionType],
 }
 
 impl<'a> FunctionView<'a> {
@@ -350,6 +351,7 @@ impl<'a> FunctionView<'a> {
             locals: module.signature_at(code.locals),
             type_parameters: &function_handle.type_parameters,
             cfg: VMControlFlowGraph::new(&code.code),
+            vtables: &function_handle.vtables,
         }
     }
 
@@ -367,6 +369,7 @@ impl<'a> FunctionView<'a> {
             locals,
             type_parameters,
             cfg: VMControlFlowGraph::new(&code.code),
+            vtables: &[],
         }
     }
 
@@ -396,5 +399,9 @@ impl<'a> FunctionView<'a> {
 
     pub fn cfg(&self) -> &VMControlFlowGraph {
         &self.cfg
+    }
+
+    pub fn vtables(&self) -> &[FunctionType] {
+        &self.vtables
     }
 }

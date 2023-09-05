@@ -221,9 +221,23 @@ impl<'a> StackUsageVerifier<'a> {
                 let return_count = self.resolver.signature_at(function_handle.return_).len() as u64;
                 (arg_count, return_count)
             },
-            Bytecode::CallVirtual(idx) => {
-
-            }
+            Bytecode::CallVirtual(v_idx) => {
+                if let Some(idx) = self.current_function {
+                    let func_def = self.resolver.function_def_at(idx)?;
+                    let func_handle = self.resolver.function_handle_at(func_def.function);
+                    let arg_count = self
+                        .resolver
+                        .signature_at(func_handle.vtables[*v_idx as usize].parameters)
+                        .len() as u64;
+                    let return_count = self
+                        .resolver
+                        .signature_at(func_handle.vtables[*v_idx as usize].return_)
+                        .len() as u64;
+                    (arg_count, return_count)
+                } else {
+                    return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
+                }
+            },
 
             // Pack performs `num_fields` pops and one push
             Bytecode::Pack(idx) => {

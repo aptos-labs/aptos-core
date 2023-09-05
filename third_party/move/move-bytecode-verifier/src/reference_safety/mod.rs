@@ -22,8 +22,8 @@ use move_binary_format::{
     binary_views::{BinaryIndexedView, FunctionView},
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, IdentifierIndex,
-        SignatureIndex, SignatureToken, StructDefinition, StructFieldInformation,
+        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, FunctionType,
+        IdentifierIndex, SignatureIndex, SignatureToken, StructDefinition, StructFieldInformation,
     },
     safe_assert, safe_unwrap,
 };
@@ -93,6 +93,40 @@ fn call(
     };
     let return_ = verifier.resolver.signature_at(function_handle.return_);
     let values = state.call(offset, arguments, &acquired_resources, return_, meter)?;
+    for value in values {
+        verifier.stack.push(value)
+    }
+    Ok(())
+}
+
+fn call_virtual_function(
+    verifier: &mut ReferenceSafetyAnalysis,
+    state: &mut AbstractState,
+    offset: CodeOffset,
+    function_ty: &FunctionType,
+    meter: &mut impl Meter,
+) -> PartialVMResult<()> {
+    // The first argument is a function pointer type.
+    verifier.stack.pop().unwrap();
+
+    let arguments = verifier
+        .resolver
+        .signature_at(function_ty.parameters)
+        .0
+        .iter()
+        .map(|_| verifier.stack.pop().unwrap())
+        .rev()
+        .collect();
+
+    // Virtual Function resource acquisition rule will be enforced at runtime. Thus no acquired resource here.
+    let acquired_resources = BTreeSet::new();
+    let values = state.call(
+        offset,
+        arguments,
+        &acquired_resources,
+        verifier.resolver.signature_at(function_ty.return_),
+        meter,
+    )?;
     for value in values {
         verifier.stack.push(value)
     }
@@ -272,6 +306,10 @@ fn execute_inner(
             let func_inst = verifier.resolver.function_instantiation_at(*idx);
             let function_handle = verifier.resolver.function_handle_at(func_inst.handle);
             call(verifier, state, offset, function_handle, meter)?
+        },
+        Bytecode::CallVirtual(idx) => {
+            let ty = &verifier.function_view.vtables()[*idx as usize];
+            call_virtual_function(verifier, state, offset, ty, meter)?
         },
 
         Bytecode::Ret => {

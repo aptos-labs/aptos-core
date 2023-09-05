@@ -170,7 +170,9 @@ impl<'a> AcquiresVerifier<'a> {
             | Bytecode::VecPushBack(_)
             | Bytecode::VecPopBack(_)
             | Bytecode::VecUnpack(..)
-            | Bytecode::VecSwap(_) => Ok(()),
+            | Bytecode::VecSwap(_)
+            // Acquire list safety of virtual invokation is checked at runtime.
+            | Bytecode::CallVirtual(_) => Ok(()),
         }
     }
 
