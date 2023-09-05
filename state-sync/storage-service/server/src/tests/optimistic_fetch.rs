@@ -30,7 +30,7 @@ use dashmap::DashMap;
 use futures::channel::oneshot;
 use lru::LruCache;
 use rand::{rngs::OsRng, Rng};
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use tokio::runtime::Handle;
 
 #[tokio::test]
@@ -78,7 +78,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
         storage_service_config,
         time_service.clone(),
     ));
-    let subscriptions = Arc::new(Mutex::new(HashMap::new()));
+    let subscriptions = Arc::new(DashMap::new());
 
     // Verify that there are no peers with ready optimistic fetches
     let peers_with_ready_optimistic_fetches =
@@ -175,7 +175,7 @@ async fn test_remove_expired_optimistic_fetches() {
         storage_service_config,
         time_service.clone(),
     ));
-    let subscriptions = Arc::new(Mutex::new(HashMap::new()));
+    let subscriptions = Arc::new(DashMap::new());
 
     // Create the first batch of test optimistic fetches
     let num_optimistic_fetches_in_batch = 10;
