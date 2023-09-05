@@ -18,7 +18,9 @@ use aptos_storage_service_types::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
         NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
-        StateValuesWithProofRequest, TransactionOutputsWithProofRequest,
+        StateValuesWithProofRequest, SubscribeTransactionOutputsWithProofRequest,
+        SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
+        SubscriptionStreamMetadata, TransactionOutputsWithProofRequest,
         TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
     },
     responses::{CompleteDataRange, TransactionOrOutputListWithProof},
@@ -46,13 +48,21 @@ use aptos_types::{
 use async_trait::async_trait;
 use futures::StreamExt;
 use rand::{rngs::OsRng, Rng};
-use std::{cmp::min, collections::HashMap, ops::DerefMut, sync::Arc, thread, time::Duration};
+use std::{
+    cmp::min,
+    collections::{BTreeMap, HashMap},
+    ops::DerefMut,
+    sync::Arc,
+    time::Duration,
+};
 use tokio::time::timeout;
 
 // TODO(joshlind): provide a better way to mock the data client.
 // Especially around verifying timeouts!
 
-/// The number of state values held at any version
+/// Generic test constants
+pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 10;
+pub const MAX_RESPONSE_ID: u64 = 100000;
 pub const TOTAL_NUM_STATE_VALUES: u64 = 2000;
 
 /// Test constants for advertised data
@@ -64,23 +74,21 @@ pub const MIN_ADVERTISED_TRANSACTION: u64 = 1000;
 pub const MAX_ADVERTISED_TRANSACTION: u64 = 10000;
 pub const MIN_ADVERTISED_TRANSACTION_OUTPUT: u64 = 1000;
 pub const MAX_ADVERTISED_TRANSACTION_OUTPUT: u64 = 10000;
+
+/// Test constants for data beyond the highest advertised
 pub const MAX_REAL_EPOCH_END: u64 = MAX_ADVERTISED_EPOCH_END + 2;
 pub const MAX_REAL_TRANSACTION: u64 = MAX_ADVERTISED_TRANSACTION + 10;
 pub const MAX_REAL_TRANSACTION_OUTPUT: u64 = MAX_REAL_TRANSACTION;
-pub const MAX_RESPONSE_ID: u64 = 100000;
-
-/// Test timeout constant
-pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 40;
 
 /// A simple mock of the Aptos Data Client
 #[derive(Clone, Debug)]
 pub struct MockAptosDataClient {
     pub aptos_data_client_config: AptosDataClientConfig,
-    pub advertised_epoch_ending_ledger_infos: HashMap<Epoch, LedgerInfoWithSignatures>,
+    pub advertised_epoch_ending_ledger_infos: BTreeMap<Epoch, LedgerInfoWithSignatures>,
     pub advertised_synced_ledger_infos: Vec<LedgerInfoWithSignatures>,
     pub data_beyond_highest_advertised: bool, // If true, data exists beyond the highest advertised
     pub data_request_counter: Arc<Mutex<HashMap<DataRequest, u64>>>, // Tracks the number of times the same data request was made
-    pub highest_epoch_ending_ledger_infos: HashMap<Epoch, LedgerInfoWithSignatures>,
+    pub highest_epoch_ending_ledger_infos: BTreeMap<Epoch, LedgerInfoWithSignatures>,
     pub limit_chunk_sizes: bool, // If true, responses will be truncated to emulate chunk and network limits
     pub skip_emulate_network_latencies: bool, // If true, skips network latency emulation
     pub skip_timeout_verification: bool, // If true, skips timeout verification for incoming requests
@@ -133,24 +141,40 @@ impl MockAptosDataClient {
         }
     }
 
-    fn emulate_network_latencies(&self) {
-        if self.skip_emulate_network_latencies {
-            return;
-        }
+    /// Clones the mock data client without timeout verification
+    fn clone_without_timeout_verification(&self) -> Self {
+        // Clone the mock data client and skip timeout verification
+        let mut aptos_data_client = self.clone();
+        aptos_data_client.skip_timeout_verification = true;
 
-        // Sleep for 10 - 50 ms to emulate variance
-        thread::sleep(Duration::from_millis(create_range_random_u64(10, 50)));
+        aptos_data_client
     }
 
-    fn emulate_optimistic_fetch_expiration(&self) -> aptos_data_client::error::Error {
-        thread::sleep(Duration::from_secs(MAX_NOTIFICATION_TIMEOUT_SECS));
+    /// Emulates network latencies by sleeping for 10 -> 50 ms
+    async fn emulate_network_latencies(&self) {
+        if !self.skip_emulate_network_latencies {
+            tokio::time::sleep(Duration::from_millis(create_range_random_u64(10, 50))).await;
+        }
+    }
+
+    /// Emulates a timeout by sleeping for a long time and returning a timeout error
+    async fn emulate_network_request_timeout(&self) -> aptos_data_client::error::Error {
+        // Sleep for a while
+        tokio::time::sleep(Duration::from_secs(MAX_NOTIFICATION_TIMEOUT_SECS)).await;
+
+        // Return a timeout error
         aptos_data_client::error::Error::TimeoutWaitingForResponse("RPC timed out!".into())
     }
 
+    /// Calculates the last index for the given start and end indices (with
+    /// respect to a chunk size limit).
     fn calculate_last_index(&self, start_index: u64, end_index: u64) -> u64 {
         if self.limit_chunk_sizes {
-            let num_items_requested = (end_index - start_index) + 1;
+            // Limit the chunk size by a random factor
             let chunk_reduction_factor = create_range_random_u64(2, 9);
+
+            // Calculate the number of items to request
+            let num_items_requested = (end_index - start_index) + 1;
             let num_reduced_items_requested = num_items_requested / chunk_reduction_factor;
             if num_reduced_items_requested <= 1 {
                 start_index // Limit the chunk to a single item
@@ -162,41 +186,60 @@ impl MockAptosDataClient {
         }
     }
 
-    fn verify_request_timeout(
+    /// Returns the known epoch for the given version using the
+    /// highest epoch ending ledger infos.
+    fn find_known_epoch_for_version(&self, known_version: u64) -> u64 {
+        // Find the epoch for the given version using the highest epoch ending ledger infos
+        for (epoch, ledger_info) in self.highest_epoch_ending_ledger_infos.iter() {
+            let epoch_ending_ledger_version = ledger_info.ledger_info().version();
+            if epoch_ending_ledger_version > known_version {
+                return *epoch;
+            }
+        }
+
+        // Otherwise, return the max epoch + 1
+        MAX_REAL_EPOCH_END + 1
+    }
+
+    /// Verifies the request timeout value for the given request type
+    fn verify_request_timeout_value(
         &self,
         request_timeout_ms: u64,
         is_optimistic_fetch_request: bool,
+        is_subscription_request: bool,
         data_request: DataRequest,
     ) {
-        if self.skip_timeout_verification {
-            return;
+        if !self.skip_timeout_verification {
+            // Verify the given timeout for the request
+            let expected_timeout = if is_optimistic_fetch_request {
+                self.aptos_data_client_config.optimistic_fetch_timeout_ms
+            } else if is_subscription_request {
+                self.aptos_data_client_config
+                    .subscription_response_timeout_ms
+            } else {
+                let min_timeout = self.aptos_data_client_config.response_timeout_ms;
+                let max_timeout = self.aptos_data_client_config.max_response_timeout_ms;
+
+                // Check how many times the given request has been made
+                // and update the request counter.
+                let mut data_request_counter_lock = self.data_request_counter.lock();
+                let num_times_requested =
+                    *data_request_counter_lock.get(&data_request).unwrap_or(&0);
+                let _ = data_request_counter_lock
+                    .deref_mut()
+                    .insert(data_request, num_times_requested + 1);
+                drop(data_request_counter_lock);
+
+                // Calculate the expected timeout based on exponential backoff
+                min(
+                    max_timeout,
+                    min_timeout * (u32::pow(2, num_times_requested as u32) as u64),
+                )
+            };
+
+            // Verify the request timeouts match
+            assert_eq!(request_timeout_ms, expected_timeout);
         }
-
-        // Verify the given timeout for the request
-        let expected_timeout = if is_optimistic_fetch_request {
-            self.aptos_data_client_config.optimistic_fetch_timeout_ms
-        } else {
-            let min_timeout = self.aptos_data_client_config.response_timeout_ms;
-            let max_timeout = self.aptos_data_client_config.max_response_timeout_ms;
-
-            // Check how many times the given request has been made
-            // and update the request counter.
-            let mut data_request_counter_lock = self.data_request_counter.lock();
-            let num_times_requested = *data_request_counter_lock.get(&data_request).unwrap_or(&0);
-            let _ = data_request_counter_lock
-                .deref_mut()
-                .insert(data_request, num_times_requested + 1);
-            drop(data_request_counter_lock);
-
-            // Calculate the expected timeout based on exponential backoff
-            min(
-                max_timeout,
-                min_timeout * (u32::pow(2, num_times_requested as u32) as u64),
-            )
-        };
-
-        // Verify the request timeouts match
-        assert_eq!(request_timeout_ms, expected_timeout);
     }
 }
 
@@ -246,16 +289,16 @@ impl AptosDataClientInterface for MockAptosDataClient {
         end_index: u64,
         request_timeout_ms: u64,
     ) -> Result<Response<StateValueChunkWithProof>, aptos_data_client::error::Error> {
-        self.verify_request_timeout(
-            request_timeout_ms,
-            false,
-            DataRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
-                version,
-                start_index,
-                end_index,
-            }),
-        );
-        self.emulate_network_latencies();
+        // Verify the request timeout
+        let data_request = DataRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
+            version,
+            start_index,
+            end_index,
+        });
+        self.verify_request_timeout_value(request_timeout_ms, false, false, data_request);
+
+        // Emulate network latencies
+        self.emulate_network_latencies().await;
 
         // Calculate the last index based on if we should limit the chunk size
         let end_index = self.calculate_last_index(start_index, end_index);
@@ -279,6 +322,8 @@ impl AptosDataClientInterface for MockAptosDataClient {
             proof: SparseMerkleRangeProof::new(vec![]),
             root_hash: HashValue::zero(),
         };
+
+        // Create and send a data client response
         Ok(create_data_client_response(state_value_chunk_with_proof))
     }
 
@@ -288,15 +333,15 @@ impl AptosDataClientInterface for MockAptosDataClient {
         end_epoch: Epoch,
         request_timeout_ms: u64,
     ) -> Result<Response<Vec<LedgerInfoWithSignatures>>, aptos_data_client::error::Error> {
-        self.verify_request_timeout(
-            request_timeout_ms,
-            false,
-            DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
-                start_epoch,
-                expected_end_epoch: end_epoch,
-            }),
-        );
-        self.emulate_network_latencies();
+        // Verify the request timeout
+        let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
+            start_epoch,
+            expected_end_epoch: end_epoch,
+        });
+        self.verify_request_timeout_value(request_timeout_ms, false, false, data_request);
+
+        // Emulate network latencies
+        self.emulate_network_latencies().await;
 
         // Calculate the last epoch based on if we should limit the chunk size
         let end_epoch = self.calculate_last_index(start_epoch, end_epoch);
@@ -313,6 +358,8 @@ impl AptosDataClientInterface for MockAptosDataClient {
             };
             epoch_ending_ledger_infos.push(ledger_info.clone());
         }
+
+        // Create and send a data client response
         Ok(create_data_client_response(epoch_ending_ledger_infos))
     }
 
@@ -325,34 +372,26 @@ impl AptosDataClientInterface for MockAptosDataClient {
         Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>,
         aptos_data_client::error::Error,
     > {
-        self.verify_request_timeout(
-            request_timeout_ms,
-            true,
+        // Verify the request timeout
+        let data_request =
             DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
                 known_version,
                 known_epoch,
-            }),
-        );
-        self.emulate_network_latencies();
+            });
+        self.verify_request_timeout_value(request_timeout_ms, true, false, data_request);
 
-        // Attempt to fetch the new data
+        // Emulate network latencies
+        self.emulate_network_latencies().await;
+
+        // Attempt to fetch and serve the new data
         if self.data_beyond_highest_advertised && known_version < MAX_REAL_TRANSACTION_OUTPUT {
             // Create a mock data client without timeout verification (to handle the internal requests)
-            let mut aptos_data_client = self.clone();
-            aptos_data_client.skip_timeout_verification = true;
+            let aptos_data_client = self.clone_without_timeout_verification();
 
-            let target_ledger_info = if known_epoch <= MAX_REAL_EPOCH_END {
-                // Fetch the epoch ending ledger info
-                aptos_data_client
-                    .get_epoch_ending_ledger_infos(known_epoch, known_epoch, request_timeout_ms)
-                    .await
-                    .unwrap()
-                    .payload[0]
-                    .clone()
-            } else {
-                // Return a synced ledger info at the last version and highest epoch
-                create_ledger_info(MAX_REAL_TRANSACTION_OUTPUT, MAX_REAL_EPOCH_END + 1, false)
-            };
+            // Determine the target ledger info
+            let target_ledger_info =
+                determine_target_ledger_info(known_epoch, request_timeout_ms, &aptos_data_client)
+                    .await;
 
             // Fetch the new transaction outputs
             let outputs_with_proof = aptos_data_client
@@ -366,14 +405,15 @@ impl AptosDataClientInterface for MockAptosDataClient {
                 .unwrap()
                 .payload;
 
-            // Return the new data
-            Ok(create_data_client_response((
+            // Create and send a data client response
+            return Ok(create_data_client_response((
                 outputs_with_proof,
                 target_ledger_info,
-            )))
-        } else {
-            Err(self.emulate_optimistic_fetch_expiration())
+            )));
         }
+
+        // Otherwise, emulate a network request timeout
+        Err(self.emulate_network_request_timeout().await)
     }
 
     async fn get_new_transactions_with_proof(
@@ -386,35 +426,27 @@ impl AptosDataClientInterface for MockAptosDataClient {
         Response<(TransactionListWithProof, LedgerInfoWithSignatures)>,
         aptos_data_client::error::Error,
     > {
-        self.verify_request_timeout(
-            request_timeout_ms,
-            true,
+        // Verify the request timeout
+        let data_request =
             DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
                 known_version,
                 known_epoch,
                 include_events,
-            }),
-        );
-        self.emulate_network_latencies();
+            });
+        self.verify_request_timeout_value(request_timeout_ms, true, false, data_request);
 
-        // Attempt to fetch the new data
+        // Emulate network latencies
+        self.emulate_network_latencies().await;
+
+        // Attempt to fetch and serve the new data
         if self.data_beyond_highest_advertised && known_version < MAX_REAL_TRANSACTION {
             // Create a mock data client without timeout verification (to handle the internal requests)
-            let mut aptos_data_client = self.clone();
-            aptos_data_client.skip_timeout_verification = true;
+            let aptos_data_client = self.clone_without_timeout_verification();
 
-            let target_ledger_info = if known_epoch <= MAX_REAL_EPOCH_END {
-                // Fetch the epoch ending ledger info
-                aptos_data_client
-                    .get_epoch_ending_ledger_infos(known_epoch, known_epoch, request_timeout_ms)
-                    .await
-                    .unwrap()
-                    .payload[0]
-                    .clone()
-            } else {
-                // Return a synced ledger info at the last version and highest epoch
-                create_ledger_info(MAX_REAL_TRANSACTION, MAX_REAL_EPOCH_END + 1, false)
-            };
+            // Determine the target ledger info
+            let target_ledger_info =
+                determine_target_ledger_info(known_epoch, request_timeout_ms, &aptos_data_client)
+                    .await;
 
             // Fetch the new transactions
             let transactions_with_proof = aptos_data_client
@@ -429,14 +461,15 @@ impl AptosDataClientInterface for MockAptosDataClient {
                 .unwrap()
                 .payload;
 
-            // Return the new data
-            Ok(create_data_client_response((
+            // Create and send a data client response
+            return Ok(create_data_client_response((
                 transactions_with_proof,
                 target_ledger_info,
-            )))
-        } else {
-            Err(self.emulate_optimistic_fetch_expiration())
+            )));
         }
+
+        // Otherwise, emulate a network request timeout
+        Err(self.emulate_network_request_timeout().await)
     }
 
     async fn get_new_transactions_or_outputs_with_proof(
@@ -448,23 +481,22 @@ impl AptosDataClientInterface for MockAptosDataClient {
     ) -> aptos_data_client::error::Result<
         Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>,
     > {
-        self.verify_request_timeout(
-            request_timeout_ms,
-            true,
-            DataRequest::GetNewTransactionsOrOutputsWithProof(
-                NewTransactionsOrOutputsWithProofRequest {
-                    known_version,
-                    known_epoch,
-                    include_events,
-                    max_num_output_reductions: 3,
-                },
-            ),
+        // Verify the request timeout
+        let data_request = DataRequest::GetNewTransactionsOrOutputsWithProof(
+            NewTransactionsOrOutputsWithProofRequest {
+                known_version,
+                known_epoch,
+                include_events,
+                max_num_output_reductions: 3,
+            },
         );
-        self.emulate_network_latencies();
+        self.verify_request_timeout_value(request_timeout_ms, true, false, data_request);
+
+        // Emulate network latencies
+        self.emulate_network_latencies().await;
 
         // Create a mock data client without timeout verification (to handle the internal requests)
-        let mut aptos_data_client = self.clone();
-        aptos_data_client.skip_timeout_verification = true;
+        let aptos_data_client = self.clone_without_timeout_verification();
 
         // Get the new transactions or outputs response
         let response = if return_transactions_instead_of_outputs() {
@@ -489,6 +521,8 @@ impl AptosDataClientInterface for MockAptosDataClient {
                 .payload;
             ((None, Some(outputs)), ledger_info)
         };
+
+        // Create and send a data client response
         Ok(create_data_client_response(response))
     }
 
@@ -497,13 +531,14 @@ impl AptosDataClientInterface for MockAptosDataClient {
         version: Version,
         request_timeout_ms: u64,
     ) -> Result<Response<u64>, aptos_data_client::error::Error> {
-        self.verify_request_timeout(
-            request_timeout_ms,
-            false,
-            DataRequest::GetNumberOfStatesAtVersion(version),
-        );
-        self.emulate_network_latencies();
+        // Verify the request timeout
+        let data_request = DataRequest::GetNumberOfStatesAtVersion(version);
+        self.verify_request_timeout_value(request_timeout_ms, false, false, data_request);
 
+        // Emulate network latencies
+        self.emulate_network_latencies().await;
+
+        // Create and send a data client response
         Ok(create_data_client_response(TOTAL_NUM_STATE_VALUES))
     }
 
@@ -514,22 +549,25 @@ impl AptosDataClientInterface for MockAptosDataClient {
         end_version: Version,
         request_timeout_ms: u64,
     ) -> Result<Response<TransactionOutputListWithProof>, aptos_data_client::error::Error> {
-        self.verify_request_timeout(
-            request_timeout_ms,
-            false,
+        // Verify the request timeout
+        let data_request =
             DataRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
                 proof_version,
                 start_version,
                 end_version,
-            }),
-        );
-        self.emulate_network_latencies();
+            });
+        self.verify_request_timeout_value(request_timeout_ms, false, false, data_request);
+
+        // Emulate network latencies
+        self.emulate_network_latencies().await;
 
         // Calculate the last version based on if we should limit the chunk size
         let end_version = self.calculate_last_index(start_version, end_version);
 
+        // Create the output list with proof
         let output_list_with_proof = create_output_list_with_proof(start_version, end_version);
 
+        // Create and send a data client response
         Ok(create_data_client_response(output_list_with_proof))
     }
 
@@ -541,25 +579,26 @@ impl AptosDataClientInterface for MockAptosDataClient {
         include_events: bool,
         request_timeout_ms: u64,
     ) -> Result<Response<TransactionListWithProof>, aptos_data_client::error::Error> {
-        self.verify_request_timeout(
-            request_timeout_ms,
-            false,
-            DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
-                proof_version,
-                start_version,
-                end_version,
-                include_events,
-            }),
-        );
-        self.emulate_network_latencies();
+        // Verify the request timeout
+        let data_request = DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+            proof_version,
+            start_version,
+            end_version,
+            include_events,
+        });
+        self.verify_request_timeout_value(request_timeout_ms, false, false, data_request);
+
+        // Emulate network latencies
+        self.emulate_network_latencies().await;
 
         // Calculate the last version based on if we should limit the chunk size
         let end_version = self.calculate_last_index(start_version, end_version);
 
+        // Create the transaction list with proof
         let transaction_list_with_proof =
             create_transaction_list_with_proof(start_version, end_version, include_events);
 
-        // Return the transaction list with proofs
+        // Create and send a data client response
         Ok(create_data_client_response(transaction_list_with_proof))
     }
 
@@ -571,22 +610,22 @@ impl AptosDataClientInterface for MockAptosDataClient {
         include_events: bool,
         request_timeout_ms: u64,
     ) -> aptos_data_client::error::Result<Response<TransactionOrOutputListWithProof>> {
-        self.verify_request_timeout(
-            request_timeout_ms,
-            false,
+        // Verify the request timeout
+        let data_request =
             DataRequest::GetTransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
                 proof_version,
                 start_version,
                 end_version,
                 include_events,
                 max_num_output_reductions: 3,
-            }),
-        );
-        self.emulate_network_latencies();
+            });
+        self.verify_request_timeout_value(request_timeout_ms, false, false, data_request);
+
+        // Emulate network latencies
+        self.emulate_network_latencies().await;
 
         // Create a mock data client without timeout verification (to handle the internal requests)
-        let mut aptos_data_client = self.clone();
-        aptos_data_client.skip_timeout_verification = true;
+        let aptos_data_client = self.clone_without_timeout_verification();
 
         // Get the transactions or outputs response
         let transactions_or_outputs = if return_transactions_instead_of_outputs() {
@@ -611,39 +650,204 @@ impl AptosDataClientInterface for MockAptosDataClient {
                 .await?;
             (None, Some(outputs_with_proof.payload))
         };
+
+        // Create and send a data client response
         Ok(create_data_client_response(transactions_or_outputs))
     }
 
     async fn subscribe_to_transaction_outputs_with_proof(
         &self,
-        _subscription_request_metadata: SubscriptionRequestMetadata,
-        _request_timeout_ms: u64,
+        subscription_request_metadata: SubscriptionRequestMetadata,
+        request_timeout_ms: u64,
     ) -> aptos_data_client::error::Result<
         Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>,
     > {
-        unimplemented!("TODO: Support me when we add unit tests!")
+        // Extract the known version, known epoch and the subscription stream index
+        let known_version_at_stream_start =
+            subscription_request_metadata.known_version_at_stream_start;
+        let known_epoch_at_stream_start = subscription_request_metadata.known_epoch_at_stream_start;
+        let subscription_stream_index = subscription_request_metadata.subscription_stream_index;
+
+        // Verify the request timeout
+        let data_request = DataRequest::SubscribeTransactionOutputsWithProof(
+            SubscribeTransactionOutputsWithProofRequest {
+                subscription_stream_metadata: SubscriptionStreamMetadata {
+                    known_version_at_stream_start,
+                    known_epoch_at_stream_start,
+                    subscription_stream_id: subscription_request_metadata.subscription_stream_id,
+                },
+                subscription_stream_index,
+            },
+        );
+        self.verify_request_timeout_value(request_timeout_ms, false, true, data_request);
+
+        // Emulate network latencies
+        self.emulate_network_latencies().await;
+
+        // Update the known version and epoch
+        let known_version = known_version_at_stream_start + subscription_stream_index;
+
+        // Attempt to fetch and serve the new data
+        if self.data_beyond_highest_advertised && known_version < MAX_REAL_TRANSACTION_OUTPUT {
+            // Create a mock data client without timeout verification (to handle the internal requests)
+            let aptos_data_client = self.clone_without_timeout_verification();
+
+            // Determine the target ledger info
+            let known_epoch = self.find_known_epoch_for_version(known_version);
+            let target_ledger_info =
+                determine_target_ledger_info(known_epoch, request_timeout_ms, &aptos_data_client)
+                    .await;
+
+            // Fetch the new transaction outputs
+            let outputs_with_proof = aptos_data_client
+                .get_transaction_outputs_with_proof(
+                    known_version + 1,
+                    known_version + 1,
+                    known_version + 1,
+                    self.aptos_data_client_config.response_timeout_ms,
+                )
+                .await
+                .unwrap()
+                .payload;
+
+            // Create and send a data client response
+            return Ok(create_data_client_response((
+                outputs_with_proof,
+                target_ledger_info,
+            )));
+        }
+
+        // Otherwise, emulate a network request timeout
+        Err(self.emulate_network_request_timeout().await)
     }
 
     async fn subscribe_to_transactions_with_proof(
         &self,
-        _subscription_request_metadata: SubscriptionRequestMetadata,
-        _include_events: bool,
-        _request_timeout_ms: u64,
+        subscription_request_metadata: SubscriptionRequestMetadata,
+        include_events: bool,
+        request_timeout_ms: u64,
     ) -> aptos_data_client::error::Result<
         Response<(TransactionListWithProof, LedgerInfoWithSignatures)>,
     > {
-        unimplemented!("TODO: Support me when we add unit tests!")
+        // Extract the known version, known epoch and the subscription stream index
+        let known_version_at_stream_start =
+            subscription_request_metadata.known_version_at_stream_start;
+        let known_epoch_at_stream_start = subscription_request_metadata.known_epoch_at_stream_start;
+        let subscription_stream_index = subscription_request_metadata.subscription_stream_index;
+
+        // Verify the request timeout
+        let data_request =
+            DataRequest::SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest {
+                subscription_stream_metadata: SubscriptionStreamMetadata {
+                    known_version_at_stream_start,
+                    known_epoch_at_stream_start,
+                    subscription_stream_id: subscription_request_metadata.subscription_stream_id,
+                },
+                subscription_stream_index,
+                include_events,
+            });
+        self.verify_request_timeout_value(request_timeout_ms, false, true, data_request);
+
+        // Emulate network latencies
+        self.emulate_network_latencies().await;
+
+        // Update the known version and epoch
+        let known_version = known_version_at_stream_start + subscription_stream_index;
+
+        // Attempt to fetch and serve the new data
+        if self.data_beyond_highest_advertised && known_version < MAX_REAL_TRANSACTION_OUTPUT {
+            // Create a mock data client without timeout verification (to handle the internal requests)
+            let aptos_data_client = self.clone_without_timeout_verification();
+
+            // Determine the target ledger info
+            let known_epoch = self.find_known_epoch_for_version(known_version);
+            let target_ledger_info =
+                determine_target_ledger_info(known_epoch, request_timeout_ms, &aptos_data_client)
+                    .await;
+
+            // Fetch the new transaction outputs
+            let outputs_with_proof = aptos_data_client
+                .get_transactions_with_proof(
+                    known_version + 1,
+                    known_version + 1,
+                    known_version + 1,
+                    include_events,
+                    self.aptos_data_client_config.response_timeout_ms,
+                )
+                .await
+                .unwrap()
+                .payload;
+
+            // Create and send a data client response
+            return Ok(create_data_client_response((
+                outputs_with_proof,
+                target_ledger_info,
+            )));
+        }
+
+        // Otherwise, emulate a network request timeout
+        Err(self.emulate_network_request_timeout().await)
     }
 
     async fn subscribe_to_transactions_or_outputs_with_proof(
         &self,
-        _subscription_request_metadata: SubscriptionRequestMetadata,
-        _include_events: bool,
-        _request_timeout_ms: u64,
+        subscription_request_metadata: SubscriptionRequestMetadata,
+        include_events: bool,
+        request_timeout_ms: u64,
     ) -> aptos_data_client::error::Result<
         Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>,
     > {
-        unimplemented!("TODO: Support me when we add unit tests!")
+        // Extract the known version, known epoch and the subscription stream index
+        let known_version_at_stream_start =
+            subscription_request_metadata.known_version_at_stream_start;
+        let known_epoch_at_stream_start = subscription_request_metadata.known_epoch_at_stream_start;
+        let subscription_stream_index = subscription_request_metadata.subscription_stream_index;
+
+        // Verify the request timeout
+        let data_request = DataRequest::SubscribeTransactionsOrOutputsWithProof(
+            SubscribeTransactionsOrOutputsWithProofRequest {
+                subscription_stream_metadata: SubscriptionStreamMetadata {
+                    known_version_at_stream_start,
+                    known_epoch_at_stream_start,
+                    subscription_stream_id: subscription_request_metadata.subscription_stream_id,
+                },
+                subscription_stream_index,
+                include_events,
+                max_num_output_reductions: 3,
+            },
+        );
+        self.verify_request_timeout_value(request_timeout_ms, false, true, data_request);
+
+        // Emulate network latencies
+        self.emulate_network_latencies().await;
+
+        // Create a mock data client without timeout verification (to handle the internal requests)
+        let aptos_data_client = self.clone_without_timeout_verification();
+
+        // Send the new transactions or outputs response
+        let response = if return_transactions_instead_of_outputs() {
+            let (transactions, ledger_info) = aptos_data_client
+                .subscribe_to_transactions_with_proof(
+                    subscription_request_metadata,
+                    include_events,
+                    request_timeout_ms,
+                )
+                .await?
+                .payload;
+            ((Some(transactions), None), ledger_info)
+        } else {
+            let (outputs, ledger_info) = aptos_data_client
+                .subscribe_to_transaction_outputs_with_proof(
+                    subscription_request_metadata,
+                    request_timeout_ms,
+                )
+                .await?
+                .payload;
+            ((None, Some(outputs)), ledger_info)
+        };
+
+        // Create and send a data client response
+        Ok(create_data_client_response(response))
     }
 }
 
@@ -703,13 +907,13 @@ fn create_epoch_ending_ledger_infos(
     start_version: Version,
     end_epoch: Epoch,
     end_version: Version,
-) -> HashMap<Epoch, LedgerInfoWithSignatures> {
+) -> BTreeMap<Epoch, LedgerInfoWithSignatures> {
     let mut current_epoch = start_epoch;
     let mut current_version = start_version;
 
     // Populate the epoch ending ledger infos using random intervals
     let max_num_versions_in_epoch = (end_version - start_version) / ((end_epoch + 1) - start_epoch);
-    let mut epoch_ending_ledger_infos = HashMap::new();
+    let mut epoch_ending_ledger_infos = BTreeMap::new();
     while current_epoch < end_epoch + 1 {
         let num_versions_in_epoch = create_non_zero_random_u64(max_num_versions_in_epoch);
         current_version += num_versions_in_epoch;
@@ -735,7 +939,7 @@ fn create_synced_ledger_infos(
     start_version: Version,
     end_epoch: Epoch,
     end_version: Version,
-    epoch_ending_ledger_infos: &HashMap<Epoch, LedgerInfoWithSignatures>,
+    epoch_ending_ledger_infos: &BTreeMap<Epoch, LedgerInfoWithSignatures>,
 ) -> Vec<LedgerInfoWithSignatures> {
     let mut current_epoch = start_epoch;
     let mut current_version = start_version;
@@ -810,6 +1014,26 @@ fn create_non_zero_random_u64(max_value: u64) -> u64 {
 fn create_range_random_u64(min_value: u64, max_value: u64) -> u64 {
     let mut rng = OsRng;
     rng.gen_range(min_value, max_value)
+}
+
+/// Determines the target ledger info for the given known epoch
+async fn determine_target_ledger_info(
+    known_epoch: Epoch,
+    request_timeout_ms: u64,
+    aptos_data_client: &MockAptosDataClient,
+) -> LedgerInfoWithSignatures {
+    if known_epoch <= MAX_REAL_EPOCH_END {
+        // Fetch the epoch ending ledger info
+        aptos_data_client
+            .get_epoch_ending_ledger_infos(known_epoch, known_epoch, request_timeout_ms)
+            .await
+            .unwrap()
+            .payload[0]
+            .clone()
+    } else {
+        // Return a synced ledger info at the last version and highest epoch
+        create_ledger_info(MAX_REAL_TRANSACTION, MAX_REAL_EPOCH_END + 1, false)
+    }
 }
 
 /// Initializes the Aptos logger for tests
