@@ -531,12 +531,6 @@ fn single_test_suite(
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
         "epoch_changer_performance" => epoch_changer_performance(),
-        "state_sync_perf_fullnodes_apply_outputs" => state_sync_perf_fullnodes_apply_outputs(),
-        "state_sync_perf_fullnodes_execute_transactions" => {
-            state_sync_perf_fullnodes_execute_transactions()
-        },
-        "state_sync_perf_fullnodes_fast_sync" => state_sync_perf_fullnodes_fast_sync(),
-        "state_sync_perf_validators" => state_sync_perf_validators(),
         "validators_join_and_leave" => validators_join_and_leave(),
         "config" => ForgeConfig::default().add_network_test(ReconfigurationTest),
         "network_partition" => network_partition(),
@@ -574,13 +568,27 @@ fn single_test_suite(
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
         "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
         "multiregion_benchmark_test" => multiregion_benchmark_test(),
+        "gather_metrics" => gather_metrics(),
+        // PFN performance tests
         "pfn_const_tps" => pfn_const_tps(duration, false, false),
         "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true),
         "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true),
+        "pfn_load_sweep" => pfn_load_sweep(false, false),
+        "pfn_load_sweep_with_network_chaos" => pfn_load_sweep(false, true),
+        "pfn_load_sweep_with_realistic_env" => pfn_load_sweep(true, true),
         "pfn_performance" => pfn_performance(duration, false, false),
         "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true),
         "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true),
-        "gather_metrics" => gather_metrics(),
+        "pfn_workload_sweep" => pfn_workload_sweep(false, false),
+        "pfn_workload_sweep_with_network_chaos" => pfn_workload_sweep(false, true),
+        "pfn_workload_sweep_with_realistic_env" => pfn_workload_sweep(true, true),
+        // State sync performance tests
+        "state_sync_perf_fullnodes_apply_outputs" => state_sync_perf_fullnodes_apply_outputs(),
+        "state_sync_perf_fullnodes_execute_transactions" => {
+            state_sync_perf_fullnodes_execute_transactions()
+        },
+        "state_sync_perf_fullnodes_fast_sync" => state_sync_perf_fullnodes_fast_sync(),
+        "state_sync_perf_validators" => state_sync_perf_validators(),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -801,8 +809,17 @@ fn consensus_stress_test() -> ForgeConfig {
 fn realistic_env_sweep_wrap(
     num_validators: usize,
     num_fullnodes: usize,
+    use_unmodified_test: bool,
     test: LoadVsPerfBenchmark,
 ) -> ForgeConfig {
+    // Determine the test type to run
+    let network_test = if use_unmodified_test {
+        CompositeNetworkTest::new_without_wrappers(test) // Use the unmodified test
+    } else {
+        wrap_with_realistic_env(test) // Wrap the test with a realistic env
+    };
+
+    // Create the forge config
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
@@ -810,7 +827,7 @@ fn realistic_env_sweep_wrap(
             helm_values["validator"]["config"]["execution"]
                 ["processed_transactions_detailed_counters"] = true.into();
         }))
-        .add_network_test(wrap_with_realistic_env(test))
+        .add_network_test(network_test)
         // Test inherits the main EmitJobRequest, so update here for more precise latency measurements
         .with_emit_job(
             EmitJobRequest::default().latency_polling_interval(Duration::from_millis(100)),
@@ -831,9 +848,9 @@ fn realistic_env_sweep_wrap(
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(20, 10, false, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TPS(&[10, 100, 1000, 3000, 5000]),
+        workloads: load_sweep_tps_workloads(),
         criteria: [
             (9, 1.5, 3., 4.),
             (95, 1.5, 3., 4.),
@@ -855,41 +872,9 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
 }
 
 fn realistic_env_workload_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(7, 3, false, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TRANSACTIONS(&[
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::CoinTransfer,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::NoOp,
-                num_modules: 100,
-                unique_senders: false,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::ModifyGlobalResource,
-                num_modules: 1,
-                unique_senders: true,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
-                num_modules: 1,
-                unique_senders: true,
-                mempool_backlog: 10000,
-            },
-            // transactions get rejected, to fix.
-            // TransactionWorkload {
-            //     transaction_type: TransactionTypeArg::PublishPackage,
-            //     num_modules: 1,
-            //     unique_senders: true,
-            //     mempool_backlog: 1000,
-            // },
-        ]),
+        workloads: workload_sweep_workloads(),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
             (3700, 0.35, 0.5, 0.8, 0.65),
@@ -1976,11 +1961,21 @@ fn pfn_const_tps(
     add_cpu_chaos: bool,
     add_network_emulation: bool,
 ) -> ForgeConfig {
+    // Determine the number of nodes of each type
+    let num_validators = 7;
+    let num_vfns = 7;
+    let num_pfns = 7;
+
+    // Create the forge config
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
-        .with_initial_fullnode_count(7)
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_vfns)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
-        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
+        .add_network_test(PFNPerformance::new(
+            num_pfns,
+            add_cpu_chaos,
+            add_network_emulation,
+        ))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Require frequent epoch changes
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
@@ -2016,6 +2011,11 @@ fn pfn_performance(
     add_cpu_chaos: bool,
     add_network_emulation: bool,
 ) -> ForgeConfig {
+    // Determine the number of nodes of each type
+    let num_validators = 7;
+    let num_vfns = 7;
+    let num_pfns = 7;
+
     // Determine the minimum expected TPS
     let min_expected_tps = if add_cpu_chaos {
         3000
@@ -2027,9 +2027,13 @@ fn pfn_performance(
 
     // Create the forge config
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
-        .with_initial_fullnode_count(7)
-        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_vfns)
+        .add_network_test(PFNPerformance::new(
+            num_pfns,
+            add_cpu_chaos,
+            add_network_emulation,
+        ))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Require frequent epoch changes
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
@@ -2046,6 +2050,160 @@ fn pfn_performance(
                     max_round_gap: 4,
                 }),
         )
+}
+
+/// This test runs a load sweep benchmark where the network includes
+/// PFNs, and the transactions are submitted to the PFNs. This is useful
+/// for measuring throughput and latencies across different loads.
+///
+/// Note: If `add_cpu_chaos` is true, CPU chaos is enabled on the entire swarm.
+/// Likewise, if `add_network_emulation` is true, network chaos is enabled.
+fn pfn_load_sweep(add_cpu_chaos: bool, add_network_emulation: bool) -> ForgeConfig {
+    // Determine the number of nodes of each type
+    let num_validators = 7;
+    let num_vfns = 7;
+    let num_pfns = 7;
+
+    // Create the forge config
+    let use_unmodified_test = true; // This is required to prevent duplicate environment emulation
+    realistic_env_sweep_wrap(
+        num_validators,
+        num_vfns,
+        use_unmodified_test,
+        LoadVsPerfBenchmark {
+            test: Box::new(PFNPerformance::new(
+                num_pfns,
+                add_cpu_chaos,
+                add_network_emulation,
+            )),
+            workloads: load_sweep_tps_workloads(),
+            criteria: [
+                // TODO: modify these to make sense for the PFNs!
+                (9, 1.5, 3., 4.),
+                (95, 1.5, 3., 4.),
+                (950, 2., 3., 4.),
+                (2750, 2.5, 3.5, 4.5),
+                (4600, 3., 4., 5.),
+            ]
+            .into_iter()
+            .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
+                SuccessCriteria::new(min_tps)
+                    .add_max_expired_tps(0)
+                    .add_max_failed_submission_tps(0)
+                    .add_latency_threshold(max_lat_p50, LatencyType::P50)
+                    .add_latency_threshold(max_lat_p90, LatencyType::P90)
+                    .add_latency_threshold(max_lat_p99, LatencyType::P99)
+            })
+            .collect(),
+        },
+    )
+}
+
+/// This test runs a workload sweep benchmark where the network includes
+/// PFNs, and the transactions are submitted to the PFNs. This is useful
+/// for measuring throughput and latencies across different workloads.
+///
+/// Note: If `add_cpu_chaos` is true, CPU chaos is enabled on the entire swarm.
+/// Likewise, if `add_network_emulation` is true, network chaos is enabled.
+fn pfn_workload_sweep(add_cpu_chaos: bool, add_network_emulation: bool) -> ForgeConfig {
+    // Determine the number of nodes of each type
+    let num_validators = 7;
+    let num_vfns = 7;
+    let num_pfns = 7;
+
+    // Create the forge config
+    let use_unmodified_test = true; // This is required to prevent duplicate environment emulation
+    realistic_env_sweep_wrap(
+        num_validators,
+        num_vfns,
+        use_unmodified_test,
+        LoadVsPerfBenchmark {
+            test: Box::new(PFNPerformance::new(
+                num_pfns,
+                add_cpu_chaos,
+                add_network_emulation,
+            )),
+            workloads: workload_sweep_workloads(),
+            criteria: [
+                // TODO: modify these to make sense for the PFNs!
+                (3700, 0.35, 0.5, 0.8, 0.65),
+                (2800, 0.35, 0.5, 1.2, 1.3),
+                (1800, 0.35, 0.5, 1.5, 2.7),
+                (950, 0.35, 0.65, 1.5, 2.9),
+            ]
+            .into_iter()
+            .map(
+                |(
+                    min_tps,
+                    batch_to_pos,
+                    pos_to_proposal,
+                    proposal_to_ordered,
+                    ordered_to_commit,
+                )| {
+                    SuccessCriteria::new(min_tps)
+                        .add_max_expired_tps(200)
+                        .add_max_failed_submission_tps(200)
+                        .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(
+                            vec![
+                                (LatencyBreakdownSlice::QsBatchToPos, batch_to_pos),
+                                (LatencyBreakdownSlice::QsPosToProposal, pos_to_proposal),
+                                (
+                                    LatencyBreakdownSlice::ConsensusProposalToOrdered,
+                                    proposal_to_ordered,
+                                ),
+                                (
+                                    LatencyBreakdownSlice::ConsensusOrderedToCommit,
+                                    ordered_to_commit,
+                                ),
+                            ],
+                        ))
+                },
+            )
+            .collect(),
+        },
+    )
+}
+
+/// Returns the common load sweep TPS workloads to be used across tests
+fn load_sweep_tps_workloads() -> Workloads {
+    Workloads::TPS(&[10, 100, 1000, 3000, 5000])
+}
+
+/// Returns the common workload sweep workloads to be used across tests
+fn workload_sweep_workloads() -> Workloads {
+    Workloads::TRANSACTIONS(&[
+        TransactionWorkload {
+            transaction_type: TransactionTypeArg::CoinTransfer,
+            num_modules: 1,
+            unique_senders: false,
+            mempool_backlog: 20000,
+        },
+        TransactionWorkload {
+            transaction_type: TransactionTypeArg::NoOp,
+            num_modules: 100,
+            unique_senders: false,
+            mempool_backlog: 20000,
+        },
+        TransactionWorkload {
+            transaction_type: TransactionTypeArg::ModifyGlobalResource,
+            num_modules: 1,
+            unique_senders: true,
+            mempool_backlog: 20000,
+        },
+        TransactionWorkload {
+            transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
+            num_modules: 1,
+            unique_senders: true,
+            mempool_backlog: 10000,
+        },
+        // transactions get rejected, to fix.
+        // TransactionWorkload {
+        //     transaction_type: TransactionTypeArg::PublishPackage,
+        //     num_modules: 1,
+        //     unique_senders: true,
+        //     mempool_backlog: 1000,
+        // },
+    ])
 }
 
 /// A simple test that runs the swarm forever. This is useful for

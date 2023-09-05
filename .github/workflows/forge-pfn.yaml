@@ -95,80 +95,80 @@ jobs:
 
   ### Public fullnode tests
 
-  # Measures PFN latencies with a constant TPS
-  run-forge-pfn-const-tps:
+  # Measures PFN latencies with a TPS load sweep
+  run-forge-pfn-load-sweep:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-pfn-const-tps-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-pfn-load-sweep-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
-      FORGE_TEST_SUITE: pfn_const_tps
+      FORGE_TEST_SUITE: pfn_load_sweep
       POST_TO_SLACK: true
 
-  # Measures PFN latencies with a constant TPS (with network chaos)
-  run-forge-pfn-const-tps-network-chaos:
+  # Measures PFN latencies with a TPS load sweep (with network chaos)
+  run-forge-pfn-load-sweep-network-chaos:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-pfn-const-tps] # Only run after the previous job completes
+    needs: [determine-test-metadata, run-forge-pfn-load-sweep] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-pfn-const-tps-with-network-chaos-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-pfn-load-sweep-with-network-chaos-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
-      FORGE_TEST_SUITE: pfn_const_tps_with_network_chaos
+      FORGE_TEST_SUITE: pfn_load_sweep_with_network_chaos
       POST_TO_SLACK: true
 
-  # Measures PFN latencies with a constant TPS (with a realistic environment)
-  run-forge-pfn-const-tps-realistic-env:
+  # Measures PFN latencies with a TPS load sweep (with a realistic environment)
+  run-forge-pfn-load-sweep-realistic-env:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-pfn-const-tps-network-chaos] # Only run after the previous job completes
+    needs: [determine-test-metadata, run-forge-pfn-load-sweep-network-chaos] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-pfn-const-tps-with-realistic-env-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-pfn-load-sweep-with-realistic-env-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
-      FORGE_TEST_SUITE: pfn_const_tps_with_realistic_env
+      FORGE_TEST_SUITE: pfn_load_sweep_with_realistic_env
       POST_TO_SLACK: true
 
-  # Measures max PFN throughput and latencies under load
-  run-forge-pfn-performance:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-pfn-const-tps-realistic-env] # Only run after the previous job completes
+  # Measures PFN latencies with a workload sweep
+  run-forge-pfn-workload-sweep:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-pfn-performance-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-pfn-workload-sweep-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
-      FORGE_TEST_SUITE: pfn_performance
+      FORGE_TEST_SUITE: pfn_workload_sweep
       POST_TO_SLACK: true
 
-  # Measures max PFN throughput and latencies under load (with network chaos)
-  run-forge-pfn-performance-network-chaos:
+  # Measures PFN latencies with a workload sweep (with network chaos)
+  run-forge-pfn-workload-sweep-network-chaos:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-pfn-performance] # Only run after the previous job completes
+    needs: [determine-test-metadata, run-forge-pfn-workload-sweep] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-pfn-performance-with-network-chaos-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-pfn-workload-sweep-with-network-chaos-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
-      FORGE_TEST_SUITE: pfn_performance_with_network_chaos
+      FORGE_TEST_SUITE: pfn_workload_sweep_with_network_chaos
       POST_TO_SLACK: true
 
-  # Measures max PFN throughput and latencies under load (with a realistic environment)
-  run-forge-pfn-performance-realistic-env:
+  # Measures PFN latencies with a workload sweep (with a realistic environment)
+  run-forge-pfn-workload-sweep-realistic-env:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-pfn-performance-network-chaos] # Only run after the previous job completes
+    needs: [determine-test-metadata, run-forge-pfn-workload-sweep-network-chaos] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-pfn-performance-with-realistic-env-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-pfn-workload-sweep-with-realistic-env-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
-      FORGE_TEST_SUITE: pfn_performance_with_realistic_env
+      FORGE_TEST_SUITE: pfn_workload_sweep_with_realistic_env
       POST_TO_SLACK: true
