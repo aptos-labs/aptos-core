@@ -170,10 +170,10 @@ public fun bls_verify_sig<Gr1, Gr2, GrT, FormatG1, FormatG2, HashMethod>(
     let hash = hash_to<Gr1, HashMethod>(&dst, &message);
     
     // Checks if $e(H(m), pk) = e(sig, g_2)$, where $g_2$ generates $\mathbb{G}_2$
-    return eq(
-        &pairing<Gr1, Gr2, GrT>(&msg_hash, &pk), 
+    eq(
+        &pairing<Gr1, Gr2, GrT>(&hash, &pk), 
         &pairing<Gr1, Gr2, GrT>(&sig, &one<Gr2>())
-    );
+    )
 }
 ```
 
