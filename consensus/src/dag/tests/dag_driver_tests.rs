@@ -79,7 +79,7 @@ async fn test_certified_node_handler() {
         epoch_state.clone(),
         storage.clone(),
         1,
-        0
+        0,
     )));
 
     let network_sender = Arc::new(MockNetworkSender {});

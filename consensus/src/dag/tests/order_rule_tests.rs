@@ -3,9 +3,10 @@
 
 use crate::{
     dag::{
+        adapter::Notifier,
         anchor_election::RoundRobinAnchorElection,
         dag_store::Dag,
-        order_rule::{Notifier, OrderRule},
+        order_rule::OrderRule,
         tests::{dag_test::MockStorage, helpers::new_certified_node},
         types::{NodeCertificate, NodeMetadata},
         CertifiedNode,
@@ -15,9 +16,11 @@ use crate::{
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
-    aggregate_signature::AggregateSignature, epoch_state::EpochState,
+    aggregate_signature::AggregateSignature, epoch_change::EpochChangeProof,
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
     validator_verifier::random_validator_verifier,
 };
+use async_trait::async_trait;
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use proptest::prelude::*;
 use std::sync::Arc;
@@ -121,13 +124,22 @@ pub struct TestNotifier {
     pub tx: UnboundedSender<Vec<Arc<CertifiedNode>>>,
 }
 
+#[async_trait]
 impl Notifier for TestNotifier {
-    fn send(
+    fn send_ordered_nodes(
         &mut self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         _failed_authors: Vec<(Round, Author)>,
     ) -> anyhow::Result<()> {
         Ok(self.tx.unbounded_send(ordered_nodes)?)
+    }
+
+    async fn send_epoch_change(&self, _proof: EpochChangeProof) {
+        unimplemented!()
+    }
+
+    async fn send_commit_proof(&self, _ledger_info: LedgerInfoWithSignatures) {
+        unimplemented!()
     }
 }
 

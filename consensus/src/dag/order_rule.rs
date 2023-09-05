@@ -1,24 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::dag_store::NodeStatus;
 use crate::dag::{
-    anchor_election::AnchorElection, dag_store::Dag, storage::DAGStorage, types::NodeMetadata,
+    adapter::Notifier,
+    anchor_election::AnchorElection,
+    dag_store::{Dag, NodeStatus},
+    storage::DAGStorage,
+    types::NodeMetadata,
     CertifiedNode,
 };
-use aptos_consensus_types::common::{Author, Round};
+use aptos_consensus_types::common::Round;
 use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfo};
 use std::sync::Arc;
-
-pub trait Notifier: Send {
-    fn send(
-        &mut self,
-        ordered_nodes: Vec<Arc<CertifiedNode>>,
-        failed_author: Vec<(Round, Author)>,
-    ) -> anyhow::Result<()>;
-}
 
 pub struct OrderRule {
     epoch_state: Arc<EpochState>,
@@ -184,7 +179,10 @@ impl OrderRule {
         if let Err(e) = self
             .storage
             .save_ordered_anchor_id(&anchor.id())
-            .and_then(|_| self.notifier.send(ordered_nodes, failed_authors))
+            .and_then(|_| {
+                self.notifier
+                    .send_ordered_nodes(ordered_nodes, failed_authors)
+            })
         {
             error!("Failed to send ordered nodes {:?}", e);
         }

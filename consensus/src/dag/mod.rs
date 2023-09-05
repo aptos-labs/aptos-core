@@ -9,6 +9,7 @@ mod dag_driver;
 mod dag_fetcher;
 mod dag_handler;
 mod dag_network;
+mod dag_state_sync;
 mod dag_store;
 mod order_rule;
 mod rb_handler;
@@ -16,7 +17,6 @@ mod storage;
 #[cfg(test)]
 mod tests;
 mod types;
-mod dag_state_sync;
 
 pub use dag_network::{RpcHandler, RpcWithFallback, TDAGNetworkSender};
 pub use types::{CertifiedNode, DAGMessage, DAGNetworkMessage, Extensions, Node, NodeId, Vote};

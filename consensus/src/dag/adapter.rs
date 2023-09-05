@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dag::{order_rule::Notifier, storage::DAGStorage, CertifiedNode},
+    dag::{storage::DAGStorage, CertifiedNode},
     experimental::buffer_manager::OrderedBlocks,
 };
 use aptos_consensus_types::{
@@ -14,17 +14,32 @@ use aptos_executor_types::StateComputeResult;
 use aptos_logger::error;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
+    epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
+use async_trait::async_trait;
 use futures_channel::mpsc::UnboundedSender;
 use std::sync::Arc;
 
-pub struct BufferManagerAdapter {
+#[async_trait]
+pub trait Notifier: Send {
+    fn send_ordered_nodes(
+        &mut self,
+        ordered_nodes: Vec<Arc<CertifiedNode>>,
+        failed_author: Vec<(Round, Author)>,
+    ) -> anyhow::Result<()>;
+
+    async fn send_epoch_change(&self, proof: EpochChangeProof);
+
+    async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures);
+}
+
+pub struct NotificationAdapter {
     executor_channel: UnboundedSender<OrderedBlocks>,
     storage: Arc<dyn DAGStorage>,
 }
 
-impl BufferManagerAdapter {
+impl NotificationAdapter {
     pub fn new(
         executor_channel: UnboundedSender<OrderedBlocks>,
         storage: Arc<dyn DAGStorage>,
@@ -36,8 +51,9 @@ impl BufferManagerAdapter {
     }
 }
 
-impl Notifier for BufferManagerAdapter {
-    fn send(
+#[async_trait]
+impl Notifier for NotificationAdapter {
+    fn send_ordered_nodes(
         &mut self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
@@ -84,5 +100,13 @@ impl Notifier for BufferManagerAdapter {
                 },
             ),
         })?)
+    }
+
+    async fn send_epoch_change(&self, _proof: EpochChangeProof) {
+        todo!()
+    }
+
+    async fn send_commit_proof(&self, _ledger_info: LedgerInfoWithSignatures) {
+        todo!()
     }
 }

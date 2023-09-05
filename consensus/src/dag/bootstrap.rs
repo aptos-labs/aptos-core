@@ -10,10 +10,10 @@ use super::{
     order_rule::OrderRule,
     rb_handler::NodeBroadcastHandler,
     storage::DAGStorage,
-    types::DAGMessage,
+    types::DAGMessage, dag_state_sync::DAG_WINDOW,
 };
 use crate::{
-    dag::adapter::BufferManagerAdapter, experimental::buffer_manager::OrderedBlocks,
+    dag::adapter::NotificationAdapter, experimental::buffer_manager::OrderedBlocks,
     network::IncomingDAGRequest, state_replication::PayloadClient,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -47,7 +47,7 @@ pub fn bootstrap_dag(
     let current_round = latest_ledger_info.round();
 
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
-    let adapter = Box::new(BufferManagerAdapter::new(ordered_nodes_tx, storage.clone()));
+    let adapter = Box::new(NotificationAdapter::new(ordered_nodes_tx, storage.clone()));
     let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
 
     // A backoff policy that starts at 100ms and doubles each iteration.
@@ -65,7 +65,7 @@ pub fn bootstrap_dag(
         epoch_state.clone(),
         storage.clone(),
         current_round,
-        0,
+        DAG_WINDOW,
     )));
 
     let anchor_election = Box::new(RoundRobinAnchorElection::new(validators));

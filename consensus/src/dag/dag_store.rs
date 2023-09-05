@@ -51,8 +51,8 @@ impl Dag {
     pub fn new(
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
-        initial_round: Round,
         highest_committed_anchor_round: Round,
+        dag_window_size_config: usize,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
@@ -82,7 +82,7 @@ impl Dag {
             nodes_by_round,
             author_to_index,
             storage,
-            initial_round,
+            initial_round: highest_committed_anchor_round - (dag_window_size_config as Round),
             epoch_state,
             highest_committed_anchor_round,
         }
