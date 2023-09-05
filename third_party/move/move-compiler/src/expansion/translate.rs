@@ -459,7 +459,7 @@ fn module_(
     let mut new_scope = AliasMapBuilder::new();
     module_self_aliases(&mut new_scope, &current_module);
 
-    // Make a copy of the original UseDecls, to path on in the expansion AST before they are
+    // Make a copy of the original UseDecls, to be passed on to the expansion AST before they are
     // processed here.
     let use_decls = members
         .iter()

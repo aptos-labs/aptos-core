@@ -1388,6 +1388,7 @@ impl GlobalEnv {
         let field_id = FieldId::new(field_name);
         field_data.insert(field_id, FieldData {
             name: field_name,
+            loc: loc.clone(),
             offset: 0,
             ty,
         });
@@ -2906,6 +2907,9 @@ pub struct FieldData {
     /// The name of this field.
     pub name: Symbol,
 
+    /// The location of the field declaration.
+    pub loc: Loc,
+
     /// The offset of this field.
     pub offset: usize,
 
@@ -2931,6 +2935,11 @@ impl<'env> FieldEnv<'env> {
     /// Gets the id of this field.
     pub fn get_id(&self) -> FieldId {
         FieldId(self.data.name)
+    }
+
+    /// Gets the location of the field declaration.
+    pub fn get_loc(&self) -> &Loc {
+        &self.data.loc
     }
 
     /// Get documentation associated with this field.

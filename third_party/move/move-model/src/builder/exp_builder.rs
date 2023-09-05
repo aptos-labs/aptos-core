@@ -2180,7 +2180,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 .expect("invalid Type::Struct");
             // Lookup the field in the struct.
             if let Some(fields) = &entry.fields {
-                if let Some((_, field_ty)) = fields.get(&field_name) {
+                if let Some((_, _, field_ty)) = fields.get(&field_name) {
                     // We must instantiate the field type by the provided type args.
                     let field_ty = field_ty.instantiate(targs);
                     Some((
@@ -2676,7 +2676,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let mut args = BTreeMap::new();
                 for (name_loc, name_, (_, value)) in fields.iter() {
                     let field_name = self.symbol_pool().make(name_);
-                    if let Some((idx, field_ty)) = field_decls.get(&field_name) {
+                    if let Some((_, idx, field_ty)) = field_decls.get(&field_name) {
                         // Translate the abstract value of the field, passing in its instantiated
                         // type.
                         let translated =
