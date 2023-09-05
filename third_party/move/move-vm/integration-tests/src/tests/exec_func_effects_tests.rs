@@ -74,7 +74,11 @@ fn setup_module() -> ModuleCode {
             fun {}(_a: & u64) {{ }}
         }}
     "#,
-        TEST_ADDR, TEST_MODULE_ID, USE_MUTREF_LABEL, EXPECT_MUTREF_OUT_VALUE, USE_REF_LABEL
+        TEST_ADDR.to_hex(),
+        TEST_MODULE_ID,
+        USE_MUTREF_LABEL,
+        EXPECT_MUTREF_OUT_VALUE,
+        USE_REF_LABEL
     );
 
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new(TEST_MODULE_ID).unwrap());

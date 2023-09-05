@@ -1701,7 +1701,7 @@ impl VMAdapter for AptosVM {
             },
             PreprocessedTransaction::UserTransaction(txn) => {
                 fail_point!("aptos_vm::execution::user_transaction");
-                let sender = txn.sender().to_string();
+                let sender = txn.sender().to_hex();
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
                 let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
 
