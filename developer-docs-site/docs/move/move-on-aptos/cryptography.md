@@ -170,10 +170,10 @@ public fun bls_verify_sig<Gr1, Gr2, GrT, FormatG1, FormatG2, HashMethod>(
     let hash = hash_to<Gr1, HashMethod>(&dst, &message);
     
     // Checks if $e(H(m), pk) = e(sig, g_2)$, where $g_2$ generates $\mathbb{G}_2$
-    return eq(
-        &pairing<Gr1, Gr2, GrT>(&msg_hash, &pk), 
+    eq(
+        &pairing<Gr1, Gr2, GrT>(&hash, &pk), 
         &pairing<Gr1, Gr2, GrT>(&sig, &one<Gr2>())
-    );
+    )
 }
 ```
 
@@ -215,7 +215,7 @@ This module is educational. It is **not** production-ready. Using it could lead 
 
 ### Groth16 zkSNARK verifier
 
-The [`groth16` example](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/groth16_example/sources) demonstrates how to verify Groth16 zkSNARK proofs[^groth16], which are the shortest, fastest-to-verify, general-purpose zero-knowledge proofs.
+The [`groth16` example](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/groth16_example/sources/groth16.move) demonstrates how to verify Groth16 zkSNARK proofs[^groth16], which are the shortest, fastest-to-verify, general-purpose zero-knowledge proofs.
 Importantly, as explained [above](#generic-elliptic-curve-arithmetic), this implementation is *generic* over **any** curve, making it very easy for Move developers to use it with their favorite (supported) curves.
 
 :::caution
