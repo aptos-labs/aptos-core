@@ -37,6 +37,7 @@ Bitwise
 BlockMetadata
 BlockMetadataTransaction
 BlockQuote
+Bo
 Boneh
 Bootle
 Bundlr
@@ -49,6 +50,7 @@ CMake
 CPU
 CPUs
 ChainID
+Chalkias
 Clippy
 CodeBlock
 CoinClient
@@ -80,6 +82,7 @@ Devnet
 Diffie
 DoS
 DocGen
+Duif
 EACCOUNT
 EALREADY
 EBS
@@ -113,6 +116,7 @@ EVM
 EWITHDRAW
 EWRONG
 EZERO
+EdDSAs
 Eg
 Enqueue
 EntryFunction
@@ -131,6 +135,7 @@ FT
 FTs
 Failover
 FaucetClient
+François
 FullNode
 Fullnodes
 FungibleAssetsClient
@@ -147,6 +152,7 @@ GPUs
 GRPC
 GUID
 Gailly
+Garillot
 Gbps
 Grafana
 GraphQL
@@ -170,9 +176,11 @@ Jetbrains
 Jolteon
 Keccak
 KiB
+Konstantinos
 Kubernetes
 LLVM
 Labs's
+Lange
 Leaderboard
 LiquidityPool
 Liveness
@@ -205,6 +213,8 @@ NHC
 NPM
 NetworkAddress
 Newtonsoft
+Niels
+Nikolaenko
 NoAvailablePeers
 NodeExporter
 ORM
@@ -252,11 +262,13 @@ SDKs
 SHA
 SPLITABLE
 SSD
+SSR
 STM
 SYNACK
 Samundra
 Scalable
 Schnorr
+Schwabe
 SeaLevel
 Shacham
 Sig
@@ -272,6 +284,7 @@ TCP
 TPS
 TXT
 TabItem
+Tanja
 Terraform
 Testnet
 ThemedImage
@@ -385,6 +398,7 @@ dapp
 dapp's
 dapps
 data's
+de
 deallocate
 debuggability
 deduping
@@ -400,11 +414,13 @@ deserialize
 deserialized
 deserializing
 dev
+devalence
 devnet
 doesnt
 dr
 dropdown
 ePrint
+eddsa
 eg
 encodings
 endian
