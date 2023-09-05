@@ -31,6 +31,12 @@ pub struct ExecutedBlock {
     state_compute_result: StateComputeResult,
 }
 
+impl ExecutedBlock {
+    pub fn ditch_result(self) -> Block {
+        self.block
+    }
+}
+
 impl Debug for ExecutedBlock {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{}", self)
