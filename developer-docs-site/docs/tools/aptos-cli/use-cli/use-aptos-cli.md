@@ -97,59 +97,67 @@ Help for sub-commands is also available. For example, see below the usage output
 
 ```bash
 
-USAGE:
-    aptos move compile [OPTIONS]
+Usage: aptos move compile [OPTIONS]
 
-OPTIONS:
-        --bytecode-version <BYTECODE_VERSION>
-            Specify the version of the bytecode the compiler is going to emit
+Options:
+      --save-metadata
+          Save the package metadata in the package's build directory
+          
+          If set, package metadata should be generated and stored in the package's build directory. This metadata can be used to construct a transaction to publish a package.
 
-    -h, --help
-            Print help information
+      --included-artifacts <INCLUDED_ARTIFACTS>
+          Artifacts to be generated when building the package
+          
+          Which artifacts to include in the package. This can be one of `none`, `sparse`, and `all`. `none` is the most compact form and does not allow to reconstruct a source package from chain; `sparse` is the minimal set of artifacts needed to reconstruct a source package; `all` includes all available artifacts. The choice of included artifacts heavily influences the size and therefore gas cost of publishing: `none` is the size of bytecode alone; `sparse` is roughly 2 times as much; and `all` 3-4 as much.
+          
+          [default: sparse]
+          [possible values: none, sparse, all]
 
-        --included-artifacts <INCLUDED_ARTIFACTS>
-            Artifacts to be generated when building the package
+      --dev
+          Enables dev mode, which uses all dev-addresses and dev-dependencies
+          
+          Dev mode allows for changing dependencies and addresses to the preset [dev-addresses] and [dev-dependencies] fields.  This works both inside and out of tests for using preset values.
+          
+          Currently, it also additionally pulls in all test compilation artifacts
 
-            Which artifacts to include in the package. This can be one of `none`, `sparse`, and
-            `all`. `none` is the most compact form and does not allow to reconstruct a source
-            package from chain; `sparse` is the minimal set of artifacts needed to reconstruct a
-            source package; `all` includes all available artifacts. The choice of included artifacts
-            heavily influences the size and therefore gas cost of publishing: `none` is the size of
-            bytecode alone; `sparse` is roughly 2 times as much; and `all` 3-4 as much.
+      --package-dir <PACKAGE_DIR>
+          Path to a move package (the folder with a Move.toml file)
 
-            [default: sparse]
+      --output-dir <OUTPUT_DIR>
+          Path to save the compiled move package
+          
+          Defaults to `<package_dir>/build`
 
-        --named-addresses <NAMED_ADDRESSES>
-            Named addresses for the move binary
+      --named-addresses <NAMED_ADDRESSES>
+          Named addresses for the move binary
+          
+          Example: alice=0x1234, bob=0x5678
+          
+          Note: This will fail if there are duplicates in the Move.toml file remove those first.
+          
+          [default: ]
 
-            Example: alice=0x1234, bob=0x5678
+      --skip-fetch-latest-git-deps
+          Skip pulling the latest git dependencies
+          
+          If you don't have a network connection, the compiler may fail due to no ability to pull git dependencies.  This will allow overriding this for local development.
 
-            Note: This will fail if there are duplicates in the Move.toml file remove those first.
+      --bytecode-version <BYTECODE_VERSION>
+          Specify the version of the bytecode the compiler is going to emit
 
-            [default: ]
+      --compiler-version <COMPILER_VERSION>
+          Specify the version of the compiler
+          
+          [possible values: v1, v2]
 
-        --output-dir <OUTPUT_DIR>
-            Path to save the compiled move package
+      --skip-attribute-checks
+          Do not complain about unknown attributes in Move code
 
-            Defaults to `<package_dir>/build`
+  -h, --help
+          Print help (see a summary with '-h')
 
-        --package-dir <PACKAGE_DIR>
-            Path to a move package (the folder with a Move.toml file)
-
-        --save-metadata
-            Save the package metadata in the package's build directory
-
-            If set, package metadata should be generated and stored in the package's build
-            directory. This metadata can be used to construct a transaction to publish a package.
-
-        --skip-fetch-latest-git-deps
-            Skip pulling the latest git dependencies
-
-            If you don't have a network connection, the compiler may fail due to no ability to pull
-            git dependencies.  This will allow overriding this for local development.
-
-    -V, --version
-            Print version information
+  -V, --version
+          Print version
 ```
 
 ## CLI information
@@ -159,15 +167,19 @@ Run the `aptos info` command to get the CLI information for debugging purposes. 
 ```bash
 {
   "Result": {
-    "build_branch": "testnet",
-    "build_cargo_version": "cargo 1.62.1 (a748cf5a3 2022-06-08)",
-    "build_commit_hash": "f8bf8fdeec33c8c6ff3d1cbaf4990b9e54c2176a",
-    "build_os": "macos-x86_64",
-    "build_pkg_version": "0.3.2",
-    "build_rust_channel": "1.62.1-x86_64-apple-darwin",
-    "build_rust_version": "rustc 1.62.1 (e092d0b6b 2022-07-16)",
+    "build_branch": "",
+    "build_cargo_version": "cargo 1.71.2 (1a737af0c 2023-08-07)",
+    "build_clean_checkout": "true",
+    "build_commit_hash": "",
+    "build_is_release_build": "true",
+    "build_os": "macos-aarch64",
+    "build_pkg_version": "2.1.0",
+    "build_profile_name": "cli",
+    "build_rust_channel": "",
+    "build_rust_version": "rustc 1.71.1 (eb26296b5 2023-08-03) (built from a source tarball)",
     "build_tag": "",
-    "build_time": "2022-08-26 22:27:31 +00:00"
+    "build_time": "2023-08-24 21:13:40 +00:00",
+    "build_using_tokio_unstable": "true"
   }
 }
 ```
@@ -246,6 +258,7 @@ A local folder named `.aptos/` will be created with a configuration `config.yaml
 ### Step 1: Run Aptos init
 
 The `aptos init` command will initialize the configuration with the private key you provided.
+Note: If you would like to initialize a new profile from ledger, please refer to the [Ledger documentation](./use-aptos-ledger.md).
 
 ```bash
 $ aptos init
