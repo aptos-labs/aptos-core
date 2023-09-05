@@ -427,6 +427,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX,
         FeatureFlag::AGGREGATOR_SNAPSHOTS,
         FeatureFlag::SAFER_RESOURCE_GROUPS,
+        FeatureFlag::SAFER_METADATA,
     ]
 }
 
