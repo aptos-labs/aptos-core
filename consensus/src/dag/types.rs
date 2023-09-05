@@ -420,12 +420,12 @@ impl TDAGMessage for CertifiedNode {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct CertifiedNodeWithLedgerInfo {
+pub struct CertifiedNodeMessage {
     inner: CertifiedNode,
     ledger_info: LedgerInfoWithSignatures,
 }
 
-impl CertifiedNodeWithLedgerInfo {
+impl CertifiedNodeMessage {
     pub fn new(node: CertifiedNode, ledger_info: LedgerInfoWithSignatures) -> Self {
         Self {
             inner: node,
@@ -438,7 +438,7 @@ impl CertifiedNodeWithLedgerInfo {
     }
 }
 
-impl Deref for CertifiedNodeWithLedgerInfo {
+impl Deref for CertifiedNodeMessage {
     type Target = CertifiedNode;
 
     fn deref(&self) -> &Self::Target {

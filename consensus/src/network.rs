@@ -493,15 +493,6 @@ impl TDAGNetworkSender for DAGNetworkSenderImpl {
             self.time_service.clone(),
         )
     }
-
-    async fn send_epoch_change(&self, proof: EpochChangeProof) {
-        self.sender.send_epoch_change(proof).await
-    }
-
-    /// Sends the ledger info to self buffer manager
-    async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
-        self.sender.send_commit_proof(ledger_info).await
-    }
 }
 
 #[async_trait]

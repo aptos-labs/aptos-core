@@ -94,6 +94,22 @@ impl Dag {
         }
     }
 
+    pub fn new_empty(
+        epoch_state: Arc<EpochState>,
+        storage: Arc<dyn DAGStorage>,
+        initial_round: Round,
+    ) -> Self {
+        let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
+        let nodes_by_round = BTreeMap::new();
+        Self {
+            nodes_by_round,
+            author_to_index,
+            storage,
+            initial_round,
+            epoch_state,
+        }
+    }
+
     pub(crate) fn lowest_round(&self) -> Round {
         *self
             .nodes_by_round
@@ -141,10 +157,6 @@ impl Dag {
         self.get_node_ref_by_metadata(metadata).is_some()
     }
 
-    pub fn exists_by_round_digest(&self, round: Round, digest: HashValue) -> bool {
-        self.get_node_by_round_digest(round, digest).is_some()
-    }
-
     pub fn all_exists<'a>(&self, nodes: impl Iterator<Item = &'a NodeMetadata>) -> bool {
         self.filter_missing(nodes).next().is_none()
     }
@@ -161,15 +173,6 @@ impl Dag {
         nodes: impl Iterator<Item = &'a NodeMetadata> + 'b,
     ) -> impl Iterator<Item = &'a NodeMetadata> + 'b {
         nodes.filter(|node_metadata| !self.exists(node_metadata))
-    }
-
-    pub fn get_node_ref_by_round_digest(
-        &self,
-        round: Round,
-        digest: HashValue,
-    ) -> Option<&NodeStatus> {
-        self.get_round_iter(round)?
-            .find(|node_status| node_status.as_node().digest() == digest)
     }
 
     pub fn get_node_ref_mut_by_round_digest(
@@ -223,15 +226,6 @@ impl Dag {
         author: &Author,
     ) -> Option<&Arc<CertifiedNode>> {
         self.get_node_ref(round, author)
-            .map(|node_status| node_status.as_node())
-    }
-
-    pub fn get_node_by_round_digest(
-        &self,
-        round: Round,
-        digest: HashValue,
-    ) -> Option<&Arc<CertifiedNode>> {
-        self.get_node_ref_by_round_digest(round, digest)
             .map(|node_status| node_status.as_node())
     }
 
@@ -377,7 +371,7 @@ impl Dag {
         }
     }
 
-    pub(super) fn highest_ordered_round(&self) -> Option<Round> {
+    pub(super) fn highest_ordered_anchor_round(&self) -> Option<Round> {
         for (round, round_nodes) in self.nodes_by_round.iter().rev() {
             for maybe_node_status in round_nodes {
                 if matches!(maybe_node_status, Some(NodeStatus::Ordered(_))) {
@@ -388,8 +382,8 @@ impl Dag {
         None
     }
 
-    pub(super) fn highest_committed_round(&self) -> Option<Round> {
-        for (round, round_nodes) in self.nodes_by_round.iter() {
+    pub(super) fn highest_committed_anchor_round(&self) -> Option<Round> {
+        for (round, round_nodes) in self.nodes_by_round.iter().rev() {
             for maybe_node_status in round_nodes {
                 if matches!(maybe_node_status, Some(NodeStatus::Committed(_))) {
                     return Some(*round);
