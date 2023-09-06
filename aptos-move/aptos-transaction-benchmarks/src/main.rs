@@ -58,13 +58,13 @@ struct ParamSweepOpt {
 
 #[derive(Debug, Parser)]
 struct ExecuteOpt {
-    #[clap(long, default_value_t = 10000)]
+    #[clap(long, default_value_t = 100000)]
     pub num_accounts: usize,
 
     #[clap(long, default_value_t = 5)]
     pub num_warmups: usize,
 
-    #[clap(long, default_value_t = 100000)]
+    #[clap(long, default_value_t = 10000)]
     pub block_size: usize,
 
     #[clap(long, default_value_t = 15)]
@@ -84,6 +84,9 @@ struct ExecuteOpt {
 
     #[clap(long)]
     pub maybe_block_gas_limit: Option<u64>,
+
+    #[clap(long, default_value_t = false)]
+    pub generate_then_execute: bool,
 }
 
 fn param_sweep(opt: ParamSweepOpt) {
@@ -121,6 +124,7 @@ fn param_sweep(opt: ParamSweepOpt) {
                 None,
                 false,
                 maybe_block_gas_limit,
+                false,
             );
             par_tps.sort();
             seq_tps.sort();
@@ -169,6 +173,7 @@ fn param_sweep(opt: ParamSweepOpt) {
 }
 
 fn execute(opt: ExecuteOpt) {
+    disable_speculative_logging();
     let bencher = TransactionBencher::new(any_with::<P2PTransferGen>((1_000, 1_000_000)));
 
     let (par_tps, _) = bencher.blockstm_benchmark(
@@ -183,6 +188,7 @@ fn execute(opt: ExecuteOpt) {
         opt.remote_executor_addresses,
         opt.no_conflict_txns,
         opt.maybe_block_gas_limit,
+        opt.generate_then_execute,
     );
 
     let sum: usize = par_tps.iter().sum();
@@ -197,6 +203,7 @@ fn main() {
             .unwrap()
             .as_millis() as i64,
     );
+    aptos_node_resource_metrics::register_node_metrics_collector();
     let _mp = MetricsPusher::start_for_local_run("block-stm-benchmark");
     let args = Args::parse();
 

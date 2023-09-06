@@ -7,28 +7,26 @@ mod module_generator;
 
 use crate::file_format_generator::module_generator::ModuleContext;
 use module_generator::ModuleGenerator;
-use move_binary_format::{
-    file_format as FF,
-    file_format::{CompiledScript, FunctionDefinition, FunctionHandle},
-    CompiledModule,
-};
+use move_binary_format::{file_format as FF, internals::ModuleIndex};
+use move_command_line_common::{address::NumericalAddress, parser::NumberFormat};
+use move_compiler::compiled_unit as CU;
 use move_model::model::GlobalEnv;
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
+use move_symbol_pool::Symbol;
 
 pub fn generate_file_format(
     env: &GlobalEnv,
     targets: &FunctionTargetsHolder,
-) -> (Vec<FF::CompiledModule>, Vec<FF::CompiledScript>) {
+) -> Vec<CU::CompiledUnit> {
     let ctx = ModuleContext { env, targets };
-    let mut modules = vec![];
-    let mut scripts = vec![];
+    let mut result = vec![];
     for module_env in ctx.env.get_modules() {
         if !module_env.is_target() {
             continue;
         }
-        let (ff_module, main_handle) = ModuleGenerator::run(&ctx, &module_env);
+        let (ff_module, source_map, main_handle) = ModuleGenerator::run(&ctx, &module_env);
         if module_env.is_script_module() {
-            let CompiledModule {
+            let FF::CompiledModule {
                 version,
                 module_handles,
                 struct_handles,
@@ -42,16 +40,18 @@ pub fn generate_file_format(
                 metadata,
                 ..
             } = ff_module;
-            if let Some(FunctionDefinition {
+            if let Some(FF::FunctionDefinition {
                 code: Some(code), ..
             }) = function_defs.pop()
             {
-                let FunctionHandle {
+                let FF::FunctionHandle {
                     parameters,
                     type_parameters,
+                    name,
                     ..
                 } = main_handle.expect("main handle defined");
-                scripts.push(CompiledScript {
+                let name = Symbol::from(identifiers[name.into_index()].as_str());
+                let script = FF::CompiledScript {
                     version,
                     module_handles,
                     struct_handles,
@@ -65,15 +65,30 @@ pub fn generate_file_format(
                     code,
                     type_parameters,
                     parameters,
-                })
+                };
+                result.push(CU::CompiledUnitEnum::Script(CU::NamedCompiledScript {
+                    package_name: None,
+                    name,
+                    script,
+                    source_map,
+                }))
             } else {
                 ctx.internal_error(module_env.get_loc(), "inconsistent script module");
             }
         } else {
-            modules.push(ff_module)
+            result.push(CU::CompiledUnitEnum::Module(CU::NamedCompiledModule {
+                package_name: None,
+                address: NumericalAddress::new(
+                    module_env.get_name().addr().expect_numerical().into_bytes(),
+                    NumberFormat::Hex,
+                ),
+                name: Symbol::from(ctx.symbol_to_str(module_env.get_name().name())),
+                module: ff_module,
+                source_map,
+            }));
         }
     }
-    (modules, scripts)
+    result
 }
 
 const MAX_MODULE_COUNT: usize = FF::TableIndex::MAX as usize;

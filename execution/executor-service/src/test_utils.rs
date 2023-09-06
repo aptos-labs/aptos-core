@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use aptos_block_partitioner::BlockPartitionerConfig;
+use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_language_e2e_tests::{
     account::AccountData, common_transactions::peer_to_peer_txn, data_store::FakeDataStore,
     executor::FakeExecutor,
@@ -101,13 +101,12 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
     for _ in 0..num_txns {
         transactions.push(generate_non_conflicting_p2p(&mut executor).0)
     }
-    let partitioner = BlockPartitionerConfig::default()
-        .num_shards(num_shards)
+    let partitioner = PartitionerV2Config::default()
         .max_partitioning_rounds(2)
         .cross_shard_dep_avoid_threshold(0.9)
         .partition_last_round(true)
         .build();
-    let partitioned_txns = partitioner.partition(transactions.clone());
+    let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),

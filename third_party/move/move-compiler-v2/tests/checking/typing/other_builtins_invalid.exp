@@ -1,16 +1,16 @@
 
 Diagnostics:
 error: invalid call of `freeze`: mutability mismatch (&mut != &) for argument 1
-  ┌─ tests/checking/typing/other_builtins_invalid.move:4:10
+  ┌─ tests/checking/typing/other_builtins_invalid.move:4:22
   │
 4 │         (freeze<u64>(x): &mut u64);
-  │          ^^^^^^^^^^^^^^
+  │                      ^
 
 error: invalid call of `freeze`: mutability mismatch (&mut != &) for argument 1
-  ┌─ tests/checking/typing/other_builtins_invalid.move:5:10
+  ┌─ tests/checking/typing/other_builtins_invalid.move:5:31
   │
 5 │         (freeze<vector<bool>>(&any()): &mut vector<bool>);
-  │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │                               ^^^^^^
 
 error: expected `u64` but found `bool`
   ┌─ tests/checking/typing/other_builtins_invalid.move:7:22

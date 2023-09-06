@@ -1,3 +1,4 @@
+import re
 import click
 from .create_testnet import create_testnet_main, CreateArgs, SystemContext
 from .delete_testnet import delete_testnet_main
@@ -26,8 +27,8 @@ import pangu_lib.util as util
 @click.option("--layout-path", help="Pass the path to the layout file (yaml).")
 @click.option(
     "--framework-path",
-    default=f"{util.TEMPLATE_DIRECTORY}/framework.mrb",
-    help="Pass in the path to the compiled move framework (head.mrb, or framework.mrb) file. Defaults to the default framework in the pangu_lib.",
+    required=True,
+    help="Pass in the path to the compiled move framework (head.mrb, or framework.mrb) file. To compile it, run: $ cargo run --locked --package aptos-framework -- release",
 )
 @click.option(
     "--num-of-validators",
@@ -45,8 +46,8 @@ import pangu_lib.util as util
 )
 @click.option(
     "--dry-run",
-    default=False,
     help="Pass in true if you would like to run genesis without deploying on K8S. All k8s YAML files will be dumped to the workspace",
+    is_flag=True,
 )
 @click.option(
     "--name",

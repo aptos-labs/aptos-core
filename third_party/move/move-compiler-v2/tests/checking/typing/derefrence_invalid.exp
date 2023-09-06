@@ -1,22 +1,22 @@
 
 Diagnostics:
 error: expected `bool` but found `u64`
-  ┌─ tests/checking/typing/derefrence_invalid.move:6:10
+  ┌─ tests/checking/typing/derefrence_invalid.move:6:11
   │
 6 │         (*x : bool);
-  │          ^^
+  │           ^
 
 error: expected `&u64` but found `u64`
-  ┌─ tests/checking/typing/derefrence_invalid.move:7:10
+  ┌─ tests/checking/typing/derefrence_invalid.move:7:11
   │
 7 │         (*x_mut: &u64);
-  │          ^^^^^^
+  │           ^^^^^
 
 error: expected `M::X` but found `M::S`
-  ┌─ tests/checking/typing/derefrence_invalid.move:9:10
+  ┌─ tests/checking/typing/derefrence_invalid.move:9:11
   │
 9 │         (*s: X);
-  │          ^^
+  │           ^
 
 error: expected `bool` but found `u64`
    ┌─ tests/checking/typing/derefrence_invalid.move:10:12
@@ -43,10 +43,10 @@ error: cannot borrow from a reference
    │           ^^^^
 
 error: expected `M::X` but found `M::S`
-   ┌─ tests/checking/typing/derefrence_invalid.move:14:10
+   ┌─ tests/checking/typing/derefrence_invalid.move:14:11
    │
 14 │         (*s_mut: X);
-   │          ^^^^^^
+   │           ^^^^^
 
 error: expected `bool` but found `u64`
    ┌─ tests/checking/typing/derefrence_invalid.move:15:12

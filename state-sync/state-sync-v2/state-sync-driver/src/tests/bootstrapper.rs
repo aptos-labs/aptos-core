@@ -714,6 +714,128 @@ async fn test_snapshot_sync_epoch_change() {
 }
 
 #[tokio::test]
+async fn test_snapshot_sync_epoch_change_genesis() {
+    // Create test data
+    let synced_version = GENESIS_TRANSACTION_VERSION; // Genesis is the highest synced version
+    let target_version = GENESIS_TRANSACTION_VERSION; // Genesis should be the target
+    let highest_version = 9999;
+    let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 0);
+
+    // Create a driver configuration with a genesis waypoint and fast syncing
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+
+    // Create the mock streaming client
+    let mut mock_streaming_client = create_mock_streaming_client();
+    let (_notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
+    mock_streaming_client
+        .expect_get_all_state_values()
+        .times(1)
+        .with(eq(target_version), eq(Some(0)))
+        .return_once(move |_, _| Ok(data_stream_listener_1));
+
+    // Create the mock metadata storage
+    let mut metadata_storage = MockMetadataStorage::new();
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(move || Ok(None));
+
+    // Create the bootstrapper
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        synced_version,
+        true,
+    );
+
+    // Manually insert a transaction output to sync
+    bootstrapper
+        .get_state_value_syncer()
+        .set_transaction_output_to_sync(create_output_list_with_proof());
+
+    // Create a global data summary
+    let mut global_data_summary = create_global_summary(0);
+    global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info.clone()];
+
+    // Drive progress to verify the waypoint
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // Drive progress again to start the state value stream
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_snapshot_sync_epoch_change_genesis_restart() {
+    // Create test data
+    let synced_version = GENESIS_TRANSACTION_VERSION; // Genesis is the highest synced version
+    let target_version = GENESIS_TRANSACTION_VERSION; // Genesis should be the target
+    let highest_version = 5000;
+    let last_persisted_index = 9999; // Fast syncing has already started in a previous run
+    let target_ledger_info = create_random_epoch_ending_ledger_info(target_version, 0);
+    let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 0);
+
+    // Create a driver configuration with a genesis waypoint and fast syncing
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+
+    // Create the mock streaming client
+    let mut mock_streaming_client = create_mock_streaming_client();
+    let (_notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
+    mock_streaming_client
+        .expect_get_all_state_values()
+        .times(1)
+        .with(eq(target_version), eq(Some(last_persisted_index)))
+        .return_once(move |_, _| Ok(data_stream_listener_1));
+
+    // Create the mock metadata storage
+    let mut metadata_storage = MockMetadataStorage::new();
+    let target_ledger_info_clone = target_ledger_info.clone();
+    let last_persisted_index_clone = last_persisted_index;
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(move || Ok(Some(target_ledger_info_clone.clone())));
+    metadata_storage
+        .expect_is_snapshot_sync_complete()
+        .returning(|_| Ok(false));
+    metadata_storage
+        .expect_get_last_persisted_state_value_index()
+        .returning(move |_| Ok(last_persisted_index_clone));
+
+    // Create the bootstrapper
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        synced_version,
+        true,
+    );
+
+    // Manually insert a transaction output to sync
+    bootstrapper
+        .get_state_value_syncer()
+        .set_transaction_output_to_sync(create_output_list_with_proof());
+
+    // Create a global data summary
+    let mut global_data_summary = create_global_summary(0);
+    global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info.clone()];
+
+    // Drive progress to verify the waypoint
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // Drive progress again to start the state value stream
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn test_snapshot_sync_existing_state() {
     // Create test data
     let synced_version = GENESIS_TRANSACTION_VERSION; // Genesis is the highest synced

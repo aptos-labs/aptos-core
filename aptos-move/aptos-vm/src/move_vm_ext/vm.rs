@@ -9,6 +9,7 @@ use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext,
     code::NativeCodeContext,
     cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
+    event::NativeEventContext,
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
@@ -187,6 +188,7 @@ impl MoveVmExt {
         ));
         extensions.add(NativeCodeContext::default());
         extensions.add(NativeStateStorageContext::new(resolver));
+        extensions.add(NativeEventContext::default());
 
         // The VM code loader has bugs around module upgrade. After a module upgrade, the internal
         // cache needs to be flushed to work around those bugs.
@@ -227,5 +229,7 @@ pub fn verifier_config(features: &Features, _timed_features: &TimedFeatures) -> 
         max_per_fun_meter_units: Some(1000 * 80000),
         max_per_mod_meter_units: Some(1000 * 80000),
         use_signature_checker_v2: features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2),
+        sig_checker_v2_fix_script_ty_param_count: features
+            .is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX),
     }
 }

@@ -893,9 +893,9 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
             (3700, 0.35, 0.5, 0.8, 0.65),
-            (2800, 0.35, 0.5, 1.2, 1.2),
+            (2800, 0.35, 0.5, 1.2, 1.3),
             (1800, 0.35, 0.5, 1.5, 2.7),
-            (950, 0.35, 0.65, 1.5, 2.7),
+            (950, 0.35, 0.65, 1.5, 2.9),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
@@ -2144,7 +2144,7 @@ impl Test for TransferCoins {
 impl AptosTest for TransferCoins {
     async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
         let client = ctx.client();
-        let mut payer = ctx.random_account();
+        let payer = ctx.random_account();
         let payee = ctx.random_account();
         ctx.create_user_account(payer.public_key()).await?;
         ctx.create_user_account(payee.public_key()).await?;

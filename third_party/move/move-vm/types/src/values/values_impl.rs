@@ -2779,7 +2779,7 @@ pub mod debug {
     }
 
     fn print_address<B: Write>(buf: &mut B, x: &AccountAddress) -> PartialVMResult<()> {
-        debug_write!(buf, "{}", x)
+        debug_write!(buf, "{}", x.to_hex())
     }
 
     fn print_value_impl<B: Write>(buf: &mut B, val: &ValueImpl) -> PartialVMResult<()> {
@@ -2995,7 +2995,6 @@ impl<'a, 'b> serde::Serialize for AnnotatedValue<'a, 'b, MoveTypeLayout, ValueIm
                 })
                 .serialize(serializer)
             },
-
             (MoveTypeLayout::Vector(layout), ValueImpl::Container(c)) => {
                 let layout = &**layout;
                 match (layout, c) {

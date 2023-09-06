@@ -9,6 +9,10 @@ use crate::{
 };
 #[allow(unused_imports)]
 use anyhow::Error;
+use aptos_aggregator::{
+    aggregator_extension::AggregatorID,
+    resolver::{AggregatorReadMode, AggregatorResolver},
+};
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::{StateView, TStateView};
 use aptos_table_natives::{TableHandle, TableResolver};
@@ -209,6 +213,27 @@ impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
         key: &[u8],
     ) -> Result<Option<Vec<u8>>, Error> {
         self.get_state_value_bytes(&StateKey::table_item((*handle).into(), key.to_vec()))
+    }
+}
+
+impl<'a, S: StateView> AggregatorResolver for StorageAdapter<'a, S> {
+    fn resolve_aggregator_value(
+        &self,
+        id: &AggregatorID,
+        _mode: AggregatorReadMode,
+    ) -> Result<u128, Error> {
+        let AggregatorID { handle, key } = id;
+        let state_key = StateKey::table_item(*handle, key.0.to_vec());
+        match self.get_state_value_u128(&state_key)? {
+            Some(value) => Ok(value),
+            None => {
+                anyhow::bail!("Could not find the value of the aggregator")
+            },
+        }
+    }
+
+    fn generate_aggregator_id(&self) -> AggregatorID {
+        unimplemented!("Aggregator id generation will be implemented for V2 aggregators.")
     }
 }
 

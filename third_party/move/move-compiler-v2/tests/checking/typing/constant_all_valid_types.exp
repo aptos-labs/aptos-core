@@ -1,24 +1,45 @@
 // ---- Model Dump
 module 0x42::M {
-    private fun t1() {
+    private fun t1(): u8 {
         0
     }
-    private fun t2() {
+    private fun t2(): u64 {
         0
     }
-    private fun t3() {
+    private fun t3(): u128 {
         0
     }
-    private fun t4() {
+    private fun t4(): bool {
         false
     }
-    private fun t5() {
+    private fun t5(): address {
         0x0
     }
-    private fun t6() {
+    private fun t6(): vector<u8> {
         [1, 35]
     }
-    private fun t7() {
+    private fun t7(): vector<u8> {
+        [97, 98, 99, 100]
+    }
+    spec fun $t1(): u8 {
+        0
+    }
+    spec fun $t2(): u64 {
+        0
+    }
+    spec fun $t3(): u128 {
+        0
+    }
+    spec fun $t4(): bool {
+        false
+    }
+    spec fun $t5(): address {
+        0x0
+    }
+    spec fun $t6(): vector<u8> {
+        [1, 35]
+    }
+    spec fun $t7(): vector<u8> {
         [97, 98, 99, 100]
     }
 } // end 0x42::M
@@ -33,4 +54,5 @@ module <SELF> {
         [97, 98, 99, 100];
         Tuple()
     }
+    spec fun $t();
 } // end <SELF>

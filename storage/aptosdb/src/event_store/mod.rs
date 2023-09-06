@@ -317,15 +317,17 @@ impl EventStore {
             .iter()
             .enumerate()
             .try_for_each::<_, Result<_>>(|(idx, event)| {
-                if !skip_index {
-                    batch.put::<EventByKeySchema>(
-                        &(*event.key(), event.sequence_number()),
-                        &(version, idx as u64),
-                    )?;
-                    batch.put::<EventByVersionSchema>(
-                        &(*event.key(), version, event.sequence_number()),
-                        &(idx as u64),
-                    )?;
+                if let ContractEvent::V1(v1) = event {
+                    if !skip_index {
+                        batch.put::<EventByKeySchema>(
+                            &(*v1.key(), v1.sequence_number()),
+                            &(version, idx as u64),
+                        )?;
+                        batch.put::<EventByVersionSchema>(
+                            &(*v1.key(), version, v1.sequence_number()),
+                            &(idx as u64),
+                        )?;
+                    }
                 }
                 batch.put::<EventSchema>(&(version, idx as u64), event)
             })?;
@@ -469,14 +471,16 @@ impl EventStore {
     ) -> anyhow::Result<()> {
         let mut current_version = start;
         for events in self.get_events_by_version_iter(start, (end - start) as usize)? {
-            for (current_index, event) in (events?).into_iter().enumerate() {
-                db_batch.delete::<EventByVersionSchema>(&(
-                    *event.key(),
-                    current_version,
-                    event.sequence_number(),
-                ))?;
-                db_batch.delete::<EventByKeySchema>(&(*event.key(), event.sequence_number()))?;
-                db_batch.delete::<EventSchema>(&(current_version, current_index as u64))?;
+            for (idx, event) in (events?).into_iter().enumerate() {
+                if let ContractEvent::V1(v1) = event {
+                    db_batch.delete::<EventByVersionSchema>(&(
+                        *v1.key(),
+                        current_version,
+                        v1.sequence_number(),
+                    ))?;
+                    db_batch.delete::<EventByKeySchema>(&(*v1.key(), v1.sequence_number()))?;
+                }
+                db_batch.delete::<EventSchema>(&(current_version, idx as u64))?;
             }
             current_version += 1;
         }
