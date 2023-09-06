@@ -24,6 +24,13 @@ export type NonGenerics = Bool | U8 | U16 | U32 | U64 | U128 | U256 | MoveString
  * // in Move: `std::bcs::to_bytes(vector<u8> [1, 2, 3, 4]);`
  * const bcsBytes = vecOfU8s.toUint8Array();
  *
+ * // vector<vector<u8>> [ vector<u8> [1], vector<u8> [1, 2, 3, 4], vector<u8> [5, 6, 7, 8] ];
+ * const vecOfVecs = new Vector<Vector<U8>>([
+ *   new Vector<U8>([new U8(1)]),
+ *   Vector.U8([1, 2, 3, 4]),
+ *   Vector.U8([5, 6, 7, 8]),
+ * ]);
+ * 
  * // vector<Option<u8>> [ std::option::some<u8>(1), std::option::some<u8>(2) ];
  * const vecOfOptionU8s = new Vector<MoveOption<U8>>([
  *    MoveOption.U8(1),
@@ -33,13 +40,6 @@ export type NonGenerics = Bool | U8 | U16 | U32 | U64 | U128 | U256 | MoveString
  * // vector<String> [ std::string::utf8(b"hello"), std::string::utf8(b"world") ];
  * const vecOfStrings = new Vector([new MoveString("hello"), new MoveString("world")]);
  * const vecOfStrings2 = Vector.String(["hello", "world"]);
- *
- * // vector<vector<u8>> [ vector<u8> [1], vector<u8> [1, 2, 3, 4], vector<u8> [5, 6, 7, 8] ];
- * const vecOfVecs = new Vector<Vector<U8>>([
- *   new Vector<U8>([new U8(1)]),
- *   Vector.U8([1, 2, 3, 4]),
- *   Vector.U8([5, 6, 7, 8]),
- * ]);
  *
  * // where MySerializableStruct is a class you've made that implements Serializable
  * const vecOfSerializableValues = new Vector<MySerializableStruct>([
