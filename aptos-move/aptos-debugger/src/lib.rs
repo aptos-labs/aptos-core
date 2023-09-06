@@ -175,7 +175,7 @@ impl AptosDebugger {
         version: Version,
     ) -> Result<Option<AnnotatedAccountStateBlob>> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let remote_storage = StorageAdapter::new(&state_view);
+        let remote_storage: StorageAdapter<_, ()> = StorageAdapter::new(&state_view);
         let annotator = AptosValueAnnotator::new(&remote_storage);
         Ok(
             match self
@@ -195,7 +195,7 @@ impl AptosDebugger {
     ) -> Result<Vec<(AccountAddress, AnnotatedAccountStateBlob)>> {
         let accounts = self.debugger.get_admin_accounts(version).await?;
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let remote_storage = StorageAdapter::new(&state_view);
+        let remote_storage: StorageAdapter<_, ()> = StorageAdapter::new(&state_view);
         let annotator = AptosValueAnnotator::new(&remote_storage);
 
         let mut result = vec![];
@@ -224,7 +224,7 @@ impl AptosDebugger {
         F: FnOnce(&mut SessionExt) -> VMResult<()>,
     {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let state_view_storage = StorageAdapter::new(&state_view);
+        let state_view_storage: StorageAdapter<_, ()> = StorageAdapter::new(&state_view);
         let features = Features::fetch_config(&state_view_storage).unwrap_or_default();
         let move_vm = MoveVmExt::new(
             NativeGasParameters::zeros(),

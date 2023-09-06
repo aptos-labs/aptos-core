@@ -576,6 +576,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "arc-swap",
  "bcs 0.1.4",
  "claims",

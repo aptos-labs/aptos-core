@@ -274,7 +274,8 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                         let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_vm"]);
                         vm.execute_single_transaction(
                             &preprocessed_txn,
-                            &vm.as_move_resolver(&state_view),
+                            // TODO(george): this should not be None.
+                            &vm.as_move_resolver::<_, ()>(&state_view, None),
                             &log_context,
                         )
                     };

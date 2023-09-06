@@ -11,6 +11,8 @@ use aptos_types::{
     fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
+use aptos_vm_types::resolver::{StateStorageResolver, TModuleResolver, TResourceResolver};
+use move_core_types::value::MoveTypeLayout;
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -62,7 +64,10 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        view: &(impl TStateView<Key = <Self::Txn as Transaction>::Key>
+              + TResourceResolver<Key = <Self::Txn as Transaction>::Key, Layout = MoveTypeLayout>
+              + TModuleResolver<Key = <Self::Txn as Transaction>::Key>
+              + StateStorageResolver),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,

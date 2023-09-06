@@ -23,6 +23,10 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use aptos_vm_types::resolver::{
+    StateStorageResolver, StateValueMetadataKind, TModuleResolver, TResourceResolver,
+};
+use move_core_types::value::MoveTypeLayout;
 use std::{
     cell::RefCell,
     fmt::Debug,
@@ -292,5 +296,56 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         self.base_view.get_usage()
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceResolver
+    for LatestView<'a, T, S, X>
+{
+    type Key = T::Key;
+    type Layout = MoveTypeLayout;
+
+    fn get_resource_bytes(
+        &self,
+        _state_key: &Self::Key,
+        _maybe_layout: Option<&Self::Layout>,
+    ) -> Result<Option<Vec<u8>>> {
+        todo!()
+    }
+
+    fn get_resource_state_value_metadata(
+        &self,
+        _state_key: &Self::Key,
+    ) -> Result<Option<StateValueMetadataKind>> {
+        todo!()
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleResolver
+    for LatestView<'a, T, S, X>
+{
+    type Key = T::Key;
+
+    fn get_module_bytes(&self, _state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        todo!()
+    }
+
+    fn get_module_state_value_metadata(
+        &self,
+        _state_key: &Self::Key,
+    ) -> Result<Option<StateValueMetadataKind>> {
+        todo!()
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageResolver
+    for LatestView<'a, T, S, X>
+{
+    fn id(&self) -> StateViewId {
+        todo!()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        todo!()
     }
 }

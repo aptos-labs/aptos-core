@@ -14,7 +14,7 @@ use aptos_aggregator::{
     resolver::{AggregatorReadMode, AggregatorResolver},
 };
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
-use aptos_state_view::{StateView, TStateView};
+use aptos_state_view::{StateView, StateViewId, TStateView};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
@@ -25,12 +25,17 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
     },
 };
+use aptos_vm_types::resolver::{
+    ExecutorResolver, StateStorageResolver, StateValueMetadataKind, TModuleResolver,
+    TResourceResolver,
+};
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     resolver::{resource_size, ModuleResolver, ResourceResolver},
+    value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use std::{cell::RefCell, collections::BTreeMap};
@@ -48,22 +53,26 @@ pub(crate) fn get_resource_group_from_metadata(
 }
 
 /// Adapter to convert a `StateView` into a `MoveResolverExt`.
-pub struct StorageAdapter<'a, S> {
+pub struct StorageAdapter<'a, S, R> {
     state_store: &'a S,
+    #[allow(dead_code)]
+    maybe_executor_resolver: Option<&'a R>,
     accurate_byte_count: bool,
     max_binary_format_version: u32,
     resource_group_cache:
         RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
 }
 
-impl<'a, S> StorageAdapter<'a, S> {
+impl<'a, S, R> StorageAdapter<'a, S, R> {
     pub fn new_with_cached_config(
         state_store: &'a S,
         gas_feature_version: u64,
         features: &Features,
+        maybe_executor_resolver: Option<&'a R>,
     ) -> Self {
         let mut s = Self {
             state_store,
+            maybe_executor_resolver,
             accurate_byte_count: false,
             max_binary_format_version: 0,
             resource_group_cache: RefCell::new(BTreeMap::new()),
@@ -76,10 +85,11 @@ impl<'a, S> StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> StorageAdapter<'a, S> {
+impl<'a, S: StateView, R: ExecutorResolver> StorageAdapter<'a, S, R> {
     pub fn new(state_store: &'a S) -> Self {
         let mut s = Self {
             state_store,
+            maybe_executor_resolver: None,
             accurate_byte_count: false,
             max_binary_format_version: 0,
             resource_group_cache: RefCell::new(BTreeMap::new()),
@@ -93,7 +103,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         s
     }
 
-    pub fn get(&self, access_path: AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
+    fn get(&self, access_path: AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
         self.state_store
             .get_state_value_bytes(&StateKey::access_path(access_path))
             .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
@@ -142,9 +152,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
             Ok((buf, buf_size))
         }
     }
-}
 
-impl<'a, S: StateView> AptosMoveResolver for StorageAdapter<'a, S> {
     fn get_resource_group_data(
         &self,
         address: &AccountAddress,
@@ -164,7 +172,9 @@ impl<'a, S: StateView> AptosMoveResolver for StorageAdapter<'a, S> {
         })?;
         self.get(ap).map_err(|e| e.finish(Location::Undefined))
     }
+}
 
+impl<'a, S: StateView, R: ExecutorResolver> AptosMoveResolver for StorageAdapter<'a, S, R> {
     fn release_resource_group_cache(
         &self,
     ) -> BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>> {
@@ -172,7 +182,52 @@ impl<'a, S: StateView> AptosMoveResolver for StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView, R: ExecutorResolver> TResourceResolver for StorageAdapter<'a, S, R> {
+    type Key = StateKey;
+    type Layout = MoveTypeLayout;
+
+    fn get_resource_bytes(
+        &self,
+        _state_key: &Self::Key,
+        _maybe_layout: Option<&Self::Layout>,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        todo!()
+    }
+
+    fn get_resource_state_value_metadata(
+        &self,
+        _state_key: &Self::Key,
+    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+        todo!()
+    }
+}
+
+impl<'a, S: StateView, R: ExecutorResolver> TModuleResolver for StorageAdapter<'a, S, R> {
+    type Key = StateKey;
+
+    fn get_module_bytes(&self, _state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
+        todo!()
+    }
+
+    fn get_module_state_value_metadata(
+        &self,
+        _state_key: &Self::Key,
+    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+        todo!()
+    }
+}
+
+impl<'a, S: StateView, R: ExecutorResolver> StateStorageResolver for StorageAdapter<'a, S, R> {
+    fn id(&self) -> StateViewId {
+        todo!()
+    }
+
+    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        todo!()
+    }
+}
+
+impl<'a, S: StateView, R: ExecutorResolver> ResourceResolver for StorageAdapter<'a, S, R> {
     fn get_resource_with_metadata(
         &self,
         address: &AccountAddress,
@@ -183,7 +238,7 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView, R: ExecutorResolver> ModuleResolver for StorageAdapter<'a, S, R> {
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
         let module_bytes = match self.get_module(module_id) {
             Ok(Some(bytes)) => bytes,
@@ -206,7 +261,7 @@ impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView, R: ExecutorResolver> TableResolver for StorageAdapter<'a, S, R> {
     fn resolve_table_entry(
         &self,
         handle: &TableHandle,
@@ -216,7 +271,7 @@ impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> AggregatorResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView, R: ExecutorResolver> AggregatorResolver for StorageAdapter<'a, S, R> {
     fn resolve_aggregator_value(
         &self,
         id: &AggregatorID,
@@ -237,29 +292,31 @@ impl<'a, S: StateView> AggregatorResolver for StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> ConfigStorage for StorageAdapter<'a, S> {
+impl<'a, S: StateView, R: ExecutorResolver> ConfigStorage for StorageAdapter<'a, S, R> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
         self.get(access_path).ok()?
     }
 }
 
-impl<'a, S: StateView> StateStorageUsageResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView, R: ExecutorResolver> StateStorageUsageResolver for StorageAdapter<'a, S, R> {
     fn get_state_storage_usage(&self) -> Result<StateStorageUsage, Error> {
         self.state_store.get_usage()
     }
 }
 
 pub trait AsMoveResolver<S> {
-    fn as_move_resolver(&self) -> StorageAdapter<S>;
+    fn as_move_resolver(&self) -> StorageAdapter<S, ()>;
 }
 
 impl<S: StateView> AsMoveResolver<S> for S {
-    fn as_move_resolver(&self) -> StorageAdapter<S> {
+    fn as_move_resolver(&self) -> StorageAdapter<S, ()> {
         StorageAdapter::new(self)
     }
 }
 
-impl<'a, S: StateView> StateValueMetadataResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView, R: ExecutorResolver> StateValueMetadataResolver
+    for StorageAdapter<'a, S, R>
+{
     fn get_state_value_metadata(
         &self,
         state_key: &StateKey,
@@ -274,7 +331,7 @@ impl<'a, S: StateView> StateValueMetadataResolver for StorageAdapter<'a, S> {
 //      directly.
 //   2. When stacking Storage adapters on top of each other, e.g.
 //      in epilogue.
-impl<'a, S: StateView> TStateView for StorageAdapter<'a, S> {
+impl<'a, S: StateView, R: ExecutorResolver> TStateView for StorageAdapter<'a, S, R> {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {

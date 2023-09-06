@@ -9,9 +9,11 @@ use aptos_types::{
     on_chain_config::ConfigStorage,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
 };
-use move_binary_format::errors::VMResult;
+use aptos_vm_types::resolver::StateStorageResolver;
 use move_core_types::{
-    account_address::AccountAddress, language_storage::StructTag, resolver::MoveResolver,
+    account_address::AccountAddress,
+    language_storage::StructTag,
+    resolver::{ModuleResolver, MoveResolver, ResourceResolver},
 };
 use std::collections::BTreeMap;
 
@@ -37,19 +39,10 @@ pub trait AptosMoveResolver:
     + StateStorageUsageResolver
     + StateValueMetadataResolver
     + ConfigStorage
+    + ResourceResolver
+    + ModuleResolver
+    + StateStorageResolver
 {
-    fn get_resource_group_data(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> VMResult<Option<Vec<u8>>>;
-
-    fn get_standard_resource(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> VMResult<Option<Vec<u8>>>;
-
     fn release_resource_group_cache(
         &self,
     ) -> BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>;

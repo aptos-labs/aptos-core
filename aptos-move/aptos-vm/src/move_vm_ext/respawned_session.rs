@@ -15,8 +15,15 @@ use aptos_types::{
     },
     write_set::TransactionWrite,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
-use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
+use aptos_vm_types::{
+    change_set::VMChangeSet,
+    resolver::{StateStorageResolver, StateValueMetadataKind, TModuleResolver, TResourceResolver},
+    storage::ChangeSetConfigs,
+};
+use move_core_types::{
+    value::MoveTypeLayout,
+    vm_status::{err_msg, StatusCode, VMStatus},
+};
 
 /// We finish the session after the user transaction is done running to get the change set and
 /// charge gas and storage fee based on it before running storage refunds and the transaction
@@ -27,7 +34,7 @@ pub struct RespawnedSession<'r, 'l> {
     state_view: ChangeSetStateView<'r>,
     #[borrows(state_view)]
     #[covariant]
-    resolver: StorageAdapter<'this, ChangeSetStateView<'r>>,
+    resolver: StorageAdapter<'this, ChangeSetStateView<'r>, ChangeSetStateView<'r>>,
     #[borrows(resolver)]
     #[not_covariant]
     session: Option<SessionExt<'this, 'l>>,
@@ -51,6 +58,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
                     state_view,
                     vm.get_gas_feature_version(),
                     vm.get_features(),
+                    Some(state_view),
                 )
             },
             session_builder: |resolver| Some(vm.new_session(resolver, session_id)),
@@ -96,6 +104,51 @@ struct ChangeSetStateView<'r> {
 impl<'r> ChangeSetStateView<'r> {
     pub fn new(base: &'r dyn StateView, change_set: VMChangeSet) -> Result<Self, VMStatus> {
         Ok(Self { base, change_set })
+    }
+}
+
+impl<'r> TResourceResolver for ChangeSetStateView<'r> {
+    type Key = StateKey;
+    type Layout = MoveTypeLayout;
+
+    fn get_resource_bytes(
+        &self,
+        _state_key: &Self::Key,
+        _maybe_layout: Option<&Self::Layout>,
+    ) -> Result<Option<Vec<u8>>> {
+        todo!()
+    }
+
+    fn get_resource_state_value_metadata(
+        &self,
+        _state_key: &Self::Key,
+    ) -> Result<Option<StateValueMetadataKind>> {
+        todo!()
+    }
+}
+
+impl<'r> TModuleResolver for ChangeSetStateView<'r> {
+    type Key = StateKey;
+
+    fn get_module_bytes(&self, _state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        todo!()
+    }
+
+    fn get_module_state_value_metadata(
+        &self,
+        _state_key: &Self::Key,
+    ) -> Result<Option<StateValueMetadataKind>> {
+        todo!()
+    }
+}
+
+impl<'r> StateStorageResolver for ChangeSetStateView<'r> {
+    fn id(&self) -> StateViewId {
+        todo!()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        todo!()
     }
 }
 
