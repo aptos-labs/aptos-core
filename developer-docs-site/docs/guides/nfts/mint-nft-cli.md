@@ -12,7 +12,7 @@ This tutorial assumes you have:
 
 * a [GitHub account](https://docs.github.com/en/get-started/signing-up-for-github/signing-up-for-a-new-github-account)
 * the [GitHub CLI](https://cli.github.com/)
-* the [Aptos CLI](../../tools/install-cli/index.md) (or you can run from [aptos-core](https://github.com/aptos-labs/aptos-core) source via `cargo run`)
+* the [Aptos CLI](../../tools/aptos-cli/install-cli/index.md) (or you can run from [aptos-core](https://github.com/aptos-labs/aptos-core) source via `cargo run`)
 * the `aptos-core` repository checked out: `git clone https://github.com/aptos-labs/aptos-core.git`
 
 Then:
@@ -44,7 +44,7 @@ In this section, we create a collection and token. This work maps to the demonst
 
 ### Create an account
 
-1. [Install the Aptos CLI](../../tools/install-cli/index.md).
+1. [Install the Aptos CLI](../../tools/aptos-cli/install-cli/index.md).
 
 2. Create a default (typical) account on Aptos devnet to receive the NFT by running the following command and selecting `devnet`:
   ```shell
@@ -335,7 +335,7 @@ The final phase of development is to make the smart contract module ready for pr
 We prepare the module for production by:
 
 * adding a `TokenMintingEvent` to emit a custom event for tracking minting of tokens from this module.
-* enabling signature verification and ntroducing the concept of a proof challenge to prevent bot spamming.
+* enabling signature verification and introducing the concept of a proof challenge to prevent bot spamming.
 * including [unit tests](../../move/book/unit-testing.md) to make sure our code works as expected.
 
 
@@ -526,7 +526,7 @@ In the [NFT Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-m
 
 ### Mint more NFTs and disable minting from admin account
 
-1. Mint another NFT using the `nft-receiver` profile, sustituting in the resource account's address:
+1. Mint another NFT using the `nft-receiver` profile, substituting in the resource account's address:
 
 ```shell
 aptos move run --function-id <resource-account-address>::minting::mint_nft --profile nft-receiver

@@ -3,10 +3,7 @@
 
 use crate::{
     account::create::DEFAULT_FUNDED_COINS,
-    common::{
-        types::{CliCommand, CliTypedResult, FaucetOptions, ProfileOptions, RestOptions},
-        utils::{fund_account, wait_for_transactions},
-    },
+    common::types::{CliCommand, CliTypedResult, FaucetOptions, ProfileOptions, RestOptions},
 };
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
@@ -22,7 +19,7 @@ pub struct FundWithFaucet {
     ///
     /// If the account wasn't previously created, it will be created when being funded
     #[clap(long, value_parser = crate::common::types::load_account_arg)]
-    pub(crate) account: AccountAddress,
+    pub(crate) account: Option<AccountAddress>,
 
     /// Number of Octas to fund the account from the faucet
     ///
@@ -46,17 +43,18 @@ impl CliCommand<String> for FundWithFaucet {
     }
 
     async fn execute(self) -> CliTypedResult<String> {
-        let hashes = fund_account(
-            self.faucet_options.faucet_url(&self.profile_options)?,
-            self.amount,
-            self.account,
-        )
-        .await?;
+        let address = if let Some(account) = self.account {
+            account
+        } else {
+            self.profile_options.account_address()?
+        };
         let client = self.rest_options.client(&self.profile_options)?;
-        wait_for_transactions(&client, hashes).await?;
+        self.faucet_options
+            .fund_account(client, &self.profile_options, self.amount, address)
+            .await?;
         return Ok(format!(
             "Added {} Octas to account {}",
-            self.amount, self.account
+            self.amount, address
         ));
     }
 }

@@ -900,7 +900,7 @@ module aptos_framework::stake {
             coin::merge(&mut stake_pool.inactive, pending_inactive_stake);
         };
 
-        // Cap withdraw amount by total ianctive coins.
+        // Cap withdraw amount by total inactive coins.
         withdraw_amount = min(withdraw_amount, coin::value(&stake_pool.inactive));
         if (withdraw_amount == 0) return coin::zero<AptosCoin>();
 
@@ -1349,6 +1349,11 @@ module aptos_framework::stake {
 
     fun assert_owner_cap_exists(owner: address) {
         assert!(exists<OwnerCapability>(owner), error::not_found(EOWNER_CAP_NOT_FOUND));
+    }
+
+    // Will be deleted after transaction_fee has its own MintCap for storage refunds.
+    public(friend) fun copy_aptos_coin_mint_cap_for_storage_refund(): MintCapability<AptosCoin> acquires AptosCoinCapabilities {
+        borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap
     }
 
     #[test_only]

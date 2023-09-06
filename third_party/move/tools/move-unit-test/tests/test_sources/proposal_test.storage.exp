@@ -30,7 +30,7 @@ Failures in 0x1::Module:
 │     │         ------- In this function in 0x1::Module
 │     ·
 │ 102 │         assert!(d<u64>(@0x2, 6), 3);
-│     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Test was not expected to error, but it aborted with code 3 originating in the module 0000000000000000000000000000000000000000000000000000000000000001::Module rooted here
+│     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Test was not expected to error, but it aborted with code 3 originating in the module 0x1::Module rooted here
 │ 
 │ 
 │ ────── Storage state at point of failure ──────

@@ -9,8 +9,8 @@ Found 2 modules
 Invalid multi-module publishing: VMError with status LINKER_ERROR at location UNDEFINED and message Cannot find ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000002, name: Identifier("A") } in data cache
 Command `sandbox publish --bundle --override-ordering A --override-ordering B -v`:
 Found 2 modules
-Publishing a new module 0000000000000000000000000000000000000000000000000000000000000002::A (wrote 121 bytes)
-Publishing a new module 0000000000000000000000000000000000000000000000000000000000000002::B (wrote 129 bytes)
+Publishing a new module 0x2::A (wrote 121 bytes)
+Publishing a new module 0x2::B (wrote 129 bytes)
 Wrote 250 bytes of module ID's and code
 Command `sandbox view storage/0x00000000000000000000000000000002/modules/A.mv`:
 Bytecode not found.

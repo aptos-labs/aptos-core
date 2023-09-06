@@ -14,7 +14,7 @@ use prometheus::{
 use std::collections::HashMap;
 
 const LINUX_SYSTEM_CPU_USAGE: &str = "linux_system_cpu_usage";
-const LINUX_CPU_METRICS_COUNT: usize = 10;
+const LINUX_CPU_METRICS_COUNT: usize = 11;
 const LINUX_CPU_STATE_LABEL: &str = "state";
 
 const LINUX_DISK_SUBSYSTEM: &str = "linux_disk";
@@ -108,6 +108,7 @@ impl Collector for LinuxCpuMetricsCollector {
         cpu_time_counter_opt!(mfs, cpu_time.steal_ms(), "steal_ms");
         cpu_time_counter_opt!(mfs, cpu_time.guest_ms(), "guest_ms");
         cpu_time_counter_opt!(mfs, cpu_time.guest_nice_ms(), "guest_nice_ms");
+        cpu_time_counter!(mfs, kernal_stats.ctxt, "context_switches");
 
         mfs
     }

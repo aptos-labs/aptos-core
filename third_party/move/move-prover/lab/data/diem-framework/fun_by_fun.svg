@@ -1,0 +1,2485 @@
+<svg width="1000" height="12390" viewBox="0 0 1000 12390" xmlns="http://www.w3.org/2000/svg">
+<rect x="0" y="0" width="1000" height="12390" opacity="1" fill="#FFFFFF" stroke="none"/>
+<rect x="0" y="1" width="45" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="54" y="2" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+= prover
+</text>
+<text x="0" y="23" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::create_designated_dealer
+</text>
+<rect x="0" y="36" width="909" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="918" y="37" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+3.201
+</text>
+<text x="0" y="58" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::create_child_vasp_account
+</text>
+<rect x="0" y="70" width="888" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="897" y="72" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+3.129
+</text>
+<text x="0" y="93" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::create_parent_vasp_account
+</text>
+<rect x="0" y="105" width="876" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="885" y="107" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+3.087
+</text>
+<text x="0" y="127" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::pay_by_signers
+</text>
+<rect x="0" y="140" width="677" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="686" y="141" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+2.385
+</text>
+<text x="0" y="162" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountCreationScripts::create_child_vasp_account
+</text>
+<rect x="0" y="175" width="651" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="660" y="176" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+2.294
+</text>
+<text x="0" y="197" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+PaymentScripts::peer_to_peer_by_signers
+</text>
+<rect x="0" y="210" width="645" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="654" y="211" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+2.272
+</text>
+<text x="0" y="232" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::pay_from
+</text>
+<rect x="0" y="245" width="639" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="648" y="246" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+2.253
+</text>
+<text x="0" y="267" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+PaymentScripts::peer_to_peer_with_metadata
+</text>
+<rect x="0" y="280" width="629" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="638" y="281" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+2.215
+</text>
+<text x="0" y="302" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TreasuryComplianceScripts::tiered_mint
+</text>
+<rect x="0" y="315" width="553" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="562" y="316" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.948
+</text>
+<text x="0" y="337" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::preburn
+</text>
+<rect x="0" y="350" width="512" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="521" y="351" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.805
+</text>
+<text x="0" y="372" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::tiered_mint
+</text>
+<rect x="0" y="385" width="512" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="521" y="386" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.803
+</text>
+<text x="0" y="407" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TreasuryComplianceScripts::cancel_burn_with_amount
+</text>
+<rect x="0" y="419" width="469" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="478" y="421" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.654
+</text>
+<text x="0" y="442" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::cancel_burn
+</text>
+<rect x="0" y="454" width="455" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="464" y="456" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.605
+</text>
+<text x="0" y="476" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TreasuryComplianceScripts::preburn
+</text>
+<rect x="0" y="489" width="455" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="464" y="490" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.603
+</text>
+<text x="0" y="511" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountCreationScripts::create_parent_vasp_account
+</text>
+<rect x="0" y="524" width="450" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="459" y="525" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.587
+</text>
+<text x="0" y="546" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountCreationScripts::create_designated_dealer
+</text>
+<rect x="0" y="559" width="433" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="442" y="560" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.526
+</text>
+<text x="0" y="581" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemSystem::update_config_and_reconfigure
+</text>
+<rect x="0" y="594" width="422" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="431" y="595" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.486
+</text>
+<text x="0" y="616" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::deposit
+</text>
+<rect x="0" y="629" width="414" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="424" y="630" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.461
+</text>
+<text x="0" y="651" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::script_prologue
+</text>
+<rect x="0" y="664" width="387" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="396" y="665" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.364
+</text>
+<text x="0" y="686" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Genesis::initialize_internal
+</text>
+<rect x="0" y="699" width="368" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="378" y="700" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.299
+</text>
+<text x="0" y="721" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::withdraw_from
+</text>
+<rect x="0" y="734" width="366" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="375" y="735" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.289
+</text>
+<text x="0" y="756" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::module_prologue
+</text>
+<rect x="0" y="768" width="353" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="362" y="770" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.243
+</text>
+<text x="0" y="791" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::create_validator_account
+</text>
+<rect x="0" y="803" width="352" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="361" y="805" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.241
+</text>
+<text x="0" y="826" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TransactionFee::burn_fees
+</text>
+<rect x="0" y="838" width="350" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="359" y="839" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.233
+</text>
+<text x="0" y="860" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::grant_role
+</text>
+<rect x="0" y="873" width="346" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="355" y="874" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.221
+</text>
+<text x="0" y="895" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::multi_agent_script_prologue
+</text>
+<rect x="0" y="908" width="343" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="353" y="909" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.211
+</text>
+<text x="0" y="930" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::create_validator_operator_account
+</text>
+<rect x="0" y="943" width="335" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="344" y="944" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.182
+</text>
+<text x="0" y="965" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::register_SCS_currency
+</text>
+<rect x="0" y="978" width="333" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="342" y="979" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.175
+</text>
+<text x="0" y="1000" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::create_treasury_compliance_account
+</text>
+<rect x="0" y="1013" width="330" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="339" y="1014" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.165
+</text>
+<text x="0" y="1035" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::preburn_to
+</text>
+<rect x="0" y="1048" width="329" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="338" y="1049" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.159
+</text>
+<text x="0" y="1070" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::prologue_common
+</text>
+<rect x="0" y="1083" width="320" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="330" y="1084" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.130
+</text>
+<text x="0" y="1105" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TreasuryComplianceScripts::burn_with_amount
+</text>
+<rect x="0" y="1118" width="316" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="326" y="1119" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.116
+</text>
+<text x="0" y="1140" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::create_diem_root_account
+</text>
+<rect x="0" y="1152" width="316" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="325" y="1154" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.114
+</text>
+<text x="0" y="1175" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DesignatedDealer::tiered_mint
+</text>
+<rect x="0" y="1187" width="312" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="322" y="1188" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.102
+</text>
+<text x="0" y="1209" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::register_currency
+</text>
+<rect x="0" y="1222" width="309" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="318" y="1223" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.091
+</text>
+<text x="0" y="1244" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::withdraw_from_balance
+</text>
+<rect x="0" y="1257" width="309" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="318" y="1258" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.088
+</text>
+<text x="0" y="1279" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Genesis::initialize
+</text>
+<rect x="0" y="1292" width="307" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="316" y="1293" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.084
+</text>
+<text x="0" y="1314" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::add_currencies_for_account
+</text>
+<rect x="0" y="1327" width="303" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="312" y="1328" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.070
+</text>
+<text x="0" y="1349" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TreasuryComplianceScripts::burn_txn_fees
+</text>
+<rect x="0" y="1362" width="301" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="310" y="1363" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.062
+</text>
+<text x="0" y="1384" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TreasuryComplianceScripts::update_exchange_rate
+</text>
+<rect x="0" y="1397" width="299" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="309" y="1398" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.056
+</text>
+<text x="0" y="1419" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountAdministrationScripts::add_currency_to_account
+</text>
+<rect x="0" y="1432" width="295" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="305" y="1433" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.042
+</text>
+<text x="0" y="1454" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemSystem::remove_validator
+</text>
+<rect x="0" y="1467" width="290" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="299" y="1468" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.023
+</text>
+<text x="0" y="1489" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorAdministrationScripts::remove_validator_and_reconfigure
+</text>
+<rect x="0" y="1501" width="289" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="298" y="1503" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+1.018
+</text>
+<text x="0" y="1524" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::update_xdx_exchange_rate
+</text>
+<rect x="0" y="1536" width="281" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="290" y="1537" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.990
+</text>
+<text x="0" y="1558" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::publish_window
+</text>
+<rect x="0" y="1571" width="280" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="289" y="1572" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.988
+</text>
+<text x="0" y="1593" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemConfig::get
+</text>
+<rect x="0" y="1606" width="271" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="280" y="1607" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.956
+</text>
+<text x="0" y="1628" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::writeset_epilogue
+</text>
+<rect x="0" y="1641" width="269" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="278" y="1642" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.949
+</text>
+<text x="0" y="1663" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorAdministrationScripts::set_validator_config_and_reconfigure
+</text>
+<rect x="0" y="1676" width="266" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="276" y="1677" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.940
+</text>
+<text x="0" y="1698" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::update_minting_ability
+</text>
+<rect x="0" y="1711" width="266" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="275" y="1712" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.939
+</text>
+<text x="0" y="1733" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::update_limits_definition
+</text>
+<rect x="0" y="1746" width="265" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="274" y="1747" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.934
+</text>
+<text x="0" y="1768" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Genesis::create_initialize_owners_operators
+</text>
+<rect x="0" y="1781" width="263" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="272" y="1782" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.927
+</text>
+<text x="0" y="1803" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+XDX::initialize
+</text>
+<rect x="0" y="1816" width="259" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="268" y="1817" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.915
+</text>
+<text x="0" y="1838" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TransactionFee::add_txn_fee_currency
+</text>
+<rect x="0" y="1850" width="259" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="268" y="1852" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.913
+</text>
+<text x="0" y="1873" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::burn
+</text>
+<rect x="0" y="1885" width="259" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="268" y="1887" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.912
+</text>
+<text x="0" y="1907" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::update_window_info
+</text>
+<rect x="0" y="1920" width="257" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="266" y="1921" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.905
+</text>
+<text x="0" y="1942" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::create_preburn
+</text>
+<rect x="0" y="1955" width="256" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="265" y="1956" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.904
+</text>
+<text x="0" y="1977" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::add_currency
+</text>
+<rect x="0" y="1990" width="256" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="265" y="1991" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.904
+</text>
+<text x="0" y="2012" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemId::remove_diem_id_domain
+</text>
+<rect x="0" y="2025" width="255" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="264" y="2026" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.900
+</text>
+<text x="0" y="2047" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorAdministrationScripts::add_validator_and_reconfigure
+</text>
+<rect x="0" y="2060" width="253" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="262" y="2061" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.894
+</text>
+<text x="0" y="2082" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemSystem::add_validator
+</text>
+<rect x="0" y="2095" width="253" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="262" y="2096" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.893
+</text>
+<text x="0" y="2117" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+XUS::initialize
+</text>
+<rect x="0" y="2130" width="253" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="262" y="2131" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.891
+</text>
+<text x="0" y="2152" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::writeset_prologue
+</text>
+<rect x="0" y="2165" width="252" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="261" y="2166" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.890
+</text>
+<text x="0" y="2187" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TreasuryComplianceScripts::update_minting_ability
+</text>
+<rect x="0" y="2199" width="247" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="256" y="2201" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.871
+</text>
+<text x="0" y="2222" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountFreezing::unfreeze_account
+</text>
+<rect x="0" y="2234" width="245" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="255" y="2236" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.866
+</text>
+<text x="0" y="2256" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DesignatedDealer::add_currency_for_test
+</text>
+<rect x="0" y="2269" width="245" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="254" y="2270" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.864
+</text>
+<text x="0" y="2291" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASPDomain::remove_vasp_domain
+</text>
+<rect x="0" y="2304" width="245" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="254" y="2305" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.863
+</text>
+<text x="0" y="2326" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountFreezing::freeze_account
+</text>
+<rect x="0" y="2339" width="243" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="253" y="2340" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.859
+</text>
+<text x="0" y="2361" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::update_deposit_limits
+</text>
+<rect x="0" y="2374" width="241" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="250" y="2375" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.850
+</text>
+<text x="0" y="2396" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::cancel_burn
+</text>
+<rect x="0" y="2409" width="241" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="250" y="2410" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.849
+</text>
+<text x="0" y="2431" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountCreationScripts::create_validator_account
+</text>
+<rect x="0" y="2444" width="240" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="249" y="2445" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.847
+</text>
+<text x="0" y="2466" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemVersion::set
+</text>
+<rect x="0" y="2479" width="239" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="249" y="2480" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.845
+</text>
+<text x="0" y="2501" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::can_receive_and_update_window
+</text>
+<rect x="0" y="2514" width="238" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="247" y="2515" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.838
+</text>
+<text x="0" y="2536" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemVersion::initialize
+</text>
+<rect x="0" y="2548" width="237" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="246" y="2550" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.836
+</text>
+<text x="0" y="2571" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountCreationScripts::create_validator_operator_account
+</text>
+<rect x="0" y="2583" width="236" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="245" y="2585" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.832
+</text>
+<text x="0" y="2605" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ParallelExecutionConfig::disable_parallel_execution
+</text>
+<rect x="0" y="2618" width="236" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="245" y="2619" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.832
+</text>
+<text x="0" y="2640" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemVMConfig::initialize
+</text>
+<rect x="0" y="2653" width="236" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="245" y="2654" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.831
+</text>
+<text x="0" y="2675" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::update_withdrawal_limits
+</text>
+<rect x="0" y="2688" width="235" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="244" y="2689" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.830
+</text>
+<text x="0" y="2710" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::can_withdraw_and_update_window
+</text>
+<rect x="0" y="2723" width="234" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="243" y="2724" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.826
+</text>
+<text x="0" y="2745" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemVMConfig::set_gas_constants
+</text>
+<rect x="0" y="2758" width="234" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="243" y="2759" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.825
+</text>
+<text x="0" y="2780" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TransactionFee::pay_fee
+</text>
+<rect x="0" y="2793" width="233" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="242" y="2794" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.823
+</text>
+<text x="0" y="2815" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::initialize
+</text>
+<rect x="0" y="2828" width="232" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="241" y="2829" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.818
+</text>
+<text x="0" y="2850" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TreasuryComplianceScripts::add_vasp_domain
+</text>
+<rect x="0" y="2863" width="232" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="241" y="2864" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.817
+</text>
+<text x="0" y="2885" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTransactionPublishingOption::initialize
+</text>
+<rect x="0" y="2897" width="227" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="236" y="2899" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.802
+</text>
+<text x="0" y="2920" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTransactionPublishingOption::set_open_module
+</text>
+<rect x="0" y="2932" width="227" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="236" y="2934" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.801
+</text>
+<text x="0" y="2954" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorAdministrationScripts::set_validator_operator
+</text>
+<rect x="0" y="2967" width="227" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="236" y="2968" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.801
+</text>
+<text x="0" y="2989" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountAdministrationScripts::rotate_authentication_key_with_nonce_admin
+</text>
+<rect x="0" y="3002" width="227" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="236" y="3003" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.800
+</text>
+<text x="0" y="3024" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::burn_now
+</text>
+<rect x="0" y="3037" width="226" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="236" y="3038" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.799
+</text>
+<text x="0" y="3059" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorAdministrationScripts::set_validator_operator_with_nonce_admin
+</text>
+<rect x="0" y="3072" width="226" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="235" y="3073" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.798
+</text>
+<text x="0" y="3094" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TransactionFee::initialize
+</text>
+<rect x="0" y="3107" width="226" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="235" y="3108" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.796
+</text>
+<text x="0" y="3129" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountAdministrationScripts::create_vasp_domains
+</text>
+<rect x="0" y="3142" width="226" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="235" y="3143" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.796
+</text>
+<text x="0" y="3164" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ParallelExecutionConfig::enable_parallel_execution_with_config
+</text>
+<rect x="0" y="3177" width="225" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="234" y="3178" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.795
+</text>
+<text x="0" y="3199" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+RegisteredCurrencies::initialize
+</text>
+<rect x="0" y="3212" width="225" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="234" y="3213" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.793
+</text>
+<text x="0" y="3234" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::assert_payment_ok
+</text>
+<rect x="0" y="3246" width="225" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="234" y="3248" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.793
+</text>
+<text x="0" y="3269" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+SystemAdministrationScripts::update_diem_consensus_config
+</text>
+<rect x="0" y="3281" width="225" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="234" y="3283" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.793
+</text>
+<text x="0" y="3304" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::balance
+</text>
+<rect x="0" y="3316" width="224" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="234" y="3317" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.792
+</text>
+<text x="0" y="3338" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountAdministrationScripts::rotate_dual_attestation_info
+</text>
+<rect x="0" y="3351" width="224" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="233" y="3352" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.791
+</text>
+<text x="0" y="3373" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountAdministrationScripts::rotate_authentication_key_with_recovery_address
+</text>
+<rect x="0" y="3386" width="224" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="233" y="3387" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.790
+</text>
+<text x="0" y="3408" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemSystem::initialize_validator_set
+</text>
+<rect x="0" y="3421" width="224" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="233" y="3422" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.790
+</text>
+<text x="0" y="3443" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemConfig::reconfigure
+</text>
+<rect x="0" y="3456" width="224" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="233" y="3457" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.789
+</text>
+<text x="0" y="3478" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTransactionPublishingOption::set_open_script
+</text>
+<rect x="0" y="3491" width="223" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="232" y="3492" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.786
+</text>
+<text x="0" y="3513" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemConsensusConfig::set
+</text>
+<rect x="0" y="3526" width="222" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="231" y="3527" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.784
+</text>
+<text x="0" y="3548" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+SystemAdministrationScripts::set_gas_constants
+</text>
+<rect x="0" y="3561" width="221" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="230" y="3562" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.781
+</text>
+<text x="0" y="3583" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TreasuryComplianceScripts::freeze_account
+</text>
+<rect x="0" y="3596" width="221" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="230" y="3597" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.781
+</text>
+<text x="0" y="3618" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::initialize
+</text>
+<rect x="0" y="3630" width="221" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="230" y="3632" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.780
+</text>
+<text x="0" y="3653" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+SystemAdministrationScripts::update_diem_version
+</text>
+<rect x="0" y="3665" width="220" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="229" y="3666" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.777
+</text>
+<text x="0" y="3687" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::balance_for
+</text>
+<rect x="0" y="3700" width="220" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="229" y="3701" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.776
+</text>
+<text x="0" y="3722" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TreasuryComplianceScripts::unfreeze_account
+</text>
+<rect x="0" y="3735" width="219" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="228" y="3736" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.774
+</text>
+<text x="0" y="3757" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::dual_attestation_required
+</text>
+<rect x="0" y="3770" width="218" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="227" y="3771" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.770
+</text>
+<text x="0" y="3792" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemId::add_diem_id_domain
+</text>
+<rect x="0" y="3805" width="218" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="227" y="3806" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.770
+</text>
+<text x="0" y="3827" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemId::publish_diem_id_domains
+</text>
+<rect x="0" y="3840" width="217" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="226" y="3841" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.767
+</text>
+<text x="0" y="3862" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::upgrade_preburn
+</text>
+<rect x="0" y="3875" width="216" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="226" y="3876" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.764
+</text>
+<text x="0" y="3897" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTransactionPublishingOption::is_script_allowed
+</text>
+<rect x="0" y="3910" width="216" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="225" y="3911" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.763
+</text>
+<text x="0" y="3932" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASPDomain::add_vasp_domain
+</text>
+<rect x="0" y="3945" width="216" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="225" y="3946" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.761
+</text>
+<text x="0" y="3967" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTransactionPublishingOption::halt_all_transactions
+</text>
+<rect x="0" y="3979" width="215" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="224" y="3981" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.758
+</text>
+<text x="0" y="4002" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::publish_preburn_queue_to_account
+</text>
+<rect x="0" y="4014" width="214" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="223" y="4015" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.756
+</text>
+<text x="0" y="4036" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemConfig::publish_new_config_and_get_capability
+</text>
+<rect x="0" y="4049" width="214" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="223" y="4050" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.755
+</text>
+<text x="0" y="4071" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::should_track_limits_for_account
+</text>
+<rect x="0" y="4084" width="214" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="223" y="4085" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.755
+</text>
+<text x="0" y="4106" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTransactionPublishingOption::is_module_allowed
+</text>
+<rect x="0" y="4119" width="214" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="223" y="4120" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.754
+</text>
+<text x="0" y="4141" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemId::publish_diem_id_domain_manager
+</text>
+<rect x="0" y="4154" width="214" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="223" y="4155" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.754
+</text>
+<text x="0" y="4176" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ParallelExecutionConfig::initialize_parallel_execution
+</text>
+<rect x="0" y="4189" width="214" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="223" y="4190" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.754
+</text>
+<text x="0" y="4211" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::mint
+</text>
+<rect x="0" y="4224" width="213" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="222" y="4225" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.753
+</text>
+<text x="0" y="4246" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DesignatedDealer::publish_designated_dealer_credential
+</text>
+<rect x="0" y="4259" width="213" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="222" y="4260" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.752
+</text>
+<text x="0" y="4281" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountAdministrationScripts::create_recovery_address
+</text>
+<rect x="0" y="4294" width="213" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="222" y="4295" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.752
+</text>
+<text x="0" y="4316" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountAdministrationScripts::rotate_authentication_key_with_nonce
+</text>
+<rect x="0" y="4328" width="213" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="222" y="4330" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.752
+</text>
+<text x="0" y="4351" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTransactionPublishingOption::resume_transactions
+</text>
+<rect x="0" y="4363" width="211" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="220" y="4365" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.746
+</text>
+<text x="0" y="4385" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DesignatedDealer::add_currency
+</text>
+<rect x="0" y="4398" width="211" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="220" y="4399" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.745
+</text>
+<text x="0" y="4420" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorConfig::remove_operator
+</text>
+<rect x="0" y="4433" width="210" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="219" y="4434" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.742
+</text>
+<text x="0" y="4455" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountAdministrationScripts::publish_shared_ed25519_public_key
+</text>
+<rect x="0" y="4468" width="210" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="219" y="4469" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.742
+</text>
+<text x="0" y="4490" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+NetworkIdentity::initialize_network_identity_event_handle
+</text>
+<rect x="0" y="4503" width="210" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="219" y="4504" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.742
+</text>
+<text x="0" y="4525" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TreasuryComplianceScripts::remove_vasp_domain
+</text>
+<rect x="0" y="4538" width="210" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="219" y="4539" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.742
+</text>
+<text x="0" y="4560" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemConfig::publish_new_config
+</text>
+<rect x="0" y="4573" width="210" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="219" y="4574" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.741
+</text>
+<text x="0" y="4595" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::burn_with_capability
+</text>
+<rect x="0" y="4608" width="210" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="219" y="4609" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.740
+</text>
+<text x="0" y="4630" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorConfig::set_operator
+</text>
+<rect x="0" y="4643" width="210" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="219" y="4644" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.740
+</text>
+<text x="0" y="4665" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorAdministrationScripts::register_validator_config
+</text>
+<rect x="0" y="4677" width="208" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="217" y="4679" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.735
+</text>
+<text x="0" y="4700" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::burn_with_resource_cap
+</text>
+<rect x="0" y="4712" width="208" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="217" y="4714" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.734
+</text>
+<text x="0" y="4734" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::has_published_account_limits
+</text>
+<rect x="0" y="4747" width="208" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="217" y="4748" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.734
+</text>
+<text x="0" y="4769" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::publish_preburn_queue
+</text>
+<rect x="0" y="4782" width="208" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="217" y="4783" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.733
+</text>
+<text x="0" y="4804" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::publish_burn_capability
+</text>
+<rect x="0" y="4817" width="207" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="216" y="4818" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.732
+</text>
+<text x="0" y="4839" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::make_account
+</text>
+<rect x="0" y="4852" width="207" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="216" y="4853" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.730
+</text>
+<text x="0" y="4874" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountAdministrationScripts::add_recovery_rotation_capability
+</text>
+<rect x="0" y="4887" width="207" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="216" y="4888" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.729
+</text>
+<text x="0" y="4909" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemConsensusConfig::initialize
+</text>
+<rect x="0" y="4922" width="206" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="215" y="4923" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.728
+</text>
+<text x="0" y="4944" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountAdministrationScripts::rotate_shared_ed25519_public_key
+</text>
+<rect x="0" y="4957" width="206" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="215" y="4958" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.727
+</text>
+<text x="0" y="4979" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountAdministrationScripts::rotate_authentication_key
+</text>
+<rect x="0" y="4992" width="206" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="215" y="4993" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.726
+</text>
+<text x="0" y="5014" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+NetworkIdentity::remove_identities
+</text>
+<rect x="0" y="5026" width="206" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="215" y="5028" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.726
+</text>
+<text x="0" y="5049" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::has_validator_role
+</text>
+<rect x="0" y="5061" width="205" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="214" y="5063" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.724
+</text>
+<text x="0" y="5083" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+CRSN::allow_crsns
+</text>
+<rect x="0" y="5096" width="205" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="214" y="5097" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.724
+</text>
+<text x="0" y="5118" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::has_diem_root_role
+</text>
+<rect x="0" y="5131" width="205" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="214" y="5132" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.722
+</text>
+<text x="0" y="5153" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::initialize
+</text>
+<rect x="0" y="5166" width="204" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="213" y="5167" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.721
+</text>
+<text x="0" y="5188" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::assert_parent_vasp_or_child_vasp
+</text>
+<rect x="0" y="5201" width="204" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="213" y="5202" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.720
+</text>
+<text x="0" y="5223" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::has_treasury_compliance_role
+</text>
+<rect x="0" y="5236" width="204" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="213" y="5237" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.720
+</text>
+<text x="0" y="5258" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::has_validator_operator_role
+</text>
+<rect x="0" y="5271" width="204" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="213" y="5272" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.720
+</text>
+<text x="0" y="5293" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemConfig::disable_reconfiguration
+</text>
+<rect x="0" y="5306" width="203" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="212" y="5307" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.717
+</text>
+<text x="0" y="5328" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TreasuryComplianceScripts::update_dual_attestation_limit
+</text>
+<rect x="0" y="5341" width="203" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="212" y="5342" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.717
+</text>
+<text x="0" y="5363" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::cancel_burn_with_capability
+</text>
+<rect x="0" y="5375" width="203" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="212" y="5377" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.716
+</text>
+<text x="0" y="5398" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::set_microdiem_limit
+</text>
+<rect x="0" y="5410" width="203" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="212" y="5412" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.716
+</text>
+<text x="0" y="5432" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+SystemAdministrationScripts::initialize_diem_consensus_config
+</text>
+<rect x="0" y="5445" width="202" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="211" y="5446" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.713
+</text>
+<text x="0" y="5467" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::assert_is_SCS_currency
+</text>
+<rect x="0" y="5480" width="202" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="211" y="5481" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.712
+</text>
+<text x="0" y="5502" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemConfig::enable_reconfiguration
+</text>
+<rect x="0" y="5515" width="201" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="211" y="5516" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.711
+</text>
+<text x="0" y="5537" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::approx_xdx_for_value
+</text>
+<rect x="0" y="5550" width="201" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="211" y="5551" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.711
+</text>
+<text x="0" y="5572" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::join
+</text>
+<rect x="0" y="5585" width="201" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="210" y="5586" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.710
+</text>
+<text x="0" y="5607" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::market_cap
+</text>
+<rect x="0" y="5620" width="201" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="210" y="5621" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.708
+</text>
+<text x="0" y="5642" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::xdx_exchange_rate
+</text>
+<rect x="0" y="5655" width="201" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="210" y="5656" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.708
+</text>
+<text x="0" y="5677" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::split
+</text>
+<rect x="0" y="5690" width="200" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="209" y="5691" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.707
+</text>
+<text x="0" y="5712" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::preburn_with_resource
+</text>
+<rect x="0" y="5724" width="200" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="209" y="5726" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.705
+</text>
+<text x="0" y="5747" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+XDX::is_xdx
+</text>
+<rect x="0" y="5759" width="200" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="209" y="5761" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.705
+</text>
+<text x="0" y="5782" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::preburn_value
+</text>
+<rect x="0" y="5794" width="199" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="208" y="5795" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.702
+</text>
+<text x="0" y="5816" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::approx_xdx_for_coin
+</text>
+<rect x="0" y="5829" width="198" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="207" y="5830" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.700
+</text>
+<text x="0" y="5851" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountFreezing::initialize
+</text>
+<rect x="0" y="5864" width="198" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="207" y="5865" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.700
+</text>
+<text x="0" y="5886" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::is_SCS_currency
+</text>
+<rect x="0" y="5899" width="198" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="207" y="5900" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.699
+</text>
+<text x="0" y="5921" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASPDomain::publish_vasp_domains
+</text>
+<rect x="0" y="5934" width="198" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="207" y="5935" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.698
+</text>
+<text x="0" y="5956" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::fractional_part
+</text>
+<rect x="0" y="5969" width="197" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="207" y="5970" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.697
+</text>
+<text x="0" y="5991" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::scaling_factor
+</text>
+<rect x="0" y="6004" width="197" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="207" y="6005" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.697
+</text>
+<text x="0" y="6026" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::mint_with_capability
+</text>
+<rect x="0" y="6039" width="197" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="206" y="6040" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.695
+</text>
+<text x="0" y="6061" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::remove_preburn_from_queue
+</text>
+<rect x="0" y="6074" width="195" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="204" y="6075" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.687
+</text>
+<text x="0" y="6096" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::rotate_base_url
+</text>
+<rect x="0" y="6108" width="193" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="203" y="6110" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.683
+</text>
+<text x="0" y="6131" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::accepts_currency
+</text>
+<rect x="0" y="6143" width="193" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="203" y="6144" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.683
+</text>
+<text x="0" y="6165" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASP::publish_child_vasp_credential
+</text>
+<rect x="0" y="6178" width="193" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="202" y="6179" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.681
+</text>
+<text x="0" y="6200" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::rotate_compliance_public_key
+</text>
+<rect x="0" y="6213" width="193" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="202" y="6214" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.681
+</text>
+<text x="0" y="6235" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemBlock::block_prologue
+</text>
+<rect x="0" y="6248" width="193" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="202" y="6249" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.681
+</text>
+<text x="0" y="6270" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::add_preburn_to_queue
+</text>
+<rect x="0" y="6283" width="192" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="201" y="6284" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.677
+</text>
+<text x="0" y="6305" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASP::publish_parent_vasp_credential
+</text>
+<rect x="0" y="6318" width="191" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="200" y="6319" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.674
+</text>
+<text x="0" y="6340" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+RegisteredCurrencies::add_currency_code
+</text>
+<rect x="0" y="6353" width="190" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="199" y="6354" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.672
+</text>
+<text x="0" y="6375" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTimestamp::update_global_time
+</text>
+<rect x="0" y="6388" width="190" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="199" y="6389" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.669
+</text>
+<text x="0" y="6410" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::reset_window
+</text>
+<rect x="0" y="6423" width="189" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="198" y="6424" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.667
+</text>
+<text x="0" y="6445" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::can_hold_balance
+</text>
+<rect x="0" y="6457" width="188" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="197" y="6459" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.665
+</text>
+<text x="0" y="6480" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorConfig::publish
+</text>
+<rect x="0" y="6492" width="188" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="197" y="6493" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.665
+</text>
+<text x="0" y="6514" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::check_secondary_signers
+</text>
+<rect x="0" y="6527" width="188" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="197" y="6528" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.665
+</text>
+<text x="0" y="6549" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemBlock::initialize_block_metadata
+</text>
+<rect x="0" y="6562" width="187" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="196" y="6563" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.661
+</text>
+<text x="0" y="6584" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorOperatorConfig::publish
+</text>
+<rect x="0" y="6597" width="187" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="196" y="6598" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.659
+</text>
+<text x="0" y="6619" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ChainId::initialize
+</text>
+<rect x="0" y="6632" width="187" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="196" y="6633" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.659
+</text>
+<text x="0" y="6654" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemConfig::initialize
+</text>
+<rect x="0" y="6667" width="186" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="195" y="6668" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.658
+</text>
+<text x="0" y="6689" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::withdraw_all
+</text>
+<rect x="0" y="6702" width="186" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="195" y="6703" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.657
+</text>
+<text x="0" y="6724" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::remove_burn_capability
+</text>
+<rect x="0" y="6737" width="186" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="195" y="6738" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.656
+</text>
+<text x="0" y="6759" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::publish_credential
+</text>
+<rect x="0" y="6772" width="186" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="195" y="6773" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.656
+</text>
+<text x="0" y="6794" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemSystem::update_ith_validator_info_
+</text>
+<rect x="0" y="6806" width="186" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="195" y="6808" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.656
+</text>
+<text x="0" y="6829" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountFreezing::account_is_frozen
+</text>
+<rect x="0" y="6841" width="186" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="195" y="6843" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.655
+</text>
+<text x="0" y="6863" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTimestamp::now_seconds
+</text>
+<rect x="0" y="6876" width="185" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="194" y="6877" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.654
+</text>
+<text x="0" y="6898" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::assert_designated_dealer
+</text>
+<rect x="0" y="6911" width="185" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="194" y="6912" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.654
+</text>
+<text x="0" y="6933" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::currency_code
+</text>
+<rect x="0" y="6946" width="185" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="194" y="6947" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.654
+</text>
+<text x="0" y="6968" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::assert_parent_vasp_role
+</text>
+<rect x="0" y="6981" width="185" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="194" y="6982" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.653
+</text>
+<text x="0" y="7003" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::assert_validator_operator
+</text>
+<rect x="0" y="7016" width="184" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7017" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.651
+</text>
+<text x="0" y="7038" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::deposit
+</text>
+<rect x="0" y="7051" width="184" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7052" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.651
+</text>
+<text x="0" y="7073" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::withdraw
+</text>
+<rect x="0" y="7086" width="184" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7087" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.651
+</text>
+<text x="0" y="7108" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::current_time
+</text>
+<rect x="0" y="7121" width="184" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7122" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.651
+</text>
+<text x="0" y="7143" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ChainId::get
+</text>
+<rect x="0" y="7155" width="184" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7157" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.651
+</text>
+<text x="0" y="7178" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::publish_crsn
+</text>
+<rect x="0" y="7190" width="184" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7192" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.651
+</text>
+<text x="0" y="7212" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::grant_treasury_compliance_role
+</text>
+<rect x="0" y="7225" width="184" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7226" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.650
+</text>
+<text x="0" y="7247" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::new_validator_operator_role
+</text>
+<rect x="0" y="7260" width="184" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7261" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.650
+</text>
+<text x="0" y="7282" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+CRSN::record
+</text>
+<rect x="0" y="7295" width="184" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7296" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.650
+</text>
+<text x="0" y="7317" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::grant_diem_root_role
+</text>
+<rect x="0" y="7330" width="184" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7331" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.649
+</text>
+<text x="0" y="7352" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::has_child_VASP_role
+</text>
+<rect x="0" y="7365" width="184" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7366" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.649
+</text>
+<text x="0" y="7387" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::has_designated_dealer_role
+</text>
+<rect x="0" y="7400" width="184" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7401" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.649
+</text>
+<text x="0" y="7422" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::new_validator_role
+</text>
+<rect x="0" y="7435" width="184" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7436" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.649
+</text>
+<text x="0" y="7457" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::new_child_vasp_role
+</text>
+<rect x="0" y="7470" width="184" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7471" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.648
+</text>
+<text x="0" y="7492" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::new_designated_dealer_role
+</text>
+<rect x="0" y="7504" width="184" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7506" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.648
+</text>
+<text x="0" y="7527" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASPDomain::publish_vasp_domain_manager
+</text>
+<rect x="0" y="7539" width="184" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7541" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.648
+</text>
+<text x="0" y="7561" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+RecoveryAddress::rotate_authentication_key
+</text>
+<rect x="0" y="7574" width="184" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="193" y="7575" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.648
+</text>
+<text x="0" y="7596" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::assert_treasury_compliance
+</text>
+<rect x="0" y="7609" width="183" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="192" y="7610" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.647
+</text>
+<text x="0" y="7631" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::zero
+</text>
+<rect x="0" y="7644" width="183" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="192" y="7645" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.647
+</text>
+<text x="0" y="7666" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::assert_child_vasp_role
+</text>
+<rect x="0" y="7679" width="183" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="192" y="7680" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.646
+</text>
+<text x="0" y="7701" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::assert_validator
+</text>
+<rect x="0" y="7714" width="183" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="192" y="7715" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.646
+</text>
+<text x="0" y="7736" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::new_parent_vasp_role
+</text>
+<rect x="0" y="7749" width="183" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="192" y="7750" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.646
+</text>
+<text x="0" y="7771" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+SharedEd25519PublicKey::publish
+</text>
+<rect x="0" y="7784" width="183" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="192" y="7785" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.646
+</text>
+<text x="0" y="7806" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::assert_parent_vasp_or_designated_dealer
+</text>
+<rect x="0" y="7819" width="183" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="192" y="7820" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.645
+</text>
+<text x="0" y="7841" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::extract_withdraw_capability
+</text>
+<rect x="0" y="7853" width="183" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="192" y="7855" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.645
+</text>
+<text x="0" y="7876" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::get_role_id
+</text>
+<rect x="0" y="7888" width="182" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="191" y="7890" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.642
+</text>
+<text x="0" y="7910" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::has_parent_VASP_role
+</text>
+<rect x="0" y="7923" width="182" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="191" y="7924" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.642
+</text>
+<text x="0" y="7945" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::destroy_zero
+</text>
+<rect x="0" y="7958" width="182" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="191" y="7959" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.642
+</text>
+<text x="0" y="7980" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::grant_mutation_capability
+</text>
+<rect x="0" y="7993" width="182" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="191" y="7994" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.642
+</text>
+<text x="0" y="8015" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountAdministrationScripts::opt_in_to_crsn
+</text>
+<rect x="0" y="8028" width="182" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="191" y="8029" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.641
+</text>
+<text x="0" y="8050" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::assert_diem_root
+</text>
+<rect x="0" y="8063" width="181" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="190" y="8064" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.640
+</text>
+<text x="0" y="8085" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+RecoveryAddress::publish
+</text>
+<rect x="0" y="8098" width="181" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="190" y="8099" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.640
+</text>
+<text x="0" y="8120" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Roles::has_role
+</text>
+<rect x="0" y="8133" width="181" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="190" y="8134" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.639
+</text>
+<text x="0" y="8155" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::assert_is_currency
+</text>
+<rect x="0" y="8168" width="181" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="190" y="8169" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.638
+</text>
+<text x="0" y="8190" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::is_synthetic_currency
+</text>
+<rect x="0" y="8202" width="181" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="190" y="8204" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.638
+</text>
+<text x="0" y="8225" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+RecoveryAddress::add_rotation_capability
+</text>
+<rect x="0" y="8237" width="181" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="190" y="8239" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.638
+</text>
+<text x="0" y="8260" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::value
+</text>
+<rect x="0" y="8272" width="180" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="189" y="8273" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.636
+</text>
+<text x="0" y="8294" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::is_currency
+</text>
+<rect x="0" y="8307" width="180" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="189" y="8308" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.636
+</text>
+<text x="0" y="8329" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::restore_withdraw_capability
+</text>
+<rect x="0" y="8342" width="180" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="189" y="8343" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.636
+</text>
+<text x="0" y="8364" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::extract_key_rotation_capability
+</text>
+<rect x="0" y="8377" width="179" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="188" y="8378" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.632
+</text>
+<text x="0" y="8399" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::rotate_authentication_key
+</text>
+<rect x="0" y="8412" width="179" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="188" y="8413" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.632
+</text>
+<text x="0" y="8434" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+SharedEd25519PublicKey::rotate_key
+</text>
+<rect x="0" y="8447" width="179" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="188" y="8448" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.632
+</text>
+<text x="0" y="8469" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemConfig::set_with_capability_and_reconfigure
+</text>
+<rect x="0" y="8482" width="179" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="188" y="8483" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.631
+</text>
+<text x="0" y="8504" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemSystem::get_validator_config
+</text>
+<rect x="0" y="8517" width="179" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="188" y="8518" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.631
+</text>
+<text x="0" y="8539" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::withdraw_capability_address
+</text>
+<rect x="0" y="8552" width="178" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="188" y="8553" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.630
+</text>
+<text x="0" y="8574" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::restore_key_rotation_capability
+</text>
+<rect x="0" y="8586" width="178" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="187" y="8588" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.628
+</text>
+<text x="0" y="8609" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorConfig::set_config
+</text>
+<rect x="0" y="8621" width="178" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="187" y="8622" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.627
+</text>
+<text x="0" y="8643" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::delegated_key_rotation_capability
+</text>
+<rect x="0" y="8656" width="178" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="187" y="8657" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.627
+</text>
+<text x="0" y="8678" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemConfig::set
+</text>
+<rect x="0" y="8691" width="177" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="186" y="8692" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.626
+</text>
+<text x="0" y="8713" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemSystem::get_validator_index_
+</text>
+<rect x="0" y="8726" width="177" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="186" y="8727" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.626
+</text>
+<text x="0" y="8748" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+SharedEd25519PublicKey::rotate_key_
+</text>
+<rect x="0" y="8761" width="176" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="185" y="8762" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.622
+</text>
+<text x="0" y="8783" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::key_rotation_capability_address
+</text>
+<rect x="0" y="8796" width="176" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="185" y="8797" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.621
+</text>
+<text x="0" y="8818" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountFreezing::assert_not_frozen
+</text>
+<rect x="0" y="8831" width="176" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="185" y="8832" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.620
+</text>
+<text x="0" y="8853" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+CRSN::shift_window_right
+</text>
+<rect x="0" y="8866" width="175" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="184" y="8867" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.618
+</text>
+<text x="0" y="8888" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::delegated_withdraw_capability
+</text>
+<rect x="0" y="8901" width="175" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="184" y="8902" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.618
+</text>
+<text x="0" y="8923" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::sequence_number_for_account
+</text>
+<rect x="0" y="8935" width="175" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="184" y="8937" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.617
+</text>
+<text x="0" y="8958" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::authentication_key
+</text>
+<rect x="0" y="8970" width="174" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="184" y="8971" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.616
+</text>
+<text x="0" y="8992" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+CRSN::force_expire
+</text>
+<rect x="0" y="9005" width="174" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="183" y="9006" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.615
+</text>
+<text x="0" y="9027" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::sequence_number
+</text>
+<rect x="0" y="9040" width="174" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="183" y="9041" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.613
+</text>
+<text x="0" y="9062" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountAdministrationScripts::force_expire
+</text>
+<rect x="0" y="9075" width="174" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="183" y="9076" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.613
+</text>
+<text x="0" y="9097" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::create_authentication_key
+</text>
+<rect x="0" y="9110" width="173" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="182" y="9111" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.612
+</text>
+<text x="0" y="9132" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemSystem::is_validator_
+</text>
+<rect x="0" y="9145" width="173" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="182" y="9146" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.611
+</text>
+<text x="0" y="9167" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::exists_at
+</text>
+<rect x="0" y="9180" width="172" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="181" y="9181" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.606
+</text>
+<text x="0" y="9202" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorConfig::get_config
+</text>
+<rect x="0" y="9215" width="170" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="179" y="9216" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.601
+</text>
+<text x="0" y="9237" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorConfig::get_human_name
+</text>
+<rect x="0" y="9250" width="169" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="178" y="9251" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.596
+</text>
+<text x="0" y="9272" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorConfig::get_operator
+</text>
+<rect x="0" y="9284" width="169" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="178" y="9286" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.596
+</text>
+<text x="0" y="9307" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorConfig::is_valid
+</text>
+<rect x="0" y="9319" width="169" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="178" y="9321" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.596
+</text>
+<text x="0" y="9341" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountFreezing::create
+</text>
+<rect x="0" y="9354" width="169" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="178" y="9355" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.596
+</text>
+<text x="0" y="9376" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorConfig::exists_config
+</text>
+<rect x="0" y="9389" width="168" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="177" y="9390" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.594
+</text>
+<text x="0" y="9411" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::has_limits_published
+</text>
+<rect x="0" y="9424" width="166" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="175" y="9425" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.586
+</text>
+<text x="0" y="9446" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemSystem::set_diem_system_config
+</text>
+<rect x="0" y="9459" width="165" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="174" y="9460" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.583
+</text>
+<text x="0" y="9481" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Authenticator::threshold
+</text>
+<rect x="0" y="9494" width="165" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="174" y="9495" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.582
+</text>
+<text x="0" y="9516" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Authenticator::multi_ed25519_authentication_key
+</text>
+<rect x="0" y="9529" width="165" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="174" y="9530" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.582
+</text>
+<text x="0" y="9551" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemSystem::get_ith_validator_address
+</text>
+<rect x="0" y="9564" width="165" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="174" y="9565" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.581
+</text>
+<text x="0" y="9586" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASPDomain::has_vasp_domains
+</text>
+<rect x="0" y="9599" width="164" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="173" y="9600" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.580
+</text>
+<text x="0" y="9621" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Authenticator::create_multi_ed25519
+</text>
+<rect x="0" y="9633" width="164" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="173" y="9635" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.580
+</text>
+<text x="0" y="9656" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Authenticator::public_keys
+</text>
+<rect x="0" y="9668" width="164" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="173" y="9670" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.578
+</text>
+<text x="0" y="9690" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+NetworkIdentity::initialize_network_identity
+</text>
+<rect x="0" y="9703" width="163" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="172" y="9704" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.577
+</text>
+<text x="0" y="9725" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+NetworkIdentity::tc_network_identity_event_handle_exists
+</text>
+<rect x="0" y="9738" width="163" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="172" y="9739" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.576
+</text>
+<text x="0" y="9760" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::assert_signature_is_valid
+</text>
+<rect x="0" y="9773" width="163" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="172" y="9774" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.575
+</text>
+<text x="0" y="9795" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemSystem::is_validator
+</text>
+<rect x="0" y="9808" width="163" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="172" y="9809" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.575
+</text>
+<text x="0" y="9830" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+NetworkIdentity::get
+</text>
+<rect x="0" y="9843" width="163" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="172" y="9844" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.575
+</text>
+<text x="0" y="9865" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+CRSN::check
+</text>
+<rect x="0" y="9878" width="163" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="172" y="9879" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.574
+</text>
+<text x="0" y="9900" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemSystem::get_diem_system_config
+</text>
+<rect x="0" y="9913" width="163" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="172" y="9914" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.574
+</text>
+<text x="0" y="9935" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASP::has_account_limits
+</text>
+<rect x="0" y="9948" width="162" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="171" y="9949" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.573
+</text>
+<text x="0" y="9970" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+CRSN::publish
+</text>
+<rect x="0" y="9982" width="162" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="171" y="9984" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.572
+</text>
+<text x="0" y="10005" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+CRSN::has_crsn
+</text>
+<rect x="0" y="10017" width="162" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="171" y="10019" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.571
+</text>
+<text x="0" y="10039" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemConfig::reconfigure_
+</text>
+<rect x="0" y="10052" width="161" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="170" y="10053" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.570
+</text>
+<text x="0" y="10074" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASPDomain::tc_domain_manager_exists
+</text>
+<rect x="0" y="10087" width="161" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="170" y="10088" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.569
+</text>
+<text x="0" y="10109" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemSystem::validator_set_size
+</text>
+<rect x="0" y="10122" width="161" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="170" y="10123" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.568
+</text>
+<text x="0" y="10144" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTransactionPublishingOption::transactions_halted
+</text>
+<rect x="0" y="10157" width="161" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="170" y="10158" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.567
+</text>
+<text x="0" y="10179" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASPDomain::has_vasp_domain
+</text>
+<rect x="0" y="10192" width="160" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="169" y="10193" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.564
+</text>
+<text x="0" y="10214" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASP::is_same_vasp
+</text>
+<rect x="0" y="10227" width="159" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="168" y="10228" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.563
+</text>
+<text x="0" y="10249" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemId::has_diem_id_domain
+</text>
+<rect x="0" y="10262" width="159" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="168" y="10263" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.563
+</text>
+<text x="0" y="10284" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemId::has_diem_id_domains
+</text>
+<rect x="0" y="10297" width="159" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="168" y="10298" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.563
+</text>
+<text x="0" y="10319" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASP::is_parent
+</text>
+<rect x="0" y="10331" width="159" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="168" y="10333" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.562
+</text>
+<text x="0" y="10354" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::dual_attestation_message
+</text>
+<rect x="0" y="10366" width="159" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="168" y="10368" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.562
+</text>
+<text x="0" y="10388" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::expiration_date
+</text>
+<rect x="0" y="10401" width="159" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="168" y="10402" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.561
+</text>
+<text x="0" y="10423" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::base_url
+</text>
+<rect x="0" y="10436" width="159" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="168" y="10437" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.560
+</text>
+<text x="0" y="10458" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::compliance_public_key
+</text>
+<rect x="0" y="10471" width="158" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="167" y="10472" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.559
+</text>
+<text x="0" y="10493" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::credential_address
+</text>
+<rect x="0" y="10506" width="158" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="167" y="10507" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.559
+</text>
+<text x="0" y="10528" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASPDomain::create_vasp_domain
+</text>
+<rect x="0" y="10541" width="158" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="167" y="10542" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.558
+</text>
+<text x="0" y="10563" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::human_name
+</text>
+<rect x="0" y="10576" width="158" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="167" y="10577" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.558
+</text>
+<text x="0" y="10598" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemId::create_diem_id_domain
+</text>
+<rect x="0" y="10611" width="158" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="167" y="10612" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.558
+</text>
+<text x="0" y="10633" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::limits_definition_address
+</text>
+<rect x="0" y="10646" width="158" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="167" y="10647" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.557
+</text>
+<text x="0" y="10668" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASP::is_vasp
+</text>
+<rect x="0" y="10680" width="158" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="167" y="10682" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.557
+</text>
+<text x="0" y="10703" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::publish_unrestricted_limits
+</text>
+<rect x="0" y="10715" width="157" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="166" y="10717" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.556
+</text>
+<text x="0" y="10738" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASP::num_children
+</text>
+<rect x="0" y="10750" width="157" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="166" y="10751" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.556
+</text>
+<text x="0" y="10772" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::has_window_published
+</text>
+<rect x="0" y="10785" width="157" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="166" y="10786" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.555
+</text>
+<text x="0" y="10807" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorOperatorConfig::has_validator_operator_config
+</text>
+<rect x="0" y="10820" width="157" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="166" y="10821" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.555
+</text>
+<text x="0" y="10842" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASP::parent_address
+</text>
+<rect x="0" y="10855" width="157" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="166" y="10856" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.554
+</text>
+<text x="0" y="10877" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TransactionFee::is_coin_initialized
+</text>
+<rect x="0" y="10890" width="157" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="166" y="10891" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.554
+</text>
+<text x="0" y="10912" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemBlock::is_initialized
+</text>
+<rect x="0" y="10925" width="157" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="166" y="10926" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.554
+</text>
+<text x="0" y="10947" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTimestamp::set_time_has_started
+</text>
+<rect x="0" y="10960" width="156" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="165" y="10961" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.552
+</text>
+<text x="0" y="10982" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorOperatorConfig::get_human_name
+</text>
+<rect x="0" y="10995" width="156" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="165" y="10996" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.552
+</text>
+<text x="0" y="11017" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Authenticator::ed25519_authentication_key
+</text>
+<rect x="0" y="11030" width="156" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="165" y="11031" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.552
+</text>
+<text x="0" y="11052" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+SlidingNonce::record_nonce_or_abort
+</text>
+<rect x="0" y="11064" width="156" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="165" y="11066" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.551
+</text>
+<text x="0" y="11087" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+VASP::is_child
+</text>
+<rect x="0" y="11099" width="156" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="165" y="11100" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.551
+</text>
+<text x="0" y="11121" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DesignatedDealer::exists_at
+</text>
+<rect x="0" y="11134" width="156" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="165" y="11135" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.551
+</text>
+<text x="0" y="11156" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemId::tc_domain_manager_exists
+</text>
+<rect x="0" y="11169" width="156" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="165" y="11170" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.551
+</text>
+<text x="0" y="11191" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTimestamp::now_microseconds
+</text>
+<rect x="0" y="11204" width="156" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="165" y="11205" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.550
+</text>
+<text x="0" y="11226" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemConfig::emit_genesis_reconfiguration_event
+</text>
+<rect x="0" y="11239" width="156" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="165" y="11240" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.550
+</text>
+<text x="0" y="11261" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemBlock::get_current_block_height
+</text>
+<rect x="0" y="11274" width="155" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="165" y="11275" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.549
+</text>
+<text x="0" y="11296" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::is_unrestricted
+</text>
+<rect x="0" y="11309" width="155" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="164" y="11310" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.548
+</text>
+<text x="0" y="11331" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorConfig::get_validator_network_addresses
+</text>
+<rect x="0" y="11344" width="155" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="164" y="11345" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.548
+</text>
+<text x="0" y="11366" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+SharedEd25519PublicKey::key
+</text>
+<rect x="0" y="11379" width="155" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="164" y="11380" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.548
+</text>
+<text x="0" y="11401" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+ValidatorConfig::get_consensus_pubkey
+</text>
+<rect x="0" y="11413" width="155" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="164" y="11415" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.546
+</text>
+<text x="0" y="11436" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+CoreAddresses::assert_currency_info
+</text>
+<rect x="0" y="11448" width="154" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="163" y="11449" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.544
+</text>
+<text x="0" y="11470" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+CoreAddresses::assert_diem_root
+</text>
+<rect x="0" y="11483" width="154" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="163" y="11484" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.544
+</text>
+<text x="0" y="11505" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+SlidingNonce::publish
+</text>
+<rect x="0" y="11518" width="154" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="163" y="11519" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.544
+</text>
+<text x="0" y="11540" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+TransactionFee::is_initialized
+</text>
+<rect x="0" y="11553" width="154" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="163" y="11554" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.544
+</text>
+<text x="0" y="11575" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+SharedEd25519PublicKey::exists_at
+</text>
+<rect x="0" y="11588" width="154" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="163" y="11589" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.544
+</text>
+<text x="0" y="11610" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTimestamp::assert_operating
+</text>
+<rect x="0" y="11623" width="154" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="163" y="11624" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.543
+</text>
+<text x="0" y="11645" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+CoreAddresses::assert_treasury_compliance
+</text>
+<rect x="0" y="11658" width="153" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="163" y="11659" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.542
+</text>
+<text x="0" y="11680" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTimestamp::is_operating
+</text>
+<rect x="0" y="11693" width="153" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="163" y="11694" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.542
+</text>
+<text x="0" y="11715" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DualAttestation::get_cur_microdiem_limit
+</text>
+<rect x="0" y="11728" width="153" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="163" y="11729" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.542
+</text>
+<text x="0" y="11750" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+CoreAddresses::assert_vm
+</text>
+<rect x="0" y="11762" width="153" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="162" y="11764" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.541
+</text>
+<text x="0" y="11785" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTimestamp::is_genesis
+</text>
+<rect x="0" y="11797" width="153" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="162" y="11799" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.541
+</text>
+<text x="0" y="11819" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTimestamp::assert_genesis
+</text>
+<rect x="0" y="11832" width="153" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="162" y="11833" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.539
+</text>
+<text x="0" y="11854" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemConfig::reconfiguration_enabled
+</text>
+<rect x="0" y="11867" width="153" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="162" y="11868" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.539
+</text>
+<text x="0" y="11889" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+XDX::reserve_address
+</text>
+<rect x="0" y="11902" width="153" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="162" y="11903" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.539
+</text>
+<text x="0" y="11924" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Diem::publish_preburn_queue_to_account_for_test
+</text>
+<rect x="0" y="11937" width="102" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="111" y="11938" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.360
+</text>
+<text x="0" y="11959" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemTimestamp::set_time_has_started_for_testing
+</text>
+<rect x="0" y="11972" width="101" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="110" y="11973" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.357
+</text>
+<text x="0" y="11994" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+SlidingNonce::try_record_nonce
+</text>
+<rect x="0" y="12007" width="101" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="110" y="12008" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.357
+</text>
+<text x="0" y="12029" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::add_currency_for_test
+</text>
+<rect x="0" y="12042" width="101" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="110" y="12043" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.357
+</text>
+<text x="0" y="12064" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::create_signer
+</text>
+<rect x="0" y="12077" width="101" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="110" y="12078" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.357
+</text>
+<text x="0" y="12099" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+NetworkIdentity::remove_members_internal
+</text>
+<rect x="0" y="12111" width="101" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="110" y="12113" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.357
+</text>
+<text x="0" y="12134" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Signature::ed25519_validate_pubkey
+</text>
+<rect x="0" y="12146" width="101" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="110" y="12148" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.356
+</text>
+<text x="0" y="12168" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+AccountLimits::publish_unrestricted_limits_for_testing
+</text>
+<rect x="0" y="12181" width="101" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="110" y="12182" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.356
+</text>
+<text x="0" y="12203" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::epilogue
+</text>
+<rect x="0" y="12216" width="101" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="110" y="12217" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.356
+</text>
+<text x="0" y="12238" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+DiemAccount::epilogue_common
+</text>
+<rect x="0" y="12251" width="101" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="110" y="12252" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.356
+</text>
+<text x="0" y="12273" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+Signature::ed25519_verify
+</text>
+<rect x="0" y="12286" width="100" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="109" y="12287" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.355
+</text>
+<text x="0" y="12308" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+NetworkIdentity::add_identities
+</text>
+<rect x="0" y="12321" width="99" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="108" y="12322" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.351
+</text>
+<text x="0" y="12343" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+NetworkIdentity::add_members_internal
+</text>
+<rect x="0" y="12356" width="99" height="8" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="108" y="12357" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.350
+</text>
+</svg>

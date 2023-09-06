@@ -13,7 +13,7 @@ Also see the [System Integrators Guide](../guides/system-integrators-guide.md) f
 
 ## Understanding rate limits
 
-As with the [Aptos Indexer](./indexing.md#rate-limits), the Aptos REST API has a rate limit of 5000 requests per five minutes by IP address, whether submitting transactions or querying the API on Aptos-provided nodes. (As a node operator, you may raise those limits on your own node.) Note that this limit can change with or without prior notice.
+As with the [Aptos Indexer](../indexer/api/labs-hosted.md#rate-limits), the Aptos REST API has a rate limit of 5000 requests per five minutes by IP address, whether submitting transactions or querying the API on Aptos-provided nodes. (As a node operator, you may raise those limits on your own node.) Note that this limit can change with or without prior notice.
 
 ## Viewing current and historical state
 
@@ -55,11 +55,11 @@ The view function operates like the [Aptos Simulation API](../guides/system-inte
 A function does not have to be immutable to be tagged as `#[view]`, but if the function is mutable it will not result in state mutation when called from the API.
 If you want to tag a mutable function as `#[view]`, consider making it private so that it cannot be maliciously called during runtime.
 
-In order to use the View functions, you need to [publish the module](../move/move-on-aptos/cli.md#publishing-a-move-package-with-a-named-address) through the [Aptos CLI](../tools/install-cli/index.md).
+In order to use the View functions, you need to [publish the module](../move/move-on-aptos/cli.md#publishing-a-move-package-with-a-named-address) through the [Aptos CLI](../tools/aptos-cli/install-cli/index.md).
 
 In the Aptos CLI, a view function request would look like this:
 ```
-aptos move view --function-id devnet::message::get_message --profile devnet --args address:devnet                   
+aptos move view --function-id devnet::message::get_message --profile devnet --args address:devnet
 {
   "Result": [
     "View functions rock!"

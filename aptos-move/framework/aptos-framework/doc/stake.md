@@ -104,6 +104,7 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Function `configure_allowed_validators`](#0x1_stake_configure_allowed_validators)
 -  [Function `is_allowed`](#0x1_stake_is_allowed)
 -  [Function `assert_owner_cap_exists`](#0x1_stake_assert_owner_cap_exists)
+-  [Function `copy_aptos_coin_mint_cap_for_storage_refund`](#0x1_stake_copy_aptos_coin_mint_cap_for_storage_refund)
 -  [Specification](#@Specification_1)
     -  [Function `initialize_validator_fees`](#@Specification_1_initialize_validator_fees)
     -  [Function `add_transaction_fee`](#@Specification_1_add_transaction_fee)
@@ -2752,7 +2753,7 @@ Withdraw from <code>pool_address</code>'s inactive stake with the corresponding 
         <a href="coin.md#0x1_coin_merge">coin::merge</a>(&<b>mut</b> stake_pool.inactive, pending_inactive_stake);
     };
 
-    // Cap withdraw amount by total ianctive coins.
+    // Cap withdraw amount by total inactive coins.
     withdraw_amount = <b>min</b>(withdraw_amount, <a href="coin.md#0x1_coin_value">coin::value</a>(&stake_pool.inactive));
     <b>if</b> (withdraw_amount == 0) <b>return</b> <a href="coin.md#0x1_coin_zero">coin::zero</a>&lt;AptosCoin&gt;();
 
@@ -3521,6 +3522,30 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 </details>
 
+<a name="0x1_stake_copy_aptos_coin_mint_cap_for_storage_refund"></a>
+
+## Function `copy_aptos_coin_mint_cap_for_storage_refund`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_copy_aptos_coin_mint_cap_for_storage_refund">copy_aptos_coin_mint_cap_for_storage_refund</a>(): <a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_copy_aptos_coin_mint_cap_for_storage_refund">copy_aptos_coin_mint_cap_for_storage_refund</a>(): MintCapability&lt;AptosCoin&gt; <b>acquires</b> <a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a> {
+    <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).mint_cap
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="@Specification_1"></a>
 
 ## Specification
@@ -4251,4 +4276,4 @@ Returns validator's next epoch voting power, including pending_active, active, a
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

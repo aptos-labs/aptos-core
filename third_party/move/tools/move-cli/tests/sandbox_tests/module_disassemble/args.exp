@@ -1,7 +1,7 @@
 Command `sandbox publish -v`:
 Found 2 modules
-Publishing a new module 000000000000000000000000000000000000000000000000000000000000000a::M1 (wrote 247 bytes)
-Publishing a new module 000000000000000000000000000000000000000000000000000000000000000c::M (wrote 297 bytes)
+Publishing a new module 0xa::M1 (wrote 247 bytes)
+Publishing a new module 0xc::M (wrote 297 bytes)
 Wrote 544 bytes of module ID's and code
 Command `sandbox view storage/0x0000000000000000000000000000000a/modules/M1.mv`:
 Bytecode not found.

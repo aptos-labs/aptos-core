@@ -37,3 +37,12 @@ pub const SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP: &IdentStr =
     ident_str!("successful_transaction_execution_cleanup");
 pub const FAILED_TRANSACTION_EXECUTION_CLEANUP: &IdentStr =
     ident_str!("failed_transaction_execution_cleanup");
+
+pub static TRANSACTION_FEE_MODULE: Lazy<ModuleId> = Lazy::new(|| {
+    ModuleId::new(
+        account_config::CORE_CODE_ADDRESS,
+        ident_str!("transaction_fee").to_owned(),
+    )
+});
+
+pub const EMIT_FEE_STATEMENT: &IdentStr = ident_str!("emit_fee_statement");

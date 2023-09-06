@@ -2,16 +2,16 @@
 
 use crate::{
     abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
-    natives::{
-        cryptography::algebra::{
-            abort_invariant_violated, feature_flag_from_structure, gas::GasParameters,
-            AlgebraContext, Structure, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        },
-        helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
+    natives::cryptography::algebra::{
+        abort_invariant_violated, feature_flag_from_structure, AlgebraContext, Structure,
+        MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
-    safe_borrow_element, safely_pop_arg, structure_from_ty_arg,
+    safe_borrow_element, structure_from_ty_arg,
 };
-use move_core_types::gas_algebra::NumArgs;
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
+};
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
@@ -29,7 +29,6 @@ macro_rules! ark_eq_internal {
 }
 
 pub fn eq_internal(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -42,31 +41,31 @@ pub fn eq_internal(
             context,
             args,
             ark_bls12_381::Fr,
-            gas_params.ark_bls12_381_fr_eq * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_FR_EQ
         ),
         Some(Structure::BLS12381Fq12) => ark_eq_internal!(
             context,
             args,
             ark_bls12_381::Fq12,
-            gas_params.ark_bls12_381_fq12_eq * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_FQ12_EQ
         ),
         Some(Structure::BLS12381G1) => ark_eq_internal!(
             context,
             args,
             ark_bls12_381::G1Projective,
-            gas_params.ark_bls12_381_g1_proj_eq * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_G1_PROJ_EQ
         ),
         Some(Structure::BLS12381G2) => ark_eq_internal!(
             context,
             args,
             ark_bls12_381::G2Projective,
-            gas_params.ark_bls12_381_g2_proj_eq * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_G2_PROJ_EQ
         ),
         Some(Structure::BLS12381Gt) => ark_eq_internal!(
             context,
             args,
             ark_bls12_381::Fq12,
-            gas_params.ark_bls12_381_fq12_eq * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_FQ12_EQ
         ),
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,

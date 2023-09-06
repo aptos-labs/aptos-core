@@ -1,11 +1,12 @@
 /// This module provides an interface to burn or collect and redistribute transaction fees.
 module aptos_framework::transaction_fee {
-    use aptos_framework::coin::{Self, AggregatableCoin, BurnCapability, Coin};
+    use aptos_framework::coin::{Self, AggregatableCoin, BurnCapability, Coin, MintCapability};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::stake;
     use aptos_framework::system_addresses;
     use std::error;
     use std::option::{Self, Option};
+    use aptos_framework::event;
 
     friend aptos_framework::block;
     friend aptos_framework::genesis;
@@ -24,12 +25,34 @@ module aptos_framework::transaction_fee {
         burn_cap: BurnCapability<AptosCoin>,
     }
 
+    /// Stores mint capability to mint the refunds.
+    struct AptosCoinMintCapability has key {
+        mint_cap: MintCapability<AptosCoin>,
+    }
+
     /// Stores information about the block proposer and the amount of fees
     /// collected when executing the block.
     struct CollectedFeesPerBlock has key {
         amount: AggregatableCoin<AptosCoin>,
         proposer: Option<address>,
         burn_percentage: u8,
+    }
+
+    #[event]
+    /// Summary of the fees charged and refunds issued for a transaction.
+    ///
+    /// This is meant to emitted as a module event.
+    struct FeeStatement has drop, store {
+        /// Total gas charge.
+        total_charge_gas_units: u64,
+        /// Execution gas charge.
+        execution_gas_units: u64,
+        /// IO gas charge.
+        io_gas_units: u64,
+        /// Storage fee charge.
+        storage_fee_octas: u64,
+        /// Storage fee refund.
+        storage_fee_refund_octas: u64,
     }
 
     /// Initializes the resource storing information about gas fees collection and
@@ -163,6 +186,13 @@ module aptos_framework::transaction_fee {
         );
     }
 
+    /// Mint refund in epilogue.
+    public(friend) fun mint_and_refund(account: address, refund: u64) acquires AptosCoinMintCapability {
+        let mint_cap = &borrow_global<AptosCoinMintCapability>(@aptos_framework).mint_cap;
+        let refund_coin = coin::mint(refund, mint_cap);
+        coin::force_deposit(account, refund_coin);
+    }
+
     /// Collect transaction fees in epilogue.
     public(friend) fun collect_fee(account: address, fee: u64) acquires CollectedFeesPerBlock {
         let collected_fees = borrow_global_mut<CollectedFeesPerBlock>(@aptos_framework);
@@ -178,6 +208,23 @@ module aptos_framework::transaction_fee {
     public(friend) fun store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         move_to(aptos_framework, AptosCoinCapabilities { burn_cap })
+    }
+
+    /// Only called during genesis.
+    public(friend) fun store_aptos_coin_mint_cap(aptos_framework: &signer, mint_cap: MintCapability<AptosCoin>) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        move_to(aptos_framework, AptosCoinMintCapability { mint_cap })
+    }
+
+    // Will be deleted after the mint cap is copied on both mainnet and testnet. New networks will get it from genesis.
+    public fun initialize_storage_refund(aptos_framework: &signer) {
+        let mint_cap = stake::copy_aptos_coin_mint_cap_for_storage_refund();
+        store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+    }
+
+    // Called by the VM after epilogue.
+    fun emit_fee_statement(fee_statement: FeeStatement) {
+        event::emit(fee_statement)
     }
 
     #[test_only]

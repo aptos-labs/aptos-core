@@ -7,7 +7,8 @@ use crate::{
 };
 use aptos_crypto::ValidCryptoMaterialStringExt;
 use aptos_forge::Swarm;
-use aptos_gas::{AptosGasParameters, GasQuantity, InitialGasSchedule, ToOnChainGasSchedule};
+use aptos_gas_algebra::GasQuantity;
+use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
 use aptos_release_builder::{
     components::{
         feature_flags::{FeatureFlag, Features},
@@ -49,11 +50,12 @@ async fn test_upgrade_flow() {
     // Bump the limit in gas schedule
     // TODO: Replace this logic with aptos-gas
     let mut gas_parameters = AptosGasParameters::initial();
-    gas_parameters.txn.max_transaction_size_in_bytes = GasQuantity::new(100_000_000);
+    gas_parameters.vm.txn.max_transaction_size_in_bytes = GasQuantity::new(100_000_000);
 
     let gas_schedule = aptos_types::on_chain_config::GasScheduleV2 {
-        feature_version: aptos_gas::LATEST_GAS_FEATURE_VERSION,
-        entries: gas_parameters.to_on_chain_gas_schedule(aptos_gas::LATEST_GAS_FEATURE_VERSION),
+        feature_version: aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION,
+        entries: gas_parameters
+            .to_on_chain_gas_schedule(aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION),
     };
 
     let (_, update_gas_script) =
@@ -95,7 +97,9 @@ async fn test_upgrade_flow() {
         .unwrap()
         .status
         .success());
-    *env.aptos_public_info().root_account().sequence_number_mut() += 1;
+    env.aptos_public_info()
+        .root_account()
+        .increment_sequence_number();
 
     let upgrade_scripts_folder = TempPath::new();
     upgrade_scripts_folder.create_as_dir().unwrap();
@@ -187,7 +191,9 @@ async fn test_upgrade_flow() {
             .status
             .success());
 
-        *env.aptos_public_info().root_account().sequence_number_mut() += 1;
+        env.aptos_public_info()
+            .root_account()
+            .increment_sequence_number();
     }
 
     //TODO: Make sure gas schedule is indeed updated by the tool.
@@ -259,7 +265,7 @@ async fn test_release_validate_tool_multi_step() {
 
     let root_account = env.aptos_public_info().root_account().address();
     // Test the module publishing workflow
-    *env.aptos_public_info().root_account().sequence_number_mut() = env
+    let sequence_number = env
         .aptos_public_info()
         .client()
         .get_account(root_account)
@@ -267,6 +273,9 @@ async fn test_release_validate_tool_multi_step() {
         .unwrap()
         .inner()
         .sequence_number;
+    env.aptos_public_info()
+        .root_account()
+        .set_sequence_number(sequence_number);
 
     let base_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     let base_path_v1 = base_dir.join("src/aptos/package_publish_modules_v1/");

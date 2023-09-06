@@ -1,12 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(feature = "testing")]
-use crate::natives::helpers::make_test_only_native_from_func;
-use crate::{
-    natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeResult},
-    safely_pop_arg, safely_pop_vec_arg,
-};
 use aptos_crypto::{bls12381, traits};
 #[cfg(feature = "testing")]
 use aptos_crypto::{
@@ -14,28 +8,25 @@ use aptos_crypto::{
     test_utils::KeyPair,
     SigningKey, Uniform,
 };
-use aptos_types::on_chain_config::{Features, TimedFeatures};
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, safely_pop_vec_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
+    SafeNativeResult,
+};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes},
     vm_status::StatusCode,
 };
-#[cfg(feature = "testing")]
-use move_vm_runtime::native_functions::NativeContext;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
 };
 #[cfg(feature = "testing")]
-use move_vm_types::{
-    natives::function::{NativeResult, PartialVMResult},
-    pop_arg,
-};
-#[cfg(feature = "testing")]
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
+use std::{collections::VecDeque, convert::TryFrom};
 
 /// Pops a `Vec<T>` off the argument stack and converts it to a `Vec<Vec<u8>>` by reading the first
 /// field of `T`, which is a `Vec<u8>` field named `bytes`.
@@ -76,186 +67,175 @@ pub struct GasParameters {
     pub per_byte_hashing: InternalGasPerByte, // signature verification involves signing |msg| bytes
 }
 
-impl GasParameters {
-    /// Deserializes a vector of PK bytes into bls12381::PublicKey structs.
-    fn bls12381_deserialize_pks(
-        &self,
-        pks_serialized: Vec<Vec<u8>>,
-        context: &mut SafeNativeContext,
-    ) -> SafeNativeResult<Vec<bls12381::PublicKey>> {
-        let mut pks = vec![];
+/// Deserializes a vector of PK bytes into bls12381::PublicKey structs.
+fn bls12381_deserialize_pks(
+    pks_serialized: Vec<Vec<u8>>,
+    context: &mut SafeNativeContext,
+) -> SafeNativeResult<Vec<bls12381::PublicKey>> {
+    let mut pks = vec![];
 
-        for pk_bytes in pks_serialized {
-            let pk = match self.bls12381_deserialize_pk(pk_bytes, context)? {
-                Some(key) => key,
-                // If PK does not deserialize correctly, break early
-                None => break,
-            };
-
-            pks.push(pk);
-        }
-
-        Ok(pks)
-    }
-
-    /// Deserializes a sequence of bytes into bls12381::PublicKey struct.
-    fn bls12381_deserialize_pk(
-        &self,
-        pk_bytes: Vec<u8>,
-        context: &mut SafeNativeContext,
-    ) -> SafeNativeResult<Option<bls12381::PublicKey>> {
-        context.charge(self.per_pubkey_deserialize * NumArgs::one())?;
-
-        match bls12381::PublicKey::try_from(&pk_bytes[..]) {
-            Ok(key) => Ok(Some(key)),
-            // If PK does not deserialize correctly, return None
-            Err(_) => Ok(None),
-        }
-    }
-
-    /// Deserializes a vector of signature bytes into bls12381::Signature structs.
-    fn bls12381_deserialize_sigs(
-        &self,
-        sigs_serialized: Vec<Vec<u8>>,
-        context: &mut SafeNativeContext,
-    ) -> SafeNativeResult<Vec<bls12381::Signature>> {
-        let mut sigs = vec![];
-
-        for sig_bytes in sigs_serialized {
-            let sig = match self.bls12381_deserialize_sig(sig_bytes, context)? {
-                Some(sig) => sig,
-                // If sig does not deserialize correctly, break early
-                None => break,
-            };
-
-            sigs.push(sig);
-        }
-
-        Ok(sigs)
-    }
-
-    /// Deserializes a sequence of bytes into bls12381::Signature struct.
-    fn bls12381_deserialize_sig(
-        &self,
-        sig_bytes: Vec<u8>,
-        context: &mut SafeNativeContext,
-    ) -> SafeNativeResult<Option<bls12381::Signature>> {
-        context.charge(self.per_sig_deserialize * NumArgs::one())?;
-
-        match bls12381::Signature::try_from(&sig_bytes[..]) {
-            Ok(sig) => Ok(Some(sig)),
-            // If PK does not deserialize correctly, return None
-            Err(_) => Ok(None),
-        }
-    }
-
-    /// Deserializes a sequence of bytes into bls12381::Signature struct.
-    fn bls12381_deserialize_pop(
-        &self,
-        pop_bytes: Vec<u8>,
-        context: &mut SafeNativeContext,
-    ) -> SafeNativeResult<Option<bls12381::ProofOfPossession>> {
-        context.charge(self.per_sig_deserialize * NumArgs::one())?;
-
-        match bls12381::ProofOfPossession::try_from(&pop_bytes[..]) {
-            Ok(pop) => Ok(Some(pop)),
+    for pk_bytes in pks_serialized {
+        let pk = match bls12381_deserialize_pk(pk_bytes, context)? {
+            Some(key) => key,
             // If PK does not deserialize correctly, break early
-            Err(_) => Ok(None),
-        }
-    }
-
-    /// Checks prime-order subgroup membership on a bls12381::PublicKey struct.
-    fn bls12381_pk_subgroub_check(
-        &self,
-        pk: &bls12381::PublicKey,
-        context: &mut SafeNativeContext,
-    ) -> SafeNativeResult<bool> {
-        // NOTE(Gas): constant-time; around 39 microseconds on Apple M1
-        context.charge(self.per_pubkey_deserialize * NumArgs::one())?;
-
-        Ok(pk.subgroup_check().is_ok())
-    }
-
-    /// Checks prime-order subgroup membership on a bls12381::Signature struct.
-    fn bls12381_sig_subgroub_check(
-        &self,
-        sig: &bls12381::Signature,
-        context: &mut SafeNativeContext,
-    ) -> SafeNativeResult<bool> {
-        context.charge(self.per_sig_subgroup_check * NumArgs::one())?;
-
-        Ok(sig.subgroup_check().is_ok())
-    }
-
-    /// Verifies a signature on an arbitrary message.
-    fn signature_verify<S: traits::Signature>(
-        &self,
-        sig: &S,
-        pk: &S::VerifyingKeyMaterial,
-        msg: Vec<u8>,
-        context: &mut SafeNativeContext,
-    ) -> SafeNativeResult<bool> {
-        // NOTE(Gas): 2 bilinear pairings and a hash-to-curve
-        context.charge(
-            self.per_sig_verify * NumArgs::one()
-                + self.per_msg_hashing * NumArgs::one()
-                + self.per_byte_hashing * NumBytes::new(msg.len() as u64),
-        )?;
-
-        Ok(sig.verify_arbitrary_msg(&msg[..], pk).is_ok())
-    }
-
-    /// This is a helper function called by our `bls12381_verify_*` functions for:
-    ///  * normal (non-aggregated) signatures,
-    ///  * signature shares (in the multisignature scheme & the aggregate signature scheme)
-    ///  * multisignatures
-    ///
-    /// Gas cost: base_cost + per_pubkey_deserialize_cost
-    ///                     +? ( per_pubkey_subgroup_check_cost * check_pk_subgroup
-    ///                          +? ( per_sig_deserialize_cost
-    ///                              +? ( per_sig_verify_cost + per_msg_hashing_cost
-    ///                                   + per_byte_hashing_cost * |msg| ) ) )
-    ///
-    /// where +? indicates that the expression stops evaluating there if the previous gas-charging step
-    /// failed.
-    pub fn bls12381_verify_signature_helper(
-        &self,
-        context: &mut SafeNativeContext,
-        _ty_args: Vec<Type>,
-        mut arguments: VecDeque<Value>,
-        check_pk_subgroup: bool,
-    ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-        debug_assert!(_ty_args.is_empty());
-        debug_assert!(arguments.len() == 3);
-
-        context.charge(self.base)?;
-
-        let msg_bytes = safely_pop_arg!(arguments, Vec<u8>);
-        let aggpk_bytes = safely_pop_arg!(arguments, Vec<u8>);
-        let multisig_bytes = safely_pop_arg!(arguments, Vec<u8>);
-
-        let pk = match self.bls12381_deserialize_pk(aggpk_bytes, context)? {
-            Some(pk) => pk,
-            None => {
-                return Ok(smallvec![Value::bool(false)]);
-            },
+            None => break,
         };
 
-        if check_pk_subgroup && !self.bls12381_pk_subgroub_check(&pk, context)? {
-            return Ok(smallvec![Value::bool(false)]);
-        }
+        pks.push(pk);
+    }
 
-        let sig = match self.bls12381_deserialize_sig(multisig_bytes, context)? {
+    Ok(pks)
+}
+
+/// Deserializes a sequence of bytes into bls12381::PublicKey struct.
+fn bls12381_deserialize_pk(
+    pk_bytes: Vec<u8>,
+    context: &mut SafeNativeContext,
+) -> SafeNativeResult<Option<bls12381::PublicKey>> {
+    context.charge(BLS12381_PER_PUBKEY_DESERIALIZE * NumArgs::one())?;
+
+    match bls12381::PublicKey::try_from(&pk_bytes[..]) {
+        Ok(key) => Ok(Some(key)),
+        // If PK does not deserialize correctly, return None
+        Err(_) => Ok(None),
+    }
+}
+
+/// Deserializes a vector of signature bytes into bls12381::Signature structs.
+fn bls12381_deserialize_sigs(
+    sigs_serialized: Vec<Vec<u8>>,
+    context: &mut SafeNativeContext,
+) -> SafeNativeResult<Vec<bls12381::Signature>> {
+    let mut sigs = vec![];
+
+    for sig_bytes in sigs_serialized {
+        let sig = match bls12381_deserialize_sig(sig_bytes, context)? {
             Some(sig) => sig,
-            None => {
-                return Ok(smallvec![Value::bool(false)]);
-            },
+            // If sig does not deserialize correctly, break early
+            None => break,
         };
 
-        let verify_result = self.signature_verify(&sig, &pk, msg_bytes, context)?;
-
-        Ok(smallvec![Value::bool(verify_result)])
+        sigs.push(sig);
     }
+
+    Ok(sigs)
+}
+
+/// Deserializes a sequence of bytes into bls12381::Signature struct.
+fn bls12381_deserialize_sig(
+    sig_bytes: Vec<u8>,
+    context: &mut SafeNativeContext,
+) -> SafeNativeResult<Option<bls12381::Signature>> {
+    context.charge(BLS12381_PER_SIG_DESERIALIZE * NumArgs::one())?;
+
+    match bls12381::Signature::try_from(&sig_bytes[..]) {
+        Ok(sig) => Ok(Some(sig)),
+        // If PK does not deserialize correctly, return None
+        Err(_) => Ok(None),
+    }
+}
+
+/// Deserializes a sequence of bytes into bls12381::Signature struct.
+fn bls12381_deserialize_pop(
+    pop_bytes: Vec<u8>,
+    context: &mut SafeNativeContext,
+) -> SafeNativeResult<Option<bls12381::ProofOfPossession>> {
+    context.charge(BLS12381_PER_SIG_DESERIALIZE * NumArgs::one())?;
+
+    match bls12381::ProofOfPossession::try_from(&pop_bytes[..]) {
+        Ok(pop) => Ok(Some(pop)),
+        // If PK does not deserialize correctly, break early
+        Err(_) => Ok(None),
+    }
+}
+
+/// Checks prime-order subgroup membership on a bls12381::PublicKey struct.
+fn bls12381_pk_subgroub_check(
+    pk: &bls12381::PublicKey,
+    context: &mut SafeNativeContext,
+) -> SafeNativeResult<bool> {
+    // NOTE(Gas): constant-time; around 39 microseconds on Apple M1
+    context.charge(BLS12381_PER_PUBKEY_DESERIALIZE * NumArgs::one())?;
+
+    Ok(pk.subgroup_check().is_ok())
+}
+
+/// Checks prime-order subgroup membership on a bls12381::Signature struct.
+fn bls12381_sig_subgroub_check(
+    sig: &bls12381::Signature,
+    context: &mut SafeNativeContext,
+) -> SafeNativeResult<bool> {
+    context.charge(BLS12381_PER_SIG_SUBGROUP_CHECK * NumArgs::one())?;
+
+    Ok(sig.subgroup_check().is_ok())
+}
+
+/// Verifies a signature on an arbitrary message.
+fn signature_verify<S: traits::Signature>(
+    sig: &S,
+    pk: &S::VerifyingKeyMaterial,
+    msg: Vec<u8>,
+    context: &mut SafeNativeContext,
+) -> SafeNativeResult<bool> {
+    // NOTE(Gas): 2 bilinear pairings and a hash-to-curve
+    context.charge(
+        BLS12381_PER_SIG_VERIFY * NumArgs::one()
+            + BLS12381_PER_MSG_HASHING * NumArgs::one()
+            + BLS12381_PER_BYTE_HASHING * NumBytes::new(msg.len() as u64),
+    )?;
+
+    Ok(sig.verify_arbitrary_msg(&msg[..], pk).is_ok())
+}
+
+/// This is a helper function called by our `bls12381_verify_*` functions for:
+///  * normal (non-aggregated) signatures,
+///  * signature shares (in the multisignature scheme & the aggregate signature scheme)
+///  * multisignatures
+///
+/// Gas cost: base_cost + per_pubkey_deserialize_cost
+///                     +? ( per_pubkey_subgroup_check_cost * check_pk_subgroup
+///                          +? ( per_sig_deserialize_cost
+///                              +? ( per_sig_verify_cost + per_msg_hashing_cost
+///                                   + per_byte_hashing_cost * |msg| ) ) )
+///
+/// where +? indicates that the expression stops evaluating there if the previous gas-charging step
+/// failed.
+pub fn bls12381_verify_signature_helper(
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+    check_pk_subgroup: bool,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(arguments.len() == 3);
+
+    context.charge(BLS12381_BASE)?;
+
+    let msg_bytes = safely_pop_arg!(arguments, Vec<u8>);
+    let aggpk_bytes = safely_pop_arg!(arguments, Vec<u8>);
+    let multisig_bytes = safely_pop_arg!(arguments, Vec<u8>);
+
+    let pk = match bls12381_deserialize_pk(aggpk_bytes, context)? {
+        Some(pk) => pk,
+        None => {
+            return Ok(smallvec![Value::bool(false)]);
+        },
+    };
+
+    if check_pk_subgroup && !bls12381_pk_subgroub_check(&pk, context)? {
+        return Ok(smallvec![Value::bool(false)]);
+    }
+
+    let sig = match bls12381_deserialize_sig(multisig_bytes, context)? {
+        Some(sig) => sig,
+        None => {
+            return Ok(smallvec![Value::bool(false)]);
+        },
+    };
+
+    let verify_result = signature_verify(&sig, &pk, msg_bytes, context)?;
+
+    Ok(smallvec![Value::bool(verify_result)])
 }
 
 /***************************************************************************************************
@@ -277,7 +257,6 @@ impl GasParameters {
  * must be charged for the failed deserialization.
  **************************************************************************************************/
 fn native_bls12381_aggregate_pubkeys(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -289,14 +268,14 @@ fn native_bls12381_aggregate_pubkeys(
     let pks_bytes = pop_as_vec_of_vec_u8(&mut arguments)?;
     let num_pks = pks_bytes.len();
 
-    context.charge(gas_params.base)?;
+    context.charge(BLS12381_BASE)?;
 
     // If zero PKs were given as input, return None.
     if pks_bytes.is_empty() {
         return Ok(smallvec![Value::vector_u8(vec![]), Value::bool(false)]);
     }
 
-    let pks = gas_params.bls12381_deserialize_pks(pks_bytes, context)?;
+    let pks = bls12381_deserialize_pks(pks_bytes, context)?;
     debug_assert!(pks.len() <= num_pks);
 
     // If not all PKs were successfully deserialized, return None and only charge for the actual work done
@@ -306,7 +285,7 @@ fn native_bls12381_aggregate_pubkeys(
 
     // Aggregate the public keys (this will NOT subgroup-check the individual PKs)
     // NOTE(Gas): |pks| elliptic curve additions
-    context.charge(gas_params.per_pubkey_aggregate * NumArgs::new(num_pks as u64))?;
+    context.charge(BLS12381_PER_PUBKEY_AGGREGATE * NumArgs::new(num_pks as u64))?;
     let aggpk =
         match bls12381::PublicKey::aggregate(pks.iter().collect::<Vec<&bls12381::PublicKey>>()) {
             Ok(aggpk) => aggpk,
@@ -334,7 +313,6 @@ fn native_bls12381_aggregate_pubkeys(
  * could lie in a small-order subgroup.
  **************************************************************************************************/
 pub fn native_bls12381_aggregate_signatures(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -346,14 +324,14 @@ pub fn native_bls12381_aggregate_signatures(
     let sigs_serialized = pop_as_vec_of_vec_u8(&mut arguments)?;
     let num_sigs = sigs_serialized.len();
 
-    context.charge(gas_params.base)?;
+    context.charge(BLS12381_BASE)?;
 
     // If zero signatures were given as input, return None.
     if sigs_serialized.is_empty() {
         return Ok(smallvec![Value::vector_u8(vec![]), Value::bool(false)]);
     }
 
-    let sigs = gas_params.bls12381_deserialize_sigs(sigs_serialized, context)?;
+    let sigs = bls12381_deserialize_sigs(sigs_serialized, context)?;
 
     if sigs.len() != num_sigs {
         return Ok(smallvec![Value::vector_u8(vec![]), Value::bool(false)]);
@@ -361,7 +339,7 @@ pub fn native_bls12381_aggregate_signatures(
 
     // Aggregate the signatures (this will NOT group-check the individual signatures)
     // NOTE(Gas): |sigs| elliptic curve additions
-    context.charge(gas_params.per_sig_aggregate * NumArgs::new(sigs.len() as u64))?;
+    context.charge(BLS12381_PER_SIG_AGGREGATE * NumArgs::new(sigs.len() as u64))?;
     let aggsig = match bls12381::Signature::aggregate(sigs) {
         Ok(aggsig) => aggsig,
         Err(_) => return Ok(smallvec![Value::vector_u8(vec![]), Value::bool(false)]),
@@ -382,7 +360,6 @@ pub fn native_bls12381_aggregate_signatures(
  * failed
  **************************************************************************************************/
 pub fn native_bls12381_signature_subgroup_check(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -390,16 +367,16 @@ pub fn native_bls12381_signature_subgroup_check(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    context.charge(gas_params.base)?;
+    context.charge(BLS12381_BASE)?;
 
     let sig_bytes = safely_pop_arg!(arguments, Vec<u8>);
 
-    let sig = match gas_params.bls12381_deserialize_sig(sig_bytes, context)? {
+    let sig = match bls12381_deserialize_sig(sig_bytes, context)? {
         Some(key) => key,
         None => return Ok(smallvec![Value::bool(false)]),
     };
 
-    let valid = gas_params.bls12381_sig_subgroub_check(&sig, context)?;
+    let valid = bls12381_sig_subgroub_check(&sig, context)?;
 
     Ok(smallvec![Value::bool(valid)])
 }
@@ -413,7 +390,6 @@ pub fn native_bls12381_signature_subgroup_check(
  * failed
  **************************************************************************************************/
 fn native_bls12381_validate_pubkey(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -421,16 +397,16 @@ fn native_bls12381_validate_pubkey(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    context.charge(gas_params.base)?;
+    context.charge(BLS12381_BASE)?;
 
     let pk_bytes = safely_pop_arg!(arguments, Vec<u8>);
 
-    let pk = match gas_params.bls12381_deserialize_pk(pk_bytes, context)? {
+    let pk = match bls12381_deserialize_pk(pk_bytes, context)? {
         Some(key) => key,
         None => return Ok(smallvec![Value::bool(false)]),
     };
 
-    let valid = gas_params.bls12381_pk_subgroub_check(&pk, context)?;
+    let valid = bls12381_pk_subgroub_check(&pk, context)?;
 
     Ok(smallvec![Value::bool(valid)])
 }
@@ -465,7 +441,6 @@ fn native_bls12381_validate_pubkey(
 * must be charged for the failed deserialization. We proceed similarly for per_sig_deserialize_cost.
 **************************************************************************************************/
 pub fn native_bls12381_verify_aggregate_signature(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -473,7 +448,7 @@ pub fn native_bls12381_verify_aggregate_signature(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 3);
 
-    context.charge(gas_params.base)?;
+    context.charge(BLS12381_BASE)?;
 
     // Parses a Vec<Vec<u8>> of all messages
     let messages = safely_pop_vec_arg!(arguments, Vec<u8>);
@@ -489,7 +464,7 @@ pub fn native_bls12381_verify_aggregate_signature(
         return Ok(smallvec![Value::bool(false)]);
     }
 
-    let pks = gas_params.bls12381_deserialize_pks(pks_serialized, context)?;
+    let pks = bls12381_deserialize_pks(pks_serialized, context)?;
     debug_assert!(pks.len() <= num_pks);
 
     // If less PKs than expected were deserialized, return None.
@@ -497,7 +472,7 @@ pub fn native_bls12381_verify_aggregate_signature(
         return Ok(smallvec![Value::bool(false)]);
     }
 
-    let aggsig = match gas_params.bls12381_deserialize_sig(aggsig_bytes, context)? {
+    let aggsig = match bls12381_deserialize_sig(aggsig_bytes, context)? {
         Some(aggsig) => aggsig,
         None => return Ok(smallvec![Value::bool(false)]),
     };
@@ -511,9 +486,9 @@ pub fn native_bls12381_verify_aggregate_signature(
     // The cost of verifying a size-n aggregate signatures involves n+1 parings and hashing all
     // the messages to elliptic curve points (proportional to sum of all message lengths).
     context.charge(
-        gas_params.per_pairing * NumArgs::new((messages.len() + 1) as u64)
-            + gas_params.per_msg_hashing * NumArgs::new(messages.len() as u64)
-            + gas_params.per_byte_hashing
+        BLS12381_PER_PAIRING * NumArgs::new((messages.len() + 1) as u64)
+            + BLS12381_PER_MSG_HASHING * NumArgs::new(messages.len() as u64)
+            + BLS12381_PER_BYTE_HASHING
                 * messages.iter().fold(NumBytes::new(0), |sum, msg| {
                     sum + NumBytes::new(msg.len() as u64)
                 }),
@@ -538,13 +513,12 @@ pub fn native_bls12381_verify_aggregate_signature(
  * failed
  **************************************************************************************************/
 pub fn native_bls12381_verify_multisignature(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let check_pk_subgroup = false;
-    gas_params.bls12381_verify_signature_helper(context, _ty_args, arguments, check_pk_subgroup)
+    bls12381_verify_signature_helper(context, _ty_args, arguments, check_pk_subgroup)
 }
 
 /***************************************************************************************************
@@ -560,7 +534,6 @@ pub fn native_bls12381_verify_multisignature(
  * failed
  **************************************************************************************************/
 pub fn native_bls12381_verify_normal_signature(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     arguments: VecDeque<Value>,
@@ -569,7 +542,7 @@ pub fn native_bls12381_verify_normal_signature(
     // might forget to check prime-order subgroup membership of the PK. Therefore, we always enforce
     // it here.
     let check_pk_subgroup = true;
-    gas_params.bls12381_verify_signature_helper(context, _ty_args, arguments, check_pk_subgroup)
+    bls12381_verify_signature_helper(context, _ty_args, arguments, check_pk_subgroup)
 }
 
 /***************************************************************************************************
@@ -583,7 +556,6 @@ pub fn native_bls12381_verify_normal_signature(
  * failed
  **************************************************************************************************/
 fn native_bls12381_verify_proof_of_possession(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -591,23 +563,23 @@ fn native_bls12381_verify_proof_of_possession(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 2);
 
-    context.charge(gas_params.base)?;
+    context.charge(BLS12381_BASE)?;
 
     let pop_bytes = safely_pop_arg!(arguments, Vec<u8>);
     let key_bytes = safely_pop_arg!(arguments, Vec<u8>);
 
-    let pk = match gas_params.bls12381_deserialize_pk(key_bytes, context)? {
+    let pk = match bls12381_deserialize_pk(key_bytes, context)? {
         Some(pk) => pk,
         None => return Ok(smallvec![Value::bool(false)]),
     };
 
-    let pop = match gas_params.bls12381_deserialize_pop(pop_bytes, context)? {
+    let pop = match bls12381_deserialize_pop(pop_bytes, context)? {
         Some(pop) => pop,
         None => return Ok(smallvec![Value::bool(false)]),
     };
 
     // NOTE(Gas): 2 bilinear pairings and a hash-to-curve
-    context.charge(gas_params.per_pop_verify * NumArgs::one())?;
+    context.charge(BLS12381_PER_POP_VERIFY * NumArgs::one())?;
     let valid = pop.verify(&pk).is_ok();
 
     Ok(smallvec![Value::bool(valid)])
@@ -625,7 +597,6 @@ fn native_bls12381_verify_proof_of_possession(
  * failed
  **************************************************************************************************/
 pub fn native_bls12381_verify_signature_share(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     arguments: VecDeque<Value>,
@@ -633,49 +604,45 @@ pub fn native_bls12381_verify_signature_share(
     // For signature shares, the caller is REQUIRED to check the PK's PoP, and thus the PK is in the
     // prime-order subgroup.
     let check_pk_subgroup = false;
-    gas_params.bls12381_verify_signature_helper(context, _ty_args, arguments, check_pk_subgroup)
+    bls12381_verify_signature_helper(context, _ty_args, arguments, check_pk_subgroup)
 }
 
 #[cfg(feature = "testing")]
 pub fn native_generate_keys(
-    _context: &mut NativeContext,
+    _context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut _arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut OsRng);
-    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+    Ok(smallvec![
         Value::vector_u8(key_pair.private_key.to_bytes()),
         Value::vector_u8(key_pair.public_key.to_bytes()),
-    ]))
+    ])
 }
 
 #[cfg(feature = "testing")]
 pub fn native_sign(
-    _context: &mut NativeContext,
+    _context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    let msg = pop_arg!(arguments, Vec<u8>);
-    let sk_bytes = pop_arg!(arguments, Vec<u8>);
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    let msg = safely_pop_arg!(arguments, Vec<u8>);
+    let sk_bytes = safely_pop_arg!(arguments, Vec<u8>);
     let sk = PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
     let sig = sk.sign_arbitrary_message(msg.as_slice());
-    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-        Value::vector_u8(sig.to_bytes()),
-    ]))
+    Ok(smallvec![Value::vector_u8(sig.to_bytes()),])
 }
 
 #[cfg(feature = "testing")]
 pub fn native_generate_proof_of_possession(
-    _context: &mut NativeContext,
+    _context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    let sk_bytes = pop_arg!(arguments, Vec<u8>);
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    let sk_bytes = safely_pop_arg!(arguments, Vec<u8>);
     let sk = PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
     let pop = ProofOfPossession::create(&sk);
-    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-        Value::vector_u8(pop.to_bytes()),
-    ]))
+    Ok(smallvec![Value::vector_u8(pop.to_bytes()),])
 }
 
 /***************************************************************************************************
@@ -683,109 +650,59 @@ pub fn native_generate_proof_of_possession(
  *
  **************************************************************************************************/
 pub fn make_all(
-    gas_params: GasParameters,
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let mut natives = vec![];
-    natives.append(&mut vec![
+
+    natives.extend([
         // BLS over BLS12-381
         (
             "aggregate_pubkeys_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                native_bls12381_aggregate_pubkeys,
-            ),
+            native_bls12381_aggregate_pubkeys as RawSafeNative,
         ),
         (
             "aggregate_signatures_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                native_bls12381_aggregate_signatures,
-            ),
+            native_bls12381_aggregate_signatures,
         ),
         (
             "signature_subgroup_check_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                native_bls12381_signature_subgroup_check,
-            ),
+            native_bls12381_signature_subgroup_check,
         ),
-        (
-            "validate_pubkey_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                native_bls12381_validate_pubkey,
-            ),
-        ),
+        ("validate_pubkey_internal", native_bls12381_validate_pubkey),
         (
             "verify_aggregate_signature_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                native_bls12381_verify_aggregate_signature,
-            ),
+            native_bls12381_verify_aggregate_signature,
         ),
         (
             "verify_multisignature_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                native_bls12381_verify_multisignature,
-            ),
+            native_bls12381_verify_multisignature,
         ),
         (
             "verify_normal_signature_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                native_bls12381_verify_normal_signature,
-            ),
+            native_bls12381_verify_normal_signature,
         ),
         (
             "verify_proof_of_possession_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                native_bls12381_verify_proof_of_possession,
-            ),
+            native_bls12381_verify_proof_of_possession,
         ),
         (
             "verify_signature_share_internal",
-            make_safe_native(
-                gas_params,
-                timed_features,
-                features,
-                native_bls12381_verify_signature_share,
-            ),
+            native_bls12381_verify_signature_share,
         ),
     ]);
+
     #[cfg(feature = "testing")]
     natives.append(&mut vec![
         (
             "generate_keys_internal",
-            make_test_only_native_from_func(native_generate_keys),
+            native_generate_keys as RawSafeNative,
         ),
-        (
-            "sign_internal",
-            make_test_only_native_from_func(native_sign),
-        ),
+        ("sign_internal", native_sign),
         (
             "generate_proof_of_possession_internal",
-            make_test_only_native_from_func(native_generate_proof_of_possession),
+            native_generate_proof_of_possession,
         ),
     ]);
-    crate::natives::helpers::make_module_natives(natives)
+
+    builder.make_named_natives(natives)
 }

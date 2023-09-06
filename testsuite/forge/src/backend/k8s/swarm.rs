@@ -5,9 +5,8 @@
 use crate::{
     check_for_container_restart, create_k8s_client, delete_all_chaos, get_default_pfn_node_config,
     get_free_port, get_stateful_set_image, install_public_fullnode,
-    interface::system_metrics::{query_prometheus_system_metrics, SystemMetricsThreshold},
     node::K8sNode,
-    prometheus::{self, query_with_metadata},
+    prometheus::{self, query_range_with_metadata, query_with_metadata},
     query_sequence_number, set_stateful_set_image_tag, uninstall_testnet_resources, ChainInfo,
     FullNode, K8sApi, Node, Result, Swarm, SwarmChaos, Validator, Version, HAPROXY_SERVICE_SUFFIX,
     REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT,
@@ -29,7 +28,10 @@ use kube::{
     api::{Api, ListParams},
     client::Client as K8sClient,
 };
-use prometheus_http_query::{response::PromqlResult, Client as PrometheusClient};
+use prometheus_http_query::{
+    response::{PromqlResult, Sample},
+    Client as PrometheusClient,
+};
 use regex::Regex;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -181,6 +183,7 @@ impl K8sSwarm {
                 .clone(),
             self.kube_namespace.clone(),
             self.use_port_forward,
+            self.fullnodes.len(),
         )
         .await?;
         k8snode.start().await?; // actually start the node. if port-forward is enabled, this is when it gets its ephemeral port
@@ -261,15 +264,23 @@ impl Swarm for K8sSwarm {
     }
 
     fn full_nodes<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn FullNode> + 'a> {
-        Box::new(self.fullnodes.values().map(|v| v as &'a dyn FullNode))
+        let mut full_nodes: Vec<_> = self
+            .fullnodes
+            .values()
+            .map(|n| n as &'a dyn FullNode)
+            .collect();
+        full_nodes.sort_by_key(|n| n.index());
+        Box::new(full_nodes.into_iter())
     }
 
     fn full_nodes_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut dyn FullNode> + 'a> {
-        Box::new(
-            self.fullnodes
-                .values_mut()
-                .map(|v| v as &'a mut dyn FullNode),
-        )
+        let mut full_nodes: Vec<_> = self
+            .fullnodes
+            .values_mut()
+            .map(|n| n as &'a mut dyn FullNode)
+            .collect();
+        full_nodes.sort_by_key(|n| n.index());
+        Box::new(full_nodes.into_iter())
     }
 
     fn full_node(&self, id: PeerId) -> Option<&dyn FullNode> {
@@ -393,32 +404,33 @@ impl Swarm for K8sSwarm {
         if let Some(c) = &self.prom_client {
             let mut labels_map = BTreeMap::new();
             labels_map.insert("namespace".to_string(), self.kube_namespace.clone());
-            return query_with_metadata(c, query, time, timeout, labels_map).await;
+            return query_with_metadata(c, query, time, timeout, &labels_map).await;
         }
         bail!("No prom client");
     }
 
-    async fn ensure_healthy_system_metrics(
-        &mut self,
+    async fn query_range_metrics(
+        &self,
+        query: &str,
         start_time: i64,
         end_time: i64,
-        threshold: SystemMetricsThreshold,
-    ) -> Result<()> {
+        timeout: Option<i64>,
+    ) -> Result<Vec<Sample>> {
         if let Some(c) = &self.prom_client {
-            let system_metrics = query_prometheus_system_metrics(
+            let mut labels_map = BTreeMap::new();
+            labels_map.insert("namespace".to_string(), self.kube_namespace.clone());
+            return query_range_with_metadata(
                 c,
+                query,
                 start_time,
                 end_time,
                 30.0,
-                &self.kube_namespace,
+                timeout,
+                &labels_map,
             )
-            .await?;
-            threshold.ensure_threshold(&system_metrics)?;
-            info!("System metrics are healthy");
-            Ok(())
-        } else {
-            bail!("No prom client");
+            .await;
         }
+        bail!("No prom client");
     }
 
     fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_> {

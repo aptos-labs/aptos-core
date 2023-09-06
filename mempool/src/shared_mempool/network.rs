@@ -369,7 +369,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                 return Err(BroadcastError::TooManyPendingBroadcasts(peer));
             }
         }
-        let retry_batch_id = state.broadcast_info.retry_batches.iter().rev().next();
+        let retry_batch_id = state.broadcast_info.retry_batches.iter().next_back();
 
         let (batch_id, transactions, metric_label) =
             match std::cmp::max(expired_batch_id, retry_batch_id) {
@@ -486,6 +486,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                 .peer(&peer)
                 .batch_id(&batch_id)
                 .backpressure(scheduled_backoff)
+                .num_txns(num_txns)
         );
         let network_id = peer.network_id();
         counters::shared_mempool_broadcast_size(network_id, num_txns);

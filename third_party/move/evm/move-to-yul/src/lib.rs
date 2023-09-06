@@ -31,7 +31,9 @@ use codespan_reporting::{
     diagnostic::Severity,
     term::termcolor::{ColorChoice, StandardStream, WriteColor},
 };
-use move_compiler::{shared::PackagePaths, Flags};
+use move_compiler::{
+    attr_derivation::get_known_attributes_for_flavor, shared::PackagePaths, Flags,
+};
 use move_core_types::metadata::Metadata;
 use move_model::{
     model::GlobalEnv, options::ModelBuilderOptions, parse_addresses_from_options,
@@ -49,6 +51,8 @@ pub fn run_to_yul_errors_to_stderr(options: Options) -> anyhow::Result<()> {
 pub fn run_to_yul<W: WriteColor>(error_writer: &mut W, mut options: Options) -> anyhow::Result<()> {
     // Run the model builder.
     let addrs = parse_addresses_from_options(options.named_address_mapping.clone())?;
+    let flags = Flags::empty().set_flavor("async");
+    let known_attributes = get_known_attributes_for_flavor(&flags);
     let env = run_model_builder_with_options_and_compilation_flags(
         vec![PackagePaths {
             name: None,
@@ -61,7 +65,8 @@ pub fn run_to_yul<W: WriteColor>(error_writer: &mut W, mut options: Options) -> 
             named_address_map: addrs,
         }],
         ModelBuilderOptions::default(),
-        Flags::empty().set_flavor("async"),
+        flags,
+        &known_attributes,
     )?;
     // If the model contains any errors, report them now and exit.
     check_errors(
@@ -102,6 +107,8 @@ pub fn run_to_abi_metadata<W: WriteColor>(
 ) -> anyhow::Result<Vec<Metadata>> {
     // Run the model builder.
     let addrs = parse_addresses_from_options(options.named_address_mapping.clone())?;
+    let flags = Flags::empty().set_flavor("async");
+    let known_attributes = get_known_attributes_for_flavor(&flags);
     let env = run_model_builder_with_options_and_compilation_flags(
         vec![PackagePaths {
             name: None,
@@ -114,7 +121,8 @@ pub fn run_to_abi_metadata<W: WriteColor>(
             named_address_map: addrs,
         }],
         ModelBuilderOptions::default(),
-        Flags::empty().set_flavor("async"),
+        flags,
+        &known_attributes,
     )?;
     // If the model contains any errors, report them now and exit.
     check_errors(

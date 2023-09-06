@@ -7,7 +7,17 @@ spec aptos_framework::event {
     spec emit_event {
         pragma opaque;
         aborts_if [abstract] false;
-        ensures handle_ref.counter == old(handle_ref.counter) + 1;
+        ensures [concrete] handle_ref.counter == old(handle_ref.counter) + 1;
+    }
+
+    spec emit {
+        pragma opaque;
+        aborts_if !features::spec_module_event_enabled();
+    }
+
+    /// Native function use opaque.
+    spec write_module_event_to_store<T: drop + store>(msg: T) {
+        pragma opaque;
     }
 
     /// Native function use opaque.

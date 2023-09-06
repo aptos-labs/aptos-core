@@ -1,22 +1,11 @@
-query getTokenActivities($idHash: String!, $offset: Int, $limit: Int) {
-  token_activities(
-    where: { token_data_id_hash: { _eq: $idHash } }
-    order_by: { transaction_version: desc }
-    offset: $offset
-    limit: $limit
-  ) {
-    creator_address
-    collection_name
-    name
-    token_data_id_hash
-    collection_data_id_hash
-    from_address
-    to_address
-    transaction_version
-    transaction_timestamp
-    property_version
-    transfer_type
-    event_sequence_number
-    token_amount
+#import "./TokenActivitiesFieldsFragment";
+query getTokenActivities(
+  $where_condition: token_activities_v2_bool_exp!
+  $offset: Int
+  $limit: Int
+  $order_by: [token_activities_v2_order_by!]
+) {
+  token_activities_v2(where: $where_condition, order_by: $order_by, offset: $offset, limit: $limit) {
+    ...TokenActivitiesFields
   }
 }

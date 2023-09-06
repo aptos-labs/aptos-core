@@ -27,6 +27,7 @@ pub const STORE_RESOURCE: &str = "Store";
 pub const STAKING_GROUP_UPDATE_COMMISSION_RESOURCE: &str = "StakingGroupUpdateCommissionEvent";
 pub const VESTING_RESOURCE: &str = "Vesting";
 pub const DELEGATION_POOL_RESOURCE: &str = "DelegationPool";
+pub const WITHDRAW_STAKE_EVENT: &str = "WithdrawStakeEvent";
 
 pub const CREATE_ACCOUNT_FUNCTION: &str = "create_account";
 pub const TRANSFER_FUNCTION: &str = "transfer";
@@ -238,7 +239,7 @@ pub struct UndelegationEvent {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct WithdrawUndelegedEvent {
+pub struct WithdrawUndelegedEvent {
     pub pool_address: AccountAddress,
     pub delegator_address: AccountAddress,
     pub amount_withdrawn: u64,

@@ -287,6 +287,7 @@ impl WriteSetV0 {
 /// This is separate because it goes through validation before becoming an immutable `WriteSet`.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct WriteSetMut {
+    // TODO: Change to HashMap with a stable iterator for serialization.
     write_set: BTreeMap<StateKey, WriteOp>,
 }
 
@@ -299,6 +300,10 @@ impl WriteSetMut {
 
     pub fn insert(&mut self, item: (StateKey, WriteOp)) {
         self.write_set.insert(item.0, item.1);
+    }
+
+    pub fn extend(&mut self, write_ops: impl IntoIterator<Item = (StateKey, WriteOp)>) {
+        self.write_set.extend(write_ops);
     }
 
     #[inline]

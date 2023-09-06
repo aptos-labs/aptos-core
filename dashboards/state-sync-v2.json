@@ -89,7 +89,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"synced\"}",
+          "expr": "aptos_state_sync_version{cluster=~\"$cluster\", chain_name=~\"$chain_name\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"synced\"}",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "range": true,
           "refId": "A"
@@ -126,7 +126,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "10.0.1-cloud.3.f250259e",
+      "pluginVersion": "10.0.3-cloud.3.cec3ab0e",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -673,7 +673,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "description": "Histogram counts of the chunk sizes used when executing or applying transactions.",
+      "description": "Histogram counts of the chunk sizes used when executing transactions.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -683,7 +683,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 41 },
       "id": 111,
       "options": {
         "displayLabels": ["percent", "name"],
@@ -698,7 +698,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (le) (rate(aptos_state_sync_storage_synchronizer_chunk_sizes_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]))",
+          "expr": "sum by (le) (aptos_state_sync_storage_synchronizer_chunk_sizes_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\",label=\"executed_transactions\"})",
           "format": "heatmap",
           "hide": false,
           "instant": true,
@@ -707,7 +707,46 @@
           "refId": "A"
         }
       ],
-      "title": "Execute/Apply chunk sizes",
+      "title": "Execute chunk sizes",
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "Histogram counts of the chunk sizes used when applying transaction outputs.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "mappings": [],
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 41 },
+      "id": 113,
+      "options": {
+        "displayLabels": ["percent", "name"],
+        "legend": { "displayMode": "list", "placement": "right", "showLegend": true, "values": ["percent"] },
+        "pieType": "pie",
+        "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "v1.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum by (le) (aptos_state_sync_storage_synchronizer_chunk_sizes_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\",label=\"applied_transaction_outputs\"}[1m])",
+          "format": "heatmap",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Apply chunk sizes",
       "type": "piechart"
     },
     {
@@ -987,9 +1026,64 @@
       "type": "timeseries"
     },
     {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "Whether or not fallback mode has been engaged",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 65 },
+      "id": 112,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_state_sync_driver_fallback_mode{chain_name=~\"$chain_name\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{label}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Fallback mode status",
+      "type": "timeseries"
+    },
+    {
       "collapsed": true,
       "datasource": { "type": "doitintl-bigquery-datasource", "uid": "P09697CCD6C202E6D" },
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 65 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 73 },
       "id": 34,
       "panels": [
         {
@@ -1022,7 +1116,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 2 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 66 },
           "id": 56,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1071,7 +1165,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 2 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 66 },
           "id": 83,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1120,7 +1214,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 74 },
           "id": 57,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1169,7 +1263,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 74 },
           "id": 84,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1218,7 +1312,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 82 },
           "id": 60,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1267,7 +1361,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 82 },
           "id": 61,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1316,7 +1410,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 90 },
           "id": 95,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1365,7 +1459,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 90 },
           "id": 62,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1415,7 +1509,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 98 },
           "id": 63,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1475,7 +1569,7 @@
               }
             ]
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 98 },
           "id": 90,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1487,12 +1581,21 @@
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
               "expr": "histogram_quantile(0.99, sum(rate(aptos_data_streaming_service_data_request_processing_latency_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$__rate_interval])) by (le))",
-              "legendFormat": "{{request_type}}",
+              "legendFormat": "P99",
               "range": true,
               "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.70, sum(rate(aptos_data_streaming_service_data_request_processing_latency_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$__rate_interval])) by (le))",
+              "hide": false,
+              "legendFormat": "P70",
+              "range": true,
+              "refId": "B"
             }
           ],
-          "title": "Request processing latencies (0.99 quantile)",
+          "title": "Request processing latencies",
           "type": "timeseries"
         },
         {
@@ -1525,7 +1628,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 106 },
           "id": 58,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1574,7 +1677,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 106 },
           "id": 59,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1623,7 +1726,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 114 },
           "id": 96,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1652,7 +1755,7 @@
     {
       "collapsed": true,
       "datasource": { "type": "doitintl-bigquery-datasource", "uid": "P09697CCD6C202E6D" },
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 66 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 74 },
       "id": 36,
       "panels": [
         {
@@ -1681,11 +1784,17 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 67 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 75 },
           "id": 41,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1730,11 +1839,17 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 67 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 75 },
           "id": 87,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1779,11 +1894,17 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 75 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 83 },
           "id": 85,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1794,7 +1915,7 @@
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
               "expr": "rate(aptos_data_client_sent_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{request_types}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{request_types}}-{{network}}",
               "range": true,
               "refId": "A"
             }
@@ -1828,11 +1949,17 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 75 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 83 },
           "id": 42,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1843,7 +1970,7 @@
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
               "expr": "rate(aptos_data_client_success_responses{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{response_type}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{response_type}}-{{network}}",
               "range": true,
               "refId": "A"
             }
@@ -1877,11 +2004,17 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 83 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 91 },
           "id": 43,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1892,7 +2025,7 @@
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
               "expr": "rate(aptos_data_client_error_responses{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{response_type}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{response_type}}-{{network}}",
               "range": true,
               "refId": "A"
             }
@@ -1926,12 +2059,18 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
               "unit": "s"
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 83 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 91 },
           "id": 47,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -1977,7 +2116,13 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
               "unit": "s"
             },
             "overrides": [
@@ -1991,7 +2136,7 @@
               }
             ]
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 91 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 99 },
           "id": 48,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -2046,11 +2191,17 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 91 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 99 },
           "id": 46,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -2077,11 +2228,17 @@
             "defaults": {
               "color": { "mode": "continuous-GrYlRd" },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 99 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 107 },
           "id": 44,
           "options": {
             "displayMode": "lcd",
@@ -2092,7 +2249,7 @@
             "showUnfilled": true,
             "valueMode": "color"
           },
-          "pluginVersion": "10.0.1-cloud.3.f250259e",
+          "pluginVersion": "10.0.3-cloud.3.cec3ab0e",
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -2132,11 +2289,17 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 99 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 107 },
           "id": 75,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -2167,7 +2330,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 107 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 115 },
           "id": 76,
           "options": {
             "displayMode": "lcd",
@@ -2222,7 +2385,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 107 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 115 },
           "id": 45,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -2252,7 +2415,7 @@
     {
       "collapsed": true,
       "datasource": { "type": "doitintl-bigquery-datasource", "uid": "P09697CCD6C202E6D" },
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 67 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 75 },
       "id": 38,
       "panels": [
         {
@@ -2285,7 +2448,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 68 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 76 },
           "id": 52,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -2334,7 +2497,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 68 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 76 },
           "id": 54,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -2384,7 +2547,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 76 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 84 },
           "id": 50,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -2444,7 +2607,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 76 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 84 },
           "id": 51,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -2462,55 +2625,6 @@
             }
           ],
           "title": "Average request processing latencies (per type)",
-          "type": "timeseries"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "The pending network events per second.",
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "palette-classic" },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": { "type": "linear" },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              },
-              "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
-            },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 84 },
-          "id": 55,
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "single", "sort": "none" }
-          },
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "editorMode": "code",
-              "expr": "rate(aptos_storage_service_server_pending_network_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{state}}",
-              "range": true,
-              "refId": "A"
-            }
-          ],
-          "title": "Pending network events (per second)",
           "type": "timeseries"
         },
         {
@@ -2543,7 +2657,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 84 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 92 },
           "id": 53,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -2560,6 +2674,211 @@
             }
           ],
           "title": "Storage errors (per second)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "The number of peers currently being ignored",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 92 },
+          "id": 98,
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "exemplar": true,
+              "expr": "aptos_storage_service_server_ignored_peer_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Number of ignored peers",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "The pending network events per second.",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 100 },
+          "id": 55,
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "expr": "rate(aptos_storage_service_server_pending_network_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{state}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Pending network events (per second)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "The rate of network frame overflows when handling storage requests (per second).",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 100 },
+          "id": 89,
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "exemplar": true,
+              "expr": "rate(aptos_storage_service_server_network_frame_overflow{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{response_type}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Network frame overflow (count per second)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "The hit rate (percentage) of the LRU storage cache per cache probe.",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "unit": "percent"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 108 },
+          "id": 80,
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "exemplar": true,
+              "expr": "sum by (kubernetes_pod_name, role, network_id) (aptos_storage_service_server_lru_cache{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", event=\"lru_cache_hit\"}) / sum by (kubernetes_pod_name, role, network_id) (aptos_storage_service_server_lru_cache{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", event=\"lru_cache_probe\"}) * 100\n",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "LRU storage cache (Hit Rate)",
           "type": "timeseries"
         },
         {
@@ -2593,7 +2912,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 92 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 108 },
           "id": 97,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -2645,7 +2964,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 92 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 116 },
           "id": 110,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -2663,7 +2982,7 @@
               "refId": "A"
             }
           ],
-          "title": "New optimistic fetch events",
+          "title": "New optimistic fetch events (per second)",
           "type": "timeseries"
         },
         {
@@ -2697,7 +3016,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 100 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 116 },
           "id": 99,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -2715,67 +3034,7 @@
               "refId": "A"
             }
           ],
-          "title": "Expired optimistic fetch events",
-          "type": "timeseries"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "The latencies for handling optimistic fetch requests.",
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "continuous-GrYlRd" },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 20,
-                "gradientMode": "scheme",
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineInterpolation": "smooth",
-                "lineWidth": 3,
-                "pointSize": 5,
-                "scaleDistribution": { "type": "linear" },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              },
-              "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
-              "unit": "s"
-            },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 100 },
-          "id": 108,
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "single", "sort": "none" }
-          },
-          "pluginVersion": "v1.0",
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum(rate(aptos_storage_service_server_optimistic_fetch_latency_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$__rate_interval])) by (le))",
-              "legendFormat": "P99",
-              "range": true,
-              "refId": "A"
-            },
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "editorMode": "code",
-              "expr": "histogram_quantile(0.70, sum(rate(aptos_storage_service_server_optimistic_fetch_latency_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$__rate_interval])) by (le))",
-              "hide": false,
-              "legendFormat": "P70",
-              "range": true,
-              "refId": "B"
-            }
-          ],
-          "title": "Optimistic fetch latencies",
+          "title": "Expired optimistic fetch events (per second)",
           "type": "timeseries"
         },
         {
@@ -2809,7 +3068,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 108 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 124 },
           "id": 109,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -2831,10 +3090,10 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "The number of peers currently being ignored",
+          "description": "The latencies for handling optimistic fetch requests.",
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "palette-classic" },
+              "color": { "mode": "continuous-GrYlRd" },
               "custom": {
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
@@ -2842,11 +3101,11 @@
                 "axisPlacement": "auto",
                 "barAlignment": 0,
                 "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
+                "fillOpacity": 20,
+                "gradientMode": "scheme",
                 "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
+                "lineInterpolation": "smooth",
+                "lineWidth": 3,
                 "pointSize": 5,
                 "scaleDistribution": { "type": "linear" },
                 "showPoints": "auto",
@@ -2856,139 +3115,42 @@
               },
               "mappings": [],
               "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
-              "unit": "none"
+              "unit": "s"
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 108 },
-          "id": 98,
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 124 },
+          "id": 108,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
             "tooltip": { "mode": "single", "sort": "none" }
           },
+          "pluginVersion": "v1.0",
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "exemplar": true,
-              "expr": "aptos_storage_service_server_ignored_peer_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}",
+              "expr": "histogram_quantile(0.99, sum(rate(aptos_storage_service_server_optimistic_fetch_latency_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$__rate_interval])) by (le))",
+              "legendFormat": "P99",
               "range": true,
               "refId": "A"
-            }
-          ],
-          "title": "Number of ignored peers",
-          "type": "timeseries"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "The hit rate (percentage) of the LRU storage cache per cache probe.",
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "palette-classic" },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": { "type": "linear" },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              },
-              "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
-              "unit": "percent"
             },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 116 },
-          "id": 80,
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "single", "sort": "none" }
-          },
-          "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "exemplar": true,
-              "expr": "sum by (kubernetes_pod_name, role, network_id) (aptos_storage_service_server_lru_cache{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", event=\"lru_cache_hit\"}) / sum by (kubernetes_pod_name, role, network_id) (aptos_storage_service_server_lru_cache{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", event=\"lru_cache_probe\"}) * 100\n",
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}",
-              "range": true,
-              "refId": "A"
-            }
-          ],
-          "title": "LRU storage cache (Hit Rate)",
-          "type": "timeseries"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "The compression ratios of sent network messages (i.e., compressed bytes / raw bytes)",
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "palette-classic" },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": { "type": "linear" },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              },
-              "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
-              "unit": "percent"
-            },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 116 },
-          "id": 88,
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "single", "sort": "none" }
-          },
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "editorMode": "code",
-              "exemplar": true,
-              "expr": "sum by (kubernetes_pod_name, role, client) (aptos_compression_byte_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", data_type=\"compressed_bytes\"}) / sum by (kubernetes_pod_name, role, client) (aptos_compression_byte_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", data_type=\"raw_bytes\"}) * 100\n",
+              "expr": "histogram_quantile(0.70, sum(rate(aptos_storage_service_server_optimistic_fetch_latency_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$__rate_interval])) by (le))",
               "hide": false,
-              "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{client}}",
+              "legendFormat": "P70",
               "range": true,
-              "refId": "A"
+              "refId": "B"
             }
           ],
-          "title": "Compression ratio (sent)",
+          "title": "Optimistic fetch latencies",
           "type": "timeseries"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "description": "The rate of network frame overflows when handling storage requests (per second).",
+          "description": "The number of active subscriptions at the server.",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -3017,8 +3179,8 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 124 },
-          "id": 89,
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 132 },
+          "id": 114,
           "options": {
             "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
             "tooltip": { "mode": "single", "sort": "none" }
@@ -3028,14 +3190,281 @@
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
               "exemplar": true,
-              "expr": "rate(aptos_storage_service_server_network_frame_overflow{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m])",
+              "expr": "aptos_storage_service_server_subscription_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{response_type}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Network frame overflow (count per second)",
+          "title": "Active subscriptions",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "New subscription events seen at the server.",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 132 },
+          "id": 115,
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "exemplar": true,
+              "expr": "rate(aptos_storage_service_server_subscription_event{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\",event=\"subscription_add\"}[1m])",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{event}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "New subscription events (per second)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "Expired subscription events seen at the server.",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 140 },
+          "id": 116,
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "exemplar": true,
+              "expr": "rate(aptos_storage_service_server_subscription_event{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\",event=\"subscription_expire\"}[1m])",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{event}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Expired subscription events (per second)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "Failed subscription events seen at the server.",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 140 },
+          "id": 117,
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "exemplar": true,
+              "expr": "rate(aptos_storage_service_server_subscription_event{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\",event=\"subscription_failure\"}[1m])",
+              "interval": "",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{event}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Failed subscription events (per second)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "The average latencies to handle subscription requests.",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 148 },
+          "id": 118,
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "pluginVersion": "v1.0",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "expr": "aptos_storage_service_server_subscription_latency_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}/aptos_storage_service_server_subscription_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{request_type}}-{{network_id}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Average subscription latencies",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "The latencies for handling subscription requests.",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "continuous-GrYlRd" },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "scheme",
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineInterpolation": "smooth",
+                "lineWidth": 3,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 148 },
+          "id": 119,
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "pluginVersion": "v1.0",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.99, sum(rate(aptos_storage_service_server_subscription_latency_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$__rate_interval])) by (le))",
+              "legendFormat": "P99",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.70, sum(rate(aptos_storage_service_server_subscription_latency_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$__rate_interval])) by (le))",
+              "hide": false,
+              "legendFormat": "P70",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Subscription latencies",
           "type": "timeseries"
         }
       ],
@@ -3047,7 +3476,7 @@
     },
     {
       "collapsed": true,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 68 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 76 },
       "id": 103,
       "panels": [
         {
@@ -3412,7 +3841,7 @@
       "type": "row"
     }
   ],
-  "refresh": false,
+  "refresh": "",
   "schemaVersion": 38,
   "style": "dark",
   "tags": ["aptos-core"],
@@ -3489,7 +3918,7 @@
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "multi": false,
         "name": "cluster",
         "options": [],
@@ -3617,6 +4046,6 @@
   "timezone": "",
   "title": "state-sync-v2",
   "uid": "state_sync_v2",
-  "version": 12,
+  "version": 24,
   "weekStart": ""
 }

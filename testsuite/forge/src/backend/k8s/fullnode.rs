@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    get_stateful_set_image, K8sNode, ReadWrite, Result, Version, REST_API_SERVICE_PORT,
+    get_stateful_set_image, make_k8s_label, K8sNode, ReadWrite, Result, Version,
+    DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, REST_API_SERVICE_PORT,
     VALIDATOR_0_DATA_PERSISTENT_VOLUME_CLAIM_PREFIX, VALIDATOR_0_GENESIS_SECRET_PREFIX,
     VALIDATOR_0_STATEFUL_SET_NAME,
 };
@@ -31,6 +32,7 @@ use k8s_openapi::{
 use kube::api::{ObjectMeta, PostParams};
 use std::{
     collections::BTreeMap,
+    env,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     path::PathBuf,
     sync::Arc,
@@ -122,9 +124,15 @@ fn create_fullnode_persistent_volume_claim(
 }
 
 fn create_fullnode_labels(fullnode_name: String) -> BTreeMap<String, String> {
+    // if present, tag the node with the test suite name and username
+    let suite_name = env::var("FORGE_TEST_SUITE").unwrap_or(DEFAULT_TEST_SUITE_NAME.to_string());
+    let username = env::var("FORGE_USERNAME").unwrap_or(DEFAULT_USERNAME.to_string());
+
     [
         ("app.kubernetes.io/name".to_string(), "fullnode".to_string()),
         ("app.kubernetes.io/instance".to_string(), fullnode_name),
+        ("forge-test-suite".to_string(), make_k8s_label(suite_name)),
+        ("forge-username".to_string(), make_k8s_label(username)),
         (
             "app.kubernetes.io/part-of".to_string(),
             "forge-pfn".to_string(),
@@ -182,6 +190,7 @@ fn create_fullnode_container(
                 ..VolumeMount::default()
             },
         ]),
+        name: "fullnode".to_string(),
         // specifically, inherit resources, env,ports, securityContext from the validator's container
         ..validator_container.clone()
     })
@@ -332,6 +341,7 @@ pub async fn install_public_fullnode<'a>(
     era: String,
     namespace: String,
     use_port_forward: bool,
+    index: usize,
 ) -> Result<(PeerId, K8sNode)> {
     let default_node_config = get_default_pfn_node_config();
 
@@ -339,7 +349,7 @@ pub async fn install_public_fullnode<'a>(
         merge_node_config(default_node_config, serde_yaml::to_value(node_config)?)?;
 
     let node_peer_id = node_config.get_peer_id().unwrap_or_else(PeerId::random);
-    let fullnode_name = format!("fullnode-{}", node_peer_id.short_str());
+    let fullnode_name = format!("public-fullnode-{}-{}", index, node_peer_id.short_str());
 
     // create the NodeConfig configmap
     let fullnode_node_config_config_map_name = format!("{}-config", fullnode_name.clone());
@@ -485,7 +495,7 @@ pub async fn install_public_fullnode<'a>(
             .name
             .context("Fullnode StatefulSet does not have metadata.name")?,
         peer_id: node_peer_id,
-        index: 0,
+        index,
         service_name: full_service_name,
         version: version.clone(),
         namespace,
@@ -713,7 +723,6 @@ mod tests {
         // top level args
         let peer_id = PeerId::random();
         let version = Version::new(0, "banana".to_string());
-        let _fullnode_name = "fullnode-".to_string() + &peer_id.to_string();
 
         // create APIs
         let stateful_set_api = Arc::new(MockStatefulSetApi::from_stateful_set(
@@ -744,6 +753,7 @@ mod tests {
             era,
             namespace,
             false,
+            7,
         )
         .await
         .unwrap();
@@ -752,8 +762,13 @@ mod tests {
         assert_eq!(created_peer_id, peer_id);
         assert_eq!(
             created_node.name,
-            format!("fullnode-{}", &peer_id.short_str())
+            format!(
+                "public-fullnode-{}-{}",
+                created_node.index,
+                &peer_id.short_str()
+            )
         );
         assert!(created_node.name.len() < 64); // This is a k8s limit
+        assert_eq!(created_node.index, 7);
     }
 }
