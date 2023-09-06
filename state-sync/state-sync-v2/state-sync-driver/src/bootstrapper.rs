@@ -463,8 +463,19 @@ impl<
         let highest_known_ledger_info = self.get_highest_known_ledger_info()?;
         let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
 
-        // If we've already synced to the highest known version, there's nothing to do
-        if highest_synced_version >= highest_known_ledger_version {
+        // Check if we need to sync more data
+        if self.get_bootstrapping_mode().is_fast_sync()
+            && highest_synced_version == GENESIS_TRANSACTION_VERSION
+            && highest_known_ledger_version == GENESIS_TRANSACTION_VERSION
+        {
+            // The node is fast syncing and an epoch change isn't
+            // advertised. We need to fast sync to genesis.
+            info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                "Fast syncing to genesis! Highest synced and advertised version is {}.",
+                highest_synced_version
+            )));
+        } else if highest_synced_version >= highest_known_ledger_version {
+            // Otherwise, if we've already synced to the highest known version, there's nothing to do
             info!(LogSchema::new(LogEntry::Bootstrapper)
                 .message(&format!("Highest synced version {} is >= highest known ledger version {}, nothing needs to be done.",
                     highest_synced_version, highest_known_ledger_version)));
@@ -476,22 +487,17 @@ impl<
             highest_synced_version, highest_known_ledger_info, self.get_bootstrapping_mode())));
 
         // Bootstrap according to the mode
-        match self.get_bootstrapping_mode() {
-            BootstrappingMode::DownloadLatestStates => {
-                self.fetch_missing_state_snapshot_data(
-                    highest_synced_version,
-                    highest_known_ledger_info,
-                )
+        if self.get_bootstrapping_mode().is_fast_sync() {
+            // We're fast syncing
+            self.fetch_missing_state_snapshot_data(
+                highest_synced_version,
+                highest_known_ledger_info,
+            )
+            .await
+        } else {
+            // We're transaction and/or output syncing
+            self.fetch_missing_transaction_data(highest_synced_version, highest_known_ledger_info)
                 .await
-            },
-            _ => {
-                // We're either transaction or output syncing
-                self.fetch_missing_transaction_data(
-                    highest_synced_version,
-                    highest_known_ledger_info,
-                )
-                .await
-            },
         }
     }
 
@@ -502,17 +508,29 @@ impl<
         highest_known_ledger_info: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
         if highest_synced_version == GENESIS_TRANSACTION_VERSION {
-            // We're syncing a new node. Check the progress and fetch the missing data.
+            // We're syncing a new node. Check the progress and fetch any missing data
             if let Some(target) = self.metadata_storage.previous_snapshot_sync_target()? {
                 if self.metadata_storage.is_snapshot_sync_complete(&target)? {
-                    return Err(Error::UnexpectedError(format!(
-                        "The snapshot sync for the target was marked as complete but \
+                    // Fast syncing to the target is complete. Verify that the
+                    // highest synced version matches the target.
+                    if target.ledger_info().version() == GENESIS_TRANSACTION_VERSION {
+                        info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                            "The fast sync to genesis is complete! Target: {:?}",
+                            target
+                        )));
+                        self.bootstrapping_complete().await
+                    } else {
+                        Err(Error::UnexpectedError(format!(
+                            "The snapshot sync for the target was marked as complete but \
                         the highest synced version is genesis! Something has gone wrong! \
                         Target snapshot sync: {:?}",
-                        target
-                    )));
+                            target
+                        )))
+                    }
+                } else {
+                    // Continue snapshot syncing to the target
+                    self.fetch_missing_state_values(target, true).await
                 }
-                self.fetch_missing_state_values(target, true).await
             } else {
                 // No snapshot sync has started. Start a new sync for the highest known ledger info.
                 self.fetch_missing_state_values(highest_known_ledger_info, false)
@@ -638,6 +656,11 @@ impl<
                 )));
             }
         } else {
+            info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                "Setting the target ledger info for fast sync! Target: {:?}",
+                target_ledger_info
+            )));
+
             self.state_value_syncer
                 .set_ledger_info_to_sync(target_ledger_info.clone());
         }
@@ -927,9 +950,7 @@ impl<
     ) -> Result<(), Error> {
         // Verify that we're expecting state value payloads
         let bootstrapping_mode = self.get_bootstrapping_mode();
-        if self.should_fetch_epoch_ending_ledger_infos()
-            || !matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates)
-        {
+        if self.should_fetch_epoch_ending_ledger_infos() || !bootstrapping_mode.is_fast_sync() {
             self.reset_active_stream(Some(NotificationAndFeedback::new(
                 notification_id,
                 NotificationFeedback::InvalidPayloadData,
@@ -947,7 +968,12 @@ impl<
         // Initialize the state value synchronizer (if not already done)
         if !self.state_value_syncer.initialized_state_snapshot_receiver {
             // Fetch all verified epoch change proofs
-            let epoch_change_proofs = self.verified_epoch_states.all_epoch_ending_ledger_infos();
+            let version_to_sync = ledger_info_to_sync.ledger_info().version();
+            let epoch_change_proofs = if version_to_sync == GENESIS_TRANSACTION_VERSION {
+                vec![ledger_info_to_sync.clone()] // Sync to genesis
+            } else {
+                self.verified_epoch_states.all_epoch_ending_ledger_infos() // Sync beyond genesis
+            };
 
             // Initialize the state value synchronizer
             let _join_handle = self.storage_synchronizer.initialize_state_synchronizer(
@@ -1078,7 +1104,7 @@ impl<
         // Verify that we're expecting transaction or output payloads
         let bootstrapping_mode = self.get_bootstrapping_mode();
         if self.should_fetch_epoch_ending_ledger_infos()
-            || (matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates)
+            || (bootstrapping_mode.is_fast_sync()
                 && self.state_value_syncer.transaction_output_to_sync.is_some())
         {
             self.reset_active_stream(Some(NotificationAndFeedback::new(
@@ -1091,8 +1117,8 @@ impl<
             ));
         }
 
-        // If we're state syncing, we expect a single transaction info
-        if matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates) {
+        // If we're fast syncing, we expect a single transaction info
+        if bootstrapping_mode.is_fast_sync() {
             return self
                 .verify_transaction_info_to_sync(
                     notification_id,

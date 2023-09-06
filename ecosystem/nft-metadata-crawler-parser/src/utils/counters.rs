@@ -198,3 +198,32 @@ pub static FAILED_TO_OPTIMIZE_IMAGE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// GCS METRICS
+
+/// Number of times the NFT Metadata Crawler Parser has attempted to upload to GCS
+pub static GCS_UPLOAD_INVOCATION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_gcs_upload_invocation_count",
+        "Number of times the NFT Metadata Crawler Parser has attempted to upload to GCS"
+    )
+    .unwrap()
+});
+
+/// Number of times the NFT Metadata Crawler Parser has successfully uploaded to GCS
+pub static SUCCESSFULLY_UPLOADED_TO_GCS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_successfully_uploaded_to_gcs_count",
+        "Number of times the NFT Metadata Crawler Parser has successfully uploaded to GCS"
+    )
+    .unwrap()
+});
+
+/// Number of times the NFT Metadata Crawler Parser has failed to upload to GCS
+pub static FAILED_TO_UPLOAD_TO_GCS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_failed_to_upload_to_gcs_count",
+        "Number of times the NFT Metadata Crawler Parser has failed to upload to GCS"
+    )
+    .unwrap()
+});

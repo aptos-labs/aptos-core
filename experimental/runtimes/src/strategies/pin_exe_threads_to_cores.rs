@@ -12,6 +12,7 @@ use rayon::ThreadPool;
 pub(crate) struct PinExeThreadsToCoresThreadManager {
     exe_threads: ThreadPool,
     non_exe_threads: ThreadPool,
+    high_pri_io_threads: ThreadPool,
     io_threads: ThreadPool,
 }
 
@@ -41,8 +42,14 @@ impl PinExeThreadsToCoresThreadManager {
             pin_cpu_set(non_exe_cpu_set),
         );
 
+        let high_pri_io_threads = spawn_rayon_thread_pool_with_start_hook(
+            "io_high".into(),
+            Some(32),
+            pin_cpu_set(exe_cpu_set),
+        );
+
         let io_threads = spawn_rayon_thread_pool_with_start_hook(
-            "io".into(),
+            "io_low".into(),
             Some(64),
             pin_cpu_set(non_exe_cpu_set),
         );
@@ -50,6 +57,7 @@ impl PinExeThreadsToCoresThreadManager {
         Self {
             exe_threads,
             non_exe_threads,
+            high_pri_io_threads,
             io_threads,
         }
     }
@@ -66,5 +74,9 @@ impl<'a> ThreadManager<'a> for PinExeThreadsToCoresThreadManager {
 
     fn get_io_pool(&'a self) -> &'a ThreadPool {
         &self.io_threads
+    }
+
+    fn get_high_pri_io_pool(&'a self) -> &'a ThreadPool {
+        &self.high_pri_io_threads
     }
 }

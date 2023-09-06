@@ -125,6 +125,7 @@ const sidebars = {
             "move/move-on-aptos/modules-on-aptos",
             "move/move-on-aptos/move-scripts",
             "move/move-on-aptos/cli",
+            "move/move-on-aptos/cryptography",
           ],
         },
         {

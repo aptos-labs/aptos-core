@@ -1,5 +1,8 @@
 # README
 
+**WARNING:** These Move examples have NOT been audited. If using it in a production system, proceed at your own risk.
+Particular care should be taken with Move examples that contain complex cryptographic code (e.g., `drand`, `veiled_coin`).
+
 ## Writing a Move example
 
 When creating a Move example, make the directory name be the same as the source file name and as the package name.

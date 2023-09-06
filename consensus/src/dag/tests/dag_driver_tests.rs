@@ -4,7 +4,7 @@ use crate::{
     dag::{
         anchor_election::RoundRobinAnchorElection,
         dag_driver::{DagDriver, DagDriverError},
-        dag_fetcher::DagFetcher,
+        dag_fetcher::DagFetcherService,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
         dag_store::Dag,
         order_rule::OrderRule,
@@ -101,7 +101,7 @@ async fn test_certified_node_handler() {
         storage.clone(),
     );
 
-    let (_, fetch_requester, _, _) = DagFetcher::new(
+    let (_, fetch_requester, _, _) = DagFetcherService::new(
         epoch_state.clone(),
         network_sender,
         dag.clone(),
