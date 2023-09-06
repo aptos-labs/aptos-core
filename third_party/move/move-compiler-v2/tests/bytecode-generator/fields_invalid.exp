@@ -11,6 +11,7 @@ module 0x42::fields {
         select fields::T.h(select fields::S.g(x)) = 42;
         Tuple()
     }
+    spec fun $write_ref(x: &fields::S);
 } // end 0x42::fields
 
 
