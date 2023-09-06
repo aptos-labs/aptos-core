@@ -93,8 +93,6 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     /// Verifies the validity of the PVSS transcript: i.e., the transcripts correctly encrypts shares
     /// of an `InputSecret` $s$ which has been $(t, n)$ secret-shared such that only $\ge t$ players
     /// can reconstruct it as a `DealtSecret`.
-    ///
-    /// TODO(Clean): Change result type to anyhow::Result to more easily indicate to the caller what the problem was.
     fn verify(
         &self,
         sc: &Self::SecretSharingConfig,

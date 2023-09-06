@@ -10,6 +10,7 @@ pub(crate) mod encryption_elgamal;
 mod fiat_shamir;
 pub(crate) mod input_secret;
 mod player;
+mod schnorr;
 pub mod scrape;
 pub mod test_utils;
 mod threshold_config;

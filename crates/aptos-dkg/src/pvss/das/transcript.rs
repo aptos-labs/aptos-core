@@ -4,24 +4,30 @@ use crate::algebra::polynomials::shamir_secret_share;
 use crate::pvss::das::DAS_SK_IN_G1;
 use crate::pvss::scrape::LowDegreeTest;
 use crate::pvss::traits::HasEncryptionPublicParams;
-use crate::pvss::{das, encryption_dlog, fiat_shamir, traits, Player, ThresholdConfig};
+use crate::pvss::{das, encryption_dlog, fiat_shamir, schnorr, traits, Player, ThresholdConfig};
 use crate::utils::random::{random_g1_point, random_g2_point, random_scalar};
 use crate::utils::{g1_multi_exp, g2_multi_exp, multi_pairing};
 use anyhow::bail;
 use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
 use group::Group;
 use serde::{Deserialize, Serialize};
-use std::ops::{Add, Mul, Neg, Sub};
+use std::ops::{Add, AddAssign, Mul, Neg, Sub};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, BCSCryptoHash, CryptoHasher)]
 #[allow(non_snake_case)]
 pub struct Transcript {
+    /// Proofs-of-knowledge (PoKs) for the dealt secret committed in $c = g_2^{p(0)}$.
+    /// Since the transcript could have been aggregated from other transcripts with their own
+    /// committed secrets in $c_i = g_2^{p_i(0)}$, this is a vector of PoKs for all these $c_i$'s
+    /// such that $\prod_i c_i = c$.
+    poks: Vec<(G2Projective, (G2Projective, Scalar))>,
     /// ElGamal encryption randomness $g_2^r \in G_2$
     hat_w: G2Projective,
-    /// First $n$ elements are commitments to the evaluations of $p(X)$: $g_2^{p(\omega^i)}$. Last
-    /// element is $g_2^{p(0)}$ (i.e., the dealt public key).
+    /// First $n$ elements are commitments to the evaluations of $p(X)$: $g_2^{p(\omega^i)}$,
+    /// where $i \in [n]$. Last element is $g_2^{p(0)}$ (i.e., the dealt public key).
     V: Vec<G2Projective>,
     /// ElGamal encryptions of the shares $h_1^{p(\omega^i)} ek^r$.
     C: Vec<G1Projective>,
@@ -29,7 +35,7 @@ pub struct Transcript {
     C_0: G1Projective,
 }
 
-// TODO(Performance): for verification, can we get any speed-ups when a lot of the PKs are the same?
+// TODO(Optimization): For verification, can we get any speed-ups when a lot of the PKs are the same? Assuming the PVSS remains secure.
 
 impl ValidCryptoMaterial for Transcript {
     fn to_bytes(&self) -> Vec<u8> {
@@ -75,7 +81,7 @@ impl traits::Transcript for Transcript {
 
         let (f, f_evals) = shamir_secret_share(sc, s, rng);
 
-        // ElGamal randomness
+        // Pick ElGamal randomness
         let r = random_scalar(&mut rng);
         let g_1 = pp.get_encryption_public_params().pubkey_base();
         let g_2 = pp.get_commitment_base();
@@ -95,10 +101,14 @@ impl traits::Transcript for Transcript {
             })
             .collect::<Vec<G1Projective>>();
 
+        // Compute PoK of input secret committed in V[n]
+        let pok = schnorr::pok_prove(&f[0], g_2, &V[sc.n], rng);
+
         debug_assert_eq!(V.len(), sc.n + 1);
         debug_assert_eq!(C.len(), sc.n);
 
         Transcript {
+            poks: vec![(V[sc.n], pok)],
             hat_w: g_2.mul(r),
             V,
             C,
@@ -130,9 +140,7 @@ impl traits::Transcript for Transcript {
         }
 
         // Derive challenges deterministically via Fiat-Shamir; it's easier to debug for distributed systems
-        let (f, r_and_alpha) = fiat_shamir::fiat_shamir(self, sc, pp, eks, dst, 2);
-        let r = r_and_alpha[0];
-        let alpha = r_and_alpha[1];
+        let (f, extra) = fiat_shamir::fiat_shamir(self, sc, pp, eks, dst, 3);
 
         let ldt = LowDegreeTest::new(f, sc.t, sc.n + 1, true, sc.get_batch_evaluation_domain())?;
         ldt.low_degree_test_on_g2(&self.V)?;
@@ -171,6 +179,7 @@ impl traits::Transcript for Transcript {
         r_i.push(Scalar::ONE);
 
         // First, compute r_i = r^i, for all i \in [0, n]
+        let r = extra[0];
         for _ in 0..sc.n - 1 {
             r_i.push(r_i.last().unwrap().mul(&r));
         }
@@ -192,6 +201,7 @@ impl traits::Transcript for Transcript {
         let h_1 = pp.get_encryption_public_params().message_base();
         let g_2 = pp.get_commitment_base();
         let g_1_inverse = pp.get_encryption_public_params().pubkey_base().neg();
+        let alpha = extra[1];
 
         // The vector of left-hand-side ($\mathbb{G}_1$) inputs to each pairing in the multi-pairing.
         let lhs = vec![h_1.mul(alpha), ek.add(g_1_inverse), self.C_0.add(c.neg())];
@@ -200,10 +210,25 @@ impl traits::Transcript for Transcript {
 
         let res = multi_pairing(lhs.iter(), rhs.iter());
         if res != Gt::identity() {
-            bail!("Expected zero, but got {} during multi-pairing check", {
-                res
-            });
+            bail!("Expected zero, but got {} during multi-pairing check", res);
         }
+
+        // Verify the PoK(s) of the dealt secret
+        let mut c = G2Projective::identity();
+        for (c_i, _) in &self.poks {
+            c.add_assign(c_i)
+        }
+
+        if c != self.V[sc.n] {
+            bail!(
+                "The PoK does not correspond to the dealt secret. Expected {} but got {}",
+                self.V[sc.n],
+                c
+            );
+        }
+
+        let gamma = extra[2];
+        schnorr::pok_batch_verify(&self.poks, g_2, &gamma)?;
 
         return Ok(());
     }
@@ -220,6 +245,10 @@ impl traits::Transcript for Transcript {
             self.V[i] += other.V[i];
         }
         self.V[sc.n] += other.V[sc.n];
+
+        for pok in &other.poks {
+            self.poks.push(*pok);
+        }
 
         debug_assert_eq!(self.C.len(), other.C.len());
         debug_assert_eq!(self.V.len(), other.V.len());
@@ -278,6 +307,7 @@ impl traits::Transcript for Transcript {
         let r2 = random_g2_point(rng);
 
         Transcript {
+            poks: vec![(r2, (acc_g2, random_scalar(rng)))],
             hat_w: g2,
             V: V.iter().map(|p2| p2 + r2).collect(),
             C: C.iter().map(|p1| p1 + r1).collect(),

@@ -11,6 +11,7 @@ use crate::utils::random::{random_g1_point, random_g2_point};
 use crate::utils::{g2_multi_exp, multi_pairing};
 use anyhow::bail;
 use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
 use group::Group;
@@ -23,7 +24,9 @@ use std::ops::{Mul, Neg};
 /// macros override serde's serialization to call into `ValidCryptoMaterial::to_bytes()`. This makes
 /// it difficult to serialize complex types because if we call serde serialization inside `to_bytes`
 /// on the struct itself, it triggers infinite recursion by having `serde` call back into `to_bytes`.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+///
+/// TODO(Security): This lacks a PoK on the dealt secret `A[n]` so it is not secure in a DKG. Need to add it (see the Das PVSS).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 #[allow(non_snake_case)]
 pub struct Transcript {
     /// Commitment to $f(0)$: $\hat{u}_2 = \hat{u}_1^{a_0}$

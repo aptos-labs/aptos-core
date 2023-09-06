@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 
 //! PVSS scheme-independent testing
+use aptos_crypto::hash::CryptoHash;
+use aptos_crypto::{bls12381, SigningKey, Uniform};
 use aptos_dkg::constants::{
     BEST_CASE_N, BEST_CASE_THRESHOLD, DST_PVSS_TESTING_APP, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES,
     WORST_CASE_N, WORST_CASE_THRESHOLD,
@@ -124,7 +126,7 @@ fn print_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(t
 ///  1. Deals a secret, creating a transcript
 ///  2. Verifies the transcript.
 ///  3. Ensures the a sufficiently-large random subset of the players can recover the dealt secret
-fn pvss_deal_verify_aggr_and_reconstruct<T: Transcript>(
+fn pvss_deal_verify_aggr_and_reconstruct<T: Transcript + CryptoHash>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
@@ -168,6 +170,10 @@ fn pvss_deal_verify_aggr_and_reconstruct<T: Transcript>(
     trx1.aggregate_with(sc, &trx2);
     trx1.verify(sc, &pp, &eks, &DST_PVSS_TESTING_APP[..])
         .expect("aggregated PVSS transcript failed verification");
+
+    // Ensure that transcript can be signed
+    let sk = bls12381::PrivateKey::generate(&mut rng);
+    let _ = sk.sign(&trx1).unwrap();
 }
 
 fn actual_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(
