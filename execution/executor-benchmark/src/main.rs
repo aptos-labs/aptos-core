@@ -119,7 +119,7 @@ pub struct PipelineOpt {
     partitioner_version: Option<String>,
     #[clap(long)]
     pre_partitioner: Option<String>,
-    #[clap(long, default_value = "4.0")]
+    #[clap(long, default_value = "2.0")]
     load_imbalance_tolerance: f32,
     #[clap(long, default_value = "8")]
     partitioner_v2_num_threads: usize,

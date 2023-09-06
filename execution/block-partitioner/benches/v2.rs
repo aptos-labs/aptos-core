@@ -35,7 +35,7 @@ fn bench_group(c: &mut Criterion) {
         dashmap_num_shards,
         merge_discards,
         Box::new(ConnectedComponentPartitioner {
-            load_imbalance_tolerance: 4.0,
+            load_imbalance_tolerance: 2.0,
         }),
     );
     group.bench_function(format!("acc={num_accounts},blk={block_size},shd={num_shards}/thr={num_threads},rnd={num_rounds_limit},avd={avoid_pct},mds={merge_discards}"), move |b| {

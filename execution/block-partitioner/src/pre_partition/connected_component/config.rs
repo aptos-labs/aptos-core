@@ -16,7 +16,7 @@ pub struct ConnectedComponentPartitionerConfig {
 impl Default for ConnectedComponentPartitionerConfig {
     fn default() -> Self {
         ConnectedComponentPartitionerConfig {
-            load_imbalance_tolerance: 4.0,
+            load_imbalance_tolerance: 2.0,
         }
     }
 }
