@@ -38,6 +38,10 @@ pub enum TransactionTypeArg {
     CreateObjects100,
     CreateObjects100WithPayload10k,
     CreateObjectsConflict100WithPayload10k,
+    ResourceGroupsGlobalWriteTag1KB,
+    ResourceGroupsGlobalWriteAndReadTag1KB,
+    ResourceGroupsSenderWriteTag1KB,
+    ResourceGroupsSenderMultiChange1KB,
     TokenV1NFTMintAndStoreSequential,
     TokenV1NFTMintAndTransferSequential,
     TokenV1NFTMintAndStoreParallel,
@@ -135,7 +139,7 @@ impl TransactionTypeArg {
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::ModifyGlobalBoundedAggV2 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::ModifyBoundedAggV2 { step : 10 },
+                entry_point: EntryPoints::ModifyBoundedAggV2 { step: 10 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -229,6 +233,42 @@ impl TransactionTypeArg {
                     entry_point: EntryPoints::CreateObjectsConflict {
                         num_objects: 100,
                         object_payload_size: 10 * 1024,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::ResourceGroupsGlobalWriteTag {
+                        string_length: 1024,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::ResourceGroupsGlobalWriteAndReadTag {
+                        string_length: 1024,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::ResourceGroupsSenderWriteTag1KB => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::ResourceGroupsSenderWriteTag {
+                        string_length: 1024,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::ResourceGroupsSenderMultiChange1KB => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::ResourceGroupsSenderMultiChange {
+                        string_length: 1024,
                     },
                     num_modules: module_working_set_size,
                     use_account_pool: sender_use_account_pool,
