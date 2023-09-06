@@ -22,8 +22,6 @@ proposals:
       - FeatureFlag:
           enabled:
             - safer_resource_groups
-      - FeatureFlag:
-          enabled:
             - safer_metadata
       - Framework:
           bytecode_version: 6
