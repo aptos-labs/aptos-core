@@ -441,6 +441,7 @@ module aptos_framework::stake {
         // Remove each validator from the validator set.
         while ({
             spec {
+                invariant i <= len;
                 invariant spec_validators_are_initialized(active_validators);
                 invariant spec_validator_indices_are_valid(active_validators);
                 invariant spec_validators_are_initialized(pending_inactive);
