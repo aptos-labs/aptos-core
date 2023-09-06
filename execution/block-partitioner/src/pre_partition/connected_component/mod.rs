@@ -129,7 +129,6 @@ impl PrePartitioner for ConnectedComponentPartitioner {
                 }
             }
         }
-        println!("ori_txns_idxs_by_shard={:?}", ori_txns_idxs_by_shard);
 
         // Prepare `ori_txn_idxs` and `start_txn_idxs_by_shard`.
         let mut start_txn_idxs_by_shard = vec![0; state.num_executor_shards];
