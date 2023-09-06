@@ -9,9 +9,10 @@ use crate::{
         constants::{MAX_RETRY_TIME_SECONDS, URI_SKIP_LIST},
         counters::{
             DUPLICATE_RAW_ANIMATION_URI_COUNT, DUPLICATE_RAW_IMAGE_URI_COUNT,
-            DUPLICATE_TOKEN_URI_COUNT, OPTIMIZE_IMAGE_TYPE_COUNT, PARSER_FAIL_COUNT,
-            PARSER_INVOCATIONS_COUNT, PARSER_SUCCESSES_COUNT, PARSE_URI_TYPE_COUNT,
-            PUBSUB_ACK_SUCCESS_COUNT, PUBSUB_STREAM_RESET_COUNT, SKIP_URI_COUNT,
+            DUPLICATE_TOKEN_URI_COUNT, GOT_CONNECTION_COUNT, OPTIMIZE_IMAGE_TYPE_COUNT,
+            PARSER_FAIL_COUNT, PARSER_INVOCATIONS_COUNT, PARSER_SUCCESSES_COUNT,
+            PARSE_URI_TYPE_COUNT, PUBSUB_ACK_SUCCESS_COUNT, PUBSUB_STREAM_RESET_COUNT,
+            SKIP_URI_COUNT, UNABLE_TO_GET_CONNECTION_COUNT,
         },
         database::{
             check_or_update_chain_id, establish_connection_pool, run_migrations, upsert_uris,
@@ -110,7 +111,16 @@ async fn spawn_parser(
 
         // Perform chain id check
         // If chain id is not set, set it
-        let mut conn = pool.get().expect("Failed to get DB connection from pool");
+        let mut conn = pool.get().unwrap_or_else(|e| {
+            error!(
+                pubsub_message = pubsub_message,
+                error = ?e,
+                "[NFT Metadata Crawler] Failed to get DB connection from pool");
+            UNABLE_TO_GET_CONNECTION_COUNT.inc();
+            panic!();
+        });
+        GOT_CONNECTION_COUNT.inc();
+
         let grpc_chain_id = parts[4].parse::<u64>().unwrap_or_else(|e| {
             error!(
                 error = ?e,
