@@ -1,3 +1,6 @@
+# Learn more about how to run this workflow here:
+# https://www.notion.so/aptoslabs/replay-verify-to-check-backward-compatibility-runbook-333f8663e2fa44199778ba47224073c0
+
 name: "*run replay-verify reusable workflow"
 
 on:
@@ -12,21 +15,21 @@ on:
       BUCKET:
         required: true
         type: string
-        description: The bucket to use for the backup. If not specified, it will use the default bucket.
+        description: The bucket to use for the backup, e.g. todo
       SUB_DIR:
         required: true
         type: string
-        description: The subdirectory to use for the backup. If not specified, it will use the default subdirectory.
+        description: The subdirectory to use for the backup, e.g. todo
       HISTORY_START:
         required: true
         type: string
-        description: The history start to use for the backup. If not specified, it will use the default history start.
+        description: The history start to use for the backup, e.g. todo
       TXNS_TO_SKIP:
         required: false
         type: string
-        description: The list of transaction versions to skip. If not specified, it will use the default list.
+        description: The list of transaction versions to skip, e.g. todo
       BACKUP_CONFIG_TEMPLATE_PATH:
-        description: "The path to the backup config template to use."
+        description: "The path to the backup config template to use, e.g. todo"
         type: string
         required: true
       # GHA job config
