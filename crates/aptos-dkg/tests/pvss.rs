@@ -11,9 +11,10 @@ use aptos_dkg::pvss::traits::{Reconstructable, SecretSharingConfig};
 use aptos_dkg::pvss::{das, scrape, test_utils, WeightedConfig, WeightedTranscript};
 use aptos_dkg::pvss::{Player, ThresholdConfig};
 use aptos_dkg::utils::random::random_scalar;
-use rand::rngs::StdRng;
+use rand::rngs::{StdRng, ThreadRng};
 use rand::thread_rng;
 use rand_core::SeedableRng;
+use aptos_crypto::{bls12381, SigningKey, Uniform};
 
 #[test]
 fn all_unweighted_pvss_bvt() {
@@ -87,6 +88,18 @@ fn weighted_fail_due_to_blst_bug() {
             seed.to_bytes_le(),
         );
     }
+}
+
+#[test]
+fn transcript_can_be_signed() {
+    let mut rng = thread_rng();
+
+    let sc = ThresholdConfig::new(10, 20).unwrap();
+    let (pp, _, eks, s, _) = test_utils::setup_dealing::<das::Transcript, ThreadRng>(&sc, &mut rng);
+    let trx = das::Transcript::deal(&sc, &pp, &eks, &s, &DST_PVSS_TESTING_APP[..], &mut rng);
+
+    let sk = bls12381::PrivateKey::generate(&mut rng);
+    let _ = sk.sign(&trx).unwrap();
 }
 
 #[test]
