@@ -1,9 +1,11 @@
+// Copyright © Aptos Foundation
+
 use crate::{
     aggregator_extension::{
-        validate_history, AggregatorID, AggregatorState, DeltaHistory, DeltaValue,
+        validate_history, AggregatorID, AggregatorState, DeltaHistory,
         SpeculativeStartValue,
     },
-    delta_change_set::{abort_error, addition, subtraction},
+    bounded_math::{abort_error, BoundedMathResult, ok_overflow, ok_underflow, addition_deltavalue},
 };
 use aptos_state_view::StateView;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -35,7 +37,7 @@ impl AggregatorChange {
 
     /// Returns the result of applying the AggregatorState to the base value
     /// Returns error if postcondition is not satisfied.
-    pub fn apply_aggregator_change_to(&self, base: u128) -> PartialVMResult<u128> {
+    pub fn apply_aggregator_change_to(&self, base: u128) -> BoundedMathResult<u128> {
         match self.state {
             AggregatorState::Data { value } => Ok(value),
             AggregatorState::Delta { delta, .. } => {
@@ -85,179 +87,71 @@ impl AggregatorChange {
                         delta: prev_delta,
                         history: prev_history,
                     } => {
-                        // Another useful macro, this time for merging deltas with different signs, such
-                        // as +A-B and -A+B. In these cases we have to check which of A or B is greater
-                        // and possibly flip a sign.
-                        macro_rules! update_different_sign {
-                            ($a:ident, $b:ident) => {
-                                if $a >= $b {
-                                    DeltaValue::Positive(subtraction($a, $b)?)
-                                } else {
-                                    DeltaValue::Negative(subtraction($b, $a)?)
-                                }
-                            };
-                        }
+                        let new_delta = prev_delta.add(&delta, self.max_value)?;
 
-                        let new_delta =
-                            match prev_delta {
-                                DeltaValue::Positive(prev_value) => match delta {
-                                    DeltaValue::Positive(self_value) => DeltaValue::Positive(
-                                        addition(prev_value, self_value, self.max_value)?,
-                                    ),
-                                    DeltaValue::Negative(self_value) => {
-                                        update_different_sign!(prev_value, self_value)
-                                    },
-                                },
-                                DeltaValue::Negative(prev_value) => match delta {
-                                    DeltaValue::Positive(self_value) => {
-                                        update_different_sign!(self_value, prev_value)
-                                    },
-                                    DeltaValue::Negative(self_value) => DeltaValue::Negative(
-                                        addition(prev_value, self_value, self.max_value)?,
-                                    ),
-                                },
-                            };
-
-                        // new_min_overflow = min(prev_min_overflow, prev_delta + min_overflow)
-                        let new_min_overflow = match (
-                            prev_history.min_overflow_positive_delta,
-                            history.min_overflow_positive_delta,
-                        ) {
-                            (
-                                Some(prev_min_overflow_positive_delta),
-                                Some(min_overflow_positive_delta),
-                            ) => {
-                                // We know that previous_speculative_value + prev_delta + min_overflow_positive_delta is
-                                // greater than max_value. Otherwise, valiate_history function should have returned an error.
-                                // Therefore delta = prev_delta + min_overflow_positive_delta still results in an overflow.
-                                // We are assured that prev_delta + min_overflow_positive_delta is positive. But in case
-                                // prev_delta + min_overflow_positive_delta is greater than max_value, then adding
-                                // delta = prev_delta + min_overflow_positive_delta to any start value will always result in
-                                // an overflow. By our convention, we consider this overflow as None.
-                                match addition_deltavalue(
+                        let new_min_overflow = {
+                            let adjusted_min_overflow_positive_delta = history.min_overflow_positive_delta.map_or(
+                                Ok(None),
+                                // Return Result<Option<u128>>. we want to have None on overflow,
+                                // and to fail the merging on underflow
+                                |min_overflow_positive_delta| ok_overflow(addition_deltavalue(
                                     min_overflow_positive_delta,
                                     prev_delta,
                                     self.max_value,
-                                ) {
-                                    Ok(val) => {
-                                        Some(u128::min(prev_min_overflow_positive_delta, val))
-                                    },
-                                    Err(_) => Some(prev_min_overflow_positive_delta),
-                                }
-                            },
-                            (Some(prev_min_overflow_positive_delta), None) => {
-                                Some(prev_min_overflow_positive_delta)
-                            },
-                            (None, Some(min_overflow_positive_delta)) => {
-                                // We know that previous_speculative_value + prev_delta + min_overflow_positive_delta is
-                                // greater than max_value. Otherwise, valiate_history function should have returned an error.
-                                // Therefore delta = prev_delta + min_overflow_positive_delta still results in an overflow.
-                                // We are assured that prev_delta + min_overflow_positive_delta is positive.
-                                // But if prev_delta + min_overflow_positive_delta exceeds max_value, by our convention the
-                                // overflow is considered as None, as any possible start value will always result in an overflow.
-                                addition_deltavalue(
-                                    min_overflow_positive_delta,
-                                    prev_delta,
-                                    self.max_value,
-                                )
-                                .ok()
-                            },
-                            (None, None) => None,
+                                ))
+                            )?;
+
+                            match (adjusted_min_overflow_positive_delta, prev_history.min_overflow_positive_delta) {
+                                (Some(a), Some(b)) => Some(u128::min(a, b)),
+                                (a, b) => a.or(b),
+                            }
                         };
 
-                        // new_max_underflow = min(prev_max_underflow, max_underflow - prev_delta)
-                        let new_max_underflow = match (
-                            prev_history.max_underflow_negative_delta,
-                            history.max_underflow_negative_delta,
-                        ) {
-                            // We know that previous_speculative_value + prev_delta - max_underflow_negative_delta is
-                            // less than 0. Otherwise, valiate_history function should have returned an error.
-                            // Therefore delta = prev_delta - max_underflow_negative_delta still results in an underflow.
-                            // We are assured that max_underflow_negative_delta - prev_delta is positive. But in case
-                            // max_underflow_negative_delta - prev_delta exceeds max_value, then adding delta =
-                            // prev_delta - max_underflow_negative_delta to any start value will always result in
-                            // an underflow. By our convention, we consider this underflow as None.
-                            (
-                                Some(prev_max_underflow_negative_delta),
-                                Some(max_underflow_negative_delta),
-                            ) => match subtraction_deltavalue(
-                                max_underflow_negative_delta,
-                                prev_delta,
-                                self.max_value,
-                            ) {
-                                Ok(val) => Some(u128::min(prev_max_underflow_negative_delta, val)),
-                                Err(_) => Some(prev_max_underflow_negative_delta),
-                            },
-                            (Some(prev_max_underflow_negative_delta), None) => {
-                                Some(prev_max_underflow_negative_delta)
-                            },
-                            (None, Some(max_underflow_negative_delta)) => {
-                                // We know that previous_speculative_value + prev_delta - max_underflow_negative_delta is
-                                // less than 0. Otherwise, valiate_history function should have returned an error.
-                                // Therefore delta = prev_delta - max_underflow_negative_delta still results in an underflow.
-                                // We are assured that max_underflow_negative_delta - prev_delta is positive. But in case
-                                // max_underflow_negative_delta - prev_delta exceeds max_value, then adding delta =
-                                // prev_delta - max_underflow_negative_delta to any start value will always result in
-                                // an underflow. By our convention, we consider this underflow as None.
-                                subtraction_deltavalue(
+                        let new_max_underflow = {
+                            let adjusted_max_underflow_negative_delta = history.max_underflow_negative_delta.map_or(
+                                Ok(None),
+                                // Return Result<Option<u128>>. we want to have None on overflow,
+                                // and to fail the merging on underflow
+                                |max_underflow_negative_delta| ok_overflow(addition_deltavalue(
                                     max_underflow_negative_delta,
-                                    prev_delta,
+                                    prev_delta.minus(),
                                     self.max_value,
-                                )
-                                .ok()
-                            },
-                            (None, None) => None,
+                                ))
+                            )?;
+
+                            match (adjusted_max_underflow_negative_delta, prev_history.max_underflow_negative_delta) {
+                                (Some(a), Some(b)) => Some(u128::min(a, b)),
+                                (a, b) => a.or(b),
+                            }
                         };
 
                         // new_max_achieved = max(prev_max_achieved, max_achieved + prev_delta)
-                        let new_max_achieved = match prev_delta {
-                            DeltaValue::Positive(prev_delta) => u128::max(
+                        // When adjusting max_achieved, if underflow - than the other is bigger,
+                        // but if overflow - we fail the merge, as we cannot successfully achieve delta larger than max_value.
+                        let new_max_achieved = ok_underflow(addition_deltavalue(
+                            history.max_achieved_positive_delta,
+                            prev_delta,
+                            self.max_value,
+                        ))?.map_or(
+                            prev_history.max_achieved_positive_delta,
+                            |value| u128::max(
                                 prev_history.max_achieved_positive_delta,
-                                addition(
-                                    history.max_achieved_positive_delta,
-                                    prev_delta,
-                                    self.max_value,
-                                )?,
-                            ),
-                            DeltaValue::Negative(prev_delta) => {
-                                if history.max_achieved_positive_delta >= prev_delta {
-                                    u128::max(
-                                        prev_history.max_achieved_positive_delta,
-                                        subtraction(
-                                            history.max_achieved_positive_delta,
-                                            prev_delta,
-                                        )?,
-                                    )
-                                } else {
-                                    prev_history.max_achieved_positive_delta
-                                }
-                            },
-                        };
+                                value,
+                            )
+                        );
 
                         // new_min_achieved = max(prev_min_achieved, min_achieved - prev_delta)
-                        let new_min_achieved = match prev_delta {
-                            DeltaValue::Positive(prev_delta) => {
-                                if history.min_achieved_negative_delta >= prev_delta {
-                                    u128::max(
-                                        prev_history.min_achieved_negative_delta,
-                                        subtraction(
-                                            history.min_achieved_negative_delta,
-                                            prev_delta,
-                                        )?,
-                                    )
-                                } else {
-                                    prev_history.min_achieved_negative_delta
-                                }
-                            },
-                            DeltaValue::Negative(prev_delta) => u128::max(
+                        let new_min_achieved = ok_underflow(addition_deltavalue(
+                            history.min_achieved_negative_delta,
+                            prev_delta.minus(),
+                            self.max_value,
+                        ))?.map_or(
+                            prev_history.min_achieved_negative_delta,
+                            |value| u128::max(
                                 prev_history.min_achieved_negative_delta,
-                                addition(
-                                    history.min_achieved_negative_delta,
-                                    prev_delta,
-                                    self.max_value,
-                                )?,
-                            ),
-                        };
+                                value,
+                            )
+                        );
 
                         if (new_min_overflow.is_some()
                             && new_min_overflow.unwrap() <= new_max_achieved)
@@ -300,30 +194,6 @@ impl AggregatorChange {
         // Perform the merge.
         self.merge_with_previous_aggregator_change(prev_change)?;
         Ok(())
-    }
-}
-
-/// Implements base + value
-pub fn addition_deltavalue(
-    base: u128,
-    value: DeltaValue,
-    max_value: u128,
-) -> PartialVMResult<u128> {
-    match value {
-        DeltaValue::Positive(value) => addition(base, value, max_value),
-        DeltaValue::Negative(value) => subtraction(base, value),
-    }
-}
-
-/// Implements base - value
-pub fn subtraction_deltavalue(
-    base: u128,
-    value: DeltaValue,
-    max_value: u128,
-) -> PartialVMResult<u128> {
-    match value {
-        DeltaValue::Positive(value) => subtraction(base, value),
-        DeltaValue::Negative(value) => addition(base, value, max_value),
     }
 }
 

@@ -137,7 +137,7 @@ fn native_try_add(
     let value = pop_value_by_type(&ty_args[0], &mut args)?;
     let (id, limit) = pop_aggregator_fields_by_type(&ty_args[0], &mut args)?;
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
-    Ok(smallvec![Value::bool(aggregator.try_add(value).is_ok())])
+    Ok(smallvec![Value::bool(aggregator.try_add(aggregator_context.resolver, value)?)])
 }
 
 /***************************************************************************************************
@@ -156,7 +156,7 @@ fn native_try_sub(
     let value = pop_value_by_type(&ty_args[0], &mut args)?;
     let (id, limit) = pop_aggregator_fields_by_type(&ty_args[0], &mut args)?;
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
-    Ok(smallvec![Value::bool(aggregator.try_sub(value).is_ok())])
+    Ok(smallvec![Value::bool(aggregator.try_sub(aggregator_context.resolver, value)?)])
 }
 
 /***************************************************************************************************
@@ -175,7 +175,7 @@ fn native_read(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let (id, limit) = pop_aggregator_fields_by_type(&ty_args[0], &mut args)?;
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
-    let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
+    let value = aggregator.read_most_recent_aggregator_value(aggregator_context.resolver)?;
     if value > limit {
         return Err(SafeNativeError::InvariantViolation(PartialVMError::new(
             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,

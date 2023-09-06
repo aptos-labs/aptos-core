@@ -8,9 +8,9 @@ use super::{
     *,
 };
 use aptos_aggregator::{
-    aggregator_extension::{DeltaHistory, DeltaValue},
+    aggregator_extension::{DeltaHistory},
     delta_change_set::{delta_add, delta_sub, DeltaOp},
-    transaction::AggregatorValue,
+    transaction::AggregatorValue, bounded_math::DeltaValue,
 };
 use aptos_types::{
     access_path::AccessPath,

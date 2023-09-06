@@ -471,8 +471,8 @@ impl VersionedAggregators {
 mod test {
     use super::*;
     use aptos_aggregator::{
-        aggregator_extension::{DeltaHistory, DeltaValue},
-        delta_change_set::DeltaOp,
+        aggregator_extension::{DeltaHistory},
+        delta_change_set::DeltaOp, bounded_math::DeltaValue,
     };
     use claims::{assert_err_eq, assert_ok_eq, assert_some};
     use test_case::test_case;

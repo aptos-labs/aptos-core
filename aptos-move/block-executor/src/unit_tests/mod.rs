@@ -15,8 +15,8 @@ use crate::{
     txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_aggregator::{
-    aggregator_extension::{DeltaHistory, DeltaValue},
-    delta_change_set::{delta_add, delta_sub, DeltaOp},
+    aggregator_extension::{DeltaHistory},
+    delta_change_set::{delta_add, delta_sub, DeltaOp}, bounded_math::DeltaValue,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{

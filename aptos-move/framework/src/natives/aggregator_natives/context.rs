@@ -107,8 +107,8 @@ impl<'a> NativeAggregatorContext<'a> {
 mod test {
     use super::*;
     use aptos_aggregator::{
-        aggregator_extension::{DeltaHistory, DeltaValue},
-        aggregator_id_for_test, AggregatorStore,
+        aggregator_extension::{DeltaHistory},
+        aggregator_id_for_test, AggregatorStore, bounded_math::DeltaValue,
     };
     use claims::{assert_matches, assert_ok};
 

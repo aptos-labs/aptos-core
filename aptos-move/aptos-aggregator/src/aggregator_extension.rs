@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aggregator_change_set::addition_deltavalue,
-    delta_change_set::{
-        abort_error, addition, subtraction, EADD_OVERFLOW, EEXPECTED_OVERFLOW, EEXPECTED_UNDERFLOW,
-        ESUB_UNDERFLOW,
+    bounded_math::{
+        addition, subtraction, BoundedMathResult, BoundedMathError, addition_deltavalue, DeltaValue, expect_ok, ok_overflow,
     },
     resolver::{AggregatorReadMode, AggregatorResolver},
 };
@@ -16,13 +14,6 @@ use aptos_types::{
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::account_address::AccountAddress;
 use std::collections::{BTreeMap, BTreeSet};
-
-/// Describes the delta of an aggregator.
-#[derive(Clone, Copy, Hash, PartialOrd, Ord, Debug, PartialEq, Eq)]
-pub enum DeltaValue {
-    Positive(u128),
-    Negative(u128),
-}
 
 /// Describes how the `speculative_start_value` in
 /// `AggregatorState` is obtained.
@@ -229,9 +220,9 @@ pub fn validate_history(
     base_value: u128,
     max_value: u128,
     state: &AggregatorState,
-) -> PartialVMResult<()> {
+) -> BoundedMathResult<()> {
     if let AggregatorState::Delta {
-        speculative_start_value,
+        speculative_start_value: _,
         delta: _,
         history,
     } = state
@@ -247,18 +238,12 @@ pub fn validate_history(
         if history.min_overflow_positive_delta.is_some()
             && base_value <= max_value - history.min_overflow_positive_delta.unwrap()
         {
-            return Err(abort_error(
-                format!("Overflow was expected when setting the aggreagator start value to {}. Previous speculative start value = {:?}, Min overflow delta = {}, Max value = {}", base_value, speculative_start_value, history.min_overflow_positive_delta.unwrap(), max_value),
-                EEXPECTED_OVERFLOW,
-            ));
+            return Err(BoundedMathError::Overflow);
         }
         if history.max_underflow_negative_delta.is_some()
             && base_value >= history.max_underflow_negative_delta.unwrap()
         {
-            return Err(abort_error(
-                format!("Underflow was expected when setting the aggreagator start value to {}. Previous speculative start value = {:?}, Max underflow delta = {}, Max value = {}", base_value, speculative_start_value, history.max_underflow_negative_delta.unwrap(), max_value),
-                EEXPECTED_UNDERFLOW,
-            ));
+            return Err(BoundedMathError::Underflow);
         }
     }
     Ok(())
@@ -296,7 +281,7 @@ impl Aggregator {
     }
 
     #[allow(dead_code)]
-    fn get_value(&self) -> PartialVMResult<u128> {
+    fn get_value(&self) -> BoundedMathResult<u128> {
         match self.state {
             AggregatorState::Data { value } => Ok(value),
             AggregatorState::Delta {
@@ -324,108 +309,63 @@ impl Aggregator {
     }
 
     /// Implements logic for adding to an aggregator.
+    /// Returns error if transaction is in invalid state, and should be re-executed.
+    /// Returns true if addition succeeded, and false if it would overflow.
     pub fn try_add(
         &mut self,
         resolver: &dyn AggregatorResolver,
         input: u128,
-    ) -> PartialVMResult<()> {
+    ) -> PartialVMResult<bool> {
         if input > self.max_value {
             // we do not have to record the overflow.
             // We record the delta that result in overflows/underflows so that when we compute the actual value
             // of aggregator, we can figure out if the output of try_add/try_sub changes.
             // When input exceeds max_value, we know that no matter what the starting value of the
             // aggregator is, it always results in an overflow.
-            return Err(abort_error(
-                format!(
-                    "overflow occurred as adding a value: {} more than max_value: {}",
-                    input, self.max_value
-                ),
-                EADD_OVERFLOW,
-            ));
+            return Ok(false);
         }
         self.read_last_committed_aggregator_value(resolver)?;
         match self.state {
             AggregatorState::Data { value } => {
                 // If aggregator knows the value, add directly and keep the state.
-                self.state = AggregatorState::Data {
-                    value: addition(value, input, self.max_value)?,
-                };
-                return Ok(());
+                if let Ok(new_value) = addition(value, input, self.max_value) {
+                    self.state = AggregatorState::Data {
+                        value: new_value,
+                    };
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
             },
             AggregatorState::Delta {
                 speculative_start_value,
                 delta,
                 history,
             } => {
-                let new_delta = match delta {
-                    DeltaValue::Positive(current_delta) => {
-                        // If speculative_start_value + delta + input exceeds max_value, it's an overflow.
-                        // Otherwise, we update the delta with delta + input.
-                        addition(
-                            speculative_start_value.get_value() + current_delta,
-                            input,
-                            self.max_value,
-                        )
-                        .map_err(|err| {
-                            // If current_delta + input exceeds max_value, we do not have to record the overflow.
-                            // We record the delta that result in overflows/underflows so that when we compute the actual value
-                            // of aggregator, we can figure out if the output of try_add/try_sub changes.
-                            // When current_delta + input exceeds max_value, we know that no matter what the starting value of the
-                            // aggregator is, it always results in an overflow.
-                            if current_delta <= self.max_value - input {
-                                self.get_mut_history()
-                                    .unwrap()
-                                    .record_overflow(current_delta + input);
-                            }
-                            err
-                        })?;
-                        DeltaValue::Positive(
-                            addition(current_delta, input, self.max_value)
-                                .expect("Addition is expected to succeed as the sum <= max_value"),
-                        )
-                    },
-                    DeltaValue::Negative(current_delta) => {
-                        // If speculative_start_value - current_delta + input is greater than max_value or less than -max_value, it's an overflow.
-                        // Otherwise, we update the delta with delta + input.
-                        if speculative_start_value.get_value() + input < current_delta {
-                            // speculative_start_value - current_delta + input < 0
-                            DeltaValue::Negative(subtraction(current_delta, input).expect(
-                                "Subtraction of smaller value from larger value must succeed",
-                            ))
-                        } else {
-                            // speculative_start_value - current_delta + input > 0
-                            if speculative_start_value.get_value() + input - current_delta
-                                > self.max_value
-                            {
-                                self.get_mut_history()
-                                    .unwrap()
-                                    .record_overflow(input - current_delta);
-                                return Err(abort_error(
-                                    format!("overflow occurred when adding {} to speculative_start_value: {:?}, current_delta: -{}", input, speculative_start_value, current_delta),
-                                    EADD_OVERFLOW,
-                                ));
-                            }
-                            if input > current_delta {
-                                DeltaValue::Positive(subtraction(input, current_delta).expect(
-                                    "Subtraction of smaller value from larger value must succeed",
-                                ))
-                            } else {
-                                DeltaValue::Negative(subtraction(current_delta, input).expect(
-                                    "Subtraction of smaller value from larger value must succeed",
-                                ))
-                            }
-                        }
-                    },
-                };
-                self.state = AggregatorState::Delta {
-                    speculative_start_value,
-                    delta: new_delta,
-                    history,
-                };
-                self.get_mut_history().unwrap().record_success(new_delta);
+                let cur_value = expect_ok(addition_deltavalue(speculative_start_value.get_value(), delta, self.max_value))?;
+
+                if addition(cur_value, input, self.max_value).is_err() {
+                    let overflow_value = expect_ok(ok_overflow(addition_deltavalue(input, delta, self.max_value)))?;
+
+                    // if value overflowed, we don't need to record it
+                    if let Some(overflow_value) = overflow_value {
+                        self.get_mut_history()
+                            .unwrap()
+                            .record_overflow(overflow_value);
+                    }
+                    Ok(false)
+                } else {
+                    let new_delta = expect_ok(delta.add(&DeltaValue::Positive(input), self.max_value))?;
+                    self.state = AggregatorState::Delta {
+                        speculative_start_value,
+                        delta: new_delta,
+                        history,
+                    };
+                    self.get_mut_history().unwrap().record_success(new_delta);
+                    Ok(true)
+                }
             },
         }
-        Ok(())
     }
 
     /// Implements logic for subtracting from an aggregator.
@@ -433,92 +373,56 @@ impl Aggregator {
         &mut self,
         resolver: &dyn AggregatorResolver,
         input: u128,
-    ) -> PartialVMResult<()> {
+    ) -> PartialVMResult<bool> {
         if input > self.max_value {
             // we do not have to record the underflow.
             // We record the delta that result in overflows/underflows so that when we compute the actual value
             // of aggregator, we can figure out if the output of try_add/try_sub changes.
             // When input exceeds max_value, we know that no matter what the starting value of the
             // aggregator is, it always results in an underflow.
-            return Err(abort_error(
-                format!(
-                    "underflow occurred as subtracting input {} more than max_value: {}",
-                    input, self.max_value
-                ),
-                ESUB_UNDERFLOW,
-            ));
+            return Ok(false);
         }
         self.read_last_committed_aggregator_value(resolver)?;
         match self.state {
             AggregatorState::Data { value } => {
                 // If aggregator knows the value, add directly and keep the state.
-                self.state = AggregatorState::Data {
-                    value: subtraction(value, input)?,
-                };
-                return Ok(());
+                if let Ok(new_value) = subtraction(value, input) {
+                    self.state = AggregatorState::Data {
+                        value: new_value,
+                    };
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
             },
             AggregatorState::Delta {
                 speculative_start_value,
                 delta,
                 history,
             } => {
-                let new_delta: DeltaValue = match delta {
-                    DeltaValue::Positive(current_delta) => {
-                        // If speculative_start_value + current_delta - input is less than 0, it's an underflow.
-                        // Otherwise, we update the delta with delta - input.
-                        if speculative_start_value.get_value() + current_delta < input {
-                            self.get_mut_history()
-                                .unwrap()
-                                .record_underflow(input - current_delta);
-                            return Err(abort_error(
-                                format!("underflow occurred when subtracting {} from speculative_start_value: {:?}, current_delta: {}", input, speculative_start_value, current_delta),
-                                ESUB_UNDERFLOW,
-                            ));
-                        }
-                        if current_delta >= input {
-                            DeltaValue::Positive(subtraction(current_delta, input).expect(
-                                "Subtraction of smaller value from larger value must succeed",
-                            ))
-                        } else {
-                            DeltaValue::Negative(subtraction(input, current_delta).expect(
-                                "Subtraction of smaller value from larger value must succeed",
-                            ))
-                        }
-                    },
-                    DeltaValue::Negative(current_delta) => {
-                        // If current_delta + input > self.max_value, it's an underflow. But no need to record it.
-                        if current_delta > self.max_value - input {
-                            return Err(abort_error(
-                                format!("underflow occurred when subtracting {} from speculative_start_value: {:?}, current_delta: -{}", input, speculative_start_value, current_delta),
-                                ESUB_UNDERFLOW,
-                            ));
-                        }
-                        // If speculative_start_value - current_delta - input is less than 0, it's an underflow.
-                        if speculative_start_value.get_value() < current_delta + input {
-                            self.get_mut_history()
-                                .unwrap()
-                                .record_underflow(input + current_delta);
-                            return Err(abort_error(
-                                format!("underflow occurred when subtracting {} from speculative_start_value: {:?}, current_delta: -{}", input, speculative_start_value, current_delta),
-                                ESUB_UNDERFLOW,
-                            ));
-                        }
-                        // Otherwise, we update the delta with delta - input.
-                        DeltaValue::Negative(
-                            addition(current_delta, input, self.max_value)
-                                .expect("Adding two values must succeed as the sum <= max_value"),
-                        )
-                    },
-                };
-                self.state = AggregatorState::Delta {
-                    speculative_start_value,
-                    delta: new_delta,
-                    history,
-                };
-                self.get_mut_history().unwrap().record_success(new_delta);
+                let cur_value = expect_ok(addition_deltavalue(speculative_start_value.get_value(), delta, self.max_value))?;
+
+                if cur_value < input {
+                    let underflow_value = expect_ok(ok_overflow(addition_deltavalue(input, delta.minus(), self.max_value)))?;
+                    // if value overflowed, we don't need to record it
+                    if let Some(underflow_value) = underflow_value {
+                        self.get_mut_history()
+                            .unwrap()
+                            .record_underflow(underflow_value);
+                    }
+                    Ok(false)
+                } else {
+                    let new_delta = expect_ok(delta.add(&DeltaValue::Negative(input), self.max_value))?;
+                    self.state = AggregatorState::Delta {
+                        speculative_start_value,
+                        delta: new_delta,
+                        history,
+                    };
+                    self.get_mut_history().unwrap().record_success(new_delta);
+                    Ok(true)
+                }
             },
         }
-        Ok(())
     }
 
     /// Implements logic for doing a "cheap read" of an aggregator.
@@ -541,11 +445,11 @@ impl Aggregator {
             } => {
                 // If we performed a "cheap read" or "expensive read" operation before, use it.
                 if speculative_start_value != SpeculativeStartValue::Unset {
-                    return addition_deltavalue(
+                    return Ok(addition_deltavalue(
                         speculative_start_value.get_value(),
                         delta,
                         self.max_value,
-                    );
+                    )?);
                 }
                 // Otherwise, we have to go to storage and read the value.
                 let value_from_storage = resolver
@@ -575,7 +479,7 @@ impl Aggregator {
                     delta,
                     history,
                 };
-                addition_deltavalue(value_from_storage, delta, self.max_value)
+                Ok(addition_deltavalue(value_from_storage, delta, self.max_value)?)
             },
         }
     }
@@ -601,7 +505,7 @@ impl Aggregator {
                 // If we performed an "expensive read" operation before, use it.
                 if let SpeculativeStartValue::AggregatedValue(start_value) = speculative_start_value
                 {
-                    return addition_deltavalue(start_value, delta, self.max_value);
+                    return Ok(addition_deltavalue(start_value, delta, self.max_value)?);
                 }
                 // Otherwise, we have to go to storage and read the value.
                 let value_from_storage = resolver
@@ -622,7 +526,7 @@ impl Aggregator {
                     delta,
                     history,
                 };
-                addition_deltavalue(value_from_storage, delta, self.max_value)
+                Ok(addition_deltavalue(value_from_storage, delta, self.max_value)?)
             },
         }
     }
@@ -739,11 +643,11 @@ impl AggregatorData {
                 speculative_start_value,
                 delta,
                 history: _,
-            } => addition_deltavalue(
+            } => Ok(addition_deltavalue(
                 speculative_start_value.get_value(),
                 delta,
                 snapshot.max_value,
-            ),
+            )?),
         }
     }
 
@@ -805,7 +709,7 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(200), 200)
             .expect("Get aggregator failed");
-      
+
         assert_eq!(aggregator.state, AggregatorState::Data { value: 0 });
         assert_ok!(aggregator.try_add(&*TEST_RESOLVER, 100));
         assert_eq!(aggregator.state, AggregatorState::Data { value: 100 });
@@ -832,7 +736,7 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
-      
+
         assert_eq!(aggregator.state, AggregatorState::Delta {
             speculative_start_value: SpeculativeStartValue::Unset,
             delta: DeltaValue::Positive(0),

@@ -6,8 +6,8 @@
 //! postcondition.
 
 use crate::{
-    aggregator_extension::{DeltaHistory, DeltaValue},
-    module::AGGREGATOR_MODULE,
+    aggregator_extension::DeltaHistory,
+    module::AGGREGATOR_MODULE, bounded_math::{DeltaValue, addition, subtraction, addition_deltavalue, ok_underflow},
 };
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -15,13 +15,7 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
     write_set::WriteOp,
 };
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
-
-/// When `Addition` operation overflows the `limit`.
-pub(crate) const EADD_OVERFLOW: u64 = 0x02_0001;
-
-/// When `Subtraction` operation goes below zero.
-pub(crate) const ESUB_UNDERFLOW: u64 = 0x02_0002;
+use move_binary_format::errors::{Location, PartialVMResult};
 
 /// When updating the aggregator start value (due to read operations
 /// or at the end of the transaction), we realize that mistakenly raised
@@ -32,6 +26,10 @@ pub(crate) const EEXPECTED_OVERFLOW: u64 = 0x02_0003;
 /// or at the end of the transaction), we realize that mistakenly raised
 /// an underflow in one of the previus try_sub operation.
 pub(crate) const EEXPECTED_UNDERFLOW: u64 = 0x02_0004;
+
+
+pub(crate) const ECODE_INVARIANT_BROKEN: u64 = 0x02_0005;
+
 
 /// Represents an update from aggregator's operation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
@@ -74,61 +72,36 @@ impl DeltaOp {
         )?;
         subtraction(base, self.history.min_achieved_negative_delta)?;
 
+        // Do we need to check overflow/underflow from history as well?
+
         // If delta has been successfully validated, apply the update.
-        match self.update {
-            DeltaValue::Positive(value) => addition(base, value, self.max_value),
-            DeltaValue::Negative(value) => subtraction(base, value),
-        }
+        Ok(addition_deltavalue(base, self.update, self.max_value)?)
     }
 
     /// Shifts by a `delta` the maximum positive value seen by `self`.
     fn shifted_max_achieved_positive_delta_by(&self, delta: &DeltaOp) -> PartialVMResult<u128> {
-        match delta.update {
-            // Suppose that maximum value seen is +M and we shift by +V. Then the
-            // new maximum value is M+V provided addition do no overflow.
-            DeltaValue::Positive(value) => addition(
-                value,
-                self.history.max_achieved_positive_delta,
-                self.max_value,
-            ),
-            // Suppose that maximum value seen is +M and we shift by -V this time.
-            // If M >= V, the result is +(M-V). Otherwise, `self` should have never
-            // reached any positive value. By convention, we use 0 for the latter
-            // case. Also, we can reuse `subtraction` which throws an error when M < V,
-            // simply mapping the error to 0.
-            DeltaValue::Negative(value) => {
-                Ok(subtraction(self.history.max_achieved_positive_delta, value).unwrap_or(0))
-            },
-        }
+        // If addition overflows, we fail
+        // If addition underflows, that means `self` should have never
+        // reached any positive value. By convention, we use 0 for the latter
+        // case. Also, we can reuse `subtraction` which throws an error when M < V,
+        // simply mapping the error to 0.
+
+        Ok(ok_underflow(addition_deltavalue(self.history.max_achieved_positive_delta, delta.update, self.max_value))
+            .map(|result| result.unwrap_or(0))?)
     }
 
     /// Shifts by a `delta` the minimum negative value seen by `self`.
     fn shifted_min_achieved_negative_delta_by(&self, delta: &DeltaOp) -> PartialVMResult<u128> {
-        match delta.update {
-            // Suppose that minimum value seen is -M and we shift by +V. Then this case
-            // is symmetric to +M-V in `shifted_max_achieved_positive_delta_by`. Indeed, if M >= V, then
-            // the minimum value should become -(M-V). Otherwise, delta had never been
-            // negative and the minimum value capped to 0.
-            DeltaValue::Positive(value) => {
-                Ok(subtraction(self.history.min_achieved_negative_delta, value).unwrap_or(0))
-            },
-            // Otherwise, given  the minimum value of -M and the shift of -V the new
-            // minimum value becomes -(M+V), which of course can overflow on addition,
-            // implying that we subtracted too much and there was an underflow.
-            DeltaValue::Negative(value) => addition(
-                value,
-                self.history.min_achieved_negative_delta,
-                self.max_value,
-            ),
-        }
+        // symmetric to `shifted_max_achieved_positive_delta_by`
+
+        Ok(ok_underflow(addition_deltavalue(self.history.min_achieved_negative_delta, delta.update.minus(), self.max_value))
+            .map(|result| result.unwrap_or(0))?)
     }
 
     /// Applies self on top of previous delta, merging them together. Note
     /// that the strict ordering here is crucial for catching overflows
     /// correctly.
     pub fn merge_with_previous_delta(&mut self, previous_delta: DeltaOp) -> PartialVMResult<()> {
-        use DeltaValue::*;
-
         assert_eq!(
             self.max_value, previous_delta.max_value,
             "Cannot merge deltas with different limits",
@@ -146,39 +119,7 @@ impl DeltaOp {
         let shifted_min_achieved_negative_delta =
             self.shifted_min_achieved_negative_delta_by(&previous_delta)?;
 
-        // Useful macro for merging deltas of the same sign, e.g. +A+B or -A-B.
-        // In this cases we compute the absolute sum of deltas (A+B) and use plus
-        // or minus sign accordingly.
-        macro_rules! update_same_sign {
-            ($sign:ident, $a:ident, $b:ident) => {
-                self.update = $sign(addition($a, $b, self.max_value)?)
-            };
-        }
-
-        // Another useful macro, this time for merging deltas with different signs, such
-        // as +A-B and -A+B. In these cases we have to check which of A or B is greater
-        // and possibly flip a sign.
-        macro_rules! update_different_sign {
-            ($a:ident, $b:ident) => {
-                if $a >= $b {
-                    self.update = Positive(subtraction($a, $b)?);
-                } else {
-                    self.update = Negative(subtraction($b, $a)?);
-                }
-            };
-        }
-
-        // History check passed, and we are ready to update the actual values now.
-        match previous_delta.update {
-            Positive(prev_value) => match self.update {
-                Positive(self_value) => update_same_sign!(Positive, prev_value, self_value),
-                Negative(self_value) => update_different_sign!(prev_value, self_value),
-            },
-            Negative(prev_value) => match self.update {
-                Positive(self_value) => update_different_sign!(self_value, prev_value),
-                Negative(self_value) => update_same_sign!(Negative, prev_value, self_value),
-            },
-        }
+        self.update = self.update.add(&previous_delta.update, self.max_value)?;
 
         // Deltas have been merged successfully - update the history as well.
         self.history.max_achieved_positive_delta = u128::max(
@@ -238,38 +179,6 @@ impl DeltaOp {
             )),
         }
     }
-}
-
-/// Implements application of `Addition` to `base`.
-pub fn addition(base: u128, value: u128, limit: u128) -> PartialVMResult<u128> {
-    if limit < base || value > (limit - base) {
-        Err(abort_error(
-            format!("overflow when adding {} to {}", value, base),
-            EADD_OVERFLOW,
-        ))
-    } else {
-        Ok(base + value)
-    }
-}
-
-/// Implements application of `Subtraction` to `base`.
-pub fn subtraction(base: u128, value: u128) -> PartialVMResult<u128> {
-    if value > base {
-        Err(abort_error(
-            format!("underflow when subtracting {} from {}", value, base),
-            ESUB_UNDERFLOW,
-        ))
-    } else {
-        Ok(base - value)
-    }
-}
-
-/// Error for delta application. Can be used by delta partial functions
-/// to return descriptive error messages and an appropriate error code.
-pub(crate) fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
-    PartialVMError::new(StatusCode::ABORTED)
-        .with_message(message.to_string())
-        .with_sub_status(code)
 }
 
 impl std::fmt::Debug for DeltaOp {
