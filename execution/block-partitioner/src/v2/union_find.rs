@@ -28,13 +28,18 @@ impl UnionFind {
     }
 
     pub fn find(&mut self, a: usize) -> usize {
-        let pa = self.parent_of[a];
-        if pa == a {
-            return a;
+        let mut root = self.parent_of[a];
+        while self.parent_of[root] != root {
+            root = self.parent_of[root];
         }
-        let ppa = self.find(pa);
-        self.parent_of[a] = ppa;
-        ppa
+
+        let mut element = a;
+        while element != root {
+            let next_element = self.parent_of[element];
+            self.parent_of[element] = root;
+            element = next_element;
+        }
+        root
     }
 
     pub fn union(&mut self, x: usize, y: usize) {
