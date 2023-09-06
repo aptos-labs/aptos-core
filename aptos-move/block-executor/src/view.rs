@@ -24,6 +24,7 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use dashmap::DashMap;
 use move_core_types::value::MoveTypeLayout;
 use move_vm_types::{
     value_transformation::{
@@ -34,6 +35,7 @@ use move_vm_types::{
 };
 use std::{
     cell::RefCell,
+    collections::HashMap,
     fmt::Debug,
     sync::{atomic::AtomicU64, Arc},
 };
@@ -58,6 +60,7 @@ pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
     versioned_map: &'a MVHashMap<T::Key, T::Value, X>,
     scheduler: &'a Scheduler,
     liftings: SyncLiftings<'a>,
+    lifted_cache: DashMap<T::Key, StateValue>,
     captured_reads: RefCell<Vec<ReadDescriptor<T::Key>>>,
 }
 
@@ -71,6 +74,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             versioned_map: shared_map,
             scheduler: shared_scheduler,
             liftings: SyncLiftings::new(shared_counter),
+            lifted_cache: DashMap::new(),
             captured_reads: RefCell::new(Vec::new()),
         }
     }
@@ -170,8 +174,9 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
 }
 
 pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
-    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Value, X>,
-    pub(crate) unsync_liftings: RefCell<UnsyncLiftings>,
+    unsync_map: &'a UnsyncMap<T::Key, T::Value, X>,
+    unsync_liftings: RefCell<UnsyncLiftings>,
+    lifted_cache: RefCell<HashMap<T::Key, StateValue>>,
 }
 
 impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
@@ -179,6 +184,7 @@ impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
         Self {
             unsync_map,
             unsync_liftings: RefCell::new(UnsyncLiftings::new(counter)),
+            lifted_cache: RefCell::new(HashMap::new()),
         }
     }
 }
@@ -244,20 +250,50 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         layout: &MoveTypeLayout,
         state_key: &T::Key,
     ) -> anyhow::Result<Option<StateValue>> {
-        let maybe_state_value = self.get_base_value(state_key)?;
-        match maybe_state_value {
-            None => Ok(None),
-            Some(state_value) => {
-                let process_lifting = |bytes: Vec<u8>| -> anyhow::Result<Vec<u8>> {
-                    let patched_value =
-                        deserialize_and_exchange(&bytes, layout, self).ok_or_else(|| {
-                            anyhow::anyhow!("Failed to deserialize for {:?}", state_key)
-                        })?;
-                    patched_value.simple_serialize(layout).ok_or_else(|| {
-                        anyhow::anyhow!("Failed to serialize value {}", patched_value)
-                    })
-                };
-                Ok(Some(state_value.try_transform_bytes(process_lifting)?))
+        let process_lifting = |bytes: Vec<u8>| -> anyhow::Result<Vec<u8>> {
+            // TODO: alert on fail?
+            let patched_value = deserialize_and_exchange(&bytes, layout, self)
+                .ok_or_else(|| anyhow::anyhow!("Failed to deserialize for {:?}", state_key))?;
+            patched_value
+                .simple_serialize(layout)
+                .ok_or_else(|| anyhow::anyhow!("Failed to serialize value {}", patched_value))
+        };
+
+        // TODO: deduplicate this logic.
+        match &self.latest_view {
+            ViewState::Sync(state) => match state.lifted_cache.get(state_key) {
+                Some(state_value) => Ok(Some(state_value.clone())),
+                None => {
+                    let maybe_state_value = self.get_base_value(state_key)?;
+                    match maybe_state_value {
+                        None => Ok(None),
+                        Some(state_value) => {
+                            let state_value = state_value.try_transform_bytes(process_lifting)?;
+                            state
+                                .lifted_cache
+                                .insert(state_key.clone(), state_value.clone());
+                            Ok(Some(state_value))
+                        },
+                    }
+                },
+            },
+            ViewState::Unsync(state) => {
+                let mut lifted_cache = state.lifted_cache.borrow_mut();
+                match lifted_cache.get(state_key) {
+                    Some(state_value) => Ok(Some(state_value.clone())),
+                    None => {
+                        let maybe_state_value = self.get_base_value(state_key)?;
+                        match maybe_state_value {
+                            None => Ok(None),
+                            Some(state_value) => {
+                                let state_value =
+                                    state_value.try_transform_bytes(process_lifting)?;
+                                lifted_cache.insert(state_key.clone(), state_value.clone());
+                                Ok(Some(state_value))
+                            },
+                        }
+                    },
+                }
             },
         }
     }

@@ -21,6 +21,13 @@ impl UnsyncLiftings {
         }
     }
 
+    #[allow(unused)]
+    pub(crate) fn increment(&mut self) -> u64 {
+        let value = self.counter;
+        self.counter += 1;
+        value
+    }
+
     pub(crate) fn insert(&mut self, value: Value) -> u64 {
         let identifier = self.counter;
         self.lifted_values.insert(identifier, value);
@@ -44,6 +51,11 @@ impl<'a> SyncLiftings<'a> {
             counter: shared_counter,
             lifted_values: DashMap::new(),
         }
+    }
+
+    #[allow(unused)]
+    pub(crate) fn increment(&self) -> u64 {
+        self.counter.fetch_add(1, Ordering::SeqCst)
     }
 
     pub(crate) fn insert(&self, value: Value) -> u64 {
