@@ -161,6 +161,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
         dst: &'static [u8],
         rng: &mut R,
     ) -> Self {
+        // TODO(Security): This EK duplication allows an adversary to decrypt share_{i_j} / share_{i_k} for any $j$th and $k$th share of a validator $i$. Prove that security holds nonetheless or remove this.
         let duplicated_eks = WeightedTranscript::<T>::to_weighted_encryption_keys(sc, eks);
 
         WeightedTranscript {
