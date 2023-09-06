@@ -9,16 +9,13 @@ use std::path::Path;
 
 datatest_stable::harness!(run, TEST_DIR, r".*\.move$");
 
-/// Root of tests which require to skip v1-v2 comparison
+/// Tests containing this string in their path will skip v1-v2 comparison
 const SKIP_V1_COMPARISON_PATH: &str = "/no-v1-comparison/";
 
 fn run(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let test_config: TestRunConfig = if let Some(p) = path.to_str() {
-        if p.contains(SKIP_V1_COMPARISON_PATH) {
-            TestRunConfig::CompilerV2
-        } else {
-            TestRunConfig::ComparisonV1V2
-        }
+    let p = path.to_str().unwrap_or_default();
+    let test_config = if p.contains(SKIP_V1_COMPARISON_PATH) {
+        TestRunConfig::CompilerV2
     } else {
         TestRunConfig::ComparisonV1V2
     };
