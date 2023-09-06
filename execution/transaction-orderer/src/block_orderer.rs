@@ -20,8 +20,7 @@ pub trait BlockOrderer {
         send_transactions_for_execution: F,
     ) -> Result<(), E>
     where
-        F: FnMut(Vec<Self::Txn>) -> Result<(), E>,
-        E: std::error::Error;
+        F: FnMut(Vec<Self::Txn>) -> Result<(), E>;
 }
 
 pub struct IdentityBlockOrderer<T> {
@@ -46,7 +45,6 @@ impl<T> BlockOrderer for IdentityBlockOrderer<T> {
     ) -> Result<(), E>
     where
         F: FnMut(Vec<Self::Txn>) -> Result<(), E>,
-        E: std::error::Error,
     {
         send_transactions_for_execution(txns)
     }
@@ -85,7 +83,6 @@ where
     ) -> Result<(), E>
     where
         F: FnMut(Vec<Self::Txn>) -> Result<(), E>,
-        E: std::error::Error,
     {
         let mut batch_orderer = self.batch_orderer.borrow_mut();
         assert!(batch_orderer.is_empty());
@@ -148,7 +145,6 @@ where
     ) -> Result<(), E>
     where
         F: FnMut(Vec<Self::Txn>) -> Result<(), E>,
-        E: std::error::Error,
     {
         let mut batch_orderer = self.batch_orderer.borrow_mut();
         assert!(batch_orderer.is_empty());

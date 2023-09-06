@@ -11,8 +11,7 @@ pub trait BlockPartitioner {
         send_transactions_for_execution: F,
     ) -> Result<(), E>
     where
-        F: FnMut(Vec<Vec<(usize, Self::Txn)>>) -> Result<(), E>,
-        E: std::error::Error;
+        F: FnMut(Vec<Vec<(usize, Self::Txn)>>) -> Result<(), E>;
 }
 
 pub struct OrderedRoundRobinPartitioner<O> {
@@ -45,7 +44,6 @@ where
     ) -> Result<(), E>
     where
         F: FnMut(Vec<Vec<(usize, Self::Txn)>>) -> Result<(), E>,
-        E: std::error::Error,
     {
         let mut ordered = 0;
         let mut batch = vec![vec![]; self.n_shards];
