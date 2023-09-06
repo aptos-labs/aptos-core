@@ -16,14 +16,14 @@ pub fn create_module(
     let writer = CodeWriter::new(Loc::default());
     emit!(
         writer,
-        "module 0x{}.{} ",
+        "module {}.{} ",
         self_addr.address(),
         self_addr.name()
     );
     emitln!(writer, "{");
     writer.indent();
     for dep in deps {
-        emitln!(writer, "import 0x{}.{};", dep.address(), dep.name());
+        emitln!(writer, "import {}.{};", dep.address(), dep.name());
     }
     emitln!(writer);
     emitln!(writer, "public entry foo(): u64 {");
