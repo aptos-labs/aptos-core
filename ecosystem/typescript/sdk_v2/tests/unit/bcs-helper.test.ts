@@ -330,14 +330,14 @@ describe("Tests for the Serializable class", () => {
   });
 
   it("serializes all vector types with factory methods correctly", () => {
-    const boolVectorFrom = Vector.ofBools([true, false, true]);
-    const u8VectorFrom = Vector.ofU8s([1, 2, 3]);
-    const u16VectorFrom = Vector.ofU16s([1, 2, 3]);
-    const u32VectorFrom = Vector.ofU32s([1, 2, 3]);
-    const u64VectorFrom = Vector.ofU64s([1, 2, 3]);
-    const u128VectorFrom = Vector.ofU128s([1, 2, 3]);
-    const u256VectorFrom = Vector.ofU256s([1, 2, 3]);
-    const stringVectorFrom = Vector.ofStrings(["abc", "def", "ghi"]);
+    const boolVectorFrom = Vector.Bool([true, false, true]);
+    const u8VectorFrom = Vector.U8([1, 2, 3]);
+    const u16VectorFrom = Vector.U16([1, 2, 3]);
+    const u32VectorFrom = Vector.U32([1, 2, 3]);
+    const u64VectorFrom = Vector.U64([1, 2, 3]);
+    const u128VectorFrom = Vector.U128([1, 2, 3]);
+    const u256VectorFrom = Vector.U256([1, 2, 3]);
+    const stringVectorFrom = Vector.String(["abc", "def", "ghi"]);
 
     const boolVectorBytes = new Uint8Array([3, 1, 0, 1]);
     const u8VectorBytes = new Uint8Array([3, 1, 2, 3]);
@@ -367,21 +367,21 @@ describe("Tests for the Serializable class", () => {
 
   it("serializes all manually constructed vector types the same way as the equivalent factory methods", () => {
     const boolVector = new Vector([new Bool(true), new Bool(false), new Bool(true)]);
-    const boolVectorFrom = Vector.ofBools([true, false, true]);
+    const boolVectorFrom = Vector.Bool([true, false, true]);
     const u8Vector = new Vector([new U8(1), new U8(2), new U8(3)]);
-    const u8VectorFrom = Vector.ofU8s([1, 2, 3]);
+    const u8VectorFrom = Vector.U8([1, 2, 3]);
     const u16Vector = new Vector([new U16(1), new U16(2), new U16(3)]);
-    const u16VectorFrom = Vector.ofU16s([1, 2, 3]);
+    const u16VectorFrom = Vector.U16([1, 2, 3]);
     const u32Vector = new Vector([new U32(1), new U32(2), new U32(3)]);
-    const u32VectorFrom = Vector.ofU32s([1, 2, 3]);
+    const u32VectorFrom = Vector.U32([1, 2, 3]);
     const u64Vector = new Vector([new U64(1), new U64(2), new U64(3)]);
-    const u64VectorFrom = Vector.ofU64s([1, 2, 3]);
+    const u64VectorFrom = Vector.U64([1, 2, 3]);
     const u128Vector = new Vector([new U128(1), new U128(2), new U128(3)]);
-    const u128VectorFrom = Vector.ofU128s([1, 2, 3]);
+    const u128VectorFrom = Vector.U128([1, 2, 3]);
     const u256Vector = new Vector([new U256(1), new U256(2), new U256(3)]);
-    const u256VectorFrom = Vector.ofU256s([1, 2, 3]);
+    const u256VectorFrom = Vector.U256([1, 2, 3]);
     const stringVector = new Vector([new MoveString("abc"), new MoveString("def"), new MoveString("ghi")]);
-    const stringVectorFrom = Vector.ofStrings(["abc", "def", "ghi"]);
+    const stringVectorFrom = Vector.String(["abc", "def", "ghi"]);
 
     expect(boolVector.toUint8Array()).toEqual(boolVectorFrom.toUint8Array());
     expect(u8Vector.toUint8Array()).toEqual(u8VectorFrom.toUint8Array());
@@ -475,14 +475,14 @@ describe("Tests for the Serializable class", () => {
       new U256(6),
       new Bool(true),
       new MoveString("some string"),
-      Vector.ofBools([true, false, true]),
-      Vector.ofU8s([1, 2, 3]),
-      Vector.ofU16s([1, 2, 3]),
-      Vector.ofU32s([1, 2, 3]),
-      Vector.ofU64s([1, 2, 3]),
-      Vector.ofU128s([1, 2, 3]),
-      Vector.ofU256s([1, 2, 3]),
-      Vector.ofStrings(["abc", "def", "ghi"]),
+      Vector.Bool([true, false, true]),
+      Vector.U8([1, 2, 3]),
+      Vector.U16([1, 2, 3]),
+      Vector.U32([1, 2, 3]),
+      Vector.U64([1, 2, 3]),
+      Vector.U128([1, 2, 3]),
+      Vector.U256([1, 2, 3]),
+      Vector.String(["abc", "def", "ghi"]),
       new MoveOption(new Bool(true)),
       new MoveOption(),
       new MoveOption(new MoveString("abc")),
