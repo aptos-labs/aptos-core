@@ -1,12 +1,17 @@
 use crate::{
     aggregator_extension::{
         validate_history, AggregatorID, AggregatorState, DeltaHistory, DeltaValue,
+        SpeculativeStartValue,
     },
-    delta_change_set::{addition, subtraction},
+    delta_change_set::{abort_error, addition, subtraction},
 };
 use aptos_state_view::StateView;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::{StatusCode, VMStatus};
+
+/// When merging aggregator changes of two transactions,
+/// unable to merge the histories of the transactions.
+pub(crate) const EMERGE_HISTORIES: u64 = 0x02_0008;
 
 /// Represents a single aggregator change.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -75,30 +80,14 @@ impl AggregatorChange {
                         // When prev_state is Data { value }, and current state is Delta { delta }, merging them into Data { value + delta }
                         validate_history(value, self.max_value, &self.state)?;
                         self.state = AggregatorState::Data {
-                            value: match delta {
-                                DeltaValue::Positive(current_delta) => {
-                                    addition(value, current_delta, self.max_value)?
-                                },
-                                DeltaValue::Negative(current_delta) => {
-                                    subtraction(value, current_delta)?
-                                },
-                            },
+                            value: addition_deltavalue(value, delta, self.max_value)?,
                         };
                     },
                     AggregatorState::Delta {
-                        speculative_start_value: prev_speculative_start_value,
-                        speculative_source: prev_speculative_source,
+                        speculative_start_value: _,
                         delta: prev_delta,
                         history: prev_history,
                     } => {
-                        // Check if the history is valid when the speculative_start_value is updated to previous_speculative_start_value + prev_delta.
-                        let new_start_value = addition_deltavalue(
-                            prev_speculative_start_value,
-                            prev_delta,
-                            self.max_value,
-                        )?;
-                        validate_history(new_start_value, self.max_value, &self.state)?;
-
                         // Another useful macro, this time for merging deltas with different signs, such
                         // as +A-B and -A+B. In these cases we have to check which of A or B is greater
                         // and possibly flip a sign.
@@ -111,7 +100,7 @@ impl AggregatorChange {
                                 }
                             };
                         }
-                        // History check passed, and we are ready to update the actual values now.
+
                         let new_delta =
                             match prev_delta {
                                 DeltaValue::Positive(prev_value) => match delta {
@@ -273,9 +262,19 @@ impl AggregatorChange {
                             ),
                         };
 
+                        if (new_min_overflow.is_some()
+                            && new_min_overflow.unwrap() <= new_max_achieved)
+                            || (new_max_underflow.is_some()
+                                && new_max_underflow.unwrap() <= new_min_achieved)
+                        {
+                            return Err(abort_error(
+                                "Unable to merge aggregator change histories",
+                                EMERGE_HISTORIES,
+                            ));
+                        };
+
                         self.state = AggregatorState::Delta {
-                            speculative_source: prev_speculative_source,
-                            speculative_start_value: prev_speculative_start_value,
+                            speculative_start_value: SpeculativeStartValue::Unset,
                             delta: new_delta,
                             history: DeltaHistory {
                                 max_achieved_positive_delta: new_max_achieved,
@@ -334,7 +333,6 @@ pub fn subtraction_deltavalue(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::aggregator_extension::SpeculativeValueSource;
     use claims::{assert_err, assert_ok};
 
     #[test]
@@ -348,8 +346,7 @@ mod test {
         let mut aggregator_change2 = AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 10,
+                speculative_start_value: SpeculativeStartValue::AggregatedValue(10),
                 delta: DeltaValue::Positive(10),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 50,
@@ -363,8 +360,7 @@ mod test {
         let mut aggregator_change3 = AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 40,
+                speculative_start_value: SpeculativeStartValue::AggregatedValue(40),
                 delta: DeltaValue::Positive(10),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 50,
@@ -420,98 +416,11 @@ mod test {
     }
 
     #[test]
-    fn test_merge_delta_into_delta_failed_history_validation() {
-        let aggregator_change1 = AggregatorChange {
-            max_value: 100,
-            state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 10,
-                delta: DeltaValue::Positive(10),
-                history: DeltaHistory {
-                    max_achieved_positive_delta: 80,
-                    min_achieved_negative_delta: 5,
-                    min_overflow_positive_delta: None,
-                    max_underflow_negative_delta: None,
-                },
-            },
-            base_aggregator: None,
-        };
-        let mut aggregator_change2 = AggregatorChange {
-            max_value: 100,
-            state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 80,
-                delta: DeltaValue::Positive(10),
-                history: DeltaHistory {
-                    max_achieved_positive_delta: 10,
-                    min_achieved_negative_delta: 55,
-                    min_overflow_positive_delta: None,
-                    max_underflow_negative_delta: None,
-                },
-            },
-            base_aggregator: None,
-        };
-        assert_err!(aggregator_change2.merge_with_previous_aggregator_change(aggregator_change1));
-        let mut aggregator_change3 = AggregatorChange {
-            max_value: 100,
-            state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 30,
-                delta: DeltaValue::Positive(10),
-                history: DeltaHistory {
-                    max_achieved_positive_delta: 30,
-                    min_achieved_negative_delta: 5,
-                    min_overflow_positive_delta: Some(75),
-                    max_underflow_negative_delta: None,
-                },
-            },
-            base_aggregator: None,
-        };
-        assert_err!(aggregator_change3.merge_with_previous_aggregator_change(aggregator_change1));
-    }
-
-    #[test]
-    fn test_merge_delta_into_delta_failed_history_validation2() {
-        let aggregator_change1 = AggregatorChange {
-            max_value: 100,
-            state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 70,
-                delta: DeltaValue::Negative(60),
-                history: DeltaHistory {
-                    max_achieved_positive_delta: 20,
-                    min_achieved_negative_delta: 60,
-                    min_overflow_positive_delta: None,
-                    max_underflow_negative_delta: None,
-                },
-            },
-            base_aggregator: None,
-        };
-        let mut aggregator_change2 = AggregatorChange {
-            max_value: 100,
-            state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 60,
-                delta: DeltaValue::Negative(10),
-                history: DeltaHistory {
-                    max_achieved_positive_delta: 10,
-                    min_achieved_negative_delta: 25,
-                    min_overflow_positive_delta: Some(50),
-                    max_underflow_negative_delta: Some(45),
-                },
-            },
-            base_aggregator: None,
-        };
-        assert_err!(aggregator_change2.merge_with_previous_aggregator_change(aggregator_change1));
-    }
-
-    #[test]
     fn test_merge_delta_into_delta() {
         let aggregator_change1 = AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 20,
+                speculative_start_value: SpeculativeStartValue::AggregatedValue(20),
                 delta: DeltaValue::Positive(10),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 30,
@@ -525,8 +434,7 @@ mod test {
         let mut aggregator_change2 = AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 40,
+                speculative_start_value: SpeculativeStartValue::AggregatedValue(40),
                 delta: DeltaValue::Positive(20),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 25,
@@ -541,8 +449,7 @@ mod test {
         assert_eq!(aggregator_change2, AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 20,
+                speculative_start_value: SpeculativeStartValue::Unset,
                 delta: DeltaValue::Positive(30),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 35,
@@ -560,8 +467,7 @@ mod test {
         let aggregator_change1 = AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 70,
+                speculative_start_value: SpeculativeStartValue::AggregatedValue(70),
                 delta: DeltaValue::Negative(40),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 20,
@@ -575,8 +481,7 @@ mod test {
         let mut aggregator_change2 = AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 60,
+                speculative_start_value: SpeculativeStartValue::AggregatedValue(60),
                 delta: DeltaValue::Negative(20),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 35,
@@ -591,8 +496,7 @@ mod test {
         assert_eq!(aggregator_change2, AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 70,
+                speculative_start_value: SpeculativeStartValue::Unset,
                 delta: DeltaValue::Negative(60),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 20,
@@ -606,8 +510,7 @@ mod test {
         let mut aggregator_change3 = AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 80,
+                speculative_start_value: SpeculativeStartValue::AggregatedValue(80),
                 delta: DeltaValue::Positive(5),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 5,
@@ -622,8 +525,7 @@ mod test {
         assert_eq!(aggregator_change3, AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 70,
+                speculative_start_value: SpeculativeStartValue::Unset,
                 delta: DeltaValue::Negative(55),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 20,
@@ -641,8 +543,7 @@ mod test {
         let aggregator_change1 = AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 70,
+                speculative_start_value: SpeculativeStartValue::AggregatedValue(70),
                 delta: DeltaValue::Positive(20),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 20,
@@ -656,8 +557,7 @@ mod test {
         let mut aggregator_change2 = AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 10,
+                speculative_start_value: SpeculativeStartValue::AggregatedValue(10),
                 delta: DeltaValue::Negative(5),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 10,
@@ -672,8 +572,7 @@ mod test {
         assert_eq!(aggregator_change2, AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 70,
+                speculative_start_value: SpeculativeStartValue::Unset,
                 delta: DeltaValue::Positive(15),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 30,
@@ -691,8 +590,7 @@ mod test {
         let aggregator_change1 = AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 70,
+                speculative_start_value: SpeculativeStartValue::AggregatedValue(70),
                 delta: DeltaValue::Negative(20),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 20,
@@ -706,8 +604,7 @@ mod test {
         let mut aggregator_change2 = AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::LastCommittedValue,
-                speculative_start_value: 70,
+                speculative_start_value: SpeculativeStartValue::LastCommittedValue(70),
                 delta: DeltaValue::Positive(5),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 10,
@@ -722,8 +619,7 @@ mod test {
         assert_eq!(aggregator_change2, AggregatorChange {
             max_value: 100,
             state: AggregatorState::Delta {
-                speculative_source: SpeculativeValueSource::AggregatedValue,
-                speculative_start_value: 70,
+                speculative_start_value: SpeculativeStartValue::Unset,
                 delta: DeltaValue::Negative(15),
                 history: DeltaHistory {
                     max_achieved_positive_delta: 20,

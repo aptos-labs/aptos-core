@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    aggregator_change_set::addition_deltavalue,
     delta_change_set::{
         abort_error, addition, subtraction, EADD_OVERFLOW, EEXPECTED_OVERFLOW, EEXPECTED_UNDERFLOW,
         ESUB_UNDERFLOW,
@@ -26,16 +27,26 @@ pub enum DeltaValue {
 /// Describes how the `speculative_start_value` in
 /// `AggregatorState` is obtained.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SpeculativeValueSource {
+pub enum SpeculativeStartValue {
     // The speculative_start_value is assigned to 0.
-    Default,
+    Unset,
     // The speculative_start_value is obtained by reading
     // the last committed value of the aggregator from MVHashmap.
-    LastCommittedValue,
+    LastCommittedValue(u128),
     // The speculative_start_value is obtained by aggregating all
     // the previous deltas of the aggregator from MVHashmap that
     // were present at the fetch time.
-    AggregatedValue,
+    AggregatedValue(u128),
+}
+
+impl SpeculativeStartValue {
+    pub fn get_value(&self) -> u128 {
+        match self {
+            SpeculativeStartValue::Unset => 0,
+            SpeculativeStartValue::LastCommittedValue(value) => *value,
+            SpeculativeStartValue::AggregatedValue(value) => *value,
+        }
+    }
 }
 
 /// Describes the state of each aggregator instance.
@@ -46,8 +57,7 @@ pub enum AggregatorState {
         value: u128,
     },
     Delta {
-        speculative_start_value: u128,
-        speculative_source: SpeculativeValueSource,
+        speculative_start_value: SpeculativeStartValue,
         delta: DeltaValue,
         history: DeltaHistory,
     },
@@ -222,7 +232,6 @@ pub fn validate_history(
 ) -> PartialVMResult<()> {
     if let AggregatorState::Delta {
         speculative_start_value,
-        speculative_source: _,
         delta: _,
         history,
     } = state
@@ -239,7 +248,7 @@ pub fn validate_history(
             && base_value <= max_value - history.min_overflow_positive_delta.unwrap()
         {
             return Err(abort_error(
-                format!("Overflow was expected when setting the aggreagator start value to {}. Previous speculative start value = {}, Min overflow delta = {}, Max value = {}", base_value, speculative_start_value, history.min_overflow_positive_delta.unwrap(), max_value),
+                format!("Overflow was expected when setting the aggreagator start value to {}. Previous speculative start value = {:?}, Min overflow delta = {}, Max value = {}", base_value, speculative_start_value, history.min_overflow_positive_delta.unwrap(), max_value),
                 EEXPECTED_OVERFLOW,
             ));
         }
@@ -247,7 +256,7 @@ pub fn validate_history(
             && base_value >= history.max_underflow_negative_delta.unwrap()
         {
             return Err(abort_error(
-                format!("Underflow was expected when setting the aggreagator start value to {}. Previous speculative start value = {}, Max underflow delta = {}, Max value = {}", base_value, speculative_start_value, history.max_underflow_negative_delta.unwrap(), max_value),
+                format!("Underflow was expected when setting the aggreagator start value to {}. Previous speculative start value = {:?}, Max underflow delta = {}, Max value = {}", base_value, speculative_start_value, history.max_underflow_negative_delta.unwrap(), max_value),
                 EEXPECTED_UNDERFLOW,
             ));
         }
@@ -292,17 +301,9 @@ impl Aggregator {
             AggregatorState::Data { value } => Ok(value),
             AggregatorState::Delta {
                 speculative_start_value,
-                speculative_source: _,
                 delta,
                 history: _,
-            } => match delta {
-                DeltaValue::Positive(current_delta) => {
-                    addition(speculative_start_value, current_delta, self.max_value)
-                },
-                DeltaValue::Negative(current_delta) => {
-                    subtraction(speculative_start_value, current_delta)
-                },
-            },
+            } => addition_deltavalue(speculative_start_value.get_value(), delta, self.max_value),
         }
     }
 
@@ -342,6 +343,7 @@ impl Aggregator {
                 EADD_OVERFLOW,
             ));
         }
+        self.read_last_committed_aggregator_value(resolver)?;
         match self.state {
             AggregatorState::Data { value } => {
                 // If aggregator knows the value, add directly and keep the state.
@@ -352,17 +354,15 @@ impl Aggregator {
             },
             AggregatorState::Delta {
                 speculative_start_value,
-                speculative_source,
                 delta,
                 history,
             } => {
-                self.read_last_committed_aggregator_value(resolver)?;
                 let new_delta = match delta {
                     DeltaValue::Positive(current_delta) => {
                         // If speculative_start_value + delta + input exceeds max_value, it's an overflow.
                         // Otherwise, we update the delta with delta + input.
                         addition(
-                            speculative_start_value + current_delta,
+                            speculative_start_value.get_value() + current_delta,
                             input,
                             self.max_value,
                         )
@@ -387,19 +387,21 @@ impl Aggregator {
                     DeltaValue::Negative(current_delta) => {
                         // If speculative_start_value - current_delta + input is greater than max_value or less than -max_value, it's an overflow.
                         // Otherwise, we update the delta with delta + input.
-                        if speculative_start_value + input < current_delta {
+                        if speculative_start_value.get_value() + input < current_delta {
                             // speculative_start_value - current_delta + input < 0
                             DeltaValue::Negative(subtraction(current_delta, input).expect(
                                 "Subtraction of smaller value from larger value must succeed",
                             ))
                         } else {
                             // speculative_start_value - current_delta + input > 0
-                            if speculative_start_value + input - current_delta > self.max_value {
+                            if speculative_start_value.get_value() + input - current_delta
+                                > self.max_value
+                            {
                                 self.get_mut_history()
                                     .unwrap()
                                     .record_overflow(input - current_delta);
                                 return Err(abort_error(
-                                    format!("overflow occurred when adding {} to speculative_start_value: {}, current_delta: -{}", input, speculative_start_value, current_delta),
+                                    format!("overflow occurred when adding {} to speculative_start_value: {:?}, current_delta: -{}", input, speculative_start_value, current_delta),
                                     EADD_OVERFLOW,
                                 ));
                             }
@@ -417,7 +419,6 @@ impl Aggregator {
                 };
                 self.state = AggregatorState::Delta {
                     speculative_start_value,
-                    speculative_source,
                     delta: new_delta,
                     history,
                 };
@@ -447,6 +448,7 @@ impl Aggregator {
                 ESUB_UNDERFLOW,
             ));
         }
+        self.read_last_committed_aggregator_value(resolver)?;
         match self.state {
             AggregatorState::Data { value } => {
                 // If aggregator knows the value, add directly and keep the state.
@@ -457,21 +459,19 @@ impl Aggregator {
             },
             AggregatorState::Delta {
                 speculative_start_value,
-                speculative_source,
                 delta,
                 history,
             } => {
-                self.read_last_committed_aggregator_value(resolver)?;
                 let new_delta: DeltaValue = match delta {
                     DeltaValue::Positive(current_delta) => {
                         // If speculative_start_value + current_delta - input is less than 0, it's an underflow.
                         // Otherwise, we update the delta with delta - input.
-                        if speculative_start_value + current_delta < input {
+                        if speculative_start_value.get_value() + current_delta < input {
                             self.get_mut_history()
                                 .unwrap()
                                 .record_underflow(input - current_delta);
                             return Err(abort_error(
-                                format!("underflow occurred when subtracting {} from speculative_start_value: {}, current_delta: {}", input, speculative_start_value, current_delta),
+                                format!("underflow occurred when subtracting {} from speculative_start_value: {:?}, current_delta: {}", input, speculative_start_value, current_delta),
                                 ESUB_UNDERFLOW,
                             ));
                         }
@@ -489,17 +489,17 @@ impl Aggregator {
                         // If current_delta + input > self.max_value, it's an underflow. But no need to record it.
                         if current_delta > self.max_value - input {
                             return Err(abort_error(
-                                format!("underflow occurred when subtracting {} from speculative_start_value: {}, current_delta: -{}", input, speculative_start_value, current_delta),
+                                format!("underflow occurred when subtracting {} from speculative_start_value: {:?}, current_delta: -{}", input, speculative_start_value, current_delta),
                                 ESUB_UNDERFLOW,
                             ));
                         }
                         // If speculative_start_value - current_delta - input is less than 0, it's an underflow.
-                        if speculative_start_value < current_delta + input {
+                        if speculative_start_value.get_value() < current_delta + input {
                             self.get_mut_history()
                                 .unwrap()
                                 .record_underflow(input + current_delta);
                             return Err(abort_error(
-                                format!("underflow occurred when subtracting {} from speculative_start_value: {}, current_delta: -{}", input, speculative_start_value, current_delta),
+                                format!("underflow occurred when subtracting {} from speculative_start_value: {:?}, current_delta: -{}", input, speculative_start_value, current_delta),
                                 ESUB_UNDERFLOW,
                             ));
                         }
@@ -512,7 +512,6 @@ impl Aggregator {
                 };
                 self.state = AggregatorState::Delta {
                     speculative_start_value,
-                    speculative_source,
                     delta: new_delta,
                     history,
                 };
@@ -524,8 +523,8 @@ impl Aggregator {
 
     /// Implements logic for doing a "cheap read" of an aggregator.
     /// This means that we query the MVHashmap for the last committed value
-    /// of the aggregator, and store it in the `speculative_start_value`, with
-    /// `speculative_source` as `LastCommitted`.
+    /// of the aggregator, and store it in the `speculative_start_value` with
+    /// `LastCommittedValue` variant.
     pub fn read_last_committed_aggregator_value(
         &mut self,
         resolver: &dyn AggregatorResolver,
@@ -537,20 +536,16 @@ impl Aggregator {
             },
             AggregatorState::Delta {
                 speculative_start_value,
-                speculative_source,
                 delta,
                 history,
             } => {
                 // If we performed a "cheap read" or "expensive read" operation before, use it.
-                if speculative_source != SpeculativeValueSource::Default {
-                    return match delta {
-                        DeltaValue::Positive(value) => {
-                            Ok(addition(speculative_start_value, value, self.max_value)?)
-                        },
-                        DeltaValue::Negative(value) => {
-                            Ok(subtraction(speculative_start_value, value)?)
-                        },
-                    };
+                if speculative_start_value != SpeculativeStartValue::Unset {
+                    return addition_deltavalue(
+                        speculative_start_value.get_value(),
+                        delta,
+                        self.max_value,
+                    );
                 }
                 // Otherwise, we have to go to storage and read the value.
                 let value_from_storage = resolver
@@ -574,17 +569,13 @@ impl Aggregator {
                     "History must be empty when reading the last committed value"
                 );
                 self.state = AggregatorState::Delta {
-                    speculative_start_value: value_from_storage,
-                    speculative_source: SpeculativeValueSource::LastCommittedValue,
+                    speculative_start_value: SpeculativeStartValue::LastCommittedValue(
+                        value_from_storage,
+                    ),
                     delta,
                     history,
                 };
-                match delta {
-                    DeltaValue::Positive(value) => {
-                        Ok(addition(value_from_storage, value, self.max_value)?)
-                    },
-                    DeltaValue::Negative(value) => Ok(subtraction(value_from_storage, value)?),
-                }
+                addition_deltavalue(value_from_storage, delta, self.max_value)
             },
         }
     }
@@ -592,7 +583,7 @@ impl Aggregator {
     /// Implements logic for doing an "expensive read" of an aggregator.
     /// This means that we query the MVHashmap for aggregator's value obtained
     /// by aggregating all the deltas of the aggregator, and store it in the
-    /// `speculative_start_value`, with `speculative_source` as `AggregatedValue`.
+    /// `speculative_start_value`, with `AggregatedValue` variant.
     pub fn read_most_recent_aggregator_value(
         &mut self,
         resolver: &dyn AggregatorResolver,
@@ -604,20 +595,13 @@ impl Aggregator {
             },
             AggregatorState::Delta {
                 speculative_start_value,
-                speculative_source,
                 delta,
                 history,
             } => {
                 // If we performed an "expensive read" operation before, use it.
-                if speculative_source == SpeculativeValueSource::AggregatedValue {
-                    return match delta {
-                        DeltaValue::Positive(value) => {
-                            Ok(addition(speculative_start_value, value, self.max_value)?)
-                        },
-                        DeltaValue::Negative(value) => {
-                            Ok(subtraction(speculative_start_value, value)?)
-                        },
-                    };
+                if let SpeculativeStartValue::AggregatedValue(start_value) = speculative_start_value
+                {
+                    return addition_deltavalue(start_value, delta, self.max_value);
                 }
                 // Otherwise, we have to go to storage and read the value.
                 let value_from_storage = resolver
@@ -632,17 +616,13 @@ impl Aggregator {
                 // Validate history and apply the delta.
                 validate_history(value_from_storage, self.max_value, &self.state)?;
                 self.state = AggregatorState::Delta {
-                    speculative_start_value: value_from_storage,
-                    speculative_source: SpeculativeValueSource::AggregatedValue,
+                    speculative_start_value: SpeculativeStartValue::AggregatedValue(
+                        value_from_storage,
+                    ),
                     delta,
                     history,
                 };
-                match delta {
-                    DeltaValue::Positive(value) => {
-                        Ok(addition(value_from_storage, value, self.max_value)?)
-                    },
-                    DeltaValue::Negative(value) => Ok(subtraction(value_from_storage, value)?),
-                }
+                addition_deltavalue(value_from_storage, delta, self.max_value)
             },
         }
     }
@@ -691,8 +671,7 @@ impl AggregatorData {
         let aggregator = self.aggregators.entry(id).or_insert(Aggregator {
             id,
             state: AggregatorState::Delta {
-                speculative_start_value: 0,
-                speculative_source: SpeculativeValueSource::Default,
+                speculative_start_value: SpeculativeStartValue::Unset,
                 delta: DeltaValue::Positive(0),
                 history: DeltaHistory::new(),
             },
@@ -749,27 +728,22 @@ impl AggregatorData {
         new_id
     }
 
-    pub fn read_snapshot(&self, id: AggregatorID) -> u128 {
+    pub fn read_snapshot(&self, id: AggregatorID) -> PartialVMResult<u128> {
         let snapshot = self
             .aggregator_snapshots
             .get(&id)
             .expect("AggregatorSnapshot doesn't exist");
         match snapshot.state {
-            AggregatorState::Data { value } => value,
+            AggregatorState::Data { value } => Ok(value),
             AggregatorState::Delta {
                 speculative_start_value,
-                speculative_source: _,
                 delta,
                 history: _,
-            } => {
-                let value = match delta {
-                    DeltaValue::Positive(value) => {
-                        addition(speculative_start_value, value, snapshot.max_value)
-                    },
-                    DeltaValue::Negative(value) => subtraction(speculative_start_value, value),
-                };
-                value.expect("AggregatorSnapshot value must be valid")
-            },
+            } => addition_deltavalue(
+                speculative_start_value.get_value(),
+                delta,
+                snapshot.max_value,
+            ),
         }
     }
 
@@ -812,9 +786,15 @@ mod test {
     static TEST_RESOLVER: Lazy<AggregatorStore> = Lazy::new(|| AggregatorStore::default());
 
     #[test]
-    fn test_read_aggregator_not_in_storage() {
+    fn test_aggregator_not_in_storage() {
         let mut aggregator_data = AggregatorData::default();
-        assert_err!(aggregator_data.get_aggregator(aggregator_id_for_test(300), 700));
+        let aggregator = aggregator_data
+            .get_aggregator(aggregator_id_for_test(300), 700)
+            .unwrap();
+        assert_err!(aggregator.read_last_committed_aggregator_value(&*TEST_RESOLVER));
+        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
+        assert_err!(aggregator.try_add(&*TEST_RESOLVER, 100));
+        assert_err!(aggregator.try_sub(&*TEST_RESOLVER, 1));
     }
 
     #[test]
@@ -851,8 +831,7 @@ mod test {
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
         assert_eq!(aggregator.state, AggregatorState::Delta {
-            speculative_start_value: 100,
-            speculative_source: SpeculativeValueSource::LastCommittedValue,
+            speculative_start_value: SpeculativeStartValue::Unset,
             delta: DeltaValue::Positive(0),
             history: DeltaHistory {
                 max_achieved_positive_delta: 0,
@@ -863,8 +842,7 @@ mod test {
         });
         assert_ok!(aggregator.try_add(&sample_resolver, 400));
         assert_eq!(aggregator.state, AggregatorState::Delta {
-            speculative_start_value: 100,
-            speculative_source: SpeculativeValueSource::LastCommittedValue,
+            speculative_start_value: SpeculativeStartValue::LastCommittedValue(100),
             delta: DeltaValue::Positive(400),
             history: DeltaHistory {
                 max_achieved_positive_delta: 400,
@@ -875,8 +853,7 @@ mod test {
         });
         assert_ok!(aggregator.try_sub(&sample_resolver, 470));
         assert_eq!(aggregator.state, AggregatorState::Delta {
-            speculative_start_value: 100,
-            speculative_source: SpeculativeValueSource::LastCommittedValue,
+            speculative_start_value: SpeculativeStartValue::LastCommittedValue(100),
             delta: DeltaValue::Negative(70),
             history: DeltaHistory {
                 max_achieved_positive_delta: 400,
@@ -892,8 +869,7 @@ mod test {
             30
         );
         assert_eq!(aggregator.state, AggregatorState::Delta {
-            speculative_start_value: 100,
-            speculative_source: SpeculativeValueSource::AggregatedValue,
+            speculative_start_value: SpeculativeStartValue::AggregatedValue(100),
             delta: DeltaValue::Negative(70),
             history: DeltaHistory {
                 max_achieved_positive_delta: 400,
@@ -914,8 +890,7 @@ mod test {
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
         assert_eq!(aggregator.state, AggregatorState::Delta {
-            speculative_start_value: 100,
-            speculative_source: SpeculativeValueSource::LastCommittedValue,
+            speculative_start_value: SpeculativeStartValue::Unset,
             delta: DeltaValue::Positive(0),
             history: DeltaHistory {
                 max_achieved_positive_delta: 0,
@@ -1093,8 +1068,7 @@ mod test {
         assert_ok!(aggregator.try_add(&sample_resolver, 400));
         assert_ok!(aggregator.try_sub(&sample_resolver, 500));
         assert_eq!(aggregator.state, AggregatorState::Delta {
-            speculative_start_value: 200,
-            speculative_source: SpeculativeValueSource::LastCommittedValue,
+            speculative_start_value: SpeculativeStartValue::LastCommittedValue(200),
             delta: DeltaValue::Negative(200),
             history: DeltaHistory {
                 max_achieved_positive_delta: 300,
@@ -1137,8 +1111,7 @@ mod test {
         assert_err!(aggregator.try_add(&sample_resolver, 401));
         assert_ok!(aggregator.try_add(&sample_resolver, 300));
         assert_eq!(aggregator.state, AggregatorState::Delta {
-            speculative_start_value: 200,
-            speculative_source: SpeculativeValueSource::LastCommittedValue,
+            speculative_start_value: SpeculativeStartValue::LastCommittedValue(200),
             delta: DeltaValue::Positive(300),
             history: DeltaHistory {
                 max_achieved_positive_delta: 300,
@@ -1182,8 +1155,7 @@ mod test {
         assert_err!(aggregator.try_sub(&sample_resolver, 101));
         assert_ok!(aggregator.try_add(&sample_resolver, 300));
         assert_eq!(aggregator.state, AggregatorState::Delta {
-            speculative_start_value: 200,
-            speculative_source: SpeculativeValueSource::LastCommittedValue,
+            speculative_start_value: SpeculativeStartValue::LastCommittedValue(200),
             delta: DeltaValue::Positive(200),
             history: DeltaHistory {
                 max_achieved_positive_delta: 200,
