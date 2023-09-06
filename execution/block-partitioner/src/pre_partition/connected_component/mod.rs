@@ -5,7 +5,7 @@ use crate::{
     v2::{
         load_balance::longest_processing_time_first,
         state::PartitionState,
-        types::{TxnIdx0, TxnIdx1},
+        types::{OriginalTxnIdx, PrePartitionedTxnIdx},
         union_find::UnionFind,
     },
 };
@@ -31,7 +31,7 @@ pub struct ConnectedComponentPartitioner {
 }
 
 impl PrePartitioner for ConnectedComponentPartitioner {
-    fn pre_partition(&self, state: &PartitionState) -> (Vec<TxnIdx0>, Vec<TxnIdx1>, Vec<Vec<TxnIdx1>>) {
+    fn pre_partition(&self, state: &PartitionState) -> (Vec<OriginalTxnIdx>, Vec<PrePartitionedTxnIdx>, Vec<Vec<PrePartitionedTxnIdx>>) {
         // Union-find.
         // Each sender/state key initially in its own set.
         // For every declared storage access to key `k` by a txn from sender `s`, merge the set of `k` and that of `s`.
@@ -65,17 +65,17 @@ impl PrePartitioner for ConnectedComponentPartitioner {
         //                  Shard-0         Shard-1
 
         // Prepare `txns_by_set`: a mapping from a conflicting set to its txns.
-        let mut txns_by_set: Vec<VecDeque<TxnIdx0>> = Vec::new();
+        let mut txns_by_set: Vec<VecDeque<OriginalTxnIdx>> = Vec::new();
         let mut set_idx_registry: HashMap<usize, usize> = HashMap::new();
         let set_idx_counter = AtomicUsize::new(0);
-        for txn_idx0 in 0..state.num_txns() {
-            let sender_idx = state.sender_idx(txn_idx0);
+        for ori_txn_idx in 0..state.num_txns() {
+            let sender_idx = state.sender_idx(ori_txn_idx);
             let uf_set_idx = uf.find(sender_idx);
             let set_idx = set_idx_registry.entry(uf_set_idx).or_insert_with(|| {
                 txns_by_set.push(VecDeque::new());
                 set_idx_counter.fetch_add(1, Ordering::SeqCst)
             });
-            txns_by_set[*set_idx].push_back(txn_idx0);
+            txns_by_set[*set_idx].push_back(ori_txn_idx);
         }
 
         // Calculate txn group size limit.
@@ -114,22 +114,22 @@ impl PrePartitioner for ConnectedComponentPartitioner {
             groups_by_shard[shard_id].push(group_id);
         }
 
-        let mut pre_partitioned_idx0s: Vec<Vec<TxnIdx0>> = vec![vec![]; state.num_executor_shards];
+        let mut ori_txns_idxs_by_shard: Vec<Vec<OriginalTxnIdx>> = vec![vec![]; state.num_executor_shards];
         for (shard_id, group_ids) in groups_by_shard.into_iter().enumerate() {
             for group_id in group_ids.into_iter() {
                 let (set_id, amount) = group_metadata[group_id];
                 for _ in 0..amount {
-                    let txn_idx0 = txns_by_set[set_id].pop_front().unwrap();
-                    pre_partitioned_idx0s[shard_id].push(txn_idx0);
+                    let ori_txn_idx = txns_by_set[set_id].pop_front().unwrap();
+                    ori_txns_idxs_by_shard[shard_id].push(ori_txn_idx);
                 }
             }
         }
 
-        // Prepare `idx1_to_idx0` and `start_txn_idxs_by_shard`.
+        // Prepare `ori_txn_idxs` and `start_txn_idxs_by_shard`.
         let mut start_txn_idxs_by_shard = vec![0; state.num_executor_shards];
         let mut ori_txn_idxs = vec![0; state.num_txns()];
         let mut pre_partitioned_txn_idx = 0;
-        for (shard_id, txn_idxs) in pre_partitioned_idx0s.iter().enumerate() {
+        for (shard_id, txn_idxs) in ori_txns_idxs_by_shard.iter().enumerate() {
             start_txn_idxs_by_shard[shard_id] = pre_partitioned_txn_idx;
             for &i0 in txn_idxs {
                 ori_txn_idxs[pre_partitioned_txn_idx] = i0;
@@ -141,7 +141,7 @@ impl PrePartitioner for ConnectedComponentPartitioner {
         let pre_partitioned = (0..state.num_executor_shards)
             .map(|shard_id| {
                 let start = state.start_txn_idxs_by_shard[shard_id];
-                let end: TxnIdx1 = if shard_id == state.num_executor_shards - 1 {
+                let end: PrePartitionedTxnIdx = if shard_id == state.num_executor_shards - 1 {
                     state.num_txns()
                 } else {
                     state.start_txn_idxs_by_shard[shard_id + 1]
@@ -155,7 +155,7 @@ impl PrePartitioner for ConnectedComponentPartitioner {
             drop(set_idx_registry);
             drop(group_metadata);
             drop(tasks);
-            drop(pre_partitioned_idx0s);
+            drop(ori_txns_idxs_by_shard);
         });
 
         (ori_txn_idxs, start_txn_idxs_by_shard, pre_partitioned)

@@ -91,13 +91,13 @@ impl BlockPartitioner for PartitionerV2 {
         Self::init(&mut state);
 
         // Step 2: pre-partition.
-        (state.idx1_to_idx0, state.start_txn_idxs_by_shard, state.pre_partitioned) = self.pre_partitioner.pre_partition(&mut state);
+        (state.ori_idxs_by_pre_partitioned, state.start_txn_idxs_by_shard, state.pre_partitioned) = self.pre_partitioner.pre_partition(&mut state);
 
         // Step 3: update trackers.
         for txn_idx1 in 0..state.num_txns() {
-            let txn_idx0 = state.idx1_to_idx0[txn_idx1];
-            let wset_guard = state.write_sets[txn_idx0].read().unwrap();
-            let rset_guard = state.read_sets[txn_idx0].read().unwrap();
+            let ori_txn_idx = state.ori_idxs_by_pre_partitioned[txn_idx1];
+            let wset_guard = state.write_sets[ori_txn_idx].read().unwrap();
+            let rset_guard = state.read_sets[ori_txn_idx].read().unwrap();
             let writes = wset_guard.iter().map(|key_idx| (key_idx, true));
             let reads = rset_guard.iter().map(|key_idx| (key_idx, false));
             for (key_idx, is_write) in writes.chain(reads) {

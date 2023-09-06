@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::v2::types::{ShardedTxnIndexV2, TxnIdx1};
+use crate::v2::types::{ShardedTxnIndexV2, PrePartitionedTxnIdx};
 #[cfg(test)]
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::{
@@ -20,9 +20,9 @@ pub struct ConflictingTxnTracker {
     /// A randomly chosen owner shard of the storage location, for conflict resolution purpose.
     pub anchor_shard_id: ShardId,
     /// Txns that (1) read the current storage location and (2) have not been accepted.
-    pending_reads: BTreeSet<TxnIdx1>,
+    pending_reads: BTreeSet<PrePartitionedTxnIdx>,
     /// Txns that (1) write the current storage location and (2) have not been accepted.
-    pending_writes: BTreeSet<TxnIdx1>,
+    pending_writes: BTreeSet<PrePartitionedTxnIdx>,
     /// Txns that have been accepted.
     pub finalized: BTreeSet<ShardedTxnIndexV2>,
     /// Txns that (1) write the current storage location and (2) have been accepted.
@@ -41,16 +41,16 @@ impl ConflictingTxnTracker {
         }
     }
 
-    pub fn add_read_candidate(&mut self, txn_id: TxnIdx1) {
+    pub fn add_read_candidate(&mut self, txn_id: PrePartitionedTxnIdx) {
         self.pending_reads.insert(txn_id);
     }
 
-    pub fn add_write_candidate(&mut self, txn_id: TxnIdx1) {
+    pub fn add_write_candidate(&mut self, txn_id: PrePartitionedTxnIdx) {
         self.pending_writes.insert(txn_id);
     }
 
     /// Partitioner has finalized the position of a txn. Remove it from the pending txn list.
-    pub fn mark_txn_ordered(&mut self, txn_id: TxnIdx1, round_id: RoundId, shard_id: ShardId) {
+    pub fn mark_txn_ordered(&mut self, txn_id: PrePartitionedTxnIdx, round_id: RoundId, shard_id: ShardId) {
         let sharded_txn_idx = ShardedTxnIndexV2::new(round_id, shard_id, txn_id);
         if self.pending_writes.remove(&txn_id) {
             self.finalized_writes.insert(sharded_txn_idx);
@@ -61,7 +61,7 @@ impl ConflictingTxnTracker {
     }
 
     /// Check if there is a txn writing to the current storage location and its txn_id in the given wrapped range [start, end).
-    pub fn has_write_in_range(&self, start_txn_id: TxnIdx1, end_txn_id: TxnIdx1) -> bool {
+    pub fn has_write_in_range(&self, start_txn_id: PrePartitionedTxnIdx, end_txn_id: PrePartitionedTxnIdx) -> bool {
         if start_txn_id <= end_txn_id {
             self.pending_writes
                 .range(start_txn_id..end_txn_id)

@@ -3,7 +3,7 @@
 use crate::v2::state::PartitionState;
 use connected_component::config::ConnectedComponentPartitionerConfig;
 use std::fmt::Debug;
-use crate::v2::types::{TxnIdx0, TxnIdx1};
+use crate::v2::types::{OriginalTxnIdx, PrePartitionedTxnIdx};
 
 /// The initial partitioning phase for `ShardedBlockPartitioner`/`PartitionerV2` to divide a block into `num_shards` sub-blocks.
 /// See `PartitionerV2::partition()` for more details.
@@ -21,11 +21,11 @@ use crate::v2::types::{TxnIdx0, TxnIdx1};
 /// - `state.num_executor_shards`: the number of shards.
 ///
 /// Implementations are responsible to create the following state items.
-/// - `idx1_to_idx0`: maps a txn's new index to its original index.
+/// - `ori_idxs_by_pre_partitioned`: maps a txn's new index to its original index.
 /// - `start_txn_idxs_by_shard`: maps a shard to the starting new index of the txns assigned to itself.
 /// - `pre_partitioned`: maps a shard to the new indices of the txns assigned to itself.
 pub trait PrePartitioner: Send {
-    fn pre_partition(&self, state: &PartitionState) -> (Vec<TxnIdx0>, Vec<TxnIdx1>, Vec<Vec<TxnIdx1>>);
+    fn pre_partition(&self, state: &PartitionState) -> (Vec<OriginalTxnIdx>, Vec<PrePartitionedTxnIdx>, Vec<Vec<PrePartitionedTxnIdx>>);
 }
 
 pub mod connected_component;

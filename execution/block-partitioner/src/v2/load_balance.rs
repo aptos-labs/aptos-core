@@ -3,9 +3,10 @@
 use itertools::Itertools;
 use std::collections::BinaryHeap;
 
-/// The longest-processing-time-first scheduling.
-///
+/// The longest-processing-time-first algorithm that schedules some tasks into some workers in a load-balanced way.
 /// Time complexity: O(num_tasks * log2(num_workers))
+///
+/// Read more at https://en.wikipedia.org/wiki/Longest-processing-time-first_scheduling.
 pub fn longest_processing_time_first(tasks: &Vec<u64>, num_workers: usize) -> (u64, Vec<usize>) {
     assert!(num_workers >= 1);
     let num_tasks = tasks.len();

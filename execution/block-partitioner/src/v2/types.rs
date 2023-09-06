@@ -37,13 +37,13 @@ impl SubBlockIdx {
 }
 
 /// The txn positions in the original block.
-pub type TxnIdx0 = usize;
+pub type OriginalTxnIdx = usize;
 
 /// The txn positions after pre-partitioning but before discarding.
-pub type TxnIdx1 = usize;
+pub type PrePartitionedTxnIdx = usize;
 
 /// The txn positions after discarding.
-pub type TxnIdx2 = usize;
+pub type FinalTxnIdx = usize;
 
 /// Represent a specific storage location in a partitioning session.
 /// TODO: ensure this type can support max num of unique state keys in a block.
@@ -58,18 +58,18 @@ pub type SenderIdx = usize;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ShardedTxnIndexV2 {
     pub sub_block_idx: SubBlockIdx,
-    pub txn_idx1: TxnIdx1,
+    pub pre_partitioned_txn_idx: PrePartitionedTxnIdx,
 }
 
 impl Ord for ShardedTxnIndexV2 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        (self.sub_block_idx, self.txn_idx1).cmp(&(other.sub_block_idx, other.txn_idx1))
+        (self.sub_block_idx, self.pre_partitioned_txn_idx).cmp(&(other.sub_block_idx, other.pre_partitioned_txn_idx))
     }
 }
 
 impl PartialOrd for ShardedTxnIndexV2 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        (self.sub_block_idx, self.txn_idx1).partial_cmp(&(other.sub_block_idx, other.txn_idx1))
+        (self.sub_block_idx, self.pre_partitioned_txn_idx).partial_cmp(&(other.sub_block_idx, other.pre_partitioned_txn_idx))
     }
 }
 
@@ -84,10 +84,10 @@ impl ShardedTxnIndexV2 {
 }
 
 impl ShardedTxnIndexV2 {
-    pub fn new(round_id: RoundId, shard_id: ShardId, txn_idx1: TxnIdx1) -> Self {
+    pub fn new(round_id: RoundId, shard_id: ShardId, txn_idx1: PrePartitionedTxnIdx) -> Self {
         Self {
             sub_block_idx: SubBlockIdx::new(round_id, shard_id),
-            txn_idx1,
+            pre_partitioned_txn_idx: txn_idx1,
         }
     }
 }
