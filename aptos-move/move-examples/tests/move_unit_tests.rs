@@ -87,7 +87,8 @@ fn test_veiled_coin() {
     let resource = create_resource_address(addr, &[]);
     let named_address = BTreeMap::from([
         (String::from("developer_addr"), addr),
-        (String::from("veiled_coin"), resource)]);
+        (String::from("veiled_coin"), resource),
+    ]);
     run_tests_for_pkg("veiled_coin", named_address);
 }
 
@@ -122,7 +123,8 @@ fn test_drand_lottery() {
     let resource = create_resource_address(addr, &[]);
     let named_address = BTreeMap::from([
         (String::from("developer_addr"), addr),
-        (String::from("drand"), resource)]);
+        (String::from("drand"), resource),
+    ]);
     run_tests_for_pkg("drand", named_address);
 }
 
