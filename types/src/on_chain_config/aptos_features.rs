@@ -38,6 +38,8 @@ pub enum FeatureFlag {
     STORAGE_DELETION_REFUND = 28,
     SIGNATURE_CHECKER_V2_SCRIPT_FIX = 29,
     AGGREGATOR_SNAPSHOTS = 30,
+    SAFER_RESOURCE_GROUPS = 31,
+    SAFER_METADATA = 32,
 }
 
 /// Representation of features on chain as a bitset.

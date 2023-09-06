@@ -1014,10 +1014,20 @@ impl AptosVM {
                     }
                 }
             }
-            aptos_framework::verify_module_metadata(m, self.0.get_features())
-                .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
+            aptos_framework::verify_module_metadata(
+                m,
+                self.0.get_features(),
+                self.0.get_timed_features(),
+            )
+            .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
-        verifier::resource_groups::validate_resource_groups(session, modules)?;
+        verifier::resource_groups::validate_resource_groups(
+            session,
+            modules,
+            self.0
+                .get_features()
+                .is_enabled(FeatureFlag::SAFER_RESOURCE_GROUPS),
+        )?;
         verifier::event_validation::validate_module_events(session, modules)?;
 
         if !expected_modules.is_empty() {
@@ -1695,7 +1705,7 @@ impl VMAdapter for AptosVM {
             },
             PreprocessedTransaction::UserTransaction(txn) => {
                 fail_point!("aptos_vm::execution::user_transaction");
-                let sender = txn.sender().to_string();
+                let sender = txn.sender().to_hex();
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
                 let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
 

@@ -33,6 +33,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_executor_types::in_memory_state_calculator::InMemoryStateCalculator;
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
@@ -60,7 +61,6 @@ use aptos_types::{
 use arr_macro::arr;
 use claims::{assert_ge, assert_le};
 use dashmap::DashMap;
-use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::{collections::HashSet, ops::Deref, sync::Arc};
 
@@ -79,14 +79,6 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * 2;
 
 const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 100000;
-
-static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(32)
-        .thread_name(|index| format!("kv_reader-{}", index))
-        .build()
-        .unwrap()
-});
 
 pub(crate) struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
@@ -804,7 +796,7 @@ impl StateStore {
                     .flat_map(|sharded_states| sharded_states.iter().flatten())
                     .map(|(key, _)| key)
                     .collect::<HashSet<_>>();
-                IO_POOL.scope(|s| {
+                THREAD_MANAGER.get_io_pool().scope(|s| {
                     for key in key_set {
                         let cache = &state_cache_with_version[key.get_shard_id() as usize];
                         s.spawn(move |_| {
@@ -1096,7 +1088,7 @@ impl StateStore {
         base_version: Version,
         sharded_state_cache: &ShardedStateCache,
     ) -> Result<()> {
-        IO_POOL.scope(|s| {
+        THREAD_MANAGER.get_io_pool().scope(|s| {
             sharded_state_cache.par_iter().for_each(|shard| {
                 shard.iter_mut().for_each(|mut entry| {
                     match entry.value() {

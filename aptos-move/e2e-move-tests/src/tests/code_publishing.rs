@@ -225,7 +225,10 @@ fn code_publishing_using_resource_account() {
     let module_address = create_resource_address(*acc.address(), &[]);
     pack.add_source(
         "m",
-        &format!("module 0x{}::m {{ public fun f() {{}} }}", module_address),
+        &format!(
+            "module 0x{}::m {{ public fun f() {{}} }}",
+            module_address.to_hex()
+        ),
     );
     let pack_dir = pack.write_to_temp().unwrap();
     let package = aptos_framework::BuiltPackage::build(

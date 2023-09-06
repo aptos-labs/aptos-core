@@ -2,44 +2,6 @@
 remote_endpoint: ~
 name: "v1.7"
 proposals:
-  - name: upgrade_framework
-    metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.7"
-      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.7"
-    execution_mode: MultiStep
-    update_sequence:
-      - DefaultGas
-      - FeatureFlag:
-          enabled:
-            - module_event
-      - Framework:
-          bytecode_version: 6
-          git_hash: ~
-      - FeatureFlag:
-          disabled:
-            - module_event
-  - name: enable_block_gas_limit
-    metadata:
-      title: "Enable Block Gas Limit"
-      description: "AIP-33: The block gas limit is a feature that terminates block execution when the gas consumed by the committed prefix of transactions exceeds the limit, thus providing predictable latency."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/132"
-    execution_mode: MultiStep
-    update_sequence:
-    - Execution:
-        V2:
-          transaction_shuffler_type:
-            deprecated_sender_aware_v1: 32
-          block_gas_limit : 35000
-  - name: enable_aggregator_snapshots
-    metadata:
-      title: "Enable Aggregator Snapshots"
-      description: "AIP-43: Aggregator snapshots can be used to postpone the read operations on aggregators to the commit phase and improve concurrency of transaction execution."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - aggregator_snapshots
   - name: enable_module_event
     metadata:
       title: "Enable module event"
@@ -50,6 +12,32 @@ proposals:
       - FeatureFlag:
           enabled:
             - module_event
+  - name: upgrade_framework
+    metadata:
+      title: "Multi-step proposal to upgrade mainnet framework to v1.7"
+      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.7"
+    execution_mode: MultiStep
+    update_sequence:
+      - DefaultGas
+      - FeatureFlag:
+          enabled:
+            - safer_resource_groups
+      - FeatureFlag:
+          enabled:
+            - safer_metadata
+      - Framework:
+          bytecode_version: 6
+          git_hash: ~
+  - name: enable_aggregator_snapshots
+    metadata:
+      title: "Enable Aggregator Snapshots"
+      description: "AIP-43: Aggregator snapshots can be used to postpone the read operations on aggregators to the commit phase and improve concurrency of transaction execution."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - aggregator_snapshots
   - name: enable_signature_checker_v2_fix
     metadata:
       title: "Enable a fix signature checker v2"
@@ -74,6 +62,16 @@ proposals:
               sender_aware_v2: 32
             block_gas_limit: 35000
             transaction_deduper_type: txn_hash_and_authenticator_v1
+  - name: enable_bulletproofs
+    metadata:
+      title: "Enable Bulletproofs Module"
+      description: "AIP-46: New modules for ElGamal, Pedersen and Bulletproofs over Ristretto255"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/222"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - bulletproofs_natives
   - name: enable_storage_deletion_refund
     metadata:
       title: "Enable Storage Deletion Refund"

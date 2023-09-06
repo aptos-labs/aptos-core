@@ -13,7 +13,7 @@ Fundamentally an indexer processor is just something that consumes a stream of a
 
 ## What is a transaction?
 
-A transaction is a unit of execution on the Aptos blockchain. If the execution of the program in a transaction (e.g. starting with an entry function in a Move module) is successful, the resulting change in state will be applied to the ledger. Learn more about the transaction lifecycle at [this page](../../concepts/blockchain/#life-of-a-transaction).
+A transaction is a unit of execution on the Aptos blockchain. If the execution of the program in a transaction (e.g. starting with an entry function in a Move module) is successful, the resulting change in state will be applied to the ledger. Learn more about the transaction lifecycle at [this page](/concepts/blockchain/#life-of-a-transaction).
 
 There are four types of transactions on Aptos:
 - Genesis
@@ -23,7 +23,7 @@ There are four types of transactions on Aptos:
 
 The first 3 of these are internal to the system and are not relevant to most processors; we do not cover them in this guide.
 
-Generally speaking, most user transactions originate from a user calling an entry function in a Move module deployed on chain, for example `0x1::coin::transfer`. In all other cases they originate from [Move scripts](../../move/move-on-aptos/move-scripts). You can learn more about the different types of transactions [here](../../concepts/txns-states##types-of-transactions).
+Generally speaking, most user transactions originate from a user calling an entry function in a Move module deployed on chain, for example `0x1::coin::transfer`. In all other cases they originate from [Move scripts](/move/move-on-aptos/move-scripts). You can learn more about the different types of transactions [here](../../concepts/txns-states##types-of-transactions).
 
 A user transaction that a processor handles contains a variety of information. At a high level it contains:
 - The payload that was submitted.
@@ -40,7 +40,7 @@ The payload is what the user submits to the blockchain when they wish to execute
 - The address + module name + function name of the function being executed.
 - The arguments to the function.
 
-There is other potentially interesting information in the payload that you can learn about at [this page](../../concepts/txns-states#contents-of-a-transaction).
+There is other potentially interesting information in the payload that you can learn about at [this page](/concepts/txns-states#contents-of-a-transaction).
 
 ### Events
 

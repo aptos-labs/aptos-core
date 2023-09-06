@@ -752,6 +752,7 @@ fn expansion_script_to_module(script: E::Script) -> E::ModuleDefinition {
         constants,
         function,
         specs,
+        use_decls,
     } = script;
 
     // Construct a pseudo module definition.
@@ -771,6 +772,7 @@ fn expansion_script_to_module(script: E::Script) -> E::ModuleDefinition {
         constants,
         functions,
         specs,
+        use_decls,
     }
 }
 

@@ -94,7 +94,8 @@ pub struct Substitution {
 /// A constraint on a type variable, maintained during unification.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Constraint {
-    /// The type variable must be instantiated with one of the given numbber types. This is used
+    /// Combination
+    /// The type variable must be instantiated with one of the given number types. This is used
     /// for representing integer constants.
     SomeNumber(BTreeSet<PrimitiveType>),
     /// The type variable must be instantiated with a reference of given type.
@@ -108,7 +109,7 @@ pub enum Constraint {
 impl Constraint {
     /// Returns the default type of a constraint. A the end of type unification, variables
     /// with constraints that have defaults will be substituted by those defaults.
-    fn default_type(&self) -> Option<Type> {
+    pub fn default_type(&self) -> Option<Type> {
         match self {
             Constraint::SomeNumber(options) if options.contains(&PrimitiveType::U64) => {
                 Some(Type::new_prim(PrimitiveType::U64))
@@ -119,6 +120,54 @@ impl Constraint {
             )),
             Constraint::WithDefault(ty) => Some(ty.clone()),
             _ => None,
+        }
+    }
+
+    /// Joins the two constraints. If they are incompatible, produces a type unification error.
+    /// Otherwise returns true if the constraint has been absorbed by the other and can be waived.
+    pub fn join(&mut self, loc: &Loc, other: &Constraint) -> Result<bool, TypeUnificationError> {
+        match (&mut *self, other) {
+            (Constraint::SomeNumber(opts1), Constraint::SomeNumber(opts2)) => {
+                let joined: BTreeSet<PrimitiveType> = opts1.intersection(opts2).cloned().collect();
+                if joined.is_empty() {
+                    Err(TypeUnificationError::ConstraintsIncompatible(
+                        loc.clone(),
+                        self.clone(),
+                        other.clone(),
+                    ))
+                } else {
+                    *opts1 = joined;
+                    Ok(true)
+                }
+            },
+            (Constraint::WithDefault(_), _) | (_, Constraint::WithDefault(_)) => Ok(false),
+            (_, _) => Err(TypeUnificationError::ConstraintsIncompatible(
+                loc.clone(),
+                self.clone(),
+                other.clone(),
+            )),
+        }
+    }
+
+    pub fn display(&self, display_context: &TypeDisplayContext) -> String {
+        match self {
+            Constraint::SomeNumber(options) => {
+                let all_ints = PrimitiveType::all_int_types()
+                    .into_iter()
+                    .collect::<BTreeSet<_>>();
+                if options == &all_ints {
+                    "integer".to_owned()
+                } else {
+                    options
+                        .iter()
+                        .map(|p| Type::new_prim(*p).display(display_context).to_string())
+                        .join("|")
+                }
+            },
+            Constraint::SomeReference(ty) => {
+                format!("&{}", ty.display(display_context))
+            },
+            Constraint::WithDefault(_ty) => "".to_owned(),
         }
     }
 }
@@ -132,6 +181,7 @@ pub enum TypeUnificationError {
     MutabilityMismatch(ReferenceKind, ReferenceKind),
     ConstraintUnsatisfied(Loc, Type, WideningOrder, Constraint),
     RedirectedError(Loc, Box<TypeUnificationError>),
+    ConstraintsIncompatible(Loc, Constraint, Constraint),
 }
 
 impl PrimitiveType {
@@ -161,7 +211,7 @@ impl PrimitiveType {
         })
     }
 
-    /// Infer a type from a value. Returns the smallest type from u64 onwards which can fit the
+    /// Infer a type from a value. Returns the set of int types which can fit the
     /// value.
     pub fn possible_int_types(value: BigInt) -> Vec<PrimitiveType> {
         Self::all_int_types()
@@ -773,6 +823,16 @@ impl WideningOrder {
             WideningOrder::Join => WideningOrder::Join,
         }
     }
+
+    /// Combine two orders. If they are the same or Join, self is returned, otherwise swapped
+    /// order.
+    pub fn combine(self, other: Self) -> Self {
+        if self == other || self == WideningOrder::Join {
+            self
+        } else {
+            self.swap()
+        }
+    }
 }
 
 impl Substitution {
@@ -784,12 +844,31 @@ impl Substitution {
         }
     }
 
-    /// Add a constraint to the variable.
-    pub fn add_constraint(&mut self, var: u32, loc: Loc, order: WideningOrder, c: Constraint) {
-        self.constraints
-            .entry(var)
-            .or_default()
-            .push((loc, order, c));
+    /// Add a constraint to the variable. This tries to first join the constraint with existing
+    /// ones. For instance `SomeNumber({u8, u16})` and `SomeNumber({u16,u32})` join as
+    /// `SomeNumber({u16})`. A TypeUnificationError is returned if the constraints are incompatible.
+    pub fn add_constraint(
+        &mut self,
+        var: u32,
+        loc: Loc,
+        order: WideningOrder,
+        ctr: Constraint,
+    ) -> Result<(), TypeUnificationError> {
+        let current = self.constraints.entry(var).or_default();
+        let mut absorbed = false;
+        for (_, o, c) in current.iter_mut() {
+            // If the orders are compatible, try to join constraints
+            if *o == order {
+                absorbed = c.join(&loc, &ctr)?;
+                if absorbed {
+                    break;
+                }
+            }
+        }
+        if !absorbed {
+            current.push((loc, order, ctr))
+        }
+        Ok(())
     }
 
     /// Returns true if this is a free variable without constraints.
@@ -818,12 +897,20 @@ impl Substitution {
     /// Binds the type variable. If there are constraints associated with the
     /// variable, those are evaluated, possibly leading into unification
     /// errors.
-    pub fn bind(&mut self, var: u32, ty: Type) -> Result<(), TypeUnificationError> {
+    pub fn bind(
+        &mut self,
+        var: u32,
+        order: WideningOrder,
+        ty: Type,
+    ) -> Result<(), TypeUnificationError> {
         // Specialize the type before binding, to maximize groundness of type terms.
         let ty = self.specialize(&ty);
         if let Some(constrs) = self.constraints.remove(&var) {
-            for (loc, order, c) in constrs {
-                self.eval_constraint(loc, &ty, order, c)?
+            for (loc, o, c) in constrs {
+                // The effective order is the one combining the constraint order with the
+                // context order. The result needs to be swapped because the constraint
+                // of the variable is evaluated against the given type.
+                self.eval_constraint(&loc, &ty, o.combine(order).swap(), c)?
             }
         }
         self.subs.insert(var, ty);
@@ -836,7 +923,7 @@ impl Substitution {
     /// are over shallow structure of types, they can be decided.
     pub fn eval_constraint(
         &mut self,
-        loc: Loc,
+        loc: &Loc,
         ty: &Type,
         order: WideningOrder,
         c: Constraint,
@@ -845,29 +932,34 @@ impl Substitution {
             Ok(())
         } else if let Type::Var(other_var) = ty {
             // Transfer constraint on to other variable, which we assert to be free
-            assert!(!self.subs.contains_key(other_var));
-            self.add_constraint(*other_var, loc, order, c);
-            Ok(())
+            debug_assert!(!self.subs.contains_key(other_var));
+            self.add_constraint(*other_var, loc.clone(), order, c)
         } else {
             match &c {
                 Constraint::SomeNumber(options) => match ty {
                     Type::Primitive(prim) if options.contains(prim) => Ok(()),
-                    _ => Err(TypeUnificationError::ConstraintUnsatisfied(
-                        loc,
-                        ty.clone(),
-                        order,
-                        c,
-                    )),
+                    _ => {
+                        println!("mismatch {:?} {:?} {:?}", ty, order, c);
+                        Err(TypeUnificationError::ConstraintUnsatisfied(
+                            loc.clone(),
+                            ty.clone(),
+                            order,
+                            c,
+                        ))
+                    },
                 },
                 Constraint::SomeReference(inner_type) => match ty {
                     Type::Reference(_, target_type) => {
                         match self.unify(Variance::NoVariance, order, target_type, inner_type) {
                             Ok(_) => Ok(()),
-                            Err(e) => Err(TypeUnificationError::RedirectedError(loc, Box::new(e))),
+                            Err(e) => Err(TypeUnificationError::RedirectedError(
+                                loc.clone(),
+                                Box::new(e),
+                            )),
                         }
                     },
                     _ => Err(TypeUnificationError::ConstraintUnsatisfied(
-                        loc,
+                        loc.clone(),
                         ty.clone(),
                         order,
                         c,
@@ -1137,7 +1229,7 @@ impl Substitution {
             }
             // Cycle check.
             if !self.occurs_check(&t2, *v1) {
-                self.bind(*v1, t2.clone())?;
+                self.bind(*v1, order, t2.clone())?;
                 Ok(Some(t2))
             } else {
                 Err(TypeUnificationError::CyclicSubstitution(
@@ -1368,11 +1460,8 @@ impl TypeUnificationAdapter {
 impl TypeUnificationError {
     /// If this error is associated with a specific location, return this.
     pub fn specific_loc(&self) -> Option<Loc> {
-        match self {
-            TypeUnificationError::ConstraintUnsatisfied(loc, ..)
-            | TypeUnificationError::RedirectedError(loc, ..) => Some(loc.clone()),
-            _ => None,
-        }
+        // Not used for now
+        None
     }
 
     /// Return the message for this error.
@@ -1403,22 +1492,12 @@ impl TypeUnificationError {
                 format!("mutability mismatch ({} != {})", pr(*k1), pr(*k2))
             },
             TypeUnificationError::ConstraintUnsatisfied(_, ty, order, constr) => match constr {
-                Constraint::SomeNumber(options) => {
-                    let all_ints = PrimitiveType::all_int_types()
-                        .into_iter()
-                        .collect::<BTreeSet<_>>();
-                    let options_str = if options == &all_ints {
-                        "integer".to_owned()
-                    } else {
-                        options
-                            .iter()
-                            .map(|p| Type::new_prim(*p).display(display_context).to_string())
-                            .join("|")
-                    };
+                Constraint::SomeNumber(_) => {
+                    let options_str = constr.display(display_context);
                     let type_str = ty.display(display_context).to_string();
                     let (expected, actual) = match order {
-                        WideningOrder::Join | WideningOrder::LeftToRight => (type_str, options_str),
-                        WideningOrder::RightToLeft => (options_str, type_str),
+                        WideningOrder::Join | WideningOrder::LeftToRight => (options_str, type_str),
+                        WideningOrder::RightToLeft => (type_str, options_str),
                     };
                     format!("expected `{}` but found `{}`", expected, actual)
                 },
@@ -1429,6 +1508,13 @@ impl TypeUnificationError {
                     )
                 },
                 Constraint::WithDefault(_) => unreachable!("default constraint in error message"),
+            },
+            TypeUnificationError::ConstraintsIncompatible(_, c1, c2) => {
+                format!(
+                    "constraint `{}` incompatible with `{}`",
+                    c1.display(display_context),
+                    c2.display(display_context)
+                )
             },
             TypeUnificationError::RedirectedError(_, err) => err.message(display_context),
         }

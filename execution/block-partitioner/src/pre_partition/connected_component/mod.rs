@@ -41,8 +41,7 @@ impl PrePartitioner for ConnectedComponentPartitioner {
         for txn_idx in 0..state.num_txns() {
             let sender_idx = state.sender_idx(txn_idx);
             let write_set = state.write_sets[txn_idx].read().unwrap();
-            let read_set = state.read_sets[txn_idx].read().unwrap();
-            for &key_idx in write_set.iter().chain(read_set.iter()) {
+            for &key_idx in write_set.iter() {
                 let key_idx_in_uf = num_senders + key_idx;
                 uf.union(key_idx_in_uf, sender_idx);
             }
@@ -122,6 +121,7 @@ impl PrePartitioner for ConnectedComponentPartitioner {
                 }
             }
         }
+        println!("ori_txns_idxs_by_shard={:?}", ori_txns_idxs_by_shard);
 
         // Prepare `ori_txn_idxs` and `start_txn_idxs_by_shard`.
         let mut start_txn_idxs_by_shard = vec![0; state.num_executor_shards];
@@ -138,11 +138,11 @@ impl PrePartitioner for ConnectedComponentPartitioner {
         // Prepare `pre_partitioned`.
         let pre_partitioned = (0..state.num_executor_shards)
             .map(|shard_id| {
-                let start = state.start_txn_idxs_by_shard[shard_id];
+                let start = start_txn_idxs_by_shard[shard_id];
                 let end: PrePartitionedTxnIdx = if shard_id == state.num_executor_shards - 1 {
                     state.num_txns()
                 } else {
-                    state.start_txn_idxs_by_shard[shard_id + 1]
+                    start_txn_idxs_by_shard[shard_id + 1]
                 };
                 (start..end).collect()
             })

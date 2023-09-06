@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod sharded_block_partitioner; //TODO: maybe v1 is a better name.
 pub mod v2;
 
 pub mod test_utils;
@@ -18,16 +17,15 @@ use std::{
     hash::{Hash, Hasher},
 };
 use v2::config::PartitionerV2Config;
+
 pub mod pre_partition;
 
 pub trait PartitionerConfig: Debug {
     fn build(&self) -> Box<dyn BlockPartitioner>;
 }
 
-/// Create a default `PartitionerConfig`.
-pub fn default_partitioner_config() -> Box<dyn PartitionerConfig> {
-    Box::<PartitionerV2Config>::default()
-}
+#[cfg(test)]
+mod tests;
 
 pub trait BlockPartitioner: Send {
     fn partition(
