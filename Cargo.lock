@@ -3581,6 +3581,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "aptos",
+ "aptos-config",
  "aptos-forge",
  "aptos-genesis",
  "aptos-global-constants",

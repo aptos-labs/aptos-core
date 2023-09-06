@@ -10,8 +10,8 @@ use crate::{
 use aptos::{common::types::EncodingType, test::CliTestFramework};
 use aptos_config::{
     config::{
-        DiscoveryMethod, FileDiscovery, Identity, NetworkConfig, NodeConfig, Peer, PeerSet,
-        RestDiscovery,
+        DiscoveryMethod, FileDiscovery, Identity, NetworkConfig, NodeConfig, OverrideNodeConfig,
+        Peer, PeerSet, RestDiscovery,
     },
     network_id::NetworkId,
 };
@@ -53,7 +53,11 @@ async fn test_connection_limiting() {
     });
 
     let vfn_peer_id = swarm
-        .add_validator_fullnode(&version, full_node_config, validator_peer_id)
+        .add_validator_fullnode(
+            &version,
+            OverrideNodeConfig::new_with_default_base(full_node_config),
+            validator_peer_id,
+        )
         .unwrap();
 
     // Wait till nodes are healthy
@@ -68,12 +72,12 @@ async fn test_connection_limiting() {
     let pfn_peer_id = swarm
         .add_full_node(
             &version,
-            add_identity_to_config(
+            OverrideNodeConfig::new_with_default_base(add_identity_to_config(
                 NodeConfig::get_default_pfn_config(),
                 &NetworkId::Public,
                 private_key,
                 peer_set,
-            ),
+            )),
         )
         .await
         .unwrap();
@@ -109,12 +113,12 @@ async fn test_connection_limiting() {
     let pfn_peer_id_fail = swarm
         .add_full_node(
             &version,
-            add_identity_to_config(
+            OverrideNodeConfig::new_with_default_base(add_identity_to_config(
                 NodeConfig::get_default_pfn_config(),
                 &NetworkId::Public,
                 private_key,
                 peer_set,
-            ),
+            )),
         )
         .await
         .unwrap();
@@ -158,7 +162,10 @@ async fn test_rest_discovery() {
     // Start a new node that should connect to the previous node only via REST
     // The startup wait time should check if it connects successfully
     swarm
-        .add_full_node(&version, full_node_config)
+        .add_full_node(
+            &version,
+            OverrideNodeConfig::new_with_default_base(full_node_config),
+        )
         .await
         .unwrap();
 }

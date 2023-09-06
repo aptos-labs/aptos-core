@@ -4,7 +4,7 @@
 
 use crate::{Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version};
 use anyhow::{bail, Context};
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, OverrideNodeConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn, InitGenesisStakeFn};
 use aptos_infallible::Mutex;
@@ -150,17 +150,14 @@ impl LocalFactory {
             .await
             .with_context(|| format!("Swarm logs can be found here: {}", swarm.logs_location()))?;
 
+        let vfn_config = vfn_config.unwrap_or_else(NodeConfig::get_default_vfn_config);
+        let vfn_override_config = OverrideNodeConfig::new_with_default_base(vfn_config);
+
         // Add and launch the fullnodes
         let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
         for validator_peer_id in validator_peer_ids.iter().take(number_of_fullnodes) {
             let _ = swarm
-                .add_validator_fullnode(
-                    version,
-                    vfn_config
-                        .clone()
-                        .unwrap_or_else(NodeConfig::get_default_vfn_config),
-                    *validator_peer_id,
-                )
+                .add_validator_fullnode(version, vfn_override_config.clone(), *validator_peer_id)
                 .unwrap();
         }
         swarm.wait_all_alive(Duration::from_secs(60)).await?;

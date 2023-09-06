@@ -10,8 +10,8 @@ use anyhow::ensure;
 use aptos_config::{
     config::{
         DiscoveryMethod, Identity, IdentityBlob, InitialSafetyRulesConfig, NetworkConfig,
-        NodeConfig, OnDiskStorageConfig, PeerRole, RoleType, SafetyRulesService, SecureBackend,
-        WaypointConfig,
+        NodeConfig, OnDiskStorageConfig, OverrideNodeConfig, PeerRole, RoleType,
+        SafetyRulesService, SecureBackend, WaypointConfig,
     },
     generator::build_seed_for_network,
     keys::ConfigKey,
@@ -223,7 +223,7 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
 
 pub struct FullnodeNodeConfig {
     pub name: String,
-    pub config: NodeConfig,
+    pub config: OverrideNodeConfig,
     pub dir: PathBuf,
 }
 
@@ -231,7 +231,7 @@ impl FullnodeNodeConfig {
     pub fn public_fullnode(
         name: String,
         config_dir: &Path,
-        config: NodeConfig,
+        config: OverrideNodeConfig,
         waypoint: &Waypoint,
         genesis: &Transaction,
     ) -> anyhow::Result<Self> {
@@ -240,7 +240,7 @@ impl FullnodeNodeConfig {
         fullnode_config.insert_waypoint(waypoint);
         fullnode_config.insert_genesis(genesis)?;
         fullnode_config.set_identity()?;
-        fullnode_config.config.randomize_ports();
+        fullnode_config.randomize_ports();
         fullnode_config.save_config()?;
 
         Ok(fullnode_config)
@@ -249,7 +249,7 @@ impl FullnodeNodeConfig {
     pub fn validator_fullnode(
         name: String,
         config_dir: &Path,
-        fullnode_config: NodeConfig,
+        fullnode_config: OverrideNodeConfig,
         validator_config: &NodeConfig,
         waypoint: &Waypoint,
         genesis: &Transaction,
@@ -259,29 +259,36 @@ impl FullnodeNodeConfig {
 
         fullnode_config.insert_waypoint(waypoint);
         fullnode_config.insert_genesis(genesis)?;
-        fullnode_config.config.randomize_ports();
+        fullnode_config.randomize_ports();
         fullnode_config.attach_to_validator(public_network, validator_config)?;
         fullnode_config.save_config()?;
 
         Ok(fullnode_config)
     }
 
-    fn new(name: String, config_dir: &Path, mut config: NodeConfig) -> anyhow::Result<Self> {
+    fn new(
+        name: String,
+        config_dir: &Path,
+        mut config: OverrideNodeConfig,
+    ) -> anyhow::Result<Self> {
+        let inner = config.config_mut();
+
         ensure!(
-            matches!(config.base.role, RoleType::FullNode),
+            matches!(inner.base.role, RoleType::FullNode),
             "config must be a FullNode config"
         );
 
         let dir = config_dir.join(&name);
         std::fs::create_dir_all(&dir)?;
 
-        config.set_data_dir(dir.clone());
+        inner.set_data_dir(dir.clone());
 
         Ok(Self { name, config, dir })
     }
 
     fn insert_waypoint(&mut self, waypoint: &Waypoint) {
-        self.config.base.waypoint = WaypointConfig::FromConfig(*waypoint);
+        let config = self.config.config_mut();
+        config.base.waypoint = WaypointConfig::FromConfig(*waypoint);
     }
 
     fn insert_genesis(&mut self, genesis: &Transaction) -> anyhow::Result<()> {
@@ -289,16 +296,23 @@ impl FullnodeNodeConfig {
         let genesis_file_location = self.dir.join("genesis.blob");
         File::create(&genesis_file_location)?.write_all(&bcs::to_bytes(&genesis)?)?;
 
-        self.config.execution.genesis = Some(genesis.clone());
-        self.config.execution.genesis_file_location = genesis_file_location;
+        let config = self.config.config_mut();
+        config.execution.genesis = Some(genesis.clone());
+        config.execution.genesis_file_location = genesis_file_location;
 
         Ok(())
     }
 
+    fn randomize_ports(&mut self) {
+        let config = self.config.config_mut();
+        config.randomize_ports();
+    }
+
     /// Sets identity for a public full node.  Should only be run on a public full node
     fn set_identity(&mut self) -> anyhow::Result<()> {
-        if self
-            .config
+        let config = self.config.config_mut();
+
+        if config
             .full_node_networks
             .iter()
             .any(|config| config.network_id == NetworkId::Vfn)
@@ -306,8 +320,7 @@ impl FullnodeNodeConfig {
             panic!("Shouldn't call set_identity on a Validator full node");
         }
 
-        let public_network = self
-            .config
+        let public_network = config
             .full_node_networks
             .iter_mut()
             .find(|config| config.network_id == NetworkId::Public)
@@ -328,8 +341,9 @@ impl FullnodeNodeConfig {
             "Validator config must be a Validator config"
         );
 
-        let fullnode_public_network = self
-            .config
+        let config = self.config.config_mut();
+
+        let fullnode_public_network = config
             .full_node_networks
             .iter_mut()
             .find(|config| config.network_id == NetworkId::Public)
@@ -345,8 +359,7 @@ impl FullnodeNodeConfig {
             .find(|config| config.network_id.is_vfn_network())
             .expect("Validator should have vfn network");
 
-        let fullnode_vfn_network = self
-            .config
+        let fullnode_vfn_network = config
             .full_node_networks
             .iter_mut()
             .find(|config| config.network_id.is_vfn_network())
