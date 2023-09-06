@@ -1546,12 +1546,11 @@ impl Script {
                 .resolve_struct_by_name(struct_name, &module_id)
                 .map_err(|err| err.finish(Location::Script))?;
             if !struct_handle.abilities.is_subset(struct_.abilities)
-                || struct_handle
+                || !struct_handle
                     .type_parameters
                     .iter()
                     .map(|ty| ty.is_phantom)
-                    .collect::<Vec<_>>()
-                    != struct_.phantom_ty_args_mask
+                    .eq(struct_.phantom_ty_args_mask.iter().cloned())
             {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)

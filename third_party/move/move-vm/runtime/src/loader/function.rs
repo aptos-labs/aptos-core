@@ -66,6 +66,7 @@ impl Function {
         index: FunctionDefinitionIndex,
         def: &FunctionDefinition,
         module: &CompiledModule,
+        signature_table: &[Vec<Type>],
     ) -> Self {
         let handle = module.function_handle_at(def.function);
         let name = module.identifier_at(handle.name).to_owned();
@@ -93,6 +94,17 @@ impl Function {
             None => vec![],
         };
         let type_parameters = handle.type_parameters.clone();
+        let return_types = signature_table[handle.return_.0 as usize].clone();
+        let local_types = if let Some(code) = &def.code {
+            let mut locals = signature_table[handle.parameters.0 as usize].clone();
+            locals.append(&mut signature_table[code.locals.0 as usize].clone());
+            locals
+        } else {
+            vec![]
+        };
+
+        let parameter_types = signature_table[handle.parameters.0 as usize].clone();
+
         Self {
             file_format_version: module.version(),
             index,
@@ -103,9 +115,9 @@ impl Function {
             def_is_friend_or_private,
             scope,
             name,
-            local_types: vec![],
-            return_types: vec![],
-            parameter_types: vec![],
+            local_types,
+            return_types,
+            parameter_types,
         }
     }
 

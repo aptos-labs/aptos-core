@@ -285,12 +285,11 @@ impl Module {
                 if module_handle != module.self_handle() {
                     let struct_ = cache.resolve_struct_by_name(struct_name, &module_id)?;
                     if !struct_handle.abilities.is_subset(struct_.abilities)
-                        || struct_handle
+                        || !struct_handle
                             .type_parameters
                             .iter()
                             .map(|ty| ty.is_phantom)
-                            .collect::<Vec<_>>()
-                            != struct_.phantom_ty_args_mask
+                            .eq(struct_.phantom_ty_args_mask.iter().cloned())
                     {
                         return Err(PartialVMError::new(
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -346,20 +345,8 @@ impl Module {
 
             for (idx, func) in module.function_defs().iter().enumerate() {
                 let findex = FunctionDefinitionIndex(idx as TableIndex);
-                let mut function = Function::new(natives, findex, func, &module);
-                let func_handle = module.function_handle_at(func.function);
-
-                function.return_types = signature_table[func_handle.return_.0 as usize].clone();
-                function.local_types = if let Some(code) = &func.code {
-                    let mut locals = signature_table[func_handle.parameters.0 as usize].clone();
-                    locals.append(&mut signature_table[code.locals.0 as usize].clone());
-                    locals
-                } else {
-                    vec![]
-                };
-
-                function.parameter_types =
-                    signature_table[func_handle.parameters.0 as usize].clone();
+                let function =
+                    Function::new(natives, findex, func, &module, signature_table.as_slice());
 
                 function_map.insert(function.name.to_owned(), idx);
                 function_defs.push(Arc::new(function));
