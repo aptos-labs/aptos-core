@@ -162,14 +162,14 @@ describe("Tests for the Serializable class", () => {
 
   it("serializes and deserializes MoveOption types with undefined inner values correctly", () => {
     const noneOptionValues = [
-      new MoveOption(undefined, U8),
-      new MoveOption(undefined, U16),
-      new MoveOption(undefined, U32),
-      new MoveOption(undefined, U64),
-      new MoveOption(undefined, U128),
-      new MoveOption(undefined, U256),
-      new MoveOption(undefined, Bool),
-      new MoveOption(undefined, MoveString),
+      MoveOption.U8(undefined),
+      MoveOption.U16(undefined),
+      MoveOption.U32(undefined),
+      MoveOption.U64(undefined),
+      MoveOption.U128(undefined),
+      MoveOption.U256(undefined),
+      MoveOption.Bool(undefined),
+      MoveOption.String(undefined),
     ];
     const noneBytes = noneOptionValues.map((_) => new Uint8Array([0]));
 
@@ -212,10 +212,10 @@ describe("Tests for the Serializable class", () => {
 
   it("throws an error when trying to unwrap an option with no value, before and after serialization", () => {
     function testSerdeAndUnwrap<T extends Serializable>(
-      optionType: new (...args: any[]) => T,
+      optionConstructor: () => MoveOption<T>,
       deserializationClass: Deserializable<T>,
     ) {
-      const option = new MoveOption(undefined, optionType);
+      const option = optionConstructor();
       expect(() => option.unwrap()).toThrow();
       serializer.serialize(option);
       const deserializer = new Deserializer(serializer.toUint8Array());
@@ -223,14 +223,14 @@ describe("Tests for the Serializable class", () => {
       expect(() => deserializedOption.unwrap()).toThrow();
     }
 
-    testSerdeAndUnwrap(U8, U8);
-    testSerdeAndUnwrap(U16, U16);
-    testSerdeAndUnwrap(U32, U32);
-    testSerdeAndUnwrap(U64, U64);
-    testSerdeAndUnwrap(U128, U128);
-    testSerdeAndUnwrap(U256, U256);
-    testSerdeAndUnwrap(Bool, Bool);
-    testSerdeAndUnwrap(MoveString, MoveString);
+    testSerdeAndUnwrap(MoveOption.U8, U8);
+    testSerdeAndUnwrap(MoveOption.U16, U16);
+    testSerdeAndUnwrap(MoveOption.U32, U32);
+    testSerdeAndUnwrap(MoveOption.U64, U64);
+    testSerdeAndUnwrap(MoveOption.U128, U128);
+    testSerdeAndUnwrap(MoveOption.U256, U256);
+    testSerdeAndUnwrap(MoveOption.Bool, Bool);
+    testSerdeAndUnwrap(MoveOption.String, MoveString);
   });
 
   it("serializes and deserializes a Vector of MoveOption types correctly", () => {
@@ -266,9 +266,11 @@ describe("Tests for the Serializable class", () => {
     });
   });
 
-  it("serializes and deserializes nested types with vector lambdas correctly", () => {
-    const vec = Vector.fromLambda([true, false, undefined], (v) => new MoveOption(v, Bool)); // the resulting type, when serialized, would be vector<Option<bool>>>
-    const vecofVecs = Vector.fromLambda([vec, vec, vec], (v) => new MoveOption(v)); // the resulting type, when serialized, would be vector<Option<vector<Option<bool>>>
+  it("serializes and deserializes nested vectors and options", () => {
+    const vec = new Vector([new MoveOption(new Bool(true)), MoveOption.Bool(false), MoveOption.Bool()]);
+    // of type Vector<MoveOption<Vector<MoveOption<Bool>>>>
+    // in move this would be: vector<Option<vector<Option<bool>>>>
+    const vecOfVecs = new Vector([new MoveOption(vec), new MoveOption(vec), new MoveOption(vec)]);
     // vector<Option<vector<Option<Bool>>>>
     // 3 Options
     //    1 vector
@@ -283,16 +285,16 @@ describe("Tests for the Serializable class", () => {
     //      3 options [ Option<Bool> = true, Option<Bool> = false, Option<Bool> = undefined ]
     //                                  1 1                  1 0                      0
     const optionVectorOptionBool_3_Bytes = new Uint8Array([1, 3, 1, 1, 1, 0, 0]);
-    const vecofVecsBytes = new Uint8Array([
+    const vecOfVecsBytes = new Uint8Array([
       3,
       ...optionVectorOptionBool_1_Bytes,
       ...optionVectorOptionBool_2_Bytes,
       ...optionVectorOptionBool_3_Bytes,
     ]);
-    expect(vecofVecsBytes).toEqual(vecofVecs.toUint8Array());
+    expect(vecOfVecsBytes).toEqual(vecOfVecs.toUint8Array());
 
-    const deserializer = new Deserializer(vecofVecsBytes);
-    const deserializer2 = new Deserializer(vecofVecsBytes);
+    const deserializer = new Deserializer(vecOfVecsBytes);
+    const deserializer2 = new Deserializer(vecOfVecsBytes);
 
     class VectorOptionBools {
       static deserialize(deserializer: Deserializer): Vector<MoveOption<Bool>> {
@@ -327,15 +329,15 @@ describe("Tests for the Serializable class", () => {
     );
   });
 
-  it("serializes all vector types with the from and fromLambda methods the same way", () => {
-    const boolVectorFrom = Vector.from([true, false, true], Bool);
-    const u8VectorFrom = Vector.from([1, 2, 3], U8);
-    const u16VectorFrom = Vector.from([1, 2, 3], U16);
-    const u32VectorFrom = Vector.from([1, 2, 3], U32);
-    const u64VectorFrom = Vector.from([1, 2, 3], U64);
-    const u128VectorFrom = Vector.from([1, 2, 3], U128);
-    const u256VectorFrom = Vector.from([1, 2, 3], U256);
-    const stringVectorFrom = Vector.from(["abc", "def", "ghi"], MoveString);
+  it("serializes all vector types with factory methods correctly", () => {
+    const boolVectorFrom = Vector.ofBools([true, false, true]);
+    const u8VectorFrom = Vector.ofU8s([1, 2, 3]);
+    const u16VectorFrom = Vector.ofU16s([1, 2, 3]);
+    const u32VectorFrom = Vector.ofU32s([1, 2, 3]);
+    const u64VectorFrom = Vector.ofU64s([1, 2, 3]);
+    const u128VectorFrom = Vector.ofU128s([1, 2, 3]);
+    const u256VectorFrom = Vector.ofU256s([1, 2, 3]);
+    const stringVectorFrom = Vector.ofStrings(["abc", "def", "ghi"]);
 
     const boolVectorBytes = new Uint8Array([3, 1, 0, 1]);
     const u8VectorBytes = new Uint8Array([3, 1, 2, 3]);
@@ -353,52 +355,33 @@ describe("Tests for the Serializable class", () => {
     ]);
     const stringVectorBytes = new Uint8Array([3, 3, 97, 98, 99, 3, 100, 101, 102, 3, 103, 104, 105]);
 
-    expect(boolVectorBytes).toEqual(boolVectorFrom.toUint8Array());
-    expect(u8VectorBytes).toEqual(u8VectorFrom.toUint8Array());
-    expect(u16VectorBytes).toEqual(u16VectorFrom.toUint8Array());
-    expect(u32VectorBytes).toEqual(u32VectorFrom.toUint8Array());
-    expect(u64VectorBytes).toEqual(u64VectorFrom.toUint8Array());
-    expect(u128VectorBytes).toEqual(u128VectorFrom.toUint8Array());
-    expect(u256VectorBytes).toEqual(u256VectorFrom.toUint8Array());
-    expect(stringVectorBytes).toEqual(stringVectorFrom.toUint8Array());
+    expect(boolVectorFrom.toUint8Array()).toEqual(boolVectorBytes);
+    expect(u8VectorFrom.toUint8Array()).toEqual(u8VectorBytes);
+    expect(u16VectorFrom.toUint8Array()).toEqual(u16VectorBytes);
+    expect(u32VectorFrom.toUint8Array()).toEqual(u32VectorBytes);
+    expect(u64VectorFrom.toUint8Array()).toEqual(u64VectorBytes);
+    expect(u128VectorFrom.toUint8Array()).toEqual(u128VectorBytes);
+    expect(u256VectorFrom.toUint8Array()).toEqual(u256VectorBytes);
+    expect(stringVectorFrom.toUint8Array()).toEqual(stringVectorBytes);
   });
 
-  it("serializes and deserializes all vector types with the `.from` static method correctly", () => {
+  it("serializes all manually constructed vector types the same way as the equivalent factory methods", () => {
     const boolVector = new Vector([new Bool(true), new Bool(false), new Bool(true)]);
-    const boolVectorFrom = Vector.from([true, false, true], Bool);
+    const boolVectorFrom = Vector.ofBools([true, false, true]);
     const u8Vector = new Vector([new U8(1), new U8(2), new U8(3)]);
-    const u8VectorFrom = Vector.from([1, 2, 3], U8);
+    const u8VectorFrom = Vector.ofU8s([1, 2, 3]);
     const u16Vector = new Vector([new U16(1), new U16(2), new U16(3)]);
-    const u16VectorFrom = Vector.from([1, 2, 3], U16);
+    const u16VectorFrom = Vector.ofU16s([1, 2, 3]);
     const u32Vector = new Vector([new U32(1), new U32(2), new U32(3)]);
-    const u32VectorFrom = Vector.from([1, 2, 3], U32);
+    const u32VectorFrom = Vector.ofU32s([1, 2, 3]);
     const u64Vector = new Vector([new U64(1), new U64(2), new U64(3)]);
-    const u64VectorFrom = Vector.from([1, 2, 3], U64);
+    const u64VectorFrom = Vector.ofU64s([1, 2, 3]);
     const u128Vector = new Vector([new U128(1), new U128(2), new U128(3)]);
-    const u128VectorFrom = Vector.from([1, 2, 3], U128);
+    const u128VectorFrom = Vector.ofU128s([1, 2, 3]);
     const u256Vector = new Vector([new U256(1), new U256(2), new U256(3)]);
-    const u256VectorFrom = Vector.from([1, 2, 3], U256);
+    const u256VectorFrom = Vector.ofU256s([1, 2, 3]);
     const stringVector = new Vector([new MoveString("abc"), new MoveString("def"), new MoveString("ghi")]);
-    const stringVectorFrom = Vector.from(["abc", "def", "ghi"], MoveString);
-    const optionBoolVector = new Vector([
-      new MoveOption(new Bool(true)),
-      new MoveOption(new Bool(false)),
-      new MoveOption(),
-    ]);
-    const optionBoolVectorFrom = Vector.fromLambda([true, false, undefined], (v) => new MoveOption(v, Bool));
-    const optionU64Vector = new Vector([
-      new MoveOption(new U64(1)),
-      new MoveOption(undefined),
-      new MoveOption(new U64(3)),
-    ]);
-    const optionU64VectorFrom = Vector.fromLambda([1, undefined, 3], (v) => new MoveOption(v, U64));
-
-    const optionStringVector = new Vector([
-      new MoveOption(new MoveString("abc")),
-      new MoveOption(undefined),
-      new MoveOption(new MoveString("ghi")),
-    ]);
-    const optionStringVectorFrom = Vector.fromLambda(["abc", undefined, "ghi"], (v) => new MoveOption(v, MoveString));
+    const stringVectorFrom = Vector.ofStrings(["abc", "def", "ghi"]);
 
     expect(boolVector.toUint8Array()).toEqual(boolVectorFrom.toUint8Array());
     expect(u8Vector.toUint8Array()).toEqual(u8VectorFrom.toUint8Array());
@@ -408,9 +391,6 @@ describe("Tests for the Serializable class", () => {
     expect(u128Vector.toUint8Array()).toEqual(u128VectorFrom.toUint8Array());
     expect(u256Vector.toUint8Array()).toEqual(u256VectorFrom.toUint8Array());
     expect(stringVector.toUint8Array()).toEqual(stringVectorFrom.toUint8Array());
-    expect(optionBoolVector.toUint8Array()).toEqual(optionBoolVectorFrom.toUint8Array());
-    expect(optionU64Vector.toUint8Array()).toEqual(optionU64VectorFrom.toUint8Array());
-    expect(optionStringVector.toUint8Array()).toEqual(optionStringVectorFrom.toUint8Array());
   });
 
   it("serializes and deserializes a complex class correctly", () => {
@@ -495,14 +475,14 @@ describe("Tests for the Serializable class", () => {
       new U256(6),
       new Bool(true),
       new MoveString("some string"),
-      new Vector([new Bool(true), new Bool(false), new Bool(true)]),
-      new Vector([new U8(1), new U8(2), new U8(3)]),
-      new Vector([new U16(1), new U16(2), new U16(3)]),
-      new Vector([new U32(1), new U32(2), new U32(3)]),
-      new Vector([new U64(1), new U64(2), new U64(3)]),
-      new Vector([new U128(1), new U128(2), new U128(3)]),
-      new Vector([new U256(1), new U256(2), new U256(3)]),
-      new Vector([new MoveString("abc"), new MoveString("def"), new MoveString("ghi")]),
+      Vector.ofBools([true, false, true]),
+      Vector.ofU8s([1, 2, 3]),
+      Vector.ofU16s([1, 2, 3]),
+      Vector.ofU32s([1, 2, 3]),
+      Vector.ofU64s([1, 2, 3]),
+      Vector.ofU128s([1, 2, 3]),
+      Vector.ofU256s([1, 2, 3]),
+      Vector.ofStrings(["abc", "def", "ghi"]),
       new MoveOption(new Bool(true)),
       new MoveOption(),
       new MoveOption(new MoveString("abc")),

@@ -1,49 +1,154 @@
-import { Hex } from "../../core/hex";
 import { Serializable, Serializer } from "../serializer";
 import { Deserializable, Deserializer } from "../deserializer";
 import { Bool, U128, U16, U256, U32, U64, U8 } from "./primitives";
+import { AnyNumber, HexInput } from "../../types";
+import { AccountAddress } from "../../core";
 
 export type NonGenericInputs = boolean | number | string | bigint;
 export type NonGenerics = Bool | U8 | U16 | U32 | U64 | U128 | U256 | MoveString;
 
+/**
+ * This class is the Aptos Typescript SDK representation of a Move `vector<T>`,
+ * where `T` represents either a primitive type (`bool`, `u8`, `u64`, ...)
+ * or a BCS-serializable struct itself.
+ *
+ * It is a BCS-serializable, array-like type that contains an array of values of type `T`,
+ * where `T` is a class that implements `Serializable`.
+ *
+ * The purpose of this class is to facilitate easy construction of BCS-serializable
+ * Move `vector<T>` types.
+ *
+ * @example
+ * // in Move: `vector<u8> [1, 2, 3, 4];`
+ * const vecOfU8s = new Vector([new U8(1), new U8(2), new U8(3), new U8(4)]);
+ * // in Move: `std::bcs::to_bytes(vector<u8> [1, 2, 3, 4]);`
+ * const bcsBytes = vecOfU8s.toUint8Array();
+ *
+ * // vector<Option<u8>> [ std::option::some<u8>(1), std::option::some<u8>(2) ];
+ * const vecOfOptionU8s = new Vector([
+ *    MoveOption.U8(1),
+ *    MoveOption.U8(2),
+ * ]);
+ *
+ * // vector<String> [ std::string::utf8(b"hello"), std::string::utf8(b"world") ];
+ * const vecOfStrings = new Vector([new MoveString("hello"), new MoveString("world")]);
+ * const vecOfStrings2 = Vector.ofStrings(["hello", "world"]);
+ *
+ * // vector<vector<u8>> [ vector<u8> [1, 2, 3, 4], vector<u8> [5, 6, 7, 8] ];
+ * const vecOfVecs = new Vector<Vector<U8>>([
+ *   vecOfU8s,
+ *   Vector.ofU8s([1, 2, 3, 4]),
+ *   Vector.ofU8s([5, 6, 7, 8]),
+ * ]);
+ *
+ * // where MySerializableStruct is a class you've made that implements Serializable
+ * const vecOfSerializableValues = new Vector([
+ *   new MySerializableStruct("hello", "world"),
+ *   new MySerializableStruct("foo", "bar"),
+ * ]);
+ * @params
+ * values: an Array<T> of values where T is a class that implements Serializable
+ * @returns a Vector<T> with the values `values`
+ */
 export class Vector<T extends Serializable> extends Serializable {
   constructor(public values: Array<T>) {
     super();
   }
 
   /**
-   * Allow for typecasting from an array of primitive inputs to a Vector of the corresponding non-generic class
-   *
-   * NOTE: This only works with a depth of one. Generics will not work.
+   * Factory method to generate a Vector of U8s from an array of numbers.
    *
    * @example
-   * const v = Vector.from([true, false, true], Bool);
-   * const v2 = Vector.from([1, 2, 3], U64);
-   * const v3 = Vector.from(["abc", "def", "ghi"], MoveString);
-   * const v4 = Vector.from([new U64(1), new U64(2), new U64(3)], MoveOption<U64>); // This will NOT work.
-   * @params values: an array of primitive values that can be used to create the non-generic Move type T
-   * cls: the class to typecast the input values to
-   * @returns a Vector of the corresponding class T
+   * const v = Vector.ofU8s([1, 2, 3, 4]);
+   * @params values: an array of `numbers` to convert to U8s
+   * @returns a Vector<U8>
    */
-  static from<T extends NonGenerics>(values: Array<NonGenericInputs>, cls: new (...args: any[]) => T): Vector<T> {
-    return new Vector<T>(values.map((v) => new (cls as any)(v)) as Array<T>);
+  static ofU8s(values: Array<number>): Vector<U8> {
+    return new Vector<U8>(values.map((v) => new U8(v)));
   }
 
   /**
-   * Allow for typecasting an array of any input to a Vector of the corresponding class,
-   * using the second arg as a lambda function.
+   * Factory method to generate a Vector of U16s from an array of numbers.
    *
    * @example
-   * const vec = Vector.fromLambda([true, false, undefined], (v) => new MoveOption(v, Bool));
-   *
-   * // the resulting type below, when serialized, would be vector<vector<Option<bool>>>
-   * const vecofVecs = Vector.fromLambda([vec, vec, vec], (v) => new MoveOption(v, Vector));
-   * @params values: an array of primitive values that can be used to create the non-generic Move type T
-   * cls: the class to typecast the input values to
-   * @returns a Vector of the corresponding class T
+   * const v = Vector.ofU16s([1, 2, 3, 4]);
+   * @params values: an array of `numbers` to convert to U16s
+   * @returns a Vector<U16>
    */
-  static fromLambda<T extends Serializable>(values: Array<any>, f: (...args: any[]) => T): Vector<T> {
-    return new Vector<T>(values.map((v) => f(v)) as Array<T>);
+  static ofU16s(values: Array<number>): Vector<U16> {
+    return new Vector<U16>(values.map((v) => new U16(v)));
+  }
+
+  /**
+   * Factory method to generate a Vector of U32s from an array of numbers.
+   *
+   * @example
+   * const v = Vector.ofU32s([1, 2, 3, 4]);
+   * @params values: an array of `numbers` to convert to U32s
+   * @returns a Vector<U32>
+   */
+  static ofU32s(values: Array<number>): Vector<U32> {
+    return new Vector<U32>(values.map((v) => new U32(v)));
+  }
+
+  /**
+   * Factory method to generate a Vector of U64s from an array of numbers or bigints.
+   *
+   * @example
+   * const v = Vector.ofU64s([1, 2, 3, 4]);
+   * @params values: an array of numbers of type `number | bigint` to convert to U64s
+   * @returns a Vector<U64>
+   */
+  static ofU64s(values: Array<AnyNumber>): Vector<U64> {
+    return new Vector<U64>(values.map((v) => new U64(v)));
+  }
+
+  /**
+   * Factory method to generate a Vector of U128s from an array of numbers or bigints.
+   *
+   * @example
+   * const v = Vector.ofU128s([1, 2, 3, 4]);
+   * @params values: an array of numbers of type `number | bigint` to convert to U128s
+   * @returns a Vector<U128>
+   */
+  static ofU128s(values: Array<AnyNumber>): Vector<U128> {
+    return new Vector<U128>(values.map((v) => new U128(v)));
+  }
+
+  /**
+   * Factory method to generate a Vector of U256s from an array of numbers or bigints.
+   *
+   * @example
+   * const v = Vector.ofU256s([1, 2, 3, 4]);
+   * @params values: an array of numbers of type `number | bigint` to convert to U256s
+   * @returns a Vector<U256>
+   */
+  static ofU256s(values: Array<AnyNumber>): Vector<U256> {
+    return new Vector<U256>(values.map((v) => new U256(v)));
+  }
+
+  /**
+   * Factory method to generate a Vector of Bools from an array of booleans.
+   *
+   * @example
+   * const v = Vector.ofBools([true, false, true, false]);
+   * @params values: an array of `numbers` to convert to Bools
+   * @returns a Vector<Bool>
+   */
+  static ofBools(values: Array<boolean>): Vector<Bool> {
+    return new Vector<Bool>(values.map((v) => new Bool(v)));
+  }
+
+  /**
+   * Factory method to generate a Vector of MoveStrings from an array of strings.
+   *
+   * @example
+   * const v = Vector.ofStrings(["hello", "world"]);
+   * @params values: an array of `numbers` to convert to MoveStrings
+   * @returns a Vector<MoveString>
+   */
+  static ofStrings(values: Array<string>): Vector<MoveString> {
+    return new Vector<MoveString>(values.map((v) => new MoveString(v)));
   }
 
   serialize(serializer: Serializer): void {
@@ -90,64 +195,15 @@ export class MoveString extends Serializable {
   }
 }
 
-// NOTES:
-// So I actually tried to implement the RotationCapabilityProofOfferChallengeV2 in the unit test,
-// and I realized the old way was actually a little more annoying.
-// First thing I noticed:
-//    the ability to do .toUint8Array() on anything is amazing
-// Second thing:
-//    having the typed fields is great. It means you don't have to guess what the fields are,
-//    it's explicitly a U64 or U8 or whatever. It makes it clear what you're working with in the Move contract
-//    but you as the developer don't have to worry about it past the initial class construction.
-// Third thing:
-//    The ability to serialize and deserialize individual values is really nice. You can now see the individual
-//    fields laid out, meaning debugging serialization issues is *much* easier.
-//
-// The main thing to think about now is if it's acceptable that it doesn't work on *everything* and if we should
-// leave the `.from` methods in Vector.
-//
-// Also named arguments instead of a list of fields in the class: aka
-// Serializable will require that each class have a field called MoveFields that is just a dictionary of the fields.
-// Then the .serialize() method will just iterate over the fields with Object.keys() or whatever and serialize each
-// one of them, since they're all Serializable.
-// This makes even *more* sense when you consider that we are trying to move to object args.
-//
-// The entire thing becomes *very* useful and nice when you start being able to use ABI generated classes to create
-// Serializable classes.
-// You can just define your ABI in a Move struct/contract, and then generate the Serializable classes from that,
-// rather than having to do it by hand.
-//
-//
-// serialize(serializer: Serializer): void {
-//   serializer.serialize(this.moduleAddress);
-//   serializer.serializeStr(this.moduleName);
-//   serializer.serializeStr(this.structName);
-//   serializer.serializeStr(this.functionName);
-//   serializer.serializeU8(this.chainId);
-//   serializer.serializeU64(this.sequenceNumber);
-//   serializer.serialize(this.sourceAddress);
-//   serializer.serialize(this.recipientAddress);
-// }
-// I just ran into an issue where I forgot to add `serializer.serializeStr(this.functionName);`
-//    This *wouldn't* happen if you had the field structFields and just iterated over them for
-//    serialization and deserialization.
-//
-
 export class MoveOption<T extends Serializable> extends Serializable {
   private vec: Vector<T>;
 
   public value: T | undefined;
 
-  constructor(value?: T | NonGenericInputs, cls?: new (...args: any[]) => T) {
+  constructor(value?: T) {
     super();
     if (typeof value !== "undefined") {
-      if (cls) {
-        this.vec = new Vector([new (cls as any)(value)] as T[]);
-      } else if (!(value instanceof Serializable)) {
-        throw new Error("MoveOption value must be a Serializable object if you do not provide a class to typecast to.");
-      } else {
-        this.vec = new Vector([value as T]);
-      }
+      this.vec = new Vector([value]);
     } else {
       this.vec = new Vector([]);
     }
@@ -187,10 +243,131 @@ export class MoveOption<T extends Serializable> extends Serializable {
   serialize(serializer: Serializer): void {
     // serialize 0 or 1
     // if 1, serialize the value
-    
+
     if (this.vec) {
       this.vec.serialize(serializer);
     }
+  }
+
+  /**
+   * Factory method to generate a MoveOption<U8> from a `number` or `undefined`.
+   *
+   * @example
+   * MoveOption.U8(1).isSome() === true;
+   * MoveOption.U8().isSome() === false;
+   * MoveOption.U8(undefined).isSome() === false;
+   * @params value: the value used to fill the MoveOption. If `value` is undefined
+   * the resulting MoveOption's .isSome() method will return false.
+   * @returns a MoveOption<U8> with an inner value `value`
+   */
+  static U8(value?: number): MoveOption<U8> {
+    return new MoveOption<U8>(value !== undefined ? new U8(value) : undefined);
+  }
+
+  /**
+   * Factory method to generate a MoveOption<U16> from a `number` or `undefined`.
+   *
+   * @example
+   * MoveOption.U16(1).isSome() === true;
+   * MoveOption.U16().isSome() === false;
+   * MoveOption.U16(undefined).isSome() === false;
+   * @params value: the value used to fill the MoveOption. If `value` is undefined
+   * the resulting MoveOption's .isSome() method will return false.
+   * @returns a MoveOption<U16> with an inner value `value`
+   */
+  static U16(value?: number): MoveOption<U16> {
+    return new MoveOption<U16>(value !== undefined ? new U16(value) : undefined);
+  }
+
+  /**
+   * Factory method to generate a MoveOption<U32> from a `number` or `undefined`.
+   *
+   * @example
+   * MoveOption.U32(1).isSome() === true;
+   * MoveOption.U32().isSome() === false;
+   * MoveOption.U32(undefined).isSome() === false;
+   * @params value: the value used to fill the MoveOption. If `value` is undefined
+   * the resulting MoveOption's .isSome() method will return false.
+   * @returns a MoveOption<U32> with an inner value `value`
+   */
+  static U32(value?: number): MoveOption<U32> {
+    return new MoveOption<U32>(value !== undefined ? new U32(value) : undefined);
+  }
+
+  /**
+   * Factory method to generate a MoveOption<U64> from a `number` or a `bigint` or `undefined`.
+   *
+   * @example
+   * MoveOption.U64(1).isSome() === true;
+   * MoveOption.U64().isSome() === false;
+   * MoveOption.U64(undefined).isSome() === false;
+   * @params value: the value used to fill the MoveOption. If `value` is undefined
+   * the resulting MoveOption's .isSome() method will return false.
+   * @returns a MoveOption<U64> with an inner value `value`
+   */
+  static U64(value?: AnyNumber): MoveOption<U64> {
+    return new MoveOption<U64>(value !== undefined ? new U64(value) : undefined);
+  }
+
+  /**
+   * Factory method to generate a MoveOption<U128> from a `number` or a `bigint` or `undefined`.
+   *
+   * @example
+   * MoveOption.U128(1).isSome() === true;
+   * MoveOption.U128().isSome() === false;
+   * MoveOption.U128(undefined).isSome() === false;
+   * @params value: the value used to fill the MoveOption. If `value` is undefined
+   * the resulting MoveOption's .isSome() method will return false.
+   * @returns a MoveOption<U128> with an inner value `value`
+   */
+  static U128(value?: AnyNumber): MoveOption<U128> {
+    return new MoveOption<U128>(value !== undefined ? new U128(value) : undefined);
+  }
+
+  /**
+   * Factory method to generate a MoveOption<U256> from a `number` or a `bigint` or `undefined`.
+   *
+   * @example
+   * MoveOption.U256(1).isSome() === true;
+   * MoveOption.U256().isSome() === false;
+   * MoveOption.U256(undefined).isSome() === false;
+   * @params value: the value used to fill the MoveOption. If `value` is undefined
+   * the resulting MoveOption's .isSome() method will return false.
+   * @returns a MoveOption<U256> with an inner value `value`
+   */
+  static U256(value?: AnyNumber): MoveOption<U256> {
+    return new MoveOption<U256>(value !== undefined ? new U256(value) : undefined);
+  }
+
+  /**
+   * Factory method to generate a MoveOption<Bool> from a `boolean` or `undefined`.
+   *
+   * @example
+   * MoveOption.Bool(true).isSome() === true;
+   * MoveOption.Bool().isSome() === false;
+   * MoveOption.Bool(undefined).isSome() === false;
+   * @params value: the value used to fill the MoveOption. If `value` is undefined
+   * the resulting MoveOption's .isSome() method will return false.
+   * @returns a MoveOption<Bool> with an inner value `value`
+   */
+  static Bool(value?: boolean): MoveOption<Bool> {
+    return new MoveOption<Bool>(value !== undefined ? new Bool(value) : undefined);
+  }
+
+  /**
+   * Factory method to generate a MoveOption<MoveString> from a `string` or `undefined`.
+   *
+   * @example
+   * MoveOption.String("hello").isSome() === true;
+   * MoveOption.String("").isSome() === true;
+   * MoveOption.String().isSome() === false;
+   * MoveOption.String(undefined).isSome() === false;
+   * @params value: the value used to fill the MoveOption. If `value` is undefined
+   * the resulting MoveOption's .isSome() method will return false.
+   * @returns a MoveOption<MoveString> with an inner value `value`
+   */
+  static String(value?: string): MoveOption<MoveString> {
+    return new MoveOption<MoveString>(value !== undefined ? new MoveString(value) : undefined);
   }
 
   static deserialize<U extends Serializable>(deserializer: Deserializer, cls: Deserializable<U>): MoveOption<U> {
@@ -199,14 +376,16 @@ export class MoveOption<T extends Serializable> extends Serializable {
   }
 }
 
-// TODO: Name MoveObject? Not sure what to call this.
 export class MoveObject extends Serializable {
-  // this should eventually be value: AccountAddress
-  constructor(public value: Hex) {
+  value: AccountAddress;
+
+  constructor(value: HexInput) {
     super();
+
+    this.value = AccountAddress.fromHexInput({ input: value });
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeFixedBytes(this.value.toUint8Array());
+    serializer.serialize(this.value);
   }
 }
