@@ -2,16 +2,28 @@
 
 use std::cmp::Ordering;
 
+/// A union-find implementation with [path compression](https://en.wikipedia.org/wiki/Disjoint-set_data_structure#Finding_set_representatives)
+/// and [union by rank](https://en.wikipedia.org/wiki/Disjoint-set_data_structure#Union_by_rank),
+/// where elements are organized as a forest, each tree representing a set.
+///
+/// The amortized time complexity for both `union()` and `find()` is `O(a(n))`,
+/// where:
+/// `a()` is the extremely slow-growing inverse Ackermann function.
+/// `n` is the total number of elements.
 pub struct UnionFind {
+    /// Tracks the parent of each element in the forest.
+    /// Initially pointing to self and can be updated during `union()` (and also `find()`, due to path compression).
     parent_of: Vec<usize>,
-    depth_of: Vec<usize>,
+    /// Tracks the height of each sub-tree.
+    /// This state is required by "union by rank" to guarantee each tree heights are less than `log2(n)`.
+    height_of: Vec<usize>,
 }
 
 impl UnionFind {
     pub fn new(num_participants: usize) -> Self {
         Self {
             parent_of: (0..num_participants).collect(),
-            depth_of: vec![0; num_participants],
+            height_of: vec![0; num_participants],
         }
     }
 
@@ -32,7 +44,7 @@ impl UnionFind {
             return;
         }
 
-        match self.depth_of[px].cmp(&self.depth_of[py]) {
+        match self.height_of[px].cmp(&self.height_of[py]) {
             Ordering::Less => {
                 self.parent_of[py] = px;
             },
@@ -41,7 +53,7 @@ impl UnionFind {
             },
             Ordering::Equal => {
                 self.parent_of[px] = py;
-                self.depth_of[py] += 1;
+                self.height_of[py] += 1;
             },
         }
     }
