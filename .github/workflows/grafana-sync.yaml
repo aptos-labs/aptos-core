@@ -17,8 +17,8 @@ jobs:
   grafana-sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
-      - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
         with:
           run_install: |
             - recursive: false

@@ -19,4 +19,6 @@ module 0x8675309::M {
         M::R{ dummy_field: _ } = Deref(Borrow(Mutable)(select M::B.r(b)));
         Tuple()
     }
+    spec fun $t0(r: &M::R,b: &M::B);
+    spec fun $t1(r: &mut M::R,b: &mut M::B);
 } // end 0x8675309::M

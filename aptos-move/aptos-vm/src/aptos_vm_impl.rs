@@ -58,6 +58,7 @@ pub struct AptosVMImpl {
     storage_gas_params: Result<StorageGasParameters, String>,
     version: Option<Version>,
     features: Features,
+    timed_features: TimedFeatures,
 }
 
 pub fn gas_config(
@@ -154,7 +155,7 @@ impl AptosVMImpl {
             gas_feature_version,
             chain_id.id(),
             features.clone(),
-            timed_features,
+            timed_features.clone(),
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
@@ -167,6 +168,7 @@ impl AptosVMImpl {
             storage_gas_params,
             version,
             features,
+            timed_features,
         }
     }
 
@@ -214,6 +216,10 @@ impl AptosVMImpl {
 
     pub fn get_features(&self) -> &Features {
         &self.features
+    }
+
+    pub fn get_timed_features(&self) -> &TimedFeatures {
+        &self.timed_features
     }
 
     pub fn check_gas(

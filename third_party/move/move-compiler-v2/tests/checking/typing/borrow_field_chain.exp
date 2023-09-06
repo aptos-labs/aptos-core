@@ -21,4 +21,5 @@ module 0x8675309::M {
         Borrow(Mutable)(select M::X3.f(select M::X2.x3(select M::X1.x2(x1_mut))));
         Tuple()
     }
+    spec fun $t0(x1: &M::X1,x1_mut: &mut M::X1);
 } // end 0x8675309::M

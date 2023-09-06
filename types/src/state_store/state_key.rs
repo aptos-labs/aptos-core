@@ -294,7 +294,7 @@ mod tests {
         )));
         assert_eq!(
             &format!("{:?}", key),
-            "StateKey { inner: AccessPath { address: 0xcafe, path: \"Code(0xcafe::my_module)\" }, hash: OnceCell(Uninit) }"
+            "StateKey { inner: AccessPath { address: 0xcafe, path: \"Code(000000000000000000000000000000000000000000000000000000000000cafe::my_module)\" }, hash: OnceCell(Uninit) }"
         );
 
         // resource

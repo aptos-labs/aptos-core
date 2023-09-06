@@ -3,7 +3,7 @@
 use super::{
     anchor_election::RoundRobinAnchorElection,
     dag_driver::DagDriver,
-    dag_fetcher::{DagFetcher, FetchRequestHandler},
+    dag_fetcher::{DagFetcherService, FetchRequestHandler},
     dag_handler::NetworkHandler,
     dag_network::TDAGNetworkSender,
     dag_store::Dag,
@@ -78,7 +78,7 @@ pub fn bootstrap_dag(
     );
 
     let (dag_fetcher, fetch_requester, node_fetch_waiter, certified_node_fetch_waiter) =
-        DagFetcher::new(
+        DagFetcherService::new(
             epoch_state.clone(),
             dag_network_sender,
             dag.clone(),
