@@ -161,6 +161,21 @@ pub enum EntryPoints {
     },
     /// Increment destination resource - COUNTER_STEP
     StepDst,
+    /// Modifying a single random tag in a resource group (which contains 8 tags)
+    /// from a global resource (at module publishers' address)
+    ResourceGroupsGlobalResource {
+        string_length: usize,
+    },
+    /// Modifying a single random tag in a resource group (which contains 8 tags)
+    /// from a user's resource (i.e. each user modifies their own resource)
+    ResourceGroupsIndividualResource {
+        string_length: usize,
+    },
+    /// Modifying 3 out of 8 random tags in a resource group
+    /// from a user's resource (i.e. each user modifies their own resource)
+    ResourceGroupsMultiChange {
+        string_length: usize,
+    },
 
     CreateObjects {
         num_objects: u64,
@@ -229,7 +244,10 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferNFTParallel
             | EntryPoints::TokenV1MintAndTransferNFTSequential
             | EntryPoints::TokenV1MintAndStoreFT
-            | EntryPoints::TokenV1MintAndTransferFT => "framework_usecases",
+            | EntryPoints::TokenV1MintAndTransferFT
+            | EntryPoints::ResourceGroupsGlobalResource { .. }
+            | EntryPoints::ResourceGroupsIndividualResource { .. }
+            | EntryPoints::ResourceGroupsMultiChange { .. } => "framework_usecases",
             EntryPoints::TokenV2AmbassadorMint => "ambassador_token",
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
@@ -271,6 +289,9 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferNFTSequential
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => "token_v1",
+            EntryPoints::ResourceGroupsGlobalResource { .. }
+            | EntryPoints::ResourceGroupsIndividualResource { .. }
+            | EntryPoints::ResourceGroupsMultiChange { .. } => "resource_groups_example",
             EntryPoints::TokenV2AmbassadorMint => "ambassador",
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
@@ -436,6 +457,38 @@ impl EntryPoints {
                 ident_str!("token_v1_mint_and_transfer_ft").to_owned(),
                 vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
             ),
+            EntryPoints::ResourceGroupsGlobalResource { string_length }
+            | EntryPoints::ResourceGroupsIndividualResource { string_length } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let index: u64 = rng.gen_range(0, 8);
+                get_payload(
+                    module_id,
+                    ident_str!(
+                        if let EntryPoints::ResourceGroupsGlobalResource { .. } = self {
+                            "set_p"
+                        } else {
+                            "set"
+                        }
+                    )
+                    .to_owned(),
+                    vec![
+                        bcs::to_bytes(&index).unwrap(),
+                        bcs::to_bytes(&rand_string(rng, *string_length)).unwrap(), // name
+                    ],
+                )
+            },
+            EntryPoints::ResourceGroupsMultiChange { string_length } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let index1: u64 = rng.gen_range(0, 8);
+                let index2: u64 = rng.gen_range(0, 8);
+                let index3: u64 = rng.gen_range(0, 8);
+                get_payload(module_id, ident_str!("set_3").to_owned(), vec![
+                    bcs::to_bytes(&index1).unwrap(),
+                    bcs::to_bytes(&index2).unwrap(),
+                    bcs::to_bytes(&index3).unwrap(),
+                    bcs::to_bytes(&rand_string(rng, *string_length)).unwrap(), // name
+                ])
+            },
             EntryPoints::TokenV2AmbassadorMint => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
@@ -520,6 +573,7 @@ impl EntryPoints {
         match self {
             EntryPoints::Nop2Signers => MultiSigConfig::Random(1),
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
+            EntryPoints::ResourceGroupsGlobalResource { .. } => MultiSigConfig::Publisher,
             EntryPoints::TokenV2AmbassadorMint => MultiSigConfig::Publisher,
             _ => MultiSigConfig::None,
         }

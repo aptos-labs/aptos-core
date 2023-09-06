@@ -26,6 +26,8 @@ class Flow(Flag):
     PREVIEWNET = auto()
     # Tests used for previewnet evaluation
     PREVIEWNET_LARGE_DB = auto()
+    # Test resource groups
+    RESOURCE_GROUPS = auto()
 
 
 # Tests that are run on LAND_BLOCKING and continuously on main
@@ -111,6 +113,13 @@ TESTS = [
     RunGroupConfig(expected_tps=5, key=RunGroupKey("smart-table-picture1-b-with1-k-change"), included_in=Flow(0), waived=True),
     RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-b-with1-k-change", module_working_set_size=20), included_in=Flow(0), waived=True),
 
+    RunGroupConfig(expected_tps=4000, key=RunGroupKey("resource-groups-global-resource1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-resource1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-individual-resource1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-individual-resource1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-multi-change1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    
     RunGroupConfig(expected_tps=1890, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=9250, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=1100, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),

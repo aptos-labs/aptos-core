@@ -35,6 +35,9 @@ pub enum TransactionTypeArg {
     CreateObjects100,
     CreateObjects100WithPayload10k,
     CreateObjectsConflict100WithPayload10k,
+    ResourceGroupsGlobalResource1KB,
+    ResourceGroupsIndividualResource1KB,
+    ResourceGroupsMultiChange1KB,
     TokenV1NFTMintAndStoreSequential,
     TokenV1NFTMintAndTransferSequential,
     TokenV1NFTMintAndStoreParallel,
@@ -210,6 +213,33 @@ impl TransactionTypeArg {
                     entry_point: EntryPoints::CreateObjectsConflict {
                         num_objects: 100,
                         object_payload_size: 10 * 1024,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::ResourceGroupsGlobalResource1KB => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::ResourceGroupsGlobalResource {
+                        string_length: 1024,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::ResourceGroupsIndividualResource1KB => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::ResourceGroupsIndividualResource {
+                        string_length: 1024,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::ResourceGroupsMultiChange1KB => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::ResourceGroupsMultiChange {
+                        string_length: 1024,
                     },
                     num_modules: module_working_set_size,
                     use_account_pool: sender_use_account_pool,
