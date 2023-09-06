@@ -13,7 +13,13 @@ use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{convert::TryInto, hash::Hash, ops::Deref};
+use std::{
+    convert::TryInto,
+    fmt,
+    fmt::{Debug, Formatter},
+    hash::Hash,
+    ops::Deref,
+};
 use thiserror::Error;
 
 #[derive(Clone, Debug, Derivative)]
@@ -31,9 +37,7 @@ pub struct StateKey {
     hash: OnceCell<HashValue>,
 }
 
-#[derive(
-    Clone, Debug, CryptoHasher, Eq, PartialEq, Serialize, Deserialize, Ord, PartialOrd, Hash,
-)]
+#[derive(Clone, CryptoHasher, Eq, PartialEq, Serialize, Deserialize, Ord, PartialOrd, Hash)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 #[serde(rename = "StateKey")]
 pub enum StateKeyInner {
@@ -46,6 +50,27 @@ pub enum StateKeyInner {
     // Only used for testing
     #[serde(with = "serde_bytes")]
     Raw(Vec<u8>),
+}
+
+impl fmt::Debug for StateKeyInner {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            StateKeyInner::AccessPath(ap) => {
+                write!(f, "{:?}", ap)
+            },
+            StateKeyInner::TableItem { handle, key } => {
+                write!(
+                    f,
+                    "TableItem {{ handle: {:x}, key: {} }}",
+                    handle.0,
+                    hex::encode(key),
+                )
+            },
+            StateKeyInner::Raw(bytes) => {
+                write!(f, "Raw({})", hex::encode(bytes),)
+            },
+        }
+    }
 }
 
 #[repr(u8)]
@@ -231,6 +256,7 @@ pub enum StateKeyDecodeErr {
 mod tests {
     use crate::state_store::state_key::{AccessPath, StateKey};
     use aptos_crypto::hash::CryptoHash;
+    use move_core_types::language_storage::ModuleId;
 
     #[test]
     fn test_access_path_hash() {
@@ -257,5 +283,52 @@ mod tests {
             .parse()
             .unwrap();
         assert_eq!(CryptoHash::hash(&key), expected_hash);
+    }
+
+    #[test]
+    fn test_debug() {
+        // code
+        let key = StateKey::access_path(AccessPath::code_access_path(ModuleId::new(
+            "0xcafe".parse().unwrap(),
+            "my_module".parse().unwrap(),
+        )));
+        assert_eq!(
+            &format!("{:?}", key),
+            "StateKey { inner: AccessPath { address: 0xcafe, path: \"Code(000000000000000000000000000000000000000000000000000000000000cafe::my_module)\" }, hash: OnceCell(Uninit) }"
+        );
+
+        // resource
+        let key = StateKey::access_path(
+            AccessPath::resource_access_path(
+                "0xcafe".parse().unwrap(),
+                "0x1::account::Account".parse().unwrap(),
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            &format!("{:?}", key),
+            "StateKey { inner: AccessPath { address: 0xcafe, path: \"Resource(0x1::account::Account)\" }, hash: OnceCell(Uninit) }",
+        );
+
+        // table item
+        let key = StateKey::table_item("0x123".parse().unwrap(), vec![1]);
+        assert_eq!(
+            &format!("{:?}", key),
+            "StateKey { inner: TableItem { handle: 0000000000000000000000000000000000000000000000000000000000000123, key: 01 }, hash: OnceCell(Uninit) }"
+        );
+
+        // raw
+        let key = StateKey::raw(vec![1, 2, 3]);
+        assert_eq!(
+            &format!("{:?}", key),
+            "StateKey { inner: Raw(010203), hash: OnceCell(Uninit) }"
+        );
+
+        // with hash
+        let _hash = CryptoHash::hash(&key);
+        assert_eq!(
+            &format!("{:?}", key),
+            "StateKey { inner: Raw(010203), hash: OnceCell(HashValue(655ab5766bc87318e18d9287f32d318e15535d3db9d21a6e5a2b41a51b535aff)) }"
+        );
     }
 }

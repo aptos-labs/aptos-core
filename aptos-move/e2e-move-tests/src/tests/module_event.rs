@@ -45,22 +45,24 @@ fn test_module_event_enabled() {
         vec![bcs::to_bytes(&10u64).unwrap()],
     );
     let events = h.get_events();
-    assert_eq!(events.len(), 10);
-    for (i, event) in events.iter().enumerate().take(10) {
-        let module_event = event.v2().unwrap();
-        assert_eq!(
-            module_event.type_tag(),
-            &TypeTag::from_str("0xcafe::event::MyEvent").unwrap()
-        );
-        assert_eq!(
-            bcs::from_bytes::<MyEvent>(module_event.event_data()).unwrap(),
-            MyEvent {
-                seq: i as u64,
-                field: Field { field: false },
-                bytes: vec![],
-            }
-        );
+    assert_eq!(events.len(), 12);
+    let my_event_tag = TypeTag::from_str("0xcafe::event::MyEvent").unwrap();
+    let mut count = 0;
+    for event in events.iter() {
+        if event.type_tag() == &my_event_tag {
+            let module_event = event.v2().unwrap();
+            assert_eq!(
+                bcs::from_bytes::<MyEvent>(module_event.event_data()).unwrap(),
+                MyEvent {
+                    seq: count as u64,
+                    field: Field { field: false },
+                    bytes: vec![],
+                }
+            );
+            count += 1;
+        }
     }
+    assert_eq!(count, 10);
 }
 
 #[test]

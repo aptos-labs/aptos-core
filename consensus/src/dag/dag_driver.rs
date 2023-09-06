@@ -58,14 +58,20 @@ impl DagDriver {
         dag: Arc<RwLock<Dag>>,
         payload_client: Arc<dyn PayloadClient>,
         reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
-        current_round: Round,
         time_service: TimeService,
         storage: Arc<dyn DAGStorage>,
         order_rule: OrderRule,
         fetch_requester: Arc<FetchRequester>,
     ) -> Self {
-        // TODO: rebroadcast nodes after recovery
-        Self {
+        let pending_node = storage
+            .get_pending_node()
+            .expect("should be able to read dag storage");
+        let highest_round = dag.read().highest_round();
+        let current_round = dag
+            .read()
+            .get_strong_links_for_round(highest_round, &epoch_state.verifier)
+            .map_or_else(|| highest_round.saturating_sub(1), |_| highest_round);
+        let mut driver = Self {
             author,
             epoch_state,
             dag,
@@ -77,16 +83,22 @@ impl DagDriver {
             storage,
             order_rule,
             fetch_requester,
-        }
-    }
+        };
 
-    pub fn try_enter_new_round(&mut self) {
-        // In case of a new epoch, kickstart building the DAG by entering the next round
-        // without any parents.
-        if self.current_round == 0 {
-            self.enter_new_round(vec![]);
+        // If we were broadcasting the node for the round already, resume it
+        if let Some(node) = pending_node.filter(|node| node.round() == current_round + 1) {
+            driver.current_round = node.round();
+            driver.broadcast_node(node);
+        } else {
+            // kick start a new round
+            let strong_links = driver
+                .dag
+                .read()
+                .get_strong_links_for_round(current_round, &driver.epoch_state.verifier)
+                .unwrap_or(vec![]);
+            driver.enter_new_round(current_round + 1, strong_links);
         }
-        // TODO: add logic to handle building DAG from the middle, etc.
+        driver
     }
 
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
@@ -106,18 +118,18 @@ impl DagDriver {
                 .get_strong_links_for_round(self.current_round, &self.epoch_state.verifier);
             drop(dag_writer);
             if let Some(strong_links) = maybe_strong_links {
-                self.enter_new_round(strong_links);
+                self.enter_new_round(self.current_round + 1, strong_links);
             }
         }
         Ok(())
     }
 
-    pub fn enter_new_round(&mut self, strong_links: Vec<NodeCertificate>) {
+    pub fn enter_new_round(&mut self, new_round: Round, strong_links: Vec<NodeCertificate>) {
         // TODO: support pulling payload
         let payload = Payload::empty(false);
         // TODO: need to wait to pass median of parents timestamp
         let timestamp = self.time_service.now_unix_time();
-        self.current_round += 1;
+        self.current_round = new_round;
         let new_node = Node::new(
             self.epoch_state.epoch,
             self.current_round,
@@ -128,7 +140,7 @@ impl DagDriver {
             Extensions::empty(),
         );
         self.storage
-            .save_node(&new_node)
+            .save_pending_node(&new_node)
             .expect("node must be saved");
         self.broadcast_node(new_node);
     }

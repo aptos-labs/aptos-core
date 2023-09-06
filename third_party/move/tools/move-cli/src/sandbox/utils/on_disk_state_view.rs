@@ -93,7 +93,7 @@ impl OnDiskStateView {
 
     fn get_addr_path(&self, addr: &AccountAddress) -> PathBuf {
         let mut path = self.storage_dir.clone();
-        path.push(format!("0x{}", addr));
+        path.push(format!("0x{}", addr.to_hex()));
         path
     }
 
@@ -403,7 +403,7 @@ impl ToString for StructID {
         // Would be nice to expose a StructTag parser and get rid of the 0x here
         format!(
             "0x{}::{}::{}{}",
-            tag.address,
+            tag.address.to_hex(),
             tag.module,
             tag.name,
             Generics(tag.type_params.clone()).to_string()

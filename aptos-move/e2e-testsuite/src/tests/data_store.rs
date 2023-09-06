@@ -102,7 +102,6 @@ fn borrow_after_move() {
     let (module, txn) = add_module_txn(&sender, 10);
     executor.execute_and_apply(txn);
 
-    println!("HERE!");
     // remove resource fails given no resource were published
     let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
     let output = executor.execute_transaction(rem_txn);
@@ -112,18 +111,15 @@ fn borrow_after_move() {
         Ok(ExecutionStatus::ExecutionFailure { .. })
     ));
     executor.apply_write_set(output.write_set());
-    println!("HERE!");
 
     // publish resource
     let add_txn = add_resource_txn(&sender, 12, vec![module.clone()]);
     executor.execute_and_apply(add_txn);
-    println!("HERE!");
 
     // borrow resource
     let borrow_txn = borrow_resource_txn(&sender, 13, vec![module.clone()]);
     executor.execute_and_apply(borrow_txn);
 
-    println!("HERE!");
     // create a remove and a borrow resource transaction over the same resource in one block
     let txns = vec![
         Transaction::UserTransaction(remove_resource_txn(&sender, 14, vec![module.clone()])),
@@ -136,13 +132,11 @@ fn borrow_after_move() {
         output[0].status(),
         &TransactionStatus::Keep(ExecutionStatus::Success)
     );
-    println!("HERE!");
     assert!(matches!(
         output[1].status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
     ));
-    println!("HERE!");
     for out in output {
         executor.apply_write_set(out.write_set());
     }
@@ -245,7 +239,7 @@ fn add_module_txn(sender: &AccountData, seq_num: u64) -> (CompiledModule, Signed
             }}
         }}
         ",
-        sender.address(),
+        sender.address().to_hex(),
     );
 
     let framework_modules = aptos_cached_packages::head_release_bundle().compiled_modules();
@@ -286,7 +280,7 @@ fn add_resource_txn(
                 return;
             }}
         ",
-        sender.address(),
+        sender.address().to_hex(),
     );
 
     let module = compile_script(&program, extra_deps);
@@ -313,7 +307,7 @@ fn remove_resource_txn(
                 return;
             }}
         ",
-        sender.address(),
+        sender.address().to_hex(),
     );
 
     let module = compile_script(&program, extra_deps);
@@ -340,7 +334,7 @@ fn borrow_resource_txn(
                 return;
             }}
         ",
-        sender.address(),
+        sender.address().to_hex(),
     );
 
     let module = compile_script(&program, extra_deps);
@@ -367,7 +361,7 @@ fn change_resource_txn(
                 return;
             }}
         ",
-        sender.address(),
+        sender.address().to_hex(),
     );
 
     let module = compile_script(&program, extra_deps);

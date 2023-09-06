@@ -17,11 +17,11 @@ module aptos_framework::event {
     /// Emit an event with payload `msg` by using `handle_ref`'s key and counter.
     public fun emit<T: store + drop>(msg: T) {
         assert!(features::module_event_enabled(), std::error::invalid_state(EMODULE_EVENT_NOT_SUPPORTED));
-        write_to_module_event_store<T>(msg);
+        write_module_event_to_store<T>(msg);
     }
 
     /// Log `msg` with the event stream identified by `T`
-    native fun write_to_module_event_store<T: drop + store>(msg: T);
+    native fun write_module_event_to_store<T: drop + store>(msg: T);
 
     #[test_only]
     public native fun emitted_events<T: drop + store>(): vector<T>;

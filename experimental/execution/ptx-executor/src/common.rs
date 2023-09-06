@@ -15,8 +15,8 @@ pub(crate) const BASE_VERSION: TxnIdx = TxnIdx::MAX;
 pub(crate) const EXPECTANT_BLOCK_SIZE: usize = 10_000;
 pub(crate) const EXPECTANT_BLOCK_KEYS: usize = 100_000;
 
-// pub(crate) use hashbrown::{hash_map::Entry, HashMap, HashSet};
-pub(crate) use std::collections::{hash_map::Entry, HashMap, HashSet};
+pub(crate) use hashbrown::{hash_map::Entry, HashMap, HashSet};
+// pub(crate) use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 pub(crate) trait VersionedKeyHelper {
     fn key(&self) -> &StateKey;

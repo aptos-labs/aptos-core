@@ -8,19 +8,24 @@ use crate::{
     experimental::{
         buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
+        commit_reliable_broadcast::{AckState, CommitMessage, DropGuard},
         execution_phase::{ExecutionRequest, ExecutionResponse},
         persisting_phase::PersistingRequest,
         pipeline_phase::CountedRequest,
         signing_phase::{SigningRequest, SigningResponse},
     },
     monitor,
-    network::NetworkSender,
-    round_manager::VerifiedEvent,
+    network::{IncomingCommitRequest, NetworkSender},
+    network_interface::ConsensusMsg,
     state_replication::StateComputerCommitCallBackType,
 };
-use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock};
+use aptos_consensus_types::{
+    common::Author, executed_block::ExecutedBlock, experimental::commit_decision::CommitDecision,
+};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
+use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_time_service::TimeService;
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
@@ -30,6 +35,7 @@ use futures::{
         mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
         oneshot,
     },
+    future::{AbortHandle, Abortable},
     FutureExt, SinkExt, StreamExt,
 };
 use once_cell::sync::OnceCell;
@@ -38,8 +44,10 @@ use std::sync::{
     Arc,
 };
 use tokio::time::{Duration, Instant};
+use tokio_retry::strategy::ExponentialBackoff;
 
-pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
+pub const COMMIT_VOTE_BROADCAST_INTERVAL_MS: u64 = 1500;
+pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 30000;
 pub const LOOP_INTERVAL_MS: u64 = 1500;
 
 #[derive(Debug, Default)]
@@ -82,8 +90,11 @@ pub struct BufferManager {
     signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
     signing_phase_rx: Receiver<SigningResponse>,
 
-    commit_msg_tx: NetworkSender,
-    commit_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
+    commit_msg_tx: Arc<NetworkSender>,
+    reliable_broadcast: ReliableBroadcast<CommitMessage, ExponentialBackoff>,
+    commit_proof_rb_handle: Option<DropGuard>,
+
+    commit_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingCommitRequest>,
 
     // we don't hear back from the persisting phase
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
@@ -113,8 +124,11 @@ impl BufferManager {
         execution_phase_rx: Receiver<ExecutionResponse>,
         signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
         signing_phase_rx: Receiver<SigningResponse>,
-        commit_msg_tx: NetworkSender,
-        commit_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
+        commit_msg_tx: Arc<NetworkSender>,
+        commit_msg_rx: aptos_channels::aptos_channel::Receiver<
+            AccountAddress,
+            IncomingCommitRequest,
+        >,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
@@ -123,6 +137,9 @@ impl BufferManager {
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
+        let rb_backoff_policy = ExponentialBackoff::from_millis(2)
+            .factor(50)
+            .max_delay(Duration::from_secs(5));
         Self {
             author,
 
@@ -136,6 +153,14 @@ impl BufferManager {
             signing_phase_tx,
             signing_phase_rx,
 
+            reliable_broadcast: ReliableBroadcast::new(
+                verifier.get_ordered_account_addresses(),
+                commit_msg_tx.clone(),
+                rb_backoff_policy,
+                TimeService::real(),
+                Duration::from_millis(COMMIT_VOTE_BROADCAST_INTERVAL_MS),
+            ),
+            commit_proof_rb_handle: None,
             commit_msg_tx,
             commit_msg_rx,
 
@@ -150,6 +175,16 @@ impl BufferManager {
             end_epoch_timestamp: OnceCell::new(),
             previous_commit_time: Instant::now(),
         }
+    }
+
+    fn do_reliable_broadcast(&self, message: CommitMessage) -> DropGuard {
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        let task = self.reliable_broadcast.broadcast(
+            message,
+            AckState::new(self.verifier.get_ordered_account_addresses_iter()),
+        );
+        tokio::spawn(Abortable::new(task, abort_registration));
+        DropGuard::new(abort_handle)
     }
 
     fn create_new_request<Request>(&self, req: Request) -> CountedRequest<Request> {
@@ -273,9 +308,11 @@ impl BufferManager {
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
                 // if we're the proposer for the block, we're responsible to broadcast the commit decision.
                 if block.author() == Some(self.author) {
-                    self.commit_msg_tx
-                        .broadcast_commit_proof(aggregated_item.commit_proof.clone())
-                        .await;
+                    let commit_decision = CommitMessage::Decision(CommitDecision::new(
+                        aggregated_item.commit_proof.clone(),
+                    ));
+                    self.commit_proof_rb_handle
+                        .replace(self.do_reliable_broadcast(commit_decision));
                 }
                 if aggregated_item.commit_proof.ledger_info().ends_epoch() {
                     self.commit_msg_tx
@@ -413,24 +450,30 @@ impl BufferManager {
             // it is possible that we already signed this buffer item (double check after the final integration)
             if item.is_executed() {
                 // we have found the buffer item
-                let signed_item = item.advance_to_signed(self.author, signature);
-                let maybe_proposer = signed_item
-                    .unwrap_signed_ref()
+                let mut signed_item = item.advance_to_signed(self.author, signature);
+                let signed_item_mut = signed_item.unwrap_signed_mut();
+                let maybe_proposer = signed_item_mut
                     .executed_blocks
                     .last()
                     .unwrap()
                     .block()
                     .author();
-                let commit_vote = signed_item.unwrap_signed_ref().commit_vote.clone();
+                let commit_vote = signed_item_mut.commit_vote.clone();
 
-                self.buffer.set(&current_cursor, signed_item);
                 if let Some(proposer) = maybe_proposer {
-                    self.commit_msg_tx
-                        .send_commit_vote(commit_vote, proposer)
-                        .await;
+                    let sender = self.commit_msg_tx.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = sender.send_commit_vote(commit_vote, proposer).await {
+                            warn!("Failed to send commit vote {:?}", e);
+                        }
+                    });
                 } else {
-                    self.commit_msg_tx.broadcast_commit_vote(commit_vote).await;
+                    let commit_vote = CommitMessage::Vote(commit_vote);
+                    signed_item_mut
+                        .rb_handle
+                        .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
                 }
+                self.buffer.set(&current_cursor, signed_item);
             } else {
                 self.buffer.set(&current_cursor, item);
             }
@@ -440,9 +483,18 @@ impl BufferManager {
     /// process the commit vote messages
     /// it scans the whole buffer for a matching blockinfo
     /// if found, try advancing the item to be aggregated
-    fn process_commit_message(&mut self, commit_msg: VerifiedEvent) -> Option<HashValue> {
-        match commit_msg {
-            VerifiedEvent::CommitVote(vote) => {
+    fn process_commit_message(&mut self, commit_msg: IncomingCommitRequest) -> Option<HashValue> {
+        let IncomingCommitRequest {
+            req,
+            protocol,
+            response_sender,
+        } = commit_msg;
+        if let Err(e) = req.verify(&self.verifier) {
+            warn!("Invalid commit message: {}", e);
+            return None;
+        }
+        match req {
+            CommitMessage::Vote(vote) => {
                 // find the corresponding item
                 let author = vote.author();
                 let commit_info = vote.commit_info().clone();
@@ -453,8 +505,15 @@ impl BufferManager {
                     .find_elem_by_key(*self.buffer.head_cursor(), target_block_id);
                 if current_cursor.is_some() {
                     let mut item = self.buffer.take(&current_cursor);
-                    let new_item = match item.add_signature_if_matched(*vote) {
-                        Ok(()) => item.try_advance_to_aggregated(&self.verifier),
+                    let new_item = match item.add_signature_if_matched(vote) {
+                        Ok(()) => {
+                            let response =
+                                ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
+                            if let Ok(bytes) = protocol.to_bytes(&response) {
+                                let _ = response_sender.send(Ok(bytes.into()));
+                            }
+                            item.try_advance_to_aggregated(&self.verifier)
+                        },
                         Err(e) => {
                             error!(
                                 error = ?e,
@@ -471,7 +530,7 @@ impl BufferManager {
                     }
                 }
             },
-            VerifiedEvent::CommitDecision(commit_proof) => {
+            CommitMessage::Decision(commit_proof) => {
                 let target_block_id = commit_proof.ledger_info().commit_info().id();
                 info!(
                     "Receive commit decision {}",
@@ -488,12 +547,18 @@ impl BufferManager {
                     let aggregated = new_item.is_aggregated();
                     self.buffer.set(&cursor, new_item);
                     if aggregated {
+                        let response =
+                            ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
+                        if let Ok(bytes) = protocol.to_bytes(&response) {
+                            let _ = response_sender.send(Ok(bytes.into()));
+                        }
                         return Some(target_block_id);
                     }
                 }
             },
-            _ => {
-                unreachable!();
+            CommitMessage::Ack(_) => {
+                // It should be filtered out by verify, so we log errors here
+                error!("Unexpected ack message");
             },
         }
         None
@@ -503,7 +568,7 @@ impl BufferManager {
     /// note that there might be other signed items after the signing root
     async fn rebroadcast_commit_votes_if_needed(&mut self) {
         if self.previous_commit_time.elapsed()
-            < Duration::from_millis(COMMIT_VOTE_REBROADCAST_INTERVAL_MS)
+            < Duration::from_millis(COMMIT_VOTE_BROADCAST_INTERVAL_MS)
         {
             return;
         }
@@ -511,20 +576,34 @@ impl BufferManager {
         let mut count = 0;
         while cursor.is_some() {
             {
-                let item = self.buffer.get(&cursor);
+                let mut item = self.buffer.take(&cursor);
                 if !item.is_signed() {
+                    self.buffer.set(&cursor, item);
                     break;
                 }
-                let signed_item = item.unwrap_signed_ref();
-                self.commit_msg_tx
-                    .broadcast_commit_vote(signed_item.commit_vote.clone())
-                    .await;
-                count += 1;
+                let signed_item = item.unwrap_signed_mut();
+                let re_broadcast = match &signed_item.rb_handle {
+                    None => true,
+                    // Since we don't persist the votes, nodes that crashed would lose the votes even after send ack,
+                    // We'll try to re-initiate the broadcast after 30s.
+                    Some((start_time, _)) => {
+                        start_time.elapsed()
+                            >= Duration::from_millis(COMMIT_VOTE_REBROADCAST_INTERVAL_MS)
+                    },
+                };
+                if re_broadcast {
+                    let commit_vote = CommitMessage::Vote(signed_item.commit_vote.clone());
+                    signed_item
+                        .rb_handle
+                        .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
+                    count += 1;
+                }
+                self.buffer.set(&cursor, item);
             }
             cursor = self.buffer.get_next(&cursor);
         }
         if count > 0 {
-            info!("Rebroadcasting {} commit votes", count);
+            info!("Start reliable broadcast {} commit votes", count);
         }
     }
 

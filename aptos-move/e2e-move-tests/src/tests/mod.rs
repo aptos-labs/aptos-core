@@ -3,6 +3,7 @@
 
 mod access_path_test;
 mod aggregator;
+mod aggregator_v2;
 mod attributes;
 mod chain_id;
 mod code_publishing;
@@ -35,6 +36,7 @@ mod simple_defi;
 mod smart_data_structures;
 mod stake;
 mod state_metadata;
+mod storage_refund;
 mod string_args;
 mod token_event_store;
 mod token_objects;

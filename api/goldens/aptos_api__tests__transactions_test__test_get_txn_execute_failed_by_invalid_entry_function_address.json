@@ -72,7 +72,23 @@
     "signature": "0xf2193dc55d63b63b5e45cee43d38e5a77dc127fc57f4bea7aff6ee09806332850eaa321f2fb7cf6662568c9dd65654642a240b3272d9ad06b2700cb2ff246004",
     "type": "ed25519_signature"
   },
-  "events": [],
+  "events": [
+    {
+      "guid": {
+        "creation_number": "0",
+        "account_address": "0x0"
+      },
+      "sequence_number": "0",
+      "type": "0x1::transaction_fee::FeeStatement",
+      "data": {
+        "execution_gas_units": "2",
+        "io_gas_units": "0",
+        "storage_fee_octas": "0",
+        "storage_fee_refund_octas": "0",
+        "total_charge_gas_units": "2"
+      }
+    }
+  ],
   "timestamp": "500000",
   "type": "user_transaction"
 }

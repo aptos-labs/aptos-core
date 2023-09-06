@@ -158,7 +158,7 @@ async fn test_module_events() {
     context
         .api_execute_entry_function(
             &mut user,
-            &format!("0x{}::event::emit", user_addr),
+            &format!("0x{}::event::emit", user_addr.to_hex()),
             json!([]),
             json!(["7"]),
         )
@@ -173,7 +173,7 @@ async fn test_module_events() {
         .await;
 
     let events = resp["events"].as_array().unwrap();
-    assert_eq!(events.len(), 7);
+    assert_eq!(events.len(), 8);
     // All events are module events
     assert!(events.iter().all(|c| c.get("guid").map_or(false, |d| d
         .get("account_address")

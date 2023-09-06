@@ -4,7 +4,7 @@ use crate::{
     dag::{
         anchor_election::RoundRobinAnchorElection,
         dag_driver::{DagDriver, DagDriverError},
-        dag_fetcher::DagFetcher,
+        dag_fetcher::DagFetcherService,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
         dag_store::Dag,
         order_rule::OrderRule,
@@ -67,8 +67,8 @@ impl TDAGNetworkSender for MockNetworkSender {
     }
 }
 
-#[test]
-fn test_certified_node_handler() {
+#[tokio::test]
+async fn test_certified_node_handler() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
@@ -87,6 +87,7 @@ fn test_certified_node_handler() {
         network_sender.clone(),
         ExponentialBackoff::from_millis(10),
         aptos_time_service::TimeService::mock(),
+        Duration::from_millis(500),
     ));
     let time_service = TimeService::mock();
     let validators = signers.iter().map(|vs| vs.author()).collect();
@@ -100,7 +101,7 @@ fn test_certified_node_handler() {
         storage.clone(),
     );
 
-    let (_, fetch_requester, _, _) = DagFetcher::new(
+    let (_, fetch_requester, _, _) = DagFetcherService::new(
         epoch_state.clone(),
         network_sender,
         dag.clone(),
@@ -114,7 +115,6 @@ fn test_certified_node_handler() {
         dag,
         Arc::new(MockPayloadManager::new(None)),
         rb,
-        1,
         time_service,
         storage,
         order_rule,

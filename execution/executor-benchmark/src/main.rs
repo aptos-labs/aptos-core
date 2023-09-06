@@ -2,16 +2,15 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_block_partitioner::{
-    sharded_block_partitioner::config::PartitionerV1Config, v2::config::PartitionerV2Config,
-    PartitionerConfig,
-};
+use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
 use aptos_executor::block_executor::TransactionBlockExecutor;
 use aptos_executor_benchmark::{native_executor::NativeExecutor, pipeline::PipelineConfig};
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
+#[cfg(target_os = "linux")]
+use aptos_experimental_runtimes::thread_manager::{ThreadConfigStrategy, ThreadManagerBuilder};
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
@@ -101,15 +100,13 @@ pub struct PipelineOpt {
     #[clap(long, default_value = "1")]
     num_executor_shards: usize,
     #[clap(long)]
-    async_partitioning: bool,
-    #[clap(long)]
     use_global_executor: bool,
+    #[clap(long, default_value = "4")]
+    num_generator_workers: usize,
     #[clap(long, default_value = "4")]
     max_partitioning_rounds: usize,
     #[clap(long, default_value = "0.90")]
     partitioner_cross_shard_dep_avoid_threshold: f32,
-    #[clap(long, default_value = "2")]
-    partitioner_version: usize,
     #[clap(long, default_value = "8")]
     partitioner_v2_num_threads: usize,
     #[clap(long, default_value = "64")]
@@ -125,29 +122,20 @@ impl PipelineOpt {
             allow_discards: self.allow_discards,
             allow_aborts: self.allow_aborts,
             num_executor_shards: self.num_executor_shards,
-            async_partitioning: self.async_partitioning,
             use_global_executor: self.use_global_executor,
+            num_generator_workers: self.num_generator_workers,
             partitioner_config: self.partitioner_config(),
         }
     }
 
     fn partitioner_config(&self) -> PartitionerConfig {
-        match self.partitioner_version {
-            1 => PartitionerConfig::V1(PartitionerV1Config {
-                num_shards: self.num_executor_shards,
-                max_partitioning_rounds: self.max_partitioning_rounds,
-                cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
-                partition_last_round: !self.use_global_executor,
-            }),
-            2 => PartitionerConfig::V2(PartitionerV2Config {
-                num_threads: self.partitioner_v2_num_threads,
-                max_partitioning_rounds: self.max_partitioning_rounds,
-                cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
-                dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
-                partition_last_round: self.use_global_executor,
-            }),
-            _ => panic!("Unknown partitioner version: {}", self.partitioner_version),
-        }
+        PartitionerConfig::V2(PartitionerV2Config {
+            num_threads: self.partitioner_v2_num_threads,
+            max_partitioning_rounds: self.max_partitioning_rounds,
+            cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
+            dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
+            partition_last_round: !self.use_global_executor,
+        })
     }
 }
 
@@ -189,8 +177,14 @@ struct Opt {
     #[clap(long)]
     shuffle_connected_txns: bool,
 
-    #[clap(long)]
-    concurrency_level: Option<usize>,
+    #[clap(long, conflicts_with_all = &["connected_tx_grps", "transactions_per_sender"])]
+    hotspot_probability: Option<f32>,
+
+    #[clap(
+        long,
+        help = "Number of threads to use for execution. Generally replaces --concurrency-level flag (directly for default case, and as a total across all shards for sharded case)"
+    )]
+    execution_threads: Option<usize>,
 
     #[clap(flatten)]
     pruner_opt: PrunerOpt,
@@ -222,18 +216,14 @@ struct Opt {
 }
 
 impl Opt {
-    fn concurrency_level(&self) -> usize {
-        match self.concurrency_level {
+    fn execution_threads(&self) -> usize {
+        match self.execution_threads {
             None => {
-                let level = (num_cpus::get() as f64 / self.pipeline_opt.num_executor_shards as f64)
-                    .ceil() as usize;
-                println!(
-                    "\nVM concurrency level defaults to {} for number of shards {} \n",
-                    level, self.pipeline_opt.num_executor_shards
-                );
-                level
+                let cores = num_cpus::get();
+                println!("\nExecution threads defaults to number of cores: {}", cores,);
+                cores
             },
-            Some(level) => level,
+            Some(threads) => threads,
         }
     }
 }
@@ -345,6 +335,12 @@ where
                 Some(mix_per_phase[0].clone())
             };
 
+            if let Some(hotspot_probability) = opt.hotspot_probability {
+                if !(0.5..1.0).contains(&hotspot_probability) {
+                    panic!("Parameter hotspot-probability has to a decimal number in [0.5, 1.0).");
+                }
+            }
+
             aptos_executor_benchmark::run_benchmark::<E>(
                 opt.block_size,
                 blocks,
@@ -352,6 +348,7 @@ where
                 opt.transactions_per_sender,
                 opt.connected_tx_grps,
                 opt.shuffle_connected_txns,
+                opt.hotspot_probability,
                 main_signer_accounts,
                 additional_dst_pool_accounts,
                 data_dir,
@@ -404,9 +401,19 @@ fn main() {
     aptos_node_resource_metrics::register_node_metrics_collector();
     let _mp = MetricsPusher::start_for_local_run("executor-benchmark");
 
-    AptosVM::set_concurrency_level_once(opt.concurrency_level());
-    AptosVM::set_num_shards_once(opt.pipeline_opt.num_executor_shards);
-    NativeExecutor::set_concurrency_level_once(opt.concurrency_level());
+    let execution_threads = opt.execution_threads();
+    let execution_shards = opt.pipeline_opt.num_executor_shards;
+    assert!(
+        execution_threads % execution_shards == 0,
+        "Execution threads ({}) must be divisible by the number of execution shards ({}).",
+        execution_threads,
+        execution_shards
+    );
+    let execution_threads_per_shard = execution_threads / execution_shards;
+
+    AptosVM::set_num_shards_once(execution_shards);
+    AptosVM::set_concurrency_level_once(execution_threads_per_shard);
+    NativeExecutor::set_concurrency_level_once(execution_threads_per_shard);
 
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
@@ -427,6 +434,8 @@ fn main() {
     if opt.vm_selection_opt.use_native_executor {
         run::<NativeExecutor>(opt);
     } else if opt.vm_selection_opt.use_ptx_executor {
+        #[cfg(target_os = "linux")]
+        ThreadManagerBuilder::set_thread_config_strategy(ThreadConfigStrategy::ThreadsPriority(48));
         run::<PtxBlockExecutor>(opt);
     } else {
         run::<AptosVM>(opt);

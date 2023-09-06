@@ -606,7 +606,7 @@ function install_xsltproc {
 
 function install_nodejs {
     if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-      curl -fsSL https://deb.nodesource.com/setup_14.x | "${PRE_COMMAND[@]}" bash -
+      curl -fsSL https://deb.nodesource.com/setup_18.x | "${PRE_COMMAND[@]}" bash -
     fi
     install_pkg nodejs "$PACKAGE_MANAGER"
     install_pkg npm "$PACKAGE_MANAGER"

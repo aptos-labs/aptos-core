@@ -3,7 +3,7 @@
 use super::{
     anchor_election::RoundRobinAnchorElection,
     dag_driver::DagDriver,
-    dag_fetcher::{DagFetcher, FetchRequestHandler},
+    dag_fetcher::{DagFetcherService, FetchRequestHandler},
     dag_handler::NetworkHandler,
     dag_network::TDAGNetworkSender,
     dag_store::Dag,
@@ -24,7 +24,7 @@ use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
 };
 use futures::stream::{AbortHandle, Abortable};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub fn bootstrap_dag(
@@ -57,6 +57,8 @@ pub fn bootstrap_dag(
         rb_network_sender,
         rb_backoff_policy,
         time_service.clone(),
+        // TODO: add to config
+        Duration::from_millis(500),
     ));
 
     let dag = Arc::new(RwLock::new(Dag::new(
@@ -76,7 +78,7 @@ pub fn bootstrap_dag(
     );
 
     let (dag_fetcher, fetch_requester, node_fetch_waiter, certified_node_fetch_waiter) =
-        DagFetcher::new(
+        DagFetcherService::new(
             epoch_state.clone(),
             dag_network_sender,
             dag.clone(),
@@ -90,7 +92,6 @@ pub fn bootstrap_dag(
         dag.clone(),
         payload_client,
         rb,
-        current_round,
         time_service,
         storage.clone(),
         order_rule,

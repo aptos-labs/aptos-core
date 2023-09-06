@@ -884,7 +884,7 @@ fn update_seq_num_and_get_num_expired(
                         account.sequence_number(),
                         count
                     );
-                    *account.sequence_number_mut() = *count;
+                    account.set_sequence_number(*count);
                 }
             },
             None => {
@@ -894,7 +894,7 @@ fn update_seq_num_and_get_num_expired(
                     account.sequence_number(),
                     start_seq_num
                 );
-                *account.sequence_number_mut() = *start_seq_num;
+                account.set_sequence_number(*start_seq_num);
             },
         }
     });
