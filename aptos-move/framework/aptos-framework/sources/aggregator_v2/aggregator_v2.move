@@ -18,12 +18,6 @@ module aptos_framework::aggregator_v2 {
     /// The generic type supplied to the aggregator is not supported.
     const EUNSUPPORTED_AGGREGATOR_TYPE: u64 = 7;
 
-    /// The aggregator identifier is out of bounds (above U64::MAX).
-    const EINVALID_AGGREGATOR_IDENTIFIER: u64 = 8;
-
-    /// The aggregator<u64> read is out of bounds (above U64::MAX).
-    const EREAD_OUT_OF_BOUNDS: u64 = 9;
-
     /// Represents an integer which supports parallel additions and subtractions
     /// across multiple transactions. See the module description for more details.
     ///

@@ -647,7 +647,7 @@ pub struct AggregatorData {
     aggregators: BTreeMap<AggregatorID, Aggregator>,
     // All aggregatorsnapshot instances that exist in the current transaction.
     aggregator_snapshots: BTreeMap<AggregatorID, AggregatorSnapshot>,
-    // Counter for generating identifiers for AggregatorSnapshots.
+    // Counter for generating identifiers for Aggregators and AggregatorSnapshots.
     pub id_counter: u64,
 }
 
@@ -805,6 +805,7 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(200), 200)
             .expect("Get aggregator failed");
+      
         assert_eq!(aggregator.state, AggregatorState::Data { value: 0 });
         assert_ok!(aggregator.try_add(&*TEST_RESOLVER, 100));
         assert_eq!(aggregator.state, AggregatorState::Data { value: 100 });
@@ -820,6 +821,7 @@ mod test {
                 .unwrap(),
             50
         );
+
     }
     #[test]
     fn test_successful_operations_in_delta_mode() {
@@ -830,6 +832,7 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
+      
         assert_eq!(aggregator.state, AggregatorState::Delta {
             speculative_start_value: SpeculativeStartValue::Unset,
             delta: DeltaValue::Positive(0),
@@ -889,6 +892,7 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
+
         assert_eq!(aggregator.state, AggregatorState::Delta {
             speculative_start_value: SpeculativeStartValue::Unset,
             delta: DeltaValue::Positive(0),
@@ -952,6 +956,7 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
+
         assert_ok!(aggregator.try_add(&sample_resolver, 400));
         assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
             max_achieved_positive_delta: 400,
@@ -1006,6 +1011,7 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
+
         assert_ok!(aggregator.try_add(&sample_resolver, 300));
         assert_eq!(aggregator.get_value().unwrap(), 500);
         assert_eq!(*aggregator.get_history().unwrap(), DeltaHistory {
@@ -1063,6 +1069,7 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
+
         assert_ok!(aggregator.try_add(&sample_resolver, 300));
         assert_ok!(aggregator.try_sub(&sample_resolver, 400));
         assert_ok!(aggregator.try_add(&sample_resolver, 400));
@@ -1108,6 +1115,7 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
+
         assert_err!(aggregator.try_add(&sample_resolver, 401));
         assert_ok!(aggregator.try_add(&sample_resolver, 300));
         assert_eq!(aggregator.state, AggregatorState::Delta {
@@ -1151,6 +1159,7 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
+
         assert_ok!(aggregator.try_sub(&sample_resolver, 100));
         assert_err!(aggregator.try_sub(&sample_resolver, 101));
         assert_ok!(aggregator.try_add(&sample_resolver, 300));
