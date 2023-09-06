@@ -105,7 +105,7 @@ impl<K, Id> Default for HashMapReservationTable<K, Id> {
 
 impl<K, Id> ReservationTable for HashMapReservationTable<K, Id>
 where
-    K: Ord + Hash + Eq + Clone,
+    K: Hash + Eq + Clone,
     Id: Ord + Eq + Hash + Default + Copy,
 {
     type Key = K;

@@ -36,9 +36,3 @@ impl PTransaction for AnalyzedTransaction {
         self.write_hints().iter().map(StorageLocation::state_key)
     }
 }
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub enum Direction {
-    Front = -1,
-    Back = 1,
-}

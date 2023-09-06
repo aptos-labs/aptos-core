@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::batch_orderer::{BatchOrderer, BatchOrdererWithWindow};
+use crate::{batch_orderer::BatchOrderer, batch_orderer_with_window::BatchOrdererWithWindow};
 use std::{
     cell::RefCell,
     cmp::{max, min},
@@ -22,6 +22,34 @@ pub trait BlockOrderer {
     where
         F: FnMut(Vec<Self::Txn>) -> Result<(), E>,
         E: std::error::Error;
+}
+
+pub struct IdentityBlockOrderer<T> {
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T> Default for IdentityBlockOrderer<T> {
+    fn default() -> Self {
+        Self {
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T> BlockOrderer for IdentityBlockOrderer<T> {
+    type Txn = T;
+
+    fn order_transactions<F, E>(
+        &self,
+        txns: Vec<Self::Txn>,
+        mut send_transactions_for_execution: F,
+    ) -> Result<(), E>
+    where
+        F: FnMut(Vec<Self::Txn>) -> Result<(), E>,
+        E: std::error::Error,
+    {
+        send_transactions_for_execution(txns)
+    }
 }
 
 /// Orders the transactions in a block in batches, using the underlying `BatchOrderer`,

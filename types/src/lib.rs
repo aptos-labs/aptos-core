@@ -53,7 +53,6 @@ pub use utility_coin::*;
 pub mod account_view;
 pub mod aggregate_signature;
 pub mod block_executor;
-pub mod const_option;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;
