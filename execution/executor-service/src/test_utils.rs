@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use aptos_block_partitioner::v2::config::PartitionerV2Config;
+use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
 use aptos_language_e2e_tests::{
     account::AccountData, common_transactions::peer_to_peer_txn, data_store::FakeDataStore,
     executor::FakeExecutor,

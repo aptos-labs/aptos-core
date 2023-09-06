@@ -1,9 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    pre_partition::{uniform_partitioner::UniformPartitioner, PrePartitioner},
-    v2::counters::{BLOCK_PARTITIONING_SECONDS, MISC_TIMERS_SECONDS},
-    BlockPartitioner,
+    pre_partition::PrePartitioner, v2::counters::BLOCK_PARTITIONING_SECONDS, BlockPartitioner,
 };
 use aptos_types::{
     block_executor::partitioner::{PartitionedTransactions, RoundId},
@@ -136,9 +134,7 @@ impl BlockPartitioner for PartitionerV2 {
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> PartitionedTransactions {
-        let _timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["total"])
-            .start_timer();
+        let _timer = BLOCK_PARTITIONING_SECONDS.start_timer();
 
         let mut state = PartitionState::new(
             self.thread_pool.clone(),
@@ -153,7 +149,11 @@ impl BlockPartitioner for PartitionerV2 {
         Self::init(&mut state);
 
         // Step 2: pre-partition.
-        (state.ori_idxs_by_pre_partitioned, state.start_txn_idxs_by_shard, state.pre_partitioned) = self.pre_partitioner.pre_partition(&mut state);
+        (
+            state.ori_idxs_by_pre_partitioned,
+            state.start_txn_idxs_by_shard,
+            state.pre_partitioned,
+        ) = self.pre_partitioner.pre_partition(&state);
 
         // Step 3: update trackers.
         for txn_idx1 in 0..state.num_txns() {

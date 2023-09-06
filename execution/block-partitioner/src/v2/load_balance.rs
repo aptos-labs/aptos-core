@@ -7,7 +7,10 @@ use std::collections::BinaryHeap;
 /// Time complexity: O(num_tasks * log2(num_workers))
 ///
 /// Read more at https://en.wikipedia.org/wiki/Longest-processing-time-first_scheduling.
-pub fn longest_processing_time_first(task_costs: &Vec<u64>, num_workers: usize) -> (u64, Vec<usize>) {
+pub fn longest_processing_time_first(
+    task_costs: &Vec<u64>,
+    num_workers: usize,
+) -> (u64, Vec<usize>) {
     assert!(num_workers >= 1);
     let num_tasks = task_costs.len();
     let mut cost_tid_pairs: Vec<(u64, usize)> = task_costs

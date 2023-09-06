@@ -9,7 +9,6 @@ use aptos_block_partitioner::{
         PrePartitionerConfig,
     },
     v2::config::PartitionerV2Config,
-    PartitionerConfig,
 };
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,

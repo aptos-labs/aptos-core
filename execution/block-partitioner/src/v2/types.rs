@@ -63,13 +63,15 @@ pub struct ShardedTxnIndexV2 {
 
 impl Ord for ShardedTxnIndexV2 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        (self.sub_block_idx, self.pre_partitioned_txn_idx).cmp(&(other.sub_block_idx, other.pre_partitioned_txn_idx))
+        (self.sub_block_idx, self.pre_partitioned_txn_idx)
+            .cmp(&(other.sub_block_idx, other.pre_partitioned_txn_idx))
     }
 }
 
 impl PartialOrd for ShardedTxnIndexV2 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        (self.sub_block_idx, self.pre_partitioned_txn_idx).partial_cmp(&(other.sub_block_idx, other.pre_partitioned_txn_idx))
+        (self.sub_block_idx, self.pre_partitioned_txn_idx)
+            .partial_cmp(&(other.sub_block_idx, other.pre_partitioned_txn_idx))
     }
 }
 

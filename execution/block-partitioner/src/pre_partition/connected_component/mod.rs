@@ -31,7 +31,14 @@ pub struct ConnectedComponentPartitioner {
 }
 
 impl PrePartitioner for ConnectedComponentPartitioner {
-    fn pre_partition(&self, state: &PartitionState) -> (Vec<OriginalTxnIdx>, Vec<PrePartitionedTxnIdx>, Vec<Vec<PrePartitionedTxnIdx>>) {
+    fn pre_partition(
+        &self,
+        state: &PartitionState,
+    ) -> (
+        Vec<OriginalTxnIdx>,
+        Vec<PrePartitionedTxnIdx>,
+        Vec<Vec<PrePartitionedTxnIdx>>,
+    ) {
         // Union-find.
         // Each sender/state key initially in its own set.
         // For every declared storage access to key `k` by a txn from sender `s`, merge the set of `k` and that of `s`.
@@ -111,7 +118,8 @@ impl PrePartitioner for ConnectedComponentPartitioner {
             groups_by_shard[shard_id].push(group_id);
         }
 
-        let mut ori_txns_idxs_by_shard: Vec<Vec<OriginalTxnIdx>> = vec![vec![]; state.num_executor_shards];
+        let mut ori_txns_idxs_by_shard: Vec<Vec<OriginalTxnIdx>> =
+            vec![vec![]; state.num_executor_shards];
         for (shard_id, group_ids) in groups_by_shard.into_iter().enumerate() {
             for group_id in group_ids.into_iter() {
                 let (set_id, amount) = group_metadata[group_id];

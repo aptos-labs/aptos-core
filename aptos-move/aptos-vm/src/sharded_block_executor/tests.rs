@@ -4,10 +4,14 @@ use crate::{
     sharded_block_executor::{local_executor_shard::LocalExecutorService, test_utils},
     ShardedBlockExecutor,
 };
-use aptos_block_partitioner::PartitionerConfig;
-use aptos_block_partitioner::v2::config::PartitionerV2Config;
-use aptos_block_partitioner::pre_partition::uniform_partitioner::config::UniformPartitionerConfig;
-use aptos_block_partitioner::pre_partition::connected_component::config::ConnectedComponentPartitionerConfig;
+use aptos_block_partitioner::{
+    pre_partition::{
+        connected_component::config::ConnectedComponentPartitionerConfig,
+        uniform_partitioner::config::UniformPartitionerConfig,
+    },
+    v2::config::PartitionerV2Config,
+    PartitionerConfig,
+};
 use rand::{rngs::OsRng, Rng};
 
 #[test]

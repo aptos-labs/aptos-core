@@ -1,27 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{PartitionerConfig, test_utils::{
-    create_non_conflicting_p2p_transaction, create_signed_p2p_transaction,
-    generate_test_account, generate_test_account_for_address,
-}, v2::config::PartitionerV2Config};
-use aptos_crypto::hash::CryptoHash;
-use aptos_types::{
-    block_executor::partitioner::{ShardedTxnIndex, SubBlock, SubBlocksForShard},
-    transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
+use crate::{
+    test_utils::{
+        create_non_conflicting_p2p_transaction, create_signed_p2p_transaction,
+        generate_test_account, verify_partitioner_output,
+    },
+    v2::config::PartitionerV2Config,
+    PartitionerConfig,
 };
+use aptos_crypto::hash::CryptoHash;
+use aptos_types::{block_executor::partitioner::SubBlocksForShard, transaction::Transaction};
 use move_core_types::account_address::AccountAddress;
 use rand::{rngs::OsRng, Rng};
 use std::{collections::HashMap, sync::Mutex};
-use crate::test_utils::verify_partitioner_output;
-
-fn verify_no_cross_shard_dependency(sub_blocks_for_shards: Vec<SubBlock<AnalyzedTransaction>>) {
-    for sub_blocks in sub_blocks_for_shards {
-        for txn in sub_blocks.iter() {
-            assert_eq!(txn.cross_shard_dependencies().num_required_edges(), 0);
-        }
-    }
-}
 
 #[test]
 // Test that the partitioner works correctly for no conflict transactions. In this case, the

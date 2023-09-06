@@ -4,11 +4,13 @@
 use crate::test_utils::P2PBlockGenerator;
 use crate::{
     pre_partition::PrePartitioner,
-    v2::{state::PartitionState, types::PrePartitionedTxnIdx},
+    v2::{
+        state::PartitionState,
+        types::{OriginalTxnIdx, PrePartitionedTxnIdx},
+    },
 };
 #[cfg(test)]
 use rand::thread_rng;
-use crate::v2::types::OriginalTxnIdx;
 
 /// A naive partitioner that evenly divide txns into shards.
 /// Example: processing txns 0..11 results in [[0,1,2,3],[4,5,6,7],[8,9,10]].
@@ -33,7 +35,14 @@ impl UniformPartitioner {
 }
 
 impl PrePartitioner for UniformPartitioner {
-    fn pre_partition(&self, state: &PartitionState) -> (Vec<OriginalTxnIdx>, Vec<PrePartitionedTxnIdx>, Vec<Vec<PrePartitionedTxnIdx>>) {
+    fn pre_partition(
+        &self,
+        state: &PartitionState,
+    ) -> (
+        Vec<OriginalTxnIdx>,
+        Vec<PrePartitionedTxnIdx>,
+        Vec<Vec<PrePartitionedTxnIdx>>,
+    ) {
         let pre_partitioned = self.process(state.num_txns(), state.num_executor_shards);
         let mut txn_counter = 0;
         let mut start_txn_idxs_by_shard = vec![0; state.num_executor_shards];

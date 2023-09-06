@@ -7,7 +7,8 @@ use crate::{
         conflicting_txn_tracker::ConflictingTxnTracker,
         counters::MISC_TIMERS_SECONDS,
         types::{
-            SenderIdx, ShardedTxnIndexV2, StorageKeyIdx, SubBlockIdx, OriginalTxnIdx, PrePartitionedTxnIdx, FinalTxnIdx,
+            FinalTxnIdx, OriginalTxnIdx, PrePartitionedTxnIdx, SenderIdx, ShardedTxnIndexV2,
+            StorageKeyIdx, SubBlockIdx,
         },
     },
     Sender,
@@ -192,7 +193,11 @@ impl PartitionState {
     }
 
     pub(crate) fn sender_idx(&self, ori_txn_idx: OriginalTxnIdx) -> SenderIdx {
-        *self.sender_idxs[ori_txn_idx].read().unwrap().as_ref().unwrap()
+        *self.sender_idxs[ori_txn_idx]
+            .read()
+            .unwrap()
+            .as_ref()
+            .unwrap()
     }
 
     pub(crate) fn add_sender(&self, sender: Sender) -> SenderIdx {
@@ -306,7 +311,9 @@ impl PartitionState {
                 .last()
             {
                 let src_txn_idx = ShardedTxnIndex {
-                    txn_index: *self.final_idxs_by_pre_partitioned[txn_idx.pre_partitioned_txn_idx].read().unwrap(),
+                    txn_index: *self.final_idxs_by_pre_partitioned[txn_idx.pre_partitioned_txn_idx]
+                        .read()
+                        .unwrap(),
                     shard_id: txn_idx.shard_id(),
                     round_id: txn_idx.round_id(),
                 };
@@ -329,7 +336,10 @@ impl PartitionState {
                     let final_sub_blk_idx =
                         self.final_sub_block_idx(follower_txn_idx.sub_block_idx);
                     let dst_txn_idx = ShardedTxnIndex {
-                        txn_index: *self.final_idxs_by_pre_partitioned[follower_txn_idx.pre_partitioned_txn_idx].read().unwrap(),
+                        txn_index: *self.final_idxs_by_pre_partitioned
+                            [follower_txn_idx.pre_partitioned_txn_idx]
+                            .read()
+                            .unwrap(),
                         shard_id: final_sub_blk_idx.shard_id,
                         round_id: final_sub_blk_idx.round_id,
                     };

@@ -1,9 +1,11 @@
 // Copyright © Aptos Foundation
 
-use crate::v2::state::PartitionState;
+use crate::v2::{
+    state::PartitionState,
+    types::{OriginalTxnIdx, PrePartitionedTxnIdx},
+};
 use connected_component::config::ConnectedComponentPartitionerConfig;
 use std::fmt::Debug;
-use crate::v2::types::{OriginalTxnIdx, PrePartitionedTxnIdx};
 
 /// The initial partitioning phase for `ShardedBlockPartitioner`/`PartitionerV2` to divide a block into `num_shards` sub-blocks.
 /// See `PartitionerV2::partition()` for more details.
@@ -25,7 +27,14 @@ use crate::v2::types::{OriginalTxnIdx, PrePartitionedTxnIdx};
 /// - `start_txn_idxs_by_shard`: maps a shard to the starting new index of the txns assigned to itself.
 /// - `pre_partitioned`: maps a shard to the new indices of the txns assigned to itself.
 pub trait PrePartitioner: Send {
-    fn pre_partition(&self, state: &PartitionState) -> (Vec<OriginalTxnIdx>, Vec<PrePartitionedTxnIdx>, Vec<Vec<PrePartitionedTxnIdx>>);
+    fn pre_partition(
+        &self,
+        state: &PartitionState,
+    ) -> (
+        Vec<OriginalTxnIdx>,
+        Vec<PrePartitionedTxnIdx>,
+        Vec<Vec<PrePartitionedTxnIdx>>,
+    );
 }
 
 pub mod connected_component;

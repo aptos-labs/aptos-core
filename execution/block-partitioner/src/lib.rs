@@ -16,7 +16,6 @@ use std::{
     fmt::Debug,
     hash::{Hash, Hasher},
 };
-use v2::config::PartitionerV2Config;
 
 pub mod pre_partition;
 

@@ -20,7 +20,7 @@ use crate::{
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
 use aptos_block_executor::counters as block_executor_counters;
-use aptos_block_partitioner::v2::config::PartitionerV2Config;
+use aptos_block_partitioner::v2::counters::BLOCK_PARTITIONING_SECONDS;
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
 use aptos_executor::{
@@ -52,7 +52,6 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::Runtime;
-use aptos_block_partitioner::v2::counters::BLOCK_PARTITIONING_SECONDS;
 
 pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
@@ -559,7 +558,6 @@ impl GasMesurement {
 #[cfg(test)]
 mod tests {
     use crate::{native_executor::NativeExecutor, pipeline::PipelineConfig};
-    use aptos_block_partitioner::default_partitioner_config;
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_executor::block_executor::TransactionBlockExecutor;
     use aptos_temppath::TempPath;
