@@ -5,11 +5,11 @@ use crate::pvss::traits::{
 };
 use crate::pvss::{Player, ThresholdConfig, WeightedConfig};
 use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
-use aptos_crypto_derive::{SilentDebug, SilentDisplay};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher, SilentDebug, SilentDisplay};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 /// A weighting wrapper around a `Transcript` type `T`. Given an implementation of an [unweighted
 /// PVSS] `Transcript` for `T`, this wrapper can be used to easily obtain a *weighted* PVSS abiding
 /// by the same `Transcript` trait.
@@ -36,10 +36,10 @@ pub struct WeightedKey<Key> {
 //     }
 // }
 
-/// Helpful for debugging in tests by calling `WeightedKey<Key>::sub_key().to_bytes()` since I could
-/// not implement the `ValidCryptoMaterial` trait here due to the non-generic `DeserializeKey`
-/// procedural macro, which I could not fix up.
 impl<Key> WeightedKey<Key> {
+    /// Helpful for debugging in tests by calling `WeightedKey<Key>::sub_key().to_bytes()` since I could
+    /// not implement the `ValidCryptoMaterial` trait here due to the non-generic `DeserializeKey`
+    /// procedural macro, which I could not fix up.
     pub fn sub_key(&self) -> &Key {
         &self.key
     }

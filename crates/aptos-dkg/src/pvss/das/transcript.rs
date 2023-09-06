@@ -9,7 +9,7 @@ use crate::utils::random::{random_g1_point, random_g2_point, random_scalar};
 use crate::utils::{g1_multi_exp, g2_multi_exp, multi_pairing};
 use anyhow::bail;
 use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
-use aptos_crypto_derive::{CryptoHasher, BCSCryptoHash};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
 use group::Group;

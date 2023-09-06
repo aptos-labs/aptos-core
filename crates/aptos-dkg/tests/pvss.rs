@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 
 //! PVSS scheme-independent testing
+use aptos_crypto::hash::CryptoHash;
+use aptos_crypto::{bls12381, SigningKey, Uniform};
 use aptos_dkg::constants::{
     BEST_CASE_N, BEST_CASE_THRESHOLD, DST_PVSS_TESTING_APP, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES,
     WORST_CASE_N, WORST_CASE_THRESHOLD,
@@ -11,10 +13,9 @@ use aptos_dkg::pvss::traits::{Reconstructable, SecretSharingConfig};
 use aptos_dkg::pvss::{das, scrape, test_utils, WeightedConfig, WeightedTranscript};
 use aptos_dkg::pvss::{Player, ThresholdConfig};
 use aptos_dkg::utils::random::random_scalar;
-use rand::rngs::{StdRng, ThreadRng};
+use rand::rngs::StdRng;
 use rand::thread_rng;
 use rand_core::SeedableRng;
-use aptos_crypto::{bls12381, SigningKey, Uniform};
 
 #[test]
 fn all_unweighted_pvss_bvt() {
@@ -91,18 +92,6 @@ fn weighted_fail_due_to_blst_bug() {
 }
 
 #[test]
-fn transcript_can_be_signed() {
-    let mut rng = thread_rng();
-
-    let sc = ThresholdConfig::new(10, 20).unwrap();
-    let (pp, _, eks, s, _) = test_utils::setup_dealing::<das::Transcript, ThreadRng>(&sc, &mut rng);
-    let trx = das::Transcript::deal(&sc, &pp, &eks, &s, &DST_PVSS_TESTING_APP[..], &mut rng);
-
-    let sk = bls12381::PrivateKey::generate(&mut rng);
-    let _ = sk.sign(&trx).unwrap();
-}
-
-#[test]
 fn transcript_size() {
     for (t, n) in [
         (BEST_CASE_THRESHOLD, BEST_CASE_N),
@@ -137,7 +126,7 @@ fn print_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(t
 ///  1. Deals a secret, creating a transcript
 ///  2. Verifies the transcript.
 ///  3. Ensures the a sufficiently-large random subset of the players can recover the dealt secret
-fn pvss_deal_verify_aggr_and_reconstruct<T: Transcript>(
+fn pvss_deal_verify_aggr_and_reconstruct<T: Transcript + CryptoHash>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
@@ -181,6 +170,10 @@ fn pvss_deal_verify_aggr_and_reconstruct<T: Transcript>(
     trx1.aggregate_with(sc, &trx2);
     trx1.verify(sc, &pp, &eks, &DST_PVSS_TESTING_APP[..])
         .expect("aggregated PVSS transcript failed verification");
+
+    // Ensure that transcript can be signed
+    let sk = bls12381::PrivateKey::generate(&mut rng);
+    let _ = sk.sign(&trx1).unwrap();
 }
 
 fn actual_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(
