@@ -30,6 +30,9 @@ pub enum TransactionTypeArg {
     TokenV1FTMintAndStore,
     TokenV1FTMintAndTransfer,
     TokenV2AmbassadorMint,
+    ResourceGroupsGlobalResource1KB,
+    ResourceGroupsIndividualResource1KB,
+    ResourceGroupsMultiChange1KB,
 }
 
 impl TransactionTypeArg {
@@ -154,6 +157,21 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::TokenV2AmbassadorMint => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::TokenV2AmbassadorMint,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ResourceGroupsGlobalResource => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::ResourceGroupsGlobalResource { string_length: 1024},
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ResourceGroupsIndividualResource => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::ResourceGroupsIndividualResource { string_length: 1024},
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ResourceGroupsMultiChange => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::ResourceGroupsMultiChange { string_length: 1024},
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },

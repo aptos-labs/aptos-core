@@ -3,7 +3,8 @@ name = 'ambassador'
 version = '1.0.0'
 
 [addresses]
-ambassador = "_"
+# needs to be set, to be able to be compiled for transaction generator
+ambassador = "0xABCD"
 
 [dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }

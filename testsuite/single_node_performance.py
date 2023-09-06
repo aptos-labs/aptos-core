@@ -118,6 +118,13 @@ TESTS = [
     RunGroupConfig(expected_tps=12000 if NUM_ACCOUNTS < 5000000 else 7000, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=100), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
     RunGroupConfig(expected_tps=35000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB, waived=True),
     RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB, waived=True),
+
+    RunGroupConfig(expected_tps=4000, key=RunGroupKey("resource-groups-global-resource"), included_in=Flow.LAND_BLOCKING, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-resource", module_working_set_size=20), included_in=Flow(0), waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-individual-resource"), included_in=Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-individual-resource", module_working_set_size=20), included_in=Flow(0), waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-multi-change"), included_in=Flow.LAND_BLOCKING, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-multi-change", module_working_set_size=20), included_in=Flow(0), waived=True),
 ]
 # fmt: on
 

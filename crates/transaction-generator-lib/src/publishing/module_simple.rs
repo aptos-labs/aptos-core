@@ -168,6 +168,10 @@ pub enum EntryPoints {
     TokenV1MintAndTransferFT,
 
     TokenV2AmbassadorMint,
+
+    ResourceGroupsGlobalResource { string_length: usize },
+    ResourceGroupsIndividualResource { string_length: usize },
+    ResourceGroupsMultiChange { string_length: usize },
 }
 
 impl EntryPoints {
@@ -199,7 +203,10 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferNFTParallel
             | EntryPoints::TokenV1MintAndTransferNFTSequential
             | EntryPoints::TokenV1MintAndStoreFT
-            | EntryPoints::TokenV1MintAndTransferFT => "framework_usecases",
+            | EntryPoints::TokenV1MintAndTransferFT
+            | EntryPoints::ResourceGroupsGlobalResource { .. }
+            | EntryPoints::ResourceGroupsIndividualResource { .. }
+            | EntryPoints::ResourceGroupsMultiChange { .. } => "framework_usecases",
             EntryPoints::TokenV2AmbassadorMint => "ambassador_token",
         }
     }
@@ -234,6 +241,9 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => "token_v1",
             EntryPoints::TokenV2AmbassadorMint => "ambassador",
+            EntryPoints::ResourceGroupsGlobalResource { .. }
+            | EntryPoints::ResourceGroupsIndividualResource  { .. }
+            | EntryPoints::ResourceGroupsMultiChange  { .. } => "resource_groups_example",
         }
     }
 
@@ -373,6 +383,37 @@ impl EntryPoints {
                     ],
                 )
             },
+            EntryPoints::ResourceGroupsGlobalResource { string_length}
+            | EntryPoints::ResourceGroupsIndividualResource { string_length} => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let index: u64 = rng.gen_range(0, 8);
+                get_payload(
+                    module_id,
+                    ident_str!(if let EntryPoints::ResourceGroupsGlobalResource = self { "set_p"} else { "set" }).to_owned(),
+                    vec![
+                        bcs::to_bytes(&index).unwrap(),
+                        bcs::to_bytes(&rand_string(rng, string_length)).unwrap(),  // name
+                    ],
+                )
+            },
+            EntryPoints::ResourceGroupsMultiChange { string_length} => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let index1: u64 = rng.gen_range(0, 8);
+                let index2: u64 = rng.gen_range(0, 8);
+                let index3: u64 = rng.gen_range(0, 8);
+                let index4: u64 = rng.gen_range(0, 8);
+                get_payload(
+                    module_id,
+                    ident_str!("set_4").to_owned(),
+                    vec![
+                        bcs::to_bytes(&index1).unwrap(),
+                        bcs::to_bytes(&index2).unwrap(),
+                        bcs::to_bytes(&index3).unwrap(),
+                        bcs::to_bytes(&index4).unwrap(),
+                        bcs::to_bytes(&rand_string(rng, string_length)).unwrap(),  // name
+                    ],
+                )
+            }
         }
     }
 
@@ -395,6 +436,7 @@ impl EntryPoints {
             EntryPoints::Nop2Signers => MultiSigConfig::Random(1),
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
             EntryPoints::TokenV2AmbassadorMint => MultiSigConfig::Publisher,
+            EntryPoints::ResourceGroupsGlobalResource => MultiSigConfig::Publisher,
             _ => MultiSigConfig::None,
         }
     }
