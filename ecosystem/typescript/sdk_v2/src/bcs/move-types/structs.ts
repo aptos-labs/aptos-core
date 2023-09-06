@@ -1,7 +1,7 @@
-import { Hex } from "../core/hex";
-import { Deserializable, Deserializer } from "./deserializer";
-import { Bool, U128, U16, U256, U32, U64, U8 } from "./serializable_primitives";
-import { Serializable, Serializer } from "./serializer";
+import { Hex } from "../../core/hex";
+import { Serializable, Serializer } from "../serializer";
+import { Deserializable, Deserializer } from "../deserializer";
+import { Bool, U128, U16, U256, U32, U64, U8 } from "./primitives";
 
 export type NonGenericInputs = boolean | number | string | bigint;
 export type NonGenerics = Bool | U8 | U16 | U32 | U64 | U128 | U256 | MoveString;
@@ -185,7 +185,12 @@ export class MoveOption<T extends Serializable> extends Serializable {
   }
 
   serialize(serializer: Serializer): void {
-    this.vec.serialize(serializer);
+    // serialize 0 or 1
+    // if 1, serialize the value
+    
+    if (this.vec) {
+      this.vec.serialize(serializer);
+    }
   }
 
   static deserialize<U extends Serializable>(deserializer: Deserializer, cls: Deserializable<U>): MoveOption<U> {

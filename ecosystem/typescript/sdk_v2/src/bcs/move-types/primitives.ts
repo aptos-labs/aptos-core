@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { Serializable, Serializer } from "./serializer";
-import { Deserializer } from "./deserializer";
-import { AnyNumber } from "./types";
+import { AnyNumber } from "../../types";
+import { Deserializer } from "../deserializer";
+import { Serializable, Serializer } from "../serializer";
 
 export class Bool extends Serializable {
   constructor(public value: boolean) {

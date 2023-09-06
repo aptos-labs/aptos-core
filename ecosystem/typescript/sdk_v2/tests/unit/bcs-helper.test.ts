@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { AnyNumber } from "../../src/bcs";
 import { Deserializable, Deserializer } from "../../src/bcs/deserializer";
-import { Bool, U128, U16, U256, U32, U64, U8 } from "../../src/bcs/serializable_primitives";
-import { MoveOption, MoveString, Vector } from "../../src/bcs/serializable_structs";
+import { Bool, U128, U16, U256, U32, U64, U8 } from "../../src/bcs/move-types/primitives";
+import { MoveOption, MoveString, Vector } from "../../src/bcs/move-types/structs";
 import { Serializable, Serializer } from "../../src/bcs/serializer";
 import { AccountAddress } from "../../src/core";
 
