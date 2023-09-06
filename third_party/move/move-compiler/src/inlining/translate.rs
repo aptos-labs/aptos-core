@@ -19,6 +19,7 @@ use crate::{
             SpecLambdaLiftedFunction, UnannotatedExp_,
         },
         core::{infer_abilities, InferAbilityContext, Subst},
+        translate::lvalues_expected_types,
     },
 };
 use move_ir_types::location::{sp, Loc};
@@ -101,7 +102,7 @@ impl<'l> Inliner<'l> {
                 if !fdef.inline {
                     let mut visitor = OuterVisitor { inliner };
                     Dispatcher::new(&mut visitor).function(fdef);
-                    //Self::eprint_fdef(&format!("fun {} ", _name), fdef);
+                    //DEBUG Self::eprint_fdef(&format!("fun {} ", _name), fdef);
                 }
             },
         );
@@ -634,7 +635,7 @@ impl<'l> Inliner<'l> {
                     mcall.name.0.value
                 ),
             };
-            let type_arguments = fdef
+            let type_arguments: BTreeMap<TParamID, Type> = fdef
                 .signature
                 .type_parameters
                 .iter()
@@ -644,11 +645,22 @@ impl<'l> Inliner<'l> {
             let mut inliner_visitor = OuterVisitor { inliner: self };
             let mut inlined_args = mcall.arguments.clone();
             Dispatcher::new(&mut inliner_visitor).exp(&mut inlined_args);
+
+            // Expand Type formal params in types of other params.
+            let mut param_visitor = TypeSubstitutionVisitor {
+                type_arguments: type_arguments.clone(),
+            };
+            let mut param_dispatcher = Dispatcher::new(&mut param_visitor);
+            let fix_types = |(var, mut spanned_type): (Var, Type)| {
+                param_dispatcher.type_(&mut spanned_type);
+                (var, spanned_type)
+            };
             let mapped_params = fdef
                 .signature
                 .parameters
                 .iter()
                 .cloned()
+                .map(fix_types)
                 .zip(get_args_from_exp(&inlined_args));
             let (decls_for_let, bindings) = self.process_parameters(call_loc, mapped_params);
 
@@ -666,6 +678,7 @@ impl<'l> Inliner<'l> {
             for decl in decls_for_let.into_iter().rev() {
                 seq.push_front(decl)
             }
+
             Some(UnannotatedExp_::Block(seq))
         } else {
             None
@@ -685,18 +698,15 @@ impl<'l> Inliner<'l> {
         let mut tys = vec![];
         let mut exps = vec![];
 
-        for ((var, _), e) in params {
-            let ty = e.ty.clone();
+        for ((var, ty), e) in params {
             if ty.value.is_fun() {
                 bindings.insert(var.0.value, e);
             } else {
                 lvalues.push(sp(loc, LValue_::Var(var, Box::new(ty.clone()))));
-                tys.push(ty);
+                tys.push(e.ty.clone());
                 exps.push(e);
             }
         }
-
-        let opt_tys = tys.iter().map(|t| Some(t.clone())).collect();
 
         let exp = match exps.len() {
             0 => Exp {
@@ -725,9 +735,12 @@ impl<'l> Inliner<'l> {
             },
         };
 
+        let spanned_lvalues = sp(loc, lvalues);
+        let lvalue_ty = lvalues_expected_types(&spanned_lvalues); // BUGBUG - added
+                                                                  // substitute
         let decl = sp(
             loc,
-            SequenceItem_::Bind(sp(loc, lvalues), opt_tys, Box::new(exp)),
+            SequenceItem_::Bind(spanned_lvalues, lvalue_ty, Box::new(exp)),
         );
         (vec![decl], bindings)
     }
@@ -966,4 +979,14 @@ fn visit_type(subs: &BTreeMap<TParamID, Type>, ty: &mut Type) -> VisitorContinua
         }
     }
     VisitorContinuation::Descend
+}
+
+struct TypeSubstitutionVisitor {
+    type_arguments: BTreeMap<TParamID, Type>,
+}
+
+impl Visitor for TypeSubstitutionVisitor {
+    fn type_(&mut self, ty: &mut Type) -> VisitorContinuation {
+        visit_type(&self.type_arguments, ty)
+    }
 }
