@@ -12,7 +12,7 @@ use crate::{
 use fail::fail_point;
 use move_binary_format::{
     errors::*,
-    file_format::{Ability, AbilitySet, Bytecode, FunctionHandleIndex, FunctionInstantiationIndex},
+    file_format::{Ability, AbilitySet, Bytecode, FunctionHandleIndex, FunctionInstantiationIndex, VTableIndex},
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -133,7 +133,7 @@ impl Interpreter {
         }
 
         let mut current_frame = self
-            .make_new_frame(loader, function, ty_args, locals)
+            .make_new_frame(loader, function, ty_args, locals, vec![])
             .map_err(|err| self.set_location(err))?;
         loop {
             let resolver = current_frame.resolver(loader);
@@ -204,7 +204,7 @@ impl Interpreter {
                         continue;
                     }
                     let frame = self
-                        .make_call_frame(loader, func, vec![])
+                        .make_call_frame(loader, func, vec![], vec![])
                         .map_err(|e| self.set_location(e))
                         .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
                     self.call_stack.push(current_frame).map_err(|frame| {
@@ -255,6 +255,7 @@ impl Interpreter {
                         current_frame.pc += 1; // advance past the Call instruction in the caller
                         continue;
                     }
+                    let vtable = resolver.function_from_instantiation(idx)
                     let frame = self
                         .make_call_frame(loader, func, ty_args)
                         .map_err(|e| self.set_location(e))
@@ -266,6 +267,7 @@ impl Interpreter {
                     })?;
                     current_frame = frame;
                 },
+                ExitCode::CallVirtual(_) => unimplemented!(),
             }
         }
     }
@@ -280,6 +282,7 @@ impl Interpreter {
         loader: &Loader,
         func: Arc<Function>,
         ty_args: Vec<Type>,
+        vtable: Vec<(Arc<Function>,Vec<Type>)>,
     ) -> PartialVMResult<Frame> {
         let mut locals = Locals::new(func.local_count());
         let arg_count = func.arg_count();
@@ -306,7 +309,7 @@ impl Interpreter {
                 }
             }
         }
-        self.make_new_frame(loader, func, ty_args, locals)
+        self.make_new_frame(loader, func, ty_args, locals, vtable)
     }
 
     /// Create a new `Frame` given a `Function` and the function `Locals`.
@@ -318,6 +321,7 @@ impl Interpreter {
         function: Arc<Function>,
         ty_args: Vec<Type>,
         locals: Locals,
+        vtables: Vec<(Arc<Function>,Vec<Type>)>,
     ) -> PartialVMResult<Frame> {
         let local_tys = if self.paranoid_type_checks {
             if ty_args.is_empty() {
@@ -339,6 +343,7 @@ impl Interpreter {
             function,
             ty_args,
             local_tys,
+            vtables
         })
     }
 
@@ -1093,6 +1098,7 @@ struct Frame {
     function: Arc<Function>,
     ty_args: Vec<Type>,
     local_tys: Vec<Type>,
+    vtables: Vec<(Arc<Function>,Vec<Type>)>,
 }
 
 /// An `ExitCode` from `execute_code_unit`.
@@ -1101,6 +1107,7 @@ enum ExitCode {
     Return,
     Call(FunctionHandleIndex),
     CallGeneric(FunctionInstantiationIndex),
+    CallVirtual(VTableIndex),
 }
 
 fn check_ability(has_ability: bool) -> PartialVMResult<()> {
@@ -1150,7 +1157,7 @@ impl Frame {
     ) -> PartialVMResult<()> {
         match instruction {
             // Call instruction will be checked at execute_main.
-            Bytecode::Call(_) | Bytecode::CallGeneric(_) => (),
+            Bytecode::Call(_) | Bytecode::CallGeneric(_) | Bytecode::CallVirtual(_) => (),
             Bytecode::BrFalse(_) | Bytecode::BrTrue(_) => {
                 interpreter.operand_stack.pop_ty()?;
             },
@@ -1264,6 +1271,7 @@ impl Frame {
             | Bytecode::Ret
             | Bytecode::Call(_)
             | Bytecode::CallGeneric(_)
+            | Bytecode::CallVirtual(_)
             | Bytecode::Abort => {
                 // Invariants hold because all of the instructions above will force VM to break from the interpreter loop and thus not hit this code path.
                 unreachable!("control flow instruction encountered during type check")
@@ -1905,6 +1913,9 @@ impl Frame {
                     },
                     Bytecode::CallGeneric(idx) => {
                         return Ok(ExitCode::CallGeneric(*idx));
+                    },
+                    Bytecode::CallVirtual(idx) => {
+                        return Ok(ExitCode::CallVirtual(*idx));
                     },
                     Bytecode::MutBorrowLoc(idx) | Bytecode::ImmBorrowLoc(idx) => {
                         let instr = match instruction {
