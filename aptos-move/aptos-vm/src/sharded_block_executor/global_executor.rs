@@ -16,6 +16,7 @@ use std::sync::Arc;
 pub struct GlobalExecutor<S: StateView + Sync + Send + 'static> {
     global_cross_shard_client: Arc<GlobalCrossShardClient>,
     executor_thread_pool: Arc<rayon::ThreadPool>,
+    concurrency_level: usize,
     phantom: std::marker::PhantomData<S>,
 }
 
@@ -33,6 +34,7 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
             global_cross_shard_client: cross_shard_client,
             executor_thread_pool,
             phantom: std::marker::PhantomData,
+            concurrency_level: num_threads,
         }
     }
 
@@ -54,7 +56,7 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
             None,
             GLOBAL_ROUND_ID,
             state_view,
-            self.executor_thread_pool.current_num_threads() - 2,
+            self.concurrency_level,
             maybe_block_gas_limit,
         )
     }
