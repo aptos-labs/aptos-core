@@ -157,7 +157,8 @@ fun destroy_droppable_vector<T: drop>(vec: vector<T>) {
 }
 ```
 
-Similarly, vectors cannot be copied unless the element type has `copy`. 
+Similarly, vectors cannot be copied unless the element type has `copy`. In other words, a
+`vector<T>` has `copy` if and only if `T` has `copy`.
 
 For more details see the sections on [type abilities](./abilities.md) and [generics](./generics.md).
 
