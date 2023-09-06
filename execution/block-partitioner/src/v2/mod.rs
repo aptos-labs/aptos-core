@@ -91,7 +91,7 @@ impl BlockPartitioner for PartitionerV2 {
         Self::init(&mut state);
 
         // Step 2: pre-partition.
-        self.pre_partitioner.pre_partition(&mut state);
+        (state.idx1_to_idx0, state.start_txn_idxs_by_shard, state.pre_partitioned) = self.pre_partitioner.pre_partition(&mut state);
 
         // Step 3: update trackers.
         for txn_idx1 in 0..state.num_txns() {

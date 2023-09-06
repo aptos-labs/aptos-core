@@ -31,17 +31,17 @@ pub struct ConnectedComponentPartitioner {
 }
 
 impl PrePartitioner for ConnectedComponentPartitioner {
-    fn pre_partition(&self, state: &mut PartitionState) {
+    fn pre_partition(&self, state: &PartitionState) -> (Vec<TxnIdx0>, Vec<TxnIdx1>, Vec<Vec<TxnIdx1>>) {
         // Union-find.
         // Each sender/state key initially in its own set.
         // For every declared storage access to key `k` by a txn from sender `s`, merge the set of `k` and that of `s`.
         let num_senders = state.num_senders();
         let num_keys = state.num_keys();
         let mut uf = UnionFind::new(num_senders + num_keys);
-        for txn_idx0 in 0..state.num_txns() {
-            let sender_idx = state.sender_idx(txn_idx0);
-            let write_set = state.write_sets[txn_idx0].read().unwrap();
-            let read_set = state.read_sets[txn_idx0].read().unwrap();
+        for txn_idx in 0..state.num_txns() {
+            let sender_idx = state.sender_idx(txn_idx);
+            let write_set = state.write_sets[txn_idx].read().unwrap();
+            let read_set = state.read_sets[txn_idx].read().unwrap();
             for &key_idx in write_set.iter().chain(read_set.iter()) {
                 let key_idx_in_uf = num_senders + key_idx;
                 uf.union(key_idx_in_uf, sender_idx);
@@ -125,18 +125,20 @@ impl PrePartitioner for ConnectedComponentPartitioner {
             }
         }
 
-        // Prepare `state.idx1_to_idx0` and `state.start_txn_idxs_by_shard`.
-        let mut i1 = 0;
+        // Prepare `idx1_to_idx0` and `start_txn_idxs_by_shard`.
+        let mut start_txn_idxs_by_shard = vec![0; state.num_executor_shards];
+        let mut ori_txn_idxs = vec![0; state.num_txns()];
+        let mut pre_partitioned_txn_idx = 0;
         for (shard_id, txn_idxs) in pre_partitioned_idx0s.iter().enumerate() {
-            state.start_txn_idxs_by_shard[shard_id] = i1;
+            start_txn_idxs_by_shard[shard_id] = pre_partitioned_txn_idx;
             for &i0 in txn_idxs {
-                state.idx1_to_idx0[i1] = i0;
-                i1 += 1;
+                ori_txn_idxs[pre_partitioned_txn_idx] = i0;
+                pre_partitioned_txn_idx += 1;
             }
         }
 
-        // Prepare `state.pre_partitioned`.
-        state.pre_partitioned = (0..state.num_executor_shards)
+        // Prepare `pre_partitioned`.
+        let pre_partitioned = (0..state.num_executor_shards)
             .map(|shard_id| {
                 let start = state.start_txn_idxs_by_shard[shard_id];
                 let end: TxnIdx1 = if shard_id == state.num_executor_shards - 1 {
@@ -155,6 +157,8 @@ impl PrePartitioner for ConnectedComponentPartitioner {
             drop(tasks);
             drop(pre_partitioned_idx0s);
         });
+
+        (ori_txn_idxs, start_txn_idxs_by_shard, pre_partitioned)
     }
 }
 

@@ -8,6 +8,7 @@ use crate::{
 };
 #[cfg(test)]
 use rand::thread_rng;
+use crate::v2::types::TxnIdx0;
 
 /// A naive partitioner that evenly divide txns into shards.
 /// Example: processing txns 0..11 results in [[0,1,2,3],[4,5,6,7],[8,9,10]].
@@ -32,15 +33,16 @@ impl UniformPartitioner {
 }
 
 impl PrePartitioner for UniformPartitioner {
-    fn pre_partition(&self, state: &mut PartitionState) {
-        state.pre_partitioned = self.process(state.num_txns(), state.num_executor_shards);
+    fn pre_partition(&self, state: &PartitionState) -> (Vec<TxnIdx0>, Vec<TxnIdx1>, Vec<Vec<TxnIdx1>>) {
+        let pre_partitioned = self.process(state.num_txns(), state.num_executor_shards);
         let mut txn_counter = 0;
-        state.start_txn_idxs_by_shard = vec![0; state.num_executor_shards];
-        for (shard_id, txns) in state.pre_partitioned.iter().enumerate() {
-            state.start_txn_idxs_by_shard[shard_id] = txn_counter;
+        let mut start_txn_idxs_by_shard = vec![0; state.num_executor_shards];
+        for (shard_id, txns) in pre_partitioned.iter().enumerate() {
+            start_txn_idxs_by_shard[shard_id] = txn_counter;
             txn_counter += txns.len();
         }
-        state.idx1_to_idx0 = (0..state.num_txns()).collect();
+        let ori_txn_idxs = (0..state.num_txns()).collect();
+        (ori_txn_idxs, start_txn_idxs_by_shard, pre_partitioned)
     }
 }
 
