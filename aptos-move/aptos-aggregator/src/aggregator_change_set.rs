@@ -41,10 +41,7 @@ impl AggregatorChange {
             AggregatorState::Delta { delta, .. } => {
                 // First, validate if the current delta operation can be applied to the base.
                 validate_history(base, self.max_value, &self.state)?;
-                match delta {
-                    DeltaValue::Positive(value) => addition(base, value, self.max_value),
-                    DeltaValue::Negative(value) => subtraction(base, value),
-                }
+                addition_deltavalue(base, delta, self.max_value)
             },
         }
     }
