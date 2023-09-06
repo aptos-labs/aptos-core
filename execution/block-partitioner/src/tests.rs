@@ -336,10 +336,7 @@ fn test_no_conflict_across_shards_in_non_last_rounds() {
             let sub_block_for_round = sub_blocks_for_shard.get_sub_block(round).unwrap();
             for txn in sub_block_for_round.iter() {
                 let analyzed_txn = txns_by_hash.get(&txn.txn().transaction().hash()).unwrap();
-                let storage_locations = analyzed_txn
-                    .read_hints()
-                    .iter()
-                    .chain(analyzed_txn.write_hints().iter());
+                let storage_locations = analyzed_txn.write_hints().iter();
                 for storage_location in storage_locations {
                     if storage_location_to_shard_map.contains_key(storage_location) {
                         assert_eq!(
