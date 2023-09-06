@@ -41,13 +41,3 @@ impl PTransaction for AnalyzedTransaction {
         self.write_hints().iter().map(StorageLocation::state_key)
     }
 }
-
-fn debug_func(t: &AnalyzedTransaction) -> impl Iterator<Item = &StorageLocation>{
-    t.read_hints().iter().chain(t.write_hints().iter())
-}
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub enum Direction {
-    Front = -1,
-    Back = 1,
-}

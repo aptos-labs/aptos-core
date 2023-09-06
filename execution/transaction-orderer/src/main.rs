@@ -8,12 +8,16 @@ use aptos_block_partitioner::test_utils::{
 };
 use aptos_transaction_orderer::{
     batch_orderer::SequentialDynamicAriaOrderer,
-    block_orderer::BatchedBlockOrdererWithWindow,
-    block_partitioner::{BlockPartitioner, OrderedRoundRobinPartitioner},
-    transaction_compressor::compress_transactions,
+    batch_orderer_with_window::SequentialDynamicWindowOrderer,
+    block_orderer::{
+        BatchedBlockOrdererWithWindow, BatchedBlockOrdererWithoutWindow, BlockOrderer,
+        IdentityBlockOrderer,
+    },
+    quality::{amortized_inverse_dependency_cost_function, order_total_cost},
+    transaction_compressor::{compress_transactions, CompressedPTransaction},
 };
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use rand::rngs::OsRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
@@ -22,6 +26,13 @@ use std::{
     sync::Mutex,
     time::{Duration, Instant},
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum Orderer {
+    Aria,
+    Window,
+    Identity,
+}
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -34,13 +45,14 @@ struct Args {
     #[clap(long, default_value_t = 10)]
     pub num_blocks: usize,
 
-    #[clap(long, default_value_t = 4)]
-    pub num_shards: usize,
+    #[clap(long)]
+    pub orderer: Orderer,
 }
 
-fn main() {
-    println!("Starting the transaction orderer benchmark");
-    let args = Args::parse();
+fn run_benchmark<O>(args: Args, block_orderer: O)
+where
+    O: BlockOrderer<Txn = CompressedPTransaction<AnalyzedTransaction>>,
+{
     let num_accounts = args.num_accounts;
     println!("Creating {} accounts", num_accounts);
     let accounts: Vec<Mutex<TestAccount>> = (0..num_accounts)
@@ -61,21 +73,11 @@ fn main() {
         })
         .collect();
 
-    let min_ordered_transaction_before_execution = min(100, args.block_size);
-    let block_orderer = BatchedBlockOrdererWithWindow::new(
-        SequentialDynamicAriaOrderer::with_window(),
-        min_ordered_transaction_before_execution * 5,
-        1000,
-    );
-    let block_partitioner = OrderedRoundRobinPartitioner::new(
-        block_orderer,
-        args.num_shards,
-        (min_ordered_transaction_before_execution + args.num_shards - 1) / args.num_shards,
-    );
-
     let now = Instant::now();
     let (transactions, compressor) = compress_transactions(transactions);
     println!("Mapping time: {:?}", now.elapsed());
+
+    let min_ordered_transaction_before_execution = min(100, args.block_size);
 
     for _ in 0..args.num_blocks {
         let transactions = transactions.clone();
@@ -89,15 +91,15 @@ fn main() {
 
         let mut latency = None;
         let mut count_ordered = 0;
+        let mut results = Vec::new();
 
-        block_partitioner
-            .partition_transactions(transactions, |sharded_txns| -> Result<(), io::Error> {
-                count_ordered += sharded_txns.iter().map(|txns| txns.len()).sum::<usize>();
+        block_orderer
+            .order_transactions(transactions, |ordered_txns| -> Result<(), io::Error> {
+                count_ordered += ordered_txns.len();
                 if latency.is_none() && count_ordered >= min_ordered_transaction_before_execution {
                     latency = Some(now.elapsed());
                 }
-                // println!("Partitioned {} transactions ({} new)", count_ordered,
-                //          sharded_txns.iter().map(|txns| txns.len()).sum::<usize>());
+                results.push(ordered_txns);
                 Ok(())
             })
             .unwrap();
@@ -110,6 +112,57 @@ fn main() {
             (Duration::from_secs(1).as_nanos() * (args.block_size as u128)) / elapsed.as_nanos()
         );
         println!("Latency: {:?}", latency.unwrap());
+
+        let odered_txns = results.into_iter().flatten().collect::<Vec<_>>();
+        println!(
+            "Ordering cost (1 / D): {:?}",
+            order_total_cost(&odered_txns, amortized_inverse_dependency_cost_function(0.),)
+        );
+        println!(
+            "Ordering cost (1 / (16 + D)): {:?}",
+            order_total_cost(
+                &odered_txns,
+                amortized_inverse_dependency_cost_function(16.),
+            )
+        );
+        println!(
+            "Ordering cost (1 / (50 + D)): {:?}",
+            order_total_cost(
+                &odered_txns,
+                amortized_inverse_dependency_cost_function(50.),
+            )
+        );
+    }
+}
+
+fn main() {
+    let args = Args::parse();
+
+    match args.orderer {
+        Orderer::Aria => {
+            let min_ordered_transaction_before_execution = min(100, args.block_size);
+            let block_orderer = BatchedBlockOrdererWithoutWindow::new(
+                SequentialDynamicAriaOrderer::default(),
+                min_ordered_transaction_before_execution * 5,
+            );
+
+            run_benchmark(args, block_orderer);
+        },
+        Orderer::Window => {
+            let min_ordered_transaction_before_execution = min(100, args.block_size);
+            let block_orderer = BatchedBlockOrdererWithWindow::new(
+                SequentialDynamicWindowOrderer::default(),
+                min_ordered_transaction_before_execution * 5,
+                1000,
+            );
+
+            run_benchmark(args, block_orderer);
+        },
+        Orderer::Identity => {
+            let block_orderer = IdentityBlockOrderer::default();
+
+            run_benchmark(args, block_orderer);
+        },
     }
 }
 

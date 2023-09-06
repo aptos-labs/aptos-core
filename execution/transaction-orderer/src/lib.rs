@@ -14,14 +14,17 @@ use aptos_logger::prelude::*;
 use aptos_types::block_executor::partitioner::{PartitionedTransactions, PartitionedTransactionsV3, PartitionV3};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use crate::batch_orderer::SequentialDynamicAriaOrderer;
+use crate::batch_orderer_with_window::SequentialDynamicWindowOrderer;
 use crate::block_orderer::BatchedBlockOrdererWithWindow;
 use crate::block_partitioner::{BlockPartitioner, OrderedRoundRobinPartitioner};
 use crate::transaction_compressor::{compress_transactions, CompressedPTransaction, CompressedPTransactionInner};
 
 pub mod batch_orderer;
+pub mod batch_orderer_with_window;
 pub mod block_orderer;
 pub mod block_partitioner;
 pub mod common;
+pub mod quality;
 mod reservation_table;
 pub mod transaction_compressor;
 
@@ -59,7 +62,7 @@ impl aptos_block_partitioner::BlockPartitioner for V3ReorderingPartitioner {
         info!("V3ReorderingPartitioner started with configs: max_window_size={}, min_ordered_transaction_before_execution={}", max_window_size, min_ordered_transaction_before_execution);
 
         let block_orderer = BatchedBlockOrdererWithWindow::new(
-            SequentialDynamicAriaOrderer::with_window(),
+            SequentialDynamicWindowOrderer::default(),
             min_ordered_transaction_before_execution * 5,
             max_window_size,
         );

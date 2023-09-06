@@ -4051,7 +4051,6 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "clap 4.4.14",
- "dashmap",
  "itertools 0.12.1",
  "move-core-types",
  "once_cell",

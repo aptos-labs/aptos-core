@@ -3,7 +3,7 @@
 
 // Copyright © Aptos Foundation
 
-use crate::batch_orderer::{BatchOrderer, BatchOrdererWithWindow};
+use crate::{batch_orderer::BatchOrderer, batch_orderer_with_window::BatchOrdererWithWindow};
 use std::{
     cell::RefCell,
     cmp::{max, min},
@@ -23,8 +23,34 @@ pub trait BlockOrderer {
         send_transactions_for_execution: F,
     ) -> Result<(), E>
     where
+        F: FnMut(Vec<Self::Txn>) -> Result<(), E>;
+}
+
+pub struct IdentityBlockOrderer<T> {
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T> Default for IdentityBlockOrderer<T> {
+    fn default() -> Self {
+        Self {
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T> BlockOrderer for IdentityBlockOrderer<T> {
+    type Txn = T;
+
+    fn order_transactions<F, E>(
+        &self,
+        txns: Vec<Self::Txn>,
+        mut send_transactions_for_execution: F,
+    ) -> Result<(), E>
+    where
         F: FnMut(Vec<Self::Txn>) -> Result<(), E>,
-        E: std::error::Error;
+    {
+        send_transactions_for_execution(txns)
+    }
 }
 
 /// Orders the transactions in a block in batches, using the underlying `BatchOrderer`,
@@ -60,7 +86,6 @@ where
     ) -> Result<(), E>
     where
         F: FnMut(Vec<Self::Txn>) -> Result<(), E>,
-        E: std::error::Error,
     {
         let mut batch_orderer = self.batch_orderer.borrow_mut();
         assert!(batch_orderer.is_empty());
@@ -123,7 +148,6 @@ where
     ) -> Result<(), E>
     where
         F: FnMut(Vec<Self::Txn>) -> Result<(), E>,
-        E: std::error::Error,
     {
         let mut batch_orderer = self.batch_orderer.borrow_mut();
         assert!(batch_orderer.is_empty());

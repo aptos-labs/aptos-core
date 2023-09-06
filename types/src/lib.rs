@@ -63,7 +63,6 @@ pub mod batched_stream;
 pub mod block_executor;
 pub mod bytes;
 pub mod closuretools;
-pub mod const_option;
 pub mod delayed_fields;
 pub mod keyless;
 pub mod no_error;

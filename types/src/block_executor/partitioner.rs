@@ -19,6 +19,7 @@ use std::{
 
 pub type ShardId = usize;
 pub type TxnIndex = usize;
+pub type ITxnIndex = isize;
 pub type RoundId = usize;
 
 pub static MAX_ALLOWED_PARTITIONING_ROUNDS: usize = 8;
