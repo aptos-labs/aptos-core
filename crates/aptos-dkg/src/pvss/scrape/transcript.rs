@@ -23,6 +23,8 @@ use std::ops::{Mul, Neg};
 /// macros override serde's serialization to call into `ValidCryptoMaterial::to_bytes()`. This makes
 /// it difficult to serialize complex types because if we call serde serialization inside `to_bytes`
 /// on the struct itself, it triggers infinite recursion by having `serde` call back into `to_bytes`.
+///
+/// TODO(Security): This lacks a PoK on the dealt secret `A[n]` so it is not secure in a DKG. Need to add it (see the Das PVSS).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct Transcript {

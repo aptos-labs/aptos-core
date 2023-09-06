@@ -78,3 +78,19 @@ where
 
     res.final_exponentiation()
 }
+
+pub trait HasMultiExp: Sized {
+    fn multi_exp(points: &[Self], scalars: &[Scalar]) -> Self;
+}
+
+impl HasMultiExp for G2Projective {
+    fn multi_exp(points: &[Self], scalars: &[Scalar]) -> Self {
+        G2Projective::multi_exp(points, scalars)
+    }
+}
+
+impl HasMultiExp for G1Projective {
+    fn multi_exp(points: &[Self], scalars: &[Scalar]) -> Self {
+        G1Projective::multi_exp(points, scalars)
+    }
+}
