@@ -723,13 +723,21 @@ algorithm for doing so is quite simple:
 For example:
 
 ```move
+struct Foo {
+    f: u64
+}
+
+struct Coin has copy {
+    value: u64
+}
+
 let s = b"hello";
 let foo = Foo { f: 0 };
 let coin = Coin { value: 0 };
 
-let s2 = s; // move
+let s2 = s; // copy
 let foo2 = foo; // move
-let coin2 = coin; // move
+let coin2 = coin; // copy
 
 let x = 0;
 let b = false;
