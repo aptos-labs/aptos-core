@@ -2,7 +2,7 @@
 
 use aptos_crypto::Uniform;
 use aptos_dkg::constants::{
-    BEST_CASE_N, BEST_CASE_THRESHOLD, DST_PVSS_TESTING_APP, WORST_CASE_N, WORST_CASE_THRESHOLD,
+    BEST_CASE_N, BEST_CASE_THRESHOLD, WORST_CASE_N, WORST_CASE_THRESHOLD,
 };
 use aptos_dkg::pvss;
 use aptos_dkg::pvss::traits::transcript::Transcript;
@@ -54,7 +54,7 @@ fn pvss_deal<T: Transcript, M: Measurement>(
                 let s = T::InputSecret::generate(&mut rng);
                 (s, rng)
             },
-            |(s, mut rng)| T::deal(&sc, &pp, &eks, &s, &DST_PVSS_TESTING_APP[..], &mut rng),
+            |(s, mut rng)| T::deal(&sc, &pp, &eks, &s, &mut rng),
         )
     });
 }
@@ -92,10 +92,10 @@ fn pvss_verify<T: Transcript, M: Measurement>(
         b.iter_with_setup(
             || {
                 let s = T::InputSecret::generate(&mut rng);
-                T::deal(&sc, &pp, &eks, &s, &DST_PVSS_TESTING_APP[..], &mut rng)
+                T::deal(&sc, &pp, &eks, &s, &mut rng)
             },
             |trx| {
-                trx.verify(&sc, &pp, &eks, &DST_PVSS_TESTING_APP[..])
+                trx.verify(&sc, &pp, &eks)
                     .expect("PVSS transcript verification should succeed");
             },
         )
@@ -112,7 +112,7 @@ fn pvss_decrypt_own_share<T: Transcript, M: Measurement>(
     let (pp, dks, eks, _, _) = test_utils::setup_dealing::<T, ThreadRng>(sc, &mut rng);
 
     let s = T::InputSecret::generate(&mut rng);
-    let trx = T::deal(&sc, &pp, &eks, &s, &DST_PVSS_TESTING_APP[..], &mut rng);
+    let trx = T::deal(&sc, &pp, &eks, &s, &mut rng);
 
     g.bench_function(format!("decrypt-share/{}", sc), move |b| {
         b.iter_with_setup(

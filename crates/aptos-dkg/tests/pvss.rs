@@ -4,7 +4,7 @@
 use aptos_crypto::hash::CryptoHash;
 use aptos_crypto::{bls12381, SigningKey, Uniform};
 use aptos_dkg::constants::{
-    BEST_CASE_N, BEST_CASE_THRESHOLD, DST_PVSS_TESTING_APP, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES,
+    BEST_CASE_N, BEST_CASE_THRESHOLD, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES,
     WORST_CASE_N, WORST_CASE_THRESHOLD,
 };
 use aptos_dkg::pvss;
@@ -137,9 +137,9 @@ fn pvss_deal_verify_aggr_and_reconstruct<T: Transcript + CryptoHash>(
     // TODO: Change this to return multiple InputSecrets, and their sum as the DealtSK. Then, test the secret reconstruction from the aggregated transcript shares.
     let (pp, dks, eks, s, sk) = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
 
-    let mut trx1 = T::deal(&sc, &pp, &eks, &s, &DST_PVSS_TESTING_APP[..], &mut rng);
-    let trx2 = T::deal(&sc, &pp, &eks, &s, &DST_PVSS_TESTING_APP[..], &mut rng);
-    trx1.verify(&sc, &pp, &eks, &DST_PVSS_TESTING_APP[..])
+    let mut trx1 = T::deal(&sc, &pp, &eks, &s, &mut rng);
+    let trx2 = T::deal(&sc, &pp, &eks, &s, &mut rng);
+    trx1.verify(&sc, &pp, &eks)
         .expect("PVSS transcript failed verification");
 
     // Test transcript (de)serialization
@@ -168,7 +168,7 @@ fn pvss_deal_verify_aggr_and_reconstruct<T: Transcript + CryptoHash>(
 
     // Test aggregation
     trx1.aggregate_with(sc, &trx2);
-    trx1.verify(sc, &pp, &eks, &DST_PVSS_TESTING_APP[..])
+    trx1.verify(sc, &pp, &eks)
         .expect("aggregated PVSS transcript failed verification");
 
     // Ensure that transcript can be signed

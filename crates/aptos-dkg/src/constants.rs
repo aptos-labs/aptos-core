@@ -28,16 +28,13 @@ pub const LARGE_SIZES: [usize; 3] = [8192, 16_384, 32_768];
 // DSTs and seeds
 //
 
-pub const DST_PVSS_TESTING_APP: &[u8; 36] = b"APTOS_SACRIFICING_PVSS_BENCHMARK_DST";
-
 /// TODO(rand_core_hell): Domain-separator for our `rand_core_hell` randomness generation.
-pub const DST_RAND_CORE_HELL: &[u8; 21] = b"AptosRandCoreHellHack";
+pub const DST_RAND_CORE_HELL: &[u8; 24] = b"APTOS_RAND_CORE_HELL_DST";
 
-/// Domain-separator for picking group elements in our PVSS public parameters by hashing to the curve.
-pub const DST_PVSS_PUBLIC_PARAMS_GENERATION: &[u8; 35] = b"AptosPvssPublicParametersGeneration";
-
-/// "Nothing-up-my-sleeve" seed for picking group elements in our PVSS public parameters by hashing to the curve.
-pub const SEED_PVSS_PUBLIC_PARAMS_GENERATION: &[u8; 33] = b"APTOS_DISTRIBUTED_RANDOMNESS_SEED";
+/// "Nothing up my sleeve" message & domain-separator tag (DST) for the hash-to-curve operation used
+/// to pick our PVSS public parameters (group elements) as `hash_to_curve(seed, dst, group_element_name)`.
+pub const DST_PVSS_PUBLIC_PARAMS: &[u8; 32] = b"APTOS_DISTRIBUTED_RANDOMNESS_DST";
+pub const SEED_PVSS_PUBLIC_PARAMS: &[u8; 33] = b"APTOS_DISTRIBUTED_RANDOMNESS_SEED";
 
 //
 // Sizes

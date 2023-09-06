@@ -86,7 +86,6 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         pp: &Self::PvssPublicParameters,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
-        dst: &'static [u8],
         rng: &mut R,
     ) -> Self;
 
@@ -98,7 +97,6 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         sc: &Self::SecretSharingConfig,
         pp: &Self::PvssPublicParameters,
         eks: &Vec<Self::EncryptPubKey>,
-        dst: &'static [u8],
     ) -> anyhow::Result<()>;
 
     /// Aggregates two transcripts.

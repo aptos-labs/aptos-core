@@ -7,7 +7,7 @@ use aptos_crypto_derive::{DeserializeKey, SerializeKey};
 use blstrs::{G1Projective, G2Projective};
 
 use crate::constants::{
-    DST_PVSS_PUBLIC_PARAMS_GENERATION, G2_PROJ_NUM_BYTES, SEED_PVSS_PUBLIC_PARAMS_GENERATION,
+    DST_PVSS_PUBLIC_PARAMS, G2_PROJ_NUM_BYTES, SEED_PVSS_PUBLIC_PARAMS,
 };
 use crate::pvss::encryption_dlog;
 use crate::pvss::traits;
@@ -31,17 +31,17 @@ impl PublicParameters {
         PublicParameters {
             enc: encryption_dlog::g2::PublicParameters::new(G2Projective::hash_to_curve(
                 seed,
-                DST_PVSS_PUBLIC_PARAMS_GENERATION.as_slice(),
+                DST_PVSS_PUBLIC_PARAMS.as_slice(),
                 b"h1_hat",
             )),
             u1_hat: G2Projective::hash_to_curve(
                 seed,
-                DST_PVSS_PUBLIC_PARAMS_GENERATION.as_slice(),
+                DST_PVSS_PUBLIC_PARAMS.as_slice(),
                 b"u1_hat",
             ),
             g1: G1Projective::hash_to_curve(
                 seed,
-                DST_PVSS_PUBLIC_PARAMS_GENERATION.as_slice(),
+                DST_PVSS_PUBLIC_PARAMS.as_slice(),
                 b"g1",
             ),
         }
@@ -82,7 +82,7 @@ impl ValidCryptoMaterial for PublicParameters {
 impl Default for PublicParameters {
     /// Verifiably creates Aptos-specific public parameters.
     fn default() -> Self {
-        Self::new_from_seed(SEED_PVSS_PUBLIC_PARAMS_GENERATION)
+        Self::new_from_seed(SEED_PVSS_PUBLIC_PARAMS)
     }
 }
 

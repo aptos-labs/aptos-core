@@ -163,11 +163,10 @@ impl DKGManager {
             &pp,
             &consensus_keys,
             &s,
-            &DST_PVSS_TESTING_APP[..],
             &mut rng,
         );
         trx_1
-            .verify(&wc_1, &pp, &consensus_keys, &DST_PVSS_TESTING_APP[..])
+            .verify(&wc_1, &pp, &consensus_keys)
             .expect("PVSS transcript failed verification");
 
         // // Test transcript (de)serialization
@@ -176,9 +175,9 @@ impl DKGManager {
         //     .expect("serialized transcript should deserialize correctly");
         // assert_eq!(trx_1, deserialized);
 
-        let trx_2 = WT::deal(&wc_2, &pp, &consensus_keys, &s, &DST_PVSS_TESTING_APP[..], &mut rng);
+        let trx_2 = WT::deal(&wc_2, &pp, &consensus_keys, &s, &mut rng);
         trx_2
-            .verify(&wc_2, &pp, &consensus_keys, &DST_PVSS_TESTING_APP[..])
+            .verify(&wc_2, &pp, &consensus_keys)
             .expect("PVSS transcript failed verification");
 
         // // Test transcript (de)serialization

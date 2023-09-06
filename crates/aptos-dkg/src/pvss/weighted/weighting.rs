@@ -158,14 +158,13 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
         pp: &Self::PvssPublicParameters,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
-        dst: &'static [u8],
         rng: &mut R,
     ) -> Self {
         // TODO(Security): This EK duplication allows an adversary to decrypt share_{i_j} / share_{i_k} for any $j$th and $k$th share of a validator $i$. Prove that security holds nonetheless or remove this.
         let duplicated_eks = WeightedTranscript::<T>::to_weighted_encryption_keys(sc, eks);
 
         WeightedTranscript {
-            trx: T::deal(sc.get_threshold_config(), pp, &duplicated_eks, s, dst, rng),
+            trx: T::deal(sc.get_threshold_config(), pp, &duplicated_eks, s, rng),
         }
     }
 
@@ -174,7 +173,6 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
         sc: &Self::SecretSharingConfig,
         pp: &Self::PvssPublicParameters,
         eks: &Vec<Self::EncryptPubKey>,
-        dst: &'static [u8],
     ) -> anyhow::Result<()> {
         let duplicated_eks = WeightedTranscript::<T>::to_weighted_encryption_keys(sc, eks);
 
@@ -183,7 +181,6 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
             sc.get_threshold_config(),
             pp,
             &duplicated_eks,
-            dst,
         )
     }
 

@@ -67,13 +67,11 @@ impl DKGTranscriptWrapper {
             &dkg_pvss_config.wc_1,
             &dkg_pvss_config.pp,
             &dkg_pvss_config.eks,
-            dkg_pvss_config.dst,
         )?;
         self.trx_two_third.verify(
             &dkg_pvss_config.wc_2,
             &dkg_pvss_config.pp,
             &dkg_pvss_config.eks,
-            dkg_pvss_config.dst,
         )?;
         Ok(())
     }

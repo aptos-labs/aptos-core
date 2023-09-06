@@ -16,6 +16,9 @@ use group::Group;
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, AddAssign, Mul, Neg, Sub};
 
+/// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
+const DAS_PVSS_FIAT_SHAMIR_DST: &[u8; 30] = b"APTOS_DAS_PVSS_FIAT_SHAMIR_DST";
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, BCSCryptoHash, CryptoHasher)]
 #[allow(non_snake_case)]
 pub struct Transcript {
@@ -70,11 +73,10 @@ impl traits::Transcript for Transcript {
 
     #[allow(non_snake_case)]
     fn deal<R: rand_core::RngCore + rand_core::CryptoRng>(
-        sc: &ThresholdConfig,
-        pp: &das::PublicParameters,
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PvssPublicParameters,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
-        _dst: &'static [u8], // DSTs are only needed in `Transcript::verify` for computing random challenges via Fiat-Shamir
         mut rng: &mut R,
     ) -> Self {
         assert_eq!(eks.len(), sc.n);
@@ -118,10 +120,9 @@ impl traits::Transcript for Transcript {
 
     fn verify(
         &self,
-        sc: &ThresholdConfig,
-        pp: &das::PublicParameters,
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PvssPublicParameters,
         eks: &Vec<Self::EncryptPubKey>,
-        dst: &'static [u8],
     ) -> anyhow::Result<()> {
         if eks.len() != sc.n {
             bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
@@ -140,7 +141,7 @@ impl traits::Transcript for Transcript {
         }
 
         // Derive challenges deterministically via Fiat-Shamir; it's easier to debug for distributed systems
-        let (f, extra) = fiat_shamir::fiat_shamir(self, sc, pp, eks, dst, 3);
+        let (f, extra) = fiat_shamir::fiat_shamir(self, sc, pp, eks, &DAS_PVSS_FIAT_SHAMIR_DST[..], 3);
 
         let ldt = LowDegreeTest::new(f, sc.t, sc.n + 1, true, sc.get_batch_evaluation_domain())?;
         ldt.low_degree_test_on_g2(&self.V)?;
