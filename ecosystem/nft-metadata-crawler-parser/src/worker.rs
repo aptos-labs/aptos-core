@@ -9,10 +9,9 @@ use crate::{
         constants::{MAX_RETRY_TIME_SECONDS, URI_SKIP_LIST},
         counters::{
             DUPLICATE_RAW_ANIMATION_URI_COUNT, DUPLICATE_RAW_IMAGE_URI_COUNT,
-            DUPLICATE_TOKEN_URI_COUNT, GOT_CONNECTION_COUNT, OPTIMIZE_IMAGE_TYPE_COUNT,
-            PARSER_FAIL_COUNT, PARSER_INVOCATIONS_COUNT, PARSER_SUCCESSES_COUNT,
-            PARSE_URI_TYPE_COUNT, PUBSUB_ACK_SUCCESS_COUNT, PUBSUB_STREAM_RESET_COUNT,
-            SKIP_URI_COUNT, UNABLE_TO_GET_CONNECTION_COUNT,
+            DUPLICATE_TOKEN_URI_COUNT, OPTIMIZE_IMAGE_TYPE_COUNT, PARSER_FAIL_COUNT,
+            PARSER_INVOCATIONS_COUNT, PARSER_SUCCESSES_COUNT, PARSE_URI_TYPE_COUNT,
+            PUBSUB_ACK_SUCCESS_COUNT, PUBSUB_STREAM_RESET_COUNT, SKIP_URI_COUNT,
         },
         database::{
             check_or_update_chain_id, establish_connection_pool, run_migrations, upsert_uris,
@@ -111,8 +110,7 @@ async fn spawn_parser(
 
         // Perform chain id check
         // If chain id is not set, set it
-        let mut conn = get_conn(pool.clone());
-
+        let mut conn = pool.get().expect("Failed to get DB connection from pool");
         let grpc_chain_id = parts[4].parse::<u64>().unwrap_or_else(|e| {
             error!(
                 error = ?e,
@@ -229,28 +227,6 @@ async fn send_ack(subscription: &Subscription, ack_id: &str) -> anyhow::Result<(
     )
     .await?
     .context("Failed to ack message to PubSub")
-}
-
-/// Gets a Postgres connection from the pool
-fn get_conn(
-    pool: Pool<ConnectionManager<PgConnection>>,
-) -> PooledConnection<ConnectionManager<PgConnection>> {
-    loop {
-        match pool.get() {
-            Ok(conn) => {
-                GOT_CONNECTION_COUNT.inc();
-                return conn;
-            },
-            Err(err) => {
-                UNABLE_TO_GET_CONNECTION_COUNT.inc();
-                error!(
-                    "Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
-                    pool.connection_timeout(),
-                    err
-                );
-            },
-        };
-    }
 }
 
 #[async_trait::async_trait]
