@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod sharded_block_partitioner; //TODO: maybe v1 is a better name.
 pub mod v2;
 
 pub mod test_utils;
@@ -12,13 +11,14 @@ use aptos_types::{
     transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
 };
 use move_core_types::account_address::AccountAddress;
-use sharded_block_partitioner::config::PartitionerV1Config;
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
 };
 use v2::config::PartitionerV2Config;
 mod pre_partition;
+#[cfg(test)]
+mod tests;
 
 pub trait BlockPartitioner: Send {
     fn partition(
@@ -41,7 +41,6 @@ type Sender = Option<AccountAddress>;
 
 #[derive(Clone, Copy, Debug)]
 pub enum PartitionerConfig {
-    V1(PartitionerV1Config),
     V2(PartitionerV2Config),
 }
 
@@ -54,7 +53,6 @@ impl Default for PartitionerConfig {
 impl PartitionerConfig {
     pub fn build(self) -> Box<dyn BlockPartitioner> {
         match self {
-            PartitionerConfig::V1(c) => c.build(),
             PartitionerConfig::V2(c) => c.build(),
         }
     }

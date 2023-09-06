@@ -5,7 +5,7 @@
 use crate::{
     parser::ast::{
         self as P, Ability, Ability_, BinOp, ConstantName, Field, FunctionName, ModuleName,
-        QuantKind, SpecApplyPattern, StructName, UnaryOp, Var, ENTRY_MODIFIER,
+        QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, ENTRY_MODIFIER,
     },
     shared::{
         ast_debug::*,
@@ -90,6 +90,7 @@ pub struct Script {
     pub function_name: FunctionName,
     pub function: Function,
     pub specs: Vec<SpecBlock>,
+    pub use_decls: Vec<UseDecl>,
 }
 
 //**************************************************************************************************
@@ -125,6 +126,7 @@ pub struct ModuleDefinition {
     pub functions: UniqueMap<FunctionName, Function>,
     pub constants: UniqueMap<ConstantName, Constant>,
     pub specs: Vec<SpecBlock>,
+    pub use_decls: Vec<UseDecl>,
 }
 
 //**************************************************************************************************
@@ -917,6 +919,7 @@ impl AstDebug for Script {
             function_name,
             function,
             specs,
+            use_decls: _,
         } = self;
         if let Some(n) = package_name {
             w.writeln(&format!("{}", n))
@@ -957,6 +960,7 @@ impl AstDebug for ModuleDefinition {
             functions,
             constants,
             specs,
+            use_decls: _,
         } = self;
         if let Some(n) = package_name {
             w.writeln(&format!("{}", n))

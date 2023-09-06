@@ -76,7 +76,7 @@ impl OrderRule {
                         .dag
                         .write()
                         .reachable_mut(&anchor, None)
-                        .for_each(|node_statue| node_statue.mark_as_ordered());
+                        .for_each(|node_status| node_status.mark_as_ordered());
                 }
             } else {
                 // re-process pending anchors

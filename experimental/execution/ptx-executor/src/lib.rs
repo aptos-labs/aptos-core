@@ -24,6 +24,7 @@ use crate::{
 use aptos_executor::{
     block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput,
 };
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
 use aptos_state_view::StateView;
@@ -33,7 +34,6 @@ use aptos_types::{
     transaction::{Transaction, TransactionOutput},
 };
 use aptos_vm::{
-    aptos_vm::RAYON_EXEC_POOL,
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     AptosVM, VMExecutor,
 };
@@ -66,7 +66,7 @@ impl VMExecutor for PtxBlockExecutor {
 
         let ret = Arc::new(Mutex::new(None));
         let ret_clone = ret.clone();
-        RAYON_EXEC_POOL.scope(move |scope| {
+        THREAD_MANAGER.get_exe_cpu_pool().scope(move |scope| {
             let num_txns = transactions.len();
             let (result_tx, result_rx) = channel();
 

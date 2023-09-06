@@ -117,7 +117,7 @@ pub(crate) struct StructEntry {
     pub struct_id: StructId,
     pub type_params: Vec<TypeParameter>,
     pub abilities: AbilitySet,
-    pub fields: Option<BTreeMap<Symbol, (usize, Type)>>,
+    pub fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
     pub attributes: Vec<Attribute>,
 }
 
@@ -295,7 +295,7 @@ impl<'env> ModelBuilder<'env> {
         struct_id: StructId,
         abilities: AbilitySet,
         type_params: Vec<TypeParameter>,
-        fields: Option<BTreeMap<Symbol, (usize, Type)>>,
+        fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
     ) {
         let entry = StructEntry {
             loc,
