@@ -992,8 +992,8 @@ module aptos_framework::stake {
         let validator_len = vector::length(&validator_perf.validators);
 
         spec {
-            update valid = validator_perf;
-            update ghost_prosper_idx = proposer_index;
+            update ghost_valid_perf = validator_perf;
+            update ghost_proposer_idx = proposer_index;
         };
         // proposer_index is an option because it can be missing (for NilBlocks)
         if (option::is_some(&proposer_index)) {
@@ -1014,9 +1014,9 @@ module aptos_framework::stake {
         while ({
             spec {
                 invariant len(validator_perf.validators) == validator_len;
-                invariant (option::spec_is_some(ghost_prosper_idx) && option::spec_borrow(ghost_prosper_idx) < validator_len) ==>
-                    (validator_perf.validators[option::spec_borrow(ghost_prosper_idx)].successful_proposals ==
-                        valid.validators[option::spec_borrow(ghost_prosper_idx)].successful_proposals + 1);
+                invariant (option::spec_is_some(ghost_proposer_idx) && option::spec_borrow(ghost_proposer_idx) < validator_len) ==>
+                    (validator_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals ==
+                        ghost_valid_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals + 1);
             };
             f < f_len
         }) {

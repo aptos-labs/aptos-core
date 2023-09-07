@@ -18,8 +18,8 @@ spec aptos_framework::stake {
         // property 3: The total staked value in the stake pool should be constant (excluding adding and withdrawing operations).
         apply StakedValueNochange to * except add_stake, add_stake_with_cap, withdraw, withdraw_with_cap, on_new_epoch, update_stake_pool;
         // ghost variable
-        global valid: ValidatorPerformance;
-        global ghost_prosper_idx: Option<u64>;
+        global ghost_valid_perf: ValidatorPerformance;
+        global ghost_proposer_idx: Option<u64>;
     }
 
     spec schema ConsensusInv{
@@ -199,11 +199,10 @@ spec aptos_framework::stake {
 
         let validator_perf = global<ValidatorPerformance>(@aptos_framework);
         let post post_validator_perf = global<ValidatorPerformance>(@aptos_framework);
-        let post x = proposer_index;
         let validator_len = len(validator_perf.validators);
-        ensures (option::spec_is_some(ghost_prosper_idx) && option::spec_borrow(ghost_prosper_idx) < validator_len) ==>
-            (post_validator_perf.validators[option::spec_borrow(ghost_prosper_idx)].successful_proposals ==
-                validator_perf.validators[option::spec_borrow(ghost_prosper_idx)].successful_proposals + 1);
+        ensures (option::spec_is_some(ghost_proposer_idx) && option::spec_borrow(ghost_proposer_idx) < validator_len) ==>
+            (post_validator_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals ==
+                validator_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals + 1);
     }
 
  spec update_stake_pool {
@@ -570,7 +569,6 @@ spec aptos_framework::stake {
                 } else {
                     denominator_0
                 };
-                let nominator = aptos_std::fixed_point64::spec_multiply_u128(denominator, epoch_rewards_rate);
                 denominator
             }
         } else {
