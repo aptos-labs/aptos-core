@@ -102,7 +102,7 @@ impl<'l> Inliner<'l> {
                 if !fdef.inline {
                     let mut visitor = OuterVisitor { inliner };
                     Dispatcher::new(&mut visitor).function(fdef);
-                    //DEBUG Self::eprint_fdef(&format!("fun {} ", _name), fdef);
+                    //Self::eprint_fdef(&format!("fun {} ", _name), fdef);
                 }
             },
         );
@@ -736,8 +736,8 @@ impl<'l> Inliner<'l> {
         };
 
         let spanned_lvalues = sp(loc, lvalues);
-        let lvalue_ty = lvalues_expected_types(&spanned_lvalues); // BUGBUG - added
-                                                                  // substitute
+        let lvalue_ty = lvalues_expected_types(&spanned_lvalues);
+
         let decl = sp(
             loc,
             SequenceItem_::Bind(spanned_lvalues, lvalue_ty, Box::new(exp)),
