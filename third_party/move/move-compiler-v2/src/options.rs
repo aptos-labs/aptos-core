@@ -4,6 +4,7 @@
 
 use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
+use std::collections::BTreeSet;
 
 /// Defines options for a run of the compiler.
 #[derive(Parser, Clone, Debug)]
@@ -30,6 +31,10 @@ pub struct Options {
     /// Do not complain about unknown attributes in Move code.
     #[clap(long, default_value = "false")]
     pub skip_attribute_checks: bool,
+    /// Known attributes for this dialect of move; if empty, assumes third-party Move.
+    /// Only used if skip_attribute_checks is false.
+    #[clap(skip)]
+    pub known_attributes: BTreeSet<String>,
     /// Whether we generate code for tests. This specifically guarantees stable output
     /// for baseline testing.
     #[clap(long)]
