@@ -5,6 +5,7 @@ use crate::{
     dag::{
         adapter::Notifier,
         anchor_election::RoundRobinAnchorElection,
+        dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
         order_rule::OrderRule,
         tests::{dag_test::MockStorage, helpers::new_certified_node},
@@ -186,7 +187,7 @@ proptest! {
             epoch: 1,
             verifier: validator_verifier,
         });
-        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 1, 0);
+        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 0, DAG_WINDOW);
         for round_nodes in &nodes {
             for node in round_nodes.iter().flatten() {
                 dag.add_node(node.clone()).unwrap();
@@ -273,7 +274,12 @@ fn test_order_rule_basic() {
         epoch: 1,
         verifier: validator_verifier,
     });
-    let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 1, 0);
+    let mut dag = Dag::new(
+        epoch_state.clone(),
+        Arc::new(MockStorage::new()),
+        0,
+        DAG_WINDOW,
+    );
     for round_nodes in &nodes {
         for node in round_nodes.iter().flatten() {
             dag.add_node(node.clone()).unwrap();

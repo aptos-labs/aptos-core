@@ -141,7 +141,10 @@ impl StateSyncManager {
 
         // Create a new DAG store and Fetch blocks
         let target_round = node.round();
-        let start_round = commit_li.commit_info().round().saturating_sub(DAG_WINDOW as Round);
+        let start_round = commit_li
+            .commit_info()
+            .round()
+            .saturating_sub(DAG_WINDOW as Round);
         let sync_dag_store = Arc::new(RwLock::new(Dag::new_empty(
             self.epoch_state.clone(),
             self.storage.clone(),

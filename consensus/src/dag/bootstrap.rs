@@ -6,11 +6,12 @@ use super::{
     dag_fetcher::{DagFetcherService, FetchRequestHandler},
     dag_handler::NetworkHandler,
     dag_network::TDAGNetworkSender,
+    dag_state_sync::DAG_WINDOW,
     dag_store::Dag,
     order_rule::OrderRule,
     rb_handler::NodeBroadcastHandler,
     storage::DAGStorage,
-    types::DAGMessage, dag_state_sync::DAG_WINDOW,
+    types::DAGMessage,
 };
 use crate::{
     dag::adapter::NotificationAdapter, experimental::buffer_manager::OrderedBlocks,

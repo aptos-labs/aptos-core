@@ -78,11 +78,16 @@ impl Dag {
         if let Err(e) = storage.delete_certified_nodes(expired) {
             error!("Error deleting expired nodes: {:?}", e);
         }
+        let initial_round = if highest_committed_anchor_round <= dag_window_size_config as Round {
+            1
+        } else {
+            highest_committed_anchor_round.saturating_sub(dag_window_size_config as Round)
+        };
         Self {
             nodes_by_round,
             author_to_index,
             storage,
-            initial_round: highest_committed_anchor_round - (dag_window_size_config as Round),
+            initial_round,
             epoch_state,
             highest_committed_anchor_round,
         }
