@@ -21,6 +21,7 @@ use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
 };
@@ -38,6 +39,7 @@ pub fn bootstrap_dag(
     dag_network_sender: Arc<dyn TDAGNetworkSender>,
     time_service: aptos_time_service::TimeService,
     payload_client: Arc<dyn PayloadClient>,
+    db: Arc<dyn DbReader>,
 ) -> (
     AbortHandle,
     AbortHandle,
@@ -98,6 +100,7 @@ pub fn bootstrap_dag(
         storage.clone(),
         order_rule,
         fetch_requester.clone(),
+        db,
     );
     let rb_handler = NodeBroadcastHandler::new(
         dag.clone(),

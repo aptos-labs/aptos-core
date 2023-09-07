@@ -20,9 +20,12 @@ use crate::{
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
+use aptos_storage_interface::DbReader;
 use aptos_time_service::TimeService;
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfo, validator_verifier::random_validator_verifier,
+    epoch_state::EpochState,
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
+    validator_verifier::random_validator_verifier,
 };
 use async_trait::async_trait;
 use claims::{assert_ok, assert_ok_eq};
@@ -65,6 +68,16 @@ impl TDAGNetworkSender for MockNetworkSender {
         _rpc_timeout: Duration,
     ) -> RpcWithFallback {
         unimplemented!()
+    }
+}
+
+pub(super) struct MockDbReader {
+    pub(super) ledger_info: LedgerInfoWithSignatures,
+}
+
+impl DbReader for MockDbReader {
+    fn get_latest_ledger_info(&self) -> anyhow::Result<LedgerInfoWithSignatures> {
+        Ok(self.ledger_info.clone())
     }
 }
 
@@ -111,6 +124,12 @@ async fn test_certified_node_handler() {
     );
     let fetch_requester = Arc::new(fetch_requester);
 
+    let mock_ledger_info = LedgerInfo::mock_genesis(None);
+    let mock_ledger_info = generate_ledger_info_with_sig(&signers, mock_ledger_info);
+    let db = Arc::new(MockDbReader {
+        ledger_info: mock_ledger_info,
+    });
+
     let mut driver = DagDriver::new(
         signers[0].author(),
         epoch_state,
@@ -121,6 +140,7 @@ async fn test_certified_node_handler() {
         storage,
         order_rule,
         fetch_requester,
+        db,
     );
 
     let first_round_node = new_certified_node(1, signers[0].author(), vec![]);

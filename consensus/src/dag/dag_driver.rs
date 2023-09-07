@@ -5,7 +5,7 @@ use super::{
     dag_fetcher::FetchRequester,
     order_rule::OrderRule,
     storage::DAGStorage,
-    types::{CertifiedAck, DAGMessage, Extensions},
+    types::{CertifiedAck, CertifiedNodeMessage, DAGMessage, Extensions},
     RpcHandler,
 };
 use crate::{
@@ -21,6 +21,7 @@ use aptos_consensus_types::common::{Author, Payload};
 use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_storage_interface::DbReader;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{block_info::Round, epoch_state::EpochState};
 use futures::{
@@ -49,6 +50,7 @@ pub(crate) struct DagDriver {
     storage: Arc<dyn DAGStorage>,
     order_rule: OrderRule,
     fetch_requester: Arc<FetchRequester>,
+    db: Arc<dyn DbReader>,
 }
 
 impl DagDriver {
@@ -62,6 +64,7 @@ impl DagDriver {
         storage: Arc<dyn DAGStorage>,
         order_rule: OrderRule,
         fetch_requester: Arc<FetchRequester>,
+        db: Arc<dyn DbReader>,
     ) -> Self {
         let pending_node = storage
             .get_pending_node()
@@ -83,6 +86,7 @@ impl DagDriver {
             storage,
             order_rule,
             fetch_requester,
+            db,
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -151,12 +155,19 @@ impl DagDriver {
         let signature_builder =
             SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone());
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
+        let latest_ledger_info = self
+            .db
+            .get_latest_ledger_info()
+            .expect("latest ledger info must exist");
         let task = self
             .reliable_broadcast
             .broadcast(node.clone(), signature_builder)
             .then(move |certificate| {
                 let certified_node = CertifiedNode::new(node, certificate.signatures().to_owned());
-                rb.broadcast(certified_node, cert_ack_set)
+
+                let certified_node_msg =
+                    CertifiedNodeMessage::new(certified_node, latest_ledger_info);
+                rb.broadcast(certified_node_msg, cert_ack_set)
             });
         tokio::spawn(Abortable::new(task, abort_registration));
         if let Some(prev_handle) = self.rb_abort_handle.replace(abort_handle) {
