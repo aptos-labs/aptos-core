@@ -34,7 +34,7 @@ pub struct RespawnedSession<'r, 'l> {
     state_view: ChangeSetStateView<'r>,
     #[borrows(state_view)]
     #[covariant]
-    resolver: StorageAdapter<'this, ChangeSetStateView<'r>, ChangeSetStateView<'r>>,
+    resolver: StorageAdapter<'this, ChangeSetStateView<'r>>,
     #[borrows(resolver)]
     #[not_covariant]
     session: Option<SessionExt<'this, 'l>>,
@@ -58,7 +58,6 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
                     state_view,
                     vm.get_gas_feature_version(),
                     vm.get_features(),
-                    Some(state_view),
                 )
             },
             session_builder: |resolver| Some(vm.new_session(resolver, session_id)),

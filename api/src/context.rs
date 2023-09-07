@@ -1153,7 +1153,7 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let storage_adapter: StorageAdapter<_, ()> = StorageAdapter::new(&state_view);
+            let storage_adapter = StorageAdapter::new(&state_view);
 
             let gas_schedule_params =
                 match GasScheduleV2::fetch_config(&storage_adapter).and_then(|gas_schedule| {
@@ -1218,7 +1218,7 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let storage_adapter: StorageAdapter<_, ()> = StorageAdapter::new(&state_view);
+            let storage_adapter = StorageAdapter::new(&state_view);
 
             let block_gas_limit = OnChainExecutionConfig::fetch_config(&storage_adapter)
                 .and_then(|config| config.block_gas_limit());

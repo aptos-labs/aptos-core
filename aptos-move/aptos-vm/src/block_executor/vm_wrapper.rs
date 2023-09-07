@@ -34,7 +34,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     fn init(argument: &'a S) -> Self {
         // AptosVM has to be initialized using configs from storage.
         // Using adapter allows us to fetch those.
-        let config_storage = StorageAdapter::<_, ()>::new(argument);
+        let config_storage = StorageAdapter::new(argument);
         let vm = AptosVM::new(&config_storage);
 
         // Loading `0x1::account` and its transitive dependency into the code cache.
@@ -47,7 +47,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
 
         let _ = vm.load_module(
             &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            &vm.as_move_resolver::<_, ()>(argument, None),
+            &vm.as_move_resolver(argument),
         );
 
         Self {
@@ -67,7 +67,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
-        let resolver = &self.vm.as_move_resolver(view, Some(view));
+        let resolver = &self.vm.as_move_resolver(view);
 
         match self
             .vm
