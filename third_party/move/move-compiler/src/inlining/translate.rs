@@ -4,7 +4,7 @@
 use crate::{
     diag,
     expansion::ast::{AbilitySet, ModuleIdent, ModuleIdent_, SpecId, Visibility},
-    inlining::visitor::{Dispatcher, TypedDispatcher, TypedVisitor, Visitor, VisitorContinuation},
+    inlining::visitor::{Dispatcher, Visitor, VisitorContinuation},
     naming,
     naming::ast::{
         FunctionSignature, StructDefinition, StructTypeParameter, TParam, TParamID, Type,
@@ -305,7 +305,7 @@ impl<'l, 'r> Visitor for SubstitutionVisitor<'l, 'r> {
         self.shadowed.pop_front();
     }
 
-    fn var_decl(&mut self, var: &mut Var) {
+    fn var_decl(&mut self, _ty: &mut Type, var: &mut Var) {
         self.shadowed
             .front_mut()
             .expect("scoped")
@@ -518,7 +518,7 @@ impl<'l, 'r> Visitor for RenamingVisitor<'l, 'r> {
         }
     }
 
-    fn var_decl(&mut self, var: &mut Var) {
+    fn var_decl(&mut self, _ty: &mut Type, var: &mut Var) {
         let new_name = Symbol::from(format!("{}#{}", var.0.value, self.inliner.rename_counter));
         self.inliner.rename_counter += 1;
         self.renamings
@@ -528,7 +528,7 @@ impl<'l, 'r> Visitor for RenamingVisitor<'l, 'r> {
         var.0.value = new_name;
     }
 
-    fn var_use(&mut self, var: &mut Var) {
+    fn var_use(&mut self, _ty: &mut Type, var: &mut Var) {
         for mapping in &self.renamings {
             if let Some(new_name) = mapping.get(&var.0.value) {
                 var.0.value = *new_name
@@ -549,8 +549,8 @@ struct SignatureExtractionVisitor<'l, 'r> {
     used_type_params: BTreeSet<TParam>,
 }
 
-impl<'l, 'r> TypedVisitor for SignatureExtractionVisitor<'l, 'r> {
-    fn ty(&mut self, t: &mut Type) -> VisitorContinuation {
+impl<'l, 'r> Visitor for SignatureExtractionVisitor<'l, 'r> {
+    fn type_(&mut self, t: &mut Type) -> VisitorContinuation {
         if let Type_::Param(param) = &t.value {
             self.used_type_params.insert(param.clone());
         }
@@ -892,7 +892,7 @@ fn lift_lambda_as_function(
         used_local_vars: BTreeMap::new(),
         used_type_params: BTreeSet::new(),
     };
-    TypedDispatcher::new(&mut extraction_visitor).exp(&mut lambda);
+    Dispatcher::new(&mut extraction_visitor).exp(&mut lambda);
     let SignatureExtractionVisitor {
         inliner: _,
         declared_vars: _,
