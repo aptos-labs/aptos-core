@@ -15,6 +15,8 @@ use ureq::Response;
 
 const MAX_COLLECTION_SIZE: usize = 100;
 
+// TODO: This needs to use reqwest somehow instead.
+
 // This generates an arbitrary generic response returned by vault for various API calls.
 prop_compose! {
     pub fn arb_generic_response(

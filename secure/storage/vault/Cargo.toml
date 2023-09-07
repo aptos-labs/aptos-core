@@ -18,17 +18,20 @@ aptos-proptest-helpers = { workspace = true, optional = true }
 aptos-types = { workspace = true, optional = true }
 base64 = { workspace = true }
 chrono = { workspace = true }
-native-tls = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
+reqwest = { workspace = true, features = ["blocking"] }
+rustls-pemfile = "=2.0.0-alpha.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-ureq = { workspace = true }
 
 [dev-dependencies]
 aptos-proptest-helpers = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
+http = "0.2.9"
+wiremock = "0.5.19"
+tokio = { workspace = true }
 proptest = { workspace = true }
 
 [features]

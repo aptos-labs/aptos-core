@@ -498,17 +498,17 @@ futures-core = "0.3.25"
 futures-util = "0.3.21"
 gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
-git2 = "0.16.1"
+git2 = { version = "0.16.1", features = [], default-features = false }
 glob = "0.3.0"
 goldenfile = "1.1.0"
-google-cloud-pubsub = "0.18.0"
-google-cloud-storage = "0.13.0"
+google-cloud-pubsub = { version = "0.18.0", features = ["auth", "rustls-tls"], default-features = false }
+google-cloud-storage = { version = "0.13.0", features = ["auth", "rustls-tls"], default-features = false }
 handlebars = "4.2.2"
 heck = "0.3.2"
 hex = "0.4.3"
 hkdf = "0.10.0"
 hostname = "0.3.1"
-httpmock = "0.6.8"
+httpmock = { version = "0.6.8", features = [], default-features = false }
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-tls = "0.5.0"
 image = "0.24.5"
@@ -536,7 +536,6 @@ mime = "0.3.16"
 mirai-annotations = "1.12.0"
 mockall = "0.11.4"
 more-asserts = "0.3.0"
-native-tls = "0.2.10"
 ntest = "0.9.0"
 num_cpus = "1.13.1"
 num-derive = "0.3.3"
@@ -556,7 +555,7 @@ procfs = "0.14.1"
 proc-macro2 = "1.0.38"
 project-root = "0.2.2"
 prometheus = { version = "0.13.0", default-features = false }
-prometheus-http-query = "0.5.2"
+prometheus-http-query = { version = "0.6.6", features = ["rustls-tls"], default-features = false }
 prometheus-parse = "0.2.4"
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
@@ -571,14 +570,15 @@ rayon = "1.5.2"
 redis = { version = "0.22.3", features = ["tokio-comp", "script", "connection-manager"] }
 redis-test = { version = "0.1.1", features = ["aio"] }
 regex = "1.9.3"
-reqwest = { version = "0.11.11", features = [
+reqwest = { version = "0.11.20", features = [
     "blocking",
     "cookies",
     "json",
     "stream",
-] }
+    "rustls-tls",
+], default-features = false }
 reqwest-middleware = "0.2.0"
-reqwest-retry = "0.2.1"
+reqwest-retry = {version = "0.2.3", default-features = false}
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rocksdb = { version = "0.21.0", features = ["lz4"] }
@@ -635,13 +635,13 @@ tonic = { version = "0.8.3", features = [
 tonic-reflection = "0.6.0"
 ureq = { version = "1.5.4", features = [
     "json",
-    "native-tls",
-], default_features = false }
+    "tls",
+], default-features = false }
 url = { version = "2.4.0", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
-warp-reverse-proxy = "1.0.0"
+warp-reverse-proxy = { version = "1.0.0", features = ["rustls-tls"], default-features = false }
 which = "4.2.5"
 x25519-dalek = "1.2.0"
 

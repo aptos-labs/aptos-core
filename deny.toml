@@ -1,0 +1,32 @@
+all-features = false
+no-default-features = false
+targets = [
+    { triple = "aarch64-apple-darwin" },
+]
+
+[advisories]
+vulnerability = "allow"
+unmaintained = "allow"
+notice = "allow"
+unsound = "allow"
+yanked = "allow"
+
+[licenses]
+unlicensed = "allow"
+copyleft = "allow"
+default = "allow"
+
+[bans]
+multiple-versions = "allow"
+wildcards = "allow"
+workspace-default-features = "allow"
+external-default-features = "allow"
+deny = [
+    { name = "openssl" },
+    { name = "openssl-sys" },
+    { name = "openssl-macros" },
+]
+
+[sources]
+unknown-registry = "allow"
+unknown-git = "allow"

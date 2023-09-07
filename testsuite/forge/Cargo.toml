@@ -41,7 +41,6 @@ either = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
-hyper-tls = { workspace = true }
 itertools = { workspace = true }
 json-patch = { workspace = true }
 k8s-openapi = { version = "0.13.1", default-features = false, features = [
