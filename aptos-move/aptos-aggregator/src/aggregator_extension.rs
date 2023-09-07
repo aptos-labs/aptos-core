@@ -3,7 +3,8 @@
 
 use crate::{
     bounded_math::{
-        addition, subtraction, BoundedMathResult, BoundedMathError, addition_deltavalue, DeltaValue, expect_ok, ok_overflow,
+        abort_error, addition, addition_deltavalue, expect_ok, ok_overflow, subtraction,
+        BoundedMathResult, DeltaValue, EEXPECTED_OVERFLOW, EEXPECTED_UNDERFLOW,
     },
     resolver::{AggregatorReadMode, AggregatorResolver},
 };
@@ -220,9 +221,9 @@ pub fn validate_history(
     base_value: u128,
     max_value: u128,
     state: &AggregatorState,
-) -> BoundedMathResult<()> {
+) -> PartialVMResult<()> {
     if let AggregatorState::Delta {
-        speculative_start_value: _,
+        speculative_start_value,
         delta: _,
         history,
     } = state
@@ -238,12 +239,18 @@ pub fn validate_history(
         if history.min_overflow_positive_delta.is_some()
             && base_value <= max_value - history.min_overflow_positive_delta.unwrap()
         {
-            return Err(BoundedMathError::Overflow);
+            return Err(abort_error(
+                format!("Overflow was expected when setting the aggreagator start value to {}. Previous speculative start value = {:?}, Min overflow delta = {}, Max value = {}", base_value, speculative_start_value, history.min_overflow_positive_delta.unwrap(), max_value),
+                EEXPECTED_OVERFLOW,
+            ));
         }
         if history.max_underflow_negative_delta.is_some()
             && base_value >= history.max_underflow_negative_delta.unwrap()
         {
-            return Err(BoundedMathError::Underflow);
+            return Err(abort_error(
+                format!("Underflow was expected when setting the aggreagator start value to {}. Previous speculative start value = {:?}, Max underflow delta = {}, Max value = {}", base_value, speculative_start_value, history.max_underflow_negative_delta.unwrap(), max_value),
+                EEXPECTED_UNDERFLOW,
+            ));
         }
     }
     Ok(())
@@ -329,9 +336,7 @@ impl Aggregator {
             AggregatorState::Data { value } => {
                 // If aggregator knows the value, add directly and keep the state.
                 if let Ok(new_value) = addition(value, input, self.max_value) {
-                    self.state = AggregatorState::Data {
-                        value: new_value,
-                    };
+                    self.state = AggregatorState::Data { value: new_value };
                     Ok(true)
                 } else {
                     Ok(false)
@@ -342,10 +347,18 @@ impl Aggregator {
                 delta,
                 history,
             } => {
-                let cur_value = expect_ok(addition_deltavalue(speculative_start_value.get_value(), delta, self.max_value))?;
+                let cur_value = expect_ok(addition_deltavalue(
+                    speculative_start_value.get_value(),
+                    delta,
+                    self.max_value,
+                ))?;
 
                 if addition(cur_value, input, self.max_value).is_err() {
-                    let overflow_value = expect_ok(ok_overflow(addition_deltavalue(input, delta, self.max_value)))?;
+                    let overflow_value = expect_ok(ok_overflow(addition_deltavalue(
+                        input,
+                        delta,
+                        self.max_value,
+                    )))?;
 
                     // if value overflowed, we don't need to record it
                     if let Some(overflow_value) = overflow_value {
@@ -355,7 +368,8 @@ impl Aggregator {
                     }
                     Ok(false)
                 } else {
-                    let new_delta = expect_ok(delta.add(&DeltaValue::Positive(input), self.max_value))?;
+                    let new_delta =
+                        expect_ok(delta.add(&DeltaValue::Positive(input), self.max_value))?;
                     self.state = AggregatorState::Delta {
                         speculative_start_value,
                         delta: new_delta,
@@ -387,9 +401,7 @@ impl Aggregator {
             AggregatorState::Data { value } => {
                 // If aggregator knows the value, add directly and keep the state.
                 if let Ok(new_value) = subtraction(value, input) {
-                    self.state = AggregatorState::Data {
-                        value: new_value,
-                    };
+                    self.state = AggregatorState::Data { value: new_value };
                     Ok(true)
                 } else {
                     Ok(false)
@@ -400,10 +412,18 @@ impl Aggregator {
                 delta,
                 history,
             } => {
-                let cur_value = expect_ok(addition_deltavalue(speculative_start_value.get_value(), delta, self.max_value))?;
+                let cur_value = expect_ok(addition_deltavalue(
+                    speculative_start_value.get_value(),
+                    delta,
+                    self.max_value,
+                ))?;
 
                 if cur_value < input {
-                    let underflow_value = expect_ok(ok_overflow(addition_deltavalue(input, delta.minus(), self.max_value)))?;
+                    let underflow_value = expect_ok(ok_overflow(addition_deltavalue(
+                        input,
+                        delta.minus(),
+                        self.max_value,
+                    )))?;
                     // if value overflowed, we don't need to record it
                     if let Some(underflow_value) = underflow_value {
                         self.get_mut_history()
@@ -412,7 +432,8 @@ impl Aggregator {
                     }
                     Ok(false)
                 } else {
-                    let new_delta = expect_ok(delta.add(&DeltaValue::Negative(input), self.max_value))?;
+                    let new_delta =
+                        expect_ok(delta.add(&DeltaValue::Negative(input), self.max_value))?;
                     self.state = AggregatorState::Delta {
                         speculative_start_value,
                         delta: new_delta,
@@ -479,7 +500,11 @@ impl Aggregator {
                     delta,
                     history,
                 };
-                Ok(addition_deltavalue(value_from_storage, delta, self.max_value)?)
+                Ok(addition_deltavalue(
+                    value_from_storage,
+                    delta,
+                    self.max_value,
+                )?)
             },
         }
     }
@@ -526,7 +551,11 @@ impl Aggregator {
                     delta,
                     history,
                 };
-                Ok(addition_deltavalue(value_from_storage, delta, self.max_value)?)
+                Ok(addition_deltavalue(
+                    value_from_storage,
+                    delta,
+                    self.max_value,
+                )?)
             },
         }
     }
@@ -725,7 +754,6 @@ mod test {
                 .unwrap(),
             50
         );
-
     }
     #[test]
     fn test_successful_operations_in_delta_mode() {

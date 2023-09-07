@@ -1,12 +1,28 @@
 // Copyright © Aptos Foundation
 
+use aptos_logger::error;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
-use aptos_logger::error;
 
-use crate::delta_change_set::{EEXPECTED_OVERFLOW, EEXPECTED_UNDERFLOW, ECODE_INVARIANT_BROKEN};
+// When bounded math operation overflows
+// Generally means addition exceeded limit.
+pub(crate) const EBOUND_OVERFLOW: u64 = 0x02_0001;
 
+/// When bounded math operation underflows
+/// Generally means subtraction went below 0.
+pub(crate) const EBOUND_UNDERFLOW: u64 = 0x02_0002;
 
+/// When updating the aggregator start value (due to read operations
+/// or at the end of the transaction), we realize that mistakenly raised
+/// an overflow in one of the previus try_add operation.
+pub(crate) const EEXPECTED_OVERFLOW: u64 = 0x02_0003;
+
+/// When updating the aggregator start value (due to read operations
+/// or at the end of the transaction), we realize that mistakenly raised
+/// an underflow in one of the previus try_sub operation.
+pub(crate) const EEXPECTED_UNDERFLOW: u64 = 0x02_0004;
+
+pub(crate) const ECODE_INVARIANT_BROKEN: u64 = 0x02_0005;
 
 #[derive(Debug)]
 pub enum BoundedMathError {
@@ -25,14 +41,8 @@ pub(crate) fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
 impl From<BoundedMathError> for PartialVMError {
     fn from(err: BoundedMathError) -> Self {
         match err {
-            BoundedMathError::Overflow => abort_error(
-                "Overflow",
-                EEXPECTED_OVERFLOW,
-            ),
-            BoundedMathError::Underflow => abort_error(
-                "Underflow",
-                EEXPECTED_UNDERFLOW,
-            ),
+            BoundedMathError::Overflow => abort_error("Overflow", EBOUND_OVERFLOW),
+            BoundedMathError::Underflow => abort_error("Underflow", EBOUND_UNDERFLOW),
         }
     }
 }
@@ -59,7 +69,10 @@ pub fn expect_ok<T>(value: BoundedMathResult<T>) -> PartialVMResult<T> {
     value.map_err(|e| {
         error!("Aggregator code invariant broken (there is a bug in the code)");
         abort_error(
-            format!("Aggregator code invariant broken (there is a bug in the code), {:?}", e),
+            format!(
+                "Aggregator code invariant broken (there is a bug in the code), {:?}",
+                e
+            ),
             ECODE_INVARIANT_BROKEN,
         )
     })
@@ -106,24 +119,22 @@ impl DeltaValue {
         macro_rules! update_different_sign {
             ($a:ident, $b:ident) => {
                 if $a >= $b {
-                    DeltaValue::Positive(subtraction(* $a, * $b)?)
+                    DeltaValue::Positive(subtraction(*$a, *$b)?)
                 } else {
-                    DeltaValue::Negative(subtraction(* $b, * $a)?)
+                    DeltaValue::Negative(subtraction(*$b, *$a)?)
                 }
             };
         }
 
         Ok(match (self, other) {
-            (DeltaValue::Positive(v1), DeltaValue::Positive(v2)) => DeltaValue::Positive(
-                addition(*v1, *v2, max_value)?
-            ),
-            (DeltaValue::Positive(v1), DeltaValue::Negative(v2)) =>
-                update_different_sign!(v1, v2),
-            (DeltaValue::Negative(v1), DeltaValue::Positive(v2)) =>
-                update_different_sign!(v2, v1),
-            (DeltaValue::Negative(v1), DeltaValue::Negative(v2)) => DeltaValue::Negative(
-                addition(*v1, *v2, max_value)?
-            ),
+            (DeltaValue::Positive(v1), DeltaValue::Positive(v2)) => {
+                DeltaValue::Positive(addition(*v1, *v2, max_value)?)
+            },
+            (DeltaValue::Positive(v1), DeltaValue::Negative(v2)) => update_different_sign!(v1, v2),
+            (DeltaValue::Negative(v1), DeltaValue::Positive(v2)) => update_different_sign!(v2, v1),
+            (DeltaValue::Negative(v1), DeltaValue::Negative(v2)) => {
+                DeltaValue::Negative(addition(*v1, *v2, max_value)?)
+            },
         })
     }
 }

@@ -2,10 +2,9 @@
 
 use crate::{
     aggregator_extension::{
-        validate_history, AggregatorID, AggregatorState, DeltaHistory,
-        SpeculativeStartValue,
+        validate_history, AggregatorID, AggregatorState, DeltaHistory, SpeculativeStartValue,
     },
-    bounded_math::{abort_error, BoundedMathResult, ok_overflow, ok_underflow, addition_deltavalue},
+    bounded_math::{abort_error, addition_deltavalue, ok_overflow, ok_underflow},
 };
 use aptos_state_view::StateView;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -37,13 +36,13 @@ impl AggregatorChange {
 
     /// Returns the result of applying the AggregatorState to the base value
     /// Returns error if postcondition is not satisfied.
-    pub fn apply_aggregator_change_to(&self, base: u128) -> BoundedMathResult<u128> {
+    pub fn apply_aggregator_change_to(&self, base: u128) -> PartialVMResult<u128> {
         match self.state {
             AggregatorState::Data { value } => Ok(value),
             AggregatorState::Delta { delta, .. } => {
                 // First, validate if the current delta operation can be applied to the base.
                 validate_history(base, self.max_value, &self.state)?;
-                addition_deltavalue(base, delta, self.max_value)
+                Ok(addition_deltavalue(base, delta, self.max_value)?)
             },
         }
     }
@@ -90,36 +89,48 @@ impl AggregatorChange {
                         let new_delta = prev_delta.add(&delta, self.max_value)?;
 
                         let new_min_overflow = {
-                            let adjusted_min_overflow_positive_delta = history.min_overflow_positive_delta.map_or(
-                                Ok(None),
-                                // Return Result<Option<u128>>. we want to have None on overflow,
-                                // and to fail the merging on underflow
-                                |min_overflow_positive_delta| ok_overflow(addition_deltavalue(
-                                    min_overflow_positive_delta,
-                                    prev_delta,
-                                    self.max_value,
-                                ))
-                            )?;
+                            let adjusted_min_overflow_positive_delta =
+                                history.min_overflow_positive_delta.map_or(
+                                    Ok(None),
+                                    // Return Result<Option<u128>>. we want to have None on overflow,
+                                    // and to fail the merging on underflow
+                                    |min_overflow_positive_delta| {
+                                        ok_overflow(addition_deltavalue(
+                                            min_overflow_positive_delta,
+                                            prev_delta,
+                                            self.max_value,
+                                        ))
+                                    },
+                                )?;
 
-                            match (adjusted_min_overflow_positive_delta, prev_history.min_overflow_positive_delta) {
+                            match (
+                                adjusted_min_overflow_positive_delta,
+                                prev_history.min_overflow_positive_delta,
+                            ) {
                                 (Some(a), Some(b)) => Some(u128::min(a, b)),
                                 (a, b) => a.or(b),
                             }
                         };
 
                         let new_max_underflow = {
-                            let adjusted_max_underflow_negative_delta = history.max_underflow_negative_delta.map_or(
-                                Ok(None),
-                                // Return Result<Option<u128>>. we want to have None on overflow,
-                                // and to fail the merging on underflow
-                                |max_underflow_negative_delta| ok_overflow(addition_deltavalue(
-                                    max_underflow_negative_delta,
-                                    prev_delta.minus(),
-                                    self.max_value,
-                                ))
-                            )?;
+                            let adjusted_max_underflow_negative_delta =
+                                history.max_underflow_negative_delta.map_or(
+                                    Ok(None),
+                                    // Return Result<Option<u128>>. we want to have None on overflow,
+                                    // and to fail the merging on underflow
+                                    |max_underflow_negative_delta| {
+                                        ok_overflow(addition_deltavalue(
+                                            max_underflow_negative_delta,
+                                            prev_delta.minus(),
+                                            self.max_value,
+                                        ))
+                                    },
+                                )?;
 
-                            match (adjusted_max_underflow_negative_delta, prev_history.max_underflow_negative_delta) {
+                            match (
+                                adjusted_max_underflow_negative_delta,
+                                prev_history.max_underflow_negative_delta,
+                            ) {
                                 (Some(a), Some(b)) => Some(u128::min(a, b)),
                                 (a, b) => a.or(b),
                             }
@@ -132,26 +143,20 @@ impl AggregatorChange {
                             history.max_achieved_positive_delta,
                             prev_delta,
                             self.max_value,
-                        ))?.map_or(
-                            prev_history.max_achieved_positive_delta,
-                            |value| u128::max(
-                                prev_history.max_achieved_positive_delta,
-                                value,
-                            )
-                        );
+                        ))?
+                        .map_or(prev_history.max_achieved_positive_delta, |value| {
+                            u128::max(prev_history.max_achieved_positive_delta, value)
+                        });
 
                         // new_min_achieved = max(prev_min_achieved, min_achieved - prev_delta)
                         let new_min_achieved = ok_underflow(addition_deltavalue(
                             history.min_achieved_negative_delta,
                             prev_delta.minus(),
                             self.max_value,
-                        ))?.map_or(
-                            prev_history.min_achieved_negative_delta,
-                            |value| u128::max(
-                                prev_history.min_achieved_negative_delta,
-                                value,
-                            )
-                        );
+                        ))?
+                        .map_or(prev_history.min_achieved_negative_delta, |value| {
+                            u128::max(prev_history.min_achieved_negative_delta, value)
+                        });
 
                         if (new_min_overflow.is_some()
                             && new_min_overflow.unwrap() <= new_max_achieved)
@@ -200,6 +205,7 @@ impl AggregatorChange {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::bounded_math::DeltaValue;
     use claims::{assert_err, assert_ok};
 
     #[test]

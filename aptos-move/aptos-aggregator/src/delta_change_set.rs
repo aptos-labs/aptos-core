@@ -7,7 +7,8 @@
 
 use crate::{
     aggregator_extension::DeltaHistory,
-    module::AGGREGATOR_MODULE, bounded_math::{DeltaValue, addition, subtraction, addition_deltavalue, ok_underflow},
+    bounded_math::{addition, addition_deltavalue, ok_underflow, subtraction, DeltaValue},
+    module::AGGREGATOR_MODULE,
 };
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -16,20 +17,6 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use move_binary_format::errors::{Location, PartialVMResult};
-
-/// When updating the aggregator start value (due to read operations
-/// or at the end of the transaction), we realize that mistakenly raised
-/// an overflow in one of the previus try_add operation.
-pub(crate) const EEXPECTED_OVERFLOW: u64 = 0x02_0003;
-
-/// When updating the aggregator start value (due to read operations
-/// or at the end of the transaction), we realize that mistakenly raised
-/// an underflow in one of the previus try_sub operation.
-pub(crate) const EEXPECTED_UNDERFLOW: u64 = 0x02_0004;
-
-
-pub(crate) const ECODE_INVARIANT_BROKEN: u64 = 0x02_0005;
-
 
 /// Represents an update from aggregator's operation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
@@ -86,16 +73,24 @@ impl DeltaOp {
         // case. Also, we can reuse `subtraction` which throws an error when M < V,
         // simply mapping the error to 0.
 
-        Ok(ok_underflow(addition_deltavalue(self.history.max_achieved_positive_delta, delta.update, self.max_value))
-            .map(|result| result.unwrap_or(0))?)
+        Ok(ok_underflow(addition_deltavalue(
+            self.history.max_achieved_positive_delta,
+            delta.update,
+            self.max_value,
+        ))
+        .map(|result| result.unwrap_or(0))?)
     }
 
     /// Shifts by a `delta` the minimum negative value seen by `self`.
     fn shifted_min_achieved_negative_delta_by(&self, delta: &DeltaOp) -> PartialVMResult<u128> {
         // symmetric to `shifted_max_achieved_positive_delta_by`
 
-        Ok(ok_underflow(addition_deltavalue(self.history.min_achieved_negative_delta, delta.update.minus(), self.max_value))
-            .map(|result| result.unwrap_or(0))?)
+        Ok(ok_underflow(addition_deltavalue(
+            self.history.min_achieved_negative_delta,
+            delta.update.minus(),
+            self.max_value,
+        ))
+        .map(|result| result.unwrap_or(0))?)
     }
 
     /// Applies self on top of previous delta, merging them together. Note
@@ -236,7 +231,10 @@ pub fn delta_add(v: u128, max_value: u128) -> DeltaOp {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::AggregatorStore;
+    use crate::{
+        bounded_math::{EBOUND_OVERFLOW, EBOUND_UNDERFLOW},
+        AggregatorStore,
+    };
     use aptos_state_view::TStateView;
     use aptos_types::state_store::{
         state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -559,11 +557,11 @@ mod test {
 
         assert_matches!(
             add_op.try_into_write_op(&state_view, &KEY),
-            Err(VMStatus::MoveAbort(_, EADD_OVERFLOW))
+            Err(VMStatus::MoveAbort(_, EBOUND_OVERFLOW))
         );
         assert_matches!(
             sub_op.try_into_write_op(&state_view, &KEY),
-            Err(VMStatus::MoveAbort(_, ESUB_UNDERFLOW))
+            Err(VMStatus::MoveAbort(_, EBOUND_UNDERFLOW))
         );
     }
 }

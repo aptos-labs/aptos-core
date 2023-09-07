@@ -85,7 +85,6 @@ pub fn pop_value_by_type(ty_arg: &Type, args: &mut VecDeque<Value>) -> SafeNativ
     }
 }
 
-
 /***************************************************************************************************
  * native fun create_aggregator<Element>(limit: Element): Aggregator<Element>;
  **************************************************************************************************/
@@ -137,7 +136,9 @@ fn native_try_add(
     let value = pop_value_by_type(&ty_args[0], &mut args)?;
     let (id, limit) = pop_aggregator_fields_by_type(&ty_args[0], &mut args)?;
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
-    Ok(smallvec![Value::bool(aggregator.try_add(aggregator_context.resolver, value)?)])
+    Ok(smallvec![Value::bool(
+        aggregator.try_add(aggregator_context.resolver, value)?
+    )])
 }
 
 /***************************************************************************************************
@@ -156,7 +157,9 @@ fn native_try_sub(
     let value = pop_value_by_type(&ty_args[0], &mut args)?;
     let (id, limit) = pop_aggregator_fields_by_type(&ty_args[0], &mut args)?;
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
-    Ok(smallvec![Value::bool(aggregator.try_sub(aggregator_context.resolver, value)?)])
+    Ok(smallvec![Value::bool(
+        aggregator.try_sub(aggregator_context.resolver, value)?
+    )])
 }
 
 /***************************************************************************************************
