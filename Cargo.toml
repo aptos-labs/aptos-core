@@ -127,9 +127,9 @@ members = [
     "network/framework",
     "network/memsocket",
     "network/netcore",
-    "network/peer-monitoring-service/client",
-    "network/peer-monitoring-service/server",
-    "network/peer-monitoring-service/types",
+    "peer-monitoring-service/client",
+    "peer-monitoring-service/server",
+    "peer-monitoring-service/types",
     "sdk",
     "secure/net",
     "secure/storage",
@@ -362,9 +362,9 @@ aptos-node-resource-metrics = { path = "crates/node-resource-metrics" }
 aptos-num-variants = { path = "crates/num-variants" }
 aptos-openapi = { path = "crates/aptos-openapi" }
 aptos-package-builder = { path = "aptos-move/package-builder" }
-aptos-peer-monitoring-service-client = { path = "network/peer-monitoring-service/client" }
-aptos-peer-monitoring-service-server = { path = "network/peer-monitoring-service/server" }
-aptos-peer-monitoring-service-types = { path = "network/peer-monitoring-service/types" }
+aptos-peer-monitoring-service-client = { path = "peer-monitoring-service/client" }
+aptos-peer-monitoring-service-server = { path = "peer-monitoring-service/server" }
+aptos-peer-monitoring-service-types = { path = "peer-monitoring-service/types" }
 aptos-profiler = { path = "crates/aptos-profiler" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "crates/aptos-protos" }

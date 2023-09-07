@@ -111,7 +111,15 @@ async fn spawn_parser(
 
         // Perform chain id check
         // If chain id is not set, set it
-        let mut conn = get_conn(pool.clone());
+        let mut conn = pool.get().unwrap_or_else(|e| {
+            error!(
+                pubsub_message = pubsub_message,
+                error = ?e,
+                "[NFT Metadata Crawler] Failed to get DB connection from pool");
+            UNABLE_TO_GET_CONNECTION_COUNT.inc();
+            panic!();
+        });
+        GOT_CONNECTION_COUNT.inc();
 
         let grpc_chain_id = parts[4].parse::<u64>().unwrap_or_else(|e| {
             error!(
@@ -229,28 +237,6 @@ async fn send_ack(subscription: &Subscription, ack_id: &str) -> anyhow::Result<(
     )
     .await?
     .context("Failed to ack message to PubSub")
-}
-
-/// Gets a Postgres connection from the pool
-fn get_conn(
-    pool: Pool<ConnectionManager<PgConnection>>,
-) -> PooledConnection<ConnectionManager<PgConnection>> {
-    loop {
-        match pool.get() {
-            Ok(conn) => {
-                GOT_CONNECTION_COUNT.inc();
-                return conn;
-            },
-            Err(err) => {
-                UNABLE_TO_GET_CONNECTION_COUNT.inc();
-                error!(
-                    "Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
-                    pool.connection_timeout(),
-                    err
-                );
-            },
-        };
-    }
 }
 
 #[async_trait::async_trait]

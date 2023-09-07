@@ -40,8 +40,8 @@ impl PartitionerV2 {
                         .for_each(|shard_id| {
                             let twds = state.finalized_txn_matrix[round_id][shard_id]
                                 .par_iter()
-                                .map(|&ori_txn_idx| {
-                                    state.take_txn_with_dep(round_id, shard_id, ori_txn_idx)
+                                .map(|&txn_idx1| {
+                                    state.take_txn_with_dep(round_id, shard_id, txn_idx1)
                                 })
                                 .collect();
                             let sub_block =
