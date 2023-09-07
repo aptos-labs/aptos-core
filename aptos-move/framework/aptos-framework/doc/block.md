@@ -524,7 +524,7 @@ The runtime always runs this before executing the transactions in a block.
             };
         } <b>else</b> {
             <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"case 2. This should not happen."));
-            <b>abort</b>(1);
+            <b>abort</b>(1)
         };
         <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"on_expire() finished."));
     } <b>else</b> {
