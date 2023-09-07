@@ -39,9 +39,6 @@ pub trait AptosMoveResolver:
     + StateStorageUsageResolver
     + StateValueMetadataResolver
     + ConfigStorage
-    + ResourceResolver
-    + ModuleResolver
-    + StateStorageResolver
 {
     fn release_resource_group_cache(
         &self,
@@ -49,6 +46,13 @@ pub trait AptosMoveResolver:
 }
 
 // TODO: Remove dependency on StateView.
-pub trait MoveResolverExt: AptosMoveResolver + StateView {}
+pub trait MoveResolverExt:
+    AptosMoveResolver + StateView + ResourceResolver + ModuleResolver + StateStorageResolver
+{
+}
 
-impl<T: AptosMoveResolver + StateView> MoveResolverExt for T {}
+impl<
+        T: AptosMoveResolver + StateView + ResourceResolver + ModuleResolver + StateStorageResolver,
+    > MoveResolverExt for T
+{
+}
