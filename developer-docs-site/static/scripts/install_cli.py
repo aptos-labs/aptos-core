@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import sysconfig
+import tarfile
 import tempfile
 import warnings
 from contextlib import closing
@@ -313,6 +314,41 @@ class Installer:
 
     def build_binary_url(self, version: str, target: str) -> str:
         return f"https://github.com/aptos-labs/aptos-core/releases/download/aptos-cli-v{version}/aptos-cli-{version}-{target}.zip"
+    
+    def install_openssl3_for_mac(self):
+        self._write(
+            "Installing OpenSSL3 for MacOS"
+        )
+        
+        self.bin_dir.mkdir(parents=True, exist_ok=True)
+        if self.bin_path.exists():
+            self.bin_path.unlink()
+        
+        openssl_file_name = "openssl-3.1.2"
+        openssl3_url = "https://www.openssl.org/source/openssl-3.1.2.tar.gz"
+        
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            tar_file = os.path.join(tmpdirname, "openssl-3.1.2.tar.gz")
+            urlretrieve(openssl3_url, tar_file)
+            shutil.unpack_archive(tar_file, self.bin_dir)
+        
+        # Build and install OpenSSL
+        self._write("Building and installing OpenSSL3")
+        openssl_extracted_dir = os.path.join(self.bin_dir, openssl_file_name)
+        os.chdir(openssl_extracted_dir)
+        
+        # Configure OpenSSL3
+        # Set the prefix to /usr/local because thats where aptos is expecting it to be
+        self._write("Configuring OpenSSL3...")
+        subprocess.run(["./config", "--prefix", "/usr/local", "darwin64-x86_64-cc"], check=True)
+        
+        # Compile and install OpenSSL3
+        self._write("Make install openssl3...")
+        subprocess.run(["make"])
+        subprocess.run(["make", "install"])
+        
+        self._write("OpenSSL3 installed successfully!")
+        
 
     def display_pre_message(self) -> None:
         kwargs = {
@@ -433,6 +469,15 @@ class Installer:
                 return None, current_version
 
         return latest_version, current_version
+    
+    def is_brew_installed(self) -> bool:
+        try:
+            # Run the "brew" command with the "--version" option
+            subprocess.check_output(["brew", "--version"])
+            return True
+        except subprocess.CalledProcessError:
+            # The "brew" command was not found or an error occurred
+            return False
 
     # Given the OS and CPU architecture, determine the "target" to download.
     def get_target(self):
@@ -449,19 +494,15 @@ class Installer:
                 )
             )
             return None
+        
 
         if WINDOWS:
             return "Windows-x86_64"
         
-        if MACOS:
-            sys.stdout.write(
-                colorize("error", "You are trying to install from macOS. Please use brew to install Aptos CLI instead - [brew install aptos]")
-            )
-            self._write("")
-            sys.exit(1)
 
         # On Linux, we check what version of OpenSSL we're working with to figure out
         # which binary to download.
+        # For Mac, OpenSSL3 is required
         try:
             out = subprocess.check_output(
                 ["openssl", "version"],
@@ -476,7 +517,24 @@ class Installer:
                 )
             )
             openssl_version = "1.0.0"
+        
+        if MACOS:
+            # Force the user to use brew to install aptos if they already have brew installed
+            if self.is_brew_installed() is True:
+                sys.stdout.write(
+                    colorize("error", "It looks like you already have brew install, please install aptos using brew instead - [brew install aptos]")
+                )
+                self._write("")
+                sys.exit(1)
+            
+            # Install OpenSSL3 if the user doesn't have it installed
+            # This is required for MacOS when installing aptos CLI from source
+            if openssl_version.startswith("3.") is False:
+                self.install_openssl3_for_mac()
+                
+            return "MacOSX-x86_64"
 
+        # Linux
         if openssl_version.startswith("3."):
             return "Ubuntu-22.04-x86_64"
 
