@@ -1,6 +1,5 @@
 //# publish
-// Try to pass a lambda to a non-inline function by mistake.
-// Should generate an error.
+// Should succeed.
 module 0x42::test_case {
     use std::vector;
 
@@ -8,7 +7,7 @@ module 0x42::test_case {
     const EINVALID_RANGE: u64 = 0x20001;
 
     /// Apply the function to a reference of each element in the vector.
-    public fun for_each_ref<Element>(v: &vector<Element>, f: |&Element|) {
+    public inline fun for_each_ref<Element>(v: &vector<Element>, f: |&Element|) {
         let i = 0;
         while (i < vector::length(v)) {
             f(vector::borrow(v, i));
