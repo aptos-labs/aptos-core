@@ -12,7 +12,6 @@ module aptos_framework::reconfiguration {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::chain_status;
-    use aptos_framework::stake::ValidatorInfo;
     use aptos_framework::storage_gas;
     use aptos_framework::transaction_fee;
 

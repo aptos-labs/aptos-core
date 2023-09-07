@@ -432,7 +432,7 @@ Full ValidatorSet, stored in @aptos_framework.
 3. on_new_epoch processes two pending queues and refresh ValidatorInfo from the owner's address.
 
 
-<pre><code><b>struct</b> <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> <b>has</b> <b>copy</b>, drop, store, key
+<pre><code><b>struct</b> <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> <b>has</b> key
 </code></pre>
 
 

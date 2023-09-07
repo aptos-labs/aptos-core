@@ -2,7 +2,6 @@
 module aptos_framework::block {
     use std::error;
     use std::features;
-    use std::features::reconfigure_with_dkg_enabled;
     use std::vector;
     use std::option;
     use std::option::{some, none};
@@ -246,7 +245,7 @@ module aptos_framework::block {
                 };
             } else {
                 debug::print(&utf8(b"case 2. This should not happen."));
-                abort(1);
+                abort(1)
             };
             debug::print(&std::string::utf8(b"on_expire() finished."));
         } else {
