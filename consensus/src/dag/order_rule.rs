@@ -21,7 +21,7 @@ pub struct OrderRule {
     lowest_unordered_anchor_round: Round,
     dag: Arc<RwLock<Dag>>,
     anchor_election: Box<dyn AnchorElection>,
-    notifier: Box<dyn Notifier>,
+    notifier: Arc<dyn Notifier>,
     storage: Arc<dyn DAGStorage>,
 }
 

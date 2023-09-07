@@ -22,7 +22,12 @@ use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::{block_info::Round, epoch_state::EpochState};
+use aptos_types::{
+    aggregate_signature::AggregateSignature,
+    block_info::{BlockInfo, Round},
+    epoch_state::EpochState,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+};
 use futures::{
     future::{AbortHandle, Abortable},
     FutureExt,
@@ -160,7 +165,6 @@ impl DagDriver {
             .broadcast(node.clone(), signature_builder)
             .then(move |certificate| {
                 let certified_node = CertifiedNode::new(node, certificate.signatures().to_owned());
-
                 let certified_node_msg =
                     CertifiedNodeMessage::new(certified_node, latest_ledger_info);
                 rb.broadcast(certified_node_msg, cert_ack_set)

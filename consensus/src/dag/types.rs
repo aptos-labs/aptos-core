@@ -431,12 +431,12 @@ impl CertifiedNodeMessage {
         }
     }
 
-    pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
-        &self.ledger_info
-    }
-
     pub fn certified_node(self) -> CertifiedNode {
         self.inner
+    }
+
+    pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
+        &self.ledger_info
     }
 }
 

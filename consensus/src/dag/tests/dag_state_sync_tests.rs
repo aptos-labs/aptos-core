@@ -4,7 +4,7 @@ use crate::{
     dag::{
         adapter::Notifier,
         dag_fetcher::{FetchRequestHandler, TDagFetcher},
-        dag_state_sync::{StateSyncManager, DAG_WINDOW},
+        dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
         storage::DAGStorage,
         tests::{dag_test::MockStorage, helpers::generate_dag_nodes},
@@ -100,7 +100,7 @@ struct MockNotifier {}
 #[async_trait]
 impl Notifier for MockNotifier {
     fn send_ordered_nodes(
-        &mut self,
+        &self,
         _ordered_nodes: Vec<Arc<CertifiedNode>>,
         _failed_author: Vec<(Round, Author)>,
     ) -> anyhow::Result<()> {
