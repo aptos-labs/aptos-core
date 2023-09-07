@@ -249,7 +249,7 @@ impl<T> Response<T> {
 }
 
 /// The different data client response payloads as an enum.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ResponsePayload {
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
     NewTransactionOutputsWithProof((TransactionOutputListWithProof, LedgerInfoWithSignatures)),

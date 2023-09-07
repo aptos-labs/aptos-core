@@ -23,7 +23,7 @@ pub struct DataNotification {
 
 /// A single payload (e.g. chunk) of data delivered to a data listener.
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataPayload {
     ContinuousTransactionOutputsWithProof(LedgerInfoWithSignatures, TransactionOutputListWithProof),
     ContinuousTransactionsWithProof(LedgerInfoWithSignatures, TransactionListWithProof),
@@ -179,6 +179,27 @@ pub struct TransactionsOrOutputsWithProofRequest {
 pub struct PendingClientResponse {
     pub client_request: DataClientRequest,
     pub client_response: Option<Result<Response<ResponsePayload>, aptos_data_client::error::Error>>,
+}
+
+impl PendingClientResponse {
+    pub fn new(client_request: DataClientRequest) -> Self {
+        Self {
+            client_request,
+            client_response: None,
+        }
+    }
+
+    #[cfg(test)]
+    /// Creates a new pending client response with a response already available
+    pub fn new_with_response(
+        client_request: DataClientRequest,
+        client_response: Result<Response<ResponsePayload>, aptos_data_client::error::Error>,
+    ) -> Self {
+        Self {
+            client_request,
+            client_response: Some(client_response),
+        }
+    }
 }
 
 impl Debug for PendingClientResponse {
