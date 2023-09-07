@@ -2,7 +2,7 @@ processed 1 task
 
 task 0 'publish'. lines 1-93:
 Error: error[E04024]: invalid usage of function type
-  ┌─ /var/folders/hx/_s_6fyh529bgmvl6z4m8m9fm0000gn/T/.tmpgXTKt8:9:62
+  ┌─ TEMPFILE:9:62
   │
 9 │     public fun for_each_ref<Element>(v: &vector<Element>, f: |&Element|) {
   │                                                              ^^^^^^^^^^ function type only allowed for inline function arguments

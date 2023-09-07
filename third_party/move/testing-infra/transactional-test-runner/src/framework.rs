@@ -935,14 +935,20 @@ fn handle_known_task<'a, Adapter: MoveTestAdapter<'a>>(
     let task_name = task.name.to_owned();
     let start_line = task.start_line;
     let stop_line = task.stop_line;
+    let data_path = match &task.data {
+        Some(f) => f.path().to_str().unwrap().to_string(),
+        None => "".to_string(),
+    };
     let result = adapter.handle_command(task);
-    let result_string = match result {
+    let mut result_string = match result {
         Ok(None) => return,
         Ok(Some(s)) => s,
         Err(e) => format!("Error: {}", e),
     };
+    if !data_path.is_empty() {
+        result_string = result_string.replace(&data_path, "TEMPFILE");
+    }
     assert!(!result_string.is_empty());
-
     writeln!(
         output,
         "\ntask {} '{}'. lines {}-{}:\n{}",
