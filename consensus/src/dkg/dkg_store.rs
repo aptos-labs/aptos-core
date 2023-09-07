@@ -162,6 +162,10 @@ impl DKGStore {
         }
     }
 
+    pub fn ready(&self) -> bool {
+        self.agg_node.get().is_some() && self.get_pvss_config().is_some()
+    }
+
     pub fn take_agg_node(&mut self) -> Option<DKGAggNode> {
         if self.agg_node.initialized() {
             self.agg_node_taken = true;

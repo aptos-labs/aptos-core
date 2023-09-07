@@ -16,7 +16,7 @@ use crate::pvss::traits;
 const NUM_BYTES: usize = encryption_elgamal::g1::PUBLIC_PARAMS_NUM_BYTES + G2_PROJ_NUM_BYTES;
 
 /// The cryptographic *public parameters* needed to run the PVSS protocol.
-#[derive(DeserializeKey, Clone, SerializeKey)]
+#[derive(DeserializeKey, Clone, SerializeKey, Debug, PartialEq, Eq)]
 pub struct PublicParameters {
     /// Encryption public parameters
     enc: encryption_elgamal::g1::PublicParameters,

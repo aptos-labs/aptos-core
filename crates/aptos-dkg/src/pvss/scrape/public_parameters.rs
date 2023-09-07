@@ -16,7 +16,7 @@ use crate::pvss::traits;
 const NUM_BYTES: usize = encryption_dlog::g2::PUBLIC_PARAMS_NUM_BYTES + 2 * G2_PROJ_NUM_BYTES;
 
 /// The cryptographic *public parameters* needed to run the SCRAPE PVSS protocol.
-#[derive(DeserializeKey, Clone, SerializeKey)]
+#[derive(DeserializeKey, Clone, SerializeKey, Debug, PartialEq, Eq)]
 pub struct PublicParameters {
     enc: encryption_dlog::g2::PublicParameters,
     /// Base for the dealt public key, which will be a group element $\hat{u}_1^a \in G_2$, where $a \in F$.

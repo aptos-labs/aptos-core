@@ -1,14 +1,11 @@
 // Copyright © Aptos Foundation
 
-use std::io::{Read, Write};
 use crate::validator_info::ValidatorInfo;
 use anyhow::Result;
-use byteorder::{LittleEndian, WriteBytesExt};
-use aptos_dkg::pvss::{das, Player, traits::Transcript, WeightedTranscript};
+use aptos_dkg::pvss::{das, traits::Transcript, WeightedTranscript};
 use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
-use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
-use crate::on_chain_config::{ConfigID, OnChainConfig};
+use aptos_crypto::ValidCryptoMaterial;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StartDKGEvent {
@@ -26,15 +23,15 @@ impl MoveStructType for StartDKGEvent {
     const STRUCT_NAME: &'static IdentStr = ident_str!("StartDKGEvent");
 }
 
-type WT = WeightedTranscript<das::Transcript>;
+type DT = das::Transcript;
+type WT = WeightedTranscript<DT>;
 
-#[derive(Clone)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct DKGPvssConfig {
     pub wc_1: <WT as Transcript>::SecretSharingConfig,
     pub wc_2: <WT as Transcript>::SecretSharingConfig,
-    pub pp: <das::Transcript as Transcript>::PvssPublicParameters,
-    pub eks: Vec<<das::Transcript as Transcript>::EncryptPubKey>,
-    pub dst: &'static [u8],
+    pub pp: <WT as Transcript>::PvssPublicParameters,
+    pub eks: Vec<<DT as Transcript>::EncryptPubKey>,
 }
 
 impl DKGPvssConfig {
@@ -43,15 +40,18 @@ impl DKGPvssConfig {
         wc_2: <WT as Transcript>::SecretSharingConfig,
         pp: <das::Transcript as Transcript>::PvssPublicParameters,
         eks: Vec<<das::Transcript as Transcript>::EncryptPubKey>,
-        dst: &'static [u8],
     ) -> Self {
         Self {
             wc_1,
             wc_2,
             pp,
             eks,
-            dst,
         }
+    }
+
+    pub fn num_bytes(&self) -> usize {
+        // dkg todo: compute size
+        0
     }
 }
 

@@ -98,19 +98,24 @@ impl ProofWithData {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct DKGPayload {
     pub dkg_agg_node: DKGAggNode,
+    pub pvss_config: DKGPvssConfig,
 }
 
 impl DKGPayload {
-    pub fn new(dkg_agg_node: DKGAggNode) -> Self {
-        DKGPayload { dkg_agg_node }
+    pub fn new(dkg_agg_node: DKGAggNode, pvss_config: DKGPvssConfig) -> Self {
+        DKGPayload { dkg_agg_node, pvss_config }
     }
 
     pub fn dkg_agg_node(&self) -> &DKGAggNode {
         &self.dkg_agg_node
     }
 
+    pub fn pvss_config(&self) -> &DKGPvssConfig {
+        &self.pvss_config
+    }
+
     pub fn num_bytes(&self) -> usize {
-        self.dkg_agg_node.num_bytes()
+        self.dkg_agg_node.num_bytes() + self.pvss_config.num_bytes()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -121,8 +126,8 @@ impl DKGPayload {
         1
     }
 
-    pub fn verify(&self, pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
-        self.dkg_agg_node.verify(pvss_config)
+    pub fn verify(&self) -> anyhow::Result<()> {
+        self.dkg_agg_node.verify(&self.pvss_config)
     }
 }
 
@@ -197,8 +202,9 @@ impl Payload {
                 }
                 Ok(())
             },
-            (_, Payload::DKG(_)) => {
-                // We will verify the DKG aggregated transcript in process_proposal and state_computer.
+            (_, Payload::DKG(dkg_payload)) => {
+                // We will verify the pvss config in process_proposal and state_computer.
+                dkg_payload.verify()?;
                 Ok(())
             }
             (_, _) => Err(anyhow::anyhow!(

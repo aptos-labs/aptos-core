@@ -5,12 +5,13 @@ use crate::pvss::{traits, Player};
 use anyhow::anyhow;
 use rand::seq::IteratorRandom;
 use rand_core::{CryptoRng, RngCore};
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 /// Encodes the *threshold configuration* for a normal/unweighted PVSS: i.e., the threshold $t$ and
 /// the number of players $n$ such that any $t$ or more players can reconstruct a dealt secret given
 /// a PVSS transcript.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Deserialize, Serialize, Debug, Eq)]
 pub struct ThresholdConfig {
     /// The reconstruction threshold $t$ that must be exceeded in order to reconstruct the dealt
     /// secret; i.e., $t$ or more shares are needed

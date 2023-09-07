@@ -16,7 +16,6 @@ use move_core_types::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt, fmt::Debug, sync::Arc};
-use crate::dkg::DKGTranscriptWrapper;
 
 mod approved_execution_hashes;
 mod aptos_features;

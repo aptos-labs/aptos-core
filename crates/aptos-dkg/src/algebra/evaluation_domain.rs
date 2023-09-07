@@ -4,12 +4,13 @@ use aptos_crypto::CryptoMaterialError;
 use blstrs::Scalar;
 use ff::{Field, PrimeField};
 use more_asserts::{assert_gt, assert_le};
+use serde::{Deserialize, Serialize};
 
 /// This struct abstracts the notion of an FFT evaluation domain over the scalar field of our curve.
 /// This consists of $N = 2^k$ and an $N$th root of unity. (The $\log_2{N}$ field is just handy in our FFT
 /// implementation.)
 #[allow(non_snake_case)]
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct EvaluationDomain {
     /// The actual number $n$ of evaluations we want, which might not be a power of two.
     pub(crate) n: usize,
@@ -31,7 +32,7 @@ pub struct EvaluationDomain {
 /// polynomial multiplication; see `accumulator_poly` function) and we want to avoid recomputing the
 /// same roots of unity multiple times, as well as other scalars.
 #[allow(non_snake_case)]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct BatchEvaluationDomain {
     /// $\log_2{N}$
     pub(crate) log_N: usize,

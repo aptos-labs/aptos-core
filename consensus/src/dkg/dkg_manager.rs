@@ -9,7 +9,6 @@ use super::{
 use crate::dkg::types::DKGNode;
 use aptos_consensus_types::common::Author;
 use aptos_dkg::{
-    constants::DST_PVSS_TESTING_APP,
     pvss::{das, traits::Transcript, WeightedTranscript},
     utils::random::random_scalar,
 };
@@ -73,6 +72,13 @@ impl DKGManagerWrapper {
                 let mut guard = dkg_manager_clone.lock();
                 guard.finish_dkg();
             },
+        }
+    }
+
+    pub fn ready(&self) -> bool {
+        match self {
+            DKGManagerWrapper::NoDKG => false,
+            DKGManagerWrapper::WithDKG(dkg_manager) => dkg_manager.lock().ready(),
         }
     }
 
@@ -186,7 +192,7 @@ impl DKGManager {
         //     .expect("serialized transcript should deserialize correctly");
         // assert_eq!(trx_2, deserialized);
 
-        let dkg_pvss_config = DKGPvssConfig::new(wc_1.clone(), wc_2.clone(), pp, consensus_keys, &DST_PVSS_TESTING_APP[..]);
+        let dkg_pvss_config = DKGPvssConfig::new(wc_1.clone(), wc_2.clone(), pp, consensus_keys);
         self.dkg_store.add_pvss_config(dkg_pvss_config);
 
         let dkg_trx_wrapper = DKGTranscriptWrapper {
@@ -257,6 +263,10 @@ impl DKGManager {
                 anyhow::bail!("[DKG] Failed to add DKG aggregated node: {:?}", e);
             },
         }
+    }
+
+    pub fn ready(&self) -> bool {
+        self.dkg_store.ready()
     }
 
     // Will be called by the proposal generator

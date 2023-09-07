@@ -11,8 +11,7 @@ use crate::{
 };
 use aptos_consensus_types::{
     block::Block,
-    common::{DataStatus, Payload},
-    dkg_types::DKGAggNode,
+    common::{DataStatus, Payload, DKGPayload},
     proof_of_store::ProofOfStore,
 };
 use aptos_crypto::HashValue;
@@ -139,7 +138,7 @@ impl PayloadManager {
     pub async fn get_transactions(
         &self,
         block: &Block,
-    ) -> Result<(Vec<SignedTransaction>, Option<DKGAggNode>), Error> {
+    ) -> Result<(Vec<SignedTransaction>, Option<DKGPayload>), Error> {
         let payload = match block.payload() {
             Some(p) => p,
             None => return Ok((Vec::new(), None)),
@@ -222,7 +221,7 @@ impl PayloadManager {
             },
             (PayloadManager::InQuorumStore(_batch_store, _), Payload::DKG(dkg_payload)) => {
                 // extract dkg transaction
-                Ok((vec![], Some(dkg_payload.dkg_agg_node().clone())))
+                Ok((vec![], Some(dkg_payload.clone())))
             },
             (_, _) => unreachable!(
                 "Wrong payload {} epoch {}, round {}, id {}",

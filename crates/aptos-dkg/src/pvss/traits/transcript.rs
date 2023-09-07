@@ -42,6 +42,8 @@ use crate::pvss::traits::{
 };
 use crate::pvss::Player;
 use aptos_crypto::{Uniform, ValidCryptoMaterial};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 
 /// A trait for a PVSS protocol. This trait allows both for:
@@ -51,9 +53,9 @@ use std::fmt::Debug;
 /// 2. Weighted $w$-out-of-$W$ PVSS protocols where any players with combined weight $\ge w$ can
 ///    reconstruct the secret (but players with combined weight $< w$ cannot)
 pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
-    type SecretSharingConfig: SecretSharingConfig;
+    type SecretSharingConfig: SecretSharingConfig + DeserializeOwned + Serialize + Debug + PartialEq + Eq;
 
-    type PvssPublicParameters: HasEncryptionPublicParams + Default + ValidCryptoMaterial;
+    type PvssPublicParameters: HasEncryptionPublicParams + Default + ValidCryptoMaterial + DeserializeOwned + Serialize + Debug + PartialEq + Eq;
 
     type DealtSecretKeyShare: PartialEq + Clone;
     type DealtPubKeyShare;
@@ -67,7 +69,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + Convert<Self::DealtSecretKey, Self::PvssPublicParameters>
         + Convert<Self::DealtPubKey, Self::PvssPublicParameters>;
 
-    type EncryptPubKey: Debug + Clone + ValidCryptoMaterial;
+    type EncryptPubKey: Debug + Clone + ValidCryptoMaterial + DeserializeOwned + Serialize + PartialEq + Eq;
     type DecryptPrivKey: Debug
         + Uniform
         + Convert<

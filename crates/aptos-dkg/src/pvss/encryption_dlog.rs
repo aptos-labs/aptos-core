@@ -10,7 +10,7 @@ macro_rules! encryption_dlog_pp_impl {
         pub const PUBLIC_PARAMS_NUM_BYTES: usize = $GT_PROJ_NUM_BYTES;
 
         /// The public parameters used in the encryption scheme.
-        #[derive(DeserializeKey, Clone, SerializeKey, PartialEq)]
+        #[derive(DeserializeKey, Clone, SerializeKey, PartialEq, Debug, Eq)]
         pub struct PublicParameters {
             /// A group element $h \in G$, where $G$ is $G_1$, $G_2$ or $G_T$.
             h: $GTProjective,

@@ -896,8 +896,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         (weighted_config_1, weighted_config_2)
                     }
                 };
-                let (sk1, pk1) = trxs.trx_one_third.decrypt_own_share(&wc_1, &Player{id: my_index}, &dk);
-                let (sk2, pk2) = trxs.trx_two_third.decrypt_own_share(&wc_2, &Player{id: my_index}, &dk);
+                let (sk1, _pk1) = trxs.trx_one_third.decrypt_own_share(&wc_1, &Player{id: my_index}, &dk);
+                let (sk2, _pk2) = trxs.trx_two_third.decrypt_own_share(&wc_2, &Player{id: my_index}, &dk);
                 //dkg todo: start randgen with these keys.
                 debug!("[DKG] starting new epoch with sk1={:?}, sk2={:?}\n current_epoch={:?}, target_epoch={}", sk1, sk2, self.epoch_state.as_ref().map(|a|a.epoch), epoch_state.epoch);
             }

@@ -4,10 +4,8 @@
 use aptos_consensus_types::common::Author;
 use aptos_crypto::bls12381;
 use aptos_dkg::pvss::WeightedConfig;
-use aptos_types::dkg::StartDKGEvent;
 
 pub const MAX_NUM_SHARES: usize = 1000;
-pub const ROUNDING_UNIT: usize = 1_000_000;
 
 pub struct DKGRounding {
     pub validator_addresses: Vec<Author>,
@@ -82,7 +80,7 @@ pub fn rounding_scheme(
     // dkg todo: better rounding?
     let validator_weights = validator_stakes
         .iter()
-        .map(|s| 10)
+        .map(|_s| 10)
         .collect::<Vec<usize>>();
     let total_weight = validator_weights.iter().sum::<usize>();
     // dkg todo: calculate the actual weights of one third stake and two third stake

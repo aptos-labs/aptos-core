@@ -28,7 +28,7 @@ macro_rules! encryption_elgamal_pp_impl {
         //
 
         /// The public parameters used in the encryption scheme.
-        #[derive(DeserializeKey, PartialEq, Clone, SerializeKey, Eq)]
+        #[derive(DeserializeKey, PartialEq, Clone, SerializeKey, Eq, Debug)]
         pub struct PublicParameters {
             /// A group element $g \in G$, where $G$ is $G_1$, $G_2$ or $G_T$ used to exponentiate
             /// both the (1) ciphertext randomness and the (2) the SK when computing its PK.

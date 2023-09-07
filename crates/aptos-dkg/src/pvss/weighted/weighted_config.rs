@@ -6,13 +6,14 @@ use anyhow::anyhow;
 use more_asserts::assert_lt;
 use rand::Rng;
 use rand_core::{CryptoRng, RngCore};
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 /// Encodes the *threshold configuration* for a *weighted* PVSS: i.e., the minimum weight $w$ and
 /// the total weight $W$ such that any subset of players with weight $\ge w$ can reconstruct a
 /// dealt secret given a PVSS transcript.
 #[allow(non_snake_case)]
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq)]
 pub struct WeightedConfig {
     /// A weighted config is a $w$-out-of-$W$ threshold config, where $w$ is the minimum weight
     /// needed to reconstruct the secret and $W$ is the total weight.

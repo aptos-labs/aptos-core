@@ -702,11 +702,9 @@ impl RoundManager {
         // If the proposal contains DKG payload, should verify its validity
         match proposal.payload() {
             Some(Payload::DKG(dkg_payload)) => {
-                if let Some(pvss_config) = self.dkg_manager_wrapper.get_pvss_config() {
-                    ensure!(dkg_payload.verify(&pvss_config).is_ok(), "[RoundManager] Invalid DKG payload: {:?}!", dkg_payload.dkg_agg_node().metadata());
-                } else {
-                    // dkg todo: Need to buffer DKG payload when locally has no pvss_config yet
-                }
+                // Already verified in UnverifiedEvent, now checking if pvss config matches
+                ensure!(self.dkg_manager_wrapper.get_pvss_config().is_some(), "[DKG] DKG payload received but no PVSS config is set!");
+                ensure!(*dkg_payload.pvss_config() == self.dkg_manager_wrapper.get_pvss_config().unwrap(), "[DKG] Mismatch PVSS config in DKG payload: {:?}!", dkg_payload.dkg_agg_node().metadata());
             }
             _ => {}
         }

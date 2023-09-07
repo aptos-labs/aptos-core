@@ -24,7 +24,7 @@ use aptos_consensus_types::{
     common::{Author, DKGPayload, Payload, PayloadFilter, Round},
     quorum_cert::QuorumCert,
 };
-use aptos_logger::{error, sample, sample::SampleRate, warn};
+use aptos_logger::{error, sample, sample::SampleRate, warn, debug};
 use futures::future::BoxFuture;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
@@ -258,12 +258,14 @@ impl ProposalGenerator {
                 Payload::empty(self.quorum_store_enabled),
                 hqc.certified_block().timestamp_usecs(),
             )
-        } else if let Some(dkg_agg_node) = self.dkg_manager_wrapper.take_agg_node() {
-            println!("DKG debug: node {} epoch {} generates DKG payload", dkg_agg_node.epoch(), self.author);
+        } else if self.dkg_manager_wrapper.ready() {            
             // generate DKG payload
             // the block contains just one DKG aggregate node
             // dkg todo: handle the bad path where the submitted dkg payload does not get committed, i.e., when the validator sees its dkg payload is discarded, it needs to re-propose
-            let payload = Payload::DKG(DKGPayload::new(dkg_agg_node));
+            let pvss_config = self.dkg_manager_wrapper.get_pvss_config().unwrap();
+            let dkg_agg_node = self.dkg_manager_wrapper.take_agg_node().unwrap();
+            debug!("[DKG]: epoch {} node {} generates DKG payload", dkg_agg_node.epoch(), self.author);
+            let payload = Payload::DKG(DKGPayload::new(dkg_agg_node, pvss_config));
             let timestamp = self.time_service.get_current_timestamp();
             (payload, timestamp.as_micros() as u64)
         } else {

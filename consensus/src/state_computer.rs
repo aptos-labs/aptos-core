@@ -14,7 +14,7 @@ use crate::{
     transaction_shuffler::TransactionShuffler,
     txn_notifier::TxnNotifier,
 };
-use anyhow::{Error, Result};
+use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
@@ -129,16 +129,16 @@ impl StateComputer for ExecutionProxy {
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
         let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
-        let (txns, maybe_dkg_agg_node) = payload_manager.get_transactions(block).await?;
+        let (txns, maybe_dkg_payload) = payload_manager.get_transactions(block).await?;
 
-        let dkg_transcript = maybe_dkg_agg_node.map_or_else(|| None, |agg_node| {
+        let dkg_transcript = maybe_dkg_payload.map_or_else(|| None, |dkg_payload| {
             // verify the DKG aggregated transcript
-            match agg_node.verify(self.dkg_manager_wrapper.lock().as_ref().unwrap().get_pvss_config().as_ref().unwrap()) {
+            match dkg_payload.dkg_agg_node().verify(dkg_payload.pvss_config()) {
                 Ok(_) => {
-                    Some(agg_node.agg_trx().clone())
+                    Some(dkg_payload.dkg_agg_node().agg_trx().clone())
                 },
                 Err(e) => {
-                    debug!("[DKG] Aggregated transcript verification failed for epoch {:?}, error = {:?}", agg_node.epoch(), e);
+                    debug!("[DKG] Aggregated transcript verification failed for epoch {:?}, error = {:?}", dkg_payload.dkg_agg_node().epoch(), e);
                     None
                 }
             }
@@ -185,6 +185,25 @@ impl StateComputer for ExecutionProxy {
                 error = ?e, "Failed to notify mempool of rejected txns",
             );
         }
+
+        // trigger the start of dkg after compute instead of commit to ensure pvss_config is always available for execution; otherwise it is possible one validator executes pvss trx before dkg starts
+        if compute_result.has_dkg_event() {
+            let dkg_events = compute_result.dkg_events().clone().to_vec();
+            let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().as_ref().unwrap().clone();
+
+            // trigger the start of dkg
+            match StartDKGEvent::try_from(dkg_events
+                .first().unwrap()) {
+                Ok(e) => {
+                    debug!("[DKG] commit: StartDKGEvent={:?}", &e);
+                }
+                _ => {
+                    debug!("[DKG] commit: StartDKGEvent decoding failure?");
+                }
+            }
+            dkg_manager_wrapper.start_dkg(dkg_events).await;
+        }
+
         Ok(compute_result)
     }
 
@@ -200,7 +219,6 @@ impl StateComputer for ExecutionProxy {
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
         let mut reconfig_events = Vec::new();
-        let mut dkg_events = Vec::new();
         let mut has_dkg_payloads = false;
         let mut payloads = Vec::new();
         let logical_time = LogicalTime::new(
@@ -222,20 +240,20 @@ impl StateComputer for ExecutionProxy {
                 payloads.push(payload.clone());
             }
 
-            let (signed_txns, maybe_dkg_agg_node) =
+            let (signed_txns, maybe_dkg_payload) =
                 payload_manager.get_transactions(block.block()).await?;
             let deduped_txns = txn_deduper.dedup(signed_txns);
             let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
-            let dkg_transcript = maybe_dkg_agg_node.map_or_else(|| None, |agg_node| {
+            let dkg_transcript = maybe_dkg_payload.map_or_else(|| None, |dkg_payload| {
                 // verify the DKG aggregated transcript
-                match agg_node.verify(self.dkg_manager_wrapper.lock().as_ref().unwrap().get_pvss_config().as_ref().unwrap()) {
+                match dkg_payload.dkg_agg_node().verify(dkg_payload.pvss_config()) {
                     Ok(_) => {
                         has_dkg_payloads = true;
-                        Some(agg_node.agg_trx().clone())
+                        Some(dkg_payload.dkg_agg_node().agg_trx().clone())
                     },
                     Err(e) => {
-                        debug!("[DKG] Aggregated transcript verification failed for epoch {:?}, error = {:?}", agg_node.epoch(), e);
+                        debug!("[DKG] Aggregated transcript verification failed for epoch {:?}, error = {:?}", dkg_payload.dkg_agg_node().epoch(), e);
                         None
                     }
                 }
@@ -250,7 +268,6 @@ impl StateComputer for ExecutionProxy {
                 maybe_randomness,
             ));
             reconfig_events.extend(block.reconfig_event());
-            dkg_events.extend(block.dkg_events());
         }
 
         let executor = self.executor.clone();
@@ -275,25 +292,10 @@ impl StateComputer for ExecutionProxy {
             .send((Box::new(wrapped_callback), txns, reconfig_events))
             .await
             .expect("Failed to send async state sync notification");
-        debug!("[DKG] commit: num_dkg_events={}", dkg_events.len());
-        let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().as_ref().unwrap().clone();
-        debug!("[DKG] commit: lock acquired.");
-        // trigger the start of dkg
-        if !dkg_events.is_empty() {
-            match StartDKGEvent::try_from(dkg_events
-                .first().unwrap()) {
-                Ok(e) => {
-                    debug!("[DKG] commit: StartDKGEvent={:?}", &e);
-                }
-                _ => {
-                    debug!("[DKG] commit: StartDKGEvent decoding failure?");
-                }
-            }
-            dkg_manager_wrapper.start_dkg(dkg_events).await;
-        }
-
+        
         // finish dkg when the aggregated transcript is committed
         if has_dkg_payloads {
+            let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().as_ref().unwrap().clone();
             dkg_manager_wrapper.finish_dkg();
         }
 
