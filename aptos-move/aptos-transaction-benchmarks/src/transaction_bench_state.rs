@@ -3,7 +3,9 @@
 use crate::{transactions, transactions::RAYON_EXEC_POOL};
 use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
-use aptos_block_partitioner::{v2::config::PartitionerV2Config, BlockPartitioner};
+use aptos_block_partitioner::{
+    v2::config::PartitionerV2Config, BlockPartitioner, PartitionerConfig,
+};
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
     account_universe::{AUTransactionGen, AccountPickStyle, AccountUniverse, AccountUniverseGen},
