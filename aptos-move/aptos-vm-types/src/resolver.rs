@@ -4,7 +4,9 @@
 use aptos_aggregator::resolver::AggregatorResolver;
 use aptos_state_view::StateViewId;
 use aptos_types::state_store::{
-    state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValueMetadata,
+    state_key::StateKey,
+    state_storage_usage::StateStorageUsage,
+    state_value::{StateValue, StateValueMetadata},
 };
 use move_core_types::value::MoveTypeLayout;
 
@@ -16,35 +18,28 @@ pub trait TResourceResolver {
     type Key;
     type Layout;
 
+    fn get_resource_state_value(
+        &self,
+        state_key: &Self::Key,
+        maybe_layout: Option<&Self::Layout>,
+    ) -> anyhow::Result<Option<StateValue>>;
+
     fn get_resource_bytes(
         &self,
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<Vec<u8>>>;
-
-    fn get_resource_state_value_metadata(
-        &self,
-        state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>>;
-}
-
-impl TResourceResolver for () {
-    type Key = StateKey;
-    type Layout = MoveTypeLayout;
-
-    fn get_resource_bytes(
-        &self,
-        _state_key: &Self::Key,
-        _maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Vec<u8>>> {
-        unimplemented!()
+        let maybe_state_value = self.get_resource_state_value(state_key, maybe_layout)?;
+        Ok(maybe_state_value.map(StateValue::into_bytes))
     }
 
     fn get_resource_state_value_metadata(
         &self,
-        _state_key: &Self::Key,
+        state_key: &Self::Key,
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
-        unimplemented!()
+        // For metadata, layouts are not important.
+        let maybe_state_value = self.get_resource_state_value(state_key, None)?;
+        Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 }
 
@@ -55,26 +50,19 @@ impl<T: TResourceResolver<Key = StateKey, Layout = MoveTypeLayout>> ResourceReso
 pub trait TModuleResolver {
     type Key;
 
-    fn get_module_bytes(&self, state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>>;
+    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>>;
 
-    fn get_module_state_value_metadata(
-        &self,
-        state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>>;
-}
-
-impl TModuleResolver for () {
-    type Key = StateKey;
-
-    fn get_module_bytes(&self, _state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
-        unimplemented!()
+    fn get_module_bytes(&self, state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
+        let maybe_state_value = self.get_module_state_value(state_key)?;
+        Ok(maybe_state_value.map(StateValue::into_bytes))
     }
 
     fn get_module_state_value_metadata(
         &self,
-        _state_key: &Self::Key,
+        state_key: &Self::Key,
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
-        unimplemented!()
+        let maybe_state_value = self.get_module_state_value(state_key)?;
+        Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 }
 
@@ -86,16 +74,6 @@ pub trait StateStorageResolver {
     fn id(&self) -> StateViewId;
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage>;
-}
-
-impl StateStorageResolver for () {
-    fn id(&self) -> StateViewId {
-        unimplemented!()
-    }
-
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-        unimplemented!()
-    }
 }
 
 pub trait ExecutorResolver:

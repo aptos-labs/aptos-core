@@ -9,13 +9,12 @@ use crate::{
 use aptos_aggregator::resolver::AggregatorResolver;
 use aptos_gas_algebra::Fee;
 use aptos_state_view::StateViewId;
-use aptos_types::state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage};
+use aptos_types::state_store::{
+    state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+};
 use aptos_vm_types::{
     change_set::VMChangeSet,
-    resolver::{
-        ExecutorResolver, StateStorageResolver, StateValueMetadataKind, TModuleResolver,
-        TResourceResolver,
-    },
+    resolver::{ExecutorResolver, StateStorageResolver, TModuleResolver, TResourceResolver},
     storage::ChangeSetConfigs,
 };
 use move_core_types::{
@@ -109,18 +108,11 @@ impl<'r> TResourceResolver for ChangeSetStateView<'r> {
     type Key = StateKey;
     type Layout = MoveTypeLayout;
 
-    fn get_resource_bytes(
+    fn get_resource_state_value(
         &self,
         _state_key: &Self::Key,
         _maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<Vec<u8>>> {
-        todo!()
-    }
-
-    fn get_resource_state_value_metadata(
-        &self,
-        _state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValue>> {
         todo!()
     }
 }
@@ -128,25 +120,18 @@ impl<'r> TResourceResolver for ChangeSetStateView<'r> {
 impl<'r> TModuleResolver for ChangeSetStateView<'r> {
     type Key = StateKey;
 
-    fn get_module_bytes(&self, _state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
-        todo!()
-    }
-
-    fn get_module_state_value_metadata(
-        &self,
-        _state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    fn get_module_state_value(&self, _state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
         todo!()
     }
 }
 
 impl<'r> StateStorageResolver for ChangeSetStateView<'r> {
     fn id(&self) -> StateViewId {
-        todo!()
+        self.base.id()
     }
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-        todo!()
+        anyhow::bail!("Unexpected access to get_usage()")
     }
 }
 

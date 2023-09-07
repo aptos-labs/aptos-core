@@ -26,8 +26,7 @@ use aptos_types::{
     },
 };
 use aptos_vm_types::resolver::{
-    ExecutorResolver, StateStorageResolver, StateValueMetadataKind, TModuleResolver,
-    TResourceResolver,
+    ExecutorResolver, StateStorageResolver, TModuleResolver, TResourceResolver,
 };
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
@@ -179,18 +178,11 @@ impl<'a, S: StateView> TResourceResolver for StateViewAdapter<'a, S> {
     type Key = StateKey;
     type Layout = MoveTypeLayout;
 
-    fn get_resource_bytes(
+    fn get_resource_state_value(
         &self,
         _state_key: &Self::Key,
         _maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<Vec<u8>>> {
-        todo!()
-    }
-
-    fn get_resource_state_value_metadata(
-        &self,
-        _state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValue>> {
         todo!()
     }
 }
@@ -198,25 +190,18 @@ impl<'a, S: StateView> TResourceResolver for StateViewAdapter<'a, S> {
 impl<'a, S: StateView> TModuleResolver for StateViewAdapter<'a, S> {
     type Key = StateKey;
 
-    fn get_module_bytes(&self, _state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
-        todo!()
-    }
-
-    fn get_module_state_value_metadata(
-        &self,
-        _state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    fn get_module_state_value(&self, _state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
         todo!()
     }
 }
 
 impl<'a, S: StateView> StateStorageResolver for StateViewAdapter<'a, S> {
     fn id(&self) -> StateViewId {
-        todo!()
+        self.state_view.id()
     }
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-        todo!()
+        self.state_view.get_usage()
     }
 }
 
@@ -360,18 +345,11 @@ impl<'a, R: ExecutorResolver> TResourceResolver for ExecutorResolverAdapter<'a, 
     type Key = StateKey;
     type Layout = MoveTypeLayout;
 
-    fn get_resource_bytes(
+    fn get_resource_state_value(
         &self,
         _state_key: &Self::Key,
         _maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<Vec<u8>>> {
-        todo!()
-    }
-
-    fn get_resource_state_value_metadata(
-        &self,
-        _state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValue>> {
         todo!()
     }
 }
@@ -379,14 +357,7 @@ impl<'a, R: ExecutorResolver> TResourceResolver for ExecutorResolverAdapter<'a, 
 impl<'a, R: ExecutorResolver> TModuleResolver for ExecutorResolverAdapter<'a, R> {
     type Key = StateKey;
 
-    fn get_module_bytes(&self, _state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
-        todo!()
-    }
-
-    fn get_module_state_value_metadata(
-        &self,
-        _state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    fn get_module_state_value(&self, _state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
         todo!()
     }
 }

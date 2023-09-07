@@ -23,14 +23,14 @@ use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
-    vm_status::{StatusCode, VMStatus},
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use aptos_vm_types::resolver::{
-    StateStorageResolver, StateValueMetadataKind, TModuleResolver, TResourceResolver,
+use aptos_vm_types::resolver::{StateStorageResolver, TModuleResolver, TResourceResolver};
+use move_core_types::{
+    value::MoveTypeLayout,
+    vm_status::{StatusCode, VMStatus},
 };
-use move_core_types::value::MoveTypeLayout;
 use std::{
     cell::RefCell,
     fmt::Debug,
@@ -294,12 +294,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
         }
     }
 
-    fn id(&self) -> StateViewId {
-        self.base_view.id()
-    }
-
     fn get_usage(&self) -> Result<StateStorageUsage> {
-        self.base_view.get_usage()
+        todo!()
     }
 }
 
@@ -309,18 +305,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceRe
     type Key = T::Key;
     type Layout = MoveTypeLayout;
 
-    fn get_resource_bytes(
+    fn get_resource_state_value(
         &self,
         _state_key: &Self::Key,
         _maybe_layout: Option<&Self::Layout>,
-    ) -> Result<Option<Vec<u8>>> {
-        todo!()
-    }
-
-    fn get_resource_state_value_metadata(
-        &self,
-        _state_key: &Self::Key,
-    ) -> Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValue>> {
         todo!()
     }
 }
@@ -330,14 +319,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleReso
 {
     type Key = T::Key;
 
-    fn get_module_bytes(&self, _state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
-        todo!()
-    }
-
-    fn get_module_state_value_metadata(
-        &self,
-        _state_key: &Self::Key,
-    ) -> Result<Option<StateValueMetadataKind>> {
+    fn get_module_state_value(&self, _state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
         todo!()
     }
 }
@@ -346,11 +328,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorag
     for LatestView<'a, T, S, X>
 {
     fn id(&self) -> StateViewId {
-        todo!()
+        self.base_view.id()
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
-        todo!()
+    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        self.base_view.get_usage()
     }
 }
 

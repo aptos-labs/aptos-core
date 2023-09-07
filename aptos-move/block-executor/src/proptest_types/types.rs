@@ -537,7 +537,7 @@ where
                 let mut reads_result = vec![];
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
-                    // TODO FIX THIS
+                    // TODO: test other kinds of reads as well?
                     match view.get_resource_bytes(k, None) {
                         Ok(v) => reads_result.push(v),
                         Err(_) => reads_result.push(None),
