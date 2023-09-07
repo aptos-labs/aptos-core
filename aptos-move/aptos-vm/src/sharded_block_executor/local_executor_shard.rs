@@ -198,7 +198,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         let mut sharded_output = self.get_output_from_shards()?;
 
         // We could call sharded_aggregator_service::aggregate_and_update_total_supply() from here,
-        // calling on the global shard might help us get the resources on the global shard (say
+        // but calling on the global shard will get us the resources on the global shard (say
         // like thread pool)
         self.global_executor.aggregate_results(
             &mut sharded_output,

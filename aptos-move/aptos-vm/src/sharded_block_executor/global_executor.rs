@@ -72,6 +72,7 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
             sharded_output,
             global_output,
             state_view,
+            self.executor_thread_pool.clone(),
         );
     }
 }

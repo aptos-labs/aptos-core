@@ -303,10 +303,10 @@ impl WriteSetV0 {
         self.0.get(key)
     }
 
-    pub fn get_value(&self, key: &StateKey) -> Option<u128> {
+    pub fn get_total_supply(&self) -> Option<u128> {
         let value = self
             .0
-            .get(key)
+            .get(&TOTAL_SUPPLY_STATE_KEY)
             .and_then(|op| op.bytes())
             .map(bcs::from_bytes);
         value.transpose().map_err(anyhow::Error::msg).unwrap()
