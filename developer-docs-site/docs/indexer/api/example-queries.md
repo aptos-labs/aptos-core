@@ -6,7 +6,7 @@ title: "Example Queries"
 
 ## Running example queries
 
-1. Open the Hasura Explorer for the network you want to query. You can find the URLs [here](./labs-hosted#hasura-explorer).
+1. Open the Hasura Explorer for the network you want to query. You can find the URLs [here](/indexer/api/labs-hosted#hasura-explorer).
 1. Paste the **Query** code from an example into the main query section, and the **Query Variables** code from the same example into the Query Variables section (below the main query section).
 
 ## More Examples

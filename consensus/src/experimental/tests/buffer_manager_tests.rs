@@ -16,9 +16,8 @@ use crate::{
         tests::test_utils::prepare_executed_blocks_with_ledger_info,
     },
     metrics_safety_rules::MetricsSafetyRules,
-    network::NetworkSender,
+    network::{IncomingCommitRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
-    round_manager::{UnverifiedEvent, VerifiedEvent},
     test_utils::{
         consensus_runtime, timed_block_on, EmptyStateComputer, MockStorage,
         RandomComputeResultStateComputer,
@@ -59,7 +58,7 @@ pub fn prepare_buffer_manager() -> (
     BufferManager,
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
-    aptos_channel::Sender<AccountAddress, VerifiedEvent>,
+    aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
     aptos_channels::Receiver<Event<ConsensusMsg>>,
     PipelinePhase<ExecutionPhase>,
     PipelinePhase<SigningPhase>,
@@ -116,8 +115,11 @@ pub fn prepare_buffer_manager() -> (
         validators.clone(),
     );
 
-    let (msg_tx, msg_rx) =
-        aptos_channel::new::<AccountAddress, VerifiedEvent>(QueueStyle::FIFO, channel_size, None);
+    let (msg_tx, msg_rx) = aptos_channel::new::<AccountAddress, IncomingCommitRequest>(
+        QueueStyle::FIFO,
+        channel_size,
+        None,
+    );
 
     let (result_tx, result_rx) = create_channel::<OrderedBlocks>();
     let (reset_tx, _) = create_channel::<ResetRequest>();
@@ -170,7 +172,7 @@ pub fn prepare_buffer_manager() -> (
 pub fn launch_buffer_manager() -> (
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
-    aptos_channel::Sender<AccountAddress, VerifiedEvent>,
+    aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
     aptos_channels::Receiver<Event<ConsensusMsg>>,
     HashValue,
     Runtime,
@@ -215,20 +217,20 @@ pub fn launch_buffer_manager() -> (
 
 async fn loopback_commit_vote(
     self_loop_rx: &mut aptos_channels::Receiver<Event<ConsensusMsg>>,
-    msg_tx: &aptos_channel::Sender<AccountAddress, VerifiedEvent>,
+    msg_tx: &aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
     verifier: &ValidatorVerifier,
 ) {
     match self_loop_rx.next().await {
-        Some(Event::Message(author, msg)) => {
-            if matches!(msg, ConsensusMsg::CommitVoteMsg(_)) {
-                let event: UnverifiedEvent = msg.into();
+        Some(Event::RpcRequest(author, msg, protocol, callback)) => {
+            if let ConsensusMsg::CommitMessage(msg) = msg {
+                msg.verify(verifier).unwrap();
+                let request = IncomingCommitRequest {
+                    req: *msg,
+                    protocol,
+                    response_sender: callback,
+                };
                 // verify the message and send the message into self loop
-                msg_tx
-                    .push(
-                        author,
-                        event.verify(author, verifier, false, false, 100).unwrap(),
-                    )
-                    .ok();
+                msg_tx.push(author, request).ok();
             }
         },
         _ => {

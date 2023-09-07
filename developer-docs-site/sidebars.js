@@ -125,6 +125,7 @@ const sidebars = {
             "move/move-on-aptos/modules-on-aptos",
             "move/move-on-aptos/move-scripts",
             "move/move-on-aptos/cli",
+            "move/move-on-aptos/cryptography",
           ],
         },
         {
@@ -425,7 +426,11 @@ const sidebars = {
               link: { type: "doc", id: "indexer/legacy/index" },
               collapsible: true,
               collapsed: true,
-              items: ["indexer/legacy/indexer-fullnode", "indexer/legacy/custom-data-model"],
+              items: [
+                "indexer/legacy/indexer-fullnode",
+                "indexer/legacy/custom-data-model",
+                "indexer/legacy/migration",
+              ],
             },
           ],
         },

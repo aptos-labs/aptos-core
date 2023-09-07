@@ -72,6 +72,7 @@ use aptos_config::config::{
 };
 use aptos_crypto::HashValue;
 use aptos_db_indexer::Indexer;
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{SchemaBatch, DB};
@@ -133,14 +134,6 @@ pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
 pub const STATE_KV_DB_NAME: &str = "state_kv_db";
 
 pub(crate) const NUM_STATE_SHARDS: usize = 16;
-
-static COMMIT_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(32)
-        .thread_name(|index| format!("commit-{}", index))
-        .build()
-        .unwrap()
-});
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
 // or guarantee that there is always a recent enough waypoint and client knows to boot from there.
@@ -892,19 +885,28 @@ impl AptosDB {
         sharded_state_cache: Option<&ShardedStateCache>,
         skip_index_and_usage: bool,
     ) -> Result<HashValue> {
-        let new_root_hash = thread::scope(|s| {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["save_transactions__work"])
-                .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["save_transactions__work"])
+            .start_timer();
+        let mut new_root_hash = HashValue::zero();
+        THREAD_MANAGER.get_non_exe_cpu_pool().scope(|s| {
             // TODO(grao): Write progress for each of the following databases, and handle the
             // inconsistency at the startup time.
-            let t0 =
-                s.spawn(|| self.commit_events(txns_to_commit, first_version, skip_index_and_usage));
-            let t1 = s.spawn(|| self.commit_write_sets(txns_to_commit, first_version));
-            let t2 = s.spawn(|| {
-                self.commit_transactions(txns_to_commit, first_version, skip_index_and_usage)
+            //
+            // TODO(grao): Consider propagating the error instead of panic, if necessary.
+            s.spawn(|_| {
+                self.commit_events(txns_to_commit, first_version, skip_index_and_usage)
+                    .unwrap()
             });
-            let t3 = s.spawn(|| {
+            s.spawn(|_| {
+                self.commit_write_sets(txns_to_commit, first_version)
+                    .unwrap()
+            });
+            s.spawn(|_| {
+                self.commit_transactions(txns_to_commit, first_version, skip_index_and_usage)
+                    .unwrap()
+            });
+            s.spawn(|_| {
                 self.commit_state_kv_and_ledger_metadata(
                     txns_to_commit,
                     first_version,
@@ -912,17 +914,18 @@ impl AptosDB {
                     sharded_state_cache,
                     skip_index_and_usage,
                 )
+                .unwrap()
             });
-            let t4 = s.spawn(|| self.commit_transaction_infos(txns_to_commit, first_version));
-            let t5 = s.spawn(|| self.commit_transaction_accumulator(txns_to_commit, first_version));
-            // TODO(grao): Consider propagating the error instead of panic, if necessary.
-            t0.join().unwrap()?;
-            t1.join().unwrap()?;
-            t2.join().unwrap()?;
-            t3.join().unwrap()?;
-            t4.join().unwrap()?;
-            t5.join().unwrap()
-        })?;
+            s.spawn(|_| {
+                self.commit_transaction_infos(txns_to_commit, first_version)
+                    .unwrap()
+            });
+            s.spawn(|_| {
+                new_root_hash = self
+                    .commit_transaction_accumulator(txns_to_commit, first_version)
+                    .unwrap()
+            });
+        });
 
         Ok(new_root_hash)
     }
@@ -971,14 +974,14 @@ impl AptosDB {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_state_kv_and_ledger_metadata___commit"])
             .start_timer();
-        thread::scope(|s| {
-            s.spawn(|| {
+        rayon::scope(|s| {
+            s.spawn(|_| {
                 self.ledger_db
                     .metadata_db()
                     .write_schemas(ledger_metadata_batch)
                     .unwrap();
             });
-            s.spawn(|| {
+            s.spawn(|_| {
                 self.state_kv_db
                     .commit(
                         last_version,

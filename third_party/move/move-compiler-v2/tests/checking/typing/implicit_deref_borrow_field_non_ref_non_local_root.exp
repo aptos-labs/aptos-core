@@ -3,10 +3,10 @@ module 0x8675309::M {
     struct S {
         f: u64,
     }
-    private fun bar() {
+    private fun bar(): M::S {
         pack M::S(0)
     }
-    private fun foo() {
+    private fun foo(): &M::S {
         Abort(0)
     }
     private fun t0(cond: bool,_s: M::S) {
@@ -24,4 +24,11 @@ module 0x8675309::M {
         });
         Tuple()
     }
+    spec fun $bar(): M::S {
+        pack M::S(0)
+    }
+    spec fun $foo(): M::S {
+        Abort(0)
+    }
+    spec fun $t0(cond: bool,_s: M::S);
 } // end 0x8675309::M

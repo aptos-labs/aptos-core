@@ -31,9 +31,10 @@ use diesel::{
 };
 use futures::{future::join_all, StreamExt};
 use google_cloud_pubsub::{
-    client::{Client, ClientConfig},
+    client::{Client as PubsubClient, ClientConfig as PubsubClientConfig},
     subscription::{MessageStream, Subscription},
 };
+use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GCSClientConfig};
 use image::ImageFormat;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -62,6 +63,7 @@ async fn spawn_parser(
     parser_config: ParserConfig,
     pool: Pool<ConnectionManager<PgConnection>>,
     subscription: Subscription,
+    gcs_client: GCSClient,
     ack_parsed_uris: bool,
 ) {
     let mut db_chain_id = None;
@@ -109,7 +111,15 @@ async fn spawn_parser(
 
         // Perform chain id check
         // If chain id is not set, set it
-        let mut conn = get_conn(pool.clone());
+        let mut conn = pool.get().unwrap_or_else(|e| {
+            error!(
+                pubsub_message = pubsub_message,
+                error = ?e,
+                "[NFT Metadata Crawler] Failed to get DB connection from pool");
+            UNABLE_TO_GET_CONNECTION_COUNT.inc();
+            panic!();
+        });
+        GOT_CONNECTION_COUNT.inc();
 
         let grpc_chain_id = parts[4].parse::<u64>().unwrap_or_else(|e| {
             error!(
@@ -138,6 +148,7 @@ async fn spawn_parser(
         let mut worker = Worker::new(
             parser_config.clone(),
             conn,
+        gcs_client.clone(),
             pubsub_message.clone(),
             parts[0].to_string(),
             parts[1].to_string(),
@@ -228,28 +239,6 @@ async fn send_ack(subscription: &Subscription, ack_id: &str) -> anyhow::Result<(
     .context("Failed to ack message to PubSub")
 }
 
-/// Gets a Postgres connection from the pool
-fn get_conn(
-    pool: Pool<ConnectionManager<PgConnection>>,
-) -> PooledConnection<ConnectionManager<PgConnection>> {
-    loop {
-        match pool.get() {
-            Ok(conn) => {
-                GOT_CONNECTION_COUNT.inc();
-                return conn;
-            },
-            Err(err) => {
-                UNABLE_TO_GET_CONNECTION_COUNT.inc();
-                error!(
-                    "Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
-                    pool.connection_timeout(),
-                    err
-                );
-            },
-        };
-    }
-}
-
 #[async_trait::async_trait]
 impl RunnableConfig for ParserConfig {
     /// Main driver function that establishes a connection to Pubsub and parses the Pubsub entries in parallel
@@ -274,8 +263,28 @@ impl RunnableConfig for ParserConfig {
             );
         }
 
-        // Establish gRPC client
-        let config = ClientConfig::default()
+        // Establish PubSub client
+        let pubsub_config = PubsubClientConfig::default()
+            .with_auth()
+            .await
+            .unwrap_or_else(|e| {
+                error!(
+                    error = ?e,
+                    "[NFT Metadata Crawler] Failed to create PubSub client config"
+                );
+                panic!();
+            });
+        let pubsub_client = PubsubClient::new(pubsub_config).await.unwrap_or_else(|e| {
+            error!(
+                error = ?e,
+                "[NFT Metadata Crawler] Failed to create PubSub client"
+            );
+            panic!();
+        });
+        let subscription = pubsub_client.subscription(&self.subscription_name);
+
+        // Establish GCS client
+        let gcs_config = GCSClientConfig::default()
             .with_auth()
             .await
             .unwrap_or_else(|e| {
@@ -285,14 +294,7 @@ impl RunnableConfig for ParserConfig {
                 );
                 panic!();
             });
-        let client = Client::new(config).await.unwrap_or_else(|e| {
-            error!(
-                error = ?e,
-                "[NFT Metadata Crawler] Failed to create gRPC client"
-            );
-            panic!();
-        });
-        let subscription = client.subscription(&self.subscription_name);
+        let gcs_client = GCSClient::new(gcs_config);
 
         // Spawns workers
         let mut workers: Vec<JoinHandle<()>> = Vec::new();
@@ -301,6 +303,7 @@ impl RunnableConfig for ParserConfig {
                 self.clone(),
                 pool.clone(),
                 subscription.clone(),
+                gcs_client.clone(),
                 self.ack_parsed_uris.unwrap_or(false),
             ));
 
@@ -320,6 +323,7 @@ impl RunnableConfig for ParserConfig {
 pub struct Worker {
     config: ParserConfig,
     conn: PooledConnection<ConnectionManager<PgConnection>>,
+    gcs_client: GCSClient,
     pubsub_message: String,
     model: NFTMetadataCrawlerURIs,
     token_data_id: String,
@@ -333,6 +337,7 @@ impl Worker {
     pub fn new(
         config: ParserConfig,
         conn: PooledConnection<ConnectionManager<PgConnection>>,
+        gcs_client: GCSClient,
         pubsub_message: String,
         token_data_id: String,
         token_uri: String,
@@ -343,6 +348,7 @@ impl Worker {
         let worker = Self {
             config,
             conn,
+            gcs_client,
             pubsub_message,
             model: NFTMetadataCrawlerURIs::new(token_uri.clone()),
             token_data_id,
@@ -406,9 +412,13 @@ impl Worker {
         // Save parsed JSON to GCS
         if json != Value::Null {
             self.log_info("Writing JSON to GCS");
-            let cdn_json_uri_result =
-                write_json_to_gcs(self.config.bucket.clone(), self.token_data_id.clone(), json)
-                    .await;
+            let cdn_json_uri_result = write_json_to_gcs(
+                self.config.bucket.clone(),
+                self.token_data_id.clone(),
+                json,
+                &self.gcs_client,
+            )
+            .await;
 
             if let Err(e) = cdn_json_uri_result.as_ref() {
                 self.log_error("Failed to write JSON to GCS", e);
@@ -485,6 +495,7 @@ impl Worker {
                     self.config.bucket.clone(),
                     self.token_data_id.clone(),
                     image,
+                    &self.gcs_client,
                 )
                 .await;
 
@@ -565,6 +576,7 @@ impl Worker {
                     self.config.bucket.clone(),
                     self.token_data_id.clone(),
                     animation,
+                    &self.gcs_client,
                 )
                 .await;
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod aggregator;
+pub mod aggregator_v2;
 pub mod aptos_governance;
 pub mod harness;
 pub mod stake;

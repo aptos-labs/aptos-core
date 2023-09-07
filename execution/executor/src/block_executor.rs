@@ -22,6 +22,7 @@ use aptos_executor_types::{
     execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
     BlockExecutorTrait, Error, StateComputeResult,
 };
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_scratchpad::SparseMerkleTree;
@@ -252,10 +253,12 @@ where
                     .with_label_values(&["state_checkpoint"])
                     .start_timer();
 
-                chunk_output.into_state_checkpoint_output(
-                    parent_output.state(),
-                    maybe_block_gas_limit.map(|_| block_id),
-                )?
+                THREAD_MANAGER.get_exe_cpu_pool().install(|| {
+                    chunk_output.into_state_checkpoint_output(
+                        parent_output.state(),
+                        maybe_block_gas_limit.map(|_| block_id),
+                    )
+                })?
             };
 
         let _ = self.block_tree.add_block(
@@ -306,10 +309,12 @@ where
                 );
                 parent_output.reconfig_suffix()
             } else {
-                let (output, _, _) = ApplyChunkOutput::calculate_ledger_update(
-                    state_checkpoint_output,
-                    parent_accumulator.clone(),
-                )?;
+                let (output, _, _) = THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
+                    ApplyChunkOutput::calculate_ledger_update(
+                        state_checkpoint_output,
+                        parent_accumulator.clone(),
+                    )
+                })?;
                 output
             };
 

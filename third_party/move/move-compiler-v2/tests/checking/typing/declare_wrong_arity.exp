@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: expected `u64` but found `()`
+error: expected `u64` but found `()` (from assignment or declaration context)
   ┌─ tests/checking/typing/declare_wrong_arity.move:6:13
   │
 6 │         let (): u64;

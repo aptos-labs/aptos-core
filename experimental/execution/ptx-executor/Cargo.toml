@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-executor = { workspace = true }
+aptos-experimental-runtimes = { workspace = true }
 aptos-framework =  { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }

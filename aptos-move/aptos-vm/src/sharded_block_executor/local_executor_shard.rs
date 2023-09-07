@@ -192,7 +192,6 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         let global_output = self.global_executor.execute_global_txns(
             global_txns,
             state_view.as_ref(),
-            concurrency_level_per_shard,
             maybe_block_gas_limit,
         )?;
 
