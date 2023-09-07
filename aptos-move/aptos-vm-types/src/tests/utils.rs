@@ -68,6 +68,7 @@ pub(crate) fn build_change_set(
 }
 
 // For testing, output has always a success execution status and uses 100 gas units.
+#[allow(unused)]
 pub(crate) fn build_vm_output(
     resource_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,

@@ -5,6 +5,7 @@
 use crate::task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput};
 use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
+    resolver::AggregatorResolver,
     transaction::AggregatorValue,
 };
 use aptos_mvhashmap::types::TxnIndex;
@@ -19,8 +20,9 @@ use aptos_types::{
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
+use aptos_vm_types::resolver::{StateStorageResolver, TModuleResolver, TResourceResolver};
 use claims::assert_ok;
-use move_core_types::language_storage::TypeTag;
+use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout};
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -510,7 +512,10 @@ where
 
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = K>,
+        view: &(impl TResourceResolver<Key = K, Layout = MoveTypeLayout>
+              + TModuleResolver<Key = K>
+              + StateStorageResolver
+              + AggregatorResolver),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,
@@ -532,7 +537,8 @@ where
                 let mut reads_result = vec![];
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
-                    match view.get_state_value_bytes(k) {
+                    // TODO FIX THIS
+                    match view.get_resource_bytes(k, None) {
                         Ok(v) => reads_result.push(v),
                         Err(_) => reads_result.push(None),
                     }

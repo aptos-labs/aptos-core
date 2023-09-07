@@ -9,7 +9,7 @@ use crate::{
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     counters::*,
-    data_cache::StorageAdapter,
+    data_cache::StateViewAdapter,
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, MoveResolverExt, RespawnedSession, SessionExt, SessionId},
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
@@ -121,7 +121,7 @@ impl AptosVM {
     }
 
     pub fn new_from_state_view(state_view: &impl StateView) -> Self {
-        let config_storage = StorageAdapter::new(state_view);
+        let config_storage = StateViewAdapter::new(state_view);
         Self(AptosVMImpl::new(&config_storage))
     }
 
@@ -253,8 +253,8 @@ impl AptosVM {
         .1
     }
 
-    pub fn as_move_resolver<'a, S>(&self, state_view: &'a S) -> StorageAdapter<'a, S> {
-        StorageAdapter::new_with_cached_config(
+    pub fn as_move_resolver<'a, S: StateView>(&self, state_view: &'a S) -> StateViewAdapter<'a, S> {
+        StateViewAdapter::new_with_cached_config(
             state_view,
             self.0.get_gas_feature_version(),
             self.0.get_features(),
@@ -528,7 +528,7 @@ impl AptosVM {
 
         // TODO(Gas): Charge for aggregator writes
         let session_id = SessionId::epilogue_meta(txn_data);
-        RespawnedSession::spawn(&self.0, session_id, resolver, change_set, storage_refund)
+        RespawnedSession::spawn(self, session_id, resolver, change_set, storage_refund)
     }
 
     // Execute a multisig transaction:
@@ -731,7 +731,7 @@ impl AptosVM {
         // Start a fresh session for running cleanup that does not contain any changes from
         // the inner function call earlier (since it failed).
         let mut respawned_session = RespawnedSession::spawn(
-            &self.0,
+            self,
             SessionId::epilogue_meta(txn_data),
             resolver,
             VMChangeSet::empty(),
@@ -1184,7 +1184,8 @@ impl AptosVM {
     }
 
     pub fn execute_user_transaction_with_custom_gas_meter<G, F>(
-        state_view: &impl StateView,
+        &self,
+        resolver: &impl MoveResolverExt,
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
         make_gas_meter: F,
@@ -1193,25 +1194,16 @@ impl AptosVM {
         G: AptosGasMeter,
         F: FnOnce(u64, VMGasParameters, StorageGasParameters, Gas) -> Result<G, VMStatus>,
     {
-        // TODO(Gas): revisit this.
-        let vm = AptosVM::new_from_state_view(state_view);
-
         // TODO(Gas): avoid creating txn metadata twice.
         let balance = TransactionMetadata::new(txn).max_gas_amount();
         let mut gas_meter = make_gas_meter(
-            vm.0.get_gas_feature_version(),
-            vm.0.get_gas_parameters(log_context)?.vm.clone(),
-            vm.0.get_storage_gas_parameters(log_context)?.clone(),
+            self.0.get_gas_feature_version(),
+            self.0.get_gas_parameters(log_context)?.vm.clone(),
+            self.0.get_storage_gas_parameters(log_context)?.clone(),
             balance,
         )?;
-
-        let resolver = StorageAdapter::new_with_cached_config(
-            state_view,
-            vm.0.get_gas_feature_version(),
-            vm.0.get_features(),
-        );
         let (status, output) =
-            vm.execute_user_transaction_impl(&resolver, txn, log_context, &mut gas_meter);
+            self.execute_user_transaction_impl(resolver, txn, log_context, &mut gas_meter);
 
         Ok((status, output, gas_meter))
     }
@@ -1264,7 +1256,7 @@ impl AptosVM {
 
     fn read_change_set(
         &self,
-        state_view: &impl StateView,
+        state_view: &impl MoveResolverExt,
         change_set: &VMChangeSet,
     ) -> Result<(), VMStatus> {
         assert!(
@@ -1276,7 +1268,8 @@ impl AptosVM {
         // access path that the write set is going to update.
         for (state_key, _) in change_set.write_set_iter() {
             state_view
-                .get_state_value_bytes(state_key)
+                // TODO: Fix this, placeholder!
+                .get_module_bytes(state_key)
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         }
         Ok(())
@@ -1389,15 +1382,17 @@ impl AptosVM {
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
-        let (vm_status, vm_output) = simulation_vm.simulate_signed_transaction(
-            &simulation_vm.0.as_move_resolver(state_view),
-            txn,
-            &log_context,
+        let resolver = StateViewAdapter::new_with_cached_config(
+            state_view,
+            simulation_vm.0 .0.get_gas_feature_version(),
+            simulation_vm.0 .0.get_features(),
         );
+        let (vm_status, vm_output) =
+            simulation_vm.simulate_signed_transaction(&resolver, txn, &log_context);
         (
             vm_status,
             vm_output
-                .try_into_transaction_output(state_view)
+                .try_into_transaction_output(&resolver)
                 .expect("Simulation cannot fail"),
         )
     }
@@ -1419,7 +1414,11 @@ impl AptosVM {
                 vm.0.get_storage_gas_parameters(&log_context)?.clone(),
                 gas_budget,
             )));
-        let resolver = vm.as_move_resolver(state_view);
+        let resolver = StateViewAdapter::new_with_cached_config(
+            state_view,
+            vm.0.get_gas_feature_version(),
+            vm.0.get_features(),
+        );
         let mut session = vm.new_session(&resolver, SessionId::Void);
 
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
@@ -1597,7 +1596,11 @@ impl VMValidator for AptosVM {
             },
         };
 
-        let resolver = self.as_move_resolver(state_view);
+        let resolver = StateViewAdapter::new_with_cached_config(
+            state_view,
+            self.0.get_gas_feature_version(),
+            self.0.get_features(),
+        );
         let mut session = self.0.new_session(&resolver, SessionId::prologue(&txn));
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,

@@ -45,7 +45,7 @@ use aptos_types::{
 };
 use aptos_utils::aptos_try;
 use aptos_vm::{
-    data_cache::{AsMoveResolver, StorageAdapter},
+    data_cache::{AsMoveResolver, StateViewAdapter},
     move_vm_ext::AptosMoveResolver,
 };
 use futures::{channel::oneshot, SinkExt};
@@ -1153,7 +1153,7 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let storage_adapter = StorageAdapter::new(&state_view);
+            let storage_adapter = StateViewAdapter::new(&state_view);
 
             let gas_schedule_params =
                 match GasScheduleV2::fetch_config(&storage_adapter).and_then(|gas_schedule| {
@@ -1218,7 +1218,7 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let storage_adapter = StorageAdapter::new(&state_view);
+            let storage_adapter = StateViewAdapter::new(&state_view);
 
             let block_gas_limit = OnChainExecutionConfig::fetch_config(&storage_adapter)
                 .and_then(|config| config.block_gas_limit());

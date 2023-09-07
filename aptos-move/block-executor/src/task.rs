@@ -2,9 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_aggregator::{delta_change_set::DeltaOp, resolver::AggregatorResolver};
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::TStateView;
 use aptos_types::{
     contract_event::ReadWriteEvent,
     executable::ModulePath,
@@ -64,10 +63,10 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &(impl TStateView<Key = <Self::Txn as Transaction>::Key>
-              + TResourceResolver<Key = <Self::Txn as Transaction>::Key, Layout = MoveTypeLayout>
+        view: &(impl TResourceResolver<Key = <Self::Txn as Transaction>::Key, Layout = MoveTypeLayout>
               + TModuleResolver<Key = <Self::Txn as Transaction>::Key>
-              + StateStorageResolver),
+              + StateStorageResolver
+              + AggregatorResolver),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,

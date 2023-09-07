@@ -6,7 +6,7 @@ use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
-    data_cache::StorageAdapter,
+    data_cache::{ExecutorResolverAdapter, StateViewAdapter},
 };
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
@@ -34,7 +34,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     fn init(argument: &'a S) -> Self {
         // AptosVM has to be initialized using configs from storage.
         // Using adapter allows us to fetch those.
-        let config_storage = StorageAdapter::new(argument);
+        let config_storage = StateViewAdapter::new(argument);
         let vm = AptosVM::new(&config_storage);
 
         // Loading `0x1::account` and its transitive dependency into the code cache.
@@ -45,9 +45,14 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         // Loading up `0x1::account` should be sufficient as this is the most common module
         // used for prologue, epilogue and transfer functionality.
 
+        let resolver = StateViewAdapter::new_with_cached_config(
+            argument,
+            vm.0.get_gas_feature_version(),
+            vm.0.get_features(),
+        );
         let _ = vm.load_module(
             &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            &vm.as_move_resolver(argument),
+            &resolver,
         );
 
         Self {
@@ -61,17 +66,21 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
-        view: &(impl StateView + ExecutorResolver),
+        view: &impl ExecutorResolver,
         txn: &PreprocessedTransaction,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
-        let resolver = &self.vm.as_move_resolver(view);
+        let resolver = ExecutorResolverAdapter::new_with_cached_config(
+            view,
+            self.vm.0.get_gas_feature_version(),
+            self.vm.0.get_features(),
+        );
 
         match self
             .vm
-            .execute_single_transaction(txn, resolver, &log_context)
+            .execute_single_transaction(txn, &resolver, &log_context)
         {
             Ok((vm_status, mut vm_output, sender)) => {
                 if materialize_deltas {

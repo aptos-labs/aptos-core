@@ -14,6 +14,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey, transaction::TransactionOutput, write_set::TransactionWrite,
 };
+use aptos_vm::data_cache::StateViewAdapter;
 use aptos_vm_types::output::VMOutput;
 use once_cell::sync::Lazy;
 use rayon::Scope;
@@ -118,9 +119,8 @@ impl<'view> Worker<'view> {
 
     fn finalize_one(&mut self) {
         let vm_output = self.buffer.pop_front().unwrap().unwrap();
-        let txn_out = vm_output
-            .try_into_transaction_output(&self.state_view)
-            .unwrap();
+        let resolver = StateViewAdapter::new(&self.state_view);
+        let txn_out = vm_output.try_into_transaction_output(&resolver).unwrap();
         for (key, op) in txn_out.write_set() {
             // TODO(ptx): hack: deal only with the total supply
             if key == Lazy::force(&TOTAL_SUPPLY_STATE_KEY) {

@@ -3,17 +3,14 @@
 
 use aptos_aggregator::resolver::AggregatorResolver;
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
-use aptos_state_view::StateView;
 use aptos_table_natives::TableResolver;
 use aptos_types::{
     on_chain_config::ConfigStorage,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
 };
-use aptos_vm_types::resolver::StateStorageResolver;
+use aptos_vm_types::resolver::{ModuleResolver, ResourceResolver, StateStorageResolver};
 use move_core_types::{
-    account_address::AccountAddress,
-    language_storage::StructTag,
-    resolver::{ModuleResolver, MoveResolver, ResourceResolver},
+    account_address::AccountAddress, language_storage::StructTag, resolver::MoveResolver,
 };
 use std::collections::BTreeMap;
 
@@ -47,12 +44,11 @@ pub trait AptosMoveResolver:
 
 // TODO: Remove dependency on StateView.
 pub trait MoveResolverExt:
-    AptosMoveResolver + StateView + ResourceResolver + ModuleResolver + StateStorageResolver
+    AptosMoveResolver + ResourceResolver + ModuleResolver + StateStorageResolver
 {
 }
 
-impl<
-        T: AptosMoveResolver + StateView + ResourceResolver + ModuleResolver + StateStorageResolver,
-    > MoveResolverExt for T
+impl<T: AptosMoveResolver + ResourceResolver + ModuleResolver + StateStorageResolver>
+    MoveResolverExt for T
 {
 }

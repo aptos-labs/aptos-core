@@ -28,7 +28,7 @@ use aptos_types::{
     transaction::{AtomicVersion, Version},
     write_set::{WriteOp, WriteSet},
 };
-use aptos_vm::data_cache::{AsMoveResolver, StorageAdapter};
+use aptos_vm::data_cache::{AsMoveResolver, StateViewAdapter};
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
@@ -88,7 +88,7 @@ impl Indexer {
 
     pub fn index_with_annotator(
         &self,
-        annotator: &MoveValueAnnotator<StorageAdapter<DbStateView>>,
+        annotator: &MoveValueAnnotator<StateViewAdapter<DbStateView>>,
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
@@ -152,7 +152,7 @@ impl Indexer {
 
 struct TableInfoParser<'a> {
     indexer: &'a Indexer,
-    annotator: &'a MoveValueAnnotator<'a, StorageAdapter<'a, DbStateView>>,
+    annotator: &'a MoveValueAnnotator<'a, StateViewAdapter<'a, DbStateView>>,
     result: HashMap<TableHandle, TableInfo>,
     pending_on: HashMap<TableHandle, Vec<&'a [u8]>>,
 }
@@ -160,7 +160,7 @@ struct TableInfoParser<'a> {
 impl<'a> TableInfoParser<'a> {
     pub fn new(
         indexer: &'a Indexer,
-        annotator: &'a MoveValueAnnotator<StorageAdapter<DbStateView>>,
+        annotator: &'a MoveValueAnnotator<StateViewAdapter<DbStateView>>,
     ) -> Self {
         Self {
             indexer,

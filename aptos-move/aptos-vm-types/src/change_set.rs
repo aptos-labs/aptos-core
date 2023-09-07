@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::check_change_set::CheckChangeSet;
-use aptos_aggregator::delta_change_set::{serialize, DeltaOp};
-use aptos_state_view::StateView;
+use aptos_aggregator::{
+    delta_change_set::{serialize, DeltaOp},
+    resolver::AggregatorResolver,
+};
 use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::{StateKey, StateKeyInner},
@@ -203,7 +205,10 @@ impl VMChangeSet {
 
     /// Materializes this change set: all deltas are converted into writes and
     /// are combined with existing aggregator writes.
-    pub fn try_materialize(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
+    pub fn try_materialize(
+        self,
+        resolver: &impl AggregatorResolver,
+    ) -> anyhow::Result<Self, VMStatus> {
         let Self {
             resource_write_set,
             module_write_set,
@@ -214,7 +219,7 @@ impl VMChangeSet {
 
         let into_write =
             |(state_key, delta): (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
-                let write = delta.try_into_write_op(state_view, &state_key)?;
+                let write = delta.try_into_write_op(resolver, &state_key)?;
                 Ok((state_key, write))
             };
 
