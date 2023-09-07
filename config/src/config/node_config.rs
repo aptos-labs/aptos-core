@@ -342,6 +342,13 @@ pub fn diff_override_config_yaml(
     }
 }
 
+/// A utility struct for managing a node config that is overriding a base config, and outputting a
+/// yaml representation of it. In most cases, the base config will be the default config, and the
+/// output will be a minimal yaml diff that an aptos node can read.
+///
+/// In rare cases you may want to explicitly write a yaml value that is the same as the default
+/// config (e.g., to avoid the config being optimized by ConfigOptimizer). To do this, change the
+/// base config to a different value before calling get_yaml().
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct OverrideNodeConfig {
     config: NodeConfig,
