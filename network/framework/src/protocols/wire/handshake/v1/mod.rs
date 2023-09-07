@@ -106,8 +106,8 @@ impl ProtocolId {
             ProtocolId::PeerMonitoringServiceRpc,
             ProtocolId::ConsensusRpcCompressed,
             ProtocolId::ConsensusDirectSendCompressed,
-            ProtocolId::BenchmarkRpc,
             ProtocolId::BenchmarkDirectSend,
+            ProtocolId::BenchmarkRpc,
         ]
     }
 

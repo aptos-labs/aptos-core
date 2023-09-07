@@ -5,7 +5,11 @@ use aptos_config::{
     config::NodeConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_logger::{info, warn};
+use aptos_logger::{
+    debug, info,
+    prelude::{sample, SampleRate},
+    warn,
+};
 use aptos_metrics_core::{register_int_counter_vec, IntCounter, IntCounterVec};
 use aptos_network::{
     application::interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
@@ -34,15 +38,15 @@ pub enum BenchmarkMessage {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BenchmarkDataSend {
     pub request_counter: u64, // A monotonically increasing counter to verify responses
-    pub send_micros: i64, // micro seconds since some epoch at a moment just before this message is sent
+    pub send_micros: u64, // micro seconds since some epoch at a moment just before this message is sent
     pub data: Vec<u8>,    // A vector of bytes to send in the request; zero length in reply
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BenchmarkDataReply {
     pub request_counter: u64, // A monotonically increasing counter to verify responses
-    pub send_micros: i64, // micro seconds since some epoch at a moment just before this message is sent
-    pub request_send_micros: i64, // the send_micros from the previous message
+    pub send_micros: u64, // micro seconds since some epoch at a moment just before this message is sent
+    pub request_send_micros: u64, // the send_micros from the previous message
 }
 
 /// Counter for pending network events to the benchmark service (server-side)
@@ -96,7 +100,7 @@ async fn handle_direct(
         BenchmarkMessage::DataSend(send) => {
             let reply = BenchmarkDataReply {
                 request_counter: send.request_counter,
-                send_micros: time_service.now_unix_time().as_micros() as i64,
+                send_micros: time_service.now_unix_time().as_micros() as u64,
                 request_send_micros: send.send_micros,
             };
             let result = network_client.send_to_peer(
@@ -112,7 +116,7 @@ async fn handle_direct(
             }
         },
         BenchmarkMessage::DataReply(reply) => {
-            let receive_time = time_service.now_unix_time().as_micros() as i64;
+            let receive_time = time_service.now_unix_time().as_micros() as u64;
             let rec = {
                 let reader = shared.read().await;
                 reader.find(reply.request_counter)
@@ -120,7 +124,7 @@ async fn handle_direct(
             if rec.request_counter == reply.request_counter {
                 let micros = receive_time - rec.send_micros;
                 direct_messages("ok");
-                direct_micros("ok", micros as u64);
+                direct_micros("ok", micros);
                 direct_bytes("ok", rec.bytes_sent as u64);
             } else {
                 direct_messages("late");
@@ -145,7 +149,7 @@ async fn handle_rpc(
         BenchmarkMessage::DataSend(send) => {
             let reply = BenchmarkDataReply {
                 request_counter: send.request_counter,
-                send_micros: time_service.now_unix_time().as_micros() as i64,
+                send_micros: time_service.now_unix_time().as_micros() as u64,
                 request_send_micros: send.send_micros,
             };
             let reply = BenchmarkMessage::DataReply(reply);
@@ -178,7 +182,7 @@ async fn handle_rpc(
 }
 
 /// handle work split out by source_loop()
-async fn handler_thread(
+async fn handler_task(
     node_config: NodeConfig,
     network_client: NetworkClient<BenchmarkMessage>,
     work_rx: async_channel::Receiver<(NetworkId, Event<BenchmarkMessage>)>,
@@ -251,22 +255,32 @@ pub async fn run_benchmark_service(
     network_requests: NetworkServiceEvents<BenchmarkMessage>,
     time_service: TimeService,
 ) {
-    let shared = Arc::new(tokio::sync::RwLock::new(BenchmarkSharedState::new()));
+    let shared = Arc::new(RwLock::new(BenchmarkSharedState::new()));
     let config = node_config.benchmark.unwrap();
     let benchmark_service_threads = config.benchmark_service_threads;
     let num_threads = match benchmark_service_threads {
         Some(x) => x,
         None => match std::thread::available_parallelism() {
-            Ok(val) => val.get(),
-            Err(_) => 1,
+            Ok(val) => {
+                let num_threads = val.get();
+                debug!(
+                    "benchmark service running {:?} threads based on available parallelism",
+                    num_threads
+                );
+                num_threads
+            },
+            Err(_) => {
+                debug!("benchmark service running 1 thread as fallback");
+                1
+            },
         },
     };
     let (work_sender, work_receiver) = async_channel::bounded(num_threads * 2);
     let runtime_handle = Handle::current();
-    let source_thread = runtime_handle.spawn(source_loop(network_requests, work_sender));
+    let source_task = runtime_handle.spawn(source_loop(network_requests, work_sender));
     let mut handlers = vec![];
     for _ in 0..num_threads {
-        handlers.push(runtime_handle.spawn(handler_thread(
+        handlers.push(runtime_handle.spawn(handler_task(
             node_config.clone(),
             network_client.clone(),
             work_receiver.clone(),
@@ -274,7 +288,7 @@ pub async fn run_benchmark_service(
             shared.clone(),
         )));
     }
-    if let Err(err) = source_thread.await {
+    if let Err(err) = source_task.await {
         warn!("benchmark source_thread join: {}", err);
     }
     for hai in handlers {
@@ -285,7 +299,7 @@ pub async fn run_benchmark_service(
 }
 
 // once every 0.1s log a message for something that may be happening 10_000 times per second
-const BLAB_MICROS: i64 = 100_000;
+const BLAB_MICROS: u64 = 100_000;
 
 pub async fn direct_sender(
     node_config: NodeConfig,
@@ -310,8 +324,6 @@ pub async fn direct_sender(
 
     let mut counter: u64 = rng.gen();
 
-    let mut next_blab: i64 = 0;
-
     loop {
         ticker.next().await;
 
@@ -323,7 +335,7 @@ pub async fn direct_sender(
             dest.copy_from_slice(&counter_bytes);
         }
 
-        let nowu = time_service.now_unix_time().as_micros() as i64;
+        let nowu = time_service.now_unix_time().as_micros() as u64;
         let msg = BenchmarkDataSend {
             request_counter: counter,
             send_micros: nowu,
@@ -349,10 +361,10 @@ pub async fn direct_sender(
             direct_messages("sent");
         }
 
-        if nowu > next_blab {
-            info!("benchmark ds counter={}", counter);
-            next_blab = nowu + BLAB_MICROS;
-        }
+        sample!(
+            SampleRate::Duration(Duration::from_micros(BLAB_MICROS)),
+            info!("benchmark ds counter={}", counter)
+        );
     }
 }
 
@@ -378,8 +390,6 @@ pub async fn rpc_sender(
 
     let mut counter: u64 = rng.gen();
 
-    let mut next_blab: i64 = 0;
-
     let mut open_rpcs = FuturesUnordered::new();
 
     loop {
@@ -397,7 +407,7 @@ pub async fn rpc_sender(
                     dest.copy_from_slice(&counter_bytes);
                 }
 
-                let nowu = time_service.now_unix_time().as_micros() as i64;
+                let nowu = time_service.now_unix_time().as_micros() as u64;
                 let msg = BenchmarkDataSend {
                     request_counter: counter,
                     send_micros: nowu,
@@ -415,10 +425,7 @@ pub async fn rpc_sender(
                 rpc_messages("sent");
                 open_rpcs.push(result);
 
-                if nowu > next_blab {
-                    info!("benchmark rpc counter={}", counter);
-                    next_blab = nowu + BLAB_MICROS;
-                }
+                sample!(SampleRate::Duration(Duration::from_micros(BLAB_MICROS)), info!("benchmark rpc counter={}", counter));
             }
             result = open_rpcs.next() => {
                 let result = match result {
@@ -435,13 +442,13 @@ pub async fn rpc_sender(
                         return;
                     }
                     Ok(msg_wrapper) => {
-                        let nowu = time_service.now_unix_time().as_micros() as i64;
+                        let nowu = time_service.now_unix_time().as_micros() as u64;
                         if let BenchmarkMessage::DataReply(msg) = msg_wrapper {
                             let send_dt = nowu - msg.request_send_micros;
                             info!("benchmark [{}] rpc at {} µs, took {} µs", msg.request_counter, nowu, send_dt);
                             rpc_messages("ok");
                             rpc_bytes("ok").inc_by(data_size as u64);
-                            rpc_micros("ok").inc_by(send_dt as u64);
+                            rpc_micros("ok").inc_by(send_dt);
                         } else {
                             rpc_messages("bad");
                             info!("benchmark [{}] rpc garbage reply", counter);
@@ -516,7 +523,7 @@ impl BenchmarkSharedState {
 #[derive(Clone)]
 pub struct SendRecord {
     pub request_counter: u64,
-    pub send_micros: i64,
+    pub send_micros: u64,
     pub bytes_sent: usize,
 }
 
