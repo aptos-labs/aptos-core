@@ -1256,6 +1256,24 @@ impl Client {
         let response = self.inner.post(url).json(&data).send().await?;
         self.json(response).await
     }
+    pub async fn get_table_item_at_version<K: Serialize>(
+        &self,
+        table_handle: AccountAddress,
+        key_type: &str,
+        value_type: &str,
+        key: K,
+        version: u64,
+    ) -> AptosResult<Response<Value>> {
+        let url = self.build_path(&format!("tables/{}/item?ledger_version={}", table_handle,version))?;
+        let data = json!({
+            "key_type": key_type,
+            "value_type": value_type,
+            "key": json!(key),
+        });
+
+        let response = self.inner.post(url).json(&data).send().await?;
+        self.json(response).await
+    }
 
     pub async fn get_table_item_bcs<K: Serialize, T: DeserializeOwned>(
         &self,
@@ -1265,6 +1283,24 @@ impl Client {
         key: K,
     ) -> AptosResult<Response<T>> {
         let url = self.build_path(&format!("tables/{}/item", table_handle))?;
+        let data = json!({
+            "key_type": key_type,
+            "value_type": value_type,
+            "key": json!(key),
+        });
+
+        let response = self.post_bcs(url, data).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+    pub async fn get_table_item_bcs_at_version<K: Serialize, T: DeserializeOwned>(
+        &self,
+        table_handle: AccountAddress,
+        key_type: &str,
+        value_type: &str,
+        key: K,
+        version: u64,
+    ) -> AptosResult<Response<T>> {
+        let url = self.build_path(&format!("tables/{}/item?ledger_version={}", table_handle, version))?;
         let data = json!({
             "key_type": key_type,
             "value_type": value_type,
