@@ -518,10 +518,11 @@ indoc = "1.0.6"
 inferno = "0.11.14"
 ipnet = "2.5.0"
 itertools = "0.10.3"
-jemallocator = { version = "0.3.2", features = [
+jemallocator = { version = "0.5.0", features = [
     "profiling",
     "unprefixed_malloc_on_supported_platforms",
 ] }
+jemalloc-sys = "0.5.4"
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 libc = "0.2.147"
@@ -551,6 +552,7 @@ pin-project = "1.0.10"
 poem = { version = "=1.3.55", features = ["anyhow", "rustls"] }
 poem-openapi = { version = "=2.0.11", features = ["swagger-ui", "url"] }
 poem-openapi-derive = "=2.0.11"
+pprof = { version = "0.11", features = ["flamegraph"] }
 pretty_assertions = "1.2.1"
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
