@@ -222,16 +222,47 @@ impl CliCommand<RotateSummary> for RotateKey {
             return Err(CliError::AbortedError);
         }
 
-        let mut profile_config = ProfileConfig {
-            private_key: Some(new_private_key.clone()),
-            public_key: Some(new_private_key.public_key()),
-            account: Some(sender_address),
-            ..self.txn_options.profile_options.profile()?
+        let profile_config = match self.txn_options.profile_options.profile() {
+            Ok(profile) => ProfileConfig {
+                private_key: Some(new_private_key.clone()),
+                public_key: Some(new_private_key.public_key()),
+                account: Some(sender_address),
+                ..profile
+            },
+            Err(_) => {
+                let (rest_url, faucet_url) = if let Some(url) = self.txn_options.rest_options.url {
+                    let url_str = url.to_string();
+                    if url_str.contains("testnet") {
+                        (
+                            Some(url_str),
+                            Some("https://faucet.testnet.aptoslabs.com".to_string()),
+                        )
+                    } else if url_str.contains("devnet") {
+                        (
+                            Some(url_str),
+                            Some("https://faucet.devnet.aptoslabs.com".to_string()),
+                        )
+                    } else if url_str.contains("localhost") {
+                        (Some(url_str), Some("http://localhost:8081".to_string()))
+                    } else {
+                        // no faucet for mainnet
+                        (Some(url.to_string()), None)
+                    }
+                } else {
+                    return Err(CliError::CommandArgumentError(
+                        "Either [--url or --profile] argument is needed".to_string(),
+                    ));
+                };
+                ProfileConfig {
+                    private_key: Some(new_private_key.clone()),
+                    public_key: Some(new_private_key.public_key()),
+                    account: Some(sender_address),
+                    rest_url,
+                    faucet_url,
+                    ..Default::default()
+                }
+            },
         };
-
-        if let Some(url) = self.txn_options.rest_options.url {
-            profile_config.rest_url = Some(url.into());
-        }
 
         if config.profiles.is_none() {
             config.profiles = Some(BTreeMap::new());
