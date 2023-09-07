@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path_cache::AccessPathCache, data_cache::get_resource_group_from_metadata,
-    move_vm_ext::AptosMoveResolver, transaction_metadata::TransactionMetadata,
+    access_path_cache::AccessPathCache,
+    data_cache::get_resource_group_from_metadata,
+    move_vm_ext::{write_op_converter::WriteOpConverter, AptosMoveResolver},
+    transaction_metadata::TransactionMetadata,
 };
-use aptos_aggregator::{aggregator_extension::AggregatorID, delta_change_set::serialize};
+use aptos_aggregator::aggregator_extension::AggregatorID;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
@@ -15,12 +17,8 @@ use aptos_framework::natives::{
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
-    block_metadata::BlockMetadata,
-    contract_event::ContractEvent,
-    on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
-    state_store::{state_key::StateKey, state_value::StateValueMetadata},
-    transaction::SignatureCheckedTransaction,
-    write_set::WriteOp,
+    block_metadata::BlockMetadata, contract_event::ContractEvent, on_chain_config::Features,
+    state_store::state_key::StateKey, transaction::SignatureCheckedTransaction,
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
@@ -28,7 +26,7 @@ use move_core_types::{
     account_address::AccountAddress,
     effects::{AccountChangeSet, ChangeSet as MoveChangeSet, Op as MoveStorageOp},
     language_storage::{ModuleId, StructTag},
-    vm_status::{err_msg, StatusCode, VMStatus},
+    vm_status::{StatusCode, VMStatus},
 };
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use serde::{Deserialize, Serialize};
@@ -153,7 +151,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let (change_set, resource_group_change_set) =
             Self::split_and_merge_resource_groups(move_vm, self.remote, change_set)?;
-        let current_time = CurrentTimeMicroseconds::fetch_config(self.remote);
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
@@ -166,10 +163,13 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.into_events();
 
-        let change_set = Self::convert_change_set(
+        let woc = WriteOpConverter::new(
             self.remote,
             self.features.is_storage_slot_metadata_enabled(),
-            current_time.as_ref(),
+        );
+
+        let change_set = Self::convert_change_set(
+            &woc,
             change_set,
             resource_group_change_set,
             events,
@@ -293,10 +293,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         Ok((change_set_filtered, resource_group_change_set))
     }
 
-    pub fn convert_change_set<C: AccessPathCache>(
-        remote: &dyn AptosMoveResolver,
-        is_storage_slot_metadata_enabled: bool,
-        current_time: Option<&CurrentTimeMicroseconds>,
+    pub(crate) fn convert_change_set<C: AccessPathCache>(
+        woc: &WriteOpConverter,
         change_set: MoveChangeSet,
         resource_group_change_set: MoveChangeSet,
         events: Vec<ContractEvent>,
@@ -305,19 +303,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
-        let mut new_slot_metadata: Option<StateValueMetadata> = None;
-        if is_storage_slot_metadata_enabled {
-            if let Some(current_time) = current_time {
-                // The deposit on the metadata is a placeholder (0), it will be updated later when
-                // storage fee is charged.
-                new_slot_metadata = Some(StateValueMetadata::new(0, current_time));
-            }
-        }
-        let woc = WriteOpConverter {
-            remote,
-            new_slot_metadata,
-        };
-
         let mut resource_write_set = HashMap::new();
         let mut module_write_set = HashMap::new();
         let mut aggregator_write_set = HashMap::new();
@@ -404,108 +389,5 @@ impl<'r, 'l> Deref for SessionExt<'r, 'l> {
 impl<'r, 'l> DerefMut for SessionExt<'r, 'l> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
-    }
-}
-
-struct WriteOpConverter<'r> {
-    remote: &'r dyn AptosMoveResolver,
-    new_slot_metadata: Option<StateValueMetadata>,
-}
-
-impl<'r> WriteOpConverter<'r> {
-    fn convert(
-        &self,
-        state_key: &StateKey,
-        move_storage_op: MoveStorageOp<Vec<u8>>,
-        legacy_creation_as_modification: bool,
-    ) -> Result<WriteOp, VMStatus> {
-        use MoveStorageOp::*;
-        use WriteOp::*;
-
-        let maybe_existing_metadata =
-            self.remote
-                .get_state_value_metadata(state_key)
-                .map_err(|_| {
-                    VMStatus::error(
-                        StatusCode::STORAGE_ERROR,
-                        err_msg("Storage read failed when converting change set."),
-                    )
-                })?;
-
-        let write_op = match (maybe_existing_metadata, move_storage_op) {
-            (None, Modify(_) | Delete) => {
-                return Err(VMStatus::error(
-                    // Possible under speculative execution, returning storage error waiting for re-execution
-                    StatusCode::STORAGE_ERROR,
-                    err_msg("When converting write op: updating non-existent value."),
-                ));
-            },
-            (Some(_), New(_)) => {
-                return Err(VMStatus::error(
-                    // Possible under speculative execution, returning storage error waiting for re-execution
-                    StatusCode::STORAGE_ERROR,
-                    err_msg("When converting write op: Recreating existing value."),
-                ));
-            },
-            (None, New(data)) => match &self.new_slot_metadata {
-                None => {
-                    if legacy_creation_as_modification {
-                        Modification(data)
-                    } else {
-                        Creation(data)
-                    }
-                },
-                Some(metadata) => CreationWithMetadata {
-                    data,
-                    metadata: metadata.clone(),
-                },
-            },
-            (Some(existing_metadata), Modify(data)) => {
-                // Inherit metadata even if the feature flags is turned off, for compatibility.
-                match existing_metadata {
-                    None => Modification(data),
-                    Some(metadata) => ModificationWithMetadata { data, metadata },
-                }
-            },
-            (Some(existing_metadata), Delete) => {
-                // Inherit metadata even if the feature flags is turned off, for compatibility.
-                match existing_metadata {
-                    None => Deletion,
-                    Some(metadata) => DeletionWithMetadata { metadata },
-                }
-            },
-        };
-        Ok(write_op)
-    }
-
-    fn convert_aggregator_mod(
-        &self,
-        state_key: &StateKey,
-        value: u128,
-    ) -> Result<WriteOp, VMStatus> {
-        let maybe_existing_metadata = self
-            .remote
-            .get_state_value_metadata(state_key)
-            .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
-        let data = serialize(&value);
-
-        let op = match maybe_existing_metadata {
-            None => {
-                match &self.new_slot_metadata {
-                    // n.b. Aggregator writes historically did not distinguish Create vs Modify.
-                    None => WriteOp::Modification(data),
-                    Some(metadata) => WriteOp::CreationWithMetadata {
-                        data,
-                        metadata: metadata.clone(),
-                    },
-                }
-            },
-            Some(existing_metadata) => match existing_metadata {
-                None => WriteOp::Modification(data),
-                Some(metadata) => WriteOp::ModificationWithMetadata { data, metadata },
-            },
-        };
-
-        Ok(op)
     }
 }
