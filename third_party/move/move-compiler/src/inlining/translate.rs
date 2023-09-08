@@ -231,7 +231,8 @@ struct SubstitutionVisitor<'l, 'r> {
 
 impl<'l, 'r> Visitor for SubstitutionVisitor<'l, 'r> {
     fn type_(&mut self, ty: &mut Type) -> VisitorContinuation {
-        visit_type(&self.type_arguments, ty)
+        visit_type(&self.type_arguments, ty);
+        VisitorContinuation::Descend
     }
 
     fn exp(&mut self, ex: &mut Exp) -> VisitorContinuation {
@@ -642,6 +643,7 @@ impl<'l> Inliner<'l> {
                 .zip(mcall.type_arguments.iter())
                 .map(|(p, t)| (p.id, t.clone()))
                 .collect();
+
             let mut inliner_visitor = OuterVisitor { inliner: self };
             let mut inlined_args = mcall.arguments.clone();
             Dispatcher::new(&mut inliner_visitor).exp(&mut inlined_args);
@@ -653,16 +655,24 @@ impl<'l> Inliner<'l> {
             let mut param_dispatcher = Dispatcher::new(&mut param_visitor);
             let fix_types = |(var, mut spanned_type): (Var, Type)| {
                 param_dispatcher.type_(&mut spanned_type);
+                self.infer_abilities(&mut spanned_type);
                 (var, spanned_type)
             };
-            let mapped_params = fdef
+            let mapped_params: Vec<_> = fdef
                 .signature
                 .parameters
                 .iter()
                 .cloned()
                 .map(fix_types)
-                .zip(get_args_from_exp(&inlined_args));
-            let (decls_for_let, bindings) = self.process_parameters(call_loc, mapped_params);
+                .zip(get_args_from_exp(&inlined_args))
+                .collect();
+            let (decls_for_let, bindings) =
+                self.process_parameters(call_loc, mapped_params.into_iter());
+
+            // Expand Type formal params in result type
+            let mut result_type = fdef.signature.return_type.clone();
+            param_dispatcher.type_(&mut result_type);
+            self.infer_abilities(&mut result_type);
 
             // Expand the body in its own independent visitor
             self.inline_stack.push_front(global_name); // for cycle detection
@@ -679,7 +689,15 @@ impl<'l> Inliner<'l> {
                 seq.push_front(decl)
             }
 
-            Some(UnannotatedExp_::Block(seq))
+            let body_loc = fdef.body.loc;
+            let block_expr = sp(body_loc, UnannotatedExp_::Block(seq));
+            Some(UnannotatedExp_::Annotate(
+                Box::new(Exp {
+                    exp: block_expr,
+                    ty: result_type.clone(),
+                }),
+                Box::new(result_type),
+            ))
         } else {
             None
         }
@@ -703,7 +721,7 @@ impl<'l> Inliner<'l> {
                 bindings.insert(var.0.value, e);
             } else {
                 lvalues.push(sp(loc, LValue_::Var(var, Box::new(ty.clone()))));
-                tys.push(e.ty.clone());
+                tys.push(ty.clone());
                 exps.push(e);
             }
         }
@@ -713,9 +731,21 @@ impl<'l> Inliner<'l> {
                 ty: sp(loc, Type_::Unit),
                 exp: sp(loc, UnannotatedExp_::Unit { trailing: false }),
             },
-            1 => exps.pop().unwrap(),
+            1 => {
+                let exp1 = exps.pop().unwrap();
+                let mut ty = tys.pop().unwrap();
+                self.infer_abilities(&mut ty);
+
+                Exp {
+                    ty: ty.clone(),
+                    exp: sp(
+                        loc,
+                        UnannotatedExp_::Annotate(Box::new(exp1), Box::new(ty.clone())),
+                    ),
+                }
+            },
             _ => {
-                let mut ty = Type_::multiple(loc, tys);
+                let mut ty = Type_::multiple(loc, tys.clone());
                 self.infer_abilities(&mut ty);
 
                 Exp {
@@ -724,9 +754,21 @@ impl<'l> Inliner<'l> {
                         loc,
                         UnannotatedExp_::ExpList(
                             exps.into_iter()
-                                .map(|e| {
-                                    let ty = e.ty.clone();
-                                    ExpListItem::Single(e, Box::new(ty))
+                                .zip(tys.into_iter())
+                                .map(|(e, ty)| {
+                                    ExpListItem::Single(
+                                        Exp {
+                                            exp: sp(
+                                                loc,
+                                                UnannotatedExp_::Annotate(
+                                                    Box::new(e),
+                                                    Box::new(ty.clone()),
+                                                ),
+                                            ),
+                                            ty: ty.clone(),
+                                        },
+                                        Box::new(ty.clone()),
+                                    )
                                 })
                                 .collect(),
                         ),
