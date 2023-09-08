@@ -41,6 +41,7 @@ use serde_json::Value;
 use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
 use tracing::{error, info, warn};
+use url::Url;
 
 /// Structs to hold config from YAML
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -384,8 +385,8 @@ impl Worker {
             return Ok(());
         }
 
-        // Skip if asset_uri does not contain a . (dot) and is not an IPFS URI
-        if !self.asset_uri.contains('.') && !self.asset_uri.contains("ipfs://") {
+        // Skip if asset_uri is not a valid URI
+        if Url::parse(&self.asset_uri).is_ok() {
             self.log_info("URI does not contain a dot and is not an IPFS URI, skipping parse");
             SKIP_URI_COUNT.with_label_values(&["invalid"]).inc();
             return Ok(());
