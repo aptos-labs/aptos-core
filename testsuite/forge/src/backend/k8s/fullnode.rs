@@ -344,7 +344,7 @@ pub async fn install_public_fullnode<'a>(
     index: usize,
 ) -> Result<(PeerId, K8sNode)> {
     let node_peer_id = node_config
-        .config()
+        .override_config()
         .get_peer_id()
         .unwrap_or_else(PeerId::random);
     let fullnode_name = format!("public-fullnode-{}-{}", index, node_peer_id.short_str());
@@ -616,8 +616,7 @@ mod tests {
     /// Test that we can create a node config configmap and that it contains the node config at a known data key
     async fn test_create_node_config_map() {
         let config_map_name = "aptos-node-0-validator-0-config".to_string();
-        let mut node_config = NodeConfig::default();
-        node_config.api.enabled = false;
+        let node_config = NodeConfig::default();
         let override_config = OverrideNodeConfig::new_with_default_base(node_config.clone());
 
         // expect that the one we get is the same as the one we created

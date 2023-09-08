@@ -351,48 +351,51 @@ pub fn diff_override_config_yaml(
 /// base config to a different value before calling get_yaml().
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct OverrideNodeConfig {
-    config: NodeConfig,
-    base: NodeConfig,
+    override_config: NodeConfig,
+    base_config: NodeConfig,
 }
 
 impl OverrideNodeConfig {
-    pub fn new(config: NodeConfig, base: NodeConfig) -> Self {
-        Self { config, base }
-    }
-
-    pub fn new_with_default_base(config: NodeConfig) -> Self {
+    pub fn new(override_config: NodeConfig, base_config: NodeConfig) -> Self {
         Self {
-            config,
-            base: NodeConfig::default(),
+            override_config,
+            base_config,
         }
     }
 
-    pub fn config(&self) -> &NodeConfig {
-        &self.config
+    pub fn new_with_default_base(override_config: NodeConfig) -> Self {
+        Self {
+            override_config,
+            base_config: NodeConfig::default(),
+        }
     }
 
-    pub fn config_mut(&mut self) -> &mut NodeConfig {
-        &mut self.config
+    pub fn override_config(&self) -> &NodeConfig {
+        &self.override_config
     }
 
-    pub fn base(&self) -> &NodeConfig {
-        &self.base
+    pub fn override_config_mut(&mut self) -> &mut NodeConfig {
+        &mut self.override_config
     }
 
-    pub fn base_mut(&mut self) -> &mut NodeConfig {
-        &mut self.base
+    pub fn base_config(&self) -> &NodeConfig {
+        &self.base_config
+    }
+
+    pub fn base_config_mut(&mut self) -> &mut NodeConfig {
+        &mut self.base_config
     }
 
     pub fn get_yaml(&self) -> anyhow::Result<serde_yaml::Value> {
-        let config_yaml = serde_yaml::to_value(&self.config)?;
-        let base_yaml = serde_yaml::to_value(&self.base)?;
+        let config_yaml = serde_yaml::to_value(&self.override_config)?;
+        let base_yaml = serde_yaml::to_value(&self.base_config)?;
         diff_override_config_yaml(config_yaml, base_yaml)
             .map(|diff_yaml| diff_yaml.unwrap_or(serde_yaml::Value::Null))
     }
 
     /// Save the node config to the given path
     pub fn save_to_path<P: AsRef<Path>>(&mut self, output_path: P) -> Result<(), Error> {
-        self.config.save_to_path(output_path)
+        self.override_config.save_to_path(output_path)
     }
 }
 
@@ -473,7 +476,7 @@ mod test {
     fn test_override_node_config_with_bool() {
         let mut override_config =
             OverrideNodeConfig::new(NodeConfig::default(), NodeConfig::default());
-        let config = override_config.config_mut();
+        let config = override_config.override_config_mut();
         config.api.enabled = false;
 
         let diff_yaml = override_config.get_yaml().unwrap();
@@ -491,8 +494,9 @@ mod test {
     fn test_override_node_config_with_enum() {
         let mut override_config =
             OverrideNodeConfig::new(NodeConfig::default(), NodeConfig::default());
-        let config = override_config.config_mut();
+        let config = override_config.override_config_mut();
         config.base.waypoint = WaypointConfig::FromFile(PathBuf::from("test"));
+
         let diff_yaml = override_config.get_yaml().unwrap();
         let expected_yaml: serde_yaml::Value = serde_yaml::from_str(
             r#"
@@ -505,30 +509,35 @@ mod test {
         assert_eq!(diff_yaml, expected_yaml);
     }
 
+    fn assert_equal_yaml(actual: serde_yaml::Value, expected: serde_yaml::Value) {
+        // TODO: why don't the actual Values match, only matches with as_str?
+        assert_eq!(actual.as_str(), expected.as_str());
+    }
+
     #[test]
     fn test_override_node_config_with_empty_base_vector() {
         let mut override_config =
             OverrideNodeConfig::new(NodeConfig::default(), NodeConfig::default());
-        let config = override_config.config_mut();
+        let config = override_config.override_config_mut();
         config.full_node_networks.push(Default::default());
         config.full_node_networks.push(Default::default());
+
         let diff_yaml = override_config.get_yaml().unwrap();
         let default_node_config = serde_yaml::to_value(&NetworkConfig::default()).unwrap();
         let mut expected_yaml: serde_yaml::Value = serde_yaml::Value::Null;
         expected_yaml["full_node_networks"] =
             serde_yaml::Value::Sequence(vec![default_node_config.clone(), default_node_config]);
-        // TODO: why don't the actual Values match, only matches with as_str?
-        assert_eq!(diff_yaml.as_str(), expected_yaml.as_str());
+        assert_equal_yaml(diff_yaml, expected_yaml);
     }
 
     #[test]
     fn test_override_node_config_with_non_empty_base_vector() {
         let mut override_config =
             OverrideNodeConfig::new(NodeConfig::default(), NodeConfig::default());
-        let config = override_config.config_mut();
+        let config = override_config.override_config_mut();
         config.full_node_networks.push(Default::default());
         config.full_node_networks.push(Default::default());
-        let base = override_config.base_mut();
+        let base = override_config.base_config_mut();
         base.full_node_networks.push(Default::default());
 
         // Note, the diff will include the entire vector, not just the non-equal elements
@@ -537,15 +546,14 @@ mod test {
         let mut expected_yaml: serde_yaml::Value = serde_yaml::Value::Null;
         expected_yaml["full_node_networks"] =
             serde_yaml::Value::Sequence(vec![default_node_config.clone(), default_node_config]);
-        // TODO: why don't the actual Values match, only matches with as_str?
-        assert_eq!(diff_yaml.as_str(), expected_yaml.as_str());
+        assert_equal_yaml(diff_yaml, expected_yaml);
     }
 
     #[test]
     fn test_override_node_config_with_base_change() {
         let mut override_config =
             OverrideNodeConfig::new(NodeConfig::default(), NodeConfig::default());
-        let base = override_config.base_mut();
+        let base = override_config.base_config_mut();
         base.api.enabled = false;
 
         let diff_yaml = override_config.get_yaml().unwrap();
@@ -563,7 +571,7 @@ mod test {
     fn test_override_config_load_save() {
         let mut override_config =
             OverrideNodeConfig::new(NodeConfig::default(), NodeConfig::default());
-        let config = override_config.config_mut();
+        let config = override_config.override_config_mut();
         config.api.enabled = false;
 
         let temp_file = temp_dir().join("override_config.yaml");
