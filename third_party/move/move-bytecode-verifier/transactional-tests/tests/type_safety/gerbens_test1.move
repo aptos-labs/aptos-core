@@ -86,7 +86,8 @@ module 0x42::test_case {
 
     fun test_stable_partition() {
         let v = vector[1, 2, 3, 4, 5];
-        assert!(stable_partition(&mut v, |n| *n % 2 == 0) == 2, 0);
+        let t = stable_partition(&mut v, |n| *n % 2 == 0);
+        assert!(t == 2, 0);
         assert!(&v == &vector[2, 4, 1, 3, 5], 1);
     }
 }
