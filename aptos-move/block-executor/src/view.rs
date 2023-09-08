@@ -7,11 +7,8 @@ use crate::{
     task::Transaction,
     txn_last_input_output::ReadDescriptor,
 };
-use anyhow::{Error, Result};
 use aptos_aggregator::{
-    aggregator_extension::AggregatorID,
-    delta_change_set::serialize,
-    resolver::{AggregatorReadMode, AggregatorResolver},
+    aggregator_extension::AggregatorID, delta_change_set::serialize, resolver::AggregatorResolver,
 };
 use aptos_logger::error;
 use aptos_mvhashmap::{
@@ -294,7 +291,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
         }
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
         todo!()
     }
 }
@@ -339,15 +336,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorag
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AggregatorResolver
     for LatestView<'a, T, S, X>
 {
-    fn resolve_aggregator_value(
+    fn get_aggregator_v1_state_value(
         &self,
         _id: &AggregatorID,
-        _mode: AggregatorReadMode,
-    ) -> std::result::Result<u128, Error> {
-        todo!()
-    }
-
-    fn generate_aggregator_id(&self) -> AggregatorID {
+    ) -> anyhow::Result<Option<StateValue>> {
         todo!()
     }
 }

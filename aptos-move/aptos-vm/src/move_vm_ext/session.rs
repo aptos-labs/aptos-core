@@ -363,21 +363,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
 
         for (id, change) in aggregator_change_set.changes {
-            let AggregatorID { handle, key } = id;
-            let key_bytes = key.0.to_vec();
-            let state_key = StateKey::table_item(handle, key_bytes);
-
             match change {
                 AggregatorChange::Write(value) => {
-                    let write_op = woc.convert_aggregator_mod(&state_key, value)?;
-                    aggregator_write_set.insert(state_key, write_op);
+                    let write_op = woc.convert_aggregator_mod(&id, value)?;
+                    aggregator_write_set.insert(id, write_op);
                 },
                 AggregatorChange::Merge(delta_op) => {
-                    aggregator_delta_set.insert(state_key, delta_op);
+                    aggregator_delta_set.insert(id, delta_op);
                 },
                 AggregatorChange::Delete => {
-                    let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
-                    aggregator_write_set.insert(state_key, write_op);
+                    let write_op = woc.convert_agg(&id, MoveStorageOp::Delete, false)?;
+                    aggregator_write_set.insert(id, write_op);
                 },
             }
         }
@@ -478,14 +474,75 @@ impl<'r> WriteOpConverter<'r> {
         Ok(write_op)
     }
 
-    fn convert_aggregator_mod(
+    fn convert_agg(
         &self,
-        state_key: &StateKey,
-        value: u128,
+        id: &AggregatorID,
+        move_storage_op: MoveStorageOp<Vec<u8>>,
+        legacy_creation_as_modification: bool,
     ) -> Result<WriteOp, VMStatus> {
+        use MoveStorageOp::*;
+        use WriteOp::*;
+
         let maybe_existing_metadata = self
             .remote
-            .get_state_value_metadata(state_key)
+            .get_aggregator_v1_state_value_metadata(id)
+            .map_err(|_| {
+                VMStatus::error(
+                    StatusCode::STORAGE_ERROR,
+                    err_msg("Storage read failed when converting change set."),
+                )
+            })?;
+
+        let write_op = match (maybe_existing_metadata, move_storage_op) {
+            (None, Modify(_) | Delete) => {
+                return Err(VMStatus::error(
+                    // Possible under speculative execution, returning storage error waiting for re-execution
+                    StatusCode::STORAGE_ERROR,
+                    err_msg("When converting write op: updating non-existent value."),
+                ));
+            },
+            (Some(_), New(_)) => {
+                return Err(VMStatus::error(
+                    // Possible under speculative execution, returning storage error waiting for re-execution
+                    StatusCode::STORAGE_ERROR,
+                    err_msg("When converting write op: Recreating existing value."),
+                ));
+            },
+            (None, New(data)) => match &self.new_slot_metadata {
+                None => {
+                    if legacy_creation_as_modification {
+                        Modification(data)
+                    } else {
+                        Creation(data)
+                    }
+                },
+                Some(metadata) => CreationWithMetadata {
+                    data,
+                    metadata: metadata.clone(),
+                },
+            },
+            (Some(existing_metadata), Modify(data)) => {
+                // Inherit metadata even if the feature flags is turned off, for compatibility.
+                match existing_metadata {
+                    None => Modification(data),
+                    Some(metadata) => ModificationWithMetadata { data, metadata },
+                }
+            },
+            (Some(existing_metadata), Delete) => {
+                // Inherit metadata even if the feature flags is turned off, for compatibility.
+                match existing_metadata {
+                    None => Deletion,
+                    Some(metadata) => DeletionWithMetadata { metadata },
+                }
+            },
+        };
+        Ok(write_op)
+    }
+
+    fn convert_aggregator_mod(&self, id: &AggregatorID, value: u128) -> Result<WriteOp, VMStatus> {
+        let maybe_existing_metadata = self
+            .remote
+            .get_aggregator_v1_state_value_metadata(id)
             .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         let data = serialize(&value);
 

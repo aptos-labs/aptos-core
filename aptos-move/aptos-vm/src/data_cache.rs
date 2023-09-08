@@ -9,10 +9,7 @@ use crate::{
 };
 #[allow(unused_imports)]
 use anyhow::Error;
-use aptos_aggregator::{
-    aggregator_extension::AggregatorID,
-    resolver::{AggregatorReadMode, AggregatorResolver},
-};
+use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::AggregatorResolver};
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
@@ -251,23 +248,11 @@ impl<'a, S: StateView> TableResolver for StateViewAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> AggregatorResolver for StateViewAdapter<'a, S> {
-    fn resolve_aggregator_value(
+    fn get_aggregator_v1_state_value(
         &self,
         id: &AggregatorID,
-        _mode: AggregatorReadMode,
-    ) -> Result<u128, Error> {
-        let AggregatorID { handle, key } = id;
-        let state_key = StateKey::table_item(*handle, key.0.to_vec());
-        match self.state_view.get_state_value_u128(&state_key)? {
-            Some(value) => Ok(value),
-            None => {
-                anyhow::bail!("Could not find the value of the aggregator")
-            },
-        }
-    }
-
-    fn generate_aggregator_id(&self) -> AggregatorID {
-        unimplemented!("Aggregator id generation will be implemented for V2 aggregators.")
+    ) -> anyhow::Result<Option<StateValue>> {
+        self.state_view.get_state_value(id.as_state_key())
     }
 }
 
@@ -404,15 +389,10 @@ impl<'a, R: ExecutorResolver> TableResolver for ExecutorResolverAdapter<'a, R> {
 }
 
 impl<'a, R: ExecutorResolver> AggregatorResolver for ExecutorResolverAdapter<'a, R> {
-    fn resolve_aggregator_value(
+    fn get_aggregator_v1_state_value(
         &self,
         _id: &AggregatorID,
-        _mode: AggregatorReadMode,
-    ) -> Result<u128, Error> {
-        todo!()
-    }
-
-    fn generate_aggregator_id(&self) -> AggregatorID {
+    ) -> anyhow::Result<Option<StateValue>> {
         todo!()
     }
 }

@@ -3,6 +3,7 @@
 
 use crate::check_change_set::CheckChangeSet;
 use aptos_aggregator::{
+    aggregator_extension::AggregatorID,
     delta_change_set::{serialize, DeltaOp},
     resolver::AggregatorResolver,
 };
@@ -27,8 +28,8 @@ use std::collections::{
 pub struct VMChangeSet {
     resource_write_set: HashMap<StateKey, WriteOp>,
     module_write_set: HashMap<StateKey, WriteOp>,
-    aggregator_write_set: HashMap<StateKey, WriteOp>,
-    aggregator_delta_set: HashMap<StateKey, DeltaOp>,
+    aggregator_write_set: HashMap<AggregatorID, WriteOp>,
+    aggregator_delta_set: HashMap<AggregatorID, DeltaOp>,
     events: Vec<ContractEvent>,
 }
 
@@ -62,8 +63,8 @@ impl VMChangeSet {
     pub fn new(
         resource_write_set: HashMap<StateKey, WriteOp>,
         module_write_set: HashMap<StateKey, WriteOp>,
-        aggregator_write_set: HashMap<StateKey, WriteOp>,
-        aggregator_delta_set: HashMap<StateKey, DeltaOp>,
+        aggregator_write_set: HashMap<AggregatorID, WriteOp>,
+        aggregator_delta_set: HashMap<AggregatorID, DeltaOp>,
         events: Vec<ContractEvent>,
         checker: &dyn CheckChangeSet,
     ) -> anyhow::Result<Self, VMStatus> {
@@ -131,7 +132,11 @@ impl VMChangeSet {
         let mut write_set_mut = WriteSetMut::default();
         write_set_mut.extend(resource_write_set);
         write_set_mut.extend(module_write_set);
-        write_set_mut.extend(aggregator_write_set);
+        write_set_mut.extend(
+            aggregator_write_set
+                .into_iter()
+                .map(|(id, op)| (id.into_state_key(), op)),
+        );
 
         let write_set = write_set_mut
             .freeze()
@@ -158,7 +163,11 @@ impl VMChangeSet {
         self.resource_write_set
             .iter()
             .chain(self.module_write_set.iter())
-            .chain(self.aggregator_write_set.iter())
+            .chain(
+                self.aggregator_write_set
+                    .iter()
+                    .map(|(id, op)| (id.as_state_key(), op)),
+            )
     }
 
     pub fn num_write_ops(&self) -> usize {
@@ -171,7 +180,11 @@ impl VMChangeSet {
         self.resource_write_set
             .iter_mut()
             .chain(self.module_write_set.iter_mut())
-            .chain(self.aggregator_write_set.iter_mut())
+            .chain(
+                self.aggregator_write_set
+                    .iter_mut()
+                    .map(|(id, op)| (id.as_state_key(), op)),
+            )
     }
 
     pub fn resource_write_set(&self) -> &HashMap<StateKey, WriteOp> {
@@ -185,17 +198,17 @@ impl VMChangeSet {
     // Called by `try_into_transaction_output_with_materialized_writes` only.
     pub(crate) fn extend_aggregator_write_set(
         &mut self,
-        additional_aggregator_writes: impl Iterator<Item = (StateKey, WriteOp)>,
+        additional_aggregator_writes: impl Iterator<Item = (AggregatorID, WriteOp)>,
     ) {
         self.aggregator_write_set
             .extend(additional_aggregator_writes)
     }
 
-    pub fn aggregator_v1_write_set(&self) -> &HashMap<StateKey, WriteOp> {
+    pub fn aggregator_v1_write_set(&self) -> &HashMap<AggregatorID, WriteOp> {
         &self.aggregator_write_set
     }
 
-    pub fn aggregator_v1_delta_set(&self) -> &HashMap<StateKey, DeltaOp> {
+    pub fn aggregator_v1_delta_set(&self) -> &HashMap<AggregatorID, DeltaOp> {
         &self.aggregator_delta_set
     }
 
@@ -218,16 +231,16 @@ impl VMChangeSet {
         } = self;
 
         let into_write =
-            |(state_key, delta): (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
-                let write = delta.try_into_write_op(resolver, &state_key)?;
-                Ok((state_key, write))
+            |(id, delta): (AggregatorID, DeltaOp)| -> anyhow::Result<(AggregatorID, WriteOp), VMStatus> {
+                let write = resolver.try_convert_aggregator_v2_delta_into_write_op(&id, &delta)?;
+                Ok((id, write))
             };
 
         let materialized_aggregator_delta_set =
             aggregator_delta_set
                 .into_iter()
                 .map(into_write)
-                .collect::<anyhow::Result<HashMap<StateKey, WriteOp>, VMStatus>>()?;
+                .collect::<anyhow::Result<HashMap<AggregatorID, WriteOp>, VMStatus>>()?;
         aggregator_write_set.extend(materialized_aggregator_delta_set.into_iter());
 
         Ok(Self {
@@ -240,16 +253,16 @@ impl VMChangeSet {
     }
 
     fn squash_additional_aggregator_changes(
-        aggregator_write_set: &mut HashMap<StateKey, WriteOp>,
-        aggregator_delta_set: &mut HashMap<StateKey, DeltaOp>,
-        additional_aggregator_write_set: HashMap<StateKey, WriteOp>,
-        additional_aggregator_delta_set: HashMap<StateKey, DeltaOp>,
+        aggregator_write_set: &mut HashMap<AggregatorID, WriteOp>,
+        aggregator_delta_set: &mut HashMap<AggregatorID, DeltaOp>,
+        additional_aggregator_write_set: HashMap<AggregatorID, WriteOp>,
+        additional_aggregator_delta_set: HashMap<AggregatorID, DeltaOp>,
     ) -> anyhow::Result<(), VMStatus> {
         use WriteOp::*;
 
         // First, squash deltas.
-        for (key, additional_delta_op) in additional_aggregator_delta_set {
-            if let Some(write_op) = aggregator_write_set.get_mut(&key) {
+        for (id, additional_delta_op) in additional_aggregator_delta_set {
+            if let Some(write_op) = aggregator_write_set.get_mut(&id) {
                 // In this case, delta follows a write op.
                 match write_op {
                     Creation(data)
@@ -279,7 +292,7 @@ impl VMChangeSet {
             } else {
                 // Otherwise, this is a either a new delta or an additional delta
                 // for the same state key.
-                match aggregator_delta_set.entry(key) {
+                match aggregator_delta_set.entry(id) {
                     Occupied(entry) => {
                         // In this case, we need to merge the new incoming delta
                         // to the existing delta, ensuring the strict ordering.
@@ -298,8 +311,8 @@ impl VMChangeSet {
         }
 
         // Next, squash write ops.
-        for (key, additional_write_op) in additional_aggregator_write_set {
-            match aggregator_write_set.entry(key) {
+        for (id, additional_write_op) in additional_aggregator_write_set {
+            match aggregator_write_set.entry(id) {
                 Occupied(mut entry) => {
                     squash_writes_pair!(entry, additional_write_op);
                 },

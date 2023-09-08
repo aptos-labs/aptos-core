@@ -5,8 +5,6 @@
 #[cfg(feature = "testing")]
 use anyhow::Error;
 #[cfg(feature = "testing")]
-use aptos_aggregator::resolver::AggregatorReadMode;
-#[cfg(feature = "testing")]
 use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::AggregatorResolver};
 #[cfg(feature = "testing")]
 use aptos_framework::natives::cryptography::algebra::AlgebraContext;
@@ -21,6 +19,7 @@ use aptos_types::chain_id::ChainId;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{Features, TimedFeatures},
+    state_store::state_value::StateValue,
 };
 use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]
@@ -39,18 +38,11 @@ struct AptosBlankStorage;
 
 #[cfg(feature = "testing")]
 impl AggregatorResolver for AptosBlankStorage {
-    fn resolve_aggregator_value(
+    fn get_aggregator_v1_state_value(
         &self,
         _id: &AggregatorID,
-        _mode: AggregatorReadMode,
-    ) -> Result<u128, Error> {
-        // All Move tests have aggregator in Data state, and so the resolver should
-        // not be called.
-        unreachable!("Aggregator cannot be resolved for blank storage")
-    }
-
-    fn generate_aggregator_id(&self) -> AggregatorID {
-        unimplemented!("Aggregator id generation will be implemented for V2 aggregators.")
+    ) -> anyhow::Result<Option<StateValue>> {
+        Ok(None)
     }
 }
 

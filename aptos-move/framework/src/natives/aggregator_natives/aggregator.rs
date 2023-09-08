@@ -68,7 +68,7 @@ fn native_read(
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    let aggregator = aggregator_data.get_aggregator(id.clone(), limit)?;
 
     let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
 

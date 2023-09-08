@@ -6,11 +6,14 @@ use crate::{
     move_vm_ext::{SessionExt, SessionId},
     AptosVM,
 };
-use aptos_aggregator::resolver::AggregatorResolver;
+use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::AggregatorResolver};
 use aptos_gas_algebra::Fee;
 use aptos_state_view::StateViewId;
-use aptos_types::state_store::{
-    state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+use aptos_types::{
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::{
     change_set::VMChangeSet,
@@ -94,13 +97,19 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
 /// A state view as if a change set is applied on top of the base state view.
 struct ChangeSetStateView<'r> {
     #[allow(unused)]
-    base: &'r dyn ExecutorResolver,
+    base_resolver: &'r dyn ExecutorResolver,
     change_set: VMChangeSet,
 }
 
 impl<'r> ChangeSetStateView<'r> {
-    pub fn new(base: &'r dyn ExecutorResolver, change_set: VMChangeSet) -> Result<Self, VMStatus> {
-        Ok(Self { base, change_set })
+    pub fn new(
+        base_resolver: &'r dyn ExecutorResolver,
+        change_set: VMChangeSet,
+    ) -> Result<Self, VMStatus> {
+        Ok(Self {
+            base_resolver,
+            change_set,
+        })
     }
 }
 
@@ -110,24 +119,32 @@ impl<'r> TResourceResolver for ChangeSetStateView<'r> {
 
     fn get_resource_state_value(
         &self,
-        _state_key: &Self::Key,
-        _maybe_layout: Option<&Self::Layout>,
+        state_key: &Self::Key,
+        maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<StateValue>> {
-        todo!()
+        match self.change_set.resource_write_set().get(state_key) {
+            Some(write_op) => Ok(write_op.as_state_value()),
+            None => self
+                .base_resolver
+                .get_resource_state_value(state_key, maybe_layout),
+        }
     }
 }
 
 impl<'r> TModuleResolver for ChangeSetStateView<'r> {
     type Key = StateKey;
 
-    fn get_module_state_value(&self, _state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-        todo!()
+    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        match self.change_set.module_write_set().get(state_key) {
+            Some(write_op) => Ok(write_op.as_state_value()),
+            None => self.base_resolver.get_module_state_value(state_key),
+        }
     }
 }
 
 impl<'r> StateStorageResolver for ChangeSetStateView<'r> {
     fn id(&self) -> StateViewId {
-        self.base.id()
+        self.base_resolver.id()
     }
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
@@ -136,51 +153,23 @@ impl<'r> StateStorageResolver for ChangeSetStateView<'r> {
 }
 
 impl<'r> AggregatorResolver for ChangeSetStateView<'r> {
-    fn resolve_aggregator_value(
+    fn get_aggregator_v1_state_value(
         &self,
-        _id: &aptos_aggregator::aggregator_extension::AggregatorID,
-        _mode: aptos_aggregator::resolver::AggregatorReadMode,
-    ) -> Result<u128, anyhow::Error> {
-        todo!()
-    }
-
-    fn generate_aggregator_id(&self) -> aptos_aggregator::aggregator_extension::AggregatorID {
-        todo!()
+        id: &AggregatorID,
+    ) -> anyhow::Result<Option<StateValue>> {
+        match self.change_set.aggregator_v1_delta_set().get(id) {
+            Some(delta_op) => Ok(self
+                .base_resolver
+                .try_convert_aggregator_v2_delta_into_write_op(id, delta_op)?
+                .as_state_value()),
+            None => match self.change_set.aggregator_v1_write_set().get(id) {
+                Some(write_op) => Ok(write_op.as_state_value()),
+                None => self.base_resolver.get_aggregator_v1_state_value(id),
+            },
+        }
     }
 }
 
-// impl<'r> TStateView for ChangeSetStateView<'r> {
-//     type Key = StateKey;
-//
-//     fn id(&self) -> StateViewId {
-//         self.base.id()
-//     }
-//
-//     fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>> {
-//         // TODO: `get_state_value` should differentiate between different write types.
-//         match self.change_set.aggregator_v1_delta_set().get(state_key) {
-//             Some(delta_op) => Ok(delta_op
-//                 .try_into_write_op(self.base, state_key)?
-//                 .as_state_value()),
-//             None => {
-//                 let cached_value = self
-//                     .change_set
-//                     .write_set_iter()
-//                     .find(|(k, _)| *k == state_key)
-//                     .map(|(_, v)| v);
-//                 match cached_value {
-//                     Some(write_op) => Ok(write_op.as_state_value()),
-//                     None => self.base.get_state_value(state_key),
-//                 }
-//             },
-//         }
-//     }
-//
-//     fn get_usage(&self) -> Result<StateStorageUsage> {
-//         bail!("Unexpected access to get_usage()")
-//     }
-// }
-//
 // #[cfg(test)]
 // mod test {
 //     use super::*;

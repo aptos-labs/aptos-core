@@ -5,18 +5,8 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
-use crate::{
-    aggregator_extension::{AggregatorHandle, AggregatorID},
-    module::AGGREGATOR_MODULE,
-    resolver::{AggregatorReadMode, AggregatorResolver},
-};
-use aptos_types::{
-    state_store::{state_key::StateKey, table::TableHandle},
-    vm_status::{StatusCode, VMStatus},
-    write_set::WriteOp,
-};
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
-use move_core_types::account_address::AccountAddress;
+use aptos_types::vm_status::StatusCode;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 
 /// When `Addition` operation overflows the `limit`.
 const EADD_OVERFLOW: u64 = 0x02_0001;
@@ -179,37 +169,6 @@ impl DeltaOp {
         // Perform the merge.
         self.merge_with_previous_delta(previous_delta)?;
         Ok(())
-    }
-
-    /// Consumes a single delta and tries to materialize it with a given state
-    /// key. If materialization succeeds, a write op is produced. Otherwise, an
-    /// error VM status is returned.
-    pub fn try_into_write_op(
-        self,
-        resolver: &dyn AggregatorResolver,
-        _state_key: &StateKey,
-    ) -> anyhow::Result<WriteOp, VMStatus> {
-        // In case storage fails to fetch the value, return immediately.
-
-        // TODO: fix!
-        let handle = TableHandle(AccountAddress::random());
-        let key = AggregatorHandle(AccountAddress::random());
-        let id = AggregatorID::new(handle, key);
-
-        let base = resolver
-            .resolve_aggregator_value(&id, AggregatorReadMode::Precise)
-            .map_err(|e| VMStatus::error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?;
-
-        // Otherwise we have to apply delta to the storage value.
-        self.apply_to(base)
-            .map_err(|partial_error| {
-                // If delta application fails, transform partial VM
-                // error into an appropriate VM status.
-                partial_error
-                    .finish(Location::Module(AGGREGATOR_MODULE.clone()))
-                    .into_vm_status()
-            })
-            .map(|result| WriteOp::Modification(serialize(&result)))
     }
 }
 

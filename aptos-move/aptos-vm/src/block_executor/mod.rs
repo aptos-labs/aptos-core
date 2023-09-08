@@ -121,7 +121,9 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .expect("Output to be set to get writes")
             .change_set()
             .aggregator_v1_write_set()
-            .clone()
+            .iter()
+            .map(|(id, write_op)| (id.as_state_key().clone(), write_op.clone()))
+            .collect()
     }
 
     /// Should never be called after incorporate_delta_writes, as it
@@ -133,7 +135,9 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .expect("Output to be set to get deltas")
             .change_set()
             .aggregator_v1_delta_set()
-            .clone()
+            .iter()
+            .map(|(id, delta_op)| (id.as_state_key().clone(), *delta_op))
+            .collect()
     }
 
     /// Should never be called after incorporate_delta_writes, as it
