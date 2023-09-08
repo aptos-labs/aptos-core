@@ -290,7 +290,7 @@ impl<'l, V: Visitor> Dispatcher<'l, V> {
     fn lvalue(&mut self, lv: &mut LValue, declared: bool) {
         match &mut lv.value {
             LValue_::Var(var, ty) => {
-                self.type_(ty.as_mut());
+                self.type_(ty);
                 if declared {
                     self.visitor.var_decl(ty, var)
                 } else {
