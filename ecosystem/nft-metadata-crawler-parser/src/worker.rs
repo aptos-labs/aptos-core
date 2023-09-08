@@ -386,8 +386,8 @@ impl Worker {
         }
 
         // Skip if asset_uri is not a valid URI
-        if Url::parse(&self.asset_uri).is_ok() {
-            self.log_info("URI does not contain a dot and is not an IPFS URI, skipping parse");
+        if Url::parse(&self.asset_uri).is_err() {
+            self.log_info("URI is invalid, skipping parse");
             SKIP_URI_COUNT.with_label_values(&["invalid"]).inc();
             return Ok(());
         }
