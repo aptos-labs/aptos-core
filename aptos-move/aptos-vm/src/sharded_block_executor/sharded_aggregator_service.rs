@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::sharded_block_executor::cross_shard_state_view::TOTAL_SUPPLY_AGGR_BASE_VAL;
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey, transaction::TransactionOutput,
@@ -199,7 +200,6 @@ pub fn aggregate_and_update_total_supply<S: StateView>(
 ) {
     let num_shards = sharded_output.len();
     let num_rounds = sharded_output[0].len();
-    let total_supply_base_val: u128 = get_state_value(&TOTAL_SUPPLY_STATE_KEY, state_view).unwrap();
 
     let mut aggr_total_supply_delta = vec![DeltaU128::default(); num_shards * num_rounds + 1];
 
@@ -222,7 +222,10 @@ pub fn aggregate_and_update_total_supply<S: StateView>(
                         continue;
                     }
                     aggr_total_supply_delta[round * num_shards + shard_id + 1] =
-                        DeltaU128::get_delta(last_txn_total_supply.unwrap(), total_supply_base_val);
+                        DeltaU128::get_delta(
+                            last_txn_total_supply.unwrap(),
+                            TOTAL_SUPPLY_AGGR_BASE_VAL,
+                        );
                     break;
                 }
             }
@@ -233,6 +236,17 @@ pub fn aggregate_and_update_total_supply<S: StateView>(
             aggr_total_supply_delta[idx + 1] + aggr_total_supply_delta[idx];
     }
 
+    // The txn_outputs contain 'txn_total_supply' with
+    // 'CrossShardStateViewAggrOverride::total_supply_aggr_base_val' as the base value.
+    // The actual 'total_supply_base_val' is in the state_view.
+    // The 'delta' for the shard/round is in aggr_total_supply_delta[round * num_shards + shard_id + 1]
+    // For every txn_output, we have to compute
+    //      txn_total_supply = txn_total_supply - CrossShardStateViewAggrOverride::total_supply_aggr_base_val + total_supply_base_val + delta
+    // While 'txn_total_supply' is u128, the intermediate computation can be negative. So we use
+    // DeltaU128 to handle any intermediate underflow of u128.
+    let total_supply_base_val: u128 = get_state_value(&TOTAL_SUPPLY_STATE_KEY, state_view).unwrap();
+    let base_val_delta = DeltaU128::get_delta(total_supply_base_val, TOTAL_SUPPLY_AGGR_BASE_VAL);
+
     let aggr_total_supply_delta_ref = &aggr_total_supply_delta;
     // Runtime is O(num_txns), hence parallelized at the shard level and at the txns level.
     executor_thread_pool.scope(|s| {
@@ -240,7 +254,7 @@ pub fn aggregate_and_update_total_supply<S: StateView>(
             s.spawn(move |_| {
                 for (round, txn_outputs) in shard_output.iter_mut().enumerate() {
                     let delta_for_round =
-                        aggr_total_supply_delta_ref[round * num_shards + shard_id];
+                        aggr_total_supply_delta_ref[round * num_shards + shard_id] + base_val_delta;
                     let total_txns_len = txn_outputs.len();
                     for (txn_idx, txn_output) in txn_outputs.iter_mut().enumerate() {
                         let txn_total_supply = txn_output.write_set().get_total_supply();
@@ -262,7 +276,8 @@ pub fn aggregate_and_update_total_supply<S: StateView>(
         }
     });
 
-    let delta_for_global_shard_ref = &aggr_total_supply_delta[num_shards * num_rounds];
+    let delta_for_global_shard = aggr_total_supply_delta[num_shards * num_rounds] + base_val_delta;
+    let delta_for_global_shard_ref = &delta_for_global_shard;
     let global_output_len = global_output.len();
     if global_output.len() < 25 {
         for (txn_idx, txn_output) in global_output.iter_mut().enumerate() {

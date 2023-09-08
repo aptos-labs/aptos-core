@@ -6,7 +6,7 @@ use crate::{
         coordinator_client::CoordinatorClient,
         counters::{SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS, SHARDED_BLOCK_EXECUTOR_TXN_COUNT},
         cross_shard_client::{CrossShardClient, CrossShardCommitReceiver, CrossShardCommitSender},
-        cross_shard_state_view::CrossShardStateView,
+        cross_shard_state_view::CrossShardStateViewAggrOverride,
         messages::CrossShardMsg,
         ExecutorShardCommand,
     },
@@ -99,10 +99,12 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let (callback, callback_receiver) = oneshot::channel();
 
-        let cross_shard_state_view = Arc::new(CrossShardStateView::create_cross_shard_state_view(
-            state_view,
-            &transactions,
-        ));
+        let cross_shard_state_view = Arc::new(
+            CrossShardStateViewAggrOverride::create_cross_shard_state_view_aggr_override(
+                state_view,
+                &transactions,
+            ),
+        );
 
         let cross_shard_state_view_clone = cross_shard_state_view.clone();
         let cross_shard_client_clone = cross_shard_client.clone();

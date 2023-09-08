@@ -3,7 +3,7 @@
 use crate::{
     block_executor::AptosTransactionOutput,
     sharded_block_executor::{
-        cross_shard_state_view::CrossShardStateView,
+        cross_shard_state_view::CrossShardStateViewAggrOverride,
         messages::{CrossShardMsg, CrossShardMsg::RemoteTxnWriteMsg, RemoteTxnWrite},
     },
 };
@@ -26,7 +26,7 @@ pub struct CrossShardCommitReceiver {}
 
 impl CrossShardCommitReceiver {
     pub fn start<S: StateView + Sync + Send>(
-        cross_shard_state_view: Arc<CrossShardStateView<S>>,
+        cross_shard_state_view: Arc<CrossShardStateViewAggrOverride<S>>,
         cross_shard_client: Arc<dyn CrossShardClient>,
         round: RoundId,
     ) {
