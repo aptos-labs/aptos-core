@@ -10,8 +10,9 @@ pub const MAX_JSON_REQUEST_RETRY_SECONDS: u64 = 30;
 pub const MAX_IMAGE_REQUEST_RETRY_SECONDS: u64 = 180;
 
 /// Skip URIs that contain the following strings
-pub const URI_SKIP_LIST: [&str; 3] = [
+pub const URI_SKIP_LIST: [&str; 4] = [
     "aptoslabs.com/nft_images/aptos-zero",
     "svg.souffl3.com",
     "api.apt.store",
+    "aptosnames.com",
 ];

@@ -7,10 +7,10 @@ use once_cell::sync::Lazy;
 
 // OVERALL METRICS
 
-/// Number of times a given processor has been invoked
+/// Number of times the NFT Metadata Crawler Parser has been invoked
 pub static PARSER_INVOCATIONS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "nft_metadata_crawler_parser_processor_invocation_count",
+        "nft_metadata_crawler_parser_invocation_count",
         "Number of times the parser has been invoked",
     )
     .unwrap()
@@ -19,7 +19,7 @@ pub static PARSER_INVOCATIONS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 /// Number of times the NFT Metadata Crawler Parser has completed successfully
 pub static PARSER_SUCCESSES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "nft_metadata_crawler_parser_processor_success_count",
+        "nft_metadata_crawler_parser_success_count",
         "Number of times the parser has completed successfully",
     )
     .unwrap()
@@ -28,11 +28,13 @@ pub static PARSER_SUCCESSES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 /// Number of times the NFT Metadata Crawler Parser has failed
 pub static PARSER_FAIL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "nft_metadata_crawler_parser_processor_fail_count",
+        "nft_metadata_crawler_parser_fail_count",
         "Number of times the parser has failed",
     )
     .unwrap()
 });
+
+// PUBSUB METRICS
 
 /// Number of times the PubSub subscription stream has been reset
 pub static PUBSUB_STREAM_RESET_COUNT: Lazy<IntCounter> = Lazy::new(|| {
@@ -51,6 +53,8 @@ pub static PUBSUB_ACK_SUCCESS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+// POSTGRES METRICS
 
 /// Number of times the connection pool has timed out when trying to get a connection
 pub static UNABLE_TO_GET_CONNECTION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
