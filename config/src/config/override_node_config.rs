@@ -10,92 +10,67 @@ fn diff_override_config_yaml(
     override_config: serde_yaml::Value,
     base_config: serde_yaml::Value,
 ) -> anyhow::Result<Option<serde_yaml::Value>> {
-    match override_config.clone() {
-        serde_yaml::Value::Mapping(override_mapping) => match base_config {
-            serde_yaml::Value::Mapping(base_mapping) => {
-                let mut overrides = serde_yaml::Mapping::new();
-                for (override_key, override_value) in override_mapping {
-                    match base_mapping.get(&override_key) {
-                        Some(base_value) => {
-                            if let Some(diff_value) =
-                                diff_override_config_yaml(override_value, base_value.clone())?
-                            {
-                                overrides.insert(override_key, diff_value);
-                            }
-                        },
-                        None => {
-                            overrides.insert(override_key, override_value);
-                        },
-                    }
+    match (override_config.clone(), base_config.clone()) {
+        (
+            serde_yaml::Value::Mapping(override_mapping),
+            serde_yaml::Value::Mapping(base_mapping),
+        ) => {
+            let mut overrides = serde_yaml::Mapping::new();
+            for (override_key, override_value) in override_mapping {
+                match base_mapping.get(&override_key) {
+                    Some(base_value) => {
+                        if let Some(diff_value) =
+                            diff_override_config_yaml(override_value, base_value.clone())?
+                        {
+                            overrides.insert(override_key, diff_value);
+                        }
+                    },
+                    None => {
+                        overrides.insert(override_key, override_value);
+                    },
                 }
-                if overrides.is_empty() {
-                    Ok(None)
-                } else {
-                    Ok(Some(serde_yaml::Value::Mapping(overrides)))
-                }
-            },
-            _ => Ok(Some(override_config)),
+            }
+            if overrides.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(serde_yaml::Value::Mapping(overrides)))
+            }
         },
-        serde_yaml::Value::Null => match base_config {
-            serde_yaml::Value::Null => Ok(None),
-            _ => bail!("base does not match override: Null"),
+        (serde_yaml::Value::Mapping(_), _) => Ok(Some(override_config)),
+        (serde_yaml::Value::Null, serde_yaml::Value::Null) => Ok(None),
+        (serde_yaml::Value::Bool(override_value), serde_yaml::Value::Bool(base_value)) => {
+            if override_value == base_value {
+                Ok(None)
+            } else {
+                Ok(Some(override_config))
+            }
         },
-        serde_yaml::Value::Bool(override_value) => match base_config {
-            serde_yaml::Value::Bool(base_value) => {
-                if override_value == base_value {
-                    Ok(None)
-                } else {
-                    Ok(Some(override_config))
-                }
-            },
-            _ => bail!(
-                "base does not match override: Bool({}), {:?}",
-                override_value,
-                base_config
-            ),
+        (serde_yaml::Value::Number(override_value), serde_yaml::Value::Number(base_value)) => {
+            if override_value == base_value {
+                Ok(None)
+            } else {
+                Ok(Some(override_config))
+            }
         },
-        serde_yaml::Value::Number(override_value) => match base_config {
-            serde_yaml::Value::Number(base_value) => {
-                if override_value == base_value {
-                    Ok(None)
-                } else {
-                    Ok(Some(override_config))
-                }
-            },
-            _ => bail!(
-                "base does not match override: Number({}), {:?}",
-                override_value,
-                base_config
-            ),
+        (serde_yaml::Value::String(override_value), serde_yaml::Value::String(base_value)) => {
+            if override_value == base_value {
+                Ok(None)
+            } else {
+                Ok(Some(override_config))
+            }
         },
-        serde_yaml::Value::String(override_value) => match base_config {
-            serde_yaml::Value::String(base_value) => {
-                if override_value == base_value {
-                    Ok(None)
-                } else {
-                    Ok(Some(override_config))
-                }
-            },
-            _ => bail!(
-                "base does not match override: String({}), {:?}",
-                override_value,
-                base_config
-            ),
+        (serde_yaml::Value::Sequence(override_value), serde_yaml::Value::Sequence(base_value)) => {
+            if override_value == base_value {
+                Ok(None)
+            } else {
+                Ok(Some(override_config))
+            }
         },
-        serde_yaml::Value::Sequence(override_value) => match base_config {
-            serde_yaml::Value::Sequence(base_value) => {
-                if override_value == base_value {
-                    Ok(None)
-                } else {
-                    Ok(Some(override_config))
-                }
-            },
-            _ => bail!(
-                "base does not match override: {:?}, {:?}",
-                override_config,
-                base_config
-            ),
-        },
+        (_, _) => bail!(
+            "base does not match override: {:?}, {:?}",
+            override_config,
+            base_config
+        ),
     }
 }
 
