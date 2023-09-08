@@ -3,7 +3,10 @@ module 0x8675309::M {
     struct S {
         f: u64,
     }
-    private fun t0(s: &M::S,s_mut: &mut M::S) {
+    private fun t0(s: &M::S,s_mut: &mut M::S): (u64, u64) {
+        Tuple(select M::S.f(s), select M::S.f(s_mut))
+    }
+    spec fun $t0(s: M::S,s_mut: M::S): (u64, u64) {
         Tuple(select M::S.f(s), select M::S.f(s_mut))
     }
 } // end 0x8675309::M

@@ -69,6 +69,7 @@ async fn spawn_parser(
     let mut db_chain_id = None;
     let mut stream = get_new_subscription_stream(&subscription).await;
     while let Some(msg) = stream.next().await {
+        PARSER_INVOCATIONS_COUNT.inc();
         let start_time = Instant::now();
         let pubsub_message = String::from_utf8(msg.message.clone().data).unwrap_or_else(|e| {
             error!(
@@ -94,7 +95,7 @@ async fn spawn_parser(
                     "[NFT Metadata Crawler] Received worker, acking message"
                 );
                 if let Err(e) = send_ack(&subscription, msg.ack_id()).await {
-                    error!(
+                    warn!(
                         pubsub_message = pubsub_message,
                         error = ?e,
                         "[NFT Metadata Crawler] Resetting stream"
@@ -111,7 +112,15 @@ async fn spawn_parser(
 
         // Perform chain id check
         // If chain id is not set, set it
-        let mut conn = get_conn(pool.clone());
+        let mut conn = pool.get().unwrap_or_else(|e| {
+            error!(
+                pubsub_message = pubsub_message,
+                error = ?e,
+                "[NFT Metadata Crawler] Failed to get DB connection from pool");
+            UNABLE_TO_GET_CONNECTION_COUNT.inc();
+            panic!();
+        });
+        GOT_CONNECTION_COUNT.inc();
 
         let grpc_chain_id = parts[4].parse::<u64>().unwrap_or_else(|e| {
             error!(
@@ -173,7 +182,7 @@ async fn spawn_parser(
                 "[NFT Metadata Crawler] Received worker, acking message"
             );
             if let Err(e) = send_ack(&subscription, msg.ack_id()).await {
-                error!(
+                warn!(
                     pubsub_message = pubsub_message,
                     error = ?e,
                     "[NFT Metadata Crawler] Resetting stream"
@@ -189,7 +198,6 @@ async fn spawn_parser(
             "[NFT Metadata Crawler] Starting worker"
         );
 
-        PARSER_INVOCATIONS_COUNT.inc();
         if let Err(e) = worker.parse().await {
             warn!(
                 pubsub_message = pubsub_message,
@@ -197,8 +205,6 @@ async fn spawn_parser(
                 "[NFT Metadata Crawler] Parsing failed"
             );
             PARSER_FAIL_COUNT.inc();
-        } else {
-            PARSER_SUCCESSES_COUNT.inc();
         }
 
         info!(
@@ -229,28 +235,6 @@ async fn send_ack(subscription: &Subscription, ack_id: &str) -> anyhow::Result<(
     )
     .await?
     .context("Failed to ack message to PubSub")
-}
-
-/// Gets a Postgres connection from the pool
-fn get_conn(
-    pool: Pool<ConnectionManager<PgConnection>>,
-) -> PooledConnection<ConnectionManager<PgConnection>> {
-    loop {
-        match pool.get() {
-            Ok(conn) => {
-                GOT_CONNECTION_COUNT.inc();
-                return conn;
-            },
-            Err(err) => {
-                UNABLE_TO_GET_CONNECTION_COUNT.inc();
-                error!(
-                    "Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
-                    pool.connection_timeout(),
-                    err
-                );
-            },
-        };
-    }
 }
 
 #[async_trait::async_trait]
@@ -435,7 +419,10 @@ impl Worker {
             .await;
 
             if let Err(e) = cdn_json_uri_result.as_ref() {
-                self.log_error("Failed to write JSON to GCS", e);
+                self.log_warn(
+                    "Failed to write JSON to GCS, maybe upload timed out?",
+                    Some(e),
+                );
             }
 
             let cdn_json_uri = cdn_json_uri_result
@@ -514,7 +501,10 @@ impl Worker {
                 .await;
 
                 if let Err(e) = cdn_image_uri_result.as_ref() {
-                    self.log_error("Failed to write image to GCS", e);
+                    self.log_warn(
+                        "Failed to write image to GCS, maybe upload timed out?",
+                        Some(e),
+                    );
                 }
 
                 let cdn_image_uri = cdn_image_uri_result
@@ -611,6 +601,7 @@ impl Worker {
             self.log_error("Commit to Postgres failed", &e);
         }
 
+        PARSER_SUCCESSES_COUNT.inc();
         Ok(())
     }
 

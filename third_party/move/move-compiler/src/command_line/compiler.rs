@@ -697,7 +697,7 @@ pub fn generate_interface_files(
     {
         let (id, interface_contents) =
             interface_generator::write_file_to_string(module_to_named_address, &path)?;
-        let addr_dir = dir_path!(all_addr_dir.clone(), format!("{}", id.address()));
+        let addr_dir = dir_path!(all_addr_dir.clone(), format!("{}", id.address().to_hex()));
         let file_path = file_path!(addr_dir.clone(), format!("{}", id.name()), MOVE_EXTENSION);
         result.push(IndexedPackagePath {
             path: Symbol::from(file_path.clone().into_os_string().into_string().unwrap()),

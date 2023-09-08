@@ -1,6 +1,6 @@
 // ---- Model Dump
 module 0x8675309::M {
-    private fun foo<T,U>(_x: T,_y: U) {
+    private fun foo<T,U>(_x: #0,_y: #1) {
         Tuple()
     }
     private fun t1() {
@@ -10,9 +10,14 @@ module 0x8675309::M {
         M::foo<u64, u64>(0, 0);
         Tuple()
     }
-    private fun t2<T,U,V>(t: T,u: U,v: V) {
+    private fun t2<T,U,V>(t: #0,u: #1,v: #2) {
         M::foo<T, u64>(t, 0);
         M::foo<U, V>(u, v);
         Tuple()
     }
+    spec fun $foo<T,U>(_x: #0,_y: #1) {
+        Tuple()
+    }
+    spec fun $t1();
+    spec fun $t2<T,U,V>(t: #0,u: #1,v: #2);
 } // end 0x8675309::M

@@ -2,9 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::extended_checks::ResourceGroupScope;
-use aptos_types::{on_chain_config::Features, transaction::AbortInfo};
+use aptos_types::{
+    on_chain_config::{FeatureFlag, Features, TimedFeatures},
+    transaction::AbortInfo,
+};
 use move_binary_format::{
-    file_format::{Ability, AbilitySet, CompiledScript},
+    access::ModuleAccess,
+    file_format::{
+        Ability, AbilitySet, CompiledScript, IdentifierIndex, SignatureToken,
+        StructFieldInformation, TableIndex,
+    },
     normalized::{Function, Struct},
     CompiledModule,
 };
@@ -16,11 +23,20 @@ use move_core_types::{
 };
 use move_vm_runtime::move_vm::MoveVM;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, env};
 use thiserror::Error;
 
 /// The minimal file format version from which the V1 metadata is supported
 pub const METADATA_V1_MIN_FILE_FORMAT_VERSION: u32 = 6;
+
+// For measuring complexity of a CompiledModule w.r.t. to metadata evaluation.
+// This is for the size of types.
+/// Cost of one node in a type.
+const NODE_COST: usize = 10;
+/// Cost of one character in the name of struct referred from a type node.
+const IDENT_CHAR_COST: usize = 1;
+/// Overall budget for module complexity, calibrated via tests
+const COMPLEXITY_BUDGET: usize = 200000000;
 
 /// The keys used to identify the metadata in the metadata section of the module bytecode.
 /// This is more or less arbitrary, besides we should use some unique key to identify
@@ -270,6 +286,10 @@ pub enum MalformedError {
     DeserializedError(Vec<u8>, bcs::Error),
     #[error("Duplicate key for metadata")]
     DuplicateKey,
+    #[error("Module too complex")]
+    ModuleTooComplex,
+    #[error("Index out of range")]
+    IndexOutOfRange,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -339,7 +359,12 @@ pub fn is_valid_resource_group_member(
 pub fn verify_module_metadata(
     module: &CompiledModule,
     features: &Features,
+    _timed_features: &TimedFeatures,
 ) -> Result<(), MetaDataValidationError> {
+    if features.is_enabled(FeatureFlag::SAFER_METADATA) {
+        check_module_complexity(module)?;
+    }
+
     if features.are_resource_groups_enabled() {
         check_metadata_format(module)?;
     }
@@ -441,5 +466,108 @@ impl RuntimeModuleMetadataV1 {
                 reason_name: descr.code_name.clone(),
                 description: descr.code_description.clone(),
             })
+    }
+}
+
+/// Checks the complexity of a module.
+fn check_module_complexity(module: &CompiledModule) -> Result<(), MetaDataValidationError> {
+    let mut meter: usize = 0;
+    for sig in module.signatures() {
+        for tok in &sig.0 {
+            check_sigtok_complexity(module, &mut meter, tok)?
+        }
+    }
+    for handle in module.function_handles() {
+        check_ident_complexity(module, &mut meter, handle.name)?;
+        for tok in &safe_get_table(module.signatures(), handle.parameters.0)?.0 {
+            check_sigtok_complexity(module, &mut meter, tok)?
+        }
+        for tok in &safe_get_table(module.signatures(), handle.return_.0)?.0 {
+            check_sigtok_complexity(module, &mut meter, tok)?
+        }
+    }
+    for handle in module.struct_handles() {
+        check_ident_complexity(module, &mut meter, handle.name)?;
+    }
+    for def in module.struct_defs() {
+        if let StructFieldInformation::Declared(fields) = &def.field_information {
+            for field in fields {
+                check_ident_complexity(module, &mut meter, field.name)?;
+                check_sigtok_complexity(module, &mut meter, &field.signature.0)?
+            }
+        }
+    }
+    for def in module.function_defs() {
+        if let Some(unit) = &def.code {
+            for tok in &safe_get_table(module.signatures(), unit.locals.0)?.0 {
+                check_sigtok_complexity(module, &mut meter, tok)?
+            }
+        }
+    }
+    Ok(())
+}
+
+// Iterate -- without recursion -- through the nodes of a signature token. Any sub-nodes are
+// dealt with via the iterator
+fn check_sigtok_complexity(
+    module: &CompiledModule,
+    meter: &mut usize,
+    tok: &SignatureToken,
+) -> Result<(), MetaDataValidationError> {
+    for node in tok.preorder_traversal() {
+        // Count the node.
+        *meter = meter.saturating_add(NODE_COST);
+        match node {
+            SignatureToken::Struct(idx) | SignatureToken::StructInstantiation(idx, _) => {
+                let shandle = safe_get_table(module.struct_handles(), idx.0)?;
+                let mhandle = safe_get_table(module.module_handles(), shandle.module.0)?;
+                // Count identifier sizes
+                check_ident_complexity(module, meter, shandle.name)?;
+                check_ident_complexity(module, meter, mhandle.name)?
+            },
+            _ => {},
+        }
+        check_budget(*meter)?
+    }
+    Ok(())
+}
+
+fn check_ident_complexity(
+    module: &CompiledModule,
+    meter: &mut usize,
+    idx: IdentifierIndex,
+) -> Result<(), MetaDataValidationError> {
+    *meter = meter.saturating_add(
+        safe_get_table(module.identifiers(), idx.0)?
+            .len()
+            .saturating_mul(IDENT_CHAR_COST),
+    );
+    check_budget(*meter)
+}
+
+fn safe_get_table<A>(table: &[A], idx: TableIndex) -> Result<&A, MetaDataValidationError> {
+    let idx = idx as usize;
+    if idx < table.len() {
+        Ok(&table[idx])
+    } else {
+        Err(MetaDataValidationError::Malformed(
+            MalformedError::IndexOutOfRange,
+        ))
+    }
+}
+
+fn check_budget(meter: usize) -> Result<(), MetaDataValidationError> {
+    let mut budget = COMPLEXITY_BUDGET;
+    if cfg!(feature = "testing") {
+        if let Ok(b) = env::var("METADATA_BUDGET_CAL") {
+            budget = b.parse::<usize>().unwrap()
+        }
+    }
+    if meter > budget {
+        Err(MetaDataValidationError::Malformed(
+            MalformedError::ModuleTooComplex,
+        ))
+    } else {
+        Ok(())
     }
 }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::dag::{
+    dag_state_sync::DAG_WINDOW,
     dag_store::Dag,
     storage::DAGStorage,
     tests::helpers::new_certified_node,
@@ -106,7 +107,7 @@ fn setup() -> (Vec<ValidatorSigner>, Arc<EpochState>, Dag, Arc<MockStorage>) {
         verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
-    let dag = Dag::new(epoch_state.clone(), storage.clone(), 1);
+    let dag = Dag::new(epoch_state.clone(), storage.clone(), 0, DAG_WINDOW);
     (signers, epoch_state, dag, storage)
 }
 
@@ -194,7 +195,7 @@ fn test_dag_recover_from_storage() {
             assert!(dag.add_node(node).is_ok());
         }
     }
-    let new_dag = Dag::new(epoch_state.clone(), storage.clone(), 1);
+    let new_dag = Dag::new(epoch_state.clone(), storage.clone(), 0, DAG_WINDOW);
 
     for metadata in &metadatas {
         assert!(new_dag.exists(metadata));
@@ -205,7 +206,7 @@ fn test_dag_recover_from_storage() {
         verifier: epoch_state.verifier.clone(),
     });
 
-    let _new_epoch_dag = Dag::new(new_epoch_state, storage.clone(), 1);
+    let _new_epoch_dag = Dag::new(new_epoch_state, storage.clone(), 0, DAG_WINDOW);
     assert!(storage.certified_node_data.lock().is_empty());
 }
 
