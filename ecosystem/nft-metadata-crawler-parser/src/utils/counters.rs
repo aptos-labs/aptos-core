@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 
 // OVERALL METRICS
 
-/// Number of times a given has been invoked
+/// Number of times the NFT Metadata Crawler Parser has been invoked
 pub static PARSER_INVOCATIONS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "nft_metadata_crawler_parser_invocation_count",
