@@ -6,6 +6,7 @@ use crate::{
         dag_driver::{DagDriver, DagDriverError},
         dag_fetcher::DagFetcherService,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
+        dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
         order_rule::OrderRule,
         tests::{
@@ -78,7 +79,8 @@ async fn test_certified_node_handler() {
     let dag = Arc::new(RwLock::new(Dag::new(
         epoch_state.clone(),
         storage.clone(),
-        1,
+        0,
+        DAG_WINDOW,
     )));
 
     let network_sender = Arc::new(MockNetworkSender {});
