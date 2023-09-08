@@ -5,21 +5,18 @@
 
 use crate::{
     aptos_vm_impl::gas_config,
-    move_vm_ext::{get_max_binary_format_version, AptosMoveResolver, StateValueMetadataResolver},
+    move_vm_ext::{get_max_binary_format_version, AptosMoveResolver},
 };
 #[allow(unused_imports)]
 use anyhow::Error;
 use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::AggregatorResolver};
-use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
-        state_key::StateKey,
-        state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueMetadata},
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
 };
 use aptos_vm_types::resolver::{
@@ -48,7 +45,7 @@ pub(crate) fn get_resource_group_from_metadata(
         .find_map(|attr| attr.get_resource_group_member())
 }
 
-/// Adapter to convert a `StateView` into a `MoveResolverExt`.
+/// Adapter to convert a `StateView` into a `AptosMoveResolver`.
 pub struct StateViewAdapter<'a, S> {
     state_view: &'a S,
     accurate_byte_count: bool,
@@ -262,12 +259,6 @@ impl<'a, S: StateView> ConfigStorage for StateViewAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> StateStorageUsageResolver for StateViewAdapter<'a, S> {
-    fn get_state_storage_usage(&self) -> Result<StateStorageUsage, Error> {
-        self.state_view.get_usage()
-    }
-}
-
 pub trait AsMoveResolver<S> {
     fn as_move_resolver(&self) -> StateViewAdapter<S>;
 }
@@ -275,16 +266,6 @@ pub trait AsMoveResolver<S> {
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StateViewAdapter<S> {
         StateViewAdapter::new(self)
-    }
-}
-
-impl<'a, S: StateView> StateValueMetadataResolver for StateViewAdapter<'a, S> {
-    fn get_state_value_metadata(
-        &self,
-        state_key: &StateKey,
-    ) -> anyhow::Result<Option<Option<StateValueMetadata>>> {
-        let maybe_state_value = self.state_view.get_state_value(state_key)?;
-        Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 }
 
@@ -399,21 +380,6 @@ impl<'a, R: ExecutorResolver> AggregatorResolver for ExecutorResolverAdapter<'a,
 
 impl<'a, R: ExecutorResolver> ConfigStorage for ExecutorResolverAdapter<'a, R> {
     fn fetch_config(&self, _access_path: AccessPath) -> Option<Vec<u8>> {
-        todo!()
-    }
-}
-
-impl<'a, R: ExecutorResolver> StateStorageUsageResolver for ExecutorResolverAdapter<'a, R> {
-    fn get_state_storage_usage(&self) -> Result<StateStorageUsage, Error> {
-        todo!()
-    }
-}
-
-impl<'a, R: ExecutorResolver> StateValueMetadataResolver for ExecutorResolverAdapter<'a, R> {
-    fn get_state_value_metadata(
-        &self,
-        _state_key: &StateKey,
-    ) -> anyhow::Result<Option<Option<StateValueMetadata>>> {
         todo!()
     }
 }

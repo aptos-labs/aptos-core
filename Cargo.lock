@@ -1568,6 +1568,7 @@ dependencies = [
  "aptos-table-natives",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-types",
  "ark-bls12-381",
  "ark-ec",
  "ark-ff",

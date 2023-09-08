@@ -11,7 +11,7 @@ use crate::{
     counters::*,
     data_cache::StateViewAdapter,
     errors::expect_only_successful_execution,
-    move_vm_ext::{AptosMoveResolver, MoveResolverExt, RespawnedSession, SessionExt, SessionId},
+    move_vm_ext::{AptosMoveResolver, RespawnedSession, SessionExt, SessionId},
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
@@ -238,7 +238,7 @@ impl AptosVM {
         error_code: VMStatus,
         gas_meter: &impl AptosGasMeter,
         txn_data: &TransactionMetadata,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> VMOutput {
@@ -284,7 +284,7 @@ impl AptosVM {
         error_code: VMStatus,
         gas_meter: &impl AptosGasMeter,
         txn_data: &TransactionMetadata,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> (VMStatus, VMOutput) {
@@ -415,7 +415,7 @@ impl AptosVM {
 
     fn execute_script_or_entry_function(
         &self,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         mut session: SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
@@ -506,7 +506,7 @@ impl AptosVM {
     fn charge_change_set_and_respawn_session<'r, 'l>(
         &'l self,
         session: SessionExt,
-        resolver: &'r impl MoveResolverExt,
+        resolver: &'r impl AptosMoveResolver,
         gas_meter: &mut impl AptosGasMeter,
         change_set_configs: &ChangeSetConfigs,
         txn_data: &TransactionMetadata,
@@ -540,7 +540,7 @@ impl AptosVM {
     // 3. Call post transaction cleanup function in multisig account module with the result from (2)
     fn execute_multisig_transaction(
         &self,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         mut session: SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
@@ -692,7 +692,7 @@ impl AptosVM {
 
     fn success_multisig_payload_cleanup<'r, 'l>(
         &'l self,
-        resolver: &'r impl MoveResolverExt,
+        resolver: &'r impl AptosMoveResolver,
         session: SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
@@ -723,7 +723,7 @@ impl AptosVM {
 
     fn failure_multisig_payload_cleanup<'r, 'l>(
         &'l self,
-        resolver: &'r impl MoveResolverExt,
+        resolver: &'r impl AptosMoveResolver,
         execution_error: VMStatus,
         txn_data: &TransactionMetadata,
         mut cleanup_args: Vec<Vec<u8>>,
@@ -857,7 +857,7 @@ impl AptosVM {
     /// NativeCodeContext
     fn execute_modules(
         &self,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         mut session: SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
@@ -1057,7 +1057,7 @@ impl AptosVM {
 
     fn execute_user_transaction_impl(
         &self,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
         gas_meter: &mut impl AptosGasMeter,
@@ -1172,7 +1172,7 @@ impl AptosVM {
 
     fn execute_user_transaction(
         &self,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
@@ -1185,7 +1185,7 @@ impl AptosVM {
 
     pub fn execute_user_transaction_with_custom_gas_meter<G, F>(
         &self,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
         make_gas_meter: F,
@@ -1256,7 +1256,7 @@ impl AptosVM {
 
     fn read_change_set(
         &self,
-        state_view: &impl MoveResolverExt,
+        state_view: &impl AptosMoveResolver,
         change_set: &VMChangeSet,
     ) -> Result<(), VMStatus> {
         assert!(
@@ -1300,7 +1300,7 @@ impl AptosVM {
 
     pub(crate) fn process_waypoint_change_set(
         &self,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         write_set_payload: WriteSetPayload,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
@@ -1684,7 +1684,7 @@ impl VMAdapter for AptosVM {
     fn execute_single_transaction(
         &self,
         txn: &PreprocessedTransaction,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus> {
         Ok(match txn {
@@ -1813,7 +1813,7 @@ impl AptosSimulationVM {
 
     fn simulate_signed_transaction(
         &self,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {

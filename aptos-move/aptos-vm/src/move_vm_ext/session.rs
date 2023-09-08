@@ -418,15 +418,16 @@ impl<'r> WriteOpConverter<'r> {
         use MoveStorageOp::*;
         use WriteOp::*;
 
-        let maybe_existing_metadata =
-            self.remote
-                .get_state_value_metadata(state_key)
-                .map_err(|_| {
-                    VMStatus::error(
-                        StatusCode::STORAGE_ERROR,
-                        err_msg("Storage read failed when converting change set."),
-                    )
-                })?;
+        let maybe_existing_metadata = self
+            .remote
+            // TODO FIX
+            .get_resource_state_value_metadata(state_key)
+            .map_err(|_| {
+                VMStatus::error(
+                    StatusCode::STORAGE_ERROR,
+                    err_msg("Storage read failed when converting change set."),
+                )
+            })?;
 
         let write_op = match (maybe_existing_metadata, move_storage_op) {
             (None, Modify(_) | Delete) => {
