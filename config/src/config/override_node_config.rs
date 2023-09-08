@@ -121,8 +121,9 @@ impl OverrideNodeConfig {
     pub fn get_yaml(&self) -> anyhow::Result<serde_yaml::Value> {
         let config_yaml = serde_yaml::to_value(&self.override_config)?;
         let base_yaml = serde_yaml::to_value(&self.base_config)?;
-        diff_override_config_yaml(config_yaml, base_yaml)
-            .map(|diff_yaml| diff_yaml.unwrap_or(serde_yaml::Value::Null))
+        diff_override_config_yaml(config_yaml, base_yaml).map(|diff_yaml| {
+            diff_yaml.unwrap_or(serde_yaml::Value::Mapping(serde_yaml::Mapping::new()))
+        })
     }
 
     /// Save the node config to the given path
