@@ -1650,9 +1650,19 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         .with_initial_fullnode_count(12)
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 150000,
+            mempool_backlog: 500_000,
         }))
         .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            // ask for more resources than normal
+            helm_values["validator"]["resources"]["limits"]["cpu"] = 48.into();
+            helm_values["validator"]["resources"]["requests"]["cpu"] = 48.into();
+            helm_values["validator"]["resources"]["limits"]["memory"] = "72Gi".into();
+            helm_values["validator"]["resources"]["requests"]["memory"] = "72Gi".into();
+
+            // higher concurrency level
+            helm_values["validator"]["config"]["execution"]["concurrency_level"] = 32.into();
+
+            // Consensus and QuorumStore tweaks
             helm_values["validator"]["config"]["consensus"]
                 ["max_sending_block_txns_quorum_store_override"] = 10000.into();
             helm_values["validator"]["config"]["consensus"]["pipeline_backpressure"] =
@@ -1661,9 +1671,11 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 serde_yaml::to_value(Vec::<ChainHealthBackoffValues>::new()).unwrap();
 
             helm_values["validator"]["config"]["consensus"]
-                ["wait_for_full_blocks_above_recent_fill_threshold"] = (0.8).into();
+                ["wait_for_full_blocks_above_recent_fill_threshold"] = (0.2).into();
             helm_values["validator"]["config"]["consensus"]
                 ["wait_for_full_blocks_above_pending_blocks"] = 8.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store_pull_timeout_ms"] =
+                200.into();
 
             helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
                 ["backlog_txn_limit_count"] = 100000.into();
@@ -1672,6 +1684,16 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 
             helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
                 ["dynamic_max_txn_per_s"] = 6000.into();
+
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["sender_max_batch_txns"] = 500.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["receiver_max_batch_txns"] = 500.into();
+            const MB: usize = 1024 * 1024;
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["sender_max_batch_bytes"] = (3 * MB).into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["receiver_max_batch_bytes"] = (3 * MB).into();
 
             // Experimental storage optimizations
             helm_values["validator"]["config"]["storage"]["rocksdb_configs"]["split_ledger_db"] =
