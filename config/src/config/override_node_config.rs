@@ -162,7 +162,10 @@ mod test {
     fn test_override_node_config_no_diff() {
         let override_config = OverrideNodeConfig::new(NodeConfig::default(), NodeConfig::default());
         let diff_yaml = override_config.get_yaml().unwrap();
-        assert_eq!(diff_yaml, serde_yaml::Value::Null);
+        assert_eq!(
+            diff_yaml,
+            serde_yaml::Value::Mapping(serde_yaml::Mapping::new())
+        );
     }
 
     #[test]
