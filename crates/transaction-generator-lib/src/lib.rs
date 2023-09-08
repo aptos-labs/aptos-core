@@ -29,6 +29,7 @@ mod batch_transfer;
 mod call_custom_modules;
 mod entry_points;
 mod p2p_transaction_generator;
+mod ethereum_p2p_transaction_generator;
 pub mod publish_modules;
 mod publishing;
 mod transaction_mix_generator;
@@ -36,8 +37,9 @@ use self::{
     account_generator::AccountGeneratorCreator,
     call_custom_modules::CustomModulesDelegationGeneratorCreator,
     p2p_transaction_generator::P2PTransactionGeneratorCreator,
+    ethereum_p2p_transaction_generator::EthereumP2PTransactionGeneratorCreator,
     publish_modules::PublishPackageCreator,
-    transaction_mix_generator::PhasedTxnMixGeneratorCreator,
+    transaction_mix_generator::PhasedTxnMixGeneratorCreator
 };
 use crate::{
     accounts_pool_wrapper::AccountsPoolWrapperCreator,
@@ -55,6 +57,11 @@ pub enum TransactionType {
         sender_use_account_pool: bool,
     },
     CoinTransfer {
+        invalid_transaction_ratio: usize,
+        sender_use_account_pool: bool,
+    },
+    EthereumCoinTransfer {
+        num_ethereum_accounts: usize,
         invalid_transaction_ratio: usize,
         sender_use_account_pool: bool,
     },
@@ -239,6 +246,22 @@ pub async fn create_txn_generator_creator(
                         addresses_pool.clone(),
                         *invalid_transaction_ratio,
                         SamplingMode::Basic,
+                    )),
+                    *sender_use_account_pool,
+                    accounts_pool.clone(),
+                ),
+                TransactionType::EthereumCoinTransfer {
+                    num_ethereum_accounts,
+                    invalid_transaction_ratio,
+                    sender_use_account_pool
+                } => wrap_accounts_pool(
+                    Box::new(EthereumP2PTransactionGeneratorCreator::new(
+                        txn_factory.clone(),
+                        SEND_AMOUNT,
+                        addresses_pool.clone(),
+                        *invalid_transaction_ratio,
+                        SamplingMode::Basic,
+                        *num_ethereum_accounts,
                     )),
                     *sender_use_account_pool,
                     accounts_pool.clone(),

@@ -39,7 +39,7 @@ pub trait Sampler<T>: Send + Sync {
 pub struct BasicSampler {}
 
 impl BasicSampler {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }
@@ -80,14 +80,14 @@ pub struct BurnAndRecycleSampler<T> {
 }
 
 impl<T: Clone + Send + Sync> BurnAndRecycleSampler<T> {
-    fn new(replace_batch_size: usize) -> Self {
+    pub fn new(replace_batch_size: usize) -> Self {
         Self {
             to_be_replaced: vec![],
             sub_pool_size: replace_batch_size,
         }
     }
 
-    fn sample_one_from_pool(&mut self, rng: &mut StdRng, pool: &mut Vec<T>) -> T {
+    pub fn sample_one_from_pool(&mut self, rng: &mut StdRng, pool: &mut Vec<T>) -> T {
         if pool.is_empty() {
             let num_addresses = self.to_be_replaced.len();
             for replace_batch_start in (0..num_addresses).step_by(self.sub_pool_size) {
