@@ -126,8 +126,8 @@ impl DKGPayload {
         1
     }
 
-    pub fn verify(&self) -> anyhow::Result<()> {
-        self.dkg_agg_node.verify(&self.pvss_config)
+    pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.dkg_agg_node.verify(&self.pvss_config, verifier)
     }
 }
 
@@ -203,8 +203,8 @@ impl Payload {
                 Ok(())
             },
             (_, Payload::DKG(dkg_payload)) => {
-                // We will verify the pvss config in process_proposal and state_computer.
-                dkg_payload.verify()?;
+                // We will verify the pvss config in process_proposal.
+                dkg_payload.verify(validator)?;
                 Ok(())
             }
             (_, _) => Err(anyhow::anyhow!(

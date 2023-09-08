@@ -729,6 +729,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.author,
             epoch_state.clone(),
             dkg_reliable_broadcast,
+            self.config.safety_rules.backend.clone(),
         )));
         //dkg todo: old instance is silently dropped. Is it fine? any clean-up needed?
         self.dkg_manager_wrapper = Arc::new(DKGManagerWrapper::WithDKG(dkg_manager.clone()));
@@ -849,12 +850,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
-        let (my_index, _) = validator_set.active_validators.iter().find_position(|x|x.account_address == self.author).expect(format!("[DKG] my addr is not found in new validator set.").as_str());
-        debug!("[DKG] start_new_epoch: with my_index={}", my_index);
         let epoch_state = EpochState {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
         };
+        let my_index = *epoch_state.verifier.address_to_validator_index().get(&self.author).unwrap();
+        debug!("[DKG] start_new_epoch: with my_index={}", my_index);
+
         debug!("[DKG] start_new_epoch: with current_epoch={:?}, target_epoch={}", self.epoch_state.as_ref().map(|a|a.epoch), epoch_state.epoch);
         let maybe_dkg_state: anyhow::Result<DKGState> = payload.get();
         match maybe_dkg_state {

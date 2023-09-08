@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::validator_info::ValidatorInfo;
+use crate::{validator_info::ValidatorInfo, validator_verifier::ValidatorVerifier};
 use anyhow::Result;
 use aptos_dkg::pvss::{das, traits::Transcript, WeightedTranscript};
 use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
@@ -28,6 +28,7 @@ type WT = WeightedTranscript<DT>;
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct DKGPvssConfig {
+    pub epoch: u64,
     pub wc_1: <WT as Transcript>::SecretSharingConfig,
     pub wc_2: <WT as Transcript>::SecretSharingConfig,
     pub pp: <WT as Transcript>::PvssPublicParameters,
@@ -36,12 +37,14 @@ pub struct DKGPvssConfig {
 
 impl DKGPvssConfig {
     pub fn new(
+        epoch: u64,
         wc_1: <WT as Transcript>::SecretSharingConfig,
         wc_2: <WT as Transcript>::SecretSharingConfig,
         pp: <das::Transcript as Transcript>::PvssPublicParameters,
         eks: Vec<<das::Transcript as Transcript>::EncryptPubKey>,
     ) -> Self {
         Self {
+            epoch,
             wc_1,
             wc_2,
             pp,
@@ -62,18 +65,47 @@ pub struct DKGTranscriptWrapper {
 }
 
 impl DKGTranscriptWrapper {
-    pub fn verify(&self, dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
+    pub fn verify(&self, dkg_pvss_config: &DKGPvssConfig, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        let dealers = self.verify_dealers(dkg_pvss_config.eks.len())?;
+
+        let all_eks = dkg_pvss_config.eks.clone();
+        let _eks = dealers.iter().filter_map(|&pos| all_eks.get(pos)).cloned().collect::<Vec<_>>();
+
+        let addresses = verifier.get_ordered_account_addresses();
+        let dealers_addresses = dealers.iter().filter_map(|&pos| addresses.get(pos)).cloned().collect::<Vec<_>>();
+        
+        let spks = dealers_addresses.iter().filter_map(|author| verifier.get_public_key(author)).collect::<Vec<_>>();
+
+        let aux = dealers_addresses.iter().map(|address| (dkg_pvss_config.epoch, address)).collect::<Vec<_>>();
+
         self.trx_one_third.verify(
             &dkg_pvss_config.wc_1,
             &dkg_pvss_config.pp,
-            &dkg_pvss_config.eks,
+            &spks,
+            &all_eks,
+            &aux,
         )?;
         self.trx_two_third.verify(
             &dkg_pvss_config.wc_2,
             &dkg_pvss_config.pp,
-            &dkg_pvss_config.eks,
+            &spks,
+            &all_eks,
+            &aux,
         )?;
+
         Ok(())
+    }
+
+    pub fn verify_dealers(&self, n: usize) -> anyhow::Result<Vec<usize>> {
+        let dealers_1 = self.trx_one_third.get_dealers().iter().map(|player| player.id).collect::<Vec<usize>>();
+        let dealers_2 = self.trx_two_third.get_dealers().iter().map(|player| player.id).collect::<Vec<usize>>();
+        if dealers_1 != dealers_2 {
+            anyhow::bail!("[DKG] trx dealers mismatch!");
+        }
+        if dealers_1.iter().any(|id| *id >= n) {
+            anyhow::bail!("[DKG] trx dealers out of range!");
+        }
+        Ok(dealers_1)
     }
 
     pub fn aggregate_with(&mut self, dkg_pvss_config: &DKGPvssConfig, other: &Self) {

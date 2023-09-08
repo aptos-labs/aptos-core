@@ -74,7 +74,7 @@ impl DKGStore {
             self.buffer_nodes(node);
             return Ok(None);
         }
-        match node.verify(self.dkg_pvss_config.as_ref().unwrap()) {
+        match node.verify(self.dkg_pvss_config.as_ref().unwrap(), &self.validator_verifier) {
             Ok(_) => {
                 if self.agg_node.get().is_some() || self.agg_node_taken {
                     debug!("[DKG] Node {:?} adds DKG Node failed due to agg node already available", self.author);
@@ -120,7 +120,7 @@ impl DKGStore {
                         self.author,
                         self.agg_trx.take().unwrap(),
                     );
-                    if let Err(e) = agg_node.agg_trx().verify(self.dkg_pvss_config.as_ref().unwrap()) {
+                    if let Err(e) = agg_node.verify(self.dkg_pvss_config.as_ref().unwrap(), &self.validator_verifier) {
                         debug!("[DKG] agg trx verify failed: {:?}", e);
                     }
                     debug!(
@@ -147,7 +147,7 @@ impl DKGStore {
             self.buffer_agg_nodes(agg_node);
             return Ok(None);
         }
-        match agg_node.verify(self.dkg_pvss_config.as_ref().unwrap())
+        match agg_node.verify(self.dkg_pvss_config.as_ref().unwrap(), &self.validator_verifier)
         {
             Ok(_) => {
                 if self.agg_node.set(agg_node.clone()).is_ok() {

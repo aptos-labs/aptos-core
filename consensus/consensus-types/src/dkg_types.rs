@@ -3,9 +3,8 @@
 
 use crate::common::Author;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::dkg::{DKGTranscriptWrapper, DKGPvssConfig};
+use aptos_types::{dkg::{DKGTranscriptWrapper, DKGPvssConfig}, validator_verifier::ValidatorVerifier};
 use serde::{Deserialize, Serialize};
-use aptos_crypto::bls12381;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct DKGAggNodeMetadata {
@@ -14,8 +13,7 @@ pub struct DKGAggNodeMetadata {
 }
 
 impl DKGAggNodeMetadata {
-    #[cfg(test)]
-    pub fn new_for_test(epoch: u64, author: Author) -> Self {
+    pub fn new(epoch: u64, author: Author) -> Self {
         Self { epoch, author }
     }
 
@@ -39,11 +37,6 @@ impl DKGAggNodeMetadata {
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq, Eq)]
 pub struct DKGAggNode {
     pub metadata: DKGAggNodeMetadata,
-    // TODO(Alin): The signature is best handled here (and in DKGNode)
-    pub dealers: Vec<Author>,
-    pub sig: bls12381::Signature,
-    // dkg todo: use aggregated transcript here
-    // I am assuming aggregated transcript contains the authors of individual transcript
     pub agg_trx: DKGTranscriptWrapper,
 }
 
@@ -53,11 +46,6 @@ impl DKGAggNode {
             metadata: DKGAggNodeMetadata { epoch, author },
             agg_trx,
         }
-    }
-
-    #[cfg(test)]
-    pub fn new_for_test(metadata: DKGAggNodeMetadata, agg_trx: DKGTranscriptWrapper) -> Self {
-        Self { metadata, agg_trx }
     }
 
     pub fn metadata(&self) -> &DKGAggNodeMetadata {
@@ -80,7 +68,13 @@ impl DKGAggNode {
         self.metadata.num_bytes() + self.agg_trx.num_bytes()
     }
 
-    pub fn verify(&self, pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
-        self.agg_trx.verify(pvss_config)
+    pub fn verify(&self, pvss_config: &DKGPvssConfig, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        let dealers = self.agg_trx.verify_dealers(verifier.len())?;
+        let addresses = verifier.get_ordered_account_addresses();
+        let dealers_addresses = dealers.iter().filter_map(|&pos| addresses.get(pos)).cloned().collect::<Vec<_>>();
+        // Ensure aggregated transcript has enough stakes
+        verifier.check_voting_power(dealers_addresses.iter(), false)?;
+        
+        self.agg_trx.verify(pvss_config, verifier)
     }
 }

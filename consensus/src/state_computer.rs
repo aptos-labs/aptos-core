@@ -131,17 +131,9 @@ impl StateComputer for ExecutionProxy {
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
         let (txns, maybe_dkg_payload) = payload_manager.get_transactions(block).await?;
 
+        // already verified by 2/3 stakes during consensus
         let dkg_transcript = maybe_dkg_payload.map_or_else(|| None, |dkg_payload| {
-            // verify the DKG aggregated transcript
-            match dkg_payload.dkg_agg_node().verify(dkg_payload.pvss_config()) {
-                Ok(_) => {
-                    Some(dkg_payload.dkg_agg_node().agg_trx().clone())
-                },
-                Err(e) => {
-                    debug!("[DKG] Aggregated transcript verification failed for epoch {:?}, error = {:?}", dkg_payload.dkg_agg_node().epoch(), e);
-                    None
-                }
-            }
+            Some(dkg_payload.dkg_agg_node().agg_trx().clone())
         });
 
         let deduped_txns = txn_deduper.dedup(txns);
@@ -245,18 +237,10 @@ impl StateComputer for ExecutionProxy {
             let deduped_txns = txn_deduper.dedup(signed_txns);
             let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
+            // already verified by 2/3 stakes during consensus
             let dkg_transcript = maybe_dkg_payload.map_or_else(|| None, |dkg_payload| {
-                // verify the DKG aggregated transcript
-                match dkg_payload.dkg_agg_node().verify(dkg_payload.pvss_config()) {
-                    Ok(_) => {
-                        has_dkg_payloads = true;
-                        Some(dkg_payload.dkg_agg_node().agg_trx().clone())
-                    },
-                    Err(e) => {
-                        debug!("[DKG] Aggregated transcript verification failed for epoch {:?}, error = {:?}", dkg_payload.dkg_agg_node().epoch(), e);
-                        None
-                    }
-                }
+                has_dkg_payloads = true;
+                Some(dkg_payload.dkg_agg_node().agg_trx().clone())
             });
             let maybe_randomness = block.maybe_randomness();
 

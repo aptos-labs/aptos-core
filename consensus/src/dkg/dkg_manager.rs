@@ -6,15 +6,18 @@ use super::{
     dkg_store::DKGStore,
     types::{DKGAggNode, DKGAggNodeAckState, DKGMessage, DKGNodeAckState},
 };
-use crate::dkg::types::DKGNode;
+use crate::dkg::types::{DKGNode, TDKGMessage};
+use aptos_config::config::SecureBackend;
 use aptos_consensus_types::common::Author;
 use aptos_dkg::{
-    pvss::{das, traits::Transcript, WeightedTranscript},
+    pvss::{das, traits::Transcript, WeightedTranscript, Player},
     utils::random::random_scalar,
 };
+use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::Mutex;
 use aptos_logger::{error, debug};
 use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_secure_storage::{Storage, KVStorage};
 use aptos_types::{
     contract_event::ContractEvent,
     dkg::{DKGPvssConfig, DKGTranscriptWrapper, StartDKGEvent},
@@ -24,7 +27,7 @@ use futures::future::{AbortHandle, Abortable};
 use rand::{rngs::StdRng, thread_rng, SeedableRng};
 use std::sync::Arc;
 use tokio_retry::strategy::ExponentialBackoff;
-use aptos_crypto::Uniform;
+use aptos_crypto::{Uniform, bls12381};
 
 // the transcript size is 3.25MB
 // const TRANSCRIPT_SIZE: usize = 3_250_000;
@@ -104,6 +107,7 @@ pub struct DKGManager {
     rb_abort_handle: Option<AbortHandle>,
     dkg_store: DKGStore,
     dkg_rounding: Option<DKGRounding>,
+    backend: SecureBackend, // for private signing keys
 }
 
 impl DKGManager {
@@ -111,6 +115,7 @@ impl DKGManager {
         author: Author,
         epoch_state: EpochState,
         reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
+        backend: SecureBackend,
     ) -> Self {
         let verifier = epoch_state.verifier.clone();
         Self {
@@ -120,6 +125,7 @@ impl DKGManager {
             rb_abort_handle: None,
             dkg_store: DKGStore::new(author, verifier),
             dkg_rounding: None,
+            backend,
         }
     }
 
@@ -163,43 +169,53 @@ impl DKGManager {
 
         let pp = <WT as Transcript>::PvssPublicParameters::default();
         let s = <WT as Transcript>::InputSecret::generate(&mut rng);
+        let aux = (self.epoch_state.epoch, self.author);
+
+        let my_index = *self.epoch_state.verifier.address_to_validator_index().get(&self.author).unwrap();
+
+        // get private key
+        let backend = &self.backend;
+        let storage: Storage = backend.try_into().expect("Unable to initialize storage");
+        if let Err(error) = storage.available() {
+            panic!("Storage is not available: {:?}", error);
+        }
+        let private_key: bls12381::PrivateKey = storage
+            .get(CONSENSUS_KEY)
+            .map(|v| v.value)
+            .expect("Unable to get private key");
 
         let trx_1 = WT::deal(
             &wc_1,
             &pp,
+            &private_key,
             &consensus_keys,
             &s,
+            &aux,
+            &Player{ id: my_index },
             &mut rng,
         );
-        trx_1
-            .verify(&wc_1, &pp, &consensus_keys)
-            .expect("PVSS transcript failed verification");
 
-        // // Test transcript (de)serialization
-        // let serialized = trx_1.to_bytes();
-        // let deserialized = WT::try_from(serialized.as_slice())
-        //     .expect("serialized transcript should deserialize correctly");
-        // assert_eq!(trx_1, deserialized);
+        let trx_2 = WT::deal(
+            &wc_2,
+            &pp,
+            &private_key,
+            &consensus_keys,
+            &s,
+            &aux,
+            &Player{ id: my_index },
+            &mut rng,
+        );
 
-        let trx_2 = WT::deal(&wc_2, &pp, &consensus_keys, &s, &mut rng);
-        trx_2
-            .verify(&wc_2, &pp, &consensus_keys)
-            .expect("PVSS transcript failed verification");
-
-        // // Test transcript (de)serialization
-        // let serialized = trx_2.to_bytes();
-        // let deserialized = WT::try_from(serialized.as_slice())
-        //     .expect("serialized transcript should deserialize correctly");
-        // assert_eq!(trx_2, deserialized);
-
-        let dkg_pvss_config = DKGPvssConfig::new(wc_1.clone(), wc_2.clone(), pp, consensus_keys);
-        self.dkg_store.add_pvss_config(dkg_pvss_config);
+        let dkg_pvss_config = DKGPvssConfig::new(self.epoch_state.epoch, wc_1.clone(), wc_2.clone(), pp, consensus_keys);
+        self.dkg_store.add_pvss_config(dkg_pvss_config.clone());
 
         let dkg_trx_wrapper = DKGTranscriptWrapper {
             trx_one_third: trx_1,
             trx_two_third: trx_2,
         };
         let dkg_node = DKGNode::new(self.epoch_state.epoch, self.author, dkg_trx_wrapper);
+        
+        dkg_node.verify(&dkg_pvss_config, &self.epoch_state.verifier).expect("[DKG] Failed to verify own DKG Node");
 
         debug!("[DKG] Node {:?} finish computing DKG Node of epoch {:?}", self.author, dkg_node.epoch());
 

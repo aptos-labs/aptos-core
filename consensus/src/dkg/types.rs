@@ -7,22 +7,22 @@ pub use aptos_consensus_types::{common::Author, dkg_types::DKGAggNode};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
-use aptos_types::dkg::{DKGPvssConfig, DKGTranscriptWrapper};
+use aptos_types::{dkg::{DKGPvssConfig, DKGTranscriptWrapper}, validator_verifier::ValidatorVerifier};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 pub trait TDKGMessage: Into<DKGMessage> + TryFrom<DKGMessage> {
-    fn verify(&self, dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()>;
+    fn verify(&self, dkg_pvss_config: &DKGPvssConfig, verifier: &ValidatorVerifier) -> anyhow::Result<()>;
 }
 
 impl TDKGMessage for DKGNodeAck {
-    fn verify(&self, _dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
+    fn verify(&self, _dkg_pvss_config: &DKGPvssConfig, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         Ok(())
     }
 }
 
 impl TDKGMessage for DKGAggNodeAck {
-    fn verify(&self, _dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
+    fn verify(&self, _dkg_pvss_config: &DKGPvssConfig, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         Ok(())
     }
 }
@@ -63,11 +63,6 @@ impl DKGNode {
         }
     }
 
-    #[cfg(test)]
-    pub fn new_for_test(metadata: DKGNodeMetadata, trx: DKGTranscriptWrapper) -> Self {
-        Self { metadata, trx }
-    }
-
     pub fn metadata(&self) -> &DKGNodeMetadata {
         &self.metadata
     }
@@ -86,8 +81,8 @@ impl DKGNode {
 }
 
 impl TDKGMessage for DKGNode {
-    fn verify(&self, dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
-        self.trx.verify(dkg_pvss_config)?;
+    fn verify(&self, dkg_pvss_config: &DKGPvssConfig, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.trx.verify(dkg_pvss_config, verifier)?;
 
         Ok(())
     }
@@ -139,8 +134,14 @@ where
 }
 
 impl TDKGMessage for DKGAggNode {
-    fn verify(&self, dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
-        self.agg_trx.verify(dkg_pvss_config)?;
+    fn verify(&self, dkg_pvss_config: &DKGPvssConfig, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        let dealers = self.agg_trx.verify_dealers(verifier.len())?;
+        let addresses = verifier.get_ordered_account_addresses();
+        let dealers_addresses = dealers.iter().filter_map(|&pos| addresses.get(pos)).cloned().collect::<Vec<_>>();
+        // Ensure aggregated transcript has enough stakes
+        verifier.check_voting_power(dealers_addresses.iter(), false)?;
+        
+        self.agg_trx.verify(dkg_pvss_config, verifier)?;
 
         Ok(())
     }
@@ -204,10 +205,6 @@ pub enum DKGMessage {
     DKGNodeAckMsg(DKGNodeAck),
     DKGAggNodeMsg(DKGAggNode),
     DKGAggNodeAckMsg(DKGAggNodeAck),
-    #[cfg(test)]
-    DKGTestMessage(DKGTestMessage),
-    #[cfg(test)]
-    DKGTestAck(DKGTestAck),
 }
 
 impl DKGMessage {
@@ -217,10 +214,6 @@ impl DKGMessage {
             DKGMessage::DKGNodeAckMsg(_) => "DKGNodeAckMsg",
             DKGMessage::DKGAggNodeMsg(_) => "DKGAggNodeMsg",
             DKGMessage::DKGAggNodeAckMsg(_) => "DKGAggNodeAckMsg",
-            #[cfg(test)]
-            DKGMessage::DKGTestMessage(_) => "DKGTestMessage",
-            #[cfg(test)]
-            DKGMessage::DKGTestAck(_) => "DKGTestAck",
         }
     }
 
@@ -242,10 +235,6 @@ impl TConsensusMsg for DKGMessage {
             DKGMessage::DKGNodeAckMsg(ack) => ack.epoch,
             DKGMessage::DKGAggNodeMsg(node) => node.metadata.epoch,
             DKGMessage::DKGAggNodeAckMsg(ack) => ack.epoch,
-            #[cfg(test)]
-            DKGMessage::DKGTestMessage(_) => 1,
-            #[cfg(test)]
-            DKGMessage::DKGTestAck(_) => 1,
         }
     }
 
@@ -270,27 +259,5 @@ impl TryFrom<ConsensusMsg> for DKGMessage {
 
     fn try_from(msg: ConsensusMsg) -> Result<Self, Self::Error> {
         TConsensusMsg::from_network_message(msg)
-    }
-}
-
-#[cfg(test)]
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
-pub struct DKGTestMessage(pub Vec<u8>);
-
-#[cfg(test)]
-impl TDKGMessage for DKGTestMessage {
-    fn verify(&self, _dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
-        todo!()
-    }
-}
-
-#[cfg(test)]
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct DKGTestAck(pub Vec<u8>);
-
-#[cfg(test)]
-impl TDKGMessage for DKGTestAck {
-    fn verify(&self, _dkg_pvss_config: &DKGPvssConfig) -> anyhow::Result<()> {
-        todo!()
     }
 }
