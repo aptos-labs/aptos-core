@@ -97,7 +97,7 @@ impl PayloadClient for QuorumStoreClient {
         let return_non_full = recent_max_fill_fraction
             < self.wait_for_full_blocks_above_recent_fill_threshold
             && pending_uncommitted_blocks < self.wait_for_full_blocks_above_pending_blocks;
-        let return_empty = pending_ordering && return_non_full;
+        let return_empty = true; //pending_ordering && return_non_full;
 
         WAIT_FOR_FULL_BLOCKS_TRIGGERED.observe(if !return_non_full { 1.0 } else { 0.0 });
 

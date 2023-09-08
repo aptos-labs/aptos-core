@@ -290,9 +290,9 @@ impl ProposalGenerator {
                 .await;
 
             PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
-            if !proposal_delay.is_zero() {
-                tokio::time::sleep(proposal_delay).await;
-            }
+            // if !proposal_delay.is_zero() {
+            // tokio::time::sleep(proposal_delay).await;
+            // }
 
             let max_pending_block_len = pending_blocks
                 .iter()
