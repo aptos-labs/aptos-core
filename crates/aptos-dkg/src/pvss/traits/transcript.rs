@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-//! # Traits for implementing PVSS schemes
+//! # Traits for authenticated PVSS transcripts
 //!
 //! ## `InputSecret`, `DealtSecretKey` and `DealtPublicKey`
 //!
@@ -30,6 +30,15 @@
 //! (`DealtPubKeyShare`) for each *dealt secret key share*, which will be useful for efficiently
 //! implementing threshold verifiable random functions.
 //!
+//! ## `SigningSecretKey` and `SigningPubKey`
+//!
+//! When using the PVSS protocol to build a $t$-out-of-$n$ distributed key generation (DKG) protocol,
+//! it is necessary for each DKG player to sign their PVSS transcript so as to authenticate that
+//! they contributed to the final DKG secret.
+//!
+//! To prevent replay of signed PVSS transcripts inside higher-level protocols, the PVSS dealer can
+//! include some auxiliary data to compute the signature over too.
+//!
 //! ## A note on `aptos-crypto` traits
 //!
 //! We do not implement the `PublicKey` and `PrivateKey` traits from `aptos-crypto` for our PVSS
@@ -41,10 +50,13 @@ use crate::pvss::traits::{
     Convert, HasEncryptionPublicParams, IsSecretShareable, Reconstructable, SecretSharingConfig,
 };
 use crate::pvss::Player;
-use aptos_crypto::{Uniform, ValidCryptoMaterial};
-use serde::Serialize;
+use anyhow::bail;
+use aptos_crypto::{SigningKey, Uniform, ValidCryptoMaterial, VerifyingKey};
+use num_traits::Zero;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::fmt::Debug;
+use std::ops::AddAssign;
 
 /// A trait for a PVSS protocol. This trait allows both for:
 ///
@@ -52,10 +64,26 @@ use std::fmt::Debug;
 ///    reconstruct the secret (but no fewer can)
 /// 2. Weighted $w$-out-of-$W$ PVSS protocols where any players with combined weight $\ge w$ can
 ///    reconstruct the secret (but players with combined weight $< w$ cannot)
+/// TODO: rename to AuthenticatedTranscript?
 pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
-    type SecretSharingConfig: SecretSharingConfig + DeserializeOwned + Serialize + Debug + PartialEq + Eq;
+    type SecretSharingConfig: SecretSharingConfig
+        + DeserializeOwned
+        + Serialize
+        + Debug
+        + PartialEq
+        + Eq;
 
-    type PvssPublicParameters: HasEncryptionPublicParams + Default + ValidCryptoMaterial + DeserializeOwned + Serialize + Debug + PartialEq + Eq;
+    type PvssPublicParameters: HasEncryptionPublicParams
+        + Default
+        + ValidCryptoMaterial
+        + DeserializeOwned
+        + Serialize
+        + Debug
+        + PartialEq
+        + Eq;
+
+    type SigningSecretKey: Uniform + SigningKey<VerifyingKeyMaterial = Self::SigningPubKey>;
+    type SigningPubKey: VerifyingKey<SigningKeyMaterial = Self::SigningSecretKey>;
 
     type DealtSecretKeyShare: PartialEq + Clone;
     type DealtPubKeyShare;
@@ -66,10 +94,18 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     type DealtPubKey;
 
     type InputSecret: Uniform
+        + Zero
+        + for<'a> AddAssign<&'a Self::InputSecret>
         + Convert<Self::DealtSecretKey, Self::PvssPublicParameters>
         + Convert<Self::DealtPubKey, Self::PvssPublicParameters>;
 
-    type EncryptPubKey: Debug + Clone + ValidCryptoMaterial + DeserializeOwned + Serialize + PartialEq + Eq;
+    type EncryptPubKey: Debug
+        + Clone
+        + ValidCryptoMaterial
+        + DeserializeOwned
+        + Serialize
+        + PartialEq
+        + Eq;
     type DecryptPrivKey: Debug
         + Uniform
         + Convert<
@@ -82,27 +118,65 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     fn scheme_name() -> String;
 
     /// Deals the *input secret* $s$ by creating a PVSS transcript which encrypts shares of $s$ for
-    /// all PVSS players.
-    fn deal<R: rand_core::RngCore + rand_core::CryptoRng>(
+    /// all PVSS players. Signs the transcript with `ssk`.
+    ///
+    /// The dealer will sign the transcript (or part of it; typically just a commitment to the dealt
+    /// secret) together with his player ID in `dealer` and the auxiliary data in `aux` (which might
+    /// be needed for the security of higher-level protocols; e.g., replay protection).
+    fn deal<A: Serialize + Clone, R: rand_core::RngCore + rand_core::CryptoRng>(
         sc: &Self::SecretSharingConfig,
         pp: &Self::PvssPublicParameters,
+        ssk: &Self::SigningSecretKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
+        aux: &A,
+        dealer: &Player,
         rng: &mut R,
     ) -> Self;
 
     /// Verifies the validity of the PVSS transcript: i.e., the transcripts correctly encrypts shares
     /// of an `InputSecret` $s$ which has been $(t, n)$ secret-shared such that only $\ge t$ players
     /// can reconstruct it as a `DealtSecret`.
-    fn verify(
+    ///
+    /// Additionally, verifies that the transcript was indeed aggregated from a set of players
+    /// identified by the public keys in `spks`, by verifying each player $i$'s signature on the
+    /// transcript and on `aux[i]`.
+    fn verify<A: Serialize + Clone>(
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PvssPublicParameters,
+        spks: &Vec<Self::SigningPubKey>,
         eks: &Vec<Self::EncryptPubKey>,
+        aux: &Vec<A>,
     ) -> anyhow::Result<()>;
+
+    /// Returns the set of player IDs who have contributed to this transcript.
+    /// In other words, the transcript could have been dealt by one player, in which case
+    /// the set is of size 1, or the transcript could have been obtained by aggregating `n`
+    /// other transcripts, in which case the set will be of size `n`.
+    fn get_dealers(&self) -> Vec<Player>;
 
     /// Aggregates two transcripts.
     fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Self);
+
+    /// Helper function for aggregating a vector of transcripts
+    fn aggregate(sc: &Self::SecretSharingConfig, mut trxs: Vec<Self>) -> anyhow::Result<Self> {
+        if trxs.is_empty() {
+            bail!("Cannot aggregate empty vector of transcripts")
+        }
+
+        let n = trxs.len();
+        let (first, last) = trxs.split_at_mut(1);
+
+        for other in last {
+            first[0].aggregate_with(sc, other);
+        }
+
+        trxs.truncate(1);
+        let trx = trxs.pop().unwrap();
+        assert_eq!(trx.get_dealers().len(), n);
+        Ok(trx)
+    }
 
     /// Given a valid transcript, returns the `DealtPublicKey` of that transcript: i.e., the public
     /// key associated with the secret key dealt in the transcript.

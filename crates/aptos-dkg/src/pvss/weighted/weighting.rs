@@ -139,6 +139,9 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
     type SecretSharingConfig = WeightedConfig;
     type PvssPublicParameters = T::PvssPublicParameters;
 
+    type SigningSecretKey = T::SigningSecretKey;
+    type SigningPubKey = T::SigningPubKey;
+
     /// In a weighted PVSS, an SK share is represented as a vector of SK shares in the unweighted
     /// PVSS, whose size is proportional to the weight of the owning player.
     type DealtSecretKeyShare = Vec<T::DealtSecretKeyShare>;
@@ -153,26 +156,40 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
         format!("weighted_{}", T::scheme_name())
     }
 
-    fn deal<R: RngCore + CryptoRng>(
+    fn deal<A: Serialize + Clone, R: RngCore + CryptoRng>(
         sc: &Self::SecretSharingConfig,
         pp: &Self::PvssPublicParameters,
+        ssk: &Self::SigningSecretKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
+        aux: &A,
+        dealer: &Player,
         rng: &mut R,
     ) -> Self {
         // TODO(Security): This EK duplication allows an adversary to decrypt share_{i_j} / share_{i_k} for any $j$th and $k$th share of a validator $i$. Prove that security holds nonetheless or remove this.
         let duplicated_eks = WeightedTranscript::<T>::to_weighted_encryption_keys(sc, eks);
 
         WeightedTranscript {
-            trx: T::deal(sc.get_threshold_config(), pp, &duplicated_eks, s, rng),
+            trx: T::deal(
+                sc.get_threshold_config(),
+                pp,
+                ssk,
+                &duplicated_eks,
+                s,
+                aux,
+                dealer,
+                rng,
+            ),
         }
     }
 
-    fn verify(
+    fn verify<A: Serialize + Clone>(
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PvssPublicParameters,
+        spk: &Vec<Self::SigningPubKey>,
         eks: &Vec<Self::EncryptPubKey>,
+        aux: &Vec<A>,
     ) -> anyhow::Result<()> {
         let duplicated_eks = WeightedTranscript::<T>::to_weighted_encryption_keys(sc, eks);
 
@@ -180,8 +197,14 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
             &self.trx,
             sc.get_threshold_config(),
             pp,
+            spk,
             &duplicated_eks,
+            aux,
         )
+    }
+
+    fn get_dealers(&self) -> Vec<Player> {
+        T::get_dealers(&self.trx)
     }
 
     fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Self) {

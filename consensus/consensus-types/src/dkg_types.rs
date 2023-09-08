@@ -5,6 +5,7 @@ use crate::common::Author;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::dkg::{DKGTranscriptWrapper, DKGPvssConfig};
 use serde::{Deserialize, Serialize};
+use aptos_crypto::bls12381;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct DKGAggNodeMetadata {
@@ -38,6 +39,9 @@ impl DKGAggNodeMetadata {
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq, Eq)]
 pub struct DKGAggNode {
     pub metadata: DKGAggNodeMetadata,
+    // TODO(Alin): The signature is best handled here (and in DKGNode)
+    pub dealers: Vec<Author>,
+    pub sig: bls12381::Signature,
     // dkg todo: use aggregated transcript here
     // I am assuming aggregated transcript contains the authors of individual transcript
     pub agg_trx: DKGTranscriptWrapper,

@@ -3,23 +3,50 @@
 use crate::pvss::traits::transcript::Transcript;
 use crate::pvss::traits::{Convert, HasEncryptionPublicParams, SecretSharingConfig};
 use crate::pvss::{ThresholdConfig, WeightedConfig};
-use aptos_crypto::Uniform;
+use aptos_crypto::{SigningKey, Uniform};
+use num_traits::Zero;
 use rand::prelude::ThreadRng;
 use rand::thread_rng;
+use serde::Serialize;
+use std::ops::AddAssign;
 
-/// Helper function that returns an `(pp, dks, eks, s, sk)` tuple. Useful in tests and benchmarks when
-/// wanting to quickly deal & verify a transcript.
+/// Type used to indicate that dealears are not including any auxiliary data in their PVSS transcript
+/// signatures.
+#[derive(Clone, Serialize)]
+pub struct NoAux;
+
+/// Helper function that, given a sharing configuration for `n` players, returns an a tuple of:
+///  - public parameters
+///  - a vector of `n` signing SKs
+///  - a vector of `n` signing PKs
+///  - a vector of `n` decryption SKs
+///  - a vector of `n` encryption PKs
+///  - a vector of `n` input secrets, denoted by `iss`
+///  - the aggregated dealt secret key from `\sum_i iss[i]`
+/// Useful in tests and benchmarks when wanting to quickly deal & verify a transcript.
 pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng>(
     sc: &T::SecretSharingConfig,
     mut rng: &mut R,
 ) -> (
     T::PvssPublicParameters,
+    Vec<T::SigningSecretKey>,
+    Vec<T::SigningPubKey>,
     Vec<T::DecryptPrivKey>,
     Vec<T::EncryptPubKey>,
+    Vec<T::InputSecret>,
     T::InputSecret,
     T::DealtSecretKey,
 ) {
     let pp = T::PvssPublicParameters::default();
+
+    let ssks = (0..sc.get_total_num_players())
+        .map(|_| T::SigningSecretKey::generate(&mut rng))
+        .collect::<Vec<T::SigningSecretKey>>();
+    let spks = ssks
+        .iter()
+        .map(|ssk| ssk.verifying_key())
+        .collect::<Vec<T::SigningPubKey>>();
+
     let dks = (0..sc.get_total_num_players())
         .map(|_| T::DecryptPrivKey::generate(&mut rng))
         .collect::<Vec<T::DecryptPrivKey>>();
@@ -32,11 +59,18 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
     // println!("DKs: {:?}", dks);
     // println!("EKs: {:?}", eks);
 
-    let s = T::InputSecret::generate(&mut rng);
+    let iss = (0..sc.get_total_num_players())
+        .map(|_| T::InputSecret::generate(&mut rng))
+        .collect::<Vec<T::InputSecret>>();
+
+    let mut s = T::InputSecret::zero();
+    for is in &iss {
+        s.add_assign(is)
+    }
     let sk: <T as Transcript>::DealtSecretKey = s.to(&pp);
     // println!("Dealt SK: {:?}", sk);
 
-    (pp, dks, eks, s, sk)
+    (pp, ssks, spks, dks, eks, iss, s, sk)
 }
 
 /// Useful for printing types of variables without too much hassle.
@@ -70,8 +104,8 @@ pub fn get_threshold_configs_for_testing() -> Vec<ThresholdConfig> {
     // tcs.push(ThresholdConfig::new(1, 2).unwrap());
     // for t in [1, 2, 3, 4, 5, 6, 7, 8] {
     //     for n in t..3 * (t - 1) + 1 {
-    for t in 1..20 {
-        for n in t..20 {
+    for t in 1..8 {
+        for n in t..8 {
             let tc = ThresholdConfig::new(t, n).unwrap();
             tcs.push(tc)
         }

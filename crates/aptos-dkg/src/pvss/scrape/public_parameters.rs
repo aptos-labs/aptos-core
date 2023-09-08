@@ -6,9 +6,7 @@ use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial, ValidCryptoMaterial
 use aptos_crypto_derive::{DeserializeKey, SerializeKey};
 use blstrs::{G1Projective, G2Projective};
 
-use crate::constants::{
-    DST_PVSS_PUBLIC_PARAMS, G2_PROJ_NUM_BYTES, SEED_PVSS_PUBLIC_PARAMS,
-};
+use crate::constants::{DST_PVSS_PUBLIC_PARAMS, G2_PROJ_NUM_BYTES, SEED_PVSS_PUBLIC_PARAMS};
 use crate::pvss::encryption_dlog;
 use crate::pvss::traits;
 
@@ -34,16 +32,8 @@ impl PublicParameters {
                 DST_PVSS_PUBLIC_PARAMS.as_slice(),
                 b"h1_hat",
             )),
-            u1_hat: G2Projective::hash_to_curve(
-                seed,
-                DST_PVSS_PUBLIC_PARAMS.as_slice(),
-                b"u1_hat",
-            ),
-            g1: G1Projective::hash_to_curve(
-                seed,
-                DST_PVSS_PUBLIC_PARAMS.as_slice(),
-                b"g1",
-            ),
+            u1_hat: G2Projective::hash_to_curve(seed, DST_PVSS_PUBLIC_PARAMS.as_slice(), b"u1_hat"),
+            g1: G1Projective::hash_to_curve(seed, DST_PVSS_PUBLIC_PARAMS.as_slice(), b"g1"),
         }
     }
 

@@ -2,12 +2,12 @@
 
 //! PVSS scheme-independent testing
 use aptos_crypto::hash::CryptoHash;
-use aptos_crypto::{bls12381, SigningKey, Uniform};
 use aptos_dkg::constants::{
-    BEST_CASE_N, BEST_CASE_THRESHOLD, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES,
-    WORST_CASE_N, WORST_CASE_THRESHOLD,
+    BEST_CASE_N, BEST_CASE_THRESHOLD, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, WORST_CASE_N,
+    WORST_CASE_THRESHOLD,
 };
 use aptos_dkg::pvss;
+use aptos_dkg::pvss::test_utils::NoAux;
 use aptos_dkg::pvss::traits::transcript::Transcript;
 use aptos_dkg::pvss::traits::{Reconstructable, SecretSharingConfig};
 use aptos_dkg::pvss::{das, scrape, test_utils, WeightedConfig, WeightedTranscript};
@@ -24,16 +24,17 @@ fn all_unweighted_pvss_bvt() {
     //
     // Unweighted PVSS tests
     //
-    for tc in test_utils::get_threshold_configs_for_testing() {
+    let tcs = test_utils::get_threshold_configs_for_testing();
+    for tc in tcs {
         println!("\nTesting {tc} PVSS");
 
         let seed = random_scalar(&mut rng);
 
-        // SCRAPE
-        pvss_deal_verify_aggr_and_reconstruct::<pvss::scrape::Transcript>(&tc, seed.to_bytes_le());
-
         // Das
-        pvss_deal_verify_aggr_and_reconstruct::<pvss::das::Transcript>(&tc, seed.to_bytes_le());
+        pvss_deal_verify_and_reconstruct::<pvss::das::Transcript>(&tc, seed.to_bytes_le());
+
+        // SCRAPE
+        pvss_deal_verify_and_reconstruct::<pvss::scrape::Transcript>(&tc, seed.to_bytes_le());
     }
 }
 
@@ -44,22 +45,49 @@ fn all_weighted_pvss_bvt() {
     //
     // PVSS weighted tests
     //
-    for wc in test_utils::get_weighted_configs_for_testing() {
+    let wcs = test_utils::get_weighted_configs_for_testing();
+    for wc in wcs {
         println!("\nTesting {wc} PVSS");
 
         // SCRAPE
         let seed = random_scalar(&mut rng);
-        pvss_deal_verify_aggr_and_reconstruct::<WeightedTranscript<pvss::scrape::Transcript>>(
+        pvss_deal_verify_and_reconstruct::<WeightedTranscript<pvss::scrape::Transcript>>(
             &wc,
             seed.to_bytes_le(),
         );
 
         // Das
-        pvss_deal_verify_aggr_and_reconstruct::<WeightedTranscript<pvss::das::Transcript>>(
+        pvss_deal_verify_and_reconstruct::<WeightedTranscript<pvss::das::Transcript>>(
             &wc,
             seed.to_bytes_le(),
         );
     }
+}
+
+#[test]
+fn all_unweighted_dkg_bvt() {
+    let mut rng = thread_rng();
+    let tcs = test_utils::get_threshold_configs_for_testing();
+    let seed = random_scalar(&mut rng);
+
+    aggregatable_dkg::<pvss::das::Transcript>(tcs.last().unwrap(), seed.to_bytes_le());
+    aggregatable_dkg::<pvss::scrape::Transcript>(tcs.last().unwrap(), seed.to_bytes_le());
+}
+
+#[test]
+fn all_weighted_dkg_bvt() {
+    let mut rng = thread_rng();
+    let wcs = test_utils::get_weighted_configs_for_testing();
+    let seed = random_scalar(&mut rng);
+
+    aggregatable_dkg::<WeightedTranscript<pvss::das::Transcript>>(
+        wcs.last().unwrap(),
+        seed.to_bytes_le(),
+    );
+    aggregatable_dkg::<WeightedTranscript<pvss::scrape::Transcript>>(
+        wcs.last().unwrap(),
+        seed.to_bytes_le(),
+    );
 }
 
 #[test]
@@ -84,7 +112,7 @@ fn weighted_fail_due_to_blst_bug() {
         attempt += 1;
 
         let seed = random_scalar(&mut rng);
-        pvss_deal_verify_aggr_and_reconstruct::<WeightedTranscript<pvss::scrape::Transcript>>(
+        pvss_deal_verify_and_reconstruct::<WeightedTranscript<pvss::scrape::Transcript>>(
             &wc,
             seed.to_bytes_le(),
         );
@@ -105,8 +133,8 @@ fn transcript_size() {
 }
 
 #[test]
-fn pok_of_input_secret_test() {
-    panic!("This test is just a reminder that all implemented PVSS schemes are not safe for a PVSS-based DKG without a PoK of the dealt input secret. Consult [GJM+21e] in README.md.")
+fn sok_of_input_secret_test() {
+    panic!("This test is just a reminder that all implemented PVSS schemes are not safe for a PVSS-based DKG without a SoK of the dealt input secret. Consult [GJM+21e] in README.md.")
 }
 
 fn print_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(t: usize, n: usize) {
@@ -126,7 +154,7 @@ fn print_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(t
 ///  1. Deals a secret, creating a transcript
 ///  2. Verifies the transcript.
 ///  3. Ensures the a sufficiently-large random subset of the players can recover the dealt secret
-fn pvss_deal_verify_aggr_and_reconstruct<T: Transcript + CryptoHash>(
+fn pvss_deal_verify_and_reconstruct<T: Transcript + CryptoHash>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
@@ -134,46 +162,96 @@ fn pvss_deal_verify_aggr_and_reconstruct<T: Transcript + CryptoHash>(
     // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
     let mut rng = StdRng::from_seed(seed_bytes);
 
-    // TODO: Change this to return multiple InputSecrets, and their sum as the DealtSK. Then, test the secret reconstruction from the aggregated transcript shares.
-    let (pp, dks, eks, s, sk) = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+    let (pp, ssks, spks, dks, eks, _, s, sk) = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
 
-    let mut trx1 = T::deal(&sc, &pp, &eks, &s, &mut rng);
-    let trx2 = T::deal(&sc, &pp, &eks, &s, &mut rng);
-    trx1.verify(&sc, &pp, &eks)
+    // Test dealing
+    let trx = T::deal(
+        &sc,
+        &pp,
+        &ssks[0],
+        &eks,
+        &s,
+        &NoAux,
+        &sc.get_player(0),
+        &mut rng,
+    );
+    trx.verify(&sc, &pp, &vec![spks[0].clone()], &eks, &vec![NoAux])
         .expect("PVSS transcript failed verification");
 
     // Test transcript (de)serialization
-    let serialized = trx1.to_bytes();
-    let deserialized = T::try_from(serialized.as_slice())
+    let trx_deserialized = T::try_from(trx.to_bytes().as_slice())
         .expect("serialized transcript should deserialize correctly");
 
-    assert_eq!(trx1, deserialized);
+    assert_eq!(trx, trx_deserialized);
 
+    assert_dsk_reconstructs(&sc, &mut rng, &dks, sk, trx);
+    // println!("Reconstructed {:?}", sk_reconstructed);
+}
+
+fn assert_dsk_reconstructs<T: Transcript + CryptoHash>(
+    sc: &&<T as Transcript>::SecretSharingConfig,
+    mut rng: &mut StdRng,
+    dks: &Vec<<T as Transcript>::DecryptPrivKey>,
+    sk: <T as Transcript>::DealtSecretKey,
+    trx: T,
+) {
     // Test reconstruction from t random shares
     let players_and_shares = sc
         .get_random_subset_of_capable_players(&mut rng)
         .into_iter()
         .map(|p| {
-            let (sk, _) = trx1.decrypt_own_share(&sc, &p, &dks[p.get_id()]);
+            let (sk, _) = trx.decrypt_own_share(&sc, &p, &dks[p.get_id()]);
 
             (p, sk)
         })
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
 
-    let sk_reconstruct = T::DealtSecretKey::reconstruct(&sc, &players_and_shares);
+    let sk_reconstructed = T::DealtSecretKey::reconstruct(&sc, &players_and_shares);
 
     // println!();
-    assert_eq!(sk, sk_reconstruct);
-    // println!("Reconstructed {:?}", sk_reconstruct);
+    assert_eq!(sk, sk_reconstructed);
+}
 
-    // Test aggregation
-    trx1.aggregate_with(sc, &trx2);
-    trx1.verify(sc, &pp, &eks)
-        .expect("aggregated PVSS transcript failed verification");
+/// Deals `n` times, aggregates all transcripts, and attempts to reconstruct the secret dealt in this
+/// aggregated transcript.
+fn aggregatable_dkg<T: Transcript + CryptoHash>(sc: &T::SecretSharingConfig, seed_bytes: [u8; 32]) {
+    let mut rng = StdRng::from_seed(seed_bytes);
 
-    // Ensure that transcript can be signed
-    let sk = bls12381::PrivateKey::generate(&mut rng);
-    let _ = sk.sign(&trx1).unwrap();
+    let (pp, ssks, spks, dks, eks, iss, _, sk) =
+        test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+
+    let mut trxs = vec![];
+
+    // Deal `n` transcripts
+    for i in 0..sc.get_total_num_players() {
+        trxs.push(T::deal(
+            &sc,
+            &pp,
+            &ssks[i],
+            &eks,
+            &iss[i],
+            &NoAux,
+            &sc.get_player(i),
+            &mut rng,
+        ));
+    }
+
+    // Aggregate all `n` transcripts
+    let trx = T::aggregate(sc, trxs).unwrap();
+
+    // Verify the aggregated transcript
+    trx.verify(
+        &sc,
+        &pp,
+        &spks,
+        &eks,
+        &(0..sc.get_total_num_players())
+            .map(|_| NoAux)
+            .collect::<Vec<NoAux>>(),
+    )
+    .expect("aggregated PVSS transcript failed verification");
+
+    assert_dsk_reconstructs(&sc, &mut rng, &dks, sk, trx);
 }
 
 fn actual_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(

@@ -6,11 +6,12 @@ use crate::pvss::scrape;
 use crate::pvss::scrape::{LowDegreeTest, SCRAPE_SK_IN_G2};
 use crate::pvss::threshold_config::ThresholdConfig;
 use crate::pvss::traits;
+use crate::pvss::traits::SecretSharingConfig;
 use crate::pvss::{encryption_dlog, fiat_shamir};
 use crate::utils::random::{random_g1_point, random_g2_point};
 use crate::utils::{g2_multi_exp, multi_pairing};
 use anyhow::bail;
-use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
+use aptos_crypto::{bls12381, CryptoMaterialError, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
@@ -27,11 +28,11 @@ const SCRAPE_PVSS_FIAT_SHAMIR_DST: &[u8; 33] = b"APTOS_SCRAPE_PVSS_FIAT_SHAMIR_D
 /// macros override serde's serialization to call into `ValidCryptoMaterial::to_bytes()`. This makes
 /// it difficult to serialize complex types because if we call serde serialization inside `to_bytes`
 /// on the struct itself, it triggers infinite recursion by having `serde` call back into `to_bytes`.
-///
-/// TODO(Security): This lacks a PoK on the dealt secret `A[n]` so it is not secure in a DKG. Need to add it (see the Das PVSS).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 #[allow(non_snake_case)]
 pub struct Transcript {
+    /// TODO(Security): Add a PoK and signature on the dealt secret `A[n]`. Otherwise, not secure in a publicly-verifiable DKG (see the Das PVSS)
+    soks: Vec<Player>,
     /// Commitment to $f(0)$: $\hat{u}_2 = \hat{u}_1^{a_0}$
     u2_hat: G2Projective,
     /// `A[0], ..., A[n-1]` are commitments to the $n$ evaluations of $f(X)$: $g_1^{f(\omega^i)}$
@@ -60,6 +61,8 @@ impl TryFrom<&[u8]> for Transcript {
 impl traits::Transcript for Transcript {
     type SecretSharingConfig = ThresholdConfig;
     type PvssPublicParameters = scrape::PublicParameters;
+    type SigningPubKey = bls12381::PublicKey;
+    type SigningSecretKey = bls12381::PrivateKey;
     type DealtSecretKeyShare = scrape::DealtSecretKeyShare;
     type DealtPubKeyShare = scrape::DealtPubKeyShare;
     type DealtSecretKey = scrape::DealtSecretKey;
@@ -72,11 +75,14 @@ impl traits::Transcript for Transcript {
         SCRAPE_SK_IN_G2.to_string()
     }
 
-    fn deal<R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn deal<A: Serialize, R: rand_core::RngCore + rand_core::CryptoRng>(
         sc: &Self::SecretSharingConfig,
         pp: &Self::PvssPublicParameters,
+        _ssk: &Self::SigningSecretKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
+        _aux: &A,
+        dealer: &Player,
         rng: &mut R,
     ) -> Self {
         assert_eq!(eks.len(), sc.n);
@@ -87,6 +93,7 @@ impl traits::Transcript for Transcript {
         let u1_hat = pp.get_public_key_base();
 
         Transcript {
+            soks: vec![*dealer],
             u2_hat: u1_hat.mul(f[0]),
             A: (0..sc.n)
                 .map(|i| g1.mul(f_evals[i]))
@@ -98,11 +105,13 @@ impl traits::Transcript for Transcript {
         }
     }
 
-    fn verify(
+    fn verify<A: Serialize>(
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PvssPublicParameters,
+        _spks: &Vec<Self::SigningPubKey>,
         eks: &Vec<Self::EncryptPubKey>,
+        _aux: &Vec<A>,
     ) -> anyhow::Result<()> {
         if eks.len() != sc.n {
             bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
@@ -125,7 +134,8 @@ impl traits::Transcript for Transcript {
         }
 
         // Derive challenges deterministically via Fiat-Shamir; it's easier to debug for distributed systems
-        let (f, r) = fiat_shamir::fiat_shamir(self, sc, pp, eks, &SCRAPE_PVSS_FIAT_SHAMIR_DST[..], 1);
+        let (f, r) =
+            fiat_shamir::fiat_shamir(self, sc, pp, eks, &SCRAPE_PVSS_FIAT_SHAMIR_DST[..], 1);
         let r = r[0];
 
         let ldt = LowDegreeTest::new(f, sc.t, sc.n + 1, true, sc.get_batch_evaluation_domain())?;
@@ -207,6 +217,10 @@ impl traits::Transcript for Transcript {
         }
         self.A[sc.n] += other.A[sc.n];
 
+        for sok in &other.soks {
+            self.soks.push(sok.clone());
+        }
+
         debug_assert_eq!(self.A.len(), other.A.len());
         debug_assert_eq!(self.Y_hat.len(), other.Y_hat.len());
     }
@@ -262,9 +276,14 @@ impl traits::Transcript for Transcript {
         let r2 = random_g2_point(rng);
 
         Transcript {
+            soks: vec![sc.get_player(0)],
             u2_hat: g2,
             A: g1_vec.iter().map(|p| p + r1).collect(),
             Y_hat: g2_vec.iter().map(|p| p + r2).collect(),
         }
+    }
+
+    fn get_dealers(&self) -> Vec<Player> {
+        self.soks.clone()
     }
 }

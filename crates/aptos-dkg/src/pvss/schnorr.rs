@@ -1,22 +1,33 @@
 use crate::utils::random::random_scalar;
 use crate::utils::{hash_to_scalar, HasMultiExp};
 use anyhow::bail;
+use aptos_crypto::signing_message;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::Scalar;
 use ff::Field;
 use group::Group;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::ops::{Mul, Neg};
 
-const SCHNORR_POK_DST: &[u8; 11] = b"Schnorr PoK";
+const SCHNORR_POK_DST: &[u8; 21] = b"APTOS_SCHNORR_POK_DST";
 
-#[derive(Serialize)]
-struct Challenge<Gr: Serialize> {
-    pk: Gr,
+/// A Schnorr PoK for (g, g^a) is a tuple:
+///
+///   $$(R = g^r, s = r + H(g^r, g^a, g) a)$$
+pub type PoK<Gr> = (Gr, Scalar);
+
+/// This is the Schnorr prover transcript that is hashed to obtain a Fiat-Shamir challenge.
+/// TODO(TechDebt): CryptoHasher doesn't work with lifetimes, so cannot have references here, so unnecessary copying below.
+#[derive(Serialize, Deserialize, BCSCryptoHash, CryptoHasher)]
+#[allow(non_snake_case)]
+struct Challenge<Gr> {
+    R: Gr,  // g^r
+    pk: Gr, // g^a
     g: Gr,
 }
 
 #[allow(non_snake_case)]
-pub fn pok_prove<Gr, R>(a: &Scalar, g: &Gr, pk: &Gr, rng: &mut R) -> (Gr, Scalar)
+pub fn pok_prove<Gr, R>(a: &Scalar, g: &Gr, pk: &Gr, rng: &mut R) -> PoK<Gr>
 where
     Gr: Serialize + Group + for<'a> Mul<&'a Scalar, Output = Gr>,
     R: rand_core::RngCore + rand_core::CryptoRng,
@@ -25,18 +36,20 @@ where
 
     let r = random_scalar(rng);
     let R = g.mul(&r);
-    let e = schnorr_hash(&g, &pk);
+    let e = schnorr_hash(Challenge::<Gr> { R, pk: *pk, g: *g });
     let s = r + e * a;
 
     (R, s)
 }
 
-/// Computes the Fiat-Shamir challenge in the Schnorr PoK protocol given an instance $(g, pk = g^a)$.
-fn schnorr_hash<Gr: Serialize>(g: &Gr, pk: &Gr) -> Scalar
+/// Computes the Fiat-Shamir challenge in the Schnorr PoK protocol given an instance $(g, pk = g^a)$
+/// and the commitment $R = g^r$.
+#[allow(non_snake_case)]
+fn schnorr_hash<Gr: Serialize>(c: Challenge<Gr>) -> Scalar
 where
     Gr: Serialize,
 {
-    let c = bcs::to_bytes(&Challenge { pk, g })
+    let c = signing_message(&c)
         .expect("unexpected error during Schnorr challenge struct serialization");
 
     hash_to_scalar(&c, SCHNORR_POK_DST)
@@ -52,7 +65,7 @@ where
 /// where $e_i$ is the Fiat-Shamir challenge derived by hashing the PK and the generator $g$.
 #[allow(non_snake_case)]
 pub fn pok_batch_verify<'a, Gr>(
-    poks: &Vec<(Gr, (Gr, Scalar))>,
+    poks: &Vec<(Gr, PoK<Gr>)>,
     g: &Gr,
     gamma: &Scalar,
 ) -> anyhow::Result<()>
@@ -78,7 +91,7 @@ where
         exps.push(gammas[i]);
 
         bases.push(pk);
-        exps.push(schnorr_hash(g, &pk) * gammas[i]);
+        exps.push(schnorr_hash(Challenge::<Gr> { R, pk, g: *g }) * gammas[i]);
 
         last_exp += s * gammas[i];
     }

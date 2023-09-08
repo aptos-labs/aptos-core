@@ -3,12 +3,12 @@
 use crate::algebra::polynomials::shamir_secret_share;
 use crate::pvss::das::DAS_SK_IN_G1;
 use crate::pvss::scrape::LowDegreeTest;
-use crate::pvss::traits::HasEncryptionPublicParams;
+use crate::pvss::traits::{HasEncryptionPublicParams, SecretSharingConfig};
 use crate::pvss::{das, encryption_dlog, fiat_shamir, schnorr, traits, Player, ThresholdConfig};
 use crate::utils::random::{random_g1_point, random_g2_point, random_scalar};
 use crate::utils::{g1_multi_exp, g2_multi_exp, multi_pairing};
 use anyhow::bail;
-use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
+use aptos_crypto::{bls12381, CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
@@ -26,7 +26,16 @@ pub struct Transcript {
     /// Since the transcript could have been aggregated from other transcripts with their own
     /// committed secrets in $c_i = g_2^{p_i(0)}$, this is a vector of PoKs for all these $c_i$'s
     /// such that $\prod_i c_i = c$.
-    poks: Vec<(G2Projective, (G2Projective, Scalar))>,
+    ///
+    /// Also contains BLS signatures from each player $i$ on that player's contribution $c_i$, the
+    /// player ID $i$ and auxiliary information `aux[i]` provided during dealing.
+    /// TODO: update transcript size in tests? but the # of aggregations influences the size...
+    soks: Vec<(
+        Player,
+        G2Projective,
+        bls12381::Signature,
+        schnorr::PoK<G2Projective>,
+    )>,
     /// ElGamal encryption randomness $g_2^r \in G_2$
     hat_w: G2Projective,
     /// First $n$ elements are commitments to the evaluations of $p(X)$: $g_2^{p(\omega^i)}$,
@@ -36,6 +45,15 @@ pub struct Transcript {
     C: Vec<G1Projective>,
     /// Ciphertext randomness commitment $g_1^r$.
     C_0: G1Projective,
+}
+
+/// A PVSS contribution, which is signed as part of the PVSS transcript
+/// TODO(TechDebt): CryptoHasher doesn't seem to work with lifetimes. So I cannot make this struct store references, which causes unnecesary cloning in the code.
+#[derive(Serialize, Deserialize, BCSCryptoHash, CryptoHasher)]
+pub struct Contribution<A> {
+    comm: G2Projective,
+    player: Player,
+    aux: A,
 }
 
 // TODO(Optimization): For verification, can we get any speed-ups when a lot of the PKs are the same? Assuming the PVSS remains secure.
@@ -59,6 +77,8 @@ impl TryFrom<&[u8]> for Transcript {
 impl traits::Transcript for Transcript {
     type SecretSharingConfig = ThresholdConfig;
     type PvssPublicParameters = das::PublicParameters;
+    type SigningPubKey = bls12381::PublicKey;
+    type SigningSecretKey = bls12381::PrivateKey;
     type DealtSecretKeyShare = das::DealtSecretKeyShare;
     type DealtPubKeyShare = das::DealtPubKeyShare;
     type DealtSecretKey = das::DealtSecretKey;
@@ -72,11 +92,14 @@ impl traits::Transcript for Transcript {
     }
 
     #[allow(non_snake_case)]
-    fn deal<R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn deal<A: Serialize + Clone, R: rand_core::RngCore + rand_core::CryptoRng>(
         sc: &Self::SecretSharingConfig,
         pp: &Self::PvssPublicParameters,
+        ssk: &Self::SigningSecretKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
+        aux: &A,
+        dealer: &Player,
         mut rng: &mut R,
     ) -> Self {
         assert_eq!(eks.len(), sc.n);
@@ -109,8 +132,17 @@ impl traits::Transcript for Transcript {
         debug_assert_eq!(V.len(), sc.n + 1);
         debug_assert_eq!(C.len(), sc.n);
 
+        // Sign the secret commitment, player ID and `aux`
+        let sig = ssk
+            .sign(&Contribution {
+                comm: V[sc.n],
+                player: *dealer,
+                aux: aux.clone(),
+            })
+            .expect("signing of PVSS contribution should have succeeded");
+
         Transcript {
-            poks: vec![(V[sc.n], pok)],
+            soks: vec![(*dealer, V[sc.n], sig, pok)],
             hat_w: g_2.mul(r),
             V,
             C,
@@ -118,11 +150,13 @@ impl traits::Transcript for Transcript {
         }
     }
 
-    fn verify(
+    fn verify<A: Serialize + Clone>(
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PvssPublicParameters,
+        spks: &Vec<Self::SigningPubKey>,
         eks: &Vec<Self::EncryptPubKey>,
+        aux: &Vec<A>,
     ) -> anyhow::Result<()> {
         if eks.len() != sc.n {
             bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
@@ -140,8 +174,76 @@ impl traits::Transcript for Transcript {
             );
         }
 
-        // Derive challenges deterministically via Fiat-Shamir; it's easier to debug for distributed systems
-        let (f, extra) = fiat_shamir::fiat_shamir(self, sc, pp, eks, &DAS_PVSS_FIAT_SHAMIR_DST[..], 3);
+        if self.soks.len() != spks.len() {
+            bail!(
+                "Expected {} signing PKs, but got {}",
+                self.soks.len(),
+                spks.len()
+            );
+        }
+
+        if self.soks.len() != aux.len() {
+            bail!(
+                "Expected {} auxiliary infos, but got {}",
+                self.soks.len(),
+                aux.len()
+            );
+        }
+
+        // Verify signature(s) on the secret commitment, player ID and `aux`
+        let msgs = self
+            .soks
+            .iter()
+            .zip(aux)
+            .map(|((player, comm, _, _), aux)| Contribution::<A> {
+                comm: *comm,
+                player: *player,
+                aux: aux.clone(),
+            })
+            .collect::<Vec<Contribution<A>>>();
+        let msgs_refs = msgs.iter().map(|c| c).collect::<Vec<&Contribution<A>>>();
+        let pks = spks
+            .iter()
+            .map(|pk| pk)
+            .collect::<Vec<&Self::SigningPubKey>>();
+        let sig = bls12381::Signature::aggregate(
+            self.soks
+                .iter()
+                .map(|(_, _, sig, _)| sig.clone())
+                .collect::<Vec<bls12381::Signature>>(),
+        )?;
+
+        sig.verify_aggregate(&msgs_refs[..], &pks[..])?;
+
+        // Verify the PoK(s) of the dealt secret
+        let mut c = G2Projective::identity();
+        for (_, c_i, _, _) in &self.soks {
+            c.add_assign(c_i)
+        }
+
+        if c != self.V[sc.n] {
+            bail!(
+                "The PoK does not correspond to the dealt secret. Expected {} but got {}",
+                self.V[sc.n],
+                c
+            );
+        }
+
+        // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
+        let (f, extra) =
+            fiat_shamir::fiat_shamir(self, sc, pp, eks, &DAS_PVSS_FIAT_SHAMIR_DST[..], 3);
+
+        let gamma = extra[2];
+        let g_2 = pp.get_commitment_base();
+        schnorr::pok_batch_verify(
+            &self
+                .soks
+                .iter()
+                .map(|(_, c, _, pok)| (*c, *pok))
+                .collect::<Vec<(G2Projective, schnorr::PoK<G2Projective>)>>(),
+            g_2,
+            &gamma,
+        )?;
 
         let ldt = LowDegreeTest::new(f, sc.t, sc.n + 1, true, sc.get_batch_evaluation_domain())?;
         ldt.low_degree_test_on_g2(&self.V)?;
@@ -200,7 +302,6 @@ impl traits::Transcript for Transcript {
 
         // Fetch some public parameters
         let h_1 = pp.get_encryption_public_params().message_base();
-        let g_2 = pp.get_commitment_base();
         let g_1_inverse = pp.get_encryption_public_params().pubkey_base().neg();
         let alpha = extra[1];
 
@@ -213,23 +314,6 @@ impl traits::Transcript for Transcript {
         if res != Gt::identity() {
             bail!("Expected zero, but got {} during multi-pairing check", res);
         }
-
-        // Verify the PoK(s) of the dealt secret
-        let mut c = G2Projective::identity();
-        for (c_i, _) in &self.poks {
-            c.add_assign(c_i)
-        }
-
-        if c != self.V[sc.n] {
-            bail!(
-                "The PoK does not correspond to the dealt secret. Expected {} but got {}",
-                self.V[sc.n],
-                c
-            );
-        }
-
-        let gamma = extra[2];
-        schnorr::pok_batch_verify(&self.poks, g_2, &gamma)?;
 
         return Ok(());
     }
@@ -247,8 +331,8 @@ impl traits::Transcript for Transcript {
         }
         self.V[sc.n] += other.V[sc.n];
 
-        for pok in &other.poks {
-            self.poks.push(*pok);
+        for sok in &other.soks {
+            self.soks.push(sok.clone());
         }
 
         debug_assert_eq!(self.C.len(), other.C.len());
@@ -306,13 +390,30 @@ impl traits::Transcript for Transcript {
 
         let r1 = random_g1_point(rng);
         let r2 = random_g2_point(rng);
-
+        let sk = bls12381::PrivateKey::genesis();
         Transcript {
-            poks: vec![(r2, (acc_g2, random_scalar(rng)))],
+            soks: vec![(
+                sc.get_player(0),
+                r2,
+                sk.sign(&Contribution::<usize> {
+                    comm: r2,
+                    player: sc.get_player(0),
+                    aux: 0,
+                })
+                .unwrap(),
+                (acc_g2, random_scalar(rng)),
+            )],
             hat_w: g2,
             V: V.iter().map(|p2| p2 + r2).collect(),
             C: C.iter().map(|p1| p1 + r1).collect(),
             C_0: random_g1_point(rng),
         }
+    }
+
+    fn get_dealers(&self) -> Vec<Player> {
+        self.soks
+            .iter()
+            .map(|(p, _, _, _)| *p)
+            .collect::<Vec<Player>>()
     }
 }
