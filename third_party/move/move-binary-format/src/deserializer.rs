@@ -1241,7 +1241,7 @@ fn load_virtual_function_instantiations(
                     VirtualFunctionInstantiation::Instantiated(load_function_inst_index(cursor)?)
                 },
                 SerializedVirtualFunctionInstantiation::VIRTUAL => {
-                    VirtualFunctionInstantiation::Virtual(load_vtable_index(cursor)?)
+                    VirtualFunctionInstantiation::Inherited(load_function_handle_index(cursor)?, load_vtable_index(cursor)?)
                 },
             },
         );

@@ -376,7 +376,7 @@ pub struct FunctionInstantiation {
 pub enum VirtualFunctionInstantiation {
     Defined(FunctionHandleIndex),
     Instantiated(FunctionInstantiationIndex),
-    Virtual(VTableIndex),
+    Inherited(FunctionHandleIndex, VTableIndex),
 }
 
 /// A complete or partial instantiation of a field (or the type of it).

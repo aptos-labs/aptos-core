@@ -73,7 +73,7 @@ impl<'a> CodeUnitVerifier<'a> {
                 return Err(PartialVMError::new(StatusCode::TOO_MANY_BACK_EDGES));
             }
         }
-        Ok(())
+        virtual_instantiation_verifier::verify_module(module)
     }
 
     pub fn verify_script(
@@ -112,11 +112,8 @@ impl<'a> CodeUnitVerifier<'a> {
             function_view,
             name_def_map: &name_def_map,
         };
-        virtual_instantiation_verifier::verify_function(
-            &resolver,
-            &code_unit_verifier.function_view,
-        )?;
-        code_unit_verifier.verify_common(verifier_config, &mut meter)
+        code_unit_verifier.verify_common(verifier_config, &mut meter)?;
+        virtual_instantiation_verifier::verify_script(script)
     }
 
     fn verify_function(
@@ -175,11 +172,6 @@ impl<'a> CodeUnitVerifier<'a> {
         };
         code_unit_verifier.verify_common(verifier_config, meter)?;
         AcquiresVerifier::verify(module, index, function_definition, meter)?;
-        virtual_instantiation_verifier::verify_function(
-            &resolver,
-            &code_unit_verifier.function_view,
-        )?;
-
         meter.transfer(Scope::Function, Scope::Module, 1.0)?;
 
         Ok(num_back_edges)

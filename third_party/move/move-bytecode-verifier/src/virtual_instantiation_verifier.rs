@@ -7,11 +7,15 @@
 
 use crate::type_safety::instantiate;
 use move_binary_format::{
-    binary_views::{BinaryIndexedView, FunctionView},
+    binary_views::BinaryIndexedView,
     errors::{PartialVMError, PartialVMResult},
-    file_format::{Bytecode, FunctionInstantiation, Signature, VirtualFunctionInstantiation},
+    file_format::{
+        Bytecode, CompiledModule, CompiledScript, FunctionHandleIndex, FunctionInstantiation,
+        FunctionInstantiationIndex, Signature, VirtualFunctionInstantiation,
+    },
 };
 use move_core_types::vm_status::StatusCode;
+use std::collections::BTreeSet;
 
 fn verify_instantiation<'a>(
     resolver: &BinaryIndexedView<'a>,
@@ -28,11 +32,29 @@ fn verify_instantiation<'a>(
         .iter()
         .zip(func_handle.vtables.iter())
     {
+        let expected_parameters = Signature(
+            resolver
+                .signature_at(func_ty.parameters)
+                .0
+                .iter()
+                .map(|tok| instantiate(tok, resolver.signature_at(inst.type_parameters)))
+                .collect(),
+        );
+        let expected_returns = Signature(
+            resolver
+                .signature_at(func_ty.return_)
+                .0
+                .iter()
+                .map(|tok| instantiate(tok, resolver.signature_at(inst.type_parameters)))
+                .collect(),
+        );
         match func_inst {
             VirtualFunctionInstantiation::Defined(handle) => {
                 let func = resolver.function_handle_at(*handle);
                 // Only need to compare index here as there's no duplication in signature pool.
-                if func.parameters != func_ty.parameters || func.return_ != func_ty.return_ {
+                if resolver.signature_at(func.parameters) != &expected_parameters
+                    || resolver.signature_at(func.return_) != &expected_returns
+                {
                     return Err(PartialVMError::new(StatusCode::TYPE_MISMATCH)
                         .with_message("Virtual function instantiation type mismatch".to_string()));
                 }
@@ -61,50 +83,72 @@ fn verify_instantiation<'a>(
                         .collect(),
                 );
 
-                if resolver.signature_at(func_ty.parameters) != &parameter_ty
-                    || resolver.signature_at(func_ty.return_) != &return_ty
+                if expected_parameters != parameter_ty || expected_returns != return_ty {
+                    return Err(PartialVMError::new(StatusCode::TYPE_MISMATCH)
+                        .with_message("Virtual function instantiation type mismatch".to_string()));
+                }
+            },
+            VirtualFunctionInstantiation::Inherited(fh_idx, v_idx) => {
+                let function_handle = resolver.function_handle_at(*fh_idx);
+                let func_ty = &function_handle.vtables[*v_idx as usize];
+                if &expected_parameters != resolver.signature_at(func_ty.parameters)
+                    || &expected_returns != resolver.signature_at(func_ty.return_)
                 {
                     return Err(PartialVMError::new(StatusCode::TYPE_MISMATCH)
                         .with_message("Virtual function instantiation type mismatch".to_string()));
                 }
             },
-            VirtualFunctionInstantiation::Virtual(_) => (),
         }
     }
     Ok(())
 }
 
-pub(crate) fn verify_function<'a>(
+fn verify_inheritence<'a>(
     resolver: &BinaryIndexedView<'a>,
-    function_view: &'a FunctionView<'a>,
+    fi_idx: FunctionInstantiationIndex,
+    self_idx: Option<FunctionHandleIndex>,
+    visited: &mut BTreeSet<FunctionInstantiationIndex>,
 ) -> PartialVMResult<()> {
-    for opcode in function_view.code().code.iter() {
+    let func_inst = resolver.function_instantiation_at(fi_idx);
+    for virt_func in func_inst.vtable_instantiation.iter() {
+        match virt_func {
+            VirtualFunctionInstantiation::Inherited(idx, _) => {
+                if let Some(expected_idx) = self_idx {
+                    if *idx != expected_idx {
+                        return Err(PartialVMError::new(StatusCode::TYPE_MISMATCH).with_message(
+                            "Inhertied virtual function doesn't match function handle provided"
+                                .to_string(),
+                        ));
+                    }
+                } else {
+                    return Err(PartialVMError::new(StatusCode::TYPE_MISMATCH)
+                        .with_message("Inhertied virtual function not expected".to_string()));
+                }
+            },
+            VirtualFunctionInstantiation::Instantiated(idx) => {
+                if visited.contains(idx) {
+                    return Err(PartialVMError::new(StatusCode::TYPE_MISMATCH).with_message(
+                        "Virtual function instantiation contains cycle".to_string(),
+                    ));
+                }
+                visited.insert(*idx);
+                verify_inheritence(resolver, *idx, self_idx, visited)?
+            },
+            VirtualFunctionInstantiation::Defined(_) => (),
+        }
+    }
+    Ok(())
+}
+fn verify_code_unit<'a>(
+    resolver: &BinaryIndexedView<'a>,
+    codes: &[Bytecode],
+    self_idx: Option<FunctionHandleIndex>,
+) -> PartialVMResult<()> {
+    for opcode in codes.iter() {
         use Bytecode::*;
         match opcode {
-            CallGeneric(func_inst_idx) => {
-                let inst = resolver.function_instantiation_at(*func_inst_idx);
-                let func_handle = resolver.function_handle_at(inst.handle);
-                for (func_inst, func_ty) in inst
-                    .vtable_instantiation
-                    .iter()
-                    .zip(func_handle.vtables.iter())
-                {
-                    match func_inst {
-                        VirtualFunctionInstantiation::Virtual(idx) => {
-                            if function_view.vtables()[*idx as usize].parameters
-                                != func_ty.parameters
-                                || function_view.vtables()[*idx as usize].return_ != func_ty.return_
-                            {
-                                return Err(PartialVMError::new(StatusCode::TYPE_MISMATCH)
-                                    .with_message(
-                                        "Virtual function instantiation type mismatch".to_string(),
-                                    ));
-                            }
-                        },
-                        VirtualFunctionInstantiation::Defined(_)
-                        | VirtualFunctionInstantiation::Instantiated(_) => (),
-                    }
-                }
+            CallGeneric(fi_idx) => {
+                verify_inheritence(resolver, *fi_idx, self_idx, &mut BTreeSet::new())?
             },
             PackGeneric(_)
             | UnpackGeneric(_)
@@ -193,4 +237,21 @@ pub(crate) fn verify_common(resolver: &BinaryIndexedView) -> PartialVMResult<()>
         verify_instantiation(resolver, func_inst)?;
     }
     Ok(())
+}
+
+pub(crate) fn verify_module(module: &CompiledModule) -> PartialVMResult<()> {
+    for def in module.function_defs.iter() {
+        if let Some(code) = &def.code {
+            verify_code_unit(
+                &BinaryIndexedView::Module(module),
+                &code.code,
+                Some(def.function),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn verify_script(script: &CompiledScript) -> PartialVMResult<()> {
+    verify_code_unit(&BinaryIndexedView::Script(script), &script.code.code, None)
 }

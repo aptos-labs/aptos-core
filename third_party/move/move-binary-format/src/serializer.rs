@@ -757,9 +757,10 @@ fn serialize_virtual_function_instantiation(
                 binary.push(SerializedVirtualFunctionInstantiation::INSTANTIATED as u8)?;
                 serialize_function_inst_index(binary, idx)?;
             },
-            VirtualFunctionInstantiation::Virtual(idx) => {
+            VirtualFunctionInstantiation::Inherited(fh_idx, v_idx) => {
                 binary.push(SerializedVirtualFunctionInstantiation::VIRTUAL as u8)?;
-                serialize_virtual_function_index(binary, idx)?;
+                serialize_function_handle_index(binary, fh_idx)?;
+                serialize_virtual_function_index(binary, v_idx)?;
             },
         }
     }

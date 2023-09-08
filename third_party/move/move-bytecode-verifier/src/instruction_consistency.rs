@@ -82,7 +82,7 @@ impl<'a> InstructionConsistency<'a> {
                     let inst = self.resolver.function_instantiation_at(*handle);
                     self.check_function_op(0, inst.handle, true)?
                 },
-                VirtualFunctionInstantiation::Virtual(_) => (),
+                VirtualFunctionInstantiation::Inherited(_, _) => (),
             }
         }
         Ok(())

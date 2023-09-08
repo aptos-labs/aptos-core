@@ -260,10 +260,10 @@ impl<'a> BoundsChecker<'a> {
             match virt_func {
                 VirtualFunctionInstantiation::Defined(idx) => check_bounds_impl(self.view.function_handles(), *idx)?,
                 VirtualFunctionInstantiation::Instantiated(idx) => check_bounds_impl(self.view.function_instantiations(), *idx)?,
-                VirtualFunctionInstantiation::Virtual(idx) => {
+                VirtualFunctionInstantiation::Inherited(fh_idx, v_idx) => {
                     // This is safe because we've already check this index is in bound.
-                    let func_handle = self.view.function_handle_at(function_instantiation.handle);
-                    check_bounds_impl(&func_handle.vtables, *idx)?;
+                    let func_handle = self.view.function_handle_at(*fh_idx);
+                    check_bounds_impl(&func_handle.vtables, *v_idx)?;
                 }
             }
         }
