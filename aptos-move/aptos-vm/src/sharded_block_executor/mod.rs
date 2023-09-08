@@ -17,6 +17,12 @@ use aptos_types::{
 };
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
+use std::collections::btree_set::BTreeSet;
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::Mutex;
+use aptos_block_executor::sharding::ShardingMsg;
+use aptos_mvhashmap::types::TxnIndex;
+use crate::block_executor::AptosTransactionOutput;
 
 pub mod coordinator_client;
 mod counters;
@@ -41,7 +47,7 @@ pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static, C: Executo
 pub enum ExecutorShardCommand<S> {
     ExecuteSubBlocks(
         Arc<S>,
-        SubBlocksForShard<AnalyzedTransaction>,
+        TxnProviderArgs,
         usize,
         Option<u64>,
     ),
@@ -82,6 +88,8 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
             "Block must be partitioned into {} sub-blocks",
             num_executor_shards
         );
+        let num_txns = transactions.num_txns();
+        let global_idxs = transactions.global_idxs.clone();
         let (sharded_output, global_output) = self
             .executor_client
             .execute_block(
@@ -94,23 +102,25 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
         // wait for all remote executors to send the result back and append them in order by shard id
         trace!("ShardedBlockExecutor Received all results");
         let _aggregation_timer = SHARDED_EXECUTION_RESULT_AGGREGATION_SECONDS.start_timer();
-        let num_rounds = sharded_output[0].len();
-        let mut aggregated_results = vec![];
-        let mut ordered_results = vec![vec![]; num_executor_shards * num_rounds];
-        // Append the output from individual shards in the round order
-        for (shard_id, results_from_shard) in sharded_output.into_iter().enumerate() {
-            for (round, result) in results_from_shard.into_iter().enumerate() {
-                ordered_results[round * num_executor_shards + shard_id] = result;
+        let mut aggregated_results: Vec<Option<TransactionOutput>> = vec![None; num_txns];
+
+        for (shard_id, outputs) in sharded_output.into_iter().enumerate() {
+            for (pos, output) in outputs.into_iter().enumerate() {
+                let global_idx = global_idxs[shard_id][pos];
+                aggregated_results[global_idx as usize] = Some(output);
             }
         }
 
-        for result in ordered_results.into_iter() {
-            aggregated_results.extend(result);
-        }
-
-        // Lastly append the global output
-        aggregated_results.extend(global_output);
-
-        Ok(aggregated_results)
+        Ok(aggregated_results.into_iter().map(|r|r.unwrap()).collect())
     }
+}
+
+pub struct TxnProviderArgs {
+    pub num_shards: usize,
+    pub rx: Arc<Mutex<Receiver<ShardingMsg<AptosTransactionOutput, VMStatus>>>>,
+    pub senders: Vec<Mutex<Sender<ShardingMsg<AptosTransactionOutput, VMStatus>>>>,
+    pub txns: Vec<AnalyzedTransaction>,
+    pub global_idxs: Vec<TxnIndex>,
+    pub follower_sets: Vec<BTreeSet<(usize, TxnIndex)>>,
+    pub dependency_sets: Vec<BTreeSet<(usize, TxnIndex)>>,
 }

@@ -22,9 +22,10 @@ use aptos_types::{
 use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
-use std::sync::Arc;
-use aptos_block_executor::sharding::ShardingProvider;
+use std::sync::{Arc, Condvar, Mutex};
+use aptos_block_executor::sharding::TxnProvider;
 use crate::counters::BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS;
+use crate::sharded_block_executor::TxnProviderArgs;
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
@@ -59,39 +60,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         }
     }
 
-    fn execute_sub_block(
-        &self,
-        sub_block: SubBlock<AnalyzedTransaction>,
-        round: usize,
-        state_view: &S,
-        concurrency_level: usize,
-        maybe_block_gas_limit: Option<u64>,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        disable_speculative_logging();
-        trace!(
-            "executing sub block for shard {} and round {}",
-            self.shard_id,
-            round
-        );
-        let cross_shard_commit_sender =
-            CrossShardCommitSender::new(self.shard_id, self.cross_shard_client.clone(), &sub_block);
-        Self::execute_transactions_with_dependencies(
-            Some(self.shard_id),
-            self.executor_thread_pool.clone(),
-            sub_block.into_transactions_with_deps(),
-            self.cross_shard_client.clone(),
-            Some(cross_shard_commit_sender),
-            round,
-            state_view,
-            concurrency_level,
-            maybe_block_gas_limit,
-        )
-    }
-
     pub fn execute_transactions_with_dependencies(
         shard_id: Option<ShardId>, // None means execution on global shard
         executor_thread_pool: Arc<rayon::ThreadPool>,
-        transactions: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
+        txn_provider_args: TxnProviderArgs,
         cross_shard_client: Arc<dyn CrossShardClient>,
         cross_shard_commit_sender: Option<CrossShardCommitSender>,
         round: usize,
@@ -99,9 +71,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let txns = transactions
+        let TxnProviderArgs{num_shards, rx, senders, txns, global_idxs, follower_sets, dependency_sets } = txn_provider_args;
+        let txns = txns
             .into_iter()
-            .map(|txn| txn.into_txn().into_txn())
+            .map(|txn| txn.into_txn())
             .collect();
 
         let signature_verification_timer =
@@ -111,7 +84,19 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         });
         drop(signature_verification_timer);
 
-        let sharding_provider = ShardingProvider::new_unsharded(pre_processed_txns); //TODO: new_sharded()
+        let missing_dep_counts = global_idxs.iter().map(|idx| Arc::new((Mutex::new(dependency_sets[(*idx) as usize].len()), Condvar::new()))).collect();
+        let sharding_provider = TxnProvider {
+            sharding_mode: true,
+            num_shards,
+            shard_id: shard_id.unwrap(),
+            rx,
+            senders,
+            txns: pre_processed_txns,
+            sharded_locations: vec![],
+            global_idxs,
+            missing_dep_counts,
+            follower_sets,
+        };
 
         let ret = BlockAptosVM::execute_block(
             executor_thread_pool,
@@ -126,38 +111,47 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
 
     fn execute_block(
         &self,
-        transactions: SubBlocksForShard<AnalyzedTransaction>,
+        txn_provider_args: TxnProviderArgs,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
-    ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
-        let mut result = vec![];
-        for (round, sub_block) in transactions.into_sub_blocks().into_iter().enumerate() {
-            let _timer = SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS
-                .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
-                .start_timer();
-            SHARDED_BLOCK_EXECUTOR_TXN_COUNT
-                .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
-                .observe(sub_block.transactions.len() as f64);
-            info!(
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let round = 0;
+        let _timer = SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS
+            .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
+            .start_timer();
+        SHARDED_BLOCK_EXECUTOR_TXN_COUNT
+            .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
+            .observe(txn_provider_args.txns.len() as f64);
+        info!(
                 "executing sub block for shard {} and round {}, number of txns {}",
                 self.shard_id,
                 round,
-                sub_block.transactions.len()
+                txn_provider_args.txns.len()
             );
-            result.push(self.execute_sub_block(
-                sub_block,
+        disable_speculative_logging();
+        trace!(
+            "executing sub block for shard {} and round {}",
+            self.shard_id,
+            round
+        );
+        let result =
+            Self::execute_transactions_with_dependencies(
+                Some(self.shard_id),
+                self.executor_thread_pool.clone(),
+                txn_provider_args,
+                self.cross_shard_client.clone(),
+                None,
                 round,
                 state_view,
                 concurrency_level,
                 maybe_block_gas_limit,
-            )?);
-            trace!(
+            )?;
+        trace!(
                 "Finished executing sub block for shard {} and round {}",
                 self.shard_id,
                 round
             );
-        }
         Ok(result)
     }
 
@@ -172,17 +166,17 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             match command {
                 ExecutorShardCommand::ExecuteSubBlocks(
                     state_view,
-                    transactions,
+                    txn_provider_args,
                     concurrency_level_per_shard,
                     maybe_block_gas_limit,
                 ) => {
                     trace!(
                         "Shard {} received ExecuteBlock command of block size {} ",
                         self.shard_id,
-                        transactions.num_txns()
+                        txn_provider_args.txns.len(),
                     );
                     let ret = self.execute_block(
-                        transactions,
+                        txn_provider_args,
                         state_view.as_ref(),
                         concurrency_level_per_shard,
                         maybe_block_gas_limit,

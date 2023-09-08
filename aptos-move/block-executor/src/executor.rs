@@ -37,7 +37,7 @@ use std::{
         Arc,
     },
 };
-use crate::sharding::ShardingProvider;
+use crate::sharding::TxnProvider;
 
 struct CommitGuard<'a> {
     post_commit_txs: &'a Vec<Sender<u32>>,
@@ -113,7 +113,7 @@ where
 
     fn execute(
         version: Version,
-        sharding_provider: &ShardingProvider<T, E::Output, E::Error>,
+        sharding_provider: &TxnProvider<T, E::Output, E::Error>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
@@ -125,7 +125,7 @@ where
         let (idx_to_execute, incarnation) = version;
         let global_txn_idx = sharding_provider.global_idx_from_local(idx_to_execute);
         sharding_provider.wait_for_remote_deps(idx_to_execute);
-        let txn = sharding_provider.txn_by_global_idx(idx_to_execute);
+        let txn = sharding_provider.txn(idx_to_execute);
 
         // VM execution.
         let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), global_txn_idx);
@@ -210,7 +210,7 @@ where
     }
 
     fn validate(
-        sharding_provider: &ShardingProvider<T, E::Output, E::Error>,
+        sharding_provider: &TxnProvider<T, E::Output, E::Error>,
         version_to_validate: Version,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
@@ -370,7 +370,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         base_view: &S,
-        sharding_provider: &ShardingProvider<T, E::Output, E::Error>,
+        sharding_provider: &TxnProvider<T, E::Output, E::Error>,
     ) {
         let global_idx = sharding_provider.global_idx_from_local(txn_idx);
         let delta_keys = last_input_output.delta_keys(txn_idx);
@@ -425,7 +425,7 @@ where
     fn work_task_with_scope(
         &self,
         executor_arguments: &E::Argument,
-        sharding_provider: &ShardingProvider<T, E::Output, E::Error>,
+        sharding_provider: &TxnProvider<T, E::Output, E::Error>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
@@ -529,7 +529,7 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        sharding_provider: &ShardingProvider<T, E::Output, E::Error>,
+        sharding_provider: &TxnProvider<T, E::Output, E::Error>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
@@ -635,7 +635,7 @@ where
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
-        sharding_provider: &ShardingProvider<T, E::Output, E::Error>,
+        sharding_provider: &TxnProvider<T, E::Output, E::Error>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = sharding_provider.num_local_txns();
@@ -745,7 +745,7 @@ where
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        sharding_provider: ShardingProvider<T, E::Output, E::Error>,
+        sharding_provider: TxnProvider<T, E::Output, E::Error>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {

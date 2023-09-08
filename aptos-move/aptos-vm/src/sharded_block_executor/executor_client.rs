@@ -9,13 +9,13 @@ use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
 
 pub struct ShardedExecutionOutput {
-    pub sharded_output: Vec<Vec<Vec<TransactionOutput>>>,
+    pub sharded_output: Vec<Vec<TransactionOutput>>,
     pub global_output: Vec<TransactionOutput>,
 }
 
 impl ShardedExecutionOutput {
     pub fn new(
-        sharded_output: Vec<Vec<Vec<TransactionOutput>>>,
+        sharded_output: Vec<Vec<TransactionOutput>>,
         global_output: Vec<TransactionOutput>,
     ) -> Self {
         Self {
@@ -24,7 +24,7 @@ impl ShardedExecutionOutput {
         }
     }
 
-    pub fn into_inner(self) -> (Vec<Vec<Vec<TransactionOutput>>>, Vec<TransactionOutput>) {
+    pub fn into_inner(self) -> (Vec<Vec<TransactionOutput>>, Vec<TransactionOutput>) {
         (self.sharded_output, self.global_output)
     }
 }

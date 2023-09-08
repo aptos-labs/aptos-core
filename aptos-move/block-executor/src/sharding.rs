@@ -31,28 +31,28 @@ pub enum ShardingMsg<TO: TransactionOutput, TE: Debug> {
     Shutdown,
 }
 
-pub struct ShardingProvider<T: Transaction, TO: TransactionOutput, TE: Debug> {
-    sharding_mode: bool,
-    num_shards: usize,
-    shard_id: usize,
-    rx: Arc<Mutex<Receiver<ShardingMsg<TO, TE>>>>,
-    senders: Vec<Mutex<Sender<ShardingMsg<TO, TE>>>>,
+pub struct TxnProvider<T: Transaction, TO: TransactionOutput, TE: Debug> {
+    pub sharding_mode: bool,
+    pub num_shards: usize,
+    pub shard_id: usize,
+    pub rx: Arc<Mutex<Receiver<ShardingMsg<TO, TE>>>>,
+    pub senders: Vec<Mutex<Sender<ShardingMsg<TO, TE>>>>,
 
     /// Maps a local txn idx to the txn itself.
-    pub(crate) txns: Vec<T>,
+    pub txns: Vec<T>,
     /// Maps a global txn idx to its shard and in-shard txn idx.
-    sharded_locations: Vec<(usize, LocalTxnIndex)>,
+    pub sharded_locations: Vec<(usize, LocalTxnIndex)>,
     /// Maps a local txn idx to its global idx.
-    global_idxs: Vec<TxnIndex>,
+    pub global_idxs: Vec<TxnIndex>,
 
     /// Maps a local txn idx to the number of remote txns it still waits for.
-    missing_dep_counts: Vec<Arc<(Mutex<usize>, Condvar)>>,
+    pub missing_dep_counts: Vec<Arc<(Mutex<usize>, Condvar)>>,
 
     /// Maps a global txn idx to its followers.
-    follower_sets: Vec<BTreeSet<(ShardId, GlobalTxnIndex)>>,
+    pub follower_sets: Vec<BTreeSet<(ShardId, GlobalTxnIndex)>>,
 }
 
-impl<TX, TO, TE> ShardingProvider<TX, TO, TE>
+impl<TX, TO, TE> TxnProvider<TX, TO, TE>
 where
     TX: Transaction,
     TO: TransactionOutput<Txn = TX>,
@@ -75,10 +75,8 @@ where
         }
     }
 
-    pub fn txn_by_global_idx(&self, idx: TxnIndex) -> &TX {
-        let (shard_id, local_idx) = self.sharded_locations[idx as usize];
-        assert_eq!(shard_id, self.shard_id);
-        &self.txns[local_idx as usize]
+    pub fn txn(&self, idx: LocalTxnIndex) -> &TX {
+        &self.txns[idx as usize]
     }
 
     pub fn global_idx_from_local(&self, local_idx: TxnIndex) -> TxnIndex {

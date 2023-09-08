@@ -1,16 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_executor::{
-    coordinator_client::CoordinatorClient,
-    counters::WAIT_FOR_SHARDED_OUTPUT_SECONDS,
-    cross_shard_client::CrossShardClient,
-    executor_client::{ExecutorClient, ShardedExecutionOutput},
-    global_executor::GlobalExecutor,
-    messages::CrossShardMsg,
-    sharded_executor_service::ShardedExecutorService,
-    ExecutorShardCommand,
-};
+use crate::sharded_block_executor::{coordinator_client::CoordinatorClient, counters::WAIT_FOR_SHARDED_OUTPUT_SECONDS, cross_shard_client::CrossShardClient, executor_client::{ExecutorClient, ShardedExecutionOutput}, global_executor::GlobalExecutor, messages::CrossShardMsg, sharded_executor_service::ShardedExecutorService, ExecutorShardCommand, TxnProviderArgs};
 use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -22,6 +13,8 @@ use aptos_types::{
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
+use std::sync::{mpsc, Mutex};
+use aptos_block_executor::sharding::TxnProvider;
 
 /// Executor service that runs on local machine and waits for commands from the coordinator and executes
 /// them in parallel.
@@ -36,7 +29,7 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorService<S> {
         num_shards: usize,
         num_threads: usize,
         command_rx: Receiver<ExecutorShardCommand<S>>,
-        result_tx: Sender<Result<Vec<Vec<TransactionOutput>>, VMStatus>>,
+        result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
         cross_shard_client: LocalCrossShardClient,
     ) -> Self {
         let coordinator_client = Arc::new(LocalCoordinatorClient::new(command_rx, result_tx));
@@ -81,8 +74,8 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorService<S> {
             Vec<Receiver<ExecutorShardCommand<S>>>,
         ) = (0..num_shards).map(|_| unbounded()).unzip();
         let (result_txs, result_rxs): (
-            Vec<Sender<Result<Vec<Vec<TransactionOutput>>, VMStatus>>>,
-            Vec<Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>>,
+            Vec<Sender<Result<Vec<TransactionOutput>, VMStatus>>>,
+            Vec<Receiver<Result<Vec<TransactionOutput>, VMStatus>>>,
         ) = (0..num_shards).map(|_| unbounded()).unzip();
         // We need to create channels for each shard and each round. This is needed because individual
         // shards might send cross shard messages to other shards that will be consumed in different rounds.
@@ -126,7 +119,7 @@ pub struct LocalExecutorClient<S: StateView + Sync + Send + 'static> {
     // Channels to send execute block commands to the executor shards.
     command_txs: Vec<Sender<ExecutorShardCommand<S>>>,
     // Channels to receive execution results from the executor shards.
-    result_rxs: Vec<Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>>,
+    result_rxs: Vec<Receiver<Result<Vec<TransactionOutput>, VMStatus>>>,
     executor_services: Vec<LocalExecutorService<S>>,
     global_executor: GlobalExecutor<S>,
 }
@@ -134,7 +127,7 @@ pub struct LocalExecutorClient<S: StateView + Sync + Send + 'static> {
 impl<S: StateView + Sync + Send + 'static> LocalExecutorClient<S> {
     pub fn new(
         command_tx: Vec<Sender<ExecutorShardCommand<S>>>,
-        result_rx: Vec<Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>>,
+        result_rx: Vec<Receiver<Result<Vec<TransactionOutput>, VMStatus>>>,
         executor_shards: Vec<LocalExecutorService<S>>,
         global_executor: GlobalExecutor<S>,
     ) -> Self {
@@ -146,7 +139,7 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorClient<S> {
         }
     }
 
-    fn get_output_from_shards(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
+    fn get_output_from_shards(&self) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
         let _timer = WAIT_FOR_SHARDED_OUTPUT_SECONDS.start_timer();
         trace!("LocalExecutorClient Waiting for results");
         let mut results = vec![];
@@ -173,31 +166,38 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ShardedExecutionOutput, VMStatus> {
         assert_eq!(transactions.num_shards(), self.num_shards());
-        let (sub_blocks, global_txns) = transactions.into();
-        for (i, sub_blocks_for_shard) in sub_blocks.into_iter().enumerate() {
-            self.command_txs[i]
+        let PartitionedTransactions { sharded_txns, global_idxs, dependency_sets, follower_sets } = transactions;
+        let num_shards = sharded_txns.len();
+        let mut txs = Vec::with_capacity(num_shards);
+        let mut rxs = Vec::with_capacity(num_shards);
+        for shard_id in 0..num_shards {
+            let (tx, rx) = mpsc::channel();
+            rxs.push(rx);
+            txs.push(tx);
+        }
+
+        for (shard_id, ((rx, txns), global_idxs)) in rxs.into_iter().zip(sharded_txns.into_iter()).zip(global_idxs.into_iter()).enumerate() {
+            let txn_provider_args = TxnProviderArgs {
+                num_shards,
+                rx: Arc::new(Mutex::new((rx))),
+                senders: txs.clone().into_iter().map(|tx|Mutex::new(tx.clone())).collect(),
+                txns,
+                global_idxs,
+                follower_sets: follower_sets.clone(),
+                dependency_sets: dependency_sets.clone(),
+            };
+            self.command_txs[shard_id]
                 .send(ExecutorShardCommand::ExecuteSubBlocks(
                     state_view.clone(),
-                    sub_blocks_for_shard,
+                    txn_provider_args,
                     concurrency_level_per_shard,
                     maybe_block_gas_limit,
                 ))
                 .unwrap();
         }
 
-        // This means that we are executing the global transactions concurrently with the individual shards but the
-        // global transactions will be blocked for cross shard transaction results. This hopefully will help with
-        // finishing the global transactions faster but we need to evaluate if this causes thread contention. If it
-        // does, then we can simply move this call to the end of the function.
-        let global_output = self.global_executor.execute_global_txns(
-            global_txns,
-            state_view.as_ref(),
-            concurrency_level_per_shard,
-            maybe_block_gas_limit,
-        )?;
-
         let sharded_output = self.get_output_from_shards()?;
-        Ok(ShardedExecutionOutput::new(sharded_output, global_output))
+        Ok(ShardedExecutionOutput::new(sharded_output, vec![]))
     }
 }
 
@@ -217,13 +217,13 @@ impl<S: StateView + Sync + Send + 'static> Drop for LocalExecutorClient<S> {
 pub struct LocalCoordinatorClient<S> {
     command_rx: Receiver<ExecutorShardCommand<S>>,
     // Channel to send execution results to the coordinator.
-    result_tx: Sender<Result<Vec<Vec<TransactionOutput>>, VMStatus>>,
+    result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
 }
 
 impl<S> LocalCoordinatorClient<S> {
     pub fn new(
         command_rx: Receiver<ExecutorShardCommand<S>>,
-        result_tx: Sender<Result<Vec<Vec<TransactionOutput>>, VMStatus>>,
+        result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
     ) -> Self {
         Self {
             command_rx,
@@ -237,7 +237,7 @@ impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordin
         self.command_rx.recv().unwrap()
     }
 
-    fn send_execution_result(&self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>) {
+    fn send_execution_result(&self, result: Result<Vec<TransactionOutput>, VMStatus>) {
         self.result_tx.send(result).unwrap()
     }
 }

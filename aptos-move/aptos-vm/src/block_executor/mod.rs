@@ -39,7 +39,7 @@ use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::{collections::HashMap, sync::Arc};
-use aptos_block_executor::sharding::ShardingProvider;
+use aptos_block_executor::sharding::TxnProvider;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
@@ -194,7 +194,7 @@ impl BlockAptosVM {
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
         executor_thread_pool: Arc<ThreadPool>,
-        sharding_provider: ShardingProvider<PreprocessedTransaction, AptosTransactionOutput, VMStatus>,
+        sharding_provider: TxnProvider<PreprocessedTransaction, AptosTransactionOutput, VMStatus>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,

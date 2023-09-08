@@ -70,21 +70,12 @@ impl PartitionerV2 {
             };
 
         let final_num_rounds = state.sub_block_matrix.len();
-        let sharded_txns = (0..state.num_executor_shards)
-            .map(|shard_id| {
-                let sub_blocks: Vec<SubBlock<AnalyzedTransaction>> = (0..final_num_rounds)
-                    .map(|round_id| {
-                        state.sub_block_matrix[round_id][shard_id]
-                            .lock()
-                            .unwrap()
-                            .take()
-                            .unwrap()
-                    })
-                    .collect();
-                SubBlocksForShard::new(shard_id, sub_blocks)
-            })
-            .collect();
 
-        PartitionedTransactions::new(sharded_txns, global_txns)
+        PartitionedTransactions {
+            sharded_txns: vec![],
+            global_idxs: vec![],
+            dependency_sets: vec![],
+            follower_sets: vec![],
+        }
     }
 }

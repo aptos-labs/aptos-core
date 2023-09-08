@@ -10,6 +10,8 @@ use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
 };
+use std::collections::btree_set::BTreeSet;
+use std::sync::Arc;
 
 pub type ShardId = usize;
 pub type TxnIndex = usize;
@@ -450,84 +452,44 @@ impl From<(HashValue, Vec<Transaction>)> for ExecutableBlock {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PartitionedTransactions {
-    pub sharded_txns: Vec<SubBlocksForShard<AnalyzedTransaction>>,
-    pub global_txns: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
+    pub sharded_txns: Vec<Vec<AnalyzedTransaction>>,
+    pub global_idxs: Vec<Vec<u32>>,
+    pub dependency_sets: Vec<BTreeSet<(ShardId, u32)>>,
+    pub follower_sets: Vec<BTreeSet<(ShardId, u32)>>,
 }
 
 impl PartitionedTransactions {
-    pub fn new(
-        sharded_txns: Vec<SubBlocksForShard<AnalyzedTransaction>>,
-        global_txns: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
-    ) -> Self {
-        Self {
-            sharded_txns,
-            global_txns,
-        }
-    }
-
-    pub fn empty() -> Self {
-        Self {
-            sharded_txns: Vec::new(),
-            global_txns: Vec::new(),
-        }
-    }
-
-    pub fn into(
-        self,
-    ) -> (
-        Vec<SubBlocksForShard<AnalyzedTransaction>>,
-        Vec<TransactionWithDependencies<AnalyzedTransaction>>,
-    ) {
-        (self.sharded_txns, self.global_txns)
-    }
-
     pub fn num_shards(&self) -> usize {
         self.sharded_txns.len()
     }
 
-    pub fn sharded_txns(&self) -> &[SubBlocksForShard<AnalyzedTransaction>] {
-        &self.sharded_txns
-    }
-
-    pub fn num_sharded_txns(&self) -> usize {
-        self.sharded_txns
-            .iter()
-            .map(|sub_blocks| sub_blocks.num_txns())
-            .sum::<usize>()
-    }
-
     pub fn num_txns(&self) -> usize {
-        self.num_sharded_txns() + self.global_txns.len()
+        self.follower_sets.len()
     }
 
     pub fn add_checkpoint_txn(&mut self, last_txn: Transaction) {
         assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
-        let txn_with_deps =
-            TransactionWithDependencies::new(last_txn.into(), CrossShardDependencies::default());
-        if !self.global_txns.is_empty() {
-            self.global_txns.push(txn_with_deps);
-        } else {
-            self.sharded_txns
-                .last_mut()
-                .unwrap()
-                .sub_blocks
-                .last_mut()
-                .unwrap()
-                .transactions
-                .push(txn_with_deps)
-        }
+        let new_idx = self.num_txns() as u32;
+        let analyzed_txn = AnalyzedTransaction::from(last_txn);
+        self.sharded_txns
+            .last_mut()
+            .unwrap()
+            .push(analyzed_txn);
+        self.global_idxs.last_mut().unwrap().push(new_idx);
+        self.dependency_sets.push(Default::default());
+        self.follower_sets.push(Default::default());
     }
 
     pub fn flatten(transactions: PartitionedTransactions) -> Vec<AnalyzedTransaction> {
-        SubBlocksForShard::flatten(transactions.sharded_txns)
-            .into_iter()
-            .chain(
-                transactions
-                    .global_txns
-                    .into_iter()
-                    .map(|txn| txn.into_txn()),
-            )
-            .collect()
+        let PartitionedTransactions{ sharded_txns, global_idxs, dependency_sets, follower_sets: _follower_sets } = transactions;
+        let num_txns = dependency_sets.len();
+        let mut ret: Vec<Option<AnalyzedTransaction>> = vec![None; num_txns];
+        for (shard_id, txns) in sharded_txns.into_iter().enumerate() {
+            for (i, txn) in txns.into_iter().enumerate() {
+                ret[global_idxs[shard_id][i] as usize] = Some(txn);
+            }
+        }
+        ret.into_iter().map(|t|t.unwrap()).collect()
     }
 }
 
