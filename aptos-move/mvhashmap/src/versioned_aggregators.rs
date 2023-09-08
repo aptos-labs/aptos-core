@@ -218,7 +218,7 @@ impl VersionedValue {
         while let Some((idx, entry)) = iter.next_back() {
             let delta = match &**entry {
                 Value(v, _) => {
-                    // Apply accumulated delta to resolve the aggregator value.
+                    // TODO: (here and elsewhere) make sure delta considers v2 history (4 checks).
                     return accumulator
                         .apply_to(*v)
                         .map_err(|_| MVAggregatorsError::DeltaApplicationFailure);
@@ -362,7 +362,6 @@ impl VersionedAggregators {
     /// The caller must maintain the invariant that prior to calling the methods below w.
     /// a particular aggregator ID, an invocation of either create_aggregator (for newly created
     /// aggregators), or set_base_value (for existing aggregators) must have been completed.
-
     pub fn read(&self, id: AggregatorID, txn_idx: TxnIndex) -> Result<u128, MVAggregatorsError> {
         let read_res = self
             .values
@@ -382,6 +381,7 @@ impl VersionedAggregators {
                     .read(source_idx)
                     .and_then(|source_r| match source_r {
                         VersionedRead::Value(source_v) => delta
+                            // TODO: make sure delta considers full v2 history (everywhere).
                             .apply_to(source_v)
                             .map_err(|_| MVAggregatorsError::DeltaApplicationFailure),
                         VersionedRead::Snapshot(_, _, _) => {
@@ -461,9 +461,27 @@ impl VersionedAggregators {
             .remove(txn_idx);
     }
 
-    pub fn update_committed_idx(&self, committed_idx: TxnIndex) {
-        self.next_idx_to_commit
-            .fetch_max(committed_idx + 1, Ordering::SeqCst);
+    pub fn try_commit(
+        &self,
+        idx_to_commit: TxnIndex,
+        delta_ids: Vec<AggregatorID>,
+        snapshot_ids: Vec<AggregatorID>,
+    ) -> anyhow::Result<Vec<(AggregatorID, u128)>> {
+        // TODO:
+        // Check idx to commit is next to commit (next_idx_to_commit), or err
+        // go over each delta_id:
+        //   make sure delta exists (if it's value, take the value)
+        //   use read_latest_committed_value? on ID
+        //   apply? delta on top (with v2 history checking)
+        //   record in ret.
+        // go over each snapshot id:
+        //   make sure snapshot exists there.
+        //   use read_latest_committed_value? on source
+        //   apply? delta on top (with v2 history checking)
+        //   record in ret.
+
+        // self.next_idx_to_commit.fetch_max(committed_idx + 1, Ordering::SeqCst);
+        // ret
     }
 }
 

@@ -221,6 +221,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 }
 
+// TODO: aggregatorresolver must resolve via ParallelState and SequentialState (id resolution trivial)
+// UnsyncMap needs simple ID -> u128 logic (or can be another map in sequential state).
+//   - read just takes latest
+// Parallel State must record read for validation (and other READ issues, separate discussion)
+// Once connected, can test (important!)
+
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
     for LatestView<'a, T, S, X>
 {

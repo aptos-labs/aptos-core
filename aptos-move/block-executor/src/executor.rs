@@ -258,6 +258,7 @@ where
                         versioned_cache.data().mark_estimate(&k, idx_to_validate);
                     }
                 }
+                // TODO: needs to return V2 IDs separately and call on aggregators map.
             }
 
             scheduler.finish_abort(idx_to_validate, incarnation)
@@ -279,6 +280,18 @@ where
         txn_fee_statements: &mut Vec<FeeStatement>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
+            // TODO: pass &MVHashMap, grab deltas and snapshots from the last_input_output
+            // perform try_commit on MVHashMap
+            // if error:
+            //   clear speculative logs
+            //   (could mark as estimate)
+            //   re-execute the txn and record the output (both in last_input_output & hashmap)
+            //     - could re-use logic with .execute method (ignore writes outside, simplified flow)
+            //   perform try_commit again. should not error (can assert now, later fallback / flag?)
+            // record ID->value mapping inside last_input_output.
+            // Comment: simplified flow, we don't mark as estimate, reduce validation index on abort,
+            // then check if it wrote outside and reduce again. simply reduce after execution.
+
             // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
             let _commit_guard: CommitGuard =
                 CommitGuard::new(post_commit_txs, *worker_idx, txn_idx);
@@ -366,6 +379,12 @@ where
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         base_view: &S,
     ) {
+        // TODO: also take the previously recorded ID -> u128 from txn_last_input_output.
+        // materialize any string snapshots.
+        // perform value exchange back (ID -> value), need to pass & to parallel state
+        //   and George's logic for replacement?
+        // replace strings? (How?)
+
         let delta_keys = last_input_output.delta_keys(txn_idx);
         let _events = last_input_output.events(txn_idx);
         let mut delta_writes = Vec::with_capacity(delta_keys.len());
@@ -660,6 +679,12 @@ where
                     {
                         data_map.write(key, write_op);
                     }
+
+                    // TODO: go over v2 delta outputs.
+                    // UnsyncMap (or seq state) must maintain a simple ID->u128 mapping (see view)
+                    //  - apply the updates there
+                    // Take the values and exchange via SequentialState.
+
                     // Calculating the accumulated gas costs of the committed txns.
                     let fee_statement = output.fee_statement();
                     accumulated_fee_statement.add_fee_statement(&fee_statement);
