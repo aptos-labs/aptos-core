@@ -122,7 +122,7 @@ impl VMOutput {
 
         let materialized_deltas: Vec<(AggregatorID, WriteOp)> = materialized_deltas
             .into_iter()
-            .map(|(state_key, write_op)| (AggregatorID::from_state_key(state_key), write_op))
+            .map(|(state_key, write_op)| (state_key.into(), write_op))
             .collect();
         debug_assert!(
             materialized_deltas

@@ -137,11 +137,12 @@ where
         let mut apply_updates = |output: &E::Output| {
             // First, apply writes.
             let write_version = (idx_to_execute, incarnation);
-            for (k, v) in output
-                .resource_write_set()
-                .into_iter()
-                .chain(output.aggregator_v1_write_set().into_iter())
-            {
+            for (k, v) in output.resource_write_set().into_iter().chain(
+                output
+                    .aggregator_v1_write_set()
+                    .into_iter()
+                    .map(|(id, op)| (id.into(), op)),
+            ) {
                 if prev_modified_keys.remove(&k).is_none() {
                     updates_outside = true;
                 }
@@ -157,6 +158,7 @@ where
 
             // Then, apply deltas.
             for (k, d) in output.aggregator_v1_delta_set().into_iter() {
+                let k = k.into();
                 if prev_modified_keys.remove(&k).is_none() {
                     updates_outside = true;
                 }
@@ -655,7 +657,12 @@ where
                     for (key, write_op) in output
                         .resource_write_set()
                         .into_iter()
-                        .chain(output.aggregator_v1_write_set().into_iter())
+                        .chain(
+                            output
+                                .aggregator_v1_write_set()
+                                .into_iter()
+                                .map(|(id, op)| (id.into(), op)),
+                        )
                         .chain(output.module_write_set().into_iter())
                     {
                         data_map.write(key, write_op);

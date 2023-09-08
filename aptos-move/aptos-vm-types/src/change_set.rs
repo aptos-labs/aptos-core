@@ -135,7 +135,7 @@ impl VMChangeSet {
         write_set_mut.extend(
             aggregator_write_set
                 .into_iter()
-                .map(|(id, op)| (id.into_state_key(), op)),
+                .map(|(id, op)| (id.into(), op)),
         );
 
         let write_set = write_set_mut

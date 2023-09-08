@@ -44,14 +44,18 @@ impl AggregatorID {
     pub fn as_state_key(&self) -> &StateKey {
         &self.0
     }
+}
 
-    pub fn into_state_key(self) -> StateKey {
-        self.0
-    }
-
-    pub fn from_state_key(state_key: StateKey) -> Self {
+impl From<StateKey> for AggregatorID {
+    fn from(state_key: StateKey) -> Self {
         assert_matches!(state_key.inner(), StateKeyInner::TableItem { .. });
         Self(state_key)
+    }
+}
+
+impl From<AggregatorID> for StateKey {
+    fn from(id: AggregatorID) -> Self {
+        id.0
     }
 }
 

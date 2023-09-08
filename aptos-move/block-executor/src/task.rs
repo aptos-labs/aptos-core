@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{delta_change_set::DeltaOp, resolver::AggregatorResolver};
+use aptos_aggregator::{delta_change_set::DeltaOp, resolver::TAggregatorResolver};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     contract_event::ReadWriteEvent,
@@ -31,6 +31,7 @@ pub enum ExecutionStatus<T, E> {
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + Clone + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
+    type Identifier: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + Into<Self::Key>;
     type Value: Send + Sync + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }
@@ -65,8 +66,8 @@ pub trait ExecutorTask: Sync {
         &self,
         view: &(impl TResourceResolver<Key = <Self::Txn as Transaction>::Key, Layout = MoveTypeLayout>
               + TModuleResolver<Key = <Self::Txn as Transaction>::Key>
-              + StateStorageResolver
-              + AggregatorResolver),
+              + TAggregatorResolver<Key = <Self::Txn as Transaction>::Identifier>
+              + StateStorageResolver),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
@@ -90,10 +91,10 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn aggregator_v1_write_set(
         &self,
-    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> HashMap<<Self::Txn as Transaction>::Identifier, <Self::Txn as Transaction>::Value>;
 
     /// Get the aggregator deltas of a transaction from its output.
-    fn aggregator_v1_delta_set(&self) -> HashMap<<Self::Txn as Transaction>::Key, DeltaOp>;
+    fn aggregator_v1_delta_set(&self) -> HashMap<<Self::Txn as Transaction>::Identifier, DeltaOp>;
 
     /// Get the events of a transaction from its output.
     fn get_events(&self) -> Vec<<Self::Txn as Transaction>::Event>;

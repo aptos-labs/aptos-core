@@ -5,7 +5,7 @@
 use crate::task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput};
 use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
-    resolver::AggregatorResolver,
+    resolver::TAggregatorResolver,
     transaction::AggregatorValue,
 };
 use aptos_mvhashmap::types::TxnIndex;
@@ -258,6 +258,7 @@ impl<
     > Transaction for MockTransaction<K, V, E>
 {
     type Event = E;
+    type Identifier = K;
     type Key = K;
     type Value = V;
 }
@@ -515,7 +516,7 @@ where
         view: &(impl TResourceResolver<Key = K, Layout = MoveTypeLayout>
               + TModuleResolver<Key = K>
               + StateStorageResolver
-              + AggregatorResolver),
+              + TAggregatorResolver),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,

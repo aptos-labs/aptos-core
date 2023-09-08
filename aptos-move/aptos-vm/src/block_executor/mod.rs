@@ -13,7 +13,7 @@ use crate::{
     },
     AptosVM,
 };
-use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_aggregator::{aggregator_extension::AggregatorID, delta_change_set::DeltaOp};
 use aptos_block_executor::{
     errors::Error,
     executor::BlockExecutor,
@@ -42,6 +42,7 @@ use std::{collections::HashMap, sync::Arc};
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
+    type Identifier = AggregatorID;
     type Key = StateKey;
     type Value = WriteOp;
 }
@@ -114,30 +115,26 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
-    fn aggregator_v1_write_set(&self) -> HashMap<StateKey, WriteOp> {
+    fn aggregator_v1_write_set(&self) -> HashMap<AggregatorID, WriteOp> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get writes")
             .change_set()
             .aggregator_v1_write_set()
-            .iter()
-            .map(|(id, write_op)| (id.as_state_key().clone(), write_op.clone()))
-            .collect()
+            .clone()
     }
 
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
-    fn aggregator_v1_delta_set(&self) -> HashMap<StateKey, DeltaOp> {
+    fn aggregator_v1_delta_set(&self) -> HashMap<AggregatorID, DeltaOp> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get deltas")
             .change_set()
             .aggregator_v1_delta_set()
-            .iter()
-            .map(|(id, delta_op)| (id.as_state_key().clone(), *delta_op))
-            .collect()
+            .clone()
     }
 
     /// Should never be called after incorporate_delta_writes, as it

@@ -6,7 +6,7 @@ use crate::{
     move_vm_ext::{SessionExt, SessionId},
     AptosVM,
 };
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::AggregatorResolver};
+use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorResolver};
 use aptos_gas_algebra::Fee;
 use aptos_state_view::StateViewId;
 use aptos_types::{
@@ -152,11 +152,10 @@ impl<'r> StateStorageResolver for ChangeSetStateView<'r> {
     }
 }
 
-impl<'r> AggregatorResolver for ChangeSetStateView<'r> {
-    fn get_aggregator_v1_state_value(
-        &self,
-        id: &AggregatorID,
-    ) -> anyhow::Result<Option<StateValue>> {
+impl<'r> TAggregatorResolver for ChangeSetStateView<'r> {
+    type Key = AggregatorID;
+
+    fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.aggregator_v1_delta_set().get(id) {
             Some(delta_op) => Ok(self
                 .base_resolver

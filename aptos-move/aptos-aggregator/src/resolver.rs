@@ -28,13 +28,12 @@ pub enum AggregatorReadMode {
 /// Returns a value of an aggregator from cache or global storage.
 ///   - Ok(..)       if aggregator value exists
 ///   - Err(..)      otherwise.
-pub trait AggregatorResolver {
-    fn get_aggregator_v1_state_value(
-        &self,
-        id: &AggregatorID,
-    ) -> anyhow::Result<Option<StateValue>>;
+pub trait TAggregatorResolver {
+    type Key;
 
-    fn get_aggregator_v1_value(&self, id: &AggregatorID) -> anyhow::Result<u128> {
+    fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> anyhow::Result<Option<StateValue>>;
+
+    fn get_aggregator_v1_value(&self, id: &Self::Key) -> anyhow::Result<u128> {
         let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
         // TODO: consider reviving Option<u128>?
         let u128_bytes = maybe_state_value
@@ -47,7 +46,7 @@ pub trait AggregatorResolver {
     // TODO: Nested options are used due to cyclic dependency. Aggregator crate needs refactoring.
     fn get_aggregator_v1_state_value_metadata(
         &self,
-        id: &AggregatorID,
+        id: &Self::Key,
     ) -> anyhow::Result<Option<Option<StateValueMetadata>>> {
         let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
@@ -56,7 +55,7 @@ pub trait AggregatorResolver {
     /// Returns a value of an aggregator.
     fn get_aggregator_v2_value(
         &self,
-        _id: &AggregatorID,
+        _id: &Self::Key,
         _mode: AggregatorReadMode,
     ) -> anyhow::Result<u128> {
         unimplemented!("Aggregator V2 is not yet supported")
@@ -64,7 +63,7 @@ pub trait AggregatorResolver {
 
     /// Returns a unique per-block identifier that can be used when creating a
     /// new aggregator.
-    fn generate_aggregator_v2_id(&self) -> AggregatorID {
+    fn generate_aggregator_v2_id(&self) -> Self::Key {
         unimplemented!("ID generation for Aggregator V2 is not yet supported")
     }
 
@@ -74,7 +73,7 @@ pub trait AggregatorResolver {
     // TODO: remove from the trait!
     fn try_convert_aggregator_v2_delta_into_write_op(
         &self,
-        id: &AggregatorID,
+        id: &Self::Key,
         delta_op: &DeltaOp,
     ) -> anyhow::Result<WriteOp, VMStatus> {
         // In case storage fails to fetch the value, return immediately.
@@ -96,16 +95,18 @@ pub trait AggregatorResolver {
     }
 }
 
+pub trait AggregatorResolver: TAggregatorResolver<Key = AggregatorID> {}
+
+impl<T: TAggregatorResolver<Key = AggregatorID>> AggregatorResolver for T {}
+
 // Utils to store aggregator values in data store. Here, we
 // only care about aggregators which are state items.
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils {
     use super::*;
     use crate::{aggregator_extension::AggregatorHandle, delta_change_set::serialize};
-    use aptos_state_view::TStateView;
     use aptos_types::state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-        table::TableHandle,
+        state_key::StateKey, state_value::StateValue, table::TableHandle,
     };
     use move_core_types::account_address::AccountAddress;
     use std::collections::HashMap;
@@ -125,7 +126,7 @@ pub mod test_utils {
 
     impl AggregatorStore {
         pub fn set_from_id(&mut self, id: AggregatorID, value: u128) {
-            self.set_from_state_key(id.into_state_key(), value);
+            self.set_from_state_key(id.into(), value);
         }
 
         pub fn set_from_state_key(&mut self, state_key: StateKey, value: u128) {
@@ -134,28 +135,14 @@ pub mod test_utils {
         }
     }
 
-    impl AggregatorResolver for AggregatorStore {
+    impl TAggregatorResolver for AggregatorStore {
+        type Key = AggregatorID;
+
         fn get_aggregator_v1_state_value(
             &self,
-            id: &AggregatorID,
+            id: &Self::Key,
         ) -> anyhow::Result<Option<StateValue>> {
-            self.get_state_value(id.as_state_key())
-        }
-    }
-
-    impl TStateView for AggregatorStore {
-        type Key = StateKey;
-
-        fn get_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-            Ok(self.0.get(state_key).cloned())
-        }
-
-        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-            let mut usage = StateStorageUsage::new_untracked();
-            for (k, v) in self.0.iter() {
-                usage.add_item(k.size() + v.size())
-            }
-            Ok(usage)
+            Ok(self.0.get(id.as_state_key()).cloned())
         }
     }
 }

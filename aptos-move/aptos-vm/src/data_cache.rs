@@ -9,7 +9,7 @@ use crate::{
 };
 #[allow(unused_imports)]
 use anyhow::Error;
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::AggregatorResolver};
+use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorResolver};
 use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
@@ -244,11 +244,10 @@ impl<'a, S: StateView> TableResolver for StateViewAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> AggregatorResolver for StateViewAdapter<'a, S> {
-    fn get_aggregator_v1_state_value(
-        &self,
-        id: &AggregatorID,
-    ) -> anyhow::Result<Option<StateValue>> {
+impl<'a, S: StateView> TAggregatorResolver for StateViewAdapter<'a, S> {
+    type Key = AggregatorID;
+
+    fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> anyhow::Result<Option<StateValue>> {
         self.state_view.get_state_value(id.as_state_key())
     }
 }
@@ -369,11 +368,10 @@ impl<'a, R: ExecutorResolver> TableResolver for ExecutorResolverAdapter<'a, R> {
     }
 }
 
-impl<'a, R: ExecutorResolver> AggregatorResolver for ExecutorResolverAdapter<'a, R> {
-    fn get_aggregator_v1_state_value(
-        &self,
-        _id: &AggregatorID,
-    ) -> anyhow::Result<Option<StateValue>> {
+impl<'a, R: ExecutorResolver> TAggregatorResolver for ExecutorResolverAdapter<'a, R> {
+    type Key = AggregatorID;
+
+    fn get_aggregator_v1_state_value(&self, _id: &Self::Key) -> anyhow::Result<Option<StateValue>> {
         todo!()
     }
 }

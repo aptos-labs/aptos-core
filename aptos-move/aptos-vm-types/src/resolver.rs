@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::resolver::AggregatorResolver;
+use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorResolver};
 use aptos_state_view::StateViewId;
 use aptos_types::state_store::{
     state_key::StateKey,
@@ -79,16 +79,16 @@ pub trait StateStorageResolver {
 pub trait ExecutorResolver:
     TResourceResolver<Key = StateKey, Layout = MoveTypeLayout>
     + TModuleResolver<Key = StateKey>
+    + TAggregatorResolver<Key = AggregatorID>
     + StateStorageResolver
-    + AggregatorResolver
 {
 }
 
 impl<
         T: TResourceResolver<Key = StateKey, Layout = MoveTypeLayout>
             + TModuleResolver<Key = StateKey>
-            + StateStorageResolver
-            + AggregatorResolver,
+            + TAggregatorResolver<Key = AggregatorID>
+            + StateStorageResolver,
     > ExecutorResolver for T
 {
 }
