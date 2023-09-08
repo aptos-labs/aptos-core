@@ -51,4 +51,4 @@ smallvec = { workspace = true }
 tracing = { workspace = true }
 
 # experimental
-hashbrown = "0.14.0"
+hashbrown = "0.14.2"

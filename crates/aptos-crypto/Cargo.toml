@@ -42,6 +42,7 @@ rand = { workspace = true }
 rand_core = { workspace = true }
 ring = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 serde-name = { workspace = true }
 serde_bytes = { workspace = true }
 sha2 = { workspace = true }
@@ -51,6 +52,8 @@ static_assertions = { workspace = true }
 thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
 x25519-dalek = { workspace = true }
+webauthn-rs-core = { workspace = true }
+webauthn-authenticator-rs = { workspace = true }
 
 [dev-dependencies]
 ark-bls12-381 = { workspace = true }
@@ -63,7 +66,6 @@ byteorder = { workspace = true }
 criterion = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
-serde_json = { workspace = true }
 sha3 = { workspace = true }
 trybuild = { workspace = true }
 
