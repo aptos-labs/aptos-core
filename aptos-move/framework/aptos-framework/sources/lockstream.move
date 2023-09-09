@@ -490,5 +490,4 @@ module aptos_framework::lockstream {
         }
     }
 
-
 }
