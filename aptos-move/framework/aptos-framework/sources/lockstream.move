@@ -12,19 +12,19 @@ module aptos_framework::lockstream {
         phantom BaseType,
         phantom QuoteType,
     > has key {
-        base_coins: Coin<BaseType>,
-        quote_coins: Coin<QuoteType>,
+        base_locked: Coin<BaseType>,
+        quote_locked: Coin<QuoteType>,
         participants: SmartTable<address, ParticipantInfo>,
         initial_base_locked: u64,
         initial_quote_locked: u64,
         premier_participant: address,
         premier_participant_initial_quote_locked: u64,
-        pool_seed_time_seconds: u64,
+        creation_time_seconds: u64,
         stream_start_time_seconds: u64,
         stream_end_time_seconds: u64,
-        claim_window_end_time_seconds: u64,
-        premier_sweep_window_end_time_seconds: u64,
-        seed_event_handle: EventHandle<LockstreamSeedEvent>,
+        claim_last_call_time_seconds: u64,
+        premier_sweep_last_call_time_seconds: u64,
+        creation_event_handle: EventHandle<LockstreamCreationEvent>,
         lock_event_handle: EventHandle<LockstreamLockEvent>,
         new_premier_participant_event_handle:
             EventHandle<LockstreamNewPremierParticipantEvent>,
@@ -44,18 +44,18 @@ module aptos_framework::lockstream {
         quote_type: TypeInfo,
     }
 
-    struct LockstreamSeedEvent has copy, drop, store {
-        lockstream_pool_id: LockstreamPoolID,
+    struct LockstreamCreationEvent has copy, drop, store {
+        pool_id: LockstreamPoolID,
         initial_base_locked: u64,
-        pool_seed_time_seconds: u64,
+        creation_time_seconds: u64,
         stream_start_time_seconds: u64,
         stream_end_time_seconds: u64,
-        claim_window_end_time_seconds: u64,
-        premier_sweep_window_end_time_seconds: u64,
+        claim_last_call_time_seconds: u64,
+        premier_sweep_last_call_time_seconds: u64,
     }
 
     struct LockstreamLockEvent has copy, drop, store {
-        lockstream_pool_id: LockstreamPoolID,
+        pool_id: LockstreamPoolID,
         lock_time_seconds: u64,
         participant: address,
         quote_lock_amount: u64,
@@ -64,7 +64,7 @@ module aptos_framework::lockstream {
     }
 
     struct LockstreamNewPremierParticipantEvent has copy, drop, store {
-        lockstream_pool_id: LockstreamPoolID,
+        pool_id: LockstreamPoolID,
         lock_time_seconds: u64,
         new_premier_participant: address,
         old_premier_participant: address,
@@ -74,17 +74,17 @@ module aptos_framework::lockstream {
     }
 
     struct LockstreamClaimEvent has copy, drop, store {
-        lockstream_pool_id: LockstreamPoolID,
+        pool_id: LockstreamPoolID,
         claim_time_seconds: u64,
         participant: address,
         claimed_base: u64,
         claimed_quote: u64,
-        total_claimed_base: u64,
-        total_claimed_quote: u64,
+        total_claimed_base_for_participant: u64,
+        total_claimed_quote_for_participant: u64,
     }
 
     struct LockstreamSweepEvent has copy, drop, store {
-        lockstream_pool_id: LockstreamPoolID,
+        pool_id: LockstreamPoolID,
         sweep_time_seconds: u64,
         participant: address,
         base_sweep_amount: u64,
@@ -126,7 +126,7 @@ module aptos_framework::lockstream {
     /// No coins in lockstream pool left to sweep.
     const E_NOTHING_TO_SWEEP: u64 = 12;
 
-    public entry fun seed<
+    public entry fun create<
         BaseType,
         QuoteType
     >(
@@ -134,52 +134,51 @@ module aptos_framework::lockstream {
         initial_base_locked: u64,
         stream_start_time_seconds: u64,
         stream_end_time_seconds: u64,
-        claim_window_end_time_seconds: u64,
-        premier_sweep_window_end_time_seconds: u64,
+        claim_last_call_time_seconds: u64,
+        premier_sweep_last_call_time_seconds: u64,
     ) {
         let creator_address = signer::address_of(creator);
         assert!(
             !exists<LockstreamPool<BaseType, QuoteType>>(creator_address),
             E_LOCKSTREAM_POOL_EXISTS
         );
-        let pool_seed_time_seconds = timestamp::now_seconds();
+        let creation_time_seconds = timestamp::now_seconds();
         assert!(
-            pool_seed_time_seconds        < stream_start_time_seconds &&
-            stream_start_time_seconds     < stream_end_time_seconds &&
-            stream_end_time_seconds       < claim_window_end_time_seconds &&
-            claim_window_end_time_seconds <
-                    premier_sweep_window_end_time_seconds,
+            creation_time_seconds        < stream_start_time_seconds && stream_start_time_seconds    < stream_end_time_seconds &&
+            stream_end_time_seconds      < claim_last_call_time_seconds &&
+            claim_last_call_time_seconds <
+                    premier_sweep_last_call_time_seconds,
             E_TIME_WINDOWS_INVALID
         );
         assert!(coin::is_coin_initialized<QuoteType>(), E_QUOTE_NOT_COIN);
-        let seed_event_handle = account::new_event_handle(creator);
-        event::emit_event(&mut seed_event_handle, LockstreamSeedEvent {
-            lockstream_pool_id: LockstreamPoolID {
+        let creation_event_handle = account::new_event_handle(creator);
+        event::emit_event(&mut creation_event_handle, LockstreamCreationEvent {
+            pool_id: LockstreamPoolID {
                 creator: creator_address,
                 base_type: type_info::type_of<BaseType>(),
                 quote_type: type_info::type_of<QuoteType>(),
             },
             initial_base_locked,
-            pool_seed_time_seconds,
+            creation_time_seconds,
             stream_start_time_seconds,
             stream_end_time_seconds,
-            claim_window_end_time_seconds,
-            premier_sweep_window_end_time_seconds,
+            claim_last_call_time_seconds,
+            premier_sweep_last_call_time_seconds,
         });
         move_to(creator, LockstreamPool<BaseType, QuoteType> {
-            base_coins: coin::withdraw(creator, initial_base_locked),
-            quote_coins: coin::zero(),
+            base_locked: coin::withdraw(creator, initial_base_locked),
+            quote_locked: coin::zero(),
             participants: smart_table::new(),
             initial_base_locked,
             initial_quote_locked: 0,
             premier_participant: @0x0,
             premier_participant_initial_quote_locked: 0,
-            pool_seed_time_seconds,
+            creation_time_seconds,
             stream_start_time_seconds,
             stream_end_time_seconds,
-            claim_window_end_time_seconds,
-            premier_sweep_window_end_time_seconds,
-            seed_event_handle,
+            claim_last_call_time_seconds,
+            premier_sweep_last_call_time_seconds,
+            creation_event_handle,
             lock_event_handle: account::new_event_handle(creator),
             new_premier_participant_event_handle:
                 account::new_event_handle(creator),
@@ -200,8 +199,7 @@ module aptos_framework::lockstream {
         LockstreamPool
     {
         assert!(quote_lock_amount > 0, E_NO_QUOTE_LOCK_AMOUNT);
-        let lockstream_pool_id =
-            lockstream_pool_id<BaseType, QuoteType>(creator);
+        let pool_id = pool_id<BaseType, QuoteType>(creator);
         let pool_ref_mut =
             borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(creator);
         let lock_time_seconds = timestamp::now_seconds();
@@ -210,24 +208,24 @@ module aptos_framework::lockstream {
             E_TOO_LATE_TO_LOCK
         );
         coin::merge(
-            &mut pool_ref_mut.quote_coins,
+            &mut pool_ref_mut.quote_locked,
             coin::withdraw(participant, quote_lock_amount)
         );
         let total_quote_locked_for_pool =
-            coin::value(&pool_ref_mut.quote_coins);
+            coin::value(&pool_ref_mut.quote_locked);
         let participants_ref_mut = &mut pool_ref_mut.participants;
         let participant_address = signer::address_of(participant);
-        let total_quote_locked_for_participant = quote_lock_amount;
-        if (smart_table::contains(participants_ref_mut, participant_address)) {
+        let locking_more =
+            smart_table::contains(participants_ref_mut, participant_address);
+        let total_quote_locked_for_participant = if (locking_more) {
             let participant_info_ref_mut = smart_table::borrow_mut(
                 participants_ref_mut,
                 participant_address
             );
-            total_quote_locked_for_participant =
-                total_quote_locked_for_participant +
-                participant_info_ref_mut.initial_quote_locked;
-            participant_info_ref_mut.initial_quote_locked =
-                total_quote_locked_for_participant;
+            let already_locked = participant_info_ref_mut.initial_quote_locked;
+            let total_locked = already_locked + quote_lock_amount;
+            participant_info_ref_mut.initial_quote_locked = total_locked;
+            total_locked
         } else {
             smart_table::add(
                 participants_ref_mut, participant_address, ParticipantInfo {
@@ -236,9 +234,10 @@ module aptos_framework::lockstream {
                     claimed_quote: 0,
                 }
             );
+            quote_lock_amount
         };
         let lock_event = LockstreamLockEvent {
-            lockstream_pool_id,
+            pool_id,
             lock_time_seconds,
             participant: participant_address,
             quote_lock_amount,
@@ -266,7 +265,7 @@ module aptos_framework::lockstream {
             pool_ref_mut.premier_participant_initial_quote_locked;
         if (new_premier_participant) {
             let event = LockstreamNewPremierParticipantEvent {
-                lockstream_pool_id,
+                pool_id,
                 lock_time_seconds,
                 new_premier_participant: participant_address,
                 old_premier_participant: pool_ref_mut.premier_participant,
@@ -301,8 +300,7 @@ module aptos_framework::lockstream {
         LockstreamParticipantEventHandles,
         LockstreamPool
     {
-        let lockstream_pool_id =
-            lockstream_pool_id<BaseType, QuoteType>(creator);
+        let pool_id = pool_id<BaseType, QuoteType>(creator);
         let pool_ref_mut =
             borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(creator);
         let participants_ref_mut = &mut pool_ref_mut.participants;
@@ -313,11 +311,11 @@ module aptos_framework::lockstream {
         );
         let claim_time_seconds = timestamp::now_seconds();
         assert!(
-            claim_time_seconds > pool_ref_mut.stream_start_time_seconds,
+            claim_time_seconds >= pool_ref_mut.stream_start_time_seconds,
             E_TOO_EARLY_TO_CLAIM
         );
         assert!(
-            claim_time_seconds < pool_ref_mut.claim_window_end_time_seconds,
+            claim_time_seconds <= pool_ref_mut.claim_last_call_time_seconds,
             E_TOO_LATE_TO_CLAIM
         );
         let participant_info_ref_mut =
@@ -350,13 +348,13 @@ module aptos_framework::lockstream {
             coin::register<BaseType>(participant);
             coin::deposit(
                 participant_address,
-                coin::extract(&mut pool_ref_mut.base_coins, claimed_base)
+                coin::extract(&mut pool_ref_mut.base_locked, claimed_base)
             );
         };
         if (claimed_quote > 0) {
             coin::deposit(
                 participant_address,
-                coin::extract(&mut pool_ref_mut.quote_coins, claimed_quote)
+                coin::extract(&mut pool_ref_mut.quote_locked, claimed_quote)
             );
         };
         if (claimed_base > 0 || claimed_quote > 0) {
@@ -365,13 +363,13 @@ module aptos_framework::lockstream {
             let total_claimed_quote =
                 claimed_quote + participant_info_ref_mut.claimed_quote;
             let event = LockstreamClaimEvent {
-                lockstream_pool_id,
+                pool_id,
                 claim_time_seconds,
                 participant: participant_address,
                 claimed_base,
                 claimed_quote,
-                total_claimed_base,
-                total_claimed_quote,
+                total_claimed_base_for_participant: total_claimed_base,
+                total_claimed_quote_for_participant: total_claimed_quote,
             };
             participant_info_ref_mut.claimed_base = total_claimed_base;
             participant_info_ref_mut.claimed_quote = total_claimed_quote;
@@ -396,8 +394,7 @@ module aptos_framework::lockstream {
         LockstreamParticipantEventHandles,
         LockstreamPool
     {
-        let lockstream_pool_id =
-            lockstream_pool_id<BaseType, QuoteType>(creator);
+        let pool_id = pool_id<BaseType, QuoteType>(creator);
         let pool_ref_mut =
             borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(creator);
         let participants_ref_mut = &mut pool_ref_mut.participants;
@@ -409,24 +406,23 @@ module aptos_framework::lockstream {
         let sweep_time_seconds = timestamp::now_seconds();
         if (participant_address == pool_ref_mut.premier_participant) {
             assert!(
-                sweep_time_seconds >
-                    pool_ref_mut.claim_window_end_time_seconds,
+                sweep_time_seconds > pool_ref_mut.claim_last_call_time_seconds,
                 E_TOO_EARLY_FOR_PREMIER_SWEEP
             );
             assert!(
-                sweep_time_seconds <
-                    pool_ref_mut.premier_sweep_window_end_time_seconds,
+                sweep_time_seconds <=
+                    pool_ref_mut.premier_sweep_last_call_time_seconds,
                 E_TOO_LATE_FOR_PREMIER_SWEEP
             );
         } else {
             assert!(
                 sweep_time_seconds >
-                    pool_ref_mut.premier_sweep_window_end_time_seconds,
+                    pool_ref_mut.premier_sweep_last_call_time_seconds,
                 E_TOO_EARLY_FOR_MERCENARY_SWEEP
             );
         };
-        let base_to_sweep = coin::value(&pool_ref_mut.base_coins);
-        let quote_to_sweep = coin::value(&pool_ref_mut.quote_coins);
+        let base_to_sweep = coin::value(&pool_ref_mut.base_locked);
+        let quote_to_sweep = coin::value(&pool_ref_mut.quote_locked);
         assert!(
             base_to_sweep > 0 || quote_to_sweep > 0,
             E_NOTHING_TO_SWEEP
@@ -435,17 +431,17 @@ module aptos_framework::lockstream {
             coin::register<BaseType>(participant);
             coin::deposit(
                 participant_address,
-                coin::extract_all(&mut pool_ref_mut.base_coins)
+                coin::extract_all(&mut pool_ref_mut.base_locked)
             );
         };
         if (quote_to_sweep > 0) {
             coin::deposit(
                 participant_address,
-                coin::extract_all(&mut pool_ref_mut.quote_coins)
+                coin::extract_all(&mut pool_ref_mut.quote_locked)
             );
         };
         let event = LockstreamSweepEvent {
-            lockstream_pool_id,
+            pool_id,
             sweep_time_seconds,
             participant: participant_address,
             base_sweep_amount: base_to_sweep,
@@ -466,15 +462,12 @@ module aptos_framework::lockstream {
         numerator: u64,
         denominator: u64
     ): u64 {
-        ((
-            (scalar as u128) *
-            (numerator as u128) /
-            (denominator as u128)
-        ) as u64)
+        let to_divide = (scalar as u128) * (numerator as u128);
+        ((to_divide / (denominator as u128)) as u64)
     }
 
     #[view]
-    public fun lockstream_pool_id<
+    public fun pool_id<
         BaseType,
         QuoteType
     >(creator: address):
