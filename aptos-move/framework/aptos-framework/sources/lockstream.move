@@ -323,7 +323,7 @@ module aptos_framework::lockstream {
             locker_initial_quote_locked,
             pool_ref_mut.initial_quote_locked
         );
-        let stream_done = claim_time > pool_ref_mut.stream_end_time;
+        let stream_done = claim_time >= pool_ref_mut.stream_end_time;
         let (base_claimed_ceiling, quote_claimed_ceiling) = if (stream_done) {
             (pro_rata_base, locker_initial_quote_locked)
         } else {
