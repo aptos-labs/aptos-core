@@ -3808,6 +3808,7 @@ dependencies = [
  "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
+ "claims",
  "crossbeam-channel",
  "dashmap",
  "fail 0.5.0",
