@@ -1,12 +1,11 @@
 module aptos_framework::lockstream {
 
     use aptos_framework::account;
-    use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::coin::{Self, Coin};
+    use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::timestamp;
     use aptos_std::smart_table::{Self, SmartTable};
     use aptos_std::type_info::{Self, TypeInfo};
-
     use std::signer;
 
     struct LockstreamPool<
@@ -41,7 +40,7 @@ module aptos_framework::lockstream {
     }
 
     struct LockstreamPoolID has copy, drop, store {
-        seeder: address,
+        creator: address,
         base_type: TypeInfo,
         quote_type: TypeInfo,
     }
@@ -101,13 +100,13 @@ module aptos_framework::lockstream {
         sweep_event_handle: EventHandle<LockstreamSweepEvent>,
     }
 
-    /// Time window bounds provided by seeder are invalid.
+    /// Time window bounds provided by creator are invalid.
     const E_TIME_WINDOWS_INVALID: u64 = 0;
-    /// Quote type provided by seeder is not a coin type.
+    /// Quote type provided by creator is not a coin type.
     const E_QUOTE_NOT_COIN: u64 = 1;
-    /// No lockstream pool for base type, quote type, and seeder.
+    /// No lockstream pool for base type, quote type, and creator.
     const E_NO_LOCKSTREAM_POOL: u64 = 2;
-    /// Lockstream pool for base tye, quote type, and seeder exists.
+    /// Lockstream pool for base tye, quote type, and creator exists.
     const E_LOCKSTREAM_POOL_EXISTS: u64 = 3;
     /// Too late to lock more quote into lockstream pool.
     const E_TOO_LATE_TO_LOCK: u64 = 4;
@@ -132,16 +131,16 @@ module aptos_framework::lockstream {
         BaseType,
         QuoteType
     >(
-        seeder: &signer,
+        creator: &signer,
         initial_base_locked: u64,
         stream_start_time_seconds: u64,
         stream_end_time_seconds: u64,
         claim_window_end_time_seconds: u64,
         premier_sweep_window_end_time_seconds: u64,
     ) {
-        let seeder_address = signer::address_of(seeder);
+        let creator_address = signer::address_of(creator);
         assert!(
-            !exists<LockstreamPool<BaseType, QuoteType>>(seeder_address),
+            !exists<LockstreamPool<BaseType, QuoteType>>(creator_address),
             E_LOCKSTREAM_POOL_EXISTS
         );
         let pool_seed_time_seconds = timestamp::now_seconds();
@@ -154,10 +153,10 @@ module aptos_framework::lockstream {
             E_TIME_WINDOWS_INVALID
         );
         assert!(coin::is_coin_initialized<QuoteType>(), E_QUOTE_NOT_COIN);
-        let seed_event_handle = account::new_event_handle(seeder);
+        let seed_event_handle = account::new_event_handle(creator);
         event::emit_event(&mut seed_event_handle, LockstreamSeedEvent {
             lockstream_pool_id: LockstreamPoolID {
-                seeder: seeder_address,
+                creator: creator_address,
                 base_type: type_info::type_of<BaseType>(),
                 quote_type: type_info::type_of<QuoteType>(),
             },
@@ -168,8 +167,8 @@ module aptos_framework::lockstream {
             claim_window_end_time_seconds,
             premier_sweep_window_end_time_seconds,
         });
-        move_to(seeder, LockstreamPool<BaseType, QuoteType> {
-            base_coins: coin::withdraw(seeder, initial_base_locked),
+        move_to(creator, LockstreamPool<BaseType, QuoteType> {
+            base_coins: coin::withdraw(creator, initial_base_locked),
             quote_coins: coin::zero(),
             participants: smart_table::new(),
             initial_base_locked,
@@ -182,11 +181,11 @@ module aptos_framework::lockstream {
             claim_window_end_time_seconds,
             premier_sweep_window_end_time_seconds,
             seed_event_handle,
-            lock_event_handle: account::new_event_handle(seeder),
+            lock_event_handle: account::new_event_handle(creator),
             new_premier_participant_event_handle:
-                account::new_event_handle(seeder),
-            claim_event_handle: account::new_event_handle(seeder),
-            sweep_event_handle: account::new_event_handle(seeder),
+                account::new_event_handle(creator),
+            claim_event_handle: account::new_event_handle(creator),
+            sweep_event_handle: account::new_event_handle(creator),
         });
     }
 
@@ -195,7 +194,7 @@ module aptos_framework::lockstream {
         QuoteType
     >(
         participant: &signer,
-        seeder: address,
+        creator: address,
         quote_lock_amount: u64,
     ) acquires
         LockstreamParticipantEventHandles,
@@ -203,9 +202,9 @@ module aptos_framework::lockstream {
     {
         assert!(quote_lock_amount > 0, E_NO_QUOTE_LOCK_AMOUNT);
         let lockstream_pool_id =
-            lockstream_pool_id<BaseType, QuoteType>(seeder);
+            lockstream_pool_id<BaseType, QuoteType>(creator);
         let pool_ref_mut =
-            borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(seeder);
+            borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(creator);
         let lock_time_seconds = timestamp::now_seconds();
         assert!(
             lock_time_seconds < pool_ref_mut.stream_start_time_seconds,
@@ -299,15 +298,15 @@ module aptos_framework::lockstream {
         QuoteType
     >(
         participant: &signer,
-        seeder: address,
+        creator: address,
     ) acquires
         LockstreamParticipantEventHandles,
         LockstreamPool
     {
         let lockstream_pool_id =
-            lockstream_pool_id<BaseType, QuoteType>(seeder);
+            lockstream_pool_id<BaseType, QuoteType>(creator);
         let pool_ref_mut =
-            borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(seeder);
+            borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(creator);
         let participants_ref_mut = &mut pool_ref_mut.participants;
         let participant_address = signer::address_of(participant);
         assert!(
@@ -394,15 +393,15 @@ module aptos_framework::lockstream {
         QuoteType
     >(
         participant: &signer,
-        seeder: address,
+        creator: address,
     ) acquires
         LockstreamParticipantEventHandles,
         LockstreamPool
     {
         let lockstream_pool_id =
-            lockstream_pool_id<BaseType, QuoteType>(seeder);
+            lockstream_pool_id<BaseType, QuoteType>(creator);
         let pool_ref_mut =
-            borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(seeder);
+            borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(creator);
         let participants_ref_mut = &mut pool_ref_mut.participants;
         let participant_address = signer::address_of(participant);
         assert!(
@@ -480,14 +479,14 @@ module aptos_framework::lockstream {
     public fun lockstream_pool_id<
         BaseType,
         QuoteType
-    >(seeder: address):
+    >(creator: address):
     LockstreamPoolID {
         assert!(
-            exists<LockstreamPool<BaseType, QuoteType>>(seeder),
+            exists<LockstreamPool<BaseType, QuoteType>>(creator),
             E_NO_LOCKSTREAM_POOL
         );
         LockstreamPoolID {
-            seeder,
+            creator,
             base_type: type_info::type_of<BaseType>(),
             quote_type: type_info::type_of<QuoteType>(),
         }
