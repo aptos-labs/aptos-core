@@ -76,11 +76,11 @@ pub static GOT_CONNECTION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 
 // DEDUPLICATION METRICS
 
-/// Number of times the NFT Metadata Crawler Parser has found a duplicate token URI
-pub static DUPLICATE_TOKEN_URI_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+/// Number of times the NFT Metadata Crawler Parser has found a duplicate asset URI
+pub static DUPLICATE_ASSET_URI_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "nft_metadata_crawler_parser_duplicate_token_uri_count",
-        "Number of times the NFT Metadata Crawler Parser has found a duplicate token URI"
+        "nft_metadata_crawler_parser_duplicate_asset_uri_count",
+        "Number of times the NFT Metadata Crawler Parser has found a duplicate asset URI"
     )
     .unwrap()
 });
@@ -106,10 +106,11 @@ pub static DUPLICATE_RAW_ANIMATION_URI_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 // URI PARSER METRICS
 
 /// Number of URIs skipped because of matches on the URI skip list
-pub static SKIP_URI_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
+pub static SKIP_URI_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
         "nft_metadata_crawler_parser_skip_uri_count",
         "Number of URIs skipped because of matches on the URI skip list",
+        &["reason"]
     )
     .unwrap()
 });
