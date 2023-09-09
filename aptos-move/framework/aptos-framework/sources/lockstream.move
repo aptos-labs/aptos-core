@@ -36,7 +36,6 @@ module aptos_framework::lockstream {
         initial_quote_locked: u64,
         claimed_base: u64,
         claimed_quote: u64,
-        last_claim_time_seconds: u64,
     }
 
     struct LockstreamPoolID has copy, drop, store {
@@ -235,7 +234,6 @@ module aptos_framework::lockstream {
                     initial_quote_locked: quote_lock_amount,
                     claimed_base: 0,
                     claimed_quote: 0,
-                    last_claim_time_seconds: 0
                 }
             );
         };
