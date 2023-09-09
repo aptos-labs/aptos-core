@@ -4,10 +4,12 @@ module aptos_framework::lockstream {
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::timestamp;
+    use aptos_std::math64;
     use aptos_std::smart_table::{Self, SmartTable};
     use aptos_std::type_info::{Self, TypeInfo};
     use std::signer;
 
+    /// All times in UNIX seconds.
     struct LockstreamPool<
         phantom BaseType,
         phantom QuoteType,
@@ -126,6 +128,7 @@ module aptos_framework::lockstream {
     /// No coins in lockstream pool left to sweep.
     const E_NOTHING_TO_SWEEP: u64 = 12;
 
+    /// All times in UNIX seconds.
     public entry fun create<
         BaseType,
         QuoteType
@@ -258,7 +261,7 @@ module aptos_framework::lockstream {
             total_quote_locked_for_locker >
             pool_ref_mut.premier_locker_initial_quote_locked;
         if (new_premier_locker) {
-            let event = LockstreamNewPremierLockerEvent {
+            let premier_locker_event = LockstreamNewPremierLockerEvent {
                 pool_id,
                 lock_time,
                 new_premier_locker: locker_addr,
@@ -271,11 +274,11 @@ module aptos_framework::lockstream {
             };
             event::emit_event(
                 &mut pool_ref_mut.new_premier_locker_event_handle,
-                event
+                premier_locker_event
             );
             event::emit_event(
                 &mut locker_handles_ref_mut.new_premier_locker_event_handle,
-                event
+                premier_locker_event
             );
             pool_ref_mut.premier_locker = locker_addr;
             pool_ref_mut.premier_locker_initial_quote_locked =
@@ -315,13 +318,12 @@ module aptos_framework::lockstream {
             smart_table::borrow_mut(lockers_ref_mut, locker_addr);
         let locker_initial_quote_locked =
             locker_info_ref_mut.initial_quote_locked;
-        let pro_rata_base = proportion_of(
+        let pro_rata_base = math64::mul_div(
             pool_ref_mut.initial_base_locked,
             locker_initial_quote_locked,
             pool_ref_mut.initial_quote_locked
         );
-        let stream_done = claim_time >
-            pool_ref_mut.stream_end_time;
+        let stream_done = claim_time > pool_ref_mut.stream_end_time;
         let (base_claimed_ceiling, quote_claimed_ceiling) = if (stream_done) {
             (pro_rata_base, locker_initial_quote_locked)
         } else {
@@ -329,8 +331,8 @@ module aptos_framework::lockstream {
             let elapsed = claim_time - stream_start;
             let duration = pool_ref_mut.stream_end_time - stream_start;
             (
-                proportion_of(pro_rata_base, elapsed, duration),
-                proportion_of(locker_initial_quote_locked, elapsed, duration)
+                math64::mul_div(pro_rata_base, elapsed, duration),
+                math64::mul_div(locker_initial_quote_locked, elapsed, duration)
             )
         };
         let base_claimed =
@@ -355,7 +357,7 @@ module aptos_framework::lockstream {
                 base_claimed + locker_info_ref_mut.base_claimed;
             let total_quote_claimed =
                 quote_claimed + locker_info_ref_mut.quote_claimed;
-            let event = LockstreamClaimEvent {
+            let claim_event = LockstreamClaimEvent {
                 pool_id,
                 claim_time,
                 locker: locker_addr,
@@ -366,12 +368,15 @@ module aptos_framework::lockstream {
             };
             locker_info_ref_mut.base_claimed = total_base_claimed;
             locker_info_ref_mut.quote_claimed = total_quote_claimed;
-            event::emit_event(&mut pool_ref_mut.claim_event_handle, event);
+            event::emit_event(
+                &mut pool_ref_mut.claim_event_handle,
+                claim_event
+            );
             let locker_handles_ref_mut =
                 borrow_global_mut<LockstreamLockerEventHandles>(locker_addr);
             event::emit_event(
                 &mut locker_handles_ref_mut.claim_event_handle,
-                event
+                claim_event
             );
         }
     }
@@ -429,29 +434,20 @@ module aptos_framework::lockstream {
                 coin::extract_all(&mut pool_ref_mut.quote_locked)
             );
         };
-        let event = LockstreamSweepEvent {
+        let sweep_event = LockstreamSweepEvent {
             pool_id,
             sweep_time,
             locker: locker_addr,
             base_sweep_amount: base_to_sweep,
             quote_sweep_amount: quote_to_sweep,
         };
-        event::emit_event(&mut pool_ref_mut.sweep_event_handle, event);
+        event::emit_event(&mut pool_ref_mut.sweep_event_handle, sweep_event);
         let locker_handles_ref_mut =
             borrow_global_mut<LockstreamLockerEventHandles>(locker_addr);
         event::emit_event(
             &mut locker_handles_ref_mut.sweep_event_handle,
-            event
+            sweep_event
         );
-    }
-
-    public inline fun proportion_of(
-        amount: u64,
-        numerator: u64,
-        denominator: u64
-    ): u64 {
-        let to_divide = (amount as u128) * (numerator as u128);
-        ((to_divide / (denominator as u128)) as u64)
     }
 
     #[view]
