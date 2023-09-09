@@ -22,8 +22,8 @@ use aptos_types::{
 };
 use aptos_vm::{
     adapter_common::{preprocess_transaction, VMAdapter},
-    data_cache::StorageAdapter,
-    storage_adapter::StateViewAdapter,
+    data_cache::AsMoveResolver,
+    storage_adapter::AsAdapter,
     AptosVM,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -272,15 +272,17 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     };
                     drop(_pre);
 
-                    let adapter = StateViewAdapter(&state_view);
-                    let resolver = StorageAdapter::new_with_cached_config(
-                        &adapter,
-                        vm.get_gas_feature_version(),
-                        vm.get_features(),
-                    );
+                    let adapter = state_view.as_adapter();
                     let vm_output = {
                         let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_vm"]);
-                        vm.execute_single_transaction(&preprocessed_txn, &resolver, &log_context)
+                        vm.execute_single_transaction(
+                            &preprocessed_txn,
+                            &adapter.as_resolver_with_cached_config(
+                                vm.get_gas_feature_version(),
+                                vm.get_features(),
+                            ),
+                            &log_context,
+                        )
                     };
                     let _post = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_post_vm"]);
                     // TODO(ptx): error handling

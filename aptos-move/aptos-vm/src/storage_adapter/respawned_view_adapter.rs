@@ -22,7 +22,7 @@ pub struct RespawnedViewAdapter<'r> {
 }
 
 impl<'r> RespawnedViewAdapter<'r> {
-    pub fn new(base: &'r dyn ExecutorResolver, change_set: VMChangeSet) -> Self {
+    pub(crate) fn new(base: &'r dyn ExecutorResolver, change_set: VMChangeSet) -> Self {
         Self { base, change_set }
     }
 }

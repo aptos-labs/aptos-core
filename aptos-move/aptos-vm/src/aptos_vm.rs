@@ -9,11 +9,11 @@ use crate::{
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     counters::*,
-    data_cache::StorageAdapter,
+    data_cache::AsMoveResolver,
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, RespawnedSession, SessionExt, SessionId},
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
-    storage_adapter::StateViewAdapter,
+    storage_adapter::AsAdapter,
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     verifier, VMExecutor, VMValidator,
@@ -126,9 +126,8 @@ impl AptosVM {
     }
 
     pub fn new_from_state_view(state_view: &impl StateView) -> Self {
-        let resolver = StateViewAdapter(state_view);
-        let config_storage = StorageAdapter::new(&resolver);
-        Self(AptosVMImpl::new(&config_storage))
+        let adapter = state_view.as_adapter();
+        Self(AptosVMImpl::new(&adapter.as_resolver()))
     }
 
     pub fn new_for_validation(state_view: &impl StateView) -> Self {
@@ -1388,11 +1387,10 @@ impl AptosVM {
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
-        let adapter = StateViewAdapter(state_view);
-        let resolver = StorageAdapter::new_with_cached_config(
-            &adapter,
-            simulation_vm.0 .0.get_gas_feature_version(),
-            simulation_vm.0 .0.get_features(),
+        let adapter = state_view.as_adapter();
+        let resolver = adapter.as_resolver_with_cached_config(
+            simulation_vm.0.get_gas_feature_version(),
+            simulation_vm.0.get_features(),
         );
         let (vm_status, vm_output) =
             simulation_vm.simulate_signed_transaction(&resolver, txn, &log_context);
@@ -1422,12 +1420,9 @@ impl AptosVM {
                 gas_budget,
             )));
 
-        let adapter = StateViewAdapter(state_view);
-        let resolver = StorageAdapter::new_with_cached_config(
-            &adapter,
-            vm.0.get_gas_feature_version(),
-            vm.0.get_features(),
-        );
+        let adapter = state_view.as_adapter();
+        let resolver =
+            adapter.as_resolver_with_cached_config(vm.get_gas_feature_version(), vm.get_features());
         let mut session = vm.new_session(&resolver, SessionId::Void);
 
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
@@ -1605,12 +1600,9 @@ impl VMValidator for AptosVM {
             },
         };
 
-        let adapter = StateViewAdapter(state_view);
-        let resolver = StorageAdapter::new_with_cached_config(
-            &adapter,
-            self.0.get_gas_feature_version(),
-            self.0.get_features(),
-        );
+        let adapter = state_view.as_adapter();
+        let resolver = adapter
+            .as_resolver_with_cached_config(self.get_gas_feature_version(), self.get_features());
         let mut session = self.0.new_session(&resolver, SessionId::prologue(&txn));
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,

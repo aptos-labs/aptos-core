@@ -13,7 +13,6 @@ use crate::{
         StateValueMetadataKind, StateValueMetadataResolver,
     },
 };
-#[allow(unused_imports)]
 use anyhow::Error;
 use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorResolver};
 use aptos_state_view::StateViewId;
@@ -57,8 +56,32 @@ pub struct StorageAdapter<'r, R> {
         RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
 }
 
+pub trait AsMoveResolver<R> {
+    fn as_resolver(&self) -> StorageAdapter<R>;
+
+    fn as_resolver_with_cached_config(
+        &self,
+        gas_feature_version: u64,
+        features: &Features,
+    ) -> StorageAdapter<R>;
+}
+
+impl<R: ExecutorResolver> AsMoveResolver<R> for R {
+    fn as_resolver(&self) -> StorageAdapter<R> {
+        StorageAdapter::new(self)
+    }
+
+    fn as_resolver_with_cached_config(
+        &self,
+        gas_feature_version: u64,
+        features: &Features,
+    ) -> StorageAdapter<R> {
+        StorageAdapter::new_with_cached_config(self, gas_feature_version, features)
+    }
+}
+
 impl<'r, R: ExecutorResolver> StorageAdapter<'r, R> {
-    pub fn new(resolver: &'r R) -> Self {
+    fn new(resolver: &'r R) -> Self {
         let mut s = Self {
             resolver,
             accurate_byte_count: false,
@@ -74,7 +97,7 @@ impl<'r, R: ExecutorResolver> StorageAdapter<'r, R> {
         s
     }
 
-    pub fn new_with_cached_config(
+    fn new_with_cached_config(
         resolver: &'r R,
         gas_feature_version: u64,
         features: &Features,
@@ -259,7 +282,7 @@ impl<'r, R: ExecutorResolver> ConfigStorage for StorageAdapter<'r, R> {
     }
 }
 
-impl<'r, R: ExecutorResolver> AsExecutorResolver for StorageAdapter<'r, R> {
+impl<R: ExecutorResolver> AsExecutorResolver for StorageAdapter<'_, R> {
     fn as_executor_resolver(&self) -> &dyn ExecutorResolver {
         self.resolver
     }

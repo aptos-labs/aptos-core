@@ -10,7 +10,23 @@ use aptos_vm_types::resolver::{StateStorageResolver, TModuleResolver, TResourceR
 use move_core_types::value::MoveTypeLayout;
 
 /// Adapter to convert a `StateView` into an `ExecutorResolver`.
-pub struct StateViewAdapter<'s, S>(pub &'s S);
+pub struct StateViewAdapter<'s, S>(&'s S);
+
+impl<'s, S: StateView> StateViewAdapter<'s, S> {
+    fn new(state_view: &'s S) -> Self {
+        Self(state_view)
+    }
+}
+
+pub trait AsAdapter<S> {
+    fn as_adapter(&self) -> StateViewAdapter<S>;
+}
+
+impl<S: StateView> AsAdapter<S> for S {
+    fn as_adapter(&self) -> StateViewAdapter<S> {
+        StateViewAdapter::new(self)
+    }
+}
 
 impl<'s, S: StateView> TAggregatorResolver for StateViewAdapter<'s, S> {
     type Key = AggregatorID;

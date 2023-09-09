@@ -13,9 +13,9 @@ use aptos_types::{
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
-    data_cache::StorageAdapter,
+    data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
-    storage_adapter::StateViewAdapter,
+    storage_adapter::AsAdapter,
 };
 use aptos_vm_types::storage::ChangeSetConfigs;
 use move_core_types::{
@@ -119,14 +119,14 @@ where
         TimedFeatures::enable_all(),
     )
     .unwrap();
-    let adapter = StateViewAdapter(&state_view);
-    let state_view_storage = StorageAdapter::new(&adapter);
+
+    let adapter = state_view.as_adapter();
+    let resolver = adapter.as_resolver();
     let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
-        let mut session = GenesisSession(
-            move_vm.new_session(&state_view_storage, SessionId::genesis(genesis_id)),
-        );
+        let mut session =
+            GenesisSession(move_vm.new_session(&resolver, SessionId::genesis(genesis_id)));
         session.disable_reconfiguration();
         procedure(&mut session);
         session.enable_reconfiguration();

@@ -49,9 +49,9 @@ use aptos_types::{
 };
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
-    data_cache::StorageAdapter,
+    data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionId},
-    storage_adapter::StateViewAdapter,
+    storage_adapter::AsAdapter,
     AptosVM, VMExecutor, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
@@ -235,10 +235,9 @@ impl FakeExecutor {
         //  - the e2e test outputs a golden file, and
         //  - the environment variable is properly set
         if let Some(env_trace_dir) = env::var_os(ENV_TRACE_DIR) {
-            let adapter = StateViewAdapter(&self.data_store);
-            let resolver = StorageAdapter::new(&adapter);
-            let aptos_version = Version::fetch_config(&resolver).map_or(0, |v| v.major);
-
+            let adapter = self.data_store.as_adapter();
+            let aptos_version =
+                Version::fetch_config(&adapter.as_resolver()).map_or(0, |v| v.major);
             let trace_dir = Path::new(&env_trace_dir).join(file_name);
             if trace_dir.exists() {
                 fs::remove_dir_all(&trace_dir).expect("Failed to clean up the trace directory");
@@ -541,8 +540,8 @@ impl FakeExecutor {
 
         // TODO(Gas): revisit this.
         let vm = AptosVM::new_from_state_view(&self.data_store);
-        let adapter = StateViewAdapter(&self.data_store);
-        let resolver = StorageAdapter::new(&adapter);
+        let adapter = self.data_store.as_adapter();
+        let resolver = adapter.as_resolver();
 
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
@@ -628,9 +627,8 @@ impl FakeExecutor {
     pub fn new_block_with_timestamp(&mut self, time_microseconds: u64) {
         self.block_time = time_microseconds;
 
-        let adapter = StateViewAdapter(&self.data_store);
-        let resolver = StorageAdapter::new(&adapter);
-        let validator_set = ValidatorSet::fetch_config(&resolver)
+        let adapter = self.data_store.as_adapter();
+        let validator_set = ValidatorSet::fetch_config(&adapter.as_resolver())
             .expect("Unable to retrieve the validator set from storage");
         let proposer = *validator_set.payload().next().unwrap().account_address();
         // when updating time, proposer cannot be ZERO.
@@ -646,9 +644,8 @@ impl FakeExecutor {
         let mut txn_block: Vec<Transaction> =
             txns.into_iter().map(Transaction::UserTransaction).collect();
 
-        let adapter = StateViewAdapter(&self.data_store);
-        let resolver = StorageAdapter::new(&adapter);
-        let validator_set = ValidatorSet::fetch_config(&resolver)
+        let adapter = self.data_store.as_adapter();
+        let validator_set = ValidatorSet::fetch_config(&adapter.as_resolver())
             .expect("Unable to retrieve the validator set from storage");
         let new_block_metadata = BlockMetadata::new(
             HashValue::zero(),
@@ -734,14 +731,14 @@ impl FakeExecutor {
             timed_features,
         )
         .unwrap();
-        let adapter = StateViewAdapter(&self.data_store);
-        let remote_view = StorageAdapter::new(&adapter);
+        let adapter = &self.data_store.as_adapter();
+        let resolver = adapter.as_resolver();
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
         let mut times = Vec::new();
         while i < iterations {
-            let mut session = vm.new_session(&remote_view, SessionId::void());
+            let mut session = vm.new_session(&resolver, SessionId::void());
 
             // load function name into cache to ensure cache is hot
             let _ = session.load_function(module, &Self::name(function_name), &type_params.clone());
@@ -809,9 +806,10 @@ impl FakeExecutor {
                 }),
             )
             .unwrap();
-            let adapter = StateViewAdapter(&self.data_store);
-            let remote_view = StorageAdapter::new(&adapter);
-            let mut session = vm.new_session(&remote_view, SessionId::void());
+
+            let adapter = self.data_store.as_adapter();
+            let resolver = adapter.as_resolver();
+            let mut session = vm.new_session(&resolver, SessionId::void());
 
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
@@ -881,9 +879,9 @@ impl FakeExecutor {
                 timed_features,
             )
             .unwrap();
-            let adapter = StateViewAdapter(&self.data_store);
-            let remote_view = StorageAdapter::new(&adapter);
-            let mut session = vm.new_session(&remote_view, SessionId::void());
+            let adapter = self.data_store.as_adapter();
+            let resolver = adapter.as_resolver();
+            let mut session = vm.new_session(&resolver, SessionId::void());
             session
                 .execute_function_bypass_visibility(
                     &Self::module(module_name),
@@ -933,9 +931,9 @@ impl FakeExecutor {
             TimedFeatures::enable_all(),
         )
         .unwrap();
-        let adapter = StateViewAdapter(&self.data_store);
-        let remote_view = StorageAdapter::new(&adapter);
-        let mut session = vm.new_session(&remote_view, SessionId::void());
+        let adapter = self.data_store.as_adapter();
+        let resolver = adapter.as_resolver();
+        let mut session = vm.new_session(&resolver, SessionId::void());
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),

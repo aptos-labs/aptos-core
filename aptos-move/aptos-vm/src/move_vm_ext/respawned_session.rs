@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::StorageAdapter,
+    data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
     storage_adapter::RespawnedViewAdapter,
     AptosVM,
@@ -41,11 +41,8 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         Ok(RespawnedSessionBuilder {
             state_view,
             resolver_builder: |state_view| {
-                StorageAdapter::new_with_cached_config(
-                    state_view,
-                    vm.0.get_gas_feature_version(),
-                    vm.0.get_features(),
-                )
+                state_view
+                    .as_resolver_with_cached_config(vm.get_gas_feature_version(), vm.get_features())
             },
             session_builder: |resolver| Some(vm.0.new_session(resolver, session_id)),
             storage_refund,

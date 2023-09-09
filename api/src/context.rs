@@ -45,7 +45,7 @@ use aptos_types::{
 };
 use aptos_utils::aptos_try;
 use aptos_vm::{
-    data_cache::StorageAdapter, move_vm_ext::AptosMoveResolver, storage_adapter::StateViewAdapter,
+    data_cache::AsMoveResolver, move_vm_ext::AptosMoveResolver, storage_adapter::AsAdapter,
 };
 use futures::{channel::oneshot, SinkExt};
 use move_core_types::language_storage::{ModuleId, StructTag};
@@ -362,8 +362,8 @@ impl Context {
                         .is_some()
                     };
 
-                let state_view_adapter = StateViewAdapter(&state_view);
-                let resolver = StorageAdapter::new(&state_view_adapter);
+                let adapter = state_view.as_adapter();
+                let resolver = adapter.as_resolver();
                 if is_resource_group(&resolver, &key) {
                     // An error here means a storage invariant has been violated
                     bcs::from_bytes::<ResourceGroup>(&value)
@@ -587,8 +587,8 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let state_view_adapter = StateViewAdapter(&state_view);
-        let resolver = StorageAdapter::new(&state_view_adapter);
+        let adapter = state_view.as_adapter();
+        let resolver = adapter.as_resolver();
         let converter = resolver.as_converter(self.db.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
@@ -619,8 +619,8 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let state_view_adapter = StateViewAdapter(&state_view);
-        let resolver = StorageAdapter::new(&state_view_adapter);
+        let adapter = state_view.as_adapter();
+        let resolver = adapter.as_resolver();
         let converter = resolver.as_converter(self.db.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
@@ -1155,18 +1155,19 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let adapter = StateViewAdapter(&state_view);
-            let storage_adapter = StorageAdapter::new(&adapter);
+
+            let adapter = state_view.as_adapter();
+            let resolver = adapter.as_resolver();
 
             let gas_schedule_params =
-                match GasScheduleV2::fetch_config(&storage_adapter).and_then(|gas_schedule| {
+                match GasScheduleV2::fetch_config(&resolver).and_then(|gas_schedule| {
                     let feature_version = gas_schedule.feature_version;
                     let gas_schedule = gas_schedule.to_btree_map();
                     AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
                         .ok()
                 }) {
                     Some(gas_schedule) => Ok(gas_schedule),
-                    None => GasSchedule::fetch_config(&storage_adapter)
+                    None => GasSchedule::fetch_config(&resolver)
                         .and_then(|gas_schedule| {
                             let gas_schedule = gas_schedule.to_btree_map();
                             AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0).ok()
@@ -1221,10 +1222,10 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let adapter = StateViewAdapter(&state_view);
-            let storage_adapter = StorageAdapter::new(&adapter);
+            let adapter = state_view.as_adapter();
+            let resolver = adapter.as_resolver();
 
-            let block_gas_limit = OnChainExecutionConfig::fetch_config(&storage_adapter)
+            let block_gas_limit = OnChainExecutionConfig::fetch_config(&resolver)
                 .and_then(|config| config.block_gas_limit());
 
             // Update the cache

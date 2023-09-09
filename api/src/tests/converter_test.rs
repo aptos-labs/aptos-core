@@ -4,7 +4,7 @@
 use super::new_test_context;
 use aptos_api_test_context::current_function_name;
 use aptos_api_types::{new_vm_utf8_string, AsConverter, HexEncodedBytes, MoveConverter, MoveType};
-use aptos_vm::{data_cache::StorageAdapter, storage_adapter::StateViewAdapter};
+use aptos_vm::{data_cache::AsMoveResolver, storage_adapter::AsAdapter};
 use move_core_types::{
     account_address::AccountAddress,
     resolver::MoveResolver,
@@ -20,8 +20,8 @@ async fn test_value_conversion() {
     let address = AccountAddress::from_hex_literal("0x1").unwrap();
 
     let state_view = context.latest_state_view();
-    let state_view_adapter = StateViewAdapter(&state_view);
-    let resolver = StorageAdapter::new(&state_view_adapter);
+    let adapter = state_view.as_adapter();
+    let resolver = adapter.as_resolver();
     let converter = resolver.as_converter(context.db);
 
     assert_value_conversion(&converter, "u8", 1i32, VmMoveValue::U8(1));
