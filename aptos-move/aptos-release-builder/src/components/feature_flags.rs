@@ -79,10 +79,14 @@ pub enum FeatureFlag {
     ModuleEvent,
     EmitFeeStatement,
     StorageDeletionRefund,
-    AggregatorSnapshots,
+    AggregatorApi,
     SignatureCheckerV2ScriptFix,
     SaferResourceGroups,
+<<<<<<< HEAD
     SaferMetadata,
+=======
+    AggregatorExecution,
+>>>>>>> 9241860c90 (agg v2 natives flag)
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -210,12 +214,16 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ModuleEvent => AptosFeatureFlag::MODULE_EVENT,
             FeatureFlag::EmitFeeStatement => AptosFeatureFlag::EMIT_FEE_STATEMENT,
             FeatureFlag::StorageDeletionRefund => AptosFeatureFlag::STORAGE_DELETION_REFUND,
-            FeatureFlag::AggregatorSnapshots => AptosFeatureFlag::AGGREGATOR_SNAPSHOTS,
             FeatureFlag::SignatureCheckerV2ScriptFix => {
                 AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX
             },
+            FeatureFlag::AggregatorApi => AptosFeatureFlag::AGGREGATOR_API,
             FeatureFlag::SaferResourceGroups => AptosFeatureFlag::SAFER_RESOURCE_GROUPS,
+<<<<<<< HEAD
             FeatureFlag::SaferMetadata => AptosFeatureFlag::SAFER_METADATA,
+=======
+            FeatureFlag::AggregatorExecution => AptosFeatureFlag::AGGREGATOR_EXECUTION,
+>>>>>>> 9241860c90 (agg v2 natives flag)
         }
     }
 }
@@ -266,12 +274,13 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::MODULE_EVENT => FeatureFlag::ModuleEvent,
             AptosFeatureFlag::EMIT_FEE_STATEMENT => FeatureFlag::EmitFeeStatement,
             AptosFeatureFlag::STORAGE_DELETION_REFUND => FeatureFlag::StorageDeletionRefund,
-            AptosFeatureFlag::AGGREGATOR_SNAPSHOTS => FeatureFlag::AggregatorSnapshots,
             AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX => {
                 FeatureFlag::SignatureCheckerV2ScriptFix
             },
+            AptosFeatureFlag::AGGREGATOR_API => FeatureFlag::AggregatorApi,
             AptosFeatureFlag::SAFER_RESOURCE_GROUPS => FeatureFlag::SaferResourceGroups,
             AptosFeatureFlag::SAFER_METADATA => FeatureFlag::SaferMetadata,
+            AptosFeatureFlag::AGGREGATOR_EXECUTION => FeatureFlag::AggregatorExecution,
         }
     }
 }
