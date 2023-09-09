@@ -10,7 +10,6 @@ use aptos_types::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::analyzed_transaction::AnalyzedTransaction,
-    write_set::TOTAL_SUPPLY_STATE_KEY,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -178,57 +177,5 @@ mod tests {
         assert_eq!(cross_shard_state_view.waiting_count(), 0);
 
         wait_thread.join().unwrap();
-    }
-}
-
-pub const TOTAL_SUPPLY_AGGR_BASE_VAL: u128 = u128::MAX >> 1;
-#[derive(Clone)]
-pub struct CrossShardStateViewAggrOverride<'a, S> {
-    cross_shard_state_view: CrossShardStateView<'a, S>,
-}
-
-impl<'a, S: StateView + Sync + Send> CrossShardStateViewAggrOverride<'a, S> {
-    pub fn new(cross_shard_keys: HashSet<StateKey>, base_view: &'a S) -> Self {
-        Self {
-            cross_shard_state_view: CrossShardStateView::new(cross_shard_keys, base_view),
-        }
-    }
-
-    pub fn set_value(&self, state_key: &StateKey, state_value: Option<StateValue>) {
-        self.cross_shard_state_view
-            .set_value(state_key, state_value);
-    }
-
-    pub fn create_cross_shard_state_view_aggr_override(
-        base_view: &'a S,
-        transactions: &[TransactionWithDependencies<AnalyzedTransaction>],
-    ) -> CrossShardStateViewAggrOverride<'a, S> {
-        Self {
-            cross_shard_state_view: CrossShardStateView::create_cross_shard_state_view(
-                base_view,
-                transactions,
-            ),
-        }
-    }
-
-    fn total_supply_base_view_override(&self) -> Result<Option<StateValue>> {
-        Ok(Some(StateValue::from(
-            bcs::to_bytes(&TOTAL_SUPPLY_AGGR_BASE_VAL).unwrap(),
-        )))
-    }
-}
-
-impl<'a, S: StateView + Sync + Send> TStateView for CrossShardStateViewAggrOverride<'a, S> {
-    type Key = StateKey;
-
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
-        if *state_key == *TOTAL_SUPPLY_STATE_KEY {
-            return self.total_supply_base_view_override();
-        }
-        self.cross_shard_state_view.get_state_value(state_key)
-    }
-
-    fn get_usage(&self) -> Result<StateStorageUsage> {
-        Ok(StateStorageUsage::new_untracked())
     }
 }

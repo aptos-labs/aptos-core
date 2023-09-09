@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_executor::cross_shard_state_view::TOTAL_SUPPLY_AGGR_BASE_VAL;
+use crate::sharded_block_executor::aggr_overridden_state_view::TOTAL_SUPPLY_AGGR_BASE_VAL;
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey, transaction::TransactionOutput,
     write_set::TOTAL_SUPPLY_STATE_KEY,
 };
+use rayon::prelude::*;
 use serde::de::DeserializeOwned;
 use std::{ops, sync::Arc};
 
@@ -163,35 +164,6 @@ fn test_delta_u128() {
     }
 }
 
-fn is_total_supply_absent(
-    total_supply: Option<u128>,
-    shard_id: usize,
-    num_shards: usize,
-    txn_idx: usize,
-    txns_len: usize,
-) -> bool {
-    // only first and last txn of the block can have 'none' for 'total_supply'
-    if total_supply.is_none()
-        && ((shard_id == 0 && txn_idx == 0) || (shard_id == num_shards && txn_idx == txns_len))
-    {
-        return true;
-    }
-    false
-}
-
-fn is_total_supply_absent_global_shard(
-    total_supply: Option<u128>,
-    txn_idx: usize,
-    txns_len: usize,
-) -> bool {
-    // only first and last txn of the block can have 'none' for 'total_supply', it is possible that
-    // both first and last txns are on global shard
-    if total_supply.is_none() && (txn_idx == 0 || txn_idx == txns_len) {
-        return true;
-    }
-    false
-}
-
 pub fn aggregate_and_update_total_supply<S: StateView>(
     sharded_output: &mut Vec<Vec<Vec<TransactionOutput>>>,
     global_output: &mut [TransactionOutput],
@@ -210,23 +182,12 @@ pub fn aggregate_and_update_total_supply<S: StateView>(
         .enumerate()
         .for_each(|(shard_id, shard_output)| {
             for (round, txn_outputs) in shard_output.iter().enumerate() {
-                for (txn_idx, txn_output) in txn_outputs.iter().rev().enumerate() {
-                    let last_txn_total_supply = txn_output.write_set().get_total_supply();
-                    if is_total_supply_absent(
-                        last_txn_total_supply,
-                        shard_id,
-                        num_shards,
-                        txn_idx,
-                        txn_outputs.len(),
-                    ) {
-                        continue;
+                for txn in txn_outputs.iter().rev() {
+                    if let Some(last_txn_total_supply) = txn.write_set().get_total_supply() {
+                        aggr_total_supply_delta[round * num_shards + shard_id + 1] =
+                            DeltaU128::get_delta(last_txn_total_supply, TOTAL_SUPPLY_AGGR_BASE_VAL);
+                        break;
                     }
-                    aggr_total_supply_delta[round * num_shards + shard_id + 1] =
-                        DeltaU128::get_delta(
-                            last_txn_total_supply.unwrap(),
-                            TOTAL_SUPPLY_AGGR_BASE_VAL,
-                        );
-                    break;
                 }
             }
         });
@@ -249,60 +210,36 @@ pub fn aggregate_and_update_total_supply<S: StateView>(
 
     let aggr_total_supply_delta_ref = &aggr_total_supply_delta;
     // Runtime is O(num_txns), hence parallelized at the shard level and at the txns level.
-    executor_thread_pool.scope(|s| {
-        for (shard_id, shard_output) in sharded_output.iter_mut().enumerate() {
-            s.spawn(move |_| {
+    executor_thread_pool.scope(|_| {
+        sharded_output
+            .par_iter_mut()
+            .enumerate()
+            .for_each(|(shard_id, shard_output)| {
                 for (round, txn_outputs) in shard_output.iter_mut().enumerate() {
                     let delta_for_round =
                         aggr_total_supply_delta_ref[round * num_shards + shard_id] + base_val_delta;
-                    let total_txns_len = txn_outputs.len();
-                    for (txn_idx, txn_output) in txn_outputs.iter_mut().enumerate() {
-                        let txn_total_supply = txn_output.write_set().get_total_supply();
-                        if is_total_supply_absent(
-                            txn_total_supply,
-                            shard_id,
-                            num_shards,
-                            txn_idx,
-                            total_txns_len,
-                        ) {
-                            continue;
+                    txn_outputs.par_iter_mut().for_each(|txn_output| {
+                        if let Some(txn_total_supply) = txn_output.write_set().get_total_supply() {
+                            txn_output
+                                .update_total_supply(delta_for_round.add_delta(txn_total_supply));
                         }
-                        txn_output.update_total_supply(
-                            delta_for_round.add_delta(txn_total_supply.unwrap()),
-                        );
-                    }
+                    });
                 }
             });
-        }
     });
 
     let delta_for_global_shard = aggr_total_supply_delta[num_shards * num_rounds] + base_val_delta;
     let delta_for_global_shard_ref = &delta_for_global_shard;
-    let global_output_len = global_output.len();
-    if global_output.len() < 25 {
-        for (txn_idx, txn_output) in global_output.iter_mut().enumerate() {
-            let txn_total_supply = txn_output.write_set().get_total_supply();
-            if is_total_supply_absent_global_shard(txn_total_supply, txn_idx, global_output_len) {
-                continue;
-            }
-            txn_output.update_total_supply(
-                delta_for_global_shard_ref.add_delta(txn_total_supply.unwrap()),
-            );
-        }
-    } else {
-        executor_thread_pool.scope(|s| {
-            for (txn_idx, txn_output) in global_output.iter_mut().enumerate() {
-                let txn_total_supply = txn_output.write_set().get_total_supply();
-                if is_total_supply_absent_global_shard(txn_total_supply, txn_idx, global_output_len)
-                {
-                    continue;
-                }
-                s.spawn(move |_| {
+    executor_thread_pool.scope(|_| {
+        global_output
+            .par_iter_mut()
+            .with_min_len(25)
+            .for_each(|txn_output| {
+                if let Some(txn_total_supply) = txn_output.write_set().get_total_supply() {
                     txn_output.update_total_supply(
-                        delta_for_global_shard_ref.add_delta(txn_total_supply.unwrap()),
+                        delta_for_global_shard_ref.add_delta(txn_total_supply),
                     );
-                });
-            }
-        });
-    }
+                }
+            });
+    });
 }
