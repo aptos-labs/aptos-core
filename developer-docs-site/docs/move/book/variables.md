@@ -719,6 +719,9 @@ algorithm for doing so is quite simple:
   - Except under special circumstances where it is made a `move` for predictable borrow checker
     errors.
 - Any other value is given a `move`.
+- If the compiler can prove that the source value with copy ability is not used after the 
+  assignment, then a move may be used instead of a copy for performance, but this will be invisible
+  to the programmer (except in possible decreased time or gas cost).
 
 For example:
 
