@@ -9,10 +9,11 @@ use crate::{
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     counters::*,
-    data_cache::StateViewAdapter,
+    data_cache::StorageAdapter,
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, RespawnedSession, SessionExt, SessionId},
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
+    storage_adapter::StateViewAdapter,
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     verifier, VMExecutor, VMValidator,
@@ -33,7 +34,9 @@ use aptos_types::{
     block_executor::partitioner::PartitionedTransactions,
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
-    on_chain_config::{new_epoch_event_key, ConfigStorage, FeatureFlag, TimedFeatureOverride},
+    on_chain_config::{
+        new_epoch_event_key, ConfigStorage, FeatureFlag, Features, TimedFeatureOverride,
+    },
     transaction::{
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
@@ -47,6 +50,7 @@ use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculat
 use aptos_vm_types::{
     change_set::VMChangeSet,
     output::VMOutput,
+    resolver::ExecutorResolver,
     storage::{ChangeSetConfigs, StorageGasParameters},
 };
 use fail::fail_point;
@@ -61,6 +65,7 @@ use move_core_types::{
     ident_str,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
+    resolver::MoveResolver,
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
@@ -121,7 +126,8 @@ impl AptosVM {
     }
 
     pub fn new_from_state_view(state_view: &impl StateView) -> Self {
-        let config_storage = StateViewAdapter::new(state_view);
+        let resolver = StateViewAdapter(state_view);
+        let config_storage = StorageAdapter::new(&resolver);
         Self(AptosVMImpl::new(&config_storage))
     }
 
@@ -178,6 +184,14 @@ impl AptosVM {
         }
     }
 
+    pub fn get_gas_feature_version(&self) -> u64 {
+        self.0.get_gas_feature_version()
+    }
+
+    pub fn get_features(&self) -> &Features {
+        self.0.get_features()
+    }
+
     // Set the override profile for timed features.
     pub fn set_timed_feature_override(profile: TimedFeatureOverride) {
         TIMED_FEATURE_OVERRIDE.set(profile).ok();
@@ -226,7 +240,7 @@ impl AptosVM {
     pub fn load_module(
         &self,
         module_id: &ModuleId,
-        resolver: &impl AptosMoveResolver,
+        resolver: &dyn MoveResolver,
     ) -> VMResult<Arc<CompiledModule>> {
         self.0.load_module(module_id, resolver)
     }
@@ -251,14 +265,6 @@ impl AptosVM {
             change_set_configs,
         )
         .1
-    }
-
-    pub fn as_move_resolver<'a, S: StateView>(&self, state_view: &'a S) -> StateViewAdapter<'a, S> {
-        StateViewAdapter::new_with_cached_config(
-            state_view,
-            self.0.get_gas_feature_version(),
-            self.0.get_features(),
-        )
     }
 
     fn fee_statement_from_gas_meter(
@@ -1256,7 +1262,7 @@ impl AptosVM {
 
     fn read_change_set(
         &self,
-        state_view: &impl AptosMoveResolver,
+        resolver: &dyn ExecutorResolver,
         change_set: &VMChangeSet,
     ) -> Result<(), VMStatus> {
         assert!(
@@ -1267,7 +1273,7 @@ impl AptosVM {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
         for (state_key, _) in change_set.write_set_iter() {
-            state_view
+            resolver
                 // TODO: Fix this, placeholder!
                 .get_module_bytes(state_key)
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
@@ -1314,7 +1320,7 @@ impl AptosVM {
         )?;
 
         Self::validate_waypoint_change_set(&change_set, log_context)?;
-        self.read_change_set(resolver, &change_set)?;
+        self.read_change_set(resolver.as_executor_resolver(), &change_set)?;
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
@@ -1382,8 +1388,9 @@ impl AptosVM {
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
-        let resolver = StateViewAdapter::new_with_cached_config(
-            state_view,
+        let adapter = StateViewAdapter(state_view);
+        let resolver = StorageAdapter::new_with_cached_config(
+            &adapter,
             simulation_vm.0 .0.get_gas_feature_version(),
             simulation_vm.0 .0.get_features(),
         );
@@ -1414,8 +1421,10 @@ impl AptosVM {
                 vm.0.get_storage_gas_parameters(&log_context)?.clone(),
                 gas_budget,
             )));
-        let resolver = StateViewAdapter::new_with_cached_config(
-            state_view,
+
+        let adapter = StateViewAdapter(state_view);
+        let resolver = StorageAdapter::new_with_cached_config(
+            &adapter,
             vm.0.get_gas_feature_version(),
             vm.0.get_features(),
         );
@@ -1596,8 +1605,9 @@ impl VMValidator for AptosVM {
             },
         };
 
-        let resolver = StateViewAdapter::new_with_cached_config(
-            state_view,
+        let adapter = StateViewAdapter(state_view);
+        let resolver = StorageAdapter::new_with_cached_config(
+            &adapter,
             self.0.get_gas_feature_version(),
             self.0.get_features(),
         );

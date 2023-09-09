@@ -1,16 +1,22 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
 //! Scratchpad for on chain values during the execution.
+//!
+//! This crate provides adapters which  can be used as
 
 use crate::{
     aptos_vm_impl::gas_config,
-    move_vm_ext::{get_max_binary_format_version, AptosMoveResolver},
+    move_vm_ext::{
+        get_max_binary_format_version, AptosMoveResolver, AsExecutorResolver, StateValueKind,
+        StateValueMetadataKind, StateValueMetadataResolver,
+    },
 };
 #[allow(unused_imports)]
 use anyhow::Error;
 use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorResolver};
-use aptos_state_view::{StateView, StateViewId};
+use aptos_state_view::StateViewId;
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
@@ -19,16 +25,13 @@ use aptos_types::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
 };
-use aptos_vm_types::resolver::{
-    ExecutorResolver, StateStorageResolver, TModuleResolver, TResourceResolver,
-};
+use aptos_vm_types::resolver::{ExecutorResolver, StateStorageResolver};
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     resolver::{resource_size, ModuleResolver, ResourceResolver},
-    value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use std::{cell::RefCell, collections::BTreeMap};
@@ -45,19 +48,19 @@ pub(crate) fn get_resource_group_from_metadata(
         .find_map(|attr| attr.get_resource_group_member())
 }
 
-/// Adapter to convert a `StateView` into a `AptosMoveResolver`.
-pub struct StateViewAdapter<'a, S> {
-    state_view: &'a S,
+/// Adapter which implements `AptosMoveResolver` using the underlying resolver.
+pub struct StorageAdapter<'r, R> {
+    resolver: &'r R,
     accurate_byte_count: bool,
     max_binary_format_version: u32,
     resource_group_cache:
         RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
 }
 
-impl<'a, S: StateView> StateViewAdapter<'a, S> {
-    pub fn new(state_view: &'a S) -> Self {
+impl<'r, R: ExecutorResolver> StorageAdapter<'r, R> {
+    pub fn new(resolver: &'r R) -> Self {
         let mut s = Self {
-            state_view,
+            resolver,
             accurate_byte_count: false,
             max_binary_format_version: 0,
             resource_group_cache: RefCell::new(BTreeMap::new()),
@@ -72,12 +75,12 @@ impl<'a, S: StateView> StateViewAdapter<'a, S> {
     }
 
     pub fn new_with_cached_config(
-        state_view: &'a S,
+        resolver: &'r R,
         gas_feature_version: u64,
         features: &Features,
     ) -> Self {
         let mut s = Self {
-            state_view,
+            resolver,
             accurate_byte_count: false,
             max_binary_format_version: 0,
             resource_group_cache: RefCell::new(BTreeMap::new()),
@@ -87,12 +90,6 @@ impl<'a, S: StateView> StateViewAdapter<'a, S> {
         }
         s.max_binary_format_version = get_max_binary_format_version(features, gas_feature_version);
         s
-    }
-
-    fn get(&self, access_path: AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
-        self.state_view
-            .get_state_value_bytes(&StateKey::access_path(access_path))
-            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 
     fn get_any_resource(
@@ -143,24 +140,29 @@ impl<'a, S: StateView> StateViewAdapter<'a, S> {
         &self,
         address: &AccountAddress,
         resource_group: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
-        let ap = AccessPath::resource_group_access_path(*address, resource_group.clone());
-        self.get(ap).map_err(|e| e.finish(Location::Undefined))
+    ) -> VMResult<Option<Vec<u8>>> {
+        let access_path = AccessPath::resource_group_access_path(*address, resource_group.clone());
+        self.resolver
+            .get_resource_bytes(&StateKey::access_path(access_path), None)
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined))
     }
 
     fn get_standard_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
-        let ap = AccessPath::resource_access_path(*address, struct_tag.clone()).map_err(|_| {
-            PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Undefined)
-        })?;
-        self.get(ap).map_err(|e| e.finish(Location::Undefined))
+    ) -> VMResult<Option<Vec<u8>>> {
+        let access_path =
+            AccessPath::resource_access_path(*address, struct_tag.clone()).map_err(|_| {
+                PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Undefined)
+            })?;
+        self.resolver
+            .get_resource_bytes(&StateKey::access_path(access_path), None)
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined))
     }
 }
 
-impl<'a, S: StateView> AptosMoveResolver for StateViewAdapter<'a, S> {
+impl<'r, R: ExecutorResolver> AptosMoveResolver for StorageAdapter<'r, R> {
     fn release_resource_group_cache(
         &self,
     ) -> BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>> {
@@ -168,38 +170,7 @@ impl<'a, S: StateView> AptosMoveResolver for StateViewAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> TResourceResolver for StateViewAdapter<'a, S> {
-    type Key = StateKey;
-    type Layout = MoveTypeLayout;
-
-    fn get_resource_state_value(
-        &self,
-        _state_key: &Self::Key,
-        _maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<StateValue>> {
-        todo!()
-    }
-}
-
-impl<'a, S: StateView> TModuleResolver for StateViewAdapter<'a, S> {
-    type Key = StateKey;
-
-    fn get_module_state_value(&self, _state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-        todo!()
-    }
-}
-
-impl<'a, S: StateView> StateStorageResolver for StateViewAdapter<'a, S> {
-    fn id(&self) -> StateViewId {
-        self.state_view.id()
-    }
-
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-        self.state_view.get_usage()
-    }
-}
-
-impl<'a, S: StateView> ResourceResolver for StateViewAdapter<'a, S> {
+impl<'r, R: ExecutorResolver> ResourceResolver for StorageAdapter<'r, R> {
     fn get_resource_with_metadata(
         &self,
         address: &AccountAddress,
@@ -210,7 +181,7 @@ impl<'a, S: StateView> ResourceResolver for StateViewAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> ModuleResolver for StateViewAdapter<'a, S> {
+impl<'r, R: ExecutorResolver> ModuleResolver for StorageAdapter<'r, R> {
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
         let module_bytes = match self.get_module(module_id) {
             Ok(Some(bytes)) => bytes,
@@ -227,157 +198,69 @@ impl<'a, S: StateView> ModuleResolver for StateViewAdapter<'a, S> {
     }
 
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
-        // REVIEW: cache this?
-        let ap = AccessPath::from(module_id);
-        Ok(self.get(ap).map_err(|e| e.finish(Location::Undefined))?)
+        let access_path = AccessPath::from(module_id);
+        Ok(self
+            .resolver
+            .get_module_bytes(&StateKey::access_path(access_path))
+            .map_err(|_| {
+                PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
+            })?)
     }
 }
 
-impl<'a, S: StateView> TableResolver for StateViewAdapter<'a, S> {
+impl<'r, R: ExecutorResolver> TAggregatorResolver for StorageAdapter<'r, R> {
+    type Key = AggregatorID;
+
+    fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        self.resolver.get_aggregator_v1_state_value(id)
+    }
+}
+
+impl<'r, R: ExecutorResolver> StateValueMetadataResolver for StorageAdapter<'r, R> {
+    fn get_state_value_metadata(
+        &self,
+        state_key: &StateKey,
+        kind: StateValueKind,
+    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+        match kind {
+            StateValueKind::Code => self.resolver.get_module_state_value_metadata(state_key),
+            StateValueKind::Data => self.resolver.get_resource_state_value_metadata(state_key),
+        }
+    }
+}
+
+impl<'r, R: ExecutorResolver> TableResolver for StorageAdapter<'r, R> {
     fn resolve_table_entry(
         &self,
         handle: &TableHandle,
         key: &[u8],
     ) -> Result<Option<Vec<u8>>, Error> {
-        self.state_view
-            .get_state_value_bytes(&StateKey::table_item((*handle).into(), key.to_vec()))
+        self.resolver
+            .get_resource_bytes(&StateKey::table_item((*handle).into(), key.to_vec()), None)
     }
 }
 
-impl<'a, S: StateView> TAggregatorResolver for StateViewAdapter<'a, S> {
-    type Key = AggregatorID;
-
-    fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-        self.state_view.get_state_value(id.as_state_key())
-    }
-}
-
-impl<'a, S: StateView> ConfigStorage for StateViewAdapter<'a, S> {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
-        self.get(access_path).ok()?
-    }
-}
-
-pub trait AsMoveResolver<S> {
-    fn as_move_resolver(&self) -> StateViewAdapter<S>;
-}
-
-impl<S: StateView> AsMoveResolver<S> for S {
-    fn as_move_resolver(&self) -> StateViewAdapter<S> {
-        StateViewAdapter::new(self)
-    }
-}
-
-pub struct ExecutorResolverAdapter<'a, R> {
-    #[allow(unused)]
-    executor_resolver: &'a R,
-    accurate_byte_count: bool,
-    max_binary_format_version: u32,
-    #[allow(unused)]
-    resource_group_cache:
-        RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
-}
-
-impl<'a, R: ExecutorResolver> ExecutorResolverAdapter<'a, R> {
-    pub fn new_with_cached_config(
-        executor_resolver: &'a R,
-        gas_feature_version: u64,
-        features: &Features,
-    ) -> Self {
-        let mut s = Self {
-            executor_resolver,
-            accurate_byte_count: false,
-            max_binary_format_version: 0,
-            resource_group_cache: RefCell::new(BTreeMap::new()),
-        };
-        if gas_feature_version >= 9 {
-            s.accurate_byte_count = true;
-        }
-        s.max_binary_format_version = get_max_binary_format_version(features, gas_feature_version);
-        s
-    }
-}
-
-impl<'a, R: ExecutorResolver> AptosMoveResolver for ExecutorResolverAdapter<'a, R> {
-    fn release_resource_group_cache(
-        &self,
-    ) -> BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>> {
-        todo!()
-    }
-}
-
-impl<'a, R: ExecutorResolver> TResourceResolver for ExecutorResolverAdapter<'a, R> {
-    type Key = StateKey;
-    type Layout = MoveTypeLayout;
-
-    fn get_resource_state_value(
-        &self,
-        _state_key: &Self::Key,
-        _maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<StateValue>> {
-        todo!()
-    }
-}
-
-impl<'a, R: ExecutorResolver> TModuleResolver for ExecutorResolverAdapter<'a, R> {
-    type Key = StateKey;
-
-    fn get_module_state_value(&self, _state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-        todo!()
-    }
-}
-
-impl<'a, R: ExecutorResolver> StateStorageResolver for ExecutorResolverAdapter<'a, R> {
+impl<'r, R: ExecutorResolver> StateStorageResolver for StorageAdapter<'r, R> {
     fn id(&self) -> StateViewId {
-        todo!()
+        self.resolver.id()
     }
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-        todo!()
+        self.resolver.get_usage()
     }
 }
 
-impl<'a, R: ExecutorResolver> ResourceResolver for ExecutorResolverAdapter<'a, R> {
-    fn get_resource_with_metadata(
-        &self,
-        _address: &AccountAddress,
-        _struct_tag: &StructTag,
-        _metadata: &[Metadata],
-    ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
-        todo!()
+impl<'r, R: ExecutorResolver> ConfigStorage for StorageAdapter<'r, R> {
+    fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
+        // Config is a resource on-chain.
+        self.resolver
+            .get_resource_bytes(&StateKey::access_path(access_path), None)
+            .ok()?
     }
 }
 
-impl<'a, R: ExecutorResolver> ModuleResolver for ExecutorResolverAdapter<'a, R> {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        todo!()
-    }
-
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
-        todo!()
-    }
-}
-
-impl<'a, R: ExecutorResolver> TableResolver for ExecutorResolverAdapter<'a, R> {
-    fn resolve_table_entry(
-        &self,
-        _handle: &TableHandle,
-        _key: &[u8],
-    ) -> Result<Option<Vec<u8>>, Error> {
-        todo!()
-    }
-}
-
-impl<'a, R: ExecutorResolver> TAggregatorResolver for ExecutorResolverAdapter<'a, R> {
-    type Key = AggregatorID;
-
-    fn get_aggregator_v1_state_value(&self, _id: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-        todo!()
-    }
-}
-
-impl<'a, R: ExecutorResolver> ConfigStorage for ExecutorResolverAdapter<'a, R> {
-    fn fetch_config(&self, _access_path: AccessPath) -> Option<Vec<u8>> {
-        todo!()
+impl<'r, R: ExecutorResolver> AsExecutorResolver for StorageAdapter<'r, R> {
+    fn as_executor_resolver(&self) -> &dyn ExecutorResolver {
+        self.resolver
     }
 }

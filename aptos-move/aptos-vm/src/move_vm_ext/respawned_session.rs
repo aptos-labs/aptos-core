@@ -2,28 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::ExecutorResolverAdapter,
-    move_vm_ext::{SessionExt, SessionId},
+    data_cache::StorageAdapter,
+    move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
+    storage_adapter::RespawnedViewAdapter,
     AptosVM,
 };
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorResolver};
 use aptos_gas_algebra::Fee;
-use aptos_state_view::StateViewId;
-use aptos_types::{
-    state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-    },
-    write_set::TransactionWrite,
-};
-use aptos_vm_types::{
-    change_set::VMChangeSet,
-    resolver::{ExecutorResolver, StateStorageResolver, TModuleResolver, TResourceResolver},
-    storage::ChangeSetConfigs,
-};
-use move_core_types::{
-    value::MoveTypeLayout,
-    vm_status::{err_msg, StatusCode, VMStatus},
-};
+use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
+use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 
 /// We finish the session after the user transaction is done running to get the change set and
 /// charge gas and storage fee based on it before running storage refunds and the transaction
@@ -31,10 +17,10 @@ use move_core_types::{
 /// the base state view, and this struct implements that.
 #[ouroboros::self_referencing]
 pub struct RespawnedSession<'r, 'l> {
-    state_view: ChangeSetStateView<'r>,
+    state_view: RespawnedViewAdapter<'r>,
     #[borrows(state_view)]
     #[covariant]
-    resolver: ExecutorResolverAdapter<'this, ChangeSetStateView<'r>>,
+    resolver: StorageAdapter<'this, RespawnedViewAdapter<'r>>,
     #[borrows(resolver)]
     #[not_covariant]
     session: Option<SessionExt<'this, 'l>>,
@@ -45,16 +31,17 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
     pub fn spawn(
         vm: &'l AptosVM,
         session_id: SessionId,
-        base_state_view: &'r dyn ExecutorResolver,
+        base: &'r dyn AptosMoveResolver,
         previous_session_change_set: VMChangeSet,
         storage_refund: Fee,
     ) -> Result<Self, VMStatus> {
-        let state_view = ChangeSetStateView::new(base_state_view, previous_session_change_set)?;
+        let state_view =
+            RespawnedViewAdapter::new(base.as_executor_resolver(), previous_session_change_set);
 
         Ok(RespawnedSessionBuilder {
             state_view,
             resolver_builder: |state_view| {
-                ExecutorResolverAdapter::new_with_cached_config(
+                StorageAdapter::new_with_cached_config(
                     state_view,
                     vm.0.get_gas_feature_version(),
                     vm.0.get_features(),
@@ -91,81 +78,6 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
 
     pub fn get_storage_fee_refund(&self) -> Fee {
         *self.borrow_storage_refund()
-    }
-}
-
-/// A state view as if a change set is applied on top of the base state view.
-struct ChangeSetStateView<'r> {
-    #[allow(unused)]
-    base_resolver: &'r dyn ExecutorResolver,
-    change_set: VMChangeSet,
-}
-
-impl<'r> ChangeSetStateView<'r> {
-    pub fn new(
-        base_resolver: &'r dyn ExecutorResolver,
-        change_set: VMChangeSet,
-    ) -> Result<Self, VMStatus> {
-        Ok(Self {
-            base_resolver,
-            change_set,
-        })
-    }
-}
-
-impl<'r> TResourceResolver for ChangeSetStateView<'r> {
-    type Key = StateKey;
-    type Layout = MoveTypeLayout;
-
-    fn get_resource_state_value(
-        &self,
-        state_key: &Self::Key,
-        maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<StateValue>> {
-        match self.change_set.resource_write_set().get(state_key) {
-            Some(write_op) => Ok(write_op.as_state_value()),
-            None => self
-                .base_resolver
-                .get_resource_state_value(state_key, maybe_layout),
-        }
-    }
-}
-
-impl<'r> TModuleResolver for ChangeSetStateView<'r> {
-    type Key = StateKey;
-
-    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-        match self.change_set.module_write_set().get(state_key) {
-            Some(write_op) => Ok(write_op.as_state_value()),
-            None => self.base_resolver.get_module_state_value(state_key),
-        }
-    }
-}
-
-impl<'r> StateStorageResolver for ChangeSetStateView<'r> {
-    fn id(&self) -> StateViewId {
-        self.base_resolver.id()
-    }
-
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-        anyhow::bail!("Unexpected access to get_usage()")
-    }
-}
-
-impl<'r> TAggregatorResolver for ChangeSetStateView<'r> {
-    type Key = AggregatorID;
-
-    fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-        match self.change_set.aggregator_v1_delta_set().get(id) {
-            Some(delta_op) => Ok(self
-                .base_resolver
-                .try_convert_aggregator_v2_delta_into_write_op(id, delta_op)?
-                .as_state_value()),
-            None => match self.change_set.aggregator_v1_write_set().get(id) {
-                Some(write_op) => Ok(write_op.as_state_value()),
-                None => self.base_resolver.get_aggregator_v1_state_value(id),
-            },
-        }
     }
 }
 

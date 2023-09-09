@@ -13,8 +13,9 @@ use aptos_types::{
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
-    data_cache::StateViewAdapter,
+    data_cache::StorageAdapter,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
+    storage_adapter::StateViewAdapter,
 };
 use aptos_vm_types::storage::ChangeSetConfigs;
 use move_core_types::{
@@ -118,7 +119,8 @@ where
         TimedFeatures::enable_all(),
     )
     .unwrap();
-    let state_view_storage = StateViewAdapter::new(state_view);
+    let adapter = StateViewAdapter(&state_view);
+    let state_view_storage = StorageAdapter::new(&adapter);
     let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();

@@ -24,7 +24,7 @@ use aptos_types::{
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
 };
-use aptos_vm::data_cache::AsMoveResolver;
+use aptos_vm::{data_cache::StorageAdapter, storage_adapter::StateViewAdapter};
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
     resolver::MoveResolver,
@@ -340,8 +340,9 @@ impl Account {
                 let state_view = self
                     .context
                     .latest_state_view_poem(&self.latest_ledger_info)?;
-                let converted_resources = state_view
-                    .as_move_resolver()
+                let state_view_adapter = StateViewAdapter(&state_view);
+                let resolver = StorageAdapter::new(&state_view_adapter);
+                let converted_resources = resolver
                     .as_converter(self.context.db.clone())
                     .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
                     .context("Failed to build move resource response from data in DB")
@@ -516,7 +517,8 @@ impl Account {
     ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>, BasicErrorWith404> {
         let (ledger_info, ledger_version, state_view) =
             self.context.state_view(Some(self.ledger_version))?;
-        let resolver = state_view.as_move_resolver();
+        let state_view_adapter = StateViewAdapter(&state_view);
+        let resolver = StorageAdapter::new(&state_view_adapter);
 
         let bytes = resolver
             .get_resource(&self.address.into(), resource_type)

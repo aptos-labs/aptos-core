@@ -45,8 +45,7 @@ use aptos_types::{
 };
 use aptos_utils::aptos_try;
 use aptos_vm::{
-    data_cache::{AsMoveResolver, StateViewAdapter},
-    move_vm_ext::AptosMoveResolver,
+    data_cache::StorageAdapter, move_vm_ext::AptosMoveResolver, storage_adapter::StateViewAdapter,
 };
 use futures::{channel::oneshot, SinkExt};
 use move_core_types::language_storage::{ModuleId, StructTag};
@@ -363,7 +362,8 @@ impl Context {
                         .is_some()
                     };
 
-                let resolver = state_view.as_move_resolver();
+                let state_view_adapter = StateViewAdapter(&state_view);
+                let resolver = StorageAdapter::new(&state_view_adapter);
                 if is_resource_group(&resolver, &key) {
                     // An error here means a storage invariant has been violated
                     bcs::from_bytes::<ResourceGroup>(&value)
@@ -587,7 +587,8 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let resolver = state_view.as_move_resolver();
+        let state_view_adapter = StateViewAdapter(&state_view);
+        let resolver = StorageAdapter::new(&state_view_adapter);
         let converter = resolver.as_converter(self.db.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
@@ -618,7 +619,8 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let resolver = state_view.as_move_resolver();
+        let state_view_adapter = StateViewAdapter(&state_view);
+        let resolver = StorageAdapter::new(&state_view_adapter);
         let converter = resolver.as_converter(self.db.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
@@ -1153,7 +1155,8 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let storage_adapter = StateViewAdapter::new(&state_view);
+            let adapter = StateViewAdapter(&state_view);
+            let storage_adapter = StorageAdapter::new(&adapter);
 
             let gas_schedule_params =
                 match GasScheduleV2::fetch_config(&storage_adapter).and_then(|gas_schedule| {
@@ -1218,7 +1221,8 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let storage_adapter = StateViewAdapter::new(&state_view);
+            let adapter = StateViewAdapter(&state_view);
+            let storage_adapter = StorageAdapter::new(&adapter);
 
             let block_gas_limit = OnChainExecutionConfig::fetch_config(&storage_adapter)
                 .and_then(|config| config.block_gas_limit());

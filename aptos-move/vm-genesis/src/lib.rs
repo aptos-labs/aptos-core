@@ -28,8 +28,9 @@ use aptos_types::{
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
 use aptos_vm::{
-    data_cache::AsMoveResolver,
+    data_cache::StorageAdapter,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
+    storage_adapter::StateViewAdapter,
 };
 use aptos_vm_types::storage::ChangeSetConfigs;
 use move_core_types::{
@@ -103,7 +104,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = state_view.as_move_resolver();
+    let state_view_adapter = StateViewAdapter(&state_view);
+    let data_cache = StorageAdapter::new(&state_view_adapter);
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
@@ -144,7 +146,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
     // Publish the framework, using a different session id, in case both scripts creates tables
     let state_view = GenesisStateView::new();
-    let data_cache = state_view.as_move_resolver();
+    let state_view_adapter = StateViewAdapter(&state_view);
+    let data_cache = StorageAdapter::new(&state_view_adapter);
 
     let mut id2_arr = [0u8; 32];
     id2_arr[31] = 1;
@@ -211,7 +214,8 @@ pub fn encode_genesis_change_set(
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = state_view.as_move_resolver();
+    let state_view_adapter = StateViewAdapter(&state_view);
+    let data_cache = StorageAdapter::new(&state_view_adapter);
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
@@ -253,7 +257,8 @@ pub fn encode_genesis_change_set(
     let mut change_set = session.finish(&mut (), &configs).unwrap();
 
     let state_view = GenesisStateView::new();
-    let data_cache = state_view.as_move_resolver();
+    let state_view_adapter = StateViewAdapter(&state_view);
+    let data_cache = StorageAdapter::new(&state_view_adapter);
 
     // Publish the framework, using a different session id, in case both scripts creates tables
     let mut id2_arr = [0u8; 32];
@@ -894,7 +899,8 @@ pub fn test_genesis_module_publishing() {
     {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = state_view.as_move_resolver();
+    let state_view_adapter = StateViewAdapter(&state_view);
+    let data_cache = StorageAdapter::new(&state_view_adapter);
 
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),

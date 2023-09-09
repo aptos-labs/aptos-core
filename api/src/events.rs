@@ -20,7 +20,7 @@ use aptos_api_types::{
     MoveStructTag, VerifyInputWithRecursion, VersionedEvent, U64,
 };
 use aptos_types::event::EventKey;
-use aptos_vm::data_cache::AsMoveResolver;
+use aptos_vm::{data_cache::StorageAdapter, storage_adapter::StateViewAdapter};
 use poem_openapi::{
     param::{Path, Query},
     OpenApi,
@@ -172,10 +172,10 @@ impl EventsApi {
 
         match accept_type {
             AcceptType::Json => {
-                let events = self
-                    .context
-                    .latest_state_view_poem(&latest_ledger_info)?
-                    .as_move_resolver()
+                let state_view = self.context.latest_state_view_poem(&latest_ledger_info)?;
+                let state_view_adapter = StateViewAdapter(&state_view);
+                let resolver = StorageAdapter::new(&state_view_adapter);
+                let events = resolver
                     .as_converter(self.context.db.clone())
                     .try_into_versioned_events(&events)
                     .context("Failed to convert events from storage into response")

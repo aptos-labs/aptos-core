@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path_cache::AccessPathCache, data_cache::get_resource_group_from_metadata,
-    move_vm_ext::AptosMoveResolver, transaction_metadata::TransactionMetadata,
+    access_path_cache::AccessPathCache,
+    data_cache::get_resource_group_from_metadata,
+    move_vm_ext::{AptosMoveResolver, StateValueKind},
+    transaction_metadata::TransactionMetadata,
 };
 use aptos_aggregator::{aggregator_extension::AggregatorID, delta_change_set::serialize};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -421,7 +423,7 @@ impl<'r> WriteOpConverter<'r> {
         let maybe_existing_metadata = self
             .remote
             // TODO FIX
-            .get_resource_state_value_metadata(state_key)
+            .get_state_value_metadata(state_key, StateValueKind::Data)
             .map_err(|_| {
                 VMStatus::error(
                     StatusCode::STORAGE_ERROR,

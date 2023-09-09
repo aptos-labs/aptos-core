@@ -6,7 +6,8 @@ use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
-    data_cache::{ExecutorResolverAdapter, StateViewAdapter},
+    data_cache::StorageAdapter,
+    storage_adapter::StateViewAdapter,
 };
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
@@ -34,7 +35,8 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     fn init(argument: &'a S) -> Self {
         // AptosVM has to be initialized using configs from storage.
         // Using adapter allows us to fetch those.
-        let config_storage = StateViewAdapter::new(argument);
+        let resolver = StateViewAdapter(argument);
+        let config_storage = StorageAdapter::new(&resolver);
         let vm = AptosVM::new(&config_storage);
 
         // Loading `0x1::account` and its transitive dependency into the code cache.
@@ -45,8 +47,8 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         // Loading up `0x1::account` should be sufficient as this is the most common module
         // used for prologue, epilogue and transfer functionality.
 
-        let resolver = StateViewAdapter::new_with_cached_config(
-            argument,
+        let resolver = StorageAdapter::new_with_cached_config(
+            &resolver,
             vm.0.get_gas_feature_version(),
             vm.0.get_features(),
         );
@@ -72,7 +74,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
-        let resolver = ExecutorResolverAdapter::new_with_cached_config(
+        let resolver = StorageAdapter::new_with_cached_config(
             view,
             self.vm.0.get_gas_feature_version(),
             self.vm.0.get_features(),

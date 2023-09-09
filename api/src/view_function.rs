@@ -10,7 +10,7 @@ use crate::{
     ApiTags, Context,
 };
 use aptos_api_types::{AptosErrorCode, AsConverter, MoveValue, ViewRequest, U64};
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::{data_cache::StorageAdapter, storage_adapter::StateViewAdapter, AptosVM};
 use move_core_types::language_storage::TypeTag;
 use poem_openapi::{param::Query, payload::Json, OpenApi};
 use std::sync::Arc;
@@ -55,7 +55,8 @@ impl ViewFunctionApi {
             )?;
 
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let resolver = state_view.as_move_resolver();
+        let state_view_adapter = StateViewAdapter(&state_view);
+        let resolver = StorageAdapter::new(&state_view_adapter);
 
         let entry_func = resolver
             .as_converter(self.context.db.clone())

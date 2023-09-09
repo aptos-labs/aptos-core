@@ -13,7 +13,10 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
     write_set::WriteOp,
 };
-use aptos_vm::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata, AptosVM};
+use aptos_vm::{
+    data_cache::StorageAdapter, storage_adapter::StateViewAdapter,
+    transaction_metadata::TransactionMetadata, AptosVM,
+};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::storage::StorageGasParameters;
 use move_core_types::vm_status::StatusCode::TYPE_MISMATCH;
@@ -27,7 +30,9 @@ fn failed_transaction_cleanup_test() {
 
     let log_context = AdapterLogSchema::new(executor.get_state_view().id(), 0);
     let aptos_vm = AptosVM::new_from_state_view(executor.get_state_view());
-    let data_cache = executor.get_state_view().as_move_resolver();
+
+    let state_view_adapter = StateViewAdapter(executor.get_state_view());
+    let data_cache = StorageAdapter::new(&state_view_adapter);
 
     let txn_data = TransactionMetadata {
         sender: *sender.address(),

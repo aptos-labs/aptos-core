@@ -25,7 +25,9 @@ use aptos_types::{
         TransactionStatus,
     },
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM, VMExecutor};
+use aptos_vm::{
+    data_cache::StorageAdapter, storage_adapter::StateViewAdapter, AptosVM, VMExecutor,
+};
 use aptos_vm_genesis::GENESIS_KEYPAIR;
 use clap::Parser;
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
@@ -402,8 +404,10 @@ impl<'a> AptosTestAdapter<'a> {
                 )
             })?;
 
-        let annotated = MoveValueAnnotator::new(&self.storage.as_move_resolver())
-            .view_resource(&aptos_coin_tag, &balance_blob)?;
+        let state_view_adapter = StateViewAdapter(&self.storage);
+        let resolver = StorageAdapter::new(&state_view_adapter);
+        let annotated =
+            MoveValueAnnotator::new(&resolver).view_resource(&aptos_coin_tag, &balance_blob)?;
 
         // Filter the Coin resource and return the resouce value
         for (key, val) in annotated.value {
@@ -871,13 +875,9 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         resource: &IdentStr,
         type_args: Vec<TypeTag>,
     ) -> Result<String> {
-        view_resource_in_move_storage(
-            &self.storage.as_move_resolver(),
-            address,
-            module,
-            resource,
-            type_args,
-        )
+        let adapter = StateViewAdapter(&self.storage);
+        let resolver = StorageAdapter::new(&adapter);
+        view_resource_in_move_storage(&resolver, address, module, resource, type_args)
     }
 
     fn handle_subcommand(&mut self, input: TaskInput<Self::Subcommand>) -> Result<Option<String>> {
@@ -899,7 +899,8 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                 Ok(render_events(output.events()))
             },
             AptosSubCommand::ViewTableCommand(view_table_cmd) => {
-                let resolver = self.storage.as_move_resolver();
+                let adapter = StateViewAdapter(&self.storage);
+                let resolver = StorageAdapter::new(&adapter);
                 let converter = resolver.as_converter(Arc::new(FakeDbReader {}));
 
                 let vm_key = converter

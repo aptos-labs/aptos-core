@@ -23,8 +23,9 @@ use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
 };
 use aptos_vm::{
-    data_cache::StateViewAdapter,
+    data_cache::StorageAdapter,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
+    storage_adapter::StateViewAdapter,
     AptosVM, VMExecutor,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -74,7 +75,8 @@ impl AptosDebugger {
 
         // TODO(Gas): revisit this.
         let vm = AptosVM::new_from_state_view(&state_view);
-        let resolver = vm.as_move_resolver(&state_view);
+        let state_view_adapter = StateViewAdapter(&state_view);
+        let resolver = StorageAdapter::new(&state_view_adapter);
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
@@ -178,7 +180,8 @@ impl AptosDebugger {
         version: Version,
     ) -> Result<Option<AnnotatedAccountStateBlob>> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let remote_storage = StateViewAdapter::new(&state_view);
+        let adapter = StateViewAdapter(&state_view);
+        let remote_storage = StorageAdapter::new(&adapter);
         let annotator = AptosValueAnnotator::new(&remote_storage);
         Ok(
             match self
@@ -198,7 +201,8 @@ impl AptosDebugger {
     ) -> Result<Vec<(AccountAddress, AnnotatedAccountStateBlob)>> {
         let accounts = self.debugger.get_admin_accounts(version).await?;
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let remote_storage = StateViewAdapter::new(&state_view);
+        let adapter = StateViewAdapter(&state_view);
+        let remote_storage = StorageAdapter::new(&adapter);
         let annotator = AptosValueAnnotator::new(&remote_storage);
 
         let mut result = vec![];
@@ -227,7 +231,8 @@ impl AptosDebugger {
         F: FnOnce(&mut SessionExt) -> VMResult<()>,
     {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let state_view_storage = StateViewAdapter::new(&state_view);
+        let state_view_adapter = StateViewAdapter(&state_view);
+        let state_view_storage = StorageAdapter::new(&state_view_adapter);
         let features = Features::fetch_config(&state_view_storage).unwrap_or_default();
         let move_vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
