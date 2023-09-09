@@ -5,7 +5,7 @@ module aptos_framework::lockstream {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::timestamp;
     use aptos_std::math64;
-    use aptos_std::smart_table::{Self, SmartTable};
+    use aptos_std::table::{Self, Table};
     use aptos_std::type_info::{Self, TypeInfo};
     use std::signer;
 
@@ -16,7 +16,7 @@ module aptos_framework::lockstream {
     > has key {
         base_locked: Coin<BaseType>,
         quote_locked: Coin<QuoteType>,
-        lockers: SmartTable<address, LockerInfo>,
+        lockers: Table<address, LockerInfo>,
         initial_base_locked: u64,
         initial_quote_locked: u64,
         premier_locker: address,
@@ -171,7 +171,7 @@ module aptos_framework::lockstream {
         move_to(creator, LockstreamPool<BaseType, QuoteType> {
             base_locked: coin::withdraw(creator, initial_base_locked),
             quote_locked: coin::zero(),
-            lockers: smart_table::new(),
+            lockers: table::new(),
             initial_base_locked,
             initial_quote_locked: 0,
             premier_locker: @0x0,
@@ -218,16 +218,16 @@ module aptos_framework::lockstream {
             coin::value(&pool_ref_mut.quote_locked);
         let lockers_ref_mut = &mut pool_ref_mut.lockers;
         let locker_addr = signer::address_of(locker);
-        let locking_more = smart_table::contains(lockers_ref_mut, locker_addr);
+        let locking_more = table::contains(lockers_ref_mut, locker_addr);
         let total_quote_locked_for_locker = if (locking_more) {
             let locker_info_ref_mut =
-                smart_table::borrow_mut(lockers_ref_mut, locker_addr);
+                table::borrow_mut(lockers_ref_mut, locker_addr);
             let already_locked = locker_info_ref_mut.initial_quote_locked;
             let total_locked = already_locked + quote_lock_amount;
             locker_info_ref_mut.initial_quote_locked = total_locked;
             total_locked
         } else {
-            smart_table::add(lockers_ref_mut, locker_addr, LockerInfo {
+            table::add(lockers_ref_mut, locker_addr, LockerInfo {
                 initial_quote_locked: quote_lock_amount,
                 base_claimed: 0,
                 quote_claimed: 0,
@@ -302,7 +302,7 @@ module aptos_framework::lockstream {
         let lockers_ref_mut = &mut pool_ref_mut.lockers;
         let locker_addr = signer::address_of(locker);
         assert!(
-            smart_table::contains(lockers_ref_mut, locker_addr),
+            table::contains(lockers_ref_mut, locker_addr),
             E_NOT_A_LOCKER
         );
         let claim_time = timestamp::now_seconds();
@@ -315,7 +315,7 @@ module aptos_framework::lockstream {
             E_TOO_LATE_TO_CLAIM
         );
         let locker_info_ref_mut =
-            smart_table::borrow_mut(lockers_ref_mut, locker_addr);
+            table::borrow_mut(lockers_ref_mut, locker_addr);
         let locker_initial_quote_locked =
             locker_info_ref_mut.initial_quote_locked;
         let pro_rata_base = math64::mul_div(
@@ -397,7 +397,7 @@ module aptos_framework::lockstream {
         let lockers_ref_mut = &mut pool_ref_mut.lockers;
         let locker_addr = signer::address_of(locker);
         assert!(
-            smart_table::contains(lockers_ref_mut, locker_addr),
+            table::contains(lockers_ref_mut, locker_addr),
             E_NOT_A_LOCKER
         );
         let sweep_time = timestamp::now_seconds();
