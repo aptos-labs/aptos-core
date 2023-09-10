@@ -244,7 +244,7 @@ async fn fetch_nexts(
 
     let state_view = context.latest_state_view().unwrap();
     let adapter = state_view.as_adapter();
-    let resolver = adapter.as_resolver();
+    let resolver = adapter.as_move_resolver();
     let converter = resolver.as_converter(context.db.clone());
 
     let mut transactions = vec![];

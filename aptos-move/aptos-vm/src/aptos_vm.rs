@@ -127,7 +127,7 @@ impl AptosVM {
 
     pub fn new_from_state_view(state_view: &impl StateView) -> Self {
         let adapter = state_view.as_adapter();
-        Self(AptosVMImpl::new(&adapter.as_resolver()))
+        Self(AptosVMImpl::new(&adapter.as_move_resolver()))
     }
 
     pub fn new_for_validation(state_view: &impl StateView) -> Self {
@@ -1388,7 +1388,7 @@ impl AptosVM {
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let adapter = state_view.as_adapter();
-        let resolver = adapter.as_resolver_with_cached_config(
+        let resolver = adapter.as_move_resolver_with_config(
             simulation_vm.0.get_gas_feature_version(),
             simulation_vm.0.get_features(),
         );
@@ -1422,7 +1422,7 @@ impl AptosVM {
 
         let adapter = state_view.as_adapter();
         let resolver =
-            adapter.as_resolver_with_cached_config(vm.get_gas_feature_version(), vm.get_features());
+            adapter.as_move_resolver_with_config(vm.get_gas_feature_version(), vm.get_features());
         let mut session = vm.new_session(&resolver, SessionId::Void);
 
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
@@ -1602,7 +1602,7 @@ impl VMValidator for AptosVM {
 
         let adapter = state_view.as_adapter();
         let resolver = adapter
-            .as_resolver_with_cached_config(self.get_gas_feature_version(), self.get_features());
+            .as_move_resolver_with_config(self.get_gas_feature_version(), self.get_features());
         let mut session = self.0.new_session(&resolver, SessionId::prologue(&txn));
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,

@@ -56,7 +56,7 @@ impl ViewFunctionApi {
 
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
         let adapter = state_view.as_adapter();
-        let resolver = adapter.as_resolver();
+        let resolver = adapter.as_move_resolver();
 
         let entry_func = resolver
             .as_converter(self.context.db.clone())

@@ -57,9 +57,9 @@ pub struct StorageAdapter<'r, R> {
 }
 
 pub trait AsMoveResolver<R> {
-    fn as_resolver(&self) -> StorageAdapter<R>;
+    fn as_move_resolver(&self) -> StorageAdapter<R>;
 
-    fn as_resolver_with_cached_config(
+    fn as_move_resolver_with_config(
         &self,
         gas_feature_version: u64,
         features: &Features,
@@ -67,11 +67,11 @@ pub trait AsMoveResolver<R> {
 }
 
 impl<R: ExecutorResolver> AsMoveResolver<R> for R {
-    fn as_resolver(&self) -> StorageAdapter<R> {
+    fn as_move_resolver(&self) -> StorageAdapter<R> {
         StorageAdapter::new(self)
     }
 
-    fn as_resolver_with_cached_config(
+    fn as_move_resolver_with_config(
         &self,
         gas_feature_version: u64,
         features: &Features,

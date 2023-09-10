@@ -730,7 +730,7 @@ impl TransactionsApi {
                         let timestamp =
                             self.context.get_block_timestamp(ledger_info, txn.version)?;
                         adapter
-                            .as_resolver()
+                            .as_move_resolver()
                             .as_converter(self.context.db.clone())
                             .try_into_onchain_transaction(timestamp, txn)
                             .context("Failed to convert on chain transaction to Transaction")
@@ -743,7 +743,7 @@ impl TransactionsApi {
                             })?
                     },
                     TransactionData::Pending(txn) => adapter
-                        .as_resolver()
+                        .as_move_resolver()
                         .as_converter(self.context.db.clone())
                         .try_into_pending_transaction(*txn)
                         .context("Failed to convert on pending transaction to Transaction")
@@ -913,7 +913,7 @@ impl TransactionsApi {
                 let adapter = state_view.as_adapter();
 
                 adapter
-                    .as_resolver()
+                    .as_move_resolver()
                     .as_converter(self.context.db.clone())
                     .try_into_signed_transaction_poem(data.0, self.context.chain_id())
                     .context("Failed to create SignedTransaction from SubmitTransactionRequest")
@@ -996,7 +996,7 @@ impl TransactionsApi {
                     let adapter = state_view.as_adapter();
 
                     adapter
-                        .as_resolver()
+                        .as_move_resolver()
                         .as_converter(self.context.db.clone())
                         .try_into_signed_transaction_poem(txn, self.context.chain_id())
                         .context(format!("Failed to create SignedTransaction from SubmitTransactionRequest at position {}", index))
@@ -1089,7 +1089,7 @@ impl TransactionsApi {
 
                     // We provide the pending transaction so that users have the hash associated
                     let pending_txn = adapter
-                            .as_resolver()
+                            .as_move_resolver()
                             .as_converter(self.context.db.clone())
                             .try_into_pending_transaction_poem(txn)
                             .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
@@ -1278,7 +1278,7 @@ impl TransactionsApi {
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
         let adapter = state_view.as_adapter();
         let raw_txn: RawTransaction = adapter
-            .as_resolver()
+            .as_move_resolver()
             .as_converter(self.context.db.clone())
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
             .context("The given transaction is invalid")

@@ -363,7 +363,7 @@ impl Context {
                     };
 
                 let adapter = state_view.as_adapter();
-                let resolver = adapter.as_resolver();
+                let resolver = adapter.as_move_resolver();
                 if is_resource_group(&resolver, &key) {
                     // An error here means a storage invariant has been violated
                     bcs::from_bytes::<ResourceGroup>(&value)
@@ -588,7 +588,7 @@ impl Context {
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
         let adapter = state_view.as_adapter();
-        let resolver = adapter.as_resolver();
+        let resolver = adapter.as_move_resolver();
         let converter = resolver.as_converter(self.db.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
@@ -620,7 +620,7 @@ impl Context {
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
         let adapter = state_view.as_adapter();
-        let resolver = adapter.as_resolver();
+        let resolver = adapter.as_move_resolver();
         let converter = resolver.as_converter(self.db.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
@@ -1157,7 +1157,7 @@ impl Context {
                 })?;
 
             let adapter = state_view.as_adapter();
-            let resolver = adapter.as_resolver();
+            let resolver = adapter.as_move_resolver();
 
             let gas_schedule_params =
                 match GasScheduleV2::fetch_config(&resolver).and_then(|gas_schedule| {
@@ -1223,7 +1223,7 @@ impl Context {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
             let adapter = state_view.as_adapter();
-            let resolver = adapter.as_resolver();
+            let resolver = adapter.as_move_resolver();
 
             let block_gas_limit = OnChainExecutionConfig::fetch_config(&resolver)
                 .and_then(|config| config.block_gas_limit());

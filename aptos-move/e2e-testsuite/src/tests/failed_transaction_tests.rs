@@ -31,10 +31,8 @@ fn failed_transaction_cleanup_test() {
     let log_context = AdapterLogSchema::new(executor.get_state_view().id(), 0);
     let aptos_vm = AptosVM::new_from_state_view(executor.get_state_view());
     let adapter = executor.get_state_view().as_adapter();
-    let resolver = adapter.as_resolver_with_cached_config(
-        aptos_vm.get_gas_feature_version(),
-        aptos_vm.get_features(),
-    );
+    let resolver = adapter
+        .as_move_resolver_with_config(aptos_vm.get_gas_feature_version(), aptos_vm.get_features());
 
     let txn_data = TransactionMetadata {
         sender: *sender.address(),

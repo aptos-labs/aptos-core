@@ -403,7 +403,7 @@ impl<'a> AptosTestAdapter<'a> {
             })?;
 
         let adapter = self.storage.as_adapter();
-        let annotated = MoveValueAnnotator::new(&adapter.as_resolver())
+        let annotated = MoveValueAnnotator::new(&adapter.as_move_resolver())
             .view_resource(&aptos_coin_tag, &balance_blob)?;
 
         // Filter the Coin resource and return the resouce value
@@ -873,7 +873,13 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         type_args: Vec<TypeTag>,
     ) -> Result<String> {
         let adapter = self.storage.as_adapter();
-        view_resource_in_move_storage(&adapter.as_resolver(), address, module, resource, type_args)
+        view_resource_in_move_storage(
+            &adapter.as_move_resolver(),
+            address,
+            module,
+            resource,
+            type_args,
+        )
     }
 
     fn handle_subcommand(&mut self, input: TaskInput<Self::Subcommand>) -> Result<Option<String>> {
@@ -896,7 +902,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             },
             AptosSubCommand::ViewTableCommand(view_table_cmd) => {
                 let adapter = self.storage.as_adapter();
-                let resolver = adapter.as_resolver();
+                let resolver = adapter.as_move_resolver();
                 let converter = resolver.as_converter(Arc::new(FakeDbReader {}));
 
                 let vm_key = converter

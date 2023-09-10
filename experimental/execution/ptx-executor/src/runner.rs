@@ -277,7 +277,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                         let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_vm"]);
                         vm.execute_single_transaction(
                             &preprocessed_txn,
-                            &adapter.as_resolver_with_cached_config(
+                            &adapter.as_move_resolver_with_config(
                                 vm.get_gas_feature_version(),
                                 vm.get_features(),
                             ),

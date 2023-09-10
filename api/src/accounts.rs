@@ -342,7 +342,7 @@ impl Account {
                     .latest_state_view_poem(&self.latest_ledger_info)?;
                 let adapter = state_view.as_adapter();
                 let converted_resources = adapter
-                    .as_resolver()
+                    .as_move_resolver()
                     .as_converter(self.context.db.clone())
                     .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
                     .context("Failed to build move resource response from data in DB")
@@ -518,7 +518,7 @@ impl Account {
         let (ledger_info, ledger_version, state_view) =
             self.context.state_view(Some(self.ledger_version))?;
         let adapter = state_view.as_adapter();
-        let resolver = adapter.as_resolver();
+        let resolver = adapter.as_move_resolver();
 
         let bytes = resolver
             .get_resource(&self.address.into(), resource_type)

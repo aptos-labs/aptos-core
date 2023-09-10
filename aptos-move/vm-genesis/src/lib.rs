@@ -106,7 +106,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     }
 
     let adapter = state_view.as_adapter();
-    let data_cache = adapter.as_resolver();
+    let data_cache = adapter.as_move_resolver();
 
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
@@ -149,7 +149,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     // Publish the framework, using a different session id, in case both scripts creates tables
     let state_view = GenesisStateView::new();
     let adapter = state_view.as_adapter();
-    let data_cache = adapter.as_resolver();
+    let data_cache = adapter.as_move_resolver();
 
     let mut id2_arr = [0u8; 32];
     id2_arr[31] = 1;
@@ -218,7 +218,7 @@ pub fn encode_genesis_change_set(
     }
 
     let adapter = state_view.as_adapter();
-    let resolver = adapter.as_resolver();
+    let resolver = adapter.as_move_resolver();
 
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
@@ -262,7 +262,7 @@ pub fn encode_genesis_change_set(
 
     let state_view = GenesisStateView::new();
     let adapter = state_view.as_adapter();
-    let resolver = adapter.as_resolver();
+    let resolver = adapter.as_move_resolver();
 
     // Publish the framework, using a different session id, in case both scripts creates tables
     let mut id2_arr = [0u8; 32];
@@ -905,7 +905,7 @@ pub fn test_genesis_module_publishing() {
     }
 
     let adapter = state_view.as_adapter();
-    let data_cache = adapter.as_resolver();
+    let data_cache = adapter.as_move_resolver();
 
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),

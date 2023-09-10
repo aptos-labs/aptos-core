@@ -237,7 +237,7 @@ impl FakeExecutor {
         if let Some(env_trace_dir) = env::var_os(ENV_TRACE_DIR) {
             let adapter = self.data_store.as_adapter();
             let aptos_version =
-                Version::fetch_config(&adapter.as_resolver()).map_or(0, |v| v.major);
+                Version::fetch_config(&adapter.as_move_resolver()).map_or(0, |v| v.major);
             let trace_dir = Path::new(&env_trace_dir).join(file_name);
             if trace_dir.exists() {
                 fs::remove_dir_all(&trace_dir).expect("Failed to clean up the trace directory");
@@ -541,7 +541,7 @@ impl FakeExecutor {
         // TODO(Gas): revisit this.
         let vm = AptosVM::new_from_state_view(&self.data_store);
         let adapter = self.data_store.as_adapter();
-        let resolver = adapter.as_resolver();
+        let resolver = adapter.as_move_resolver();
 
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
@@ -628,7 +628,7 @@ impl FakeExecutor {
         self.block_time = time_microseconds;
 
         let adapter = self.data_store.as_adapter();
-        let validator_set = ValidatorSet::fetch_config(&adapter.as_resolver())
+        let validator_set = ValidatorSet::fetch_config(&adapter.as_move_resolver())
             .expect("Unable to retrieve the validator set from storage");
         let proposer = *validator_set.payload().next().unwrap().account_address();
         // when updating time, proposer cannot be ZERO.
@@ -645,7 +645,7 @@ impl FakeExecutor {
             txns.into_iter().map(Transaction::UserTransaction).collect();
 
         let adapter = self.data_store.as_adapter();
-        let validator_set = ValidatorSet::fetch_config(&adapter.as_resolver())
+        let validator_set = ValidatorSet::fetch_config(&adapter.as_move_resolver())
             .expect("Unable to retrieve the validator set from storage");
         let new_block_metadata = BlockMetadata::new(
             HashValue::zero(),
@@ -732,7 +732,7 @@ impl FakeExecutor {
         )
         .unwrap();
         let adapter = &self.data_store.as_adapter();
-        let resolver = adapter.as_resolver();
+        let resolver = adapter.as_move_resolver();
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
@@ -808,7 +808,7 @@ impl FakeExecutor {
             .unwrap();
 
             let adapter = self.data_store.as_adapter();
-            let resolver = adapter.as_resolver();
+            let resolver = adapter.as_move_resolver();
             let mut session = vm.new_session(&resolver, SessionId::void());
 
             let fun_name = Self::name(function_name);
@@ -880,7 +880,7 @@ impl FakeExecutor {
             )
             .unwrap();
             let adapter = self.data_store.as_adapter();
-            let resolver = adapter.as_resolver();
+            let resolver = adapter.as_move_resolver();
             let mut session = vm.new_session(&resolver, SessionId::void());
             session
                 .execute_function_bypass_visibility(
@@ -932,7 +932,7 @@ impl FakeExecutor {
         )
         .unwrap();
         let adapter = self.data_store.as_adapter();
-        let resolver = adapter.as_resolver();
+        let resolver = adapter.as_move_resolver();
         let mut session = vm.new_session(&resolver, SessionId::void());
         session
             .execute_function_bypass_visibility(

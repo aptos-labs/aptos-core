@@ -463,7 +463,7 @@ impl AptosDB {
                 version: Some(ledger_next_version - 1),
             };
             let adapter = state_view.as_adapter();
-            let resolver = adapter.as_resolver();
+            let resolver = adapter.as_move_resolver();
             let annotator = MoveValueAnnotator::new(&resolver);
 
             const BATCH_SIZE: Version = 10000;

@@ -83,7 +83,7 @@ impl Indexer {
             version: Some(last_version),
         };
         let adapter = state_view.as_adapter();
-        let resolver = adapter.as_resolver();
+        let resolver = adapter.as_move_resolver();
         let annotator = MoveValueAnnotator::new(&resolver);
         self.index_with_annotator(&annotator, first_version, write_sets)
     }

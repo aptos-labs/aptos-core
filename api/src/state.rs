@@ -276,7 +276,7 @@ impl StateApi {
         let (ledger_info, ledger_version, state_view) = self.context.state_view(ledger_version)?;
         let adapter = state_view.as_adapter();
         let bytes = adapter
-            .as_resolver()
+            .as_move_resolver()
             .get_resource(&address.into(), &resource_type)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
@@ -297,7 +297,7 @@ impl StateApi {
             AcceptType::Json => {
                 let adapter = state_view.as_adapter();
                 let resource = adapter
-                    .as_resolver()
+                    .as_move_resolver()
                     .as_converter(self.context.db.clone())
                     .try_into_resource(&resource_type, &bytes)
                     .context("Failed to deserialize resource data retrieved from DB")
@@ -400,7 +400,7 @@ impl StateApi {
             .state_view(ledger_version.map(|inner| inner.0))?;
 
         let adapter = state_view.as_adapter();
-        let resolver = adapter.as_resolver();
+        let resolver = adapter.as_move_resolver();
         let converter = resolver.as_converter(self.context.db.clone());
 
         // Convert key to lookup version for DB

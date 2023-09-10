@@ -76,7 +76,7 @@ impl AptosDebugger {
         // TODO(Gas): revisit this.
         let vm = AptosVM::new_from_state_view(&state_view);
         let adapter = state_view.as_adapter();
-        let resolver = adapter.as_resolver();
+        let resolver = adapter.as_move_resolver();
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
@@ -181,7 +181,7 @@ impl AptosDebugger {
     ) -> Result<Option<AnnotatedAccountStateBlob>> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let adapter = state_view.as_adapter();
-        let resolver = adapter.as_resolver();
+        let resolver = adapter.as_move_resolver();
         let annotator = AptosValueAnnotator::new(&resolver);
         Ok(
             match self
@@ -202,7 +202,7 @@ impl AptosDebugger {
         let accounts = self.debugger.get_admin_accounts(version).await?;
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let adapter = state_view.as_adapter();
-        let resolver = adapter.as_resolver();
+        let resolver = adapter.as_move_resolver();
         let annotator = AptosValueAnnotator::new(&resolver);
 
         let mut result = vec![];
@@ -232,7 +232,7 @@ impl AptosDebugger {
     {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let adapter = state_view.as_adapter();
-        let resolver = adapter.as_resolver();
+        let resolver = adapter.as_move_resolver();
 
         let features = Features::fetch_config(&resolver).unwrap_or_default();
         let move_vm = MoveVmExt::new(

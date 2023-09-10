@@ -175,7 +175,7 @@ impl EventsApi {
                 let state_view = self.context.latest_state_view_poem(&latest_ledger_info)?;
                 let adapter = state_view.as_adapter();
                 let events = adapter
-                    .as_resolver()
+                    .as_move_resolver()
                     .as_converter(self.context.db.clone())
                     .try_into_versioned_events(&events)
                     .context("Failed to convert events from storage into response")

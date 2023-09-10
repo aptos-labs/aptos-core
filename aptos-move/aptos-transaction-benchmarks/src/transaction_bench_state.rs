@@ -109,7 +109,7 @@ where
 
         let executor = FakeExecutor::from_head_genesis();
         let adapter = executor.get_state_view().as_adapter();
-        let validator_set = ValidatorSet::fetch_config(&adapter.as_resolver())
+        let validator_set = ValidatorSet::fetch_config(&adapter.as_move_resolver())
             .expect("Unable to retrieve the validator set from storage");
 
         Self {

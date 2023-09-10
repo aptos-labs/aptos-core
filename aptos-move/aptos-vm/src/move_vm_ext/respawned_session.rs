@@ -42,7 +42,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
             state_view,
             resolver_builder: |state_view| {
                 state_view
-                    .as_resolver_with_cached_config(vm.get_gas_feature_version(), vm.get_features())
+                    .as_move_resolver_with_config(vm.get_gas_feature_version(), vm.get_features())
             },
             session_builder: |resolver| Some(vm.0.new_session(resolver, session_id)),
             storage_refund,

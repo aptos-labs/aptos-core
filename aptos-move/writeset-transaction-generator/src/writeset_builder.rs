@@ -121,7 +121,7 @@ where
     .unwrap();
 
     let adapter = state_view.as_adapter();
-    let resolver = adapter.as_resolver();
+    let resolver = adapter.as_move_resolver();
     let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();

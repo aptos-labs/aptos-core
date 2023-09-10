@@ -36,7 +36,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         // AptosVM has to be initialized using configs from storage.
         // Using adapter allows us to fetch those.
         let adapter = argument.as_adapter();
-        let resolver = adapter.as_resolver();
+        let resolver = adapter.as_move_resolver();
         let vm = AptosVM::new(&resolver);
 
         // Loading `0x1::account` and its transitive dependency into the code cache.
@@ -69,7 +69,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
-        let resolver = view.as_resolver_with_cached_config(
+        let resolver = view.as_move_resolver_with_config(
             self.vm.get_gas_feature_version(),
             self.vm.get_features(),
         );
