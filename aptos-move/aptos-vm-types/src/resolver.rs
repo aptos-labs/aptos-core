@@ -14,6 +14,7 @@ use move_core_types::value::MoveTypeLayout;
 /// Having a type alias allows to avoid having nested options.
 pub type StateValueMetadataKind = Option<StateValueMetadata>;
 
+/// Allows to query resources from the state storage.
 pub trait TResourceView {
     type Key;
     type Layout;
@@ -47,6 +48,7 @@ pub trait ResourceResolver: TResourceView<Key = StateKey, Layout = MoveTypeLayou
 
 impl<T: TResourceView<Key = StateKey, Layout = MoveTypeLayout>> ResourceResolver for T {}
 
+/// Allows to query modules from the state storage.
 pub trait TModuleView {
     type Key;
 
@@ -70,16 +72,18 @@ pub trait ModuleResolver: TModuleView<Key = StateKey> {}
 
 impl<T: TModuleView<Key = StateKey>> ModuleResolver for T {}
 
+/// Allows to query state information, e.g. its usage.
 pub trait StateStorageView {
     fn id(&self) -> StateViewId;
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage>;
 }
 
+/// A fine-grained view of the state during execution.
 pub trait ExecutorView:
     TResourceView<Key = StateKey, Layout = MoveTypeLayout>
     + TModuleView<Key = StateKey>
-    + TAggregatorView<Key = AggregatorID>
+    + TAggregatorView<Identifier = AggregatorID>
     + StateStorageView
 {
 }
@@ -87,7 +91,7 @@ pub trait ExecutorView:
 impl<
         T: TResourceView<Key = StateKey, Layout = MoveTypeLayout>
             + TModuleView<Key = StateKey>
-            + TAggregatorView<Key = AggregatorID>
+            + TAggregatorView<Identifier = AggregatorID>
             + StateStorageView,
     > ExecutorView for T
 {

@@ -37,10 +37,10 @@ pub static GENESIS_CHANGE_SET_TESTNET: Lazy<ChangeSet> =
 pub static GENESIS_CHANGE_SET_MAINNET: Lazy<ChangeSet> =
     Lazy::new(|| generate_genesis_change_set_for_mainnet(GenesisOptions::Mainnet));
 
-/// An in-memory implementation of `StateView` and `ExecutorResolver` for the VM.
+/// An in-memory implementation of `StateView` and `ExecutorView` for the VM.
 ///
 /// Tests use this to set up state, and pass in a reference to the cache whenever a `StateView` or
-/// `ExecutorResolver` is needed.
+/// `ExecutorView` is needed.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct FakeDataStore {
     state_data: HashMap<StateKey, StateValue>,
@@ -135,7 +135,7 @@ impl TStateView for FakeDataStore {
     }
 }
 
-// These traits allow `FakeDataStore` act as a resolver as well.
+// These traits allow `FakeDataStore` act as an executor view as well.
 impl TResourceView for FakeDataStore {
     type Key = StateKey;
     type Layout = MoveTypeLayout;
@@ -169,9 +169,9 @@ impl StateStorageView for FakeDataStore {
 }
 
 impl TAggregatorView for FakeDataStore {
-    type Key = AggregatorID;
+    type Identifier = AggregatorID;
 
-    fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> Result<Option<StateValue>> {
+    fn get_aggregator_v1_state_value(&self, id: &Self::Identifier) -> Result<Option<StateValue>> {
         self.get_state_value(id.as_state_key())
     }
 }

@@ -29,11 +29,14 @@ pub enum AggregatorReadMode {
 ///   - Ok(..)       if aggregator value exists
 ///   - Err(..)      otherwise.
 pub trait TAggregatorView {
-    type Key;
+    type Identifier;
 
-    fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> anyhow::Result<Option<StateValue>>;
+    fn get_aggregator_v1_state_value(
+        &self,
+        id: &Self::Identifier,
+    ) -> anyhow::Result<Option<StateValue>>;
 
-    fn get_aggregator_v1_value(&self, id: &Self::Key) -> anyhow::Result<u128> {
+    fn get_aggregator_v1_value(&self, id: &Self::Identifier) -> anyhow::Result<u128> {
         let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
         // TODO: consider reviving Option<u128>?
         let u128_bytes = maybe_state_value
@@ -46,7 +49,7 @@ pub trait TAggregatorView {
     // TODO: Nested options are used due to cyclic dependency. Aggregator crate needs refactoring.
     fn get_aggregator_v1_state_value_metadata(
         &self,
-        id: &Self::Key,
+        id: &Self::Identifier,
     ) -> anyhow::Result<Option<Option<StateValueMetadata>>> {
         let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
@@ -55,7 +58,7 @@ pub trait TAggregatorView {
     /// Returns a value of an aggregator.
     fn get_aggregator_v2_value(
         &self,
-        _id: &Self::Key,
+        _id: &Self::Identifier,
         _mode: AggregatorReadMode,
     ) -> anyhow::Result<u128> {
         unimplemented!("Aggregator V2 is not yet supported")
@@ -63,17 +66,18 @@ pub trait TAggregatorView {
 
     /// Returns a unique per-block identifier that can be used when creating a
     /// new aggregator.
-    fn generate_aggregator_v2_id(&self) -> Self::Key {
+    fn generate_aggregator_v2_id(&self) -> Self::Identifier {
         unimplemented!("ID generation for Aggregator V2 is not yet supported")
     }
 
     /// Consumes a single delta and tries to materialize it with a given state
     /// key. If materialization succeeds, a write op is produced. Otherwise, an
     /// error VM status is returned.
-    // TODO: remove from the trait!
+    // TODO(aggregator): This can be removed from the trait when `DeltaOp` is
+    // moved to aptos-vm-types.
     fn try_convert_aggregator_v2_delta_into_write_op(
         &self,
-        id: &Self::Key,
+        id: &Self::Identifier,
         delta_op: &DeltaOp,
     ) -> anyhow::Result<WriteOp, VMStatus> {
         // In case storage fails to fetch the value, return immediately.
@@ -95,9 +99,9 @@ pub trait TAggregatorView {
     }
 }
 
-pub trait AggregatorResolver: TAggregatorView<Key = AggregatorID> {}
+pub trait AggregatorResolver: TAggregatorView<Identifier = AggregatorID> {}
 
-impl<T: TAggregatorView<Key = AggregatorID>> AggregatorResolver for T {}
+impl<T: TAggregatorView<Identifier = AggregatorID>> AggregatorResolver for T {}
 
 // Utils to store aggregator values in data store. Here, we
 // only care about aggregators which are state items.
@@ -136,11 +140,11 @@ pub mod test_utils {
     }
 
     impl TAggregatorView for AggregatorStore {
-        type Key = AggregatorID;
+        type Identifier = AggregatorID;
 
         fn get_aggregator_v1_state_value(
             &self,
-            id: &Self::Key,
+            id: &Self::Identifier,
         ) -> anyhow::Result<Option<StateValue>> {
             Ok(self.0.get(id.as_state_key()).cloned())
         }

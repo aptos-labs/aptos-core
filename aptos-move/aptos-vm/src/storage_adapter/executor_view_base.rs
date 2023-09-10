@@ -10,33 +10,36 @@ use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceView};
 use move_core_types::value::MoveTypeLayout;
 
 /// Adapter to convert a `StateView` into an `ExecutorView`.
-pub struct ExecutorViewAdapter<'s, S>(&'s S);
+pub struct ExecutorViewBase<'s, S>(&'s S);
 
-impl<'s, S: StateView> ExecutorViewAdapter<'s, S> {
+impl<'s, S: StateView> ExecutorViewBase<'s, S> {
     pub(crate) fn new(state_view: &'s S) -> Self {
         Self(state_view)
     }
 }
 
 pub trait AsExecutorView<S> {
-    fn as_executor_view(&self) -> ExecutorViewAdapter<S>;
+    fn as_executor_view(&self) -> ExecutorViewBase<S>;
 }
 
 impl<S: StateView> AsExecutorView<S> for S {
-    fn as_executor_view(&self) -> ExecutorViewAdapter<S> {
-        ExecutorViewAdapter::new(self)
+    fn as_executor_view(&self) -> ExecutorViewBase<S> {
+        ExecutorViewBase::new(self)
     }
 }
 
-impl<'s, S: StateView> TAggregatorView for ExecutorViewAdapter<'s, S> {
-    type Key = AggregatorID;
+impl<'s, S: StateView> TAggregatorView for ExecutorViewBase<'s, S> {
+    type Identifier = AggregatorID;
 
-    fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+    fn get_aggregator_v1_state_value(
+        &self,
+        id: &Self::Identifier,
+    ) -> anyhow::Result<Option<StateValue>> {
         self.0.get_state_value(id.as_state_key())
     }
 }
 
-impl<'s, S: StateView> TResourceView for ExecutorViewAdapter<'s, S> {
+impl<'s, S: StateView> TResourceView for ExecutorViewBase<'s, S> {
     type Key = StateKey;
     type Layout = MoveTypeLayout;
 
@@ -49,7 +52,7 @@ impl<'s, S: StateView> TResourceView for ExecutorViewAdapter<'s, S> {
     }
 }
 
-impl<'s, S: StateView> TModuleView for ExecutorViewAdapter<'s, S> {
+impl<'s, S: StateView> TModuleView for ExecutorViewBase<'s, S> {
     type Key = StateKey;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
@@ -57,7 +60,7 @@ impl<'s, S: StateView> TModuleView for ExecutorViewAdapter<'s, S> {
     }
 }
 
-impl<'s, S: StateView> StateStorageView for ExecutorViewAdapter<'s, S> {
+impl<'s, S: StateView> StateStorageView for ExecutorViewBase<'s, S> {
     fn id(&self) -> StateViewId {
         self.0.id()
     }

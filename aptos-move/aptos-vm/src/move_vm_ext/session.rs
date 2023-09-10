@@ -24,7 +24,9 @@ use aptos_types::{
     transaction::SignatureCheckedTransaction,
     write_set::WriteOp,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
+use aptos_vm_types::{
+    change_set::VMChangeSet, resolver::StateValueMetadataKind, storage::ChangeSetConfigs,
+};
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -329,7 +331,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             let (modules, resources) = account_changeset.into_inner();
             for (struct_tag, blob_op) in resources {
                 let state_key = StateKey::access_path(ap_cache.get_resource_path(addr, struct_tag));
-                let op = woc.convert(
+                let op = woc.convert_resource(
                     &state_key,
                     blob_op,
                     configs.legacy_resource_creation_as_modification(),
@@ -341,7 +343,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             for (name, blob_op) in modules {
                 let state_key =
                     StateKey::access_path(ap_cache.get_module_path(ModuleId::new(addr, name)));
-                let op = woc.convert(&state_key, blob_op, false)?;
+                let op = woc.convert_module(&state_key, blob_op, false)?;
                 module_write_set.insert(state_key, op);
             }
         }
@@ -351,7 +353,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             for (struct_tag, blob_op) in resources {
                 let state_key =
                     StateKey::access_path(ap_cache.get_resource_group_path(addr, struct_tag));
-                let op = woc.convert(&state_key, blob_op, false)?;
+                let op = woc.convert_resource(&state_key, blob_op, false)?;
                 resource_write_set.insert(state_key, op);
             }
         }
@@ -359,7 +361,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         for (handle, change) in table_change_set.changes {
             for (key, value_op) in change.entries {
                 let state_key = StateKey::table_item(handle.into(), key);
-                let op = woc.convert(&state_key, value_op, false)?;
+                let op = woc.convert_resource(&state_key, value_op, false)?;
                 resource_write_set.insert(state_key, op);
             }
         }
@@ -374,7 +376,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     aggregator_delta_set.insert(id, delta_op);
                 },
                 AggregatorChange::Delete => {
-                    let write_op = woc.convert_agg(&id, MoveStorageOp::Delete, false)?;
+                    let write_op = woc.convert_aggregator(&id, MoveStorageOp::Delete, false)?;
                     aggregator_write_set.insert(id, write_op);
                 },
             }
@@ -411,18 +413,15 @@ struct WriteOpConverter<'r> {
 }
 
 impl<'r> WriteOpConverter<'r> {
-    fn convert(
+    fn convert_resource(
         &self,
         state_key: &StateKey,
         move_storage_op: MoveStorageOp<Vec<u8>>,
         legacy_creation_as_modification: bool,
     ) -> Result<WriteOp, VMStatus> {
-        use MoveStorageOp::*;
-        use WriteOp::*;
-
+        // TODO: deduplicate calls across conversion methods.
         let maybe_existing_metadata = self
             .remote
-            // TODO FIX
             .get_state_value_metadata(state_key, StateValueKind::Data)
             .map_err(|_| {
                 VMStatus::error(
@@ -430,62 +429,41 @@ impl<'r> WriteOpConverter<'r> {
                     err_msg("Storage read failed when converting change set."),
                 )
             })?;
-
-        let write_op = match (maybe_existing_metadata, move_storage_op) {
-            (None, Modify(_) | Delete) => {
-                return Err(VMStatus::error(
-                    // Possible under speculative execution, returning storage error waiting for re-execution
-                    StatusCode::STORAGE_ERROR,
-                    err_msg("When converting write op: updating non-existent value."),
-                ));
-            },
-            (Some(_), New(_)) => {
-                return Err(VMStatus::error(
-                    // Possible under speculative execution, returning storage error waiting for re-execution
-                    StatusCode::STORAGE_ERROR,
-                    err_msg("When converting write op: Recreating existing value."),
-                ));
-            },
-            (None, New(data)) => match &self.new_slot_metadata {
-                None => {
-                    if legacy_creation_as_modification {
-                        Modification(data)
-                    } else {
-                        Creation(data)
-                    }
-                },
-                Some(metadata) => CreationWithMetadata {
-                    data,
-                    metadata: metadata.clone(),
-                },
-            },
-            (Some(existing_metadata), Modify(data)) => {
-                // Inherit metadata even if the feature flags is turned off, for compatibility.
-                match existing_metadata {
-                    None => Modification(data),
-                    Some(metadata) => ModificationWithMetadata { data, metadata },
-                }
-            },
-            (Some(existing_metadata), Delete) => {
-                // Inherit metadata even if the feature flags is turned off, for compatibility.
-                match existing_metadata {
-                    None => Deletion,
-                    Some(metadata) => DeletionWithMetadata { metadata },
-                }
-            },
-        };
-        Ok(write_op)
+        self.convert(
+            maybe_existing_metadata,
+            move_storage_op,
+            legacy_creation_as_modification,
+        )
     }
 
-    fn convert_agg(
+    fn convert_module(
+        &self,
+        state_key: &StateKey,
+        move_storage_op: MoveStorageOp<Vec<u8>>,
+        legacy_creation_as_modification: bool,
+    ) -> Result<WriteOp, VMStatus> {
+        let maybe_existing_metadata = self
+            .remote
+            .get_state_value_metadata(state_key, StateValueKind::Code)
+            .map_err(|_| {
+                VMStatus::error(
+                    StatusCode::STORAGE_ERROR,
+                    err_msg("Storage read failed when converting change set."),
+                )
+            })?;
+        self.convert(
+            maybe_existing_metadata,
+            move_storage_op,
+            legacy_creation_as_modification,
+        )
+    }
+
+    fn convert_aggregator(
         &self,
         id: &AggregatorID,
         move_storage_op: MoveStorageOp<Vec<u8>>,
         legacy_creation_as_modification: bool,
     ) -> Result<WriteOp, VMStatus> {
-        use MoveStorageOp::*;
-        use WriteOp::*;
-
         let maybe_existing_metadata = self
             .remote
             .get_aggregator_v1_state_value_metadata(id)
@@ -495,6 +473,21 @@ impl<'r> WriteOpConverter<'r> {
                     err_msg("Storage read failed when converting change set."),
                 )
             })?;
+        self.convert(
+            maybe_existing_metadata,
+            move_storage_op,
+            legacy_creation_as_modification,
+        )
+    }
+
+    fn convert(
+        &self,
+        maybe_existing_metadata: Option<StateValueMetadataKind>,
+        move_storage_op: MoveStorageOp<Vec<u8>>,
+        legacy_creation_as_modification: bool,
+    ) -> Result<WriteOp, VMStatus> {
+        use MoveStorageOp::*;
+        use WriteOp::*;
 
         let write_op = match (maybe_existing_metadata, move_storage_op) {
             (None, Modify(_) | Delete) => {

@@ -38,9 +38,12 @@ struct AptosBlankStorage;
 
 #[cfg(feature = "testing")]
 impl TAggregatorView for AptosBlankStorage {
-    type Key = AggregatorID;
+    type Identifier = AggregatorID;
 
-    fn get_aggregator_v1_state_value(&self, _id: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+    fn get_aggregator_v1_state_value(
+        &self,
+        _id: &Self::Identifier,
+    ) -> anyhow::Result<Option<StateValue>> {
         Ok(None)
     }
 }

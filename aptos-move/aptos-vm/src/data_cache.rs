@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
 //! Scratchpad for on chain values during the execution.
-//!
-//! This crate provides adapters which  can be used as
 
 use crate::{
     aptos_vm_impl::gas_config,
@@ -12,7 +9,7 @@ use crate::{
         get_max_binary_format_version, AptosMoveResolver, AsExecutorView, StateValueKind,
         StateValueMetadataKind, StateValueMetadataResolver,
     },
-    storage_adapter::ExecutorViewAdapter,
+    storage_adapter::ExecutorViewBase,
 };
 use anyhow::Error;
 use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorView};
@@ -53,7 +50,6 @@ pub(crate) fn get_resource_group_from_metadata(
 // are owned in tests or in APIs.
 enum ExecutorViewKind<'r, R: 'r> {
     Borrowed(&'r R),
-    #[allow(dead_code)]
     Owned(R),
 }
 
@@ -78,12 +74,12 @@ pub struct StorageAdapter<'r, R> {
 }
 
 pub trait AsMoveResolver<S> {
-    fn as_move_resolver(&self) -> StorageAdapter<ExecutorViewAdapter<S>>;
+    fn as_move_resolver(&self) -> StorageAdapter<ExecutorViewBase<S>>;
 }
 
 impl<S: StateView> AsMoveResolver<S> for S {
-    fn as_move_resolver(&self) -> StorageAdapter<ExecutorViewAdapter<S>> {
-        StorageAdapter::new(ExecutorViewAdapter::new(self))
+    fn as_move_resolver(&self) -> StorageAdapter<ExecutorViewBase<S>> {
+        StorageAdapter::new(ExecutorViewBase::new(self))
     }
 }
 
@@ -258,9 +254,12 @@ impl<'r, R: ExecutorView> ModuleResolver for StorageAdapter<'r, R> {
 }
 
 impl<'r, R: ExecutorView> TAggregatorView for StorageAdapter<'r, R> {
-    type Key = AggregatorID;
+    type Identifier = AggregatorID;
 
-    fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+    fn get_aggregator_v1_state_value(
+        &self,
+        id: &Self::Identifier,
+    ) -> anyhow::Result<Option<StateValue>> {
         self.executor_view.get_aggregator_v1_state_value(id)
     }
 }
@@ -313,7 +312,7 @@ impl<'r, R: ExecutorView> ConfigStorage for StorageAdapter<'r, R> {
 }
 
 impl<R: ExecutorView> AsExecutorView for StorageAdapter<'_, R> {
-    fn as_executor_resolver(&self) -> &dyn ExecutorView {
+    fn as_executor_view(&self) -> &dyn ExecutorView {
         self.executor_view.deref()
     }
 }

@@ -66,7 +66,7 @@ pub trait ExecutorTask: Sync {
         &self,
         view: &(impl TResourceView<Key = <Self::Txn as Transaction>::Key, Layout = MoveTypeLayout>
               + TModuleView<Key = <Self::Txn as Transaction>::Key>
-              + TAggregatorView<Key = <Self::Txn as Transaction>::Identifier>
+              + TAggregatorView<Identifier = <Self::Txn as Transaction>::Identifier>
               + StateStorageView),
         txn: &Self::Txn,
         txn_idx: TxnIndex,

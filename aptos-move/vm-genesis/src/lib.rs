@@ -104,7 +104,6 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         state_view.add_module(&module.self_id(), module_bytes);
     }
     let data_cache = state_view.as_move_resolver();
-
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
@@ -213,7 +212,6 @@ pub fn encode_genesis_change_set(
         state_view.add_module(&module.self_id(), module_bytes);
     }
     let data_cache = state_view.as_move_resolver();
-
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
@@ -253,6 +251,7 @@ pub fn encode_genesis_change_set(
 
     let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
     let mut change_set = session.finish(&mut (), &configs).unwrap();
+
     let state_view = GenesisStateView::new();
     let data_cache = state_view.as_move_resolver();
 

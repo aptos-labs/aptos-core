@@ -1265,7 +1265,7 @@ impl AptosVM {
 
     fn read_change_set(
         &self,
-        resolver: &dyn ExecutorView,
+        executor_view: &dyn ExecutorView,
         change_set: &VMChangeSet,
     ) -> Result<(), VMStatus> {
         assert!(
@@ -1276,17 +1276,17 @@ impl AptosVM {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
         for state_key in change_set.module_write_set().keys() {
-            resolver
+            executor_view
                 .get_module_state_value(state_key)
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         }
         for state_key in change_set.resource_write_set().keys() {
-            resolver
+            executor_view
                 .get_resource_state_value(state_key, None)
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         }
         for id in change_set.aggregator_v1_write_set().keys() {
-            resolver
+            executor_view
                 .get_aggregator_v1_state_value(id)
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         }
@@ -1332,7 +1332,7 @@ impl AptosVM {
         )?;
 
         Self::validate_waypoint_change_set(&change_set, log_context)?;
-        self.read_change_set(resolver.as_executor_resolver(), &change_set)?;
+        self.read_change_set(resolver.as_executor_view(), &change_set)?;
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 

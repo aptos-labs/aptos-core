@@ -119,8 +119,9 @@ impl<'view> Worker<'view> {
 
     fn finalize_one(&mut self) {
         let vm_output = self.buffer.pop_front().unwrap().unwrap();
-        let adapter = self.state_view.as_executor_view();
-        let txn_out = vm_output.try_into_transaction_output(&adapter).unwrap();
+        let txn_out = vm_output
+            .try_into_transaction_output(&self.state_view.as_executor_view())
+            .unwrap();
         for (key, op) in txn_out.write_set() {
             // TODO(ptx): hack: deal only with the total supply
             if key == Lazy::force(&TOTAL_SUPPLY_STATE_KEY) {

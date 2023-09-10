@@ -50,5 +50,5 @@ pub trait AptosMoveResolver:
 }
 
 pub trait AsExecutorView {
-    fn as_executor_resolver(&self) -> &dyn ExecutorView;
+    fn as_executor_view(&self) -> &dyn ExecutorView;
 }

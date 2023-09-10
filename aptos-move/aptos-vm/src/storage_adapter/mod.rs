@@ -1,10 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod respawned_view_adapter;
-mod state_view_adapter;
+mod executor_view_base;
 
-pub use crate::storage_adapter::{
-    respawned_view_adapter::ExecutorViewWithChanges,
-    state_view_adapter::{AsExecutorView, ExecutorViewAdapter},
-};
+pub use crate::storage_adapter::executor_view_base::{AsExecutorView, ExecutorViewBase};
