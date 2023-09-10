@@ -63,7 +63,6 @@ use move_core_types::{
     ident_str,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
@@ -233,7 +232,7 @@ impl AptosVM {
     pub fn load_module(
         &self,
         module_id: &ModuleId,
-        resolver: &dyn MoveResolver,
+        resolver: &impl AptosMoveResolver,
     ) -> VMResult<Arc<CompiledModule>> {
         self.0.load_module(module_id, resolver)
     }

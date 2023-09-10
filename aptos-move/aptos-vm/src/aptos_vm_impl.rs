@@ -42,7 +42,6 @@ use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
     gas_algebra::NumArgs,
     language_storage::ModuleId,
-    resolver::MoveResolver,
     value::{serialize_values, MoveValue},
 };
 use move_vm_runtime::logging::expect_no_verification_errors;
@@ -651,7 +650,7 @@ impl AptosVMImpl {
     pub fn load_module(
         &self,
         module_id: &ModuleId,
-        resolver: &dyn MoveResolver,
+        resolver: &impl AptosMoveResolver,
     ) -> VMResult<Arc<CompiledModule>> {
         self.move_vm.load_module(module_id, resolver)
     }
