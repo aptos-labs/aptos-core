@@ -22,7 +22,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     adapter_common::{preprocess_transaction, VMAdapter},
-    storage_adapter::AsAdapter,
+    storage_adapter::AsExecutorView,
     AptosVM,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;

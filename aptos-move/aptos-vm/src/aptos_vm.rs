@@ -13,7 +13,7 @@ use crate::{
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, RespawnedSession, SessionExt, SessionId},
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
-    storage_adapter::AsAdapter,
+    storage_adapter::AsExecutorView,
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     verifier, VMExecutor, VMValidator,

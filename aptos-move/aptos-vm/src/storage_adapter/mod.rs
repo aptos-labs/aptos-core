@@ -6,5 +6,5 @@ mod state_view_adapter;
 
 pub use crate::storage_adapter::{
     respawned_view_adapter::ExecutorViewWithChanges,
-    state_view_adapter::{AsAdapter, ExecutorViewAdapter},
+    state_view_adapter::{AsExecutorView, ExecutorViewAdapter},
 };

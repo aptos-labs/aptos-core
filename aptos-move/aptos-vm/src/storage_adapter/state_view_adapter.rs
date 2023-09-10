@@ -18,11 +18,11 @@ impl<'s, S: StateView> ExecutorViewAdapter<'s, S> {
     }
 }
 
-pub trait AsAdapter<S> {
+pub trait AsExecutorView<S> {
     fn as_executor_view(&self) -> ExecutorViewAdapter<S>;
 }
 
-impl<S: StateView> AsAdapter<S> for S {
+impl<S: StateView> AsExecutorView<S> for S {
     fn as_executor_view(&self) -> ExecutorViewAdapter<S> {
         ExecutorViewAdapter::new(self)
     }

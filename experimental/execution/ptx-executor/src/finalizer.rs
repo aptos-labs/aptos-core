@@ -14,7 +14,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey, transaction::TransactionOutput, write_set::TransactionWrite,
 };
-use aptos_vm::storage_adapter::AsAdapter;
+use aptos_vm::storage_adapter::AsExecutorView;
 use aptos_vm_types::output::VMOutput;
 use once_cell::sync::Lazy;
 use rayon::Scope;

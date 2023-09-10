@@ -38,7 +38,7 @@ use aptos_types::{
     },
     vm_status::StatusCode,
 };
-use aptos_vm::{data_cache::AsMoveResolver, storage_adapter::AsAdapter, AptosVM};
+use aptos_vm::{data_cache::AsMoveResolver, storage_adapter::AsExecutorView, AptosVM};
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,

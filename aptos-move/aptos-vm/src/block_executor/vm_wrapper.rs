@@ -6,7 +6,7 @@ use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
-    storage_adapter::AsAdapter,
+    storage_adapter::AsExecutorView,
 };
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
