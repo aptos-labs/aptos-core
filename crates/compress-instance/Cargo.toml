@@ -1,0 +1,19 @@
+[package]
+name = "aptos-compress-instance"
+description = "Compress Instances of large types"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+# Do NOT add any inter-project dependencies.
+# This is to avoid ever having a circular dependency with the aptos-logger crate.
+[dependencies]
+dashmap = { workspace = true }
+derivative = { workspace = true }

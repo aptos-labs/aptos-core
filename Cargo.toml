@@ -89,6 +89,7 @@ members = [
     "crates/aptos-warp-webserver",
     "crates/bounded-executor",
     "crates/channel",
+    "crates/compress-instance",	
     "crates/crash-handler",
     "crates/fallible",
     "crates/indexer",
@@ -281,6 +282,7 @@ aptos-cached-packages = { path = "aptos-move/framework/cached-packages" }
 aptos-channels = { path = "crates/channel" }
 aptos-cli-common = { path = "crates/aptos-cli-common" }
 aptos-compression = { path = "crates/aptos-compression" }
+aptos-compress-instance = { path = "crates/compress-instance" }
 aptos-consensus = { path = "consensus" }
 aptos-consensus-notifications = { path = "state-sync/inter-component/consensus-notifications" }
 aptos-consensus-types = { path = "consensus/consensus-types" }

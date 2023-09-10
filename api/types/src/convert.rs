@@ -311,14 +311,19 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     ) -> Result<Vec<WriteSetChange>> {
         let hash = state_key.hash().to_hex_literal();
         let state_key = state_key.into_inner();
-        match state_key {
+        match &*state_key {
             StateKeyInner::AccessPath(access_path) => {
-                self.try_access_path_into_write_set_changes(hash, access_path, op)
+                self.try_access_path_into_write_set_changes(hash, access_path.clone(), op)
             },
             StateKeyInner::TableItem { handle, key } => {
-                vec![self.try_table_item_into_write_set_change(hash, handle, key, op)]
-                    .into_iter()
-                    .collect()
+                vec![self.try_table_item_into_write_set_change(
+                    hash,
+                    handle.clone(),
+                    key.clone(),
+                    op,
+                )]
+                .into_iter()
+                .collect()
             },
             StateKeyInner::Raw(_) => Err(format_err!(
                 "Can't convert account raw key {:?} to WriteSetChange",

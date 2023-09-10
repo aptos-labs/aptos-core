@@ -3,6 +3,7 @@
 
 use crate::{access_path::AccessPath, state_store::table::TableHandle};
 use anyhow::Result;
+use aptos_compress_instance::{Compressed, GlobalCache};
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher, DummyHasher},
     HashValue,
@@ -11,7 +12,9 @@ use aptos_crypto_derive::CryptoHasher;
 use derivative::Derivative;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest::{arbitrary::Arbitrary, prelude::*};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     convert::TryInto,
@@ -19,23 +22,37 @@ use std::{
     fmt::{Debug, Formatter},
     hash::Hash,
     ops::Deref,
+    sync::Arc,
 };
 use thiserror::Error;
 
 #[derive(Clone, Debug, Derivative)]
 #[derivative(PartialEq, PartialOrd, Hash, Ord)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub struct StateKey {
-    inner: StateKeyInner,
+    inner: Compressed<'static, StateKeyInner>,
     #[derivative(
         Hash = "ignore",
         Ord = "ignore",
         PartialEq = "ignore",
         PartialOrd = "ignore"
     )]
-    #[cfg_attr(any(test, feature = "fuzzing"), proptest(value = "OnceCell::new()"))]
     hash: OnceCell<HashValue>,
 }
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl Arbitrary for StateKey {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        StateKeyInner::arbitrary()
+            .prop_map(|inner| StateKey::new(inner))
+            .boxed()
+    }
+}
+
+static GLOBAL_STATE_KEY_INNER_CACHE: Lazy<GlobalCache<StateKeyInner>> =
+    Lazy::new(|| GlobalCache::new());
 
 #[derive(Clone, CryptoHasher, Eq, PartialEq, Serialize, Deserialize, Ord, PartialOrd, Hash)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
@@ -84,7 +101,7 @@ pub enum StateKeyTag {
 impl StateKey {
     pub fn new(inner: StateKeyInner) -> Self {
         Self {
-            inner,
+            inner: GLOBAL_STATE_KEY_INNER_CACHE.compress(inner),
             hash: OnceCell::new(),
         }
     }
@@ -122,7 +139,7 @@ impl StateKey {
     }
 
     pub fn size(&self) -> usize {
-        match &self.inner {
+        match &**self.inner.uncompressed() {
             StateKeyInner::AccessPath(access_path) => access_path.size(),
             StateKeyInner::TableItem { handle, key } => handle.size() + key.len(),
             StateKeyInner::Raw(bytes) => bytes.len(),
@@ -142,11 +159,11 @@ impl StateKey {
     }
 
     pub fn inner(&self) -> &StateKeyInner {
-        &self.inner
+        &*self.inner.uncompressed()
     }
 
-    pub fn into_inner(self) -> StateKeyInner {
-        self.inner
+    pub fn into_inner(self) -> Arc<StateKeyInner> {
+        self.inner.into_uncompressed()
     }
 
     pub fn get_shard_id(&self) -> u8 {
@@ -180,7 +197,9 @@ impl CryptoHash for StateKey {
     type Hasher = DummyHasher;
 
     fn hash(&self) -> HashValue {
-        *self.hash.get_or_init(|| CryptoHash::hash(&self.inner))
+        *self
+            .hash
+            .get_or_init(|| CryptoHash::hash(&**self.inner.uncompressed()))
     }
 }
 
@@ -189,7 +208,7 @@ impl Serialize for StateKey {
     where
         S: Serializer,
     {
-        self.inner.serialize(serializer)
+        self.inner.uncompressed().serialize(serializer)
     }
 }
 
@@ -207,7 +226,7 @@ impl Deref for StateKey {
     type Target = StateKeyInner;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &*self.inner.uncompressed()
     }
 }
 

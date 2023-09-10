@@ -668,6 +668,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-compress-instance"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "derivative",
+]
+
+[[package]]
 name = "aptos-compression"
 version = "0.1.0"
 dependencies = [
@@ -3710,6 +3718,7 @@ version = "0.0.3"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
+ "aptos-compress-instance",
  "aptos-crypto",
  "aptos-crypto-derive",
  "arr_macro",
