@@ -22,7 +22,7 @@ use aptos_types::{
     access_path::AccessPath,
     state_store::{state_key::StateKey, table::TableHandle},
 };
-use aptos_vm::{data_cache::AsMoveResolver, storage_adapter::AsAdapter};
+use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{
     language_storage::{ModuleId, StructTag},
     resolver::MoveResolver,
@@ -274,8 +274,7 @@ impl StateApi {
             })?;
 
         let (ledger_info, ledger_version, state_view) = self.context.state_view(ledger_version)?;
-        let adapter = state_view.as_adapter();
-        let bytes = adapter
+        let bytes = state_view
             .as_move_resolver()
             .get_resource(&address.into(), &resource_type)
             .context(format!(
@@ -295,8 +294,7 @@ impl StateApi {
 
         match accept_type {
             AcceptType::Json => {
-                let adapter = state_view.as_adapter();
-                let resource = adapter
+                let resource = state_view
                     .as_move_resolver()
                     .as_converter(self.context.db.clone())
                     .try_into_resource(&resource_type, &bytes)
@@ -399,8 +397,7 @@ impl StateApi {
             .context
             .state_view(ledger_version.map(|inner| inner.0))?;
 
-        let adapter = state_view.as_adapter();
-        let resolver = adapter.as_move_resolver();
+        let resolver = state_view.as_move_resolver();
         let converter = resolver.as_converter(self.context.db.clone());
 
         // Convert key to lookup version for DB

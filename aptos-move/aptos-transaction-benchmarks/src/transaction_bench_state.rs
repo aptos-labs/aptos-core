@@ -27,7 +27,6 @@ use aptos_vm::{
         local_executor_shard::{LocalExecutorClient, LocalExecutorService},
         ShardedBlockExecutor,
     },
-    storage_adapter::AsAdapter,
 };
 use proptest::{collection::vec, prelude::Strategy, strategy::ValueTree, test_runner::TestRunner};
 use std::{net::SocketAddr, sync::Arc, time::Instant};
@@ -107,10 +106,12 @@ where
             )
         };
 
-        let executor = FakeExecutor::from_head_genesis();
-        let adapter = executor.get_state_view().as_adapter();
-        let validator_set = ValidatorSet::fetch_config(&adapter.as_move_resolver())
-            .expect("Unable to retrieve the validator set from storage");
+        let validator_set = ValidatorSet::fetch_config(
+            &FakeExecutor::from_head_genesis()
+                .get_state_view()
+                .as_move_resolver(),
+        )
+        .expect("Unable to retrieve the validator set from storage");
 
         Self {
             num_transactions,

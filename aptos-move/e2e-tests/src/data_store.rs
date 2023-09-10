@@ -164,7 +164,7 @@ impl StateStorageView for FakeDataStore {
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         // Re-use implementation from the `StateView`
-        self.get_usage()
+        TStateView::get_usage(&self)
     }
 }
 

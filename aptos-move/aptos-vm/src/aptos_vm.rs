@@ -9,7 +9,7 @@ use crate::{
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     counters::*,
-    data_cache::AsMoveResolver,
+    data_cache::StorageAdapter,
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, RespawnedSession, SessionExt, SessionId},
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
@@ -34,9 +34,7 @@ use aptos_types::{
     block_executor::partitioner::PartitionedTransactions,
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
-    on_chain_config::{
-        new_epoch_event_key, ConfigStorage, FeatureFlag, Features, TimedFeatureOverride,
-    },
+    on_chain_config::{new_epoch_event_key, ConfigStorage, FeatureFlag, TimedFeatureOverride},
     transaction::{
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
@@ -125,9 +123,13 @@ impl AptosVM {
         Self(AptosVMImpl::new(config_storage))
     }
 
+    pub fn new_from_executor_view(executor_view: &impl ExecutorView) -> Self {
+        Self(AptosVMImpl::new(&StorageAdapter::borrow(executor_view)))
+    }
+
     pub fn new_from_state_view(state_view: &impl StateView) -> Self {
-        let adapter = state_view.as_adapter();
-        Self(AptosVMImpl::new(&adapter.as_move_resolver()))
+        let executor_view = state_view.as_executor_view();
+        Self(AptosVMImpl::new(&StorageAdapter::new(executor_view)))
     }
 
     pub fn new_for_validation(state_view: &impl StateView) -> Self {
@@ -181,14 +183,6 @@ impl AptosVM {
             Some(enable) => *enable,
             None => true,
         }
-    }
-
-    pub fn get_gas_feature_version(&self) -> u64 {
-        self.0.get_gas_feature_version()
-    }
-
-    pub fn get_features(&self) -> &Features {
-        self.0.get_features()
     }
 
     // Set the override profile for timed features.
@@ -264,6 +258,17 @@ impl AptosVM {
             change_set_configs,
         )
         .1
+    }
+
+    pub fn as_move_resolver<'r, R: ExecutorView>(
+        &self,
+        executor_view: &'r R,
+    ) -> StorageAdapter<'r, R> {
+        StorageAdapter::borrow_with_cached_config(
+            executor_view,
+            self.0.get_gas_feature_version(),
+            self.0.get_features(),
+        )
     }
 
     fn fee_statement_from_gas_meter(
@@ -1271,10 +1276,19 @@ impl AptosVM {
 
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
-        for (state_key, _) in change_set.write_set_iter() {
+        for state_key in change_set.module_write_set().keys() {
             resolver
-                // TODO: Fix this, placeholder!
-                .get_module_bytes(state_key)
+                .get_module_state_value(state_key)
+                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+        }
+        for state_key in change_set.resource_write_set().keys() {
+            resolver
+                .get_resource_state_value(state_key, None)
+                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+        }
+        for id in change_set.aggregator_v1_write_set().keys() {
+            resolver
+                .get_aggregator_v1_state_value(id)
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         }
         Ok(())
@@ -1381,16 +1395,16 @@ impl AptosVM {
     /// Executes a SignedTransaction without performing signature verification.
     pub fn simulate_signed_transaction(
         txn: &SignedTransaction,
-        state_view: &impl StateView,
+        executor_view: &impl ExecutorView,
     ) -> (VMStatus, TransactionOutput) {
-        let vm = AptosVM::new_from_state_view(state_view);
+        let vm = AptosVM::new_from_executor_view(executor_view);
         let simulation_vm = AptosSimulationVM(vm);
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let log_context = AdapterLogSchema::new(executor_view.id(), 0);
 
-        let adapter = state_view.as_adapter();
-        let resolver = adapter.as_move_resolver_with_config(
-            simulation_vm.0.get_gas_feature_version(),
-            simulation_vm.0.get_features(),
+        let resolver = StorageAdapter::borrow_with_cached_config(
+            executor_view,
+            simulation_vm.0 .0.get_gas_feature_version(),
+            simulation_vm.0 .0.get_features(),
         );
         let (vm_status, vm_output) =
             simulation_vm.simulate_signed_transaction(&resolver, txn, &log_context);
@@ -1420,9 +1434,8 @@ impl AptosVM {
                 gas_budget,
             )));
 
-        let adapter = state_view.as_adapter();
-        let resolver =
-            adapter.as_move_resolver_with_config(vm.get_gas_feature_version(), vm.get_features());
+        let executor_view = state_view.as_executor_view();
+        let resolver = vm.as_move_resolver(&executor_view);
         let mut session = vm.new_session(&resolver, SessionId::Void);
 
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
@@ -1600,9 +1613,8 @@ impl VMValidator for AptosVM {
             },
         };
 
-        let adapter = state_view.as_adapter();
-        let resolver = adapter
-            .as_move_resolver_with_config(self.get_gas_feature_version(), self.get_features());
+        let executor_view = state_view.as_executor_view();
+        let resolver = self.as_move_resolver(&executor_view);
         let mut session = self.0.new_session(&resolver, SessionId::prologue(&txn));
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,

@@ -22,7 +22,6 @@ use aptos_types::{
 };
 use aptos_vm::{
     adapter_common::{preprocess_transaction, VMAdapter},
-    data_cache::AsMoveResolver,
     storage_adapter::AsAdapter,
     AptosVM,
 };
@@ -272,15 +271,12 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     };
                     drop(_pre);
 
-                    let adapter = state_view.as_adapter();
+                    let executor_view = state_view.as_executor_view();
                     let vm_output = {
                         let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_vm"]);
                         vm.execute_single_transaction(
                             &preprocessed_txn,
-                            &adapter.as_move_resolver_with_config(
-                                vm.get_gas_feature_version(),
-                                vm.get_features(),
-                            ),
+                            &vm.as_move_resolver(&executor_view),
                             &log_context,
                         )
                     };

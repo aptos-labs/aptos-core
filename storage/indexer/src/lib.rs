@@ -28,7 +28,7 @@ use aptos_types::{
     transaction::{AtomicVersion, Version},
     write_set::{WriteOp, WriteSet},
 };
-use aptos_vm::{data_cache::AsMoveResolver, storage_adapter::AsAdapter};
+use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
@@ -82,8 +82,7 @@ impl Indexer {
             db: db_reader,
             version: Some(last_version),
         };
-        let adapter = state_view.as_adapter();
-        let resolver = adapter.as_move_resolver();
+        let resolver = state_view.as_move_resolver();
         let annotator = MoveValueAnnotator::new(&resolver);
         self.index_with_annotator(&annotator, first_version, write_sets)
     }

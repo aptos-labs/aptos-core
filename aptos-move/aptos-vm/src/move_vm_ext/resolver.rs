@@ -42,13 +42,13 @@ pub trait AptosMoveResolver:
     + TableResolver
     + StateValueMetadataResolver
     + StateStorageView
-    + AsExecutorResolver
+    + AsExecutorView
 {
     fn release_resource_group_cache(
         &self,
     ) -> BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>;
 }
 
-pub trait AsExecutorResolver {
+pub trait AsExecutorView {
     fn as_executor_resolver(&self) -> &dyn ExecutorView;
 }

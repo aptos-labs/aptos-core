@@ -10,7 +10,7 @@ mod vm;
 
 pub use crate::move_vm_ext::{
     resolver::{
-        AptosMoveResolver, AsExecutorResolver, StateValueKind, StateValueMetadataKind,
+        AptosMoveResolver, AsExecutorView, StateValueKind, StateValueMetadataKind,
         StateValueMetadataResolver,
     },
     respawned_session::RespawnedSession,

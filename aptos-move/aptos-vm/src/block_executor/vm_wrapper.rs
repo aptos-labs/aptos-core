@@ -6,7 +6,6 @@ use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
-    data_cache::AsMoveResolver,
     storage_adapter::AsAdapter,
 };
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
@@ -34,10 +33,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
 
     fn init(argument: &'a S) -> Self {
         // AptosVM has to be initialized using configs from storage.
-        // Using adapter allows us to fetch those.
-        let adapter = argument.as_adapter();
-        let resolver = adapter.as_move_resolver();
-        let vm = AptosVM::new(&resolver);
+        let vm = AptosVM::new_from_state_view(&argument);
 
         // Loading `0x1::account` and its transitive dependency into the code cache.
         //
@@ -47,9 +43,10 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         // Loading up `0x1::account` should be sufficient as this is the most common module
         // used for prologue, epilogue and transfer functionality.
 
+        let executor_view = argument.as_executor_view();
         let _ = vm.load_module(
             &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            &resolver,
+            &vm.as_move_resolver(&executor_view),
         );
 
         Self {
@@ -63,16 +60,13 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
-        view: &impl ExecutorView,
+        executor_view: &impl ExecutorView,
         txn: &PreprocessedTransaction,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
-        let resolver = view.as_move_resolver_with_config(
-            self.vm.get_gas_feature_version(),
-            self.vm.get_features(),
-        );
+        let resolver = self.vm.as_move_resolver(executor_view);
         match self
             .vm
             .execute_single_transaction(txn, &resolver, &log_context)
@@ -81,7 +75,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                 if materialize_deltas {
                     // TODO: Integrate aggregator v2.
                     vm_output = vm_output
-                        .try_materialize(view)
+                        .try_materialize(&resolver)
                         .expect("Delta materialization failed");
                 }
 

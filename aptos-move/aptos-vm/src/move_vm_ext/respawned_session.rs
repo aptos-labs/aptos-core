@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::{AsMoveResolver, StorageAdapter},
+    data_cache::StorageAdapter,
     move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
-    storage_adapter::RespawnedViewAdapter,
+    storage_adapter::ExecutorViewWithChanges,
     AptosVM,
 };
 use aptos_gas_algebra::Fee;
@@ -17,10 +17,10 @@ use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 /// the base state view, and this struct implements that.
 #[ouroboros::self_referencing]
 pub struct RespawnedSession<'r, 'l> {
-    state_view: RespawnedViewAdapter<'r>,
-    #[borrows(state_view)]
+    executor_view: ExecutorViewWithChanges<'r>,
+    #[borrows(executor_view)]
     #[covariant]
-    resolver: StorageAdapter<'this, RespawnedViewAdapter<'r>>,
+    resolver: StorageAdapter<'this, ExecutorViewWithChanges<'r>>,
     #[borrows(resolver)]
     #[not_covariant]
     session: Option<SessionExt<'this, 'l>>,
@@ -35,15 +35,12 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         previous_session_change_set: VMChangeSet,
         storage_refund: Fee,
     ) -> Result<Self, VMStatus> {
-        let state_view =
-            RespawnedViewAdapter::new(base.as_executor_resolver(), previous_session_change_set);
+        let executor_view =
+            ExecutorViewWithChanges::new(base.as_executor_resolver(), previous_session_change_set);
 
         Ok(RespawnedSessionBuilder {
-            state_view,
-            resolver_builder: |state_view| {
-                state_view
-                    .as_move_resolver_with_config(vm.get_gas_feature_version(), vm.get_features())
-            },
+            executor_view,
+            resolver_builder: |executor_view| vm.as_move_resolver(executor_view),
             session_builder: |resolver| Some(vm.0.new_session(resolver, session_id)),
             storage_refund,
         }
@@ -61,7 +58,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         let additional_change_set = self.with_session_mut(|session| {
             session.take().unwrap().finish(&mut (), change_set_configs)
         })?;
-        let mut change_set = self.into_heads().state_view.change_set;
+        let mut change_set = self.into_heads().executor_view.change_set;
         change_set
             .squash_additional_change_set(additional_change_set, change_set_configs)
             .map_err(|_err| {

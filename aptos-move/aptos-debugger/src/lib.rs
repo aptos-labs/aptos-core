@@ -25,7 +25,6 @@ use aptos_validator_interface::{
 use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
-    storage_adapter::AsAdapter,
     AptosVM, VMExecutor,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -75,8 +74,7 @@ impl AptosDebugger {
 
         // TODO(Gas): revisit this.
         let vm = AptosVM::new_from_state_view(&state_view);
-        let adapter = state_view.as_adapter();
-        let resolver = adapter.as_move_resolver();
+        let resolver = state_view.as_move_resolver();
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
@@ -180,9 +178,8 @@ impl AptosDebugger {
         version: Version,
     ) -> Result<Option<AnnotatedAccountStateBlob>> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let adapter = state_view.as_adapter();
-        let resolver = adapter.as_move_resolver();
-        let annotator = AptosValueAnnotator::new(&resolver);
+        let remote_storage = state_view.as_move_resolver();
+        let annotator = AptosValueAnnotator::new(&remote_storage);
         Ok(
             match self
                 .debugger
@@ -201,9 +198,8 @@ impl AptosDebugger {
     ) -> Result<Vec<(AccountAddress, AnnotatedAccountStateBlob)>> {
         let accounts = self.debugger.get_admin_accounts(version).await?;
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let adapter = state_view.as_adapter();
-        let resolver = adapter.as_move_resolver();
-        let annotator = AptosValueAnnotator::new(&resolver);
+        let remote_storage = state_view.as_move_resolver();
+        let annotator = AptosValueAnnotator::new(&remote_storage);
 
         let mut result = vec![];
         for (addr, state) in accounts.into_iter() {
@@ -231,10 +227,8 @@ impl AptosDebugger {
         F: FnOnce(&mut SessionExt) -> VMResult<()>,
     {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let adapter = state_view.as_adapter();
-        let resolver = adapter.as_move_resolver();
-
-        let features = Features::fetch_config(&resolver).unwrap_or_default();
+        let state_view_storage = state_view.as_move_resolver();
+        let features = Features::fetch_config(&state_view_storage).unwrap_or_default();
         let move_vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
             MiscGasParameters::zeros(),
@@ -244,7 +238,7 @@ impl AptosDebugger {
             TimedFeatures::enable_all(),
         )
         .unwrap();
-        let mut session = move_vm.new_session(&resolver, SessionId::Void);
+        let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         let change_set = session
             .finish(

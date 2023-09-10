@@ -16,18 +16,18 @@ use aptos_vm_types::{
 use move_core_types::value::MoveTypeLayout;
 
 /// Adapter to allow resolving the calls to `ExecutorResolver` via change set.
-pub struct RespawnedViewAdapter<'r> {
+pub struct ExecutorViewWithChanges<'r> {
     base: &'r dyn ExecutorView,
     pub(crate) change_set: VMChangeSet,
 }
 
-impl<'r> RespawnedViewAdapter<'r> {
+impl<'r> ExecutorViewWithChanges<'r> {
     pub(crate) fn new(base: &'r dyn ExecutorView, change_set: VMChangeSet) -> Self {
         Self { base, change_set }
     }
 }
 
-impl<'r> TAggregatorView for RespawnedViewAdapter<'r> {
+impl<'r> TAggregatorView for ExecutorViewWithChanges<'r> {
     type Key = AggregatorID;
 
     fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> anyhow::Result<Option<StateValue>> {
@@ -44,7 +44,7 @@ impl<'r> TAggregatorView for RespawnedViewAdapter<'r> {
     }
 }
 
-impl<'r> TResourceView for RespawnedViewAdapter<'r> {
+impl<'r> TResourceView for ExecutorViewWithChanges<'r> {
     type Key = StateKey;
     type Layout = MoveTypeLayout;
 
@@ -60,7 +60,7 @@ impl<'r> TResourceView for RespawnedViewAdapter<'r> {
     }
 }
 
-impl<'r> TModuleView for RespawnedViewAdapter<'r> {
+impl<'r> TModuleView for ExecutorViewWithChanges<'r> {
     type Key = StateKey;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
@@ -71,7 +71,7 @@ impl<'r> TModuleView for RespawnedViewAdapter<'r> {
     }
 }
 
-impl<'r> StateStorageView for RespawnedViewAdapter<'r> {
+impl<'r> StateStorageView for ExecutorViewWithChanges<'r> {
     fn id(&self) -> StateViewId {
         self.base.id()
     }

@@ -110,7 +110,7 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use aptos_vm::{data_cache::AsMoveResolver, storage_adapter::AsAdapter};
+use aptos_vm::data_cache::AsMoveResolver;
 use arr_macro::arr;
 use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
@@ -462,8 +462,7 @@ impl AptosDB {
                 db: self.state_store.clone(),
                 version: Some(ledger_next_version - 1),
             };
-            let adapter = state_view.as_adapter();
-            let resolver = adapter.as_move_resolver();
+            let resolver = state_view.as_move_resolver();
             let annotator = MoveValueAnnotator::new(&resolver);
 
             const BATCH_SIZE: Version = 10000;

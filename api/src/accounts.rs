@@ -24,7 +24,7 @@ use aptos_types::{
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
 };
-use aptos_vm::{data_cache::AsMoveResolver, storage_adapter::AsAdapter};
+use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
     resolver::MoveResolver,
@@ -340,8 +340,7 @@ impl Account {
                 let state_view = self
                     .context
                     .latest_state_view_poem(&self.latest_ledger_info)?;
-                let adapter = state_view.as_adapter();
-                let converted_resources = adapter
+                let converted_resources = state_view
                     .as_move_resolver()
                     .as_converter(self.context.db.clone())
                     .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
@@ -517,8 +516,7 @@ impl Account {
     ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>, BasicErrorWith404> {
         let (ledger_info, ledger_version, state_view) =
             self.context.state_view(Some(self.ledger_version))?;
-        let adapter = state_view.as_adapter();
-        let resolver = adapter.as_move_resolver();
+        let resolver = state_view.as_move_resolver();
 
         let bytes = resolver
             .get_resource(&self.address.into(), resource_type)
