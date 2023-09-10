@@ -6,7 +6,8 @@
 
 use crate::account::AccountData;
 use anyhow::Result;
-use aptos_state_view::{in_memory_state_view::InMemoryStateView, TStateView};
+use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorResolver};
+use aptos_state_view::{in_memory_state_view::InMemoryStateView, StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_config::CoinInfoResource,
@@ -20,7 +21,8 @@ use aptos_vm_genesis::{
     generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
     GenesisOptions,
 };
-use move_core_types::language_storage::ModuleId;
+use aptos_vm_types::resolver::{StateStorageResolver, TModuleResolver, TResourceResolver};
+use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -35,10 +37,10 @@ pub static GENESIS_CHANGE_SET_TESTNET: Lazy<ChangeSet> =
 pub static GENESIS_CHANGE_SET_MAINNET: Lazy<ChangeSet> =
     Lazy::new(|| generate_genesis_change_set_for_mainnet(GenesisOptions::Mainnet));
 
-/// An in-memory implementation of `StateView` and `RemoteCache` for the VM.
+/// An in-memory implementation of `StateView` and `ExecutorResolver` for the VM.
 ///
 /// Tests use this to set up state, and pass in a reference to the cache whenever a `StateView` or
-/// `RemoteCache` is needed.
+/// `ExecutorResolver` is needed.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct FakeDataStore {
     state_data: HashMap<StateKey, StateValue>,
@@ -130,5 +132,46 @@ impl TStateView for FakeDataStore {
 
     fn as_in_memory_state_view(&self) -> InMemoryStateView {
         InMemoryStateView::new(self.state_data.clone())
+    }
+}
+
+// These traits allow `FakeDataStore` act as a resolver as well.
+impl TResourceResolver for FakeDataStore {
+    type Key = StateKey;
+    type Layout = MoveTypeLayout;
+
+    fn get_resource_state_value(
+        &self,
+        state_key: &Self::Key,
+        _maybe_layout: Option<&Self::Layout>,
+    ) -> Result<Option<StateValue>> {
+        self.get_state_value(state_key)
+    }
+}
+
+impl TModuleResolver for FakeDataStore {
+    type Key = StateKey;
+
+    fn get_module_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>> {
+        self.get_state_value(state_key)
+    }
+}
+
+impl StateStorageResolver for FakeDataStore {
+    fn id(&self) -> StateViewId {
+        StateViewId::Miscellaneous
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        // Re-use implementation from the `StateView`
+        self.get_usage()
+    }
+}
+
+impl TAggregatorResolver for FakeDataStore {
+    type Key = AggregatorID;
+
+    fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> Result<Option<StateValue>> {
+        self.get_state_value(id.as_state_key())
     }
 }
