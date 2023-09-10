@@ -5,7 +5,7 @@
 #[cfg(feature = "testing")]
 use anyhow::Error;
 #[cfg(feature = "testing")]
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorResolver};
+use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorView};
 #[cfg(feature = "testing")]
 use aptos_framework::natives::cryptography::algebra::AlgebraContext;
 #[cfg(feature = "testing")]
@@ -37,7 +37,7 @@ use {
 struct AptosBlankStorage;
 
 #[cfg(feature = "testing")]
-impl TAggregatorResolver for AptosBlankStorage {
+impl TAggregatorView for AptosBlankStorage {
     type Key = AggregatorID;
 
     fn get_aggregator_v1_state_value(&self, _id: &Self::Key) -> anyhow::Result<Option<StateValue>> {

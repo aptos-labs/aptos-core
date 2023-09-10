@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{delta_change_set::DeltaOp, resolver::TAggregatorResolver};
+use aptos_aggregator::{delta_change_set::DeltaOp, resolver::TAggregatorView};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     contract_event::ReadWriteEvent,
@@ -10,7 +10,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
-use aptos_vm_types::resolver::{StateStorageResolver, TModuleResolver, TResourceResolver};
+use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceView};
 use move_core_types::value::MoveTypeLayout;
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
@@ -64,10 +64,10 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &(impl TResourceResolver<Key = <Self::Txn as Transaction>::Key, Layout = MoveTypeLayout>
-              + TModuleResolver<Key = <Self::Txn as Transaction>::Key>
-              + TAggregatorResolver<Key = <Self::Txn as Transaction>::Identifier>
-              + StateStorageResolver),
+        view: &(impl TResourceView<Key = <Self::Txn as Transaction>::Key, Layout = MoveTypeLayout>
+              + TModuleView<Key = <Self::Txn as Transaction>::Key>
+              + TAggregatorView<Key = <Self::Txn as Transaction>::Identifier>
+              + StateStorageView),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,

@@ -14,7 +14,7 @@ use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use aptos_vm_types::resolver::ExecutorResolver;
+use aptos_vm_types::resolver::ExecutorView;
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
@@ -63,7 +63,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
-        view: &impl ExecutorResolver,
+        view: &impl ExecutorView,
         txn: &PreprocessedTransaction,
         txn_idx: TxnIndex,
         materialize_deltas: bool,

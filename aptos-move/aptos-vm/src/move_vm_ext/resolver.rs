@@ -7,7 +7,7 @@ use aptos_types::{
     on_chain_config::ConfigStorage,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
 };
-use aptos_vm_types::resolver::{ExecutorResolver, StateStorageResolver};
+use aptos_vm_types::resolver::{ExecutorView, StateStorageView};
 use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, resolver::MoveResolver,
 };
@@ -41,7 +41,7 @@ pub trait AptosMoveResolver:
     + MoveResolver
     + TableResolver
     + StateValueMetadataResolver
-    + StateStorageResolver
+    + StateStorageView
     + AsExecutorResolver
 {
     fn release_resource_group_cache(
@@ -50,5 +50,5 @@ pub trait AptosMoveResolver:
 }
 
 pub trait AsExecutorResolver {
-    fn as_executor_resolver(&self) -> &dyn ExecutorResolver;
+    fn as_executor_resolver(&self) -> &dyn ExecutorView;
 }

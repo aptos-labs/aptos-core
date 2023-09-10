@@ -50,7 +50,7 @@ use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculat
 use aptos_vm_types::{
     change_set::VMChangeSet,
     output::VMOutput,
-    resolver::ExecutorResolver,
+    resolver::ExecutorView,
     storage::{ChangeSetConfigs, StorageGasParameters},
 };
 use fail::fail_point;
@@ -1261,7 +1261,7 @@ impl AptosVM {
 
     fn read_change_set(
         &self,
-        resolver: &dyn ExecutorResolver,
+        resolver: &dyn ExecutorView,
         change_set: &VMChangeSet,
     ) -> Result<(), VMStatus> {
         assert!(

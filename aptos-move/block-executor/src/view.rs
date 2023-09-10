@@ -7,7 +7,7 @@ use crate::{
     task::Transaction,
     txn_last_input_output::ReadDescriptor,
 };
-use aptos_aggregator::{delta_change_set::serialize, resolver::TAggregatorResolver};
+use aptos_aggregator::{delta_change_set::serialize, resolver::TAggregatorView};
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, MVModulesError, MVModulesOutput, TxnIndex},
@@ -21,7 +21,7 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use aptos_vm_types::resolver::{StateStorageResolver, TModuleResolver, TResourceResolver};
+use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceView};
 use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
@@ -224,7 +224,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceResolver
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceView
     for LatestView<'a, T, S, X>
 {
     type Key = T::Key;
@@ -278,7 +278,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceRe
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleResolver
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
     for LatestView<'a, T, S, X>
 {
     type Key = T::Key;
@@ -308,7 +308,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleReso
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageResolver
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageView
     for LatestView<'a, T, S, X>
 {
     fn id(&self) -> StateViewId {
@@ -320,7 +320,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorag
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregatorResolver
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregatorView
     for LatestView<'a, T, S, X>
 {
     type Key = T::Identifier;

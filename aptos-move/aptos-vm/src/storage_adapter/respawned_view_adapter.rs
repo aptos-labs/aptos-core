@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorResolver};
+use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorView};
 use aptos_state_view::StateViewId;
 use aptos_types::{
     state_store::{
@@ -11,23 +11,23 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     change_set::VMChangeSet,
-    resolver::{ExecutorResolver, StateStorageResolver, TModuleResolver, TResourceResolver},
+    resolver::{ExecutorView, StateStorageView, TModuleView, TResourceView},
 };
 use move_core_types::value::MoveTypeLayout;
 
 /// Adapter to allow resolving the calls to `ExecutorResolver` via change set.
 pub struct RespawnedViewAdapter<'r> {
-    base: &'r dyn ExecutorResolver,
+    base: &'r dyn ExecutorView,
     pub(crate) change_set: VMChangeSet,
 }
 
 impl<'r> RespawnedViewAdapter<'r> {
-    pub(crate) fn new(base: &'r dyn ExecutorResolver, change_set: VMChangeSet) -> Self {
+    pub(crate) fn new(base: &'r dyn ExecutorView, change_set: VMChangeSet) -> Self {
         Self { base, change_set }
     }
 }
 
-impl<'r> TAggregatorResolver for RespawnedViewAdapter<'r> {
+impl<'r> TAggregatorView for RespawnedViewAdapter<'r> {
     type Key = AggregatorID;
 
     fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> anyhow::Result<Option<StateValue>> {
@@ -44,7 +44,7 @@ impl<'r> TAggregatorResolver for RespawnedViewAdapter<'r> {
     }
 }
 
-impl<'r> TResourceResolver for RespawnedViewAdapter<'r> {
+impl<'r> TResourceView for RespawnedViewAdapter<'r> {
     type Key = StateKey;
     type Layout = MoveTypeLayout;
 
@@ -60,7 +60,7 @@ impl<'r> TResourceResolver for RespawnedViewAdapter<'r> {
     }
 }
 
-impl<'r> TModuleResolver for RespawnedViewAdapter<'r> {
+impl<'r> TModuleView for RespawnedViewAdapter<'r> {
     type Key = StateKey;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
@@ -71,7 +71,7 @@ impl<'r> TModuleResolver for RespawnedViewAdapter<'r> {
     }
 }
 
-impl<'r> StateStorageResolver for RespawnedViewAdapter<'r> {
+impl<'r> StateStorageView for RespawnedViewAdapter<'r> {
     fn id(&self) -> StateViewId {
         self.base.id()
     }

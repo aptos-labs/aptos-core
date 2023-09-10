@@ -28,7 +28,7 @@ pub enum AggregatorReadMode {
 /// Returns a value of an aggregator from cache or global storage.
 ///   - Ok(..)       if aggregator value exists
 ///   - Err(..)      otherwise.
-pub trait TAggregatorResolver {
+pub trait TAggregatorView {
     type Key;
 
     fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> anyhow::Result<Option<StateValue>>;
@@ -95,9 +95,9 @@ pub trait TAggregatorResolver {
     }
 }
 
-pub trait AggregatorResolver: TAggregatorResolver<Key = AggregatorID> {}
+pub trait AggregatorResolver: TAggregatorView<Key = AggregatorID> {}
 
-impl<T: TAggregatorResolver<Key = AggregatorID>> AggregatorResolver for T {}
+impl<T: TAggregatorView<Key = AggregatorID>> AggregatorResolver for T {}
 
 // Utils to store aggregator values in data store. Here, we
 // only care about aggregators which are state items.
@@ -135,7 +135,7 @@ pub mod test_utils {
         }
     }
 
-    impl TAggregatorResolver for AggregatorStore {
+    impl TAggregatorView for AggregatorStore {
         type Key = AggregatorID;
 
         fn get_aggregator_v1_state_value(

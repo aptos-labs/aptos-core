@@ -17,7 +17,7 @@ use aptos_vm::{
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
     storage_adapter::AsAdapter,
 };
-use aptos_vm_types::storage::ChangeSetConfigs;
+use aptos_vm_types::{resolver::ExecutorView, storage::ChangeSetConfigs};
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
@@ -106,7 +106,11 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
     }
 }
 
-pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F, chain_id: u8) -> ChangeSet
+pub fn build_changeset<R: ExecutorView, F>(
+    executor_view: &R,
+    procedure: F,
+    chain_id: u8,
+) -> ChangeSet
 where
     F: FnOnce(&mut GenesisSession),
 {
@@ -119,9 +123,7 @@ where
         TimedFeatures::enable_all(),
     )
     .unwrap();
-
-    let adapter = state_view.as_adapter();
-    let resolver = adapter.as_move_resolver();
+    let resolver = executor_view.as_move_resolver();
     let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();

@@ -6,7 +6,7 @@ use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
 use aptos_types::vm_status::StatusCode;
-use aptos_vm_types::resolver::StateStorageResolver;
+use aptos_vm_types::resolver::StateStorageView;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 use move_vm_runtime::native_functions::NativeFunction;
@@ -20,11 +20,11 @@ use std::collections::VecDeque;
 /// Exposes the ability to query state storage utilization info to native functions.
 #[derive(Tid)]
 pub struct NativeStateStorageContext<'a> {
-    resolver: &'a dyn StateStorageResolver,
+    resolver: &'a dyn StateStorageView,
 }
 
 impl<'a> NativeStateStorageContext<'a> {
-    pub fn new(resolver: &'a dyn StateStorageResolver) -> Self {
+    pub fn new(resolver: &'a dyn StateStorageView) -> Self {
         Self { resolver }
     }
 }

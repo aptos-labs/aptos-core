@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorResolver};
+use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorView};
 use aptos_state_view::StateViewId;
 use aptos_types::state_store::{
     state_key::StateKey,
@@ -14,7 +14,7 @@ use move_core_types::value::MoveTypeLayout;
 /// Having a type alias allows to avoid having nested options.
 pub type StateValueMetadataKind = Option<StateValueMetadata>;
 
-pub trait TResourceResolver {
+pub trait TResourceView {
     type Key;
     type Layout;
 
@@ -43,11 +43,11 @@ pub trait TResourceResolver {
     }
 }
 
-pub trait ResourceResolver: TResourceResolver<Key = StateKey, Layout = MoveTypeLayout> {}
+pub trait ResourceResolver: TResourceView<Key = StateKey, Layout = MoveTypeLayout> {}
 
-impl<T: TResourceResolver<Key = StateKey, Layout = MoveTypeLayout>> ResourceResolver for T {}
+impl<T: TResourceView<Key = StateKey, Layout = MoveTypeLayout>> ResourceResolver for T {}
 
-pub trait TModuleResolver {
+pub trait TModuleView {
     type Key;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>>;
@@ -66,29 +66,29 @@ pub trait TModuleResolver {
     }
 }
 
-pub trait ModuleResolver: TModuleResolver<Key = StateKey> {}
+pub trait ModuleResolver: TModuleView<Key = StateKey> {}
 
-impl<T: TModuleResolver<Key = StateKey>> ModuleResolver for T {}
+impl<T: TModuleView<Key = StateKey>> ModuleResolver for T {}
 
-pub trait StateStorageResolver {
+pub trait StateStorageView {
     fn id(&self) -> StateViewId;
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage>;
 }
 
-pub trait ExecutorResolver:
-    TResourceResolver<Key = StateKey, Layout = MoveTypeLayout>
-    + TModuleResolver<Key = StateKey>
-    + TAggregatorResolver<Key = AggregatorID>
-    + StateStorageResolver
+pub trait ExecutorView:
+    TResourceView<Key = StateKey, Layout = MoveTypeLayout>
+    + TModuleView<Key = StateKey>
+    + TAggregatorView<Key = AggregatorID>
+    + StateStorageView
 {
 }
 
 impl<
-        T: TResourceResolver<Key = StateKey, Layout = MoveTypeLayout>
-            + TModuleResolver<Key = StateKey>
-            + TAggregatorResolver<Key = AggregatorID>
-            + StateStorageResolver,
-    > ExecutorResolver for T
+        T: TResourceView<Key = StateKey, Layout = MoveTypeLayout>
+            + TModuleView<Key = StateKey>
+            + TAggregatorView<Key = AggregatorID>
+            + StateStorageView,
+    > ExecutorView for T
 {
 }

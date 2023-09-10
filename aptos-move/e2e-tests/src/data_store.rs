@@ -6,7 +6,7 @@
 
 use crate::account::AccountData;
 use anyhow::Result;
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorResolver};
+use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorView};
 use aptos_state_view::{in_memory_state_view::InMemoryStateView, StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
@@ -21,7 +21,7 @@ use aptos_vm_genesis::{
     generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
     GenesisOptions,
 };
-use aptos_vm_types::resolver::{StateStorageResolver, TModuleResolver, TResourceResolver};
+use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceView};
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -136,7 +136,7 @@ impl TStateView for FakeDataStore {
 }
 
 // These traits allow `FakeDataStore` act as a resolver as well.
-impl TResourceResolver for FakeDataStore {
+impl TResourceView for FakeDataStore {
     type Key = StateKey;
     type Layout = MoveTypeLayout;
 
@@ -149,7 +149,7 @@ impl TResourceResolver for FakeDataStore {
     }
 }
 
-impl TModuleResolver for FakeDataStore {
+impl TModuleView for FakeDataStore {
     type Key = StateKey;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>> {
@@ -157,7 +157,7 @@ impl TModuleResolver for FakeDataStore {
     }
 }
 
-impl StateStorageResolver for FakeDataStore {
+impl StateStorageView for FakeDataStore {
     fn id(&self) -> StateViewId {
         StateViewId::Miscellaneous
     }
@@ -168,7 +168,7 @@ impl StateStorageResolver for FakeDataStore {
     }
 }
 
-impl TAggregatorResolver for FakeDataStore {
+impl TAggregatorView for FakeDataStore {
     type Key = AggregatorID;
 
     fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> Result<Option<StateValue>> {

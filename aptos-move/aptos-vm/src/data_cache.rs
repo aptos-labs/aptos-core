@@ -14,7 +14,7 @@ use crate::{
     },
 };
 use anyhow::Error;
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorResolver};
+use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorView};
 use aptos_state_view::StateViewId;
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
@@ -24,7 +24,7 @@ use aptos_types::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
 };
-use aptos_vm_types::resolver::{ExecutorResolver, StateStorageResolver};
+use aptos_vm_types::resolver::{ExecutorView, StateStorageView};
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
@@ -66,7 +66,7 @@ pub trait AsMoveResolver<R> {
     ) -> StorageAdapter<R>;
 }
 
-impl<R: ExecutorResolver> AsMoveResolver<R> for R {
+impl<R: ExecutorView> AsMoveResolver<R> for R {
     fn as_move_resolver(&self) -> StorageAdapter<R> {
         StorageAdapter::new(self)
     }
@@ -80,7 +80,7 @@ impl<R: ExecutorResolver> AsMoveResolver<R> for R {
     }
 }
 
-impl<'r, R: ExecutorResolver> StorageAdapter<'r, R> {
+impl<'r, R: ExecutorView> StorageAdapter<'r, R> {
     fn new(resolver: &'r R) -> Self {
         let mut s = Self {
             resolver,
@@ -185,7 +185,7 @@ impl<'r, R: ExecutorResolver> StorageAdapter<'r, R> {
     }
 }
 
-impl<'r, R: ExecutorResolver> AptosMoveResolver for StorageAdapter<'r, R> {
+impl<'r, R: ExecutorView> AptosMoveResolver for StorageAdapter<'r, R> {
     fn release_resource_group_cache(
         &self,
     ) -> BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>> {
@@ -193,7 +193,7 @@ impl<'r, R: ExecutorResolver> AptosMoveResolver for StorageAdapter<'r, R> {
     }
 }
 
-impl<'r, R: ExecutorResolver> ResourceResolver for StorageAdapter<'r, R> {
+impl<'r, R: ExecutorView> ResourceResolver for StorageAdapter<'r, R> {
     fn get_resource_with_metadata(
         &self,
         address: &AccountAddress,
@@ -204,7 +204,7 @@ impl<'r, R: ExecutorResolver> ResourceResolver for StorageAdapter<'r, R> {
     }
 }
 
-impl<'r, R: ExecutorResolver> ModuleResolver for StorageAdapter<'r, R> {
+impl<'r, R: ExecutorView> ModuleResolver for StorageAdapter<'r, R> {
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
         let module_bytes = match self.get_module(module_id) {
             Ok(Some(bytes)) => bytes,
@@ -231,7 +231,7 @@ impl<'r, R: ExecutorResolver> ModuleResolver for StorageAdapter<'r, R> {
     }
 }
 
-impl<'r, R: ExecutorResolver> TAggregatorResolver for StorageAdapter<'r, R> {
+impl<'r, R: ExecutorView> TAggregatorView for StorageAdapter<'r, R> {
     type Key = AggregatorID;
 
     fn get_aggregator_v1_state_value(&self, id: &Self::Key) -> anyhow::Result<Option<StateValue>> {
@@ -239,7 +239,7 @@ impl<'r, R: ExecutorResolver> TAggregatorResolver for StorageAdapter<'r, R> {
     }
 }
 
-impl<'r, R: ExecutorResolver> StateValueMetadataResolver for StorageAdapter<'r, R> {
+impl<'r, R: ExecutorView> StateValueMetadataResolver for StorageAdapter<'r, R> {
     fn get_state_value_metadata(
         &self,
         state_key: &StateKey,
@@ -252,7 +252,7 @@ impl<'r, R: ExecutorResolver> StateValueMetadataResolver for StorageAdapter<'r, 
     }
 }
 
-impl<'r, R: ExecutorResolver> TableResolver for StorageAdapter<'r, R> {
+impl<'r, R: ExecutorView> TableResolver for StorageAdapter<'r, R> {
     fn resolve_table_entry(
         &self,
         handle: &TableHandle,
@@ -263,7 +263,7 @@ impl<'r, R: ExecutorResolver> TableResolver for StorageAdapter<'r, R> {
     }
 }
 
-impl<'r, R: ExecutorResolver> StateStorageResolver for StorageAdapter<'r, R> {
+impl<'r, R: ExecutorView> StateStorageView for StorageAdapter<'r, R> {
     fn id(&self) -> StateViewId {
         self.resolver.id()
     }
@@ -273,7 +273,7 @@ impl<'r, R: ExecutorResolver> StateStorageResolver for StorageAdapter<'r, R> {
     }
 }
 
-impl<'r, R: ExecutorResolver> ConfigStorage for StorageAdapter<'r, R> {
+impl<'r, R: ExecutorView> ConfigStorage for StorageAdapter<'r, R> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
         // Config is a resource on-chain.
         self.resolver
@@ -282,8 +282,8 @@ impl<'r, R: ExecutorResolver> ConfigStorage for StorageAdapter<'r, R> {
     }
 }
 
-impl<R: ExecutorResolver> AsExecutorResolver for StorageAdapter<'_, R> {
-    fn as_executor_resolver(&self) -> &dyn ExecutorResolver {
+impl<R: ExecutorView> AsExecutorResolver for StorageAdapter<'_, R> {
+    fn as_executor_resolver(&self) -> &dyn ExecutorView {
         self.resolver
     }
 }
