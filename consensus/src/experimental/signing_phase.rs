@@ -2,12 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    experimental::pipeline_phase::StatelessPipeline, metrics_safety_rules::MetricsSafetyRules,
-};
+use crate::experimental::pipeline_phase::StatelessPipeline;
 use aptos_crypto::bls12381;
-use aptos_infallible::Mutex;
-use aptos_safety_rules::{Error, TSafetyRules};
+use aptos_safety_rules::Error;
 use aptos_types::ledger_info::{LedgerInfo, LedgerInfoWithSignatures};
 use async_trait::async_trait;
 use std::{
@@ -41,17 +38,25 @@ impl Display for SigningRequest {
     }
 }
 
+pub trait CommitSignerProvider: Send + Sync {
+    fn sign_commit_vote(
+        &self,
+        ledger_info: LedgerInfoWithSignatures,
+        new_ledger_info: LedgerInfo,
+    ) -> Result<bls12381::Signature, Error>;
+}
+
 pub struct SigningResponse {
     pub signature_result: Result<bls12381::Signature, Error>,
     pub commit_ledger_info: LedgerInfo,
 }
 
 pub struct SigningPhase {
-    safety_rule_handle: Arc<Mutex<MetricsSafetyRules>>,
+    safety_rule_handle: Arc<dyn CommitSignerProvider>,
 }
 
 impl SigningPhase {
-    pub fn new(safety_rule_handle: Arc<Mutex<MetricsSafetyRules>>) -> Self {
+    pub fn new(safety_rule_handle: Arc<dyn CommitSignerProvider>) -> Self {
         Self { safety_rule_handle }
     }
 }
@@ -72,7 +77,6 @@ impl StatelessPipeline for SigningPhase {
         SigningResponse {
             signature_result: self
                 .safety_rule_handle
-                .lock()
                 .sign_commit_vote(ordered_ledger_info, commit_ledger_info.clone()),
             commit_ledger_info,
         }

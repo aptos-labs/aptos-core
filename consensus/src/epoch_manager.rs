@@ -13,6 +13,7 @@ use crate::{
         buffer_manager::{OrderedBlocks, ResetRequest},
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
         ordering_state_computer::OrderingStateComputer,
+        signing_phase::CommitSignerProvider,
     },
     liveness::{
         cached_proposer_election::CachedProposerElection,
@@ -483,7 +484,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     /// it sets `self.commit_msg_tx` to a new aptos_channel::Sender and returns an OrderingStateComputer
     fn spawn_decoupled_execution(
         &mut self,
-        safety_rules_container: Arc<Mutex<MetricsSafetyRules>>,
+        commit_signer_provider: Arc<dyn CommitSignerProvider>,
         verifier: ValidatorVerifier,
     ) -> OrderingStateComputer {
         let network_sender = NetworkSender::new(
@@ -510,7 +511,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             prepare_phases_and_buffer_manager(
                 self.author,
                 self.commit_state_computer.clone(),
-                safety_rules_container,
+                commit_signer_provider,
                 network_sender,
                 commit_msg_rx,
                 self.commit_state_computer.clone(),
