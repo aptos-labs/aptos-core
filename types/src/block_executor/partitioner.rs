@@ -452,10 +452,17 @@ impl From<(HashValue, Vec<Transaction>)> for ExecutableBlock {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PartitionedTransactions {
+    pub block_id: u8,
+    /// global_idxs[s] = [a,b,c] <=> Shard `s` needs to execute txns a,b,c.
     pub sharded_txns: Vec<Vec<AnalyzedTransaction>>,
+    /// global_idxs[s] = [a,b,c] <=> Shard `s` needs to execute txns of global idx a,b,c.
     pub global_idxs: Vec<Vec<u32>>,
-    pub dependency_sets: Vec<BTreeSet<(ShardId, u32)>>,
-    pub follower_sets: Vec<BTreeSet<(ShardId, u32)>>,
+    /// shard_idxs_by_txn[x] = s <=> txn of global idx x is sent to shard s.
+    pub shard_idxs_by_txn: Vec<usize>,
+    /// dependency_sets[x] = [y,z] <=> txn of global idx x needs to wait for txns of global idx y and z.
+    pub dependency_sets: Vec<Vec<u32>>,
+    /// follower_sets[x] = [y,z] <=> txn of global idx x needs to feed its output to txns of global idx y and z.
+    pub follower_sets: Vec<Vec<u32>>,
 }
 
 impl PartitionedTransactions {
@@ -481,7 +488,7 @@ impl PartitionedTransactions {
     }
 
     pub fn flatten(transactions: PartitionedTransactions) -> Vec<AnalyzedTransaction> {
-        let PartitionedTransactions{ sharded_txns, global_idxs, dependency_sets, follower_sets: _follower_sets } = transactions;
+        let PartitionedTransactions{block_id, sharded_txns, global_idxs, shard_idxs_by_txn, dependency_sets, follower_sets: _follower_sets } = transactions;
         let num_txns = dependency_sets.len();
         let mut ret: Vec<Option<AnalyzedTransaction>> = vec![None; num_txns];
         for (shard_id, txns) in sharded_txns.into_iter().enumerate() {

@@ -124,6 +124,7 @@ where
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let (idx_to_execute, incarnation) = version;
         let global_txn_idx = sharding_provider.global_idx_from_local(idx_to_execute);
+        info!("execute() for txn {}.", global_txn_idx);
         sharding_provider.wait_for_remote_deps(idx_to_execute);
         let txn = sharding_provider.txn(idx_to_execute);
 
@@ -206,6 +207,7 @@ where
             scheduler.halt();
             return SchedulerTask::NoTask;
         }
+        info!("finish_execute() for txn {}.", global_txn_idx);
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
     }
 
@@ -223,6 +225,7 @@ where
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let (idx_to_validate, incarnation) = version_to_validate;
         let global_idx = sharding_provider.global_idx_from_local(idx_to_validate);
+        info!("validate() for txn {}.", global_idx);
         let read_set = last_input_output
             .read_set(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
@@ -264,9 +267,10 @@ where
                     }
                 }
             }
-
+            info!("finish_abort() for txn {}.", global_idx);
             scheduler.finish_abort(idx_to_validate, incarnation)
         } else {
+            info!("finish_validation() for txn {}.", global_idx);
             scheduler.finish_validation(idx_to_validate, validation_wave);
             SchedulerTask::NoTask
         }
@@ -282,14 +286,16 @@ where
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         accumulated_fee_statement: &mut FeeStatement,
         txn_fee_statements: &mut Vec<FeeStatement>,
+        txn_provider: &TxnProvider<T, E::Output, E::Error>
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
+            let global_idx = txn_provider.global_idxs[txn_idx as usize];
             // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
             let _commit_guard: CommitGuard =
                 CommitGuard::new(post_commit_txs, *worker_idx, txn_idx);
             // Iterate round robin over workers to do commit_hook.
             *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
-
+            info!("Will ask worker {} to commit txn {}.", *worker_idx, global_idx);
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
                 // For committed txns with Success status, calculate the accumulated gas costs.
                 accumulated_fee_statement.add_fee_statement(&fee_statement);
@@ -370,9 +376,9 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         base_view: &S,
-        sharding_provider: &TxnProvider<T, E::Output, E::Error>,
+        txn_provider: &TxnProvider<T, E::Output, E::Error>,
     ) {
-        let global_idx = sharding_provider.global_idx_from_local(txn_idx);
+        let global_idx = txn_provider.global_idx_from_local(txn_idx);
         let delta_keys = last_input_output.delta_keys(txn_idx);
         let _events = last_input_output.events(txn_idx);
         let mut delta_writes = Vec::with_capacity(delta_keys.len());
@@ -406,26 +412,13 @@ where
             delta_writes.push((k, WriteOp::Modification(serialize(&committed_delta))));
         }
         last_input_output.record_delta_writes(txn_idx, delta_writes);
-        sharding_provider.on_local_commit(txn_idx, last_input_output);
-        if let Some(txn_commit_listener) = &self.transaction_commit_hook {
-            let txn_output = last_input_output.txn_output(txn_idx).unwrap();
-            let execution_status = txn_output.output_status();
-
-            match execution_status {
-                ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
-                    txn_commit_listener.on_transaction_committed(txn_idx, output);
-                },
-                ExecutionStatus::Abort(_) => {
-                    txn_commit_listener.on_execution_aborted(txn_idx);
-                },
-            }
-        }
+        txn_provider.on_local_commit(txn_idx, last_input_output);
     }
 
     fn work_task_with_scope(
         &self,
         executor_arguments: &E::Argument,
-        sharding_provider: &TxnProvider<T, E::Output, E::Error>,
+        txn_provider: &TxnProvider<T, E::Output, E::Error>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
@@ -446,7 +439,7 @@ where
         let mut worker_idx = 0;
 
         let mut accumulated_fee_statement = FeeStatement::zero();
-        let mut txn_fee_statements = Vec::with_capacity(sharding_provider.num_local_txns());
+        let mut txn_fee_statements = Vec::with_capacity(txn_provider.num_local_txns());
         loop {
             // Only one thread does try_commit to avoid contention.
             match &role {
@@ -460,6 +453,7 @@ where
                         last_input_output,
                         &mut accumulated_fee_statement,
                         &mut txn_fee_statements,
+                        txn_provider,
                     );
                 },
                 CommitRole::Worker(rx) => {
@@ -469,7 +463,7 @@ where
                             versioned_cache,
                             last_input_output,
                             base_view,
-                            sharding_provider,
+                            txn_provider,
                         );
                     }
                 },
@@ -477,7 +471,7 @@ where
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(version_to_validate, wave) => Self::validate(
-                    sharding_provider,
+                    txn_provider,
                     version_to_validate,
                     wave,
                     last_input_output,
@@ -487,13 +481,13 @@ where
                 SchedulerTask::ExecutionTask(version_to_execute, ExecutionTaskType::Execution) => {
                     Self::execute(
                         version_to_execute,
-                        sharding_provider,
+                        txn_provider,
                         last_input_output,
                         versioned_cache,
                         scheduler,
                         &executor,
                         base_view,
-                        ParallelState::new(versioned_cache, scheduler, shared_counter),
+                        ParallelState::new(versioned_cache, scheduler, shared_counter, &txn_provider.local_idxs_by_global),
                     )
                 },
                 SchedulerTask::ExecutionTask(_, ExecutionTaskType::Wakeup(condvar)) => {
@@ -505,7 +499,10 @@ where
 
                     SchedulerTask::NoTask
                 },
-                SchedulerTask::NoTask => scheduler.next_task(committing),
+                SchedulerTask::NoTask => {
+                    let new_task = scheduler.next_task(committing);
+                    new_task
+                },
                 SchedulerTask::Done => {
                     // Make sure to drain any remaining commit tasks assigned by the coordinator.
                     if let CommitRole::Worker(rx) = &role {
@@ -516,13 +513,16 @@ where
                                 versioned_cache,
                                 last_input_output,
                                 base_view,
-                                sharding_provider,
+                                txn_provider,
                             );
                         }
                     }
                     break;
                 },
             }
+        }
+        if committing {
+            txn_provider.shutdown_receiver();
         }
     }
 

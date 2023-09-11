@@ -2,11 +2,12 @@
 
 use crate::common::PTransaction;
 use std::{collections::HashMap, hash::Hash, rc::Rc};
+use std::fmt::Debug;
 
 pub type CompressedKey = u32;
 
-#[derive(Default)]
-pub struct CompressedPTransactionInner<T> {
+#[derive(Debug, Default)]
+pub struct CompressedPTransactionInner<T: Debug> {
     pub original: Box<T>,
     pub read_set: Vec<CompressedKey>,
     pub write_set: Vec<CompressedKey>,
@@ -14,7 +15,7 @@ pub struct CompressedPTransactionInner<T> {
 
 pub type CompressedPTransaction<T> = Rc<CompressedPTransactionInner<T>>;
 
-impl<T> PTransaction for CompressedPTransaction<T> {
+impl<T: Debug> PTransaction for CompressedPTransaction<T> {
     type Key = CompressedKey;
     type ReadSetIter<'a> = std::slice::Iter<'a, Self::Key> where T: 'a;
     type WriteSetIter<'a> = std::slice::Iter<'a, Self::Key> where T: 'a;
@@ -62,7 +63,7 @@ impl<K: Hash + Clone + Eq> TransactionCompressor<K> {
 
     pub fn compress_transactions<T, I>(&mut self, block: I) -> Vec<CompressedPTransaction<T>>
     where
-        T: PTransaction<Key = K>,
+        T: Debug + PTransaction<Key = K>,
         I: IntoIterator<Item = T>,
     {
         let mut res = vec![];
@@ -83,7 +84,7 @@ impl<K: Hash + Clone + Eq> TransactionCompressor<K> {
     }
 }
 
-pub fn compress_transactions<T>(block: Vec<T>) -> Vec<CompressedPTransaction<T>>
+pub fn compress_transactions<T: Debug>(block: Vec<T>) -> Vec<CompressedPTransaction<T>>
 where
     T: PTransaction,
     T::Key: Hash + Clone + Eq,

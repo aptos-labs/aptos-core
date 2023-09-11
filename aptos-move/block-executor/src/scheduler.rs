@@ -16,6 +16,7 @@ use std::{
         Arc, Condvar,
     },
 };
+use aptos_logger::info;
 use crate::sharding::TxnProvider;
 
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;

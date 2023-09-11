@@ -38,7 +38,7 @@ pub struct PipelineConfig {
     pub use_global_executor: bool,
     #[derivative(Default(value = "4"))]
     pub num_generator_workers: usize,
-    pub partitioner_config: PartitionerConfig,
+    pub partitioner_config: bool,
 }
 
 pub struct Pipeline<V> {

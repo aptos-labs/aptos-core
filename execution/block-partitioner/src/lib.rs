@@ -23,6 +23,7 @@ mod tests;
 pub trait BlockPartitioner: Send {
     fn partition(
         &self,
+        block_id: u8,
         transactions: Vec<AnalyzedTransaction>,
         num_shards: usize, //TODO: rethink about whether this is needed as part of `BlockPartitioner` API.
     ) -> PartitionedTransactions;

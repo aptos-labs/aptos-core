@@ -72,8 +72,9 @@ impl AptosTransactionOutput {
             None => self
                 .vm_output
                 .lock()
-                .take()
+                .as_ref()
                 .expect("Output must be set")
+                .clone()
                 .into_transaction_output_with_materialized_deltas(vec![]),
         }
     }
@@ -152,15 +153,15 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     /// Can be called (at most) once after transaction is committed to internally
     /// include the delta outputs with the transaction outputs.
     fn incorporate_delta_writes(&self, delta_writes: Vec<(StateKey, WriteOp)>) {
+        let val = self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output must be set to combine with deltas")
+            .clone()
+            .into_transaction_output_with_materialized_deltas(delta_writes);
         assert!(
             self.committed_output
-                .set(
-                    self.vm_output
-                        .lock()
-                        .take()
-                        .expect("Output must be set to combine with deltas")
-                        .into_transaction_output_with_materialized_deltas(delta_writes),
-                )
+                .set(val)
                 .is_ok(),
             "Could not combine VMOutput with deltas"
         );

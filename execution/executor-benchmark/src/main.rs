@@ -111,6 +111,8 @@ pub struct PipelineOpt {
     partitioner_v2_num_threads: usize,
     #[clap(long, default_value = "64")]
     partitioner_v2_dashmap_num_shards: usize,
+    #[clap(long)]
+    use_sharding_v3: bool,
 }
 
 impl PipelineOpt {
@@ -124,7 +126,7 @@ impl PipelineOpt {
             num_executor_shards: self.num_executor_shards,
             use_global_executor: self.use_global_executor,
             num_generator_workers: self.num_generator_workers,
-            partitioner_config: self.partitioner_config(),
+            partitioner_config: self.use_sharding_v3,
         }
     }
 

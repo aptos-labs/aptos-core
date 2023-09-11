@@ -13,6 +13,7 @@ use aptos_types::{
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
+use std::collections::BTreeSet;
 use std::sync::{mpsc, Mutex};
 use aptos_block_executor::sharding::TxnProvider;
 
@@ -166,25 +167,39 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ShardedExecutionOutput, VMStatus> {
         assert_eq!(transactions.num_shards(), self.num_shards());
-        let PartitionedTransactions { sharded_txns, global_idxs, dependency_sets, follower_sets } = transactions;
+        let PartitionedTransactions {block_id, sharded_txns, global_idxs, shard_idxs_by_txn, dependency_sets, follower_sets } = transactions;
         let num_shards = sharded_txns.len();
         let mut txs = Vec::with_capacity(num_shards);
         let mut rxs = Vec::with_capacity(num_shards);
-        for shard_id in 0..num_shards {
+        for _shard_id in 0..num_shards {
             let (tx, rx) = mpsc::channel();
             rxs.push(rx);
             txs.push(tx);
         }
 
+        let augmented_follower_sets: Vec<BTreeSet<(usize, u32)>> = follower_sets.into_iter().map(|follower_set|{
+            follower_set.into_iter()
+                .map(|follower_txn_idx|(shard_idxs_by_txn[follower_txn_idx as usize], follower_txn_idx))
+                .collect::<BTreeSet<_>>()
+        }).collect();
+
+        let augmented_dependency_sets: Vec<BTreeSet<(usize, u32)>> = dependency_sets.into_iter().map(|dependency_set|{
+            dependency_set.into_iter()
+                .map(|dependency_txn_idx|(shard_idxs_by_txn[dependency_txn_idx as usize], dependency_txn_idx))
+                .collect::<BTreeSet<_>>()
+        }).collect();
+
         for (shard_id, ((rx, txns), global_idxs)) in rxs.into_iter().zip(sharded_txns.into_iter()).zip(global_idxs.into_iter()).enumerate() {
             let txn_provider_args = TxnProviderArgs {
+                block_id,
                 num_shards,
                 rx: Arc::new(Mutex::new((rx))),
                 senders: txs.clone().into_iter().map(|tx|Mutex::new(tx.clone())).collect(),
                 txns,
                 global_idxs,
-                follower_sets: follower_sets.clone(),
-                dependency_sets: dependency_sets.clone(),
+                follower_sets: augmented_follower_sets.clone(),
+                dependency_sets: augmented_dependency_sets.clone(),
+                shard_idxs: shard_idxs_by_txn.clone(),
             };
             self.command_txs[shard_id]
                 .send(ExecutorShardCommand::ExecuteSubBlocks(

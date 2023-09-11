@@ -28,6 +28,8 @@ use std::{
     fmt::Debug,
     sync::{atomic::AtomicU32, Arc},
 };
+use std::collections::HashMap;
+use crate::sharding::{GlobalTxnIndex, LocalTxnIndex, TxnProvider};
 
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.
@@ -50,6 +52,7 @@ pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
     scheduler: &'a Scheduler,
     _counter: &'a AtomicU32,
     captured_reads: RefCell<Vec<ReadDescriptor<T::Key>>>,
+    local_idxs_by_global: &'a HashMap<GlobalTxnIndex, LocalTxnIndex>,
 }
 
 impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
@@ -57,12 +60,14 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         shared_map: &'a MVHashMap<T::Key, T::Value, X>,
         shared_scheduler: &'a Scheduler,
         shared_counter: &'a AtomicU32,
+        local_idxs_by_global: &'a HashMap<GlobalTxnIndex, LocalTxnIndex>,
     ) -> Self {
         Self {
             versioned_map: shared_map,
             scheduler: shared_scheduler,
             _counter: shared_counter,
             captured_reads: RefCell::new(Vec::new()),
+            local_idxs_by_global,
         }
     }
 
@@ -114,7 +119,9 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                 Err(Unresolved(_)) => return ReadResult::Unresolved,
                 Err(Dependency(dep_idx)) => {
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
-                    match self.scheduler.wait_for_dependency(txn_idx, dep_idx) {
+                    let local_idx = *self.local_idxs_by_global.get(&txn_idx).unwrap();
+                    let dep_local_idx = *self.local_idxs_by_global.get(&dep_idx).unwrap();
+                    match self.scheduler.wait_for_dependency(local_idx, dep_local_idx) {
                         DependencyResult::Dependency(dep_condition) => {
                             let _timer = counters::DEPENDENCY_WAIT_SECONDS.start_timer();
                             // Wait on a condition variable corresponding to the encountered

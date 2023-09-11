@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use std::collections::HashMap;
 use crate::{
     block_executor::BlockAptosVM,
     sharded_block_executor::{
@@ -45,6 +46,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
     ) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
+                .thread_name(move |index|format!("shard-{}-worker-{}", shard_id, index))
                 // We need two extra threads for the cross-shard commit receiver and the thread
                 // that is blocked on waiting for execute block to finish.
                 .num_threads(num_threads + 2)
@@ -71,7 +73,17 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let TxnProviderArgs{num_shards, rx, senders, txns, global_idxs, follower_sets, dependency_sets } = txn_provider_args;
+        let TxnProviderArgs {
+            block_id,
+            num_shards,
+            rx,
+            senders,
+            txns,
+            global_idxs,
+            follower_sets,
+            dependency_sets,
+            shard_idxs,
+        } = txn_provider_args;
         let txns = txns
             .into_iter()
             .map(|txn| txn.into_txn())
@@ -84,15 +96,25 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         });
         drop(signature_verification_timer);
 
-        let missing_dep_counts = global_idxs.iter().map(|idx| Arc::new((Mutex::new(dependency_sets[(*idx) as usize].len()), Condvar::new()))).collect();
+        let missing_dep_counts = global_idxs.iter().map(|idx| {
+            let shard_id = shard_idxs[*idx as usize];
+            let dep_set = &dependency_sets[(*idx) as usize];
+            let num_local_deps: usize = dep_set.range((shard_id, 0)..(shard_id+1, 0)).map(|_|1_usize).sum();
+            let num_remote_deps = dep_set.len() - num_local_deps;
+            Arc::new((Mutex::new(num_remote_deps), Condvar::new()))
+        }).collect();
+
+        let local_idxs_by_global: HashMap<u32, u32> = global_idxs.iter().enumerate().map(|(local_idx, global_idx)|(*global_idx, local_idx as u32)).collect();
+
         let sharding_provider = TxnProvider {
+            block_id,
             sharding_mode: true,
             num_shards,
             shard_id: shard_id.unwrap(),
             rx,
             senders,
             txns: pre_processed_txns,
-            sharded_locations: vec![],
+            local_idxs_by_global,
             global_idxs,
             missing_dep_counts,
             follower_sets,

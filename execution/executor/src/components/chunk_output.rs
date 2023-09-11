@@ -37,7 +37,7 @@ use std::{ops::Deref, sync::Arc, time::Duration};
 pub static SHARDED_BLOCK_EXECUTOR: Lazy<
     Arc<Mutex<ShardedBlockExecutor<CachedStateView, LocalExecutorClient<CachedStateView>>>>,
 > = Lazy::new(|| {
-    let client = LocalExecutorService::setup_local_executor_shards(AptosVM::get_num_shards(), None);
+    let client = LocalExecutorService::setup_local_executor_shards(AptosVM::get_num_shards(), Some(AptosVM::get_concurrency_level()));
     Arc::new(Mutex::new(ShardedBlockExecutor::new(client)))
 });
 

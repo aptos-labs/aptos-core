@@ -72,8 +72,10 @@ impl PartitionerV2 {
         let final_num_rounds = state.sub_block_matrix.len();
 
         PartitionedTransactions {
+            block_id: 0,
             sharded_txns: vec![],
             global_idxs: vec![],
+            shard_idxs_by_txn: vec![],
             dependency_sets: vec![],
             follower_sets: vec![],
         }

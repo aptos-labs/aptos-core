@@ -9,17 +9,12 @@ use aptos_graphs::{
     graph::{EdgeWeight, NodeWeight},
     partitioning::{
         fennel::{AlphaComputationMode, BalanceConstraintMode, FennelGraphPartitioner},
-        random::RandomPartitioner,
         PartitionId,
+        random::RandomPartitioner,
     },
 };
-use aptos_streaming_partitioner::{
-    transaction_graph_partitioner, transaction_graph_partitioner::TransactionGraphPartitioner,
-    SerializationIdx, StreamingTransactionPartitioner,
-};
-use aptos_transaction_orderer::transaction_compressor::{
-    compress_transactions, CompressedPTransaction,
-};
+use aptos_streaming_partitioner::{PartitionedTransaction, SerializationIdx, StreamingTransactionPartitioner, transaction_graph_partitioner, transaction_graph_partitioner::TransactionGraphPartitioner};
+use aptos_transaction_orderer::transaction_compressor::{compress_transactions, CompressedPTransaction, CompressedPTransactionInner};
 use aptos_types::{
     batched_stream::{Batched, BatchedStream},
     transaction::analyzed_transaction::AnalyzedTransaction,
@@ -32,6 +27,10 @@ use std::{
     sync::Mutex,
     time::{Duration, Instant},
 };
+use std::collections::BTreeSet;
+use std::rc::Rc;
+use aptos_block_partitioner::BlockPartitioner;
+use aptos_types::block_executor::partitioner::PartitionedTransactions;
 
 #[derive(Debug, Copy, Clone, ValueEnum)]
 enum Partitioner {
@@ -148,9 +147,9 @@ fn main() {
     let transactions = compress_transactions(transactions);
     println!("Mapping time: {:?}", now.elapsed());
     let transactions = transactions.into_iter().batched(args.block_size);
-
+    let x = |_: &CompressedPTransaction<AnalyzedTransaction>| 1 as NodeWeight;
     let mut params = transaction_graph_partitioner::Params {
-        node_weight_function: |_: &CompressedPTransaction<AnalyzedTransaction>| 1 as NodeWeight,
+        node_weight_function: x,
         edge_weight_function,
         shuffle_batches: false,
     };

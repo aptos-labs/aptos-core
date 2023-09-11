@@ -116,6 +116,7 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
 }
 
 pub struct TxnProviderArgs {
+    pub block_id: u8,
     pub num_shards: usize,
     pub rx: Arc<Mutex<Receiver<ShardingMsg<AptosTransactionOutput, VMStatus>>>>,
     pub senders: Vec<Mutex<Sender<ShardingMsg<AptosTransactionOutput, VMStatus>>>>,
@@ -123,4 +124,5 @@ pub struct TxnProviderArgs {
     pub global_idxs: Vec<TxnIndex>,
     pub follower_sets: Vec<BTreeSet<(usize, TxnIndex)>>,
     pub dependency_sets: Vec<BTreeSet<(usize, TxnIndex)>>,
+    pub shard_idxs: Vec<usize>,
 }
