@@ -62,7 +62,6 @@ pub enum TransactionType {
     },
     EthereumCoinTransfer {
         num_ethereum_accounts: usize,
-        invalid_transaction_ratio: usize,
         sender_use_account_pool: bool,
     },
     AccountGeneration {
@@ -252,14 +251,12 @@ pub async fn create_txn_generator_creator(
                 ),
                 TransactionType::EthereumCoinTransfer {
                     num_ethereum_accounts,
-                    invalid_transaction_ratio,
                     sender_use_account_pool
                 } => wrap_accounts_pool(
                     Box::new(EthereumP2PTransactionGeneratorCreator::new(
                         txn_factory.clone(),
-                        SEND_AMOUNT,
+                        SEND_AMOUNT as u128,
                         addresses_pool.clone(),
-                        *invalid_transaction_ratio,
                         SamplingMode::Basic,
                         *num_ethereum_accounts,
                     )),
