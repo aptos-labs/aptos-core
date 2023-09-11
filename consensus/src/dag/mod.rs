@@ -9,6 +9,7 @@ mod dag_driver;
 mod dag_fetcher;
 mod dag_handler;
 mod dag_network;
+mod dag_state_sync;
 mod dag_store;
 mod order_rule;
 mod rb_handler;

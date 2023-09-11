@@ -67,6 +67,15 @@ pub trait ExecutorTask: Sync {
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
+
+    /// Trait that allows converting blobs to proper values.
+    fn convert_to_value(
+        &self,
+        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        key: &<Self::Txn as Transaction>::Key,
+        maybe_blob: Option<Vec<u8>>,
+        creation: bool,
+    ) -> anyhow::Result<<Self::Txn as Transaction>::Value>;
 }
 
 /// Trait for execution result of a single transaction.

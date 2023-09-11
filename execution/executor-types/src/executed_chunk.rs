@@ -133,7 +133,9 @@ impl ExecutedChunk {
                     .ledger_info()
                     .transaction_accumulator_hash()
                     == result_accumulator.root_hash(),
-                "Root hash in target ledger info does not match local computation."
+                "Root hash in target ledger info does not match local computation. {:?} != {:?}",
+                verified_target_li,
+                result_accumulator
             );
             Ok(Some(verified_target_li.clone()))
         } else if let Some(epoch_change_li) = epoch_change_li {
