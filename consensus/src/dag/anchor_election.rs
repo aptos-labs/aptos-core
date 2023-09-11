@@ -6,7 +6,13 @@ use aptos_consensus_types::common::{Author, Round};
 pub trait AnchorElection: Send {
     fn get_anchor(&self, round: Round) -> Author;
 
-    fn commit(&mut self, round: Round);
+    fn update_reputation(
+        &mut self,
+        round: Round,
+        author: &Author,
+        parents: Vec<Author>,
+        failed_authors: Vec<Author>,
+    );
 }
 
 pub struct RoundRobinAnchorElection {
@@ -24,5 +30,12 @@ impl AnchorElection for RoundRobinAnchorElection {
         self.validators[(round / 2) as usize % self.validators.len()]
     }
 
-    fn commit(&mut self, _round: Round) {}
+    fn update_reputation(
+        &mut self,
+        _round: Round,
+        _author: &Author,
+        _parents: Vec<Author>,
+        _failed_authors: Vec<Author>,
+    ) {
+    }
 }

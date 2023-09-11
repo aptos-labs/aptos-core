@@ -95,28 +95,3 @@ impl ValueCodec<CertifiedNodeSchema> for CertifiedNode {
         Ok(bcs::from_bytes(data)?)
     }
 }
-
-pub const ORDERED_ANCHOR_ID_CF_NAME: ColumnFamilyName = "ordered_anchor_id";
-
-define_schema!(OrderedAnchorIdSchema, NodeId, (), ORDERED_ANCHOR_ID_CF_NAME);
-
-impl KeyCodec<OrderedAnchorIdSchema> for NodeId {
-    fn encode_key(&self) -> Result<Vec<u8>> {
-        Ok(bcs::to_bytes(&self)?)
-    }
-
-    fn decode_key(data: &[u8]) -> Result<Self> {
-        Ok(bcs::from_bytes(data)?)
-    }
-}
-
-impl ValueCodec<OrderedAnchorIdSchema> for () {
-    fn encode_value(&self) -> Result<Vec<u8>> {
-        Ok(vec![])
-    }
-
-    fn decode_value(data: &[u8]) -> Result<Self> {
-        ensure_slice_len_eq(data, size_of::<Self>())?;
-        Ok(())
-    }
-}
