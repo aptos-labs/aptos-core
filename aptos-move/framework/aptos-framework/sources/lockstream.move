@@ -10,6 +10,7 @@ module aptos_framework::lockstream {
     use aptos_std::type_info::{Self, TypeInfo};
     use std::option::{Self, Option};
     use std::signer;
+    use std::vector;
 
     /// All times in UNIX seconds.
     struct LockstreamPool<
@@ -119,6 +120,17 @@ module aptos_framework::lockstream {
         claim_last_call_time: u64,
         premier_sweep_last_call_time: u64,
         current_period: u8,
+    }
+
+    struct LockerInfoView has copy, drop, store {
+        pool_id: LockstreamPoolID,
+        locker: address,
+        pro_rata_base_share: u64,
+        initial_quote_locked: u64,
+        base_claimed: u64,
+        quote_claimed: u64,
+        claimable_base: u64,
+        claimable_quote: u64,
     }
 
     /// Minimum number of bytes required to encode the number of
@@ -339,37 +351,14 @@ module aptos_framework::lockstream {
         let period = period(pool_ref_mut, claim_time);
         assert!(!(period < PERIOD_STREAMING), E_TOO_EARLY_TO_CLAIM);
         assert!(!(period > PERIOD_CLAIMING_GRACE_PERIOD), E_TOO_LATE_TO_CLAIM);
-        let lockers_ref_mut = &mut pool_ref_mut.lockers;
         let locker_addr = signer::address_of(locker);
-        assert!(
-            table::contains(lockers_ref_mut, locker_addr),
-            E_NOT_A_LOCKER
+        let (_, base_claimed, quote_claimed) = locker_amounts_derived(
+            pool_ref_mut,
+            locker_addr,
+            claim_time
         );
         let locker_info_ref_mut =
-            table::borrow_mut(lockers_ref_mut, locker_addr);
-        let locker_initial_quote_locked =
-            locker_info_ref_mut.initial_quote_locked;
-        let pro_rata_base = math64::mul_div(
-            pool_ref_mut.initial_base_locked,
-            locker_initial_quote_locked,
-            pool_ref_mut.initial_quote_locked
-        );
-        let stream_done = claim_time >= pool_ref_mut.stream_end_time;
-        let (base_claimed_ceiling, quote_claimed_ceiling) = if (stream_done) {
-            (pro_rata_base, locker_initial_quote_locked)
-        } else {
-            let stream_start = pool_ref_mut.stream_start_time;
-            let elapsed = claim_time - stream_start;
-            let duration = pool_ref_mut.stream_end_time - stream_start;
-            (
-                math64::mul_div(pro_rata_base, elapsed, duration),
-                math64::mul_div(locker_initial_quote_locked, elapsed, duration)
-            )
-        };
-        let base_claimed =
-            base_claimed_ceiling - locker_info_ref_mut.base_claimed;
-        let quote_claimed =
-            quote_claimed_ceiling - locker_info_ref_mut.quote_claimed;
+            table::borrow_mut(&mut pool_ref_mut.lockers, locker_addr);
         if (base_claimed > 0) {
             coin::register<BaseType>(locker);
             coin::deposit(
@@ -483,6 +472,103 @@ module aptos_framework::lockstream {
     }
 
     #[view]
+    public fun current_period<
+        BaseType,
+        QuoteType
+    >(creator: address):
+    Option<u8>
+    acquires LockstreamPool {
+        if (exists<LockstreamPool<BaseType, QuoteType>>(creator)) {
+            let pool_ref = borrow_global<
+                LockstreamPool<BaseType, QuoteType>>(creator);
+            option::some(period(pool_ref, timestamp::now_seconds()))
+        } else option::none()
+    }
+
+    #[view]
+    public fun locker<
+        BaseType,
+        QuoteType
+    >(
+        creator: address,
+        locker: address,
+    ):
+    Option<LockerInfoView>
+    acquires LockstreamPool {
+        if (exists<LockstreamPool<BaseType, QuoteType>>(creator)) {
+            let (pool_id, pool_ref) =
+                pool_id_and_immutable_reference<BaseType, QuoteType>(creator);
+            if (!table::contains(&pool_ref.lockers, locker))
+                return option::none();
+            let time_seconds = timestamp::now_seconds();
+            let (pro_rata_base_share, claimable_base, claimable_quote) =
+                locker_amounts_derived(pool_ref, locker, time_seconds);
+            let locker_info_ref = table::borrow(&pool_ref.lockers, locker);
+            option::some(LockerInfoView {
+                pool_id,
+                locker,
+                pro_rata_base_share,
+                initial_quote_locked: locker_info_ref.initial_quote_locked,
+                base_claimed: locker_info_ref.base_claimed,
+                quote_claimed: locker_info_ref.quote_claimed,
+                claimable_base,
+                claimable_quote,
+            })
+        } else option::none()
+    }
+
+    #[view]
+    public fun lockers<
+        BaseType,
+        QuoteType
+    >(creator: address):
+    Option<vector<LockerInfoView>>
+    acquires LockstreamPool {
+        if (exists<LockstreamPool<BaseType, QuoteType>>(creator)) {
+            let pool_ref = borrow_global<
+                LockstreamPool<BaseType, QuoteType>>(creator);
+            let lockers = big_vector::to_vector(&pool_ref.locker_addresses);
+            option::some(vector::map(lockers, |e| {
+                option::destroy_some(locker<BaseType, QuoteType>(creator, e))
+            }))
+        } else option::none()
+    }
+
+    #[view]
+    public fun lockers_paginated<
+        BaseType,
+        QuoteType
+    >(
+        creator: address,
+        start_index: u64,
+        end_index: u64,
+    ): Option<vector<LockerInfoView>>
+    acquires LockstreamPool {
+        if (exists<LockstreamPool<BaseType, QuoteType>>(creator)) {
+            let pool_ref = borrow_global<
+                LockstreamPool<BaseType, QuoteType>>(creator);
+            let n_lockers = big_vector::length(&pool_ref.locker_addresses);
+            if ((end_index < start_index) ||
+                (start_index >= n_lockers) ||
+                (end_index >= n_lockers)) return option::none();
+            let i = start_index;
+            let lockers = vector[];
+            while (i <= end_index) {
+                let pool_ref = borrow_global<
+                    LockstreamPool<BaseType, QuoteType>>(creator);
+                let locker_address =
+                    *big_vector::borrow(&pool_ref.locker_addresses, i);
+                let locker = option::destroy_some(
+                    locker<BaseType, QuoteType>(creator, locker_address)
+                );
+                vector::push_back(&mut lockers, locker);
+                i = i + 1;
+            };
+            option::some(lockers)
+        } else option::none()
+    }
+
+    #[view]
     public fun metadata<
         BaseType,
         QuoteType
@@ -510,9 +596,7 @@ module aptos_framework::lockstream {
                     pool_ref.premier_sweep_last_call_time,
                 current_period: period(pool_ref, timestamp::now_seconds()),
             })
-        } else {
-            option::none()
-        }
+        } else option::none()
     }
 
     #[view]
@@ -528,6 +612,58 @@ module aptos_framework::lockstream {
                 quote_type: type_info::type_of<QuoteType>(),
             })
         } else option::none()
+    }
+
+    fun locker_amounts_derived<
+        BaseType,
+        QuoteType
+    >(
+        pool_ref: &LockstreamPool<BaseType, QuoteType>,
+        locker: address,
+        time_seconds: u64,
+    ): (
+       u64,
+       u64,
+       u64,
+    ) {
+        let period = period(pool_ref, time_seconds);
+        let lockers_ref = &pool_ref.lockers;
+        assert!(table::contains(lockers_ref, locker), E_NOT_A_LOCKER);
+        let locker_info_ref = table::borrow(lockers_ref, locker);
+        let initial_quote_locked = locker_info_ref.initial_quote_locked;
+        let pro_rata_base_share = math64::mul_div(
+            pool_ref.initial_base_locked,
+            initial_quote_locked,
+            pool_ref.initial_quote_locked,
+        );
+        let claimable_period =
+            period == PERIOD_STREAMING ||
+            period == PERIOD_CLAIMING_GRACE_PERIOD;
+        let (claimable_base, claimable_quote) = if (claimable_period) {
+            let (claimable_base_ceiling, claimable_quote_ceiling) =
+                if (period == PERIOD_CLAIMING_GRACE_PERIOD)
+                    (pro_rata_base_share, initial_quote_locked) else
+            {
+                let stream_start = pool_ref.stream_start_time;
+                let elapsed = time_seconds - stream_start;
+                let duration = pool_ref.stream_end_time - stream_start;
+                (
+                    math64::mul_div(pro_rata_base_share, elapsed, duration),
+                    math64::mul_div(initial_quote_locked, elapsed, duration),
+                )
+            };
+            (
+                claimable_base_ceiling - locker_info_ref.base_claimed,
+                claimable_quote_ceiling - locker_info_ref.quote_claimed,
+            )
+        } else {
+            (0, 0)
+        };
+        (
+            pro_rata_base_share,
+            claimable_base,
+            claimable_quote,
+        )
     }
 
     inline fun period<
@@ -557,7 +693,7 @@ module aptos_framework::lockstream {
         assert!(option::is_some(&pool_id_option), E_NO_LOCKSTREAM_POOL);
         (
             option::destroy_some(pool_id_option),
-            borrow_global<LockstreamPool<BaseType, QuoteType>>(creator)
+            borrow_global<LockstreamPool<BaseType, QuoteType>>(creator),
         )
     }
 
@@ -572,7 +708,7 @@ module aptos_framework::lockstream {
         assert!(option::is_some(&pool_id_option), E_NO_LOCKSTREAM_POOL);
         (
             option::destroy_some(pool_id_option),
-            borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(creator)
+            borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(creator),
         )
     }
 
