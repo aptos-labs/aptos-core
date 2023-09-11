@@ -1785,13 +1785,10 @@ fn changing_working_quorum_test_helper(
             helm_values["genesis"]["validator"]["num_validators_with_larger_stake"] =
                 num_large_validators.into();
         }))
-        .with_node_helm_config_fn(Arc::new(move |helm_values| {
-            let mut validator_config = NodeConfig::default();
-            let mut fullnode_config = NodeConfig::default();
-
-            validator_config.api.failpoints_enabled = true;
+        .with_validator_override_node_config_fn(Arc::new(move |override_config, base_config| {
+            override_config.api.failpoints_enabled = true;
             let block_size = (target_tps / 4) as u64;
-            validator_config.consensus = ConsensusConfig {
+            override_config.consensus = ConsensusConfig {
                 max_sending_block_txns: block_size,
                 max_sending_block_txns_quorum_store_override: block_size,
                 max_receiving_block_txns_quorum_store_override: block_size,
@@ -1816,26 +1813,26 @@ fn changing_working_quorum_test_helper(
                     item.backoff_if_below_participating_voting_power_percentage = 90 - i * 5;
                 }
             }
-            validator_config
-                .consensus
-                .quorum_store
-                .sender_max_batch_txns = min_block_txns as usize;
-            validator_config
+            override_config.consensus.quorum_store.sender_max_batch_txns = min_block_txns as usize;
+            override_config
                 .consensus
                 .quorum_store
                 .receiver_max_batch_txns = min_block_txns as usize;
 
-            validator_config.consensus.chain_health_backoff = chain_health_backoff;
+            override_config.consensus.chain_health_backoff = chain_health_backoff;
 
             // Override the syncing mode of all nodes to use transaction output syncing.
             // TODO(joshlind): remove me once we move back to output syncing by default.
             if apply_txn_outputs {
-                validator_config.state_sync = state_sync_config_apply_transaction_outputs();
-                fullnode_config.state_sync = state_sync_config_apply_transaction_outputs();
+                override_config.state_sync = state_sync_config_apply_transaction_outputs();
             }
-
-            helm_values["validator"]["config"] = override_yaml_from_node_config(validator_config);
-            helm_values["fullnode"]["config"] = override_yaml_from_node_config(fullnode_config);
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(move |override_config, base_config| {
+            // Override the syncing mode of all nodes to use transaction output syncing.
+            // TODO(joshlind): remove me once we move back to output syncing by default.
+            if apply_txn_outputs {
+                override_config.state_sync = state_sync_config_apply_transaction_outputs();
+            }
         }))
         .with_emit_job(
             EmitJobRequest::default()

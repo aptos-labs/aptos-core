@@ -95,6 +95,10 @@ impl OverrideNodeConfig {
         }
     }
 
+    pub fn new_default() -> Self {
+        Self::new(NodeConfig::default(), NodeConfig::default())
+    }
+
     pub fn new_with_default_base(override_config: NodeConfig) -> Self {
         Self {
             override_config,
