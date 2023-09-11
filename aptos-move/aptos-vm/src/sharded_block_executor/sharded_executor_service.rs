@@ -3,7 +3,7 @@
 use crate::{
     block_executor::BlockAptosVM,
     sharded_block_executor::{
-        aggr_overridden_state_view::AggregatorOverriddenStateView,
+        aggr_overridden_state_view::{AggregatorOverriddenStateView, TOTAL_SUPPLY_AGGR_BASE_VAL},
         coordinator_client::CoordinatorClient,
         counters::{SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS, SHARDED_BLOCK_EXECUTOR_TXN_COUNT},
         cross_shard_client::{CrossShardClient, CrossShardCommitReceiver, CrossShardCommitSender},
@@ -108,11 +108,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         let cross_shard_state_view_clone = cross_shard_state_view.clone();
         let cross_shard_client_clone = cross_shard_client.clone();
 
-        let aggr_overridden_state_view = Arc::new(
-            AggregatorOverriddenStateView::create_cross_shard_state_view_aggr_override(
-                cross_shard_state_view.as_ref(),
-            ),
-        );
+        let aggr_overridden_state_view = Arc::new(AggregatorOverriddenStateView::new(
+            cross_shard_state_view.as_ref(),
+            TOTAL_SUPPLY_AGGR_BASE_VAL,
+        ));
 
         executor_thread_pool.clone().scope(|s| {
             s.spawn(move |_| {

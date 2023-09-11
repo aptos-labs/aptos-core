@@ -8,6 +8,7 @@ use crate::sharded_block_executor::{
     executor_client::{ExecutorClient, ShardedExecutionOutput},
     global_executor::GlobalExecutor,
     messages::CrossShardMsg,
+    sharded_aggregator_service,
     sharded_executor_service::ShardedExecutorService,
     ExecutorShardCommand,
 };
@@ -197,13 +198,11 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
 
         let mut sharded_output = self.get_output_from_shards()?;
 
-        // We could call sharded_aggregator_service::aggregate_and_update_total_supply() from here,
-        // but calling on the global shard will get us the resources on the global shard (say
-        // like thread pool)
-        self.global_executor.aggregate_results(
+        sharded_aggregator_service::aggregate_and_update_total_supply(
             &mut sharded_output,
             &mut global_output,
             state_view.as_ref(),
+            self.global_executor.get_executor_thread_pool(),
         );
 
         Ok(ShardedExecutionOutput::new(sharded_output, global_output))

@@ -173,6 +173,8 @@ pub fn aggregate_and_update_total_supply<S: StateView>(
     let num_shards = sharded_output.len();
     let num_rounds = sharded_output[0].len();
 
+    // The first element is 0, which is the delta for shard 0 in round 0. +1 element will contain
+    // the delta for the global shard
     let mut aggr_total_supply_delta = vec![DeltaU128::default(); num_shards * num_rounds + 1];
 
     // No need to parallelize this as the runtime is O(num_shards)
@@ -182,6 +184,10 @@ pub fn aggregate_and_update_total_supply<S: StateView>(
         .enumerate()
         .for_each(|(shard_id, shard_output)| {
             for (round, txn_outputs) in shard_output.iter().enumerate() {
+                // Though we expect all the txn_outputs to have total_supply, there can be
+                // exceptions like 'block meta' (first txn in the block) and 'chkpt info' (last txn
+                // in the block) which may not have total supply. Hence we iterate till we find the
+                // last txn with total supply.
                 for txn in txn_outputs.iter().rev() {
                     if let Some(last_txn_total_supply) = txn.write_set().get_total_supply() {
                         aggr_total_supply_delta[round * num_shards + shard_id + 1] =

@@ -14,16 +14,20 @@ pub const TOTAL_SUPPLY_AGGR_BASE_VAL: u128 = u128::MAX >> 1;
 #[derive(Clone)]
 pub struct AggregatorOverriddenStateView<'a, S> {
     base_view: &'a S,
+    total_supply_aggr_base_val: u128,
 }
 
 impl<'a, S: StateView + Sync + Send> AggregatorOverriddenStateView<'a, S> {
-    pub fn create_cross_shard_state_view_aggr_override(base_view: &'a S) -> Self {
-        Self { base_view }
+    pub fn new(base_view: &'a S, total_supply_aggr_base_val: u128) -> Self {
+        Self {
+            base_view,
+            total_supply_aggr_base_val,
+        }
     }
 
     fn total_supply_base_view_override(&self) -> Result<Option<StateValue>> {
         Ok(Some(StateValue::from(
-            bcs::to_bytes(&TOTAL_SUPPLY_AGGR_BASE_VAL).unwrap(),
+            bcs::to_bytes(&self.total_supply_aggr_base_val).unwrap(),
         )))
     }
 }
