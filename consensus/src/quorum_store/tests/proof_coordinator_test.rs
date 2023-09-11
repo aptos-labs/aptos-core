@@ -15,7 +15,7 @@ use aptos_consensus_types::proof_of_store::{
     BatchId, ProofOfStore, SignedBatchInfo, SignedBatchInfoMsg,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::Error;
+use aptos_executor_types::ExecutorResult;
 use aptos_types::{
     transaction::SignedTransaction, validator_verifier::random_validator_verifier, PeerId,
 };
@@ -31,7 +31,7 @@ impl BatchReader for MockBatchReader {
         Some(self.peer)
     }
 
-    fn get_batch(&self, _proof: ProofOfStore) -> Receiver<Result<Vec<SignedTransaction>, Error>> {
+    fn get_batch(&self, _proof: ProofOfStore) -> Receiver<ExecutorResult<Vec<SignedTransaction>>> {
         unimplemented!();
     }
 }

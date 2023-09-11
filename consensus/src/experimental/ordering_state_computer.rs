@@ -16,7 +16,7 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::{Error as ExecutionError, StateComputeResult};
+use aptos_executor_types::{ExecutorError, ExecutorResult, StateComputeResult};
 use aptos_logger::prelude::*;
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
 use fail::fail_point;
@@ -59,7 +59,7 @@ impl StateComputer for OrderingStateComputer {
         _block: &Block,
         // The parent block id.
         _parent_block_id: HashValue,
-    ) -> Result<StateComputeResult, ExecutionError> {
+    ) -> ExecutorResult<StateComputeResult> {
         // Return dummy block and bypass the execution phase.
         // This will break the e2e smoke test (for now because
         // no one is actually handling the next phase) if the
@@ -74,7 +74,7 @@ impl StateComputer for OrderingStateComputer {
         blocks: &[Arc<ExecutedBlock>],
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
-    ) -> Result<(), ExecutionError> {
+    ) -> Result<(), ExecutorError> {
         assert!(!blocks.is_empty());
 
         if self

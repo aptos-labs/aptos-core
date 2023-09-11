@@ -14,7 +14,7 @@ use crate::{
 use anyhow::bail;
 use aptos_consensus_types::proof_of_store::{ProofOfStore, SignedBatchInfo};
 use aptos_crypto::HashValue;
-use aptos_executor_types::Error;
+use aptos_executor_types::{ExecutorError, ExecutorResult};
 use aptos_logger::prelude::*;
 use aptos_types::{
     transaction::SignedTransaction, validator_signer::ValidatorSigner,
@@ -362,19 +362,22 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         self.last_certified_time.load(Ordering::Relaxed)
     }
 
-    fn get_batch_from_db(&self, digest: &HashValue) -> Result<PersistedValue, Error> {
+    fn get_batch_from_db(&self, digest: &HashValue) -> ExecutorResult<PersistedValue> {
         counters::GET_BATCH_FROM_DB_COUNT.inc();
 
         match self.db.get_batch(digest) {
             Ok(Some(value)) => Ok(value),
             Ok(None) | Err(_) => {
                 error!("Could not get batch from db");
-                Err(Error::CouldNotGetData)
+                Err(ExecutorError::CouldNotGetData)
             },
         }
     }
 
-    pub(crate) fn get_batch_from_local(&self, digest: &HashValue) -> Result<PersistedValue, Error> {
+    pub(crate) fn get_batch_from_local(
+        &self,
+        digest: &HashValue,
+    ) -> ExecutorResult<PersistedValue> {
         if let Some(value) = self.db_cache.get(digest) {
             if value.payload_storage_mode() == StorageMode::PersistedOnly {
                 self.get_batch_from_db(digest)
@@ -383,7 +386,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                 Ok(value.clone())
             }
         } else {
-            Err(Error::CouldNotGetData)
+            Err(ExecutorError::CouldNotGetData)
         }
     }
 }
@@ -395,7 +398,7 @@ pub trait BatchReader: Send + Sync {
     fn get_batch(
         &self,
         proof: ProofOfStore,
-    ) -> oneshot::Receiver<Result<Vec<SignedTransaction>, Error>>;
+    ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>;
 }
 
 impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for BatchStore<T> {
@@ -406,7 +409,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
     fn get_batch(
         &self,
         proof: ProofOfStore,
-    ) -> oneshot::Receiver<Result<Vec<SignedTransaction>, Error>> {
+    ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>> {
         let (tx, rx) = oneshot::channel();
 
         if let Ok(mut value) = self.get_batch_from_local(proof.digest()) {
