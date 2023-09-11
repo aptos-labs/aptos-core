@@ -1,7 +1,20 @@
 import { Network } from "../utils/api-endpoints";
 
-export type AnyNumber = number | bigint;
+/**
+ * Hex data as input to a function
+ */
 export type HexInput = string | Uint8Array;
+
+/**
+ * BCS types
+ */
+export type Uint8 = number;
+export type Uint16 = number;
+export type Uint32 = number;
+export type Uint64 = bigint;
+export type Uint128 = bigint;
+export type Uint256 = bigint;
+export type AnyNumber = number | bigint;
 
 /**
  * Set of configuration options that can be provided when initializing the SDK.
@@ -31,7 +44,9 @@ export interface PaginationArgs {
   limit?: number;
 }
 
-/////// QUERY TYPES ///////
+/**
+ * QUERY TYPES
+ */
 
 /**
  * A configuration object we can pass with the request to the server.
@@ -77,7 +92,9 @@ export type LedgerVersion = {
   ledgerVersion?: AnyNumber;
 };
 
-/////// RESPONSE TYPES ///////
+/**
+ * RESPONSE TYPES
+ */
 
 export type MoveResource = {
   type: MoveResourceType;
@@ -94,16 +111,18 @@ export type MoveModuleBytecode = {
   abi?: MoveModule;
 };
 
-/////// TRANSACTION TYPES ///////
+/**
+ * TRANSACTION TYPES
+ */
 
-export type Transaction =
-  | PendingTransaction
-  | UserTransaction
-  | GenesisTransaction
-  | BlockMetadataTransaction
-  | StateCheckpointTransaction;
+export type TransactionResponse =
+  | PendingTransactionResponse
+  | UserTransactionResponse
+  | GenesisTransactionResponse
+  | BlockMetadataTransactionResponse
+  | StateCheckpointTransactionResponse;
 
-export type PendingTransaction = {
+export type PendingTransactionResponse = {
   type: string;
   hash: string;
   sender: string;
@@ -115,7 +134,7 @@ export type PendingTransaction = {
   signature?: TransactionSignature;
 };
 
-export type UserTransaction = {
+export type UserTransactionResponse = {
   type: string;
   version: string;
   hash: string;
@@ -150,7 +169,7 @@ export type UserTransaction = {
   timestamp: string;
 };
 
-export type GenesisTransaction = {
+export type GenesisTransactionResponse = {
   type: string;
   version: string;
   hash: string;
@@ -178,7 +197,7 @@ export type GenesisTransaction = {
   events: Array<Event>;
 };
 
-export type BlockMetadataTransaction = {
+export type BlockMetadataTransactionResponse = {
   type: string;
   version: string;
   hash: string;
@@ -218,7 +237,7 @@ export type BlockMetadataTransaction = {
   timestamp: string;
 };
 
-export type StateCheckpointTransaction = {
+export type StateCheckpointTransactionResponse = {
   type: string;
   version: string;
   hash: string;
@@ -242,7 +261,9 @@ export type StateCheckpointTransaction = {
   timestamp: string;
 };
 
-/////// WRITESET CHANGE TYPES ///////
+/**
+ * WRITESET CHANGE TYPES
+ */
 
 export type WriteSetChange =
   | WriteSetChangeDeleteModule

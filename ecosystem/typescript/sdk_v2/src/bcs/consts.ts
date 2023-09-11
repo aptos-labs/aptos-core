@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { Uint128, Uint16, Uint32, Uint64, Uint8, Uint256 } from "./types";
+import { Uint128, Uint16, Uint32, Uint64, Uint8, Uint256 } from "../types";
 
 // Upper bound values for uint8, uint16, uint64 and uint128
 export const MAX_U8_NUMBER: Uint8 = 2 ** 8 - 1;
