@@ -17,8 +17,12 @@ use crate::{
     },
     to_bytecode, typing, unit_test, verification,
 };
-use move_command_line_common::files::{
-    extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION,
+use move_command_line_common::{
+    env::read_bool_env_var,
+    files::{
+        extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION,
+        SOURCE_MAP_EXTENSION,
+    },
 };
 use move_core_types::language_storage::ModuleId as CompiledModuleId;
 use move_symbol_pool::Symbol;
@@ -54,13 +58,7 @@ pub struct SteppedCompiler<'a, const P: Pass> {
 }
 
 pub fn debug_compiler() -> bool {
-    static DEBUG_COMPILER: Lazy<bool> = Lazy::new(|| match std::env::var("MOVE_COMPILER_DEBUG") {
-        Ok(s) => {
-            let s = s.to_lowercase();
-            s != "0" && s != "false" && s != "no"
-        },
-        Err(_) => true,
-    });
+    static DEBUG_COMPILER: Lazy<bool> = Lazy::new(|| read_bool_env_var("MOVE_COMPILER_DEBUG"));
     *DEBUG_COMPILER
 }
 

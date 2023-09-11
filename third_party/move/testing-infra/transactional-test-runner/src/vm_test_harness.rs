@@ -210,6 +210,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 
         let id = module.self_id();
         let sender = *id.address();
+        let verbose = extra_args.verbose;
         match self.perform_session_action(
             gas_budget,
             |session, gas_status| {
@@ -232,10 +233,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             Err(vm_error) => Err(anyhow!(
                 "Unable to publish module '{}'. Got VMError: {}",
                 module.self_id(),
-                vm_error.format_test_output(
-                    move_test_debug() || extra_args.verbose,
-                    self.comparison_mode
-                )
+                vm_error.format_test_output(move_test_debug() || verbose, self.comparison_mode)
             )),
         }
     }
@@ -267,6 +265,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map(|a| MoveValue::Signer(*a).simple_serialize().unwrap())
             .chain(args)
             .collect();
+        let verbose = extra_args.verbose;
         let serialized_return_values = self
             .perform_session_action(
                 gas_budget,
@@ -278,10 +277,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map_err(|vm_error| {
                 anyhow!(
                     "Script execution failed with VMError: {}",
-                    vm_error.format_test_output(
-                        move_test_debug() || extra_args.verbose,
-                        self.comparison_mode
-                    )
+                    vm_error.format_test_output(move_test_debug() || verbose, self.comparison_mode)
                 )
             })?;
         Ok((None, serialized_return_values))
@@ -312,6 +308,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map(|a| MoveValue::Signer(*a).simple_serialize().unwrap())
             .chain(args)
             .collect();
+        let verbose = extra_args.verbose;
         let serialized_return_values = self
             .perform_session_action(
                 gas_budget,
@@ -325,10 +322,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map_err(|vm_error| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
-                    vm_error.format_test_output(
-                        move_test_debug() || extra_args.verbose,
-                        self.comparison_mode
-                    )
+                    vm_error.format_test_output(move_test_debug() || verbose, self.comparison_mode)
                 )
             })?;
         Ok((None, serialized_return_values))
