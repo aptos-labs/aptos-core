@@ -8,7 +8,7 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     test_utils::{
-        consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStateComputer, MockStorage,
+        consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStorage,
     },
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -25,7 +25,6 @@ use aptos_network::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
-use aptos_storage_interface::mock::MockDbReaderWriter;
 use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_state::EpochState,
@@ -35,7 +34,7 @@ use aptos_types::{
 };
 use claims::assert_gt;
 use futures::{
-    stream::{select, AbortHandle, Select},
+    stream::{select, Select},
     StreamExt,
 };
 use futures_channel::mpsc::UnboundedReceiver;

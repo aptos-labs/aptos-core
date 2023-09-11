@@ -24,7 +24,7 @@ use aptos_channels::{
     aptos_channel::{self, Receiver},
     message_queues::QueueStyle,
 };
-use aptos_consensus_types::common::{Author, Round};
+use aptos_consensus_types::common::Author;
 use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_logger::error;
@@ -84,14 +84,13 @@ impl DagBootstrapper {
 
     fn bootstrap_dag_store(
         &self,
-        initial_round: Round,
         latest_ledger_info: LedgerInfo,
         notifier: Arc<dyn Notifier>,
     ) -> (Arc<RwLock<Dag>>, OrderRule) {
         let dag = Arc::new(RwLock::new(Dag::new(
             self.epoch_state.clone(),
             self.storage.clone(),
-            initial_round,
+            latest_ledger_info.round(),
             DAG_WINDOW,
         )));
 
@@ -177,10 +176,7 @@ impl DagBootstrapper {
         ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
         shutdown_rx: oneshot::Receiver<()>,
     ) -> anyhow::Result<()> {
-        let adapter = Arc::new(NotifierAdapter::new(
-            ordered_nodes_tx,
-            self.storage.clone(),
-        ));
+        let adapter = Arc::new(NotifierAdapter::new(ordered_nodes_tx, self.storage.clone()));
 
         let sync_manager = DagStateSynchronizer::new(
             self.epoch_state.clone(),
@@ -204,7 +200,7 @@ impl DagBootstrapper {
 
             // TODO: fix
             let (dag_store, order_rule) =
-                self.bootstrap_dag_store(0, ledger_info.ledger_info().clone(), adapter.clone());
+                self.bootstrap_dag_store(ledger_info.ledger_info().clone(), adapter.clone());
 
             let state_sync_trigger = StateSyncTrigger::new(
                 dag_store.clone(),
@@ -276,7 +272,7 @@ pub(super) fn bootstrap_dag_for_test(
     let (rebootstrap_notification_tx, _rebootstrap_notification_rx) = tokio::sync::mpsc::channel(1);
 
     let (dag_store, order_rule) =
-        bootstraper.bootstrap_dag_store(0, latest_ledger_info, adapter.clone());
+        bootstraper.bootstrap_dag_store(latest_ledger_info, adapter.clone());
 
     let state_sync_trigger = StateSyncTrigger::new(
         dag_store.clone(),
@@ -287,9 +283,7 @@ pub(super) fn bootstrap_dag_for_test(
     let (handler, fetch_service) =
         bootstraper.bootstrap_components(dag_store.clone(), order_rule, state_sync_trigger);
 
-    let dh_handle = tokio::spawn(async move {
-        handler.start(&mut dag_rpc_rx).await
-    });
+    let dh_handle = tokio::spawn(async move { handler.start(&mut dag_rpc_rx).await });
     let df_handle = tokio::spawn(fetch_service.start());
 
     (dh_handle, df_handle, dag_rpc_tx, ordered_nodes_rx)

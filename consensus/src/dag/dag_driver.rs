@@ -23,10 +23,8 @@ use aptos_logger::error;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
-    aggregate_signature::AggregateSignature,
-    block_info::{BlockInfo, Round},
+    block_info::{Round},
     epoch_state::EpochState,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
 use futures::{
     future::{AbortHandle, Abortable},

@@ -45,18 +45,18 @@ impl StateSyncTrigger {
     /// This method checks if a state sync is required, and if so,
     /// notifies the bootstraper and yields the current task infinitely,
     /// to let the bootstraper can abort this task.
-    pub(super) async fn check(&self, node: CertifiedNodeMessage) -> CertifiedNodeMessage {
+    pub(super) async fn check(&self, node: CertifiedNodeMessage) -> anyhow::Result<CertifiedNodeMessage> {
         let ledger_info = node.ledger_info();
 
         self.notify_commit_proof(ledger_info).await;
 
         if self.need_sync_for_ledger_info(ledger_info) {
-            self.bootstrap_notifier.send(node).await;
+            self.bootstrap_notifier.send(node).await?;
             loop {
                 tokio::task::yield_now().await;
             }
         }
-        node
+        Ok(node)
     }
 
     /// Fast forward in the decoupled-execution pipeline if the block exists there
@@ -127,7 +127,7 @@ impl DagStateSynchronizer {
         node: &CertifiedNodeMessage,
         dag_fetcher: impl TDagFetcher,
         current_dag_store: Arc<RwLock<Dag>>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Option<Dag>> {
         let commit_li = node.ledger_info();
 
         {
@@ -151,7 +151,7 @@ impl DagStateSynchronizer {
                 ))
                 .await;
             // TODO: make sure to terminate DAG and yield to epoch manager
-            return Ok(());
+            return Ok(None);
         }
 
         // TODO: there is a case where DAG fetches missing nodes in window and a crash happens and when we restart,
@@ -197,6 +197,6 @@ impl DagStateSynchronizer {
 
         // TODO: the caller should rebootstrap the order rule
 
-        Ok(())
+        Ok(Arc::into_inner(sync_dag_store).map(|r| r.into_inner()))
     }
 }

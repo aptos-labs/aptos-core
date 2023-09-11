@@ -96,7 +96,7 @@ impl NetworkHandler {
                 .map(|r| r.into()),
             DAGMessage::CertifiedNodeMsg(node) => match node.verify(&self.epoch_state.verifier) {
                 Ok(_) => {
-                    let node = self.state_sync_trigger.check(node).await;
+                    let node = self.state_sync_trigger.check(node).await
                     self.dag_driver
                         .process(node.certified_node())
                         .map(|r| r.into())
