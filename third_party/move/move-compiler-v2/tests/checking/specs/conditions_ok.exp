@@ -1,0 +1,39 @@
+// ---- Model Dump
+module 0x42::M {
+    struct Ghost$some_global {
+        v: u64,
+    }
+    private fun add_some(x: &mut u64): u64 {
+        x = Add<u64>(Deref(x), 1);
+        Deref(x)
+    }
+    spec {
+      aborts_if Or(Eq<u64>($t0, 0), Eq<u64>(select M::Ghost$some_global.v(global<M::Ghost$some_global>(0x0)), 0));
+      ensures Gt(Old<u64>($t0), $t0);
+      ensures Eq<u64>(result0(), $t0);
+    }
+
+    private fun multiple_results(x: u64): (u64, bool) {
+        Tuple(x, true)
+    }
+    spec {
+      ensures And(Eq<u64>($t0, result0()), Eq<bool>(result1(), true));
+    }
+
+    private fun with_emits<T>(_guid: vector<u8>,_msg: #0,x: u64): u64 {
+        x
+    }
+    spec {
+      emit $t1 to $t0;
+      emit $t1 to $t0 if true;
+      emit $t1 to $t0 if Gt($t2, 7);
+    }
+
+    spec fun $add_some(x: &mut u64): u64;
+    spec fun $multiple_results(x: u64): (u64, bool) {
+        Tuple(x, true)
+    }
+    spec fun $with_emits<T>(_guid: vector<u8>,_msg: #0,x: u64): u64 {
+        x
+    }
+} // end 0x42::M

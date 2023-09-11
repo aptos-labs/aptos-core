@@ -550,6 +550,16 @@ where
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
     }
+
+    fn convert_to_value(
+        &self,
+        _view: &impl TStateView<Key = K>,
+        _key: &K,
+        _maybe_blob: Option<Vec<u8>>,
+        _creation: bool,
+    ) -> anyhow::Result<V> {
+        unimplemented!("TODO: implement for AggregatorV2 testing");
+    }
 }
 
 #[derive(Debug)]

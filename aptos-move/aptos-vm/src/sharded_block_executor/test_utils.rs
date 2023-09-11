@@ -117,17 +117,18 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),
-            partitioned_txns,
+            partitioned_txns.clone(),
             2,
             None,
         )
         .unwrap();
-    let unsharded_txn_output = AptosVM::execute_block(
-        transactions.into_iter().map(|t| t.into_txn()).collect(),
-        executor.data_store(),
-        None,
-    )
-    .unwrap();
+
+    let ordered_txns: Vec<Transaction> = PartitionedTransactions::flatten(partitioned_txns)
+        .into_iter()
+        .map(|t| t.into_txn())
+        .collect();
+    let unsharded_txn_output =
+        AptosVM::execute_block(ordered_txns, executor.data_store(), None).unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
 }
 

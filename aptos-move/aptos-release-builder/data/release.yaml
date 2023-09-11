@@ -22,6 +22,9 @@ proposals:
       - FeatureFlag:
           enabled:
             - safer_resource_groups
+      - FeatureFlag:
+          enabled:
+            - safer_metadata
       - Framework:
           bytecode_version: 6
           git_hash: ~
@@ -62,7 +65,7 @@ proposals:
   - name: enable_bulletproofs
     metadata:
       title: "Enable Bulletproofs Module"
-      description: "AIP-46: New modules for ElGamal, Pedersen and Bulletproofs over Ristretto255" 
+      description: "AIP-46: New modules for ElGamal, Pedersen and Bulletproofs over Ristretto255"
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/222"
     execution_mode: MultiStep
     update_sequence:

@@ -6,7 +6,10 @@
 #[macro_use]
 extern crate criterion;
 
-use aptos_block_partitioner::{test_utils::P2PBlockGenerator, v2::PartitionerV2, BlockPartitioner};
+use aptos_block_partitioner::{
+    pre_partition::connected_component::ConnectedComponentPartitioner,
+    test_utils::P2PBlockGenerator, v2::PartitionerV2, BlockPartitioner,
+};
 use criterion::Criterion;
 use rand::thread_rng;
 
@@ -31,6 +34,9 @@ fn bench_group(c: &mut Criterion) {
         avoid_pct,
         dashmap_num_shards,
         merge_discards,
+        Box::new(ConnectedComponentPartitioner {
+            load_imbalance_tolerance: 2.0,
+        }),
     );
     group.bench_function(format!("acc={num_accounts},blk={block_size},shd={num_shards}/thr={num_threads},rnd={num_rounds_limit},avd={avoid_pct},mds={merge_discards}"), move |b| {
         b.iter_with_setup(

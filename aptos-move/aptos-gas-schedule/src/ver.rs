@@ -8,6 +8,8 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V12
+///   - Making resource group charge on first read independent of BTreeMap serialization.
 /// - V11
 ///   - Ristretto255 natives (point cloning & double-scalar multiplication) and Bulletproofs natives
 ///   - Hard limit on the number of write ops per transaction
@@ -19,7 +21,7 @@
 /// - V8
 ///   - Added BLS12-381 operations.
 /// - V7
-///  - Native support for exists<T>
+///   - Native support for exists<T>
 ///   - New formulae for storage fees based on fixed APT costs
 ///   - Lower gas price (other than the newly introduced storage fees) by upping the scaling factor
 /// - V6
@@ -42,4 +44,4 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 11;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 12;
