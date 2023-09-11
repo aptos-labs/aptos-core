@@ -232,25 +232,25 @@ impl CliCommand<RotateSummary> for RotateKey {
             Err(_) => {
                 let (rest_url, faucet_url) = if let Some(url) = self.txn_options.rest_options.url {
                     let url_str = url.to_string();
-                    if url_str.contains("testnet") {
+                    if url_str == "https://fullnode.testnet.aptoslabs.com" {
                         (
                             Some(url_str),
                             Some("https://faucet.testnet.aptoslabs.com".to_string()),
                         )
-                    } else if url_str.contains("devnet") {
+                    } else if url_str == "https://fullnode.devnet.aptoslabs.com" {
                         (
                             Some(url_str),
                             Some("https://faucet.devnet.aptoslabs.com".to_string()),
                         )
-                    } else if url_str.contains("localhost") {
-                        (Some(url_str), Some("http://localhost:8081".to_string()))
-                    } else {
-                        // no faucet for mainnet
+                    } else if url_str == "https://fullnode.mainnet.aptoslabs.com" {
                         (Some(url.to_string()), None)
+                    } else {
+                        // Default to localhost
+                        (Some(url_str), Some("http://localhost:8081".to_string()))
                     }
                 } else {
                     return Err(CliError::CommandArgumentError(
-                        "Either [--url or --profile] argument is needed".to_string(),
+                        "Either [--url or --profile] argument is required".to_string(),
                     ));
                 };
                 ProfileConfig {
