@@ -10,7 +10,7 @@ use anyhow::ensure;
 use aptos_config::{
     config::{
         DiscoveryMethod, Identity, IdentityBlob, InitialSafetyRulesConfig, NetworkConfig,
-        NodeConfig, OnDiskStorageConfig, OverrideNodeConfig, PeerRole, RoleType,
+        NodeConfig, OnDiskStorageConfig, OverrideNodeConfig, PeerRole, PersistableConfig, RoleType,
         SafetyRulesService, SecureBackend, WaypointConfig,
     },
     generator::build_seed_for_network,
@@ -379,7 +379,7 @@ impl FullnodeNodeConfig {
 
     fn save_config(&mut self) -> anyhow::Result<()> {
         self.config
-            .save_to_path(self.config_path())
+            .save_config(self.config_path())
             .map_err(Into::into)
     }
 }

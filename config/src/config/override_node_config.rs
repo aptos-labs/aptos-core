@@ -129,11 +129,6 @@ impl OverrideNodeConfig {
             diff_yaml.unwrap_or(serde_yaml::Value::Mapping(serde_yaml::Mapping::new()))
         })
     }
-
-    /// Save the node config to the given path
-    pub fn save_to_path<P: AsRef<Path>>(&mut self, output_path: P) -> Result<(), Error> {
-        self.override_config.save_to_path(output_path)
-    }
 }
 
 impl PersistableConfig for OverrideNodeConfig {
