@@ -12,7 +12,6 @@ use aptos_types::{
 use std::time::Instant;
 use aptos_streaming_partitioner::{PartitionerV3, SerializationIdx, StreamingTransactionPartitioner, transaction_graph_partitioner};
 use aptos_streaming_partitioner::transaction_graph_partitioner::TransactionGraphPartitioner;
-use aptos_transaction_orderer::transaction_compressor::compress_transactions;
 use aptos_types::batched_stream::BatchedStream;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use aptos_transaction_orderer::transaction_compressor::CompressedPTransaction;

@@ -13,9 +13,10 @@ use aptos_types::{
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::{mpsc, Mutex};
-use aptos_block_executor::sharding::TxnProvider;
+use aptos_block_executor::sharding::{GlobalTxnIndex, TxnProvider};
+use aptos_types::state_store::state_key::StateKey;
 
 /// Executor service that runs on local machine and waits for commands from the coordinator and executes
 /// them in parallel.
@@ -177,30 +178,36 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
             txs.push(tx);
         }
 
-        let augmented_follower_sets: Vec<BTreeSet<(usize, u32)>> = follower_sets.into_iter().map(|follower_set|{
-            follower_set.into_iter()
-                .map(|follower_txn_idx|(shard_idxs_by_txn[follower_txn_idx as usize], follower_txn_idx))
-                .collect::<BTreeSet<_>>()
-        }).collect();
-
-        let augmented_dependency_sets: Vec<BTreeSet<(usize, u32)>> = dependency_sets.into_iter().map(|dependency_set|{
-            dependency_set.into_iter()
-                .map(|dependency_txn_idx|(shard_idxs_by_txn[dependency_txn_idx as usize], dependency_txn_idx))
-                .collect::<BTreeSet<_>>()
-        }).collect();
-
         for (shard_id, ((rx, txns), global_idxs)) in rxs.into_iter().zip(sharded_txns.into_iter()).zip(global_idxs.into_iter()).enumerate() {
+            let local_idxs_by_global = global_idxs.iter().enumerate().map(|(local_idx, global_idx)| (*global_idx, local_idx as u32)).collect();
+
+            let mut remote_dependencies: HashMap<GlobalTxnIndex, HashSet<StateKey>> = HashMap::new();
+            for &global_idx in global_idxs.iter() {
+                for (dep_txn_idx, required_keys) in dependency_sets[global_idx as usize].iter() {
+                    remote_dependencies.entry(*dep_txn_idx).or_insert_with(HashSet::new).extend(required_keys.clone());
+                }
+            }
+
+            let following_shard_sets= global_idxs.iter().map(|global_idx|{
+                follower_sets[*global_idx as usize].iter()
+                    .map(|txn_idx|shard_idxs_by_txn[*txn_idx as usize])
+                    .filter(|shard_idx| *shard_idx != shard_id)
+                    .collect::<HashSet<_>>()
+                    .into_iter().collect::<Vec<_>>()
+            }).collect();
+
             let txn_provider_args = TxnProviderArgs {
                 block_id,
                 num_shards,
                 rx: Arc::new(Mutex::new((rx))),
                 senders: txs.clone().into_iter().map(|tx|Mutex::new(tx.clone())).collect(),
                 txns,
+                local_idxs_by_global,
                 global_idxs,
-                follower_sets: augmented_follower_sets.clone(),
-                dependency_sets: augmented_dependency_sets.clone(),
-                shard_idxs: shard_idxs_by_txn.clone(),
+                remote_dependencies,
+                following_shard_sets,
             };
+
             self.command_txs[shard_id]
                 .send(ExecutorShardCommand::ExecuteSubBlocks(
                     state_view.clone(),

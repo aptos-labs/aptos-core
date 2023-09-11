@@ -47,11 +47,11 @@ pub struct TxnProvider<T: Transaction, TO: TransactionOutput, TE: Debug> {
     /// Maps a local txn idx to its global idx.
     pub global_idxs: Vec<TxnIndex>,
 
-    /// Maps a local txn idx to the number of remote txns it still waits for.
-    pub missing_dep_counts: Vec<Arc<(Mutex<usize>, Condvar)>>,
+    /// Maps a remote txn to its write set that we need to wait for locally.
+    pub remote_dependencies: HashMap<GlobalTxnIndex, HashSet<T::Key>>,
 
-    /// Maps a global txn idx to its followers.
-    pub follower_sets: Vec<BTreeSet<(ShardId, GlobalTxnIndex)>>,
+    /// Maps a local txn to every shard that contain at least 1 follower.
+    pub following_shard_sets: Vec<Vec<usize>>,
 }
 
 impl<TX, TO, TE> TxnProvider<TX, TO, TE>
@@ -73,8 +73,8 @@ where
             txns,
             local_idxs_by_global: HashMap::new(),
             global_idxs: (0..(num_txns as TxnIndex)).collect(),
-            missing_dep_counts: (0..num_txns).map(|idx|Arc::new((Mutex::new(0), Condvar::new()))).collect(),
-            follower_sets: vec![],
+            remote_dependencies: Default::default(),
+            following_shard_sets: Default::default(),
         }
     }
 
@@ -107,22 +107,10 @@ where
                             self.apply_updates_to_mv(mv, global_txn_idx, output);
                         }
                         ExecutionStatus::Abort(_) => {
-                            // Nothing to do?
+                            //sharding todo: anything to do here?
                         }
                     }
-
-                    let cur_shard_followers = self.follower_sets[global_txn_idx as usize].range((self.shard_id, 0)..(self.shard_id + 1, 0));
-                    for &(_shard_id, follower_global_idx) in cur_shard_followers {
-                        info!("block={}, shard={}, op=recv, txn_received={}, txn_affected={}", self.block_id, self.shard_id, global_txn_idx, follower_global_idx);
-                        let follower_local_idx = *self.local_idxs_by_global.get(&follower_global_idx).unwrap();
-                        let (dep_counter_mutex, cvar) = &*self.missing_dep_counts[follower_local_idx as usize].clone();
-                        let mut counter = dep_counter_mutex.lock().unwrap();
-                        *counter -= 1;
-                        info!("block={}, op=recv, cur_shard={}, txn_received={}, txn_affected={}, new_dep_count={}", self.block_id, self.shard_id, global_txn_idx, follower_global_idx, *counter);
-                        if (*counter == 0) {
-                            cvar.notify_all();
-                        }
-                    }
+                    //sharding todo: notify those who were blocked, and anything else?
                 },
                 ShardingMsg::Shutdown => {
                     break;
@@ -171,29 +159,13 @@ where
         let global_idx = self.global_idx_from_local(txn_idx);
         info!("block={}, shard={}, op=send, txn_to_be_sent={}", self.block_id, self.shard_id, global_idx);
         let txn_output = txn_last_io.txn_output(txn_idx).unwrap();
-        for shard_id in 0..self.num_shards {
-            if shard_id == self.shard_id {
-                continue;
-            }
-            if self.follower_sets[global_idx as usize].range((shard_id, 0)..(shard_id+1, 0)).next().is_some() {
-                self.senders[shard_id].lock().unwrap().send(ShardingMsg::RemoteCommit(RemoteCommit { global_txn_idx: global_idx, txn_output: txn_output.clone() })).unwrap();
-                info!("block={}, shard={}, op=send, txn_sent={}, dst_shard={}", self.block_id, self.shard_id, global_idx, shard_id);
-            }
-        }
-    }
-
-    pub fn wait_for_remote_deps(&self, idx: LocalTxnIndex) {
-        if !self.sharding_mode { return; }
-        let global_idx = self.global_idxs[idx as usize];
-        let (count_guard, cvar) = &*self.missing_dep_counts[idx as usize];
-        let mut count = count_guard.lock().unwrap();
-        loop {
-            let val = *count;
-            info!("block={}, shard={}, txn_waiting={}, remote_deps_remaining={}", self.block_id, self.shard_id, global_idx, val);
-            if val == 0 {
-                break;
-            }
-            count = cvar.wait(count).unwrap();
+        for &shard_id in &self.following_shard_sets[txn_idx as usize] {
+            let msg = ShardingMsg::RemoteCommit(RemoteCommit {
+                global_txn_idx: global_idx,
+                txn_output: txn_output.clone(),
+            });
+            let sender = self.senders[shard_id].lock().unwrap();
+            sender.send(msg).unwrap();
         }
     }
 }

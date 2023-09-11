@@ -8,6 +8,7 @@ use aptos_types::write_set::TransactionWrite;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{collections::btree_map::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
+use crate::versioned_data::EntryCell::Unspecified;
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.
@@ -31,6 +32,8 @@ enum EntryCell<V> {
     /// Option<u128> is a shortcut to aggregated value (to avoid traversing down
     /// beyond this index), which is created after the corresponding txn is committed.
     Delta(DeltaOp, Option<u128>),
+
+    Unspecified,
 }
 
 /// A VersionedValue internally contains a BTreeMap from indices of transactions
@@ -50,6 +53,13 @@ pub struct VersionedData<K, V> {
 }
 
 impl<V> Entry<V> {
+    fn new_predicted_dep() -> Entry<V> {
+        Entry {
+            cell: Unspecified,
+            flag: Flag::Estimate,
+        }
+    }
+
     fn new_write_from(incarnation: Incarnation, data: V) -> Entry<V> {
         Entry {
             cell: EntryCell::Write(incarnation, Arc::new(data)),
@@ -177,6 +187,9 @@ impl<V: TransactionWrite> VersionedValue<V> {
                     // Initialize the accumulator and continue traversal.
                     accumulator = Some(Ok(*delta))
                 },
+                (EntryCell::Unspecified, _) => {
+                    unreachable!()
+                },
             }
         }
 
@@ -231,6 +244,14 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
             .get_mut(&txn_idx)
             .expect("Entry by the txn must exist to mark estimate")
             .mark_estimate();
+    }
+
+    /// Mark an entry from transaction 'txn_idx' at access path 'key' as an estimated write
+    /// (for future incarnation). Will panic if the entry is not in the data-structure.
+    pub fn force_mark_estimate(&self, key: K, txn_idx: TxnIndex) {
+        let mut v = self.values.entry(key).or_default();
+        v.versioned_map
+            .insert(txn_idx, CachePadded::new(Entry::new_predicted_dep()));
     }
 
     /// Delete an entry from transaction 'txn_idx' at access path 'key'. Will panic

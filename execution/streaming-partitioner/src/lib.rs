@@ -5,7 +5,7 @@ pub mod transaction_graph_partitioner;
 use aptos_graphs::partitioning::PartitionId;
 use aptos_transaction_orderer::common::PTransaction;
 use aptos_types::batched_stream::{Batched, BatchedStream};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use aptos_block_partitioner::BlockPartitioner;
 use aptos_graphs::graph::{EdgeWeight, NodeWeight};
 use aptos_graphs::partitioning::fennel::{AlphaComputationMode, BalanceConstraintMode, FennelGraphPartitioner};
@@ -13,6 +13,7 @@ use aptos_transaction_orderer::transaction_compressor::{compress_transactions, C
 use aptos_types::block_executor::partitioner::PartitionedTransactions;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use std::rc::Rc;
+use aptos_types::state_store::state_key::StateKey;
 use crate::transaction_graph_partitioner::TransactionGraphPartitioner;
 
 /// Indicates the position of the transaction in the serialization order of the block.
@@ -63,14 +64,14 @@ impl BlockPartitioner for PartitionerV3 {
             shuffle_batches: true,
         };
         let mut partitioner = TransactionGraphPartitioner::new(fennel, params);
-        let compressed_txns = compress_transactions(transactions);
+        let (compressed_txns, compressor) = compress_transactions(transactions);
         let transactions = compressed_txns.into_iter().batched(block_size);
 
         let mut stream = partitioner.partition_transactions(transactions).unwrap();
         let mut global_idxs: Vec<Vec<SerializationIdx>> = vec![vec![]; num_shards];
         let mut txns = vec![None; block_size];
         let mut shard_idxs_by_txn: Vec<usize> = vec![0; block_size];
-        let mut dependency_sets = vec![vec![]; block_size];
+        let mut dependency_sets = vec![HashMap::new(); block_size];
         let mut follower_sets = vec![vec![]; block_size];
         for batch in stream.unwrap_batches().into_no_error_batch_iter() {
             for tx in batch {
@@ -79,9 +80,10 @@ impl BlockPartitioner for PartitionerV3 {
                 let CompressedPTransactionInner{ original, read_set, write_set } = t;
                 let analyzed_txn = *original;
                 shard_idxs_by_txn[serialization_idx as usize] = partition as usize;
-                for &src_idx in dependencies.keys() {
-                    dependency_sets[serialization_idx as usize].push(src_idx);
-                    follower_sets[src_idx as usize].push(serialization_idx)
+                for (src_idx, key_idxs) in dependencies {
+                    let keys: Vec<StateKey> = key_idxs.into_iter().map(|key_idx|compressor.uncompressed_key(key_idx as usize).clone()).collect();
+                    dependency_sets[serialization_idx as usize].insert(src_idx, keys);
+                    follower_sets[src_idx as usize].push(serialization_idx);
                 }
                 global_idxs[partition as usize].push(serialization_idx);
                 txns[serialization_idx as usize] = Some(analyzed_txn);

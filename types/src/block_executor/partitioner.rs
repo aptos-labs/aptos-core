@@ -12,6 +12,7 @@ use std::{
 };
 use std::collections::btree_set::BTreeSet;
 use std::sync::Arc;
+use crate::state_store::state_key::StateKey;
 
 pub type ShardId = usize;
 pub type TxnIndex = usize;
@@ -459,9 +460,11 @@ pub struct PartitionedTransactions {
     pub global_idxs: Vec<Vec<u32>>,
     /// shard_idxs_by_txn[x] = s <=> txn of global idx x is sent to shard s.
     pub shard_idxs_by_txn: Vec<usize>,
-    /// dependency_sets[x] = [y,z] <=> txn of global idx x needs to wait for txns of global idx y and z.
-    pub dependency_sets: Vec<Vec<u32>>,
-    /// follower_sets[x] = [y,z] <=> txn of global idx x needs to feed its output to txns of global idx y and z.
+
+    /// `dependency_sets[t1] == {t2:[k1, k2], t3:[k0, k3]}` means txn of global idx `t1` needs to wait for `k1, k2` from `t2` and `k0, k3` from `t3`.
+    pub dependency_sets: Vec<HashMap<u32, Vec<StateKey>>>,
+
+    /// `follower_sets[t1] == {t2, t3}` means txn of global idx `t1` needs to push its output to `t2, t3`.
     pub follower_sets: Vec<Vec<u32>>,
 }
 

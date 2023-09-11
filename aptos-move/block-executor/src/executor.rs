@@ -125,7 +125,6 @@ where
         let (idx_to_execute, incarnation) = version;
         let global_txn_idx = sharding_provider.global_idx_from_local(idx_to_execute);
         info!("execute() for txn {}.", global_txn_idx);
-        sharding_provider.wait_for_remote_deps(idx_to_execute);
         let txn = sharding_provider.txn(idx_to_execute);
 
         // VM execution.
@@ -540,6 +539,12 @@ where
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_cache = MVHashMap::new();
+        for (global_txn_idx, keys) in sharding_provider.remote_dependencies.iter() {
+            for key in keys.iter() {
+                versioned_cache.data().force_mark_estimate(key.clone(), *global_txn_idx);
+                //sharding todo: what about `versioned_cache.modules()`?
+            }
+        }
 
         let shared_counter = AtomicU32::new(0);
 

@@ -18,10 +18,12 @@ use aptos_types::{
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
 use std::collections::btree_set::BTreeSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
-use aptos_block_executor::sharding::ShardingMsg;
+use aptos_block_executor::sharding::{GlobalTxnIndex, LocalTxnIndex, ShardingMsg};
 use aptos_mvhashmap::types::TxnIndex;
+use aptos_types::state_store::state_key::StateKey;
 use crate::block_executor::AptosTransactionOutput;
 
 pub mod coordinator_client;
@@ -121,8 +123,8 @@ pub struct TxnProviderArgs {
     pub rx: Arc<Mutex<Receiver<ShardingMsg<AptosTransactionOutput, VMStatus>>>>,
     pub senders: Vec<Mutex<Sender<ShardingMsg<AptosTransactionOutput, VMStatus>>>>,
     pub txns: Vec<AnalyzedTransaction>,
+    pub local_idxs_by_global: HashMap<GlobalTxnIndex, LocalTxnIndex>,
     pub global_idxs: Vec<TxnIndex>,
-    pub follower_sets: Vec<BTreeSet<(usize, TxnIndex)>>,
-    pub dependency_sets: Vec<BTreeSet<(usize, TxnIndex)>>,
-    pub shard_idxs: Vec<usize>,
+    pub remote_dependencies: HashMap<GlobalTxnIndex, HashSet<StateKey>>,
+    pub following_shard_sets: Vec<Vec<usize>>,
 }

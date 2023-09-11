@@ -25,6 +25,7 @@ use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::sync::{Arc, Condvar, Mutex};
 use aptos_block_executor::sharding::TxnProvider;
+use aptos_types::state_store::state_key::StateKey;
 use crate::counters::BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS;
 use crate::sharded_block_executor::TxnProviderArgs;
 
@@ -79,11 +80,12 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             rx,
             senders,
             txns,
+            local_idxs_by_global,
             global_idxs,
-            follower_sets,
-            dependency_sets,
-            shard_idxs,
+            remote_dependencies,
+            following_shard_sets,
         } = txn_provider_args;
+
         let txns = txns
             .into_iter()
             .map(|txn| txn.into_txn())
@@ -96,16 +98,6 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         });
         drop(signature_verification_timer);
 
-        let missing_dep_counts = global_idxs.iter().map(|idx| {
-            let shard_id = shard_idxs[*idx as usize];
-            let dep_set = &dependency_sets[(*idx) as usize];
-            let num_local_deps: usize = dep_set.range((shard_id, 0)..(shard_id+1, 0)).map(|_|1_usize).sum();
-            let num_remote_deps = dep_set.len() - num_local_deps;
-            Arc::new((Mutex::new(num_remote_deps), Condvar::new()))
-        }).collect();
-
-        let local_idxs_by_global: HashMap<u32, u32> = global_idxs.iter().enumerate().map(|(local_idx, global_idx)|(*global_idx, local_idx as u32)).collect();
-
         let sharding_provider = TxnProvider {
             block_id,
             sharding_mode: true,
@@ -116,8 +108,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             txns: pre_processed_txns,
             local_idxs_by_global,
             global_idxs,
-            missing_dep_counts,
-            follower_sets,
+            remote_dependencies,
+            following_shard_sets,
         };
 
         let ret = BlockAptosVM::execute_block(

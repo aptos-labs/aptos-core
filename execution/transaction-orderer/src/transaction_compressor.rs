@@ -31,14 +31,14 @@ impl<T: Debug> PTransaction for CompressedPTransaction<T> {
 
 pub struct TransactionCompressor<K> {
     key_mapping: HashMap<K, CompressedKey>,
-    next_key: CompressedKey,
+    uncompressed_keys: Vec<K>,
 }
 
 impl<K> TransactionCompressor<K> {
     pub fn new() -> Self {
         Self {
             key_mapping: HashMap::new(),
-            next_key: 0,
+            uncompressed_keys: vec![],
         }
     }
 }
@@ -54,9 +54,9 @@ impl<K: Hash + Clone + Eq> TransactionCompressor<K> {
         if let Some(&mapped_key) = self.key_mapping.get(key) {
             mapped_key
         } else {
-            let mapped_key = self.next_key;
-            self.next_key += 1;
+            let mapped_key = self.uncompressed_keys.len() as u32;
             self.key_mapping.insert(key.clone(), mapped_key);
+            self.uncompressed_keys.push(key.clone());
             mapped_key
         }
     }
@@ -82,13 +82,18 @@ impl<K: Hash + Clone + Eq> TransactionCompressor<K> {
 
         res
     }
+
+    pub fn uncompressed_key(&self, compressed_key: usize) -> &K {
+        &self.uncompressed_keys[compressed_key]
+    }
 }
 
-pub fn compress_transactions<T: Debug>(block: Vec<T>) -> Vec<CompressedPTransaction<T>>
+pub fn compress_transactions<T: Debug>(block: Vec<T>) -> (Vec<CompressedPTransaction<T>>, TransactionCompressor<T::Key>)
 where
     T: PTransaction,
     T::Key: Hash + Clone + Eq,
 {
     let mut compressor = TransactionCompressor::new();
-    compressor.compress_transactions(block)
+    let txns = compressor.compress_transactions(block);
+    (txns, compressor)
 }
