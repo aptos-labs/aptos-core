@@ -33,7 +33,7 @@ export class Account {
    * }
    * ```
    */
-  async getInfo(args: { accountAddress: HexInput }): Promise<AccountData> {
+  async getAccountInfo(args: { accountAddress: HexInput }): Promise<AccountData> {
     const data = await getInfo({ aptosConfig: this.config, ...args });
     return data;
   }
@@ -48,7 +48,7 @@ export class Account {
    * @returns Account modules
    */
 
-  async getModules(args: {
+  async getAccountModules(args: {
     accountAddress: HexInput;
     options?: PaginationArgs & LedgerVersion;
   }): Promise<MoveModuleBytecode[]> {
@@ -72,7 +72,7 @@ export class Account {
    * }
    * ```
    */
-  async getModule(args: {
+  async getAccountModule(args: {
     accountAddress: HexInput;
     moduleName: string;
     options?: LedgerVersion;
@@ -91,7 +91,7 @@ export class Account {
    *
    * @returns The account transactions
    */
-  async getTransactions(args: { accountAddress: HexInput; options?: PaginationArgs }): Promise<Transaction[]> {
+  async getAccountTransactions(args: { accountAddress: HexInput; options?: PaginationArgs }): Promise<Transaction[]> {
     const transactions = await getTransactions({ aptosConfig: this.config, ...args });
     return transactions;
   }
@@ -105,7 +105,7 @@ export class Account {
    * @param accountAddress Aptos account address
    * @returns Account resources
    */
-  async getResources(args: {
+  async getAccountResources(args: {
     accountAddress: HexInput;
     options?: PaginationArgs & LedgerVersion;
   }): Promise<MoveResource[]> {
@@ -129,7 +129,7 @@ export class Account {
    * }
    * ```
    */
-  async getResource(args: {
+  async getAccountResource(args: {
     accountAddress: HexInput;
     resourceType: MoveResourceType;
     options?: LedgerVersion;
