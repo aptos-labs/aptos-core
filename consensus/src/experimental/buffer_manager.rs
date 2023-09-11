@@ -254,7 +254,10 @@ impl BufferManager {
             cursor, self.execution_root
         );
         if self.execution_root.is_some() && cursor == self.execution_root {
-            // Schedule retry
+            // Schedule retry.
+            // NOTE: probably should schedule retry for all ordered blocks, but since execution error
+            // is not expected nor retryable in reality, I'd rather remove retrying or do it more
+            // properly than complicating it here.
             let ordered_blocks = self.buffer.get(&self.execution_root).get_blocks().clone();
             let request = self.create_new_request(ExecutionRequest { ordered_blocks });
             let sender = self.execution_schedule_phase_tx.clone();
@@ -416,6 +419,16 @@ impl BufferManager {
             "Receive executed response {}",
             executed_blocks.last().unwrap().block_info()
         );
+        let current_item = self.buffer.get(&current_cursor);
+
+        if current_item.block_id() != block_id {
+            error!(
+                block_id = block_id,
+                expected_block_id = current_item.block_id(),
+                "Received result for unexpected block id. Ignoring."
+            );
+            return;
+        }
 
         // Handle reconfiguration timestamp reconciliation.
         // end epoch timestamp is set to the first block that causes the reconfiguration.

@@ -32,8 +32,9 @@ pub struct ExecutedBlock {
 }
 
 impl ExecutedBlock {
-    pub fn ditch_result(self) -> Block {
-        self.block
+    pub fn replace_result(mut self, result: StateComputeResult) -> Self {
+        self.state_compute_result = result;
+        self
     }
 }
 
