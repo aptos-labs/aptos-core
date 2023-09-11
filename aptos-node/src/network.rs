@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::services::start_benchmark_service;
+use crate::services::start_netbench_service;
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{NetworkConfig, NodeConfig},
@@ -22,7 +22,7 @@ use aptos_network::{
     },
     ProtocolId,
 };
-use aptos_network_benchmark::BenchmarkMessage;
+use aptos_network_benchmark::NetbenchMessage;
 use aptos_network_builder::builder::NetworkBuilder;
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_storage_service_types::StorageServiceMessage;
@@ -126,18 +126,18 @@ pub fn storage_service_network_configuration(node_config: &NodeConfig) -> Networ
     NetworkApplicationConfig::new(network_client_config, network_service_config)
 }
 
-pub fn benchmark_network_configuration(
+pub fn netbench_network_configuration(
     node_config: &NodeConfig,
 ) -> Option<NetworkApplicationConfig> {
-    let cfg = match node_config.benchmark {
+    let cfg = match node_config.netbench {
         None => return None,
         Some(x) => x,
     };
     if !cfg.enabled {
         return None;
     }
-    let direct_send_protocols = vec![ProtocolId::BenchmarkDirectSend];
-    let rpc_protocols = vec![ProtocolId::BenchmarkRpc];
+    let direct_send_protocols = vec![ProtocolId::NetbenchDirectSend];
+    let rpc_protocols = vec![ProtocolId::NetbenchRpc];
     let network_client_config =
         NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocols.clone());
     let max_network_channel_size = cfg.max_network_channel_size as usize;
@@ -146,7 +146,7 @@ pub fn benchmark_network_configuration(
         rpc_protocols,
         aptos_channel::Config::new(max_network_channel_size)
             .queue_style(QueueStyle::FIFO)
-            .counters(&aptos_network_benchmark::PENDING_BENCHMARK_NETWORK_EVENTS),
+            .counters(&aptos_network_benchmark::PENDING_NETBENCH_NETWORK_EVENTS),
     );
     Some(NetworkApplicationConfig::new(
         network_client_config,
@@ -203,7 +203,7 @@ pub fn setup_networks_and_get_interfaces(
     let mut mempool_network_handles = vec![];
     let mut peer_monitoring_service_network_handles = vec![];
     let mut storage_service_network_handles = vec![];
-    let mut benchmark_handles = Vec::<ApplicationNetworkHandle<BenchmarkMessage>>::new();
+    let mut netbench_handles = Vec::<ApplicationNetworkHandle<NetbenchMessage>>::new();
     for network_config in network_configs.into_iter() {
         // Create a network runtime for the config
         let runtime = create_network_runtime(&network_config);
@@ -265,14 +265,14 @@ pub fn setup_networks_and_get_interfaces(
         storage_service_network_handles.push(storage_service_network_handle);
 
         // Register benchmark test service
-        if let Some(app_config) = benchmark_network_configuration(node_config) {
-            let benchmark_handle = register_client_and_service_with_network(
+        if let Some(app_config) = netbench_network_configuration(node_config) {
+            let netbench_handle = register_client_and_service_with_network(
                 &mut network_builder,
                 network_id,
                 &network_config,
                 app_config,
             );
-            benchmark_handles.push(benchmark_handle);
+            netbench_handles.push(netbench_handle);
         }
 
         // Build and start the network on the runtime
@@ -300,21 +300,17 @@ pub fn setup_networks_and_get_interfaces(
         peers_and_metadata.clone(),
     );
 
-    if !benchmark_handles.is_empty() {
-        let benchmark_interfaces = create_network_interfaces(
-            benchmark_handles,
-            benchmark_network_configuration(node_config).unwrap(),
+    if !netbench_handles.is_empty() {
+        let netbench_interfaces = create_network_interfaces(
+            netbench_handles,
+            netbench_network_configuration(node_config).unwrap(),
             peers_and_metadata,
         );
-        let benchmark_service_threads = node_config.benchmark.unwrap().benchmark_service_threads;
-        let benchmark_runtime =
-            aptos_runtimes::spawn_named_runtime("benchmark".into(), benchmark_service_threads);
-        start_benchmark_service(
-            node_config,
-            benchmark_interfaces,
-            benchmark_runtime.handle(),
-        );
-        network_runtimes.push(benchmark_runtime);
+        let netbench_service_threads = node_config.netbench.unwrap().netbench_service_threads;
+        let netbench_runtime =
+            aptos_runtimes::spawn_named_runtime("benchmark".into(), netbench_service_threads);
+        start_netbench_service(node_config, netbench_interfaces, netbench_runtime.handle());
+        network_runtimes.push(netbench_runtime);
     }
 
     (

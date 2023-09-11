@@ -12,7 +12,7 @@ use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdate
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
 use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
-use aptos_network_benchmark::{run_benchmark_service, BenchmarkMessage};
+use aptos_network_benchmark::{run_netbench_service, NetbenchMessage};
 use aptos_peer_monitoring_service_server::{
     network::PeerMonitoringServiceNetworkEvents, storage::StorageReader,
     PeerMonitoringServiceServer,
@@ -185,13 +185,13 @@ pub fn start_peer_monitoring_service(
     peer_monitoring_service_runtime
 }
 
-pub fn start_benchmark_service(
+pub fn start_netbench_service(
     node_config: &NodeConfig,
-    network_interfaces: ApplicationNetworkInterfaces<BenchmarkMessage>,
+    network_interfaces: ApplicationNetworkInterfaces<NetbenchMessage>,
     runtime: &Handle,
 ) {
     let network_client = network_interfaces.network_client;
-    runtime.spawn(run_benchmark_service(
+    runtime.spawn(run_netbench_service(
         node_config.clone(),
         network_client,
         network_interfaces.network_service_events,

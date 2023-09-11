@@ -3,7 +3,7 @@
 
 use crate::{
     config::{
-        benchmark::BenchmarkConfig, node_config_loader::NodeConfigLoader,
+        netbench::NetbenchConfig, node_config_loader::NodeConfigLoader,
         persistable_config::PersistableConfig, utils::RootPath, ApiConfig, BaseConfig,
         ConsensusConfig, Error, ExecutionConfig, IndexerConfig, IndexerGrpcConfig,
         InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
@@ -59,7 +59,7 @@ pub struct NodeConfig {
     #[serde(default)]
     pub validator_network: Option<NetworkConfig>,
     #[serde(default)]
-    pub benchmark: Option<BenchmarkConfig>,
+    pub netbench: Option<NetbenchConfig>,
 }
 
 impl NodeConfig {
