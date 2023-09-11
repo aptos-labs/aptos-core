@@ -16,6 +16,7 @@ use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
 use aptos_types::{
     aggregate_signature::{AggregateSignature, PartialSignatures},
     epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -419,6 +420,33 @@ impl TDAGMessage for CertifiedNode {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct CertifiedNodeMessage {
+    inner: CertifiedNode,
+    ledger_info: LedgerInfoWithSignatures,
+}
+
+impl CertifiedNodeMessage {
+    pub fn new(node: CertifiedNode, ledger_info: LedgerInfoWithSignatures) -> Self {
+        Self {
+            inner: node,
+            ledger_info,
+        }
+    }
+
+    pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
+        &self.ledger_info
+    }
+}
+
+impl Deref for CertifiedNodeMessage {
+    type Target = CertifiedNode;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Vote {
     metadata: NodeMetadata,
     signature: bls12381::Signature,
@@ -528,10 +556,10 @@ pub struct RemoteFetchRequest {
 }
 
 impl RemoteFetchRequest {
-    pub fn new(epoch: u64, parents: Vec<NodeMetadata>, exists_bitmask: DagSnapshotBitmask) -> Self {
+    pub fn new(epoch: u64, targets: Vec<NodeMetadata>, exists_bitmask: DagSnapshotBitmask) -> Self {
         Self {
             epoch,
-            targets: parents,
+            targets,
             exists_bitmask,
         }
     }

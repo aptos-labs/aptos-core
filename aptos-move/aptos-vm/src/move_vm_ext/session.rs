@@ -31,7 +31,6 @@ use move_core_types::{
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use serde::{Deserialize, Serialize};
 use std::{
-    borrow::BorrowMut,
     collections::{BTreeMap, HashMap},
     ops::{Deref, DerefMut},
     sync::Arc,
@@ -150,7 +149,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let (change_set, mut extensions) = self.inner.finish_with_extensions()?;
 
         let (change_set, resource_group_change_set) =
-            Self::split_and_merge_resource_groups(move_vm, self.remote, change_set)?;
+            Self::split_and_merge_resource_groups(move_vm, self.remote, change_set, ap_cache)?;
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
@@ -206,11 +205,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///   * If group or data does't exist, Unreachable
     ///   * If elements remain, Modify
     ///   * Otherwise delete
-    fn split_and_merge_resource_groups(
+    fn split_and_merge_resource_groups<C: AccessPathCache>(
         runtime: &MoveVM,
         remote: &dyn AptosMoveResolver,
         change_set: MoveChangeSet,
-    ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
+        ap_cache: &mut C,
+    ) -> VMResult<(MoveChangeSet, HashMap<StateKey, MoveStorageOp<Vec<u8>>>)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
         let common_error = || {
@@ -219,8 +219,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 .finish(Location::Undefined)
         };
         let mut change_set_filtered = MoveChangeSet::new();
-        let mut resource_group_change_set = MoveChangeSet::new();
 
+        let mut resource_group_change_set = HashMap::new();
         let mut resource_group_cache = remote.release_resource_group_cache();
         for (addr, account_changeset) in change_set.into_inner() {
             let mut resource_groups: BTreeMap<StructTag, AccountChangeSet> = BTreeMap::new();
@@ -252,11 +252,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 .map_err(|_| common_error())?;
 
             for (resource_group_tag, resources) in resource_groups {
-                let mut source_data = resource_group_cache
-                    .borrow_mut()
-                    .get_mut(&addr)
-                    .and_then(|t| t.remove(&resource_group_tag))
-                    .unwrap_or_default();
+                let state_key = StateKey::access_path(
+                    ap_cache.get_resource_group_path(addr, resource_group_tag),
+                );
+
+                let mut source_data = resource_group_cache.remove(&state_key).unwrap_or_default();
                 let create = source_data.is_empty();
 
                 for (struct_tag, current_op) in resources.into_resources() {
@@ -284,9 +284,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 } else {
                     MoveStorageOp::Modify(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
                 };
-                resource_group_change_set
-                    .add_resource_op(addr, resource_group_tag, op)
-                    .map_err(|_| common_error())?;
+                resource_group_change_set.insert(state_key, op);
             }
         }
 
@@ -296,7 +294,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     pub(crate) fn convert_change_set<C: AccessPathCache>(
         woc: &WriteOpConverter,
         change_set: MoveChangeSet,
-        resource_group_change_set: MoveChangeSet,
+        resource_group_change_set: HashMap<StateKey, MoveStorageOp<Vec<u8>>>,
         events: Vec<ContractEvent>,
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
@@ -329,14 +327,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
         }
 
-        for (addr, account_changeset) in resource_group_change_set.into_inner() {
-            let (_, resources) = account_changeset.into_inner();
-            for (struct_tag, blob_op) in resources {
-                let state_key =
-                    StateKey::access_path(ap_cache.get_resource_group_path(addr, struct_tag));
-                let op = woc.convert(&state_key, blob_op, false)?;
-                resource_write_set.insert(state_key, op);
-            }
+        for (state_key, blob_op) in resource_group_change_set {
+            let op = woc.convert(&state_key, blob_op, false)?;
+            resource_write_set.insert(state_key, op);
         }
 
         for (handle, change) in table_change_set.changes {
