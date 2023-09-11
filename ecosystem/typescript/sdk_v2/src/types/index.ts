@@ -627,3 +627,27 @@ export type MoveFunction = {
    */
   return: Array<string>;
 };
+
+export enum RoleType {
+  VALIDATOR = "validator",
+  FULL_NODE = "full_node",
+}
+
+export type LedgerInfo = {
+  /**
+   * Chain ID of the current chain
+   */
+  chain_id: number;
+  epoch: string;
+  ledger_version: string;
+  oldest_ledger_version: string;
+  ledger_timestamp: string;
+  node_role: RoleType;
+  oldest_block_height: string;
+  block_height: string;
+  /**
+   * Git hash of the build of the API endpoint.  Can be used to determine the exact
+   * software version used by the API endpoint.
+   */
+  git_hash?: string;
+};
