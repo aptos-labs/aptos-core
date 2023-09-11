@@ -1,6 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Implementation of sync and unsync versions of data structures which are used
+//! to process aggregator liftings.
+//!
+//! Both have:
+//!   1. A counter used to generate a new unique (per-block) identifier.
+//!   2. A map from identifiers to lifted Move values.
+
 use dashmap::{mapref::one::Ref, DashMap};
 use move_vm_types::values::Value;
 use std::{

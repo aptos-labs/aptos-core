@@ -245,11 +245,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 
     #[allow(unused)]
+    /// Same as `get_base_value`, but also tries to lift values.
     fn get_base_value_with_layout(
         &self,
         layout: &MoveTypeLayout,
         state_key: &T::Key,
     ) -> anyhow::Result<Option<StateValue>> {
+        // Callback for replacing values with identifiers. Right now it is
+        // implemented as a serialization roundtrip.
         let process_lifting = |bytes: Vec<u8>| -> anyhow::Result<Vec<u8>> {
             // TODO: alert on fail?
             let patched_value = deserialize_and_exchange(&bytes, layout, self)
@@ -259,41 +262,36 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 .ok_or_else(|| anyhow::anyhow!("Failed to serialize value {}", patched_value))
         };
 
-        // TODO: deduplicate this logic.
+        // Callback which gets the value from storage, replaces values with
+        // identifiers, and caches it in the `LatestView`.
+        let get_base_value = |state_key: &<T as Transaction>::Key,
+                              insert_callback: &dyn Fn(
+            <T as Transaction>::Key,
+            StateValue,
+        ) -> Option<StateValue>|
+         -> anyhow::Result<Option<StateValue>> {
+            let maybe_state_value = self.get_base_value(state_key)?;
+            match maybe_state_value {
+                None => Ok(None),
+                Some(state_value) => {
+                    let state_value = state_value.try_transform_bytes(process_lifting)?;
+                    insert_callback(state_key.clone(), state_value.clone());
+                    Ok(Some(state_value))
+                },
+            }
+        };
+
         match &self.latest_view {
             ViewState::Sync(state) => match state.lifted_cache.get(state_key) {
                 Some(state_value) => Ok(Some(state_value.clone())),
-                None => {
-                    let maybe_state_value = self.get_base_value(state_key)?;
-                    match maybe_state_value {
-                        None => Ok(None),
-                        Some(state_value) => {
-                            let state_value = state_value.try_transform_bytes(process_lifting)?;
-                            state
-                                .lifted_cache
-                                .insert(state_key.clone(), state_value.clone());
-                            Ok(Some(state_value))
-                        },
-                    }
-                },
+                None => get_base_value(state_key, &|k, v| state.lifted_cache.insert(k, v)),
             },
-            ViewState::Unsync(state) => {
-                let mut lifted_cache = state.lifted_cache.borrow_mut();
-                match lifted_cache.get(state_key) {
-                    Some(state_value) => Ok(Some(state_value.clone())),
-                    None => {
-                        let maybe_state_value = self.get_base_value(state_key)?;
-                        match maybe_state_value {
-                            None => Ok(None),
-                            Some(state_value) => {
-                                let state_value =
-                                    state_value.try_transform_bytes(process_lifting)?;
-                                lifted_cache.insert(state_key.clone(), state_value.clone());
-                                Ok(Some(state_value))
-                            },
-                        }
-                    },
-                }
+            ViewState::Unsync(state) => match state.lifted_cache.borrow().get(state_key) {
+                Some(state_value) => Ok(Some(state_value.clone())),
+                None => get_base_value(state_key, &|k, v| {
+                    let mut lifted_cache = state.lifted_cache.borrow_mut();
+                    lifted_cache.insert(k, v)
+                }),
             },
         }
     }
@@ -373,6 +371,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
     }
 }
 
+// For aggregators V2, values are replaced with identifiers at deserialization time,
+// and are replaced back when the value is serialized. The "lifted" values are cached
+// by the `LatestView`.
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueExchange
     for LatestView<'a, T, S, X>
 {
@@ -394,6 +395,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueExchan
     }
 
     fn try_claim_back(&self, value_to_exchange: Value) -> TransformationResult<Value> {
+        // TODO(aggregator): Revisit on materialization?
+
         let identifier = value_to_exchange.as_identifier().ok_or_else(|| {
             TransformationError::new(&format!(
                 "Value {} cannot be an identifier",

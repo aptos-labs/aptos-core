@@ -160,6 +160,8 @@ impl StateValue {
         }
     }
 
+    /// Applies a bytes-to-bytes transformation on the state value contents,
+    /// leaving the state value metadata untouched.
     pub fn try_transform_bytes<F: FnOnce(Vec<u8>) -> anyhow::Result<Vec<u8>>>(
         self,
         f: F,
