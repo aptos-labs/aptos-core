@@ -1466,7 +1466,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Add overflow".to_string())
+        })
     }
 
     pub fn sub_checked(self, other: Self) -> PartialVMResult<Self> {
@@ -1483,7 +1486,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Subtract overflow".to_string())
+        })
     }
 
     pub fn mul_checked(self, other: Self) -> PartialVMResult<Self> {
@@ -1500,7 +1506,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Multiplication overflow".to_string())
+        })
     }
 
     pub fn div_checked(self, other: Self) -> PartialVMResult<Self> {
@@ -1517,7 +1526,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Division by zero".to_string())
+        })
     }
 
     pub fn rem_checked(self, other: Self) -> PartialVMResult<Self> {
@@ -1534,7 +1546,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Integer remainder by zero".to_string())
+        })
     }
 
     pub fn bit_or(self, other: Self) -> PartialVMResult<Self> {
@@ -1591,31 +1606,36 @@ impl IntegerValue {
         Ok(match self {
             U8(x) => {
                 if n_bits >= 8 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
+                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                        .with_message("Shift Left overflow".to_string()));
                 }
                 IntegerValue::U8(x << n_bits)
             },
             U16(x) => {
                 if n_bits >= 16 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
+                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                        .with_message("Shift Left overflow".to_string()));
                 }
                 IntegerValue::U16(x << n_bits)
             },
             U32(x) => {
                 if n_bits >= 32 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
+                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                        .with_message("Shift Left overflow".to_string()));
                 }
                 IntegerValue::U32(x << n_bits)
             },
             U64(x) => {
                 if n_bits >= 64 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
+                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                        .with_message("Shift Left overflow".to_string()));
                 }
                 IntegerValue::U64(x << n_bits)
             },
             U128(x) => {
                 if n_bits >= 128 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
+                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                        .with_message("Shift Left overflow".to_string()));
                 }
                 IntegerValue::U128(x << n_bits)
             },
@@ -1629,31 +1649,36 @@ impl IntegerValue {
         Ok(match self {
             U8(x) => {
                 if n_bits >= 8 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
+                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                        .with_message("Shift Right overflow".to_string()));
                 }
                 IntegerValue::U8(x >> n_bits)
             },
             U16(x) => {
                 if n_bits >= 16 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
+                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                        .with_message("Shift Right overflow".to_string()));
                 }
                 IntegerValue::U16(x >> n_bits)
             },
             U32(x) => {
                 if n_bits >= 32 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
+                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                        .with_message("Shift Right overflow".to_string()));
                 }
                 IntegerValue::U32(x >> n_bits)
             },
             U64(x) => {
                 if n_bits >= 64 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
+                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                        .with_message("Shift Right overflow".to_string()));
                 }
                 IntegerValue::U64(x >> n_bits)
             },
             U128(x) => {
                 if n_bits >= 128 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
+                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                        .with_message("Shift Right overflow".to_string()));
                 }
                 IntegerValue::U128(x >> n_bits)
             },
