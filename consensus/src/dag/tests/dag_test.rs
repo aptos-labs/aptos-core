@@ -12,8 +12,8 @@ use crate::dag::{
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_types::{
-    epoch_state::EpochState, validator_signer::ValidatorSigner,
-    validator_verifier::random_validator_verifier,
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
 };
 use std::{collections::HashMap, sync::Arc};
 
@@ -21,6 +21,7 @@ pub struct MockStorage {
     node_data: Mutex<Option<Node>>,
     vote_data: Mutex<HashMap<NodeId, Vote>>,
     certified_node_data: Mutex<HashMap<HashValue, CertifiedNode>>,
+    latest_ledger_info: Option<LedgerInfoWithSignatures>,
 }
 
 impl MockStorage {
@@ -29,6 +30,16 @@ impl MockStorage {
             node_data: Mutex::new(None),
             vote_data: Mutex::new(HashMap::new()),
             certified_node_data: Mutex::new(HashMap::new()),
+            latest_ledger_info: None,
+        }
+    }
+
+    pub fn new_with_ledger_info(ledger_info: LedgerInfoWithSignatures) -> Self {
+        Self {
+            node_data: Mutex::new(None),
+            vote_data: Mutex::new(HashMap::new()),
+            certified_node_data: Mutex::new(HashMap::new()),
+            latest_ledger_info: Some(ledger_info),
         }
     }
 }
@@ -101,6 +112,12 @@ impl DAGStorage for MockStorage {
 
     fn get_latest_k_committed_events(&self, _k: u64) -> anyhow::Result<Vec<CommitEvent>> {
         Ok(vec![])
+    }
+
+    fn get_latest_ledger_info(&self) -> anyhow::Result<LedgerInfoWithSignatures> {
+        self.latest_ledger_info
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("ledger info not set"))
     }
 }
 

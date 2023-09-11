@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use super::{dag_driver_tests::MockDbReader, dag_test};
+use super::dag_test;
 use crate::{
     dag::bootstrap::bootstrap_dag,
     experimental::buffer_manager::OrderedBlocks,
@@ -26,9 +26,8 @@ use aptos_network::{
 use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_state::EpochState,
-    ledger_info::generate_ledger_info_with_sig,
     validator_signer::ValidatorSigner,
-    validator_verifier::{random_validator_verifier, ValidatorVerifier},
+    validator_verifier::{random_validator_verifier, ValidatorVerifier}, ledger_info::generate_ledger_info_with_sig,
 };
 use claims::assert_gt;
 use futures::{
@@ -64,15 +63,12 @@ impl DagBootstrapUnit {
             epoch,
             verifier: storage.get_validator_set().into(),
         };
-        let dag_storage = dag_test::MockStorage::new();
+        let ledger_info = generate_ledger_info_with_sig(&all_signers, storage.get_ledger_info());
+        let dag_storage = dag_test::MockStorage::new_with_ledger_info(ledger_info);
 
         let network = Arc::new(DAGNetworkSenderImpl::new(Arc::new(network)));
 
         let payload_client = Arc::new(MockPayloadManager::new(None));
-
-        let mock_storage = Arc::new(MockDbReader {
-            ledger_info: generate_ledger_info_with_sig(&all_signers, storage.get_ledger_info()),
-        });
 
         let (nh_abort_handle, df_abort_handle, dag_rpc_tx, ordered_nodes_rx) = bootstrap_dag(
             self_peer,
@@ -84,7 +80,6 @@ impl DagBootstrapUnit {
             network.clone(),
             time_service,
             payload_client,
-            mock_storage,
         );
 
         (

@@ -20,11 +20,10 @@ use crate::{
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
-use aptos_storage_interface::DbReader;
 use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_state::EpochState,
-    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo},
     validator_verifier::random_validator_verifier,
 };
 use async_trait::async_trait;
@@ -71,16 +70,6 @@ impl TDAGNetworkSender for MockNetworkSender {
     }
 }
 
-pub(super) struct MockDbReader {
-    pub(super) ledger_info: LedgerInfoWithSignatures,
-}
-
-impl DbReader for MockDbReader {
-    fn get_latest_ledger_info(&self) -> anyhow::Result<LedgerInfoWithSignatures> {
-        Ok(self.ledger_info.clone())
-    }
-}
-
 #[tokio::test]
 async fn test_certified_node_handler() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
@@ -88,7 +77,10 @@ async fn test_certified_node_handler() {
         epoch: 1,
         verifier: validator_verifier,
     });
-    let storage = Arc::new(MockStorage::new());
+
+    let mock_ledger_info = LedgerInfo::mock_genesis(None);
+    let mock_ledger_info = generate_ledger_info_with_sig(&signers, mock_ledger_info);
+    let storage = Arc::new(MockStorage::new_with_ledger_info(mock_ledger_info));
     let dag = Arc::new(RwLock::new(Dag::new(
         epoch_state.clone(),
         storage.clone(),
@@ -122,13 +114,7 @@ async fn test_certified_node_handler() {
         dag.clone(),
         aptos_time_service::TimeService::mock(),
     );
-    let fetch_requester = Arc::new(fetch_requester);
-
-    let mock_ledger_info = LedgerInfo::mock_genesis(None);
-    let mock_ledger_info = generate_ledger_info_with_sig(&signers, mock_ledger_info);
-    let db = Arc::new(MockDbReader {
-        ledger_info: mock_ledger_info,
-    });
+    let fetch_requester = Arc::new(fetch_requester); 
 
     let mut driver = DagDriver::new(
         signers[0].author(),
@@ -140,7 +126,6 @@ async fn test_certified_node_handler() {
         storage,
         order_rule,
         fetch_requester,
-        db,
     );
 
     let first_round_node = new_certified_node(1, signers[0].author(), vec![]);

@@ -21,7 +21,6 @@ use aptos_consensus_types::common::{Author, Payload};
 use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_reliable_broadcast::ReliableBroadcast;
-use aptos_storage_interface::DbReader;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{block_info::Round, epoch_state::EpochState};
 use futures::{
@@ -50,7 +49,6 @@ pub(crate) struct DagDriver {
     storage: Arc<dyn DAGStorage>,
     order_rule: OrderRule,
     fetch_requester: Arc<FetchRequester>,
-    db: Arc<dyn DbReader>,
 }
 
 impl DagDriver {
@@ -64,7 +62,6 @@ impl DagDriver {
         storage: Arc<dyn DAGStorage>,
         order_rule: OrderRule,
         fetch_requester: Arc<FetchRequester>,
-        db: Arc<dyn DbReader>,
     ) -> Self {
         let pending_node = storage
             .get_pending_node()
@@ -86,7 +83,6 @@ impl DagDriver {
             storage,
             order_rule,
             fetch_requester,
-            db,
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -156,7 +152,7 @@ impl DagDriver {
             SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone());
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
         let latest_ledger_info = self
-            .db
+            .storage
             .get_latest_ledger_info()
             .expect("latest ledger info must exist");
         let task = self
