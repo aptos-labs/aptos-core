@@ -192,17 +192,17 @@ impl Compatibility {
         if self.check_struct_and_pub_function_linking && !struct_and_pub_function_linking {
             return Err(PartialVMError::new(
                 StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
-            ));
+            ).with_message("Module Update Failure: Public function/struct signature of new module differs from existing module".to_string()));
         }
         if self.check_struct_layout && !struct_layout {
             return Err(PartialVMError::new(
                 StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
-            ));
+            ).with_message("Module Update Failure: Struct layout of new module differs from existing module".to_string()));
         }
         if self.check_friend_linking && !friend_linking {
             return Err(PartialVMError::new(
                 StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
-            ));
+            ).with_message("Module Update Failure: Friend signature of new module differs from existing module".to_string()));
         }
 
         Ok(())
