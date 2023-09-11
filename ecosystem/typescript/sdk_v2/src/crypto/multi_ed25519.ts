@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /* eslint-disable no-bitwise */
-import { Deserializer, Seq, Serializer, Uint8 } from "../bcs";
+import { Deserializer, Serializer, Uint8 } from "../bcs";
 import { Ed25519PublicKey, Ed25519Signature } from "./ed25519";
 
 /**
@@ -22,7 +22,7 @@ export class MultiEd25519PublicKey {
    * @param public_keys A list of public keys
    * @param threshold At least "threshold" signatures must be valid
    */
-  constructor(public readonly public_keys: Seq<Ed25519PublicKey>, public readonly threshold: Uint8) {
+  constructor(public readonly public_keys: Ed25519PublicKey[], public readonly threshold: Uint8) {
     if (threshold > MAX_SIGNATURES_SUPPORTED) {
       throw new Error(`"threshold" cannot be larger than ${MAX_SIGNATURES_SUPPORTED}`);
     }
@@ -43,14 +43,14 @@ export class MultiEd25519PublicKey {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeByteVector(this.toUint8Array());
+    serializer.serializeBytes(this.toUint8Array());
   }
 
   static deserialize(deserializer: Deserializer): MultiEd25519PublicKey {
     const bytes = deserializer.deserializeBytes();
     const threshold = bytes[bytes.length - 1];
 
-    const keys: Seq<Ed25519PublicKey> = [];
+    const keys: Ed25519PublicKey[] = [];
 
     for (let i = 0; i < bytes.length - 1; i += Ed25519PublicKey.LENGTH) {
       const begin = i;
@@ -73,7 +73,7 @@ export class MultiEd25519Signature {
    * @param bitmap 4 bytes, at most 32 signatures are supported. If Nth bit value is `1`, the Nth
    * signature should be provided in `signatures`. Bits are read from left to right
    */
-  constructor(public readonly signatures: Seq<Ed25519Signature>, public readonly bitmap: Uint8Array) {
+  constructor(public readonly signatures: Ed25519Signature[], public readonly bitmap: Uint8Array) {
     if (bitmap.length !== MultiEd25519Signature.BITMAP_LEN) {
       throw new Error(`"bitmap" length should be ${MultiEd25519Signature.BITMAP_LEN}`);
     }
@@ -107,7 +107,7 @@ export class MultiEd25519Signature {
    *
    * @returns bitmap that is 32bit long
    */
-  static createBitmap(bits: Seq<Uint8>): Uint8Array {
+  static createBitmap(bits: Uint8[]): Uint8Array {
     // Bits are read from left to right. e.g. 0b10000000 represents the first bit is set in one byte.
     // The decimal value of 0b10000000 is 128.
     const firstBitInByte = 128;
@@ -140,14 +140,14 @@ export class MultiEd25519Signature {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeByteVector(this.toUint8Array());
+    serializer.serializeBytes(this.toUint8Array());
   }
 
   static deserialize(deserializer: Deserializer): MultiEd25519Signature {
     const bytes = deserializer.deserializeBytes();
     const bitmap = bytes.subarray(bytes.length - 4);
 
-    const sigs: Seq<Ed25519Signature> = [];
+    const sigs: Ed25519Signature[] = [];
 
     for (let i = 0; i < bytes.length - bitmap.length; i += Ed25519Signature.LENGTH) {
       const begin = i;
