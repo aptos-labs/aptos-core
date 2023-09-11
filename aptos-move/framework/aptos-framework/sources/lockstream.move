@@ -104,11 +104,34 @@ module aptos_framework::lockstream {
         sweep_event_handle: EventHandle<LockstreamSweepEvent>,
     }
 
+    struct LockstreamPoolMetadataView has copy, drop, store {
+        pool_id: LockstreamPoolID,
+        base_locked: u64,
+        quote_locked: u64,
+        n_lockers: u64,
+        initial_base_locked: u64,
+        initial_quote_locked: u64,
+        premier_locker: address,
+        premier_locker_initial_quote_locked: u64,
+        creation_time: u64,
+        stream_start_time: u64,
+        stream_end_time: u64,
+        claim_last_call_time: u64,
+        premier_sweep_last_call_time: u64,
+        current_period: u8,
+    }
+
     /// Minimum number of bytes required to encode the number of
     /// elements in a vector (for a vector with less than 128 elements).
     const MIN_BYTES_BCS_SEQUENCE_LENGTH: u64 = 1;
     /// Free number of bytes for a global storage write.
     const FREE_WRITE_BYTES_QUOTA: u64 = 1024;
+
+    const PERIOD_LOCKING: u8 = 1;
+    const PERIOD_STREAMING: u8 = 2;
+    const PERIOD_CLAIMING_GRACE_PERIOD: u8 = 3;
+    const PERIOD_PREMIER_SWEEP: u8 = 4;
+    const PERIOD_MERCENARY_SWEEP: u8 = 5;
 
     /// Time window bounds provided by creator are invalid.
     const E_TIME_WINDOWS_INVALID: u64 = 0;
@@ -215,13 +238,11 @@ module aptos_framework::lockstream {
         LockstreamPool
     {
         let (pool_id, pool_ref_mut) =
-            get_pool_id_and_mutable_reference<BaseType, QuoteType>(creator);
+            pool_id_and_mutable_reference<BaseType, QuoteType>(creator);
         assert!(quote_lock_amount > 0, E_NO_QUOTE_LOCK_AMOUNT);
         let lock_time = timestamp::now_seconds();
-        assert!(
-            lock_time < pool_ref_mut.stream_start_time,
-            E_TOO_LATE_TO_LOCK
-        );
+        let period = period(pool_ref_mut, lock_time);
+        assert!(period == PERIOD_LOCKING, E_TOO_LATE_TO_LOCK);
         coin::merge(
             &mut pool_ref_mut.quote_locked,
             coin::withdraw(locker, quote_lock_amount)
@@ -313,21 +334,16 @@ module aptos_framework::lockstream {
         LockstreamPool
     {
         let (pool_id, pool_ref_mut) =
-            get_pool_id_and_mutable_reference<BaseType, QuoteType>(creator);
+            pool_id_and_mutable_reference<BaseType, QuoteType>(creator);
+        let claim_time = timestamp::now_seconds();
+        let period = period(pool_ref_mut, claim_time);
+        assert!(!(period < PERIOD_STREAMING), E_TOO_EARLY_TO_CLAIM);
+        assert!(!(period > PERIOD_CLAIMING_GRACE_PERIOD), E_TOO_LATE_TO_CLAIM);
         let lockers_ref_mut = &mut pool_ref_mut.lockers;
         let locker_addr = signer::address_of(locker);
         assert!(
             table::contains(lockers_ref_mut, locker_addr),
             E_NOT_A_LOCKER
-        );
-        let claim_time = timestamp::now_seconds();
-        assert!(
-            claim_time > pool_ref_mut.stream_start_time,
-            E_TOO_EARLY_TO_CLAIM
-        );
-        assert!(
-            claim_time <= pool_ref_mut.claim_last_call_time,
-            E_TOO_LATE_TO_CLAIM
         );
         let locker_info_ref_mut =
             table::borrow_mut(lockers_ref_mut, locker_addr);
@@ -407,7 +423,7 @@ module aptos_framework::lockstream {
         LockstreamPool
     {
         let (pool_id, pool_ref_mut) =
-            get_pool_id_and_mutable_reference<BaseType, QuoteType>(creator);
+            pool_id_and_mutable_reference<BaseType, QuoteType>(creator);
         let lockers_ref_mut = &mut pool_ref_mut.lockers;
         let locker_addr = signer::address_of(locker);
         assert!(
@@ -415,17 +431,19 @@ module aptos_framework::lockstream {
             E_NOT_A_LOCKER
         );
         let sweep_time = timestamp::now_seconds();
+        let period = period(pool_ref_mut, sweep_time);
         if (locker_addr == pool_ref_mut.premier_locker) {
             assert!(
-                sweep_time > pool_ref_mut.claim_last_call_time,
+                !(period < PERIOD_PREMIER_SWEEP),
                 E_TOO_EARLY_FOR_PREMIER_SWEEP
             );
             assert!(
-                sweep_time <= pool_ref_mut.premier_sweep_last_call_time, E_TOO_LATE_FOR_PREMIER_SWEEP
+                !(period > PERIOD_MERCENARY_SWEEP),
+                E_TOO_LATE_FOR_PREMIER_SWEEP
             );
         } else {
             assert!(
-                sweep_time > pool_ref_mut.premier_sweep_last_call_time,
+                period == PERIOD_MERCENARY_SWEEP,
                 E_TOO_EARLY_FOR_MERCENARY_SWEEP
             );
         };
@@ -464,19 +482,37 @@ module aptos_framework::lockstream {
         );
     }
 
-    inline fun get_pool_id_and_mutable_reference<
+    #[view]
+    public fun metadata<
         BaseType,
         QuoteType
-    >(creator: address): (
-        LockstreamPoolID,
-        &mut LockstreamPool<BaseType, QuoteType>
-    ) acquires LockstreamPool {
-        let pool_id_option = pool_id<BaseType, QuoteType>(creator);
-        assert!(option::is_some(&pool_id_option), E_NO_LOCKSTREAM_POOL);
-        (
-            option::destroy_some(pool_id_option),
-            borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(creator)
-        )
+    >(creator: address):
+    Option<LockstreamPoolMetadataView>
+    acquires LockstreamPool {
+        if (exists<LockstreamPool<BaseType, QuoteType>>(creator)) {
+            let (pool_id, pool_ref) =
+                pool_id_and_immutable_reference<BaseType, QuoteType>(creator);
+            option::some(LockstreamPoolMetadataView{
+                pool_id,
+                base_locked: coin::value(&pool_ref.base_locked),
+                quote_locked: coin::value(&pool_ref.quote_locked),
+                n_lockers: big_vector::length(&pool_ref.locker_addresses),
+                initial_base_locked: pool_ref.initial_base_locked,
+                initial_quote_locked: pool_ref.initial_quote_locked,
+                premier_locker: pool_ref.premier_locker,
+                premier_locker_initial_quote_locked:
+                    pool_ref.premier_locker_initial_quote_locked,
+                creation_time: pool_ref.creation_time,
+                stream_start_time: pool_ref.stream_start_time,
+                stream_end_time: pool_ref.stream_end_time,
+                claim_last_call_time: pool_ref.stream_end_time,
+                premier_sweep_last_call_time:
+                    pool_ref.premier_sweep_last_call_time,
+                current_period: period(pool_ref, timestamp::now_seconds()),
+            })
+        } else {
+            option::none()
+        }
     }
 
     #[view]
@@ -492,6 +528,52 @@ module aptos_framework::lockstream {
                 quote_type: type_info::type_of<QuoteType>(),
             })
         } else option::none()
+    }
+
+    inline fun period<
+        BaseType,
+        QuoteType
+    >(
+        pool_ref: &LockstreamPool<BaseType, QuoteType>,
+        time_seconds: u64
+    ): u8 {
+        if (time_seconds < pool_ref.stream_start_time) PERIOD_LOCKING else
+        if (time_seconds <= pool_ref.stream_end_time) PERIOD_STREAMING else
+        if (time_seconds <= pool_ref.claim_last_call_time)
+            PERIOD_CLAIMING_GRACE_PERIOD else
+        if (time_seconds <= pool_ref.premier_sweep_last_call_time)
+            PERIOD_PREMIER_SWEEP else
+        PERIOD_MERCENARY_SWEEP
+    }
+
+    inline fun pool_id_and_immutable_reference<
+        BaseType,
+        QuoteType
+    >(creator: address): (
+        LockstreamPoolID,
+        &LockstreamPool<BaseType, QuoteType>
+    ) acquires LockstreamPool {
+        let pool_id_option = pool_id<BaseType, QuoteType>(creator);
+        assert!(option::is_some(&pool_id_option), E_NO_LOCKSTREAM_POOL);
+        (
+            option::destroy_some(pool_id_option),
+            borrow_global<LockstreamPool<BaseType, QuoteType>>(creator)
+        )
+    }
+
+    inline fun pool_id_and_mutable_reference<
+        BaseType,
+        QuoteType
+    >(creator: address): (
+        LockstreamPoolID,
+        &mut LockstreamPool<BaseType, QuoteType>
+    ) acquires LockstreamPool {
+        let pool_id_option = pool_id<BaseType, QuoteType>(creator);
+        assert!(option::is_some(&pool_id_option), E_NO_LOCKSTREAM_POOL);
+        (
+            option::destroy_some(pool_id_option),
+            borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(creator)
+        )
     }
 
 }

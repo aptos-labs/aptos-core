@@ -104,3 +104,13 @@ During pool creation, the creator transfers in the base asset locked amount and 
 | Stream end time              | When lockers can claim all quote and pro rata base       |
 | Claim last call time         | The last chance to claim                                 |
 | Premier sweep last call time | The last chance for the premier locker to sweep the pool |
+
+These result in the following periods:
+
+| Period                 | Period time bounds                                           |
+| ---------------------- | ------------------------------------------------------------ |
+| Locking period         | $t <$ Stream start time                                      |
+| Streaming period       | Stream start time $\leq t \leq$ Stream end time              |
+| Claiming grace period  | Stream end time $< t \leq$ Claim last call time              |
+| Premier sweep period   | Claim last call time $< t \leq$ Premier sweep last call time |
+| Mercenary sweep period | Premier sweep last call time $< t$                           |
