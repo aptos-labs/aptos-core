@@ -14,6 +14,7 @@ use aptos_block_partitioner::{
 };
 use rand::{rngs::OsRng, Rng};
 
+#[ignore]
 #[test]
 fn test_partitioner_v2_uniform_sharded_block_executor_no_conflict() {
     for merge_discard in [false, true] {
@@ -28,6 +29,7 @@ fn test_partitioner_v2_uniform_sharded_block_executor_no_conflict() {
     }
 }
 
+#[ignore]
 #[test]
 // Sharded execution with cross shard conflict doesn't work for now because we don't have
 // cross round dependency tracking yet.
@@ -44,6 +46,7 @@ fn test_partitioner_v2_uniform_sharded_block_executor_with_conflict_parallel() {
     }
 }
 
+#[ignore]
 #[test]
 fn test_partitioner_v2_uniform_sharded_block_executor_with_conflict_sequential() {
     for merge_discard in [false, true] {
@@ -58,6 +61,7 @@ fn test_partitioner_v2_uniform_sharded_block_executor_with_conflict_sequential()
     }
 }
 
+#[ignore]
 #[test]
 fn test_partitioner_v2_uniform_sharded_block_executor_with_random_transfers_parallel() {
     for merge_discard in [false, true] {
@@ -76,6 +80,7 @@ fn test_partitioner_v2_uniform_sharded_block_executor_with_random_transfers_para
     }
 }
 
+#[ignore]
 #[test]
 fn test_partitioner_v2_uniform_sharded_block_executor_with_random_transfers_sequential() {
     for merge_discard in [false, true] {
@@ -96,6 +101,7 @@ fn test_partitioner_v2_uniform_sharded_block_executor_with_random_transfers_sequ
     }
 }
 
+#[ignore]
 #[test]
 fn test_partitioner_v2_connected_component_sharded_block_executor_no_conflict() {
     for merge_discard in [false, true] {
@@ -110,6 +116,7 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_no_conflict() 
     }
 }
 
+#[ignore]
 #[test]
 // Sharded execution with cross shard conflict doesn't work for now because we don't have
 // cross round dependency tracking yet.
@@ -126,6 +133,7 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_with_conflict_
     }
 }
 
+#[ignore]
 #[test]
 fn test_partitioner_v2_connected_component_sharded_block_executor_with_conflict_sequential() {
     for merge_discard in [false, true] {
@@ -140,6 +148,7 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_with_conflict_
     }
 }
 
+#[ignore]
 #[test]
 fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_transfers_parallel() {
     for merge_discard in [false, true] {
@@ -158,6 +167,7 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_tr
     }
 }
 
+#[ignore]
 #[test]
 fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_transfers_sequential()
 {

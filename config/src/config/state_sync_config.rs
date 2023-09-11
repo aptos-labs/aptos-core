@@ -282,7 +282,7 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
-            latency_monitor_loop_interval_ms: 50, // 50 milliseconds
+            latency_monitor_loop_interval_ms: 100,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,

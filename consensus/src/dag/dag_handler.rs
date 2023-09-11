@@ -90,9 +90,9 @@ impl NetworkHandler {
                 .verify(&self.epoch_state.verifier)
                 .and_then(|_| self.node_receiver.process(node))
                 .map(|r| r.into()),
-            DAGMessage::CertifiedNodeMsg(node) => node
+            DAGMessage::CertifiedNodeMsg(certified_node_msg) => certified_node_msg
                 .verify(&self.epoch_state.verifier)
-                .and_then(|_| self.dag_driver.process(node))
+                .and_then(|_| self.dag_driver.process(certified_node_msg.certified_node()))
                 .map(|r| r.into()),
             DAGMessage::FetchRequest(request) => request
                 .verify(&self.epoch_state.verifier)

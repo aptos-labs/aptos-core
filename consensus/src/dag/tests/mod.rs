@@ -3,6 +3,7 @@
 
 mod dag_driver_tests;
 mod dag_network_test;
+mod dag_state_sync_tests;
 mod dag_test;
 mod fetcher_test;
 mod helpers;

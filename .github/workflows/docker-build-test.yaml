@@ -349,11 +349,11 @@ jobs:
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      FORGE_TEST_SUITE: consensus_only_perf_benchmark
+      FORGE_TEST_SUITE: consensus_only_realistic_env_max_tps
       IMAGE_TAG: consensus_only_perf_test_${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_RUNNER_DURATION_SECS: 300
-      COMMENT_HEADER: forge-consensus-only-perf-test
-      FORGE_NAMESPACE: forge-consensus-only-perf-test-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
+      COMMENT_HEADER: consensus-only-realistic-env-max-tps
+      FORGE_NAMESPACE: forge-consensus-only-realistic-env-max-tps-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
 
   # Run forge multiregion test. This test uses the multiregion forge cluster that deploys pods in three GCP regions.
   forge-multiregion-test:
