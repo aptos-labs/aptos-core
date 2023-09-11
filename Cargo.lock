@@ -3976,6 +3976,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-writeset-generator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-cached-packages",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-framework",
+ "aptos-gas-schedule",
+ "aptos-state-view",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-vm-types",
+ "bcs 0.1.4",
+ "handlebars",
+ "move-command-line-common",
+ "move-compiler",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-types",
+ "serde",
+ "tempfile",
+]
+
+[[package]]
 name = "arbitrary"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
