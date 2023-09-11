@@ -85,8 +85,8 @@ impl ProtocolId {
             PeerMonitoringServiceRpc => "PeerMonitoringServiceRpc",
             ConsensusRpcCompressed => "ConsensusRpcCompressed",
             ConsensusDirectSendCompressed => "ConsensusDirectSendCompressed",
-            NetbenchDirectSend => "BenchmarkDirectSend",
-            NetbenchRpc => "BenchmarkRpc",
+            NetbenchDirectSend => "NetbenchDirectSend",
+            NetbenchRpc => "NetbenchRpc",
         }
     }
 
