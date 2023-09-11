@@ -609,22 +609,23 @@ impl Interpreter {
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let resource =
-            match Self::load_resource(loader, data_store, gas_meter, addr, ty)?.move_from() {
-                Ok(resource) => {
-                    gas_meter.charge_move_from(
-                        is_generic,
-                        TypeWithLoader { ty, loader },
-                        Some(&resource),
-                    )?;
-                    resource
-                },
-                Err(err) => {
-                    let val: Option<&Value> = None;
-                    gas_meter.charge_move_from(is_generic, TypeWithLoader { ty, loader }, val)?;
-                    return Err(err.with_message(format!("Failed to move resource from {:?}", addr)));
-                },
-            };
+        let resource = match Self::load_resource(loader, data_store, gas_meter, addr, ty)?
+            .move_from()
+        {
+            Ok(resource) => {
+                gas_meter.charge_move_from(
+                    is_generic,
+                    TypeWithLoader { ty, loader },
+                    Some(&resource),
+                )?;
+                resource
+            },
+            Err(err) => {
+                let val: Option<&Value> = None;
+                gas_meter.charge_move_from(is_generic, TypeWithLoader { ty, loader }, val)?;
+                return Err(err.with_message(format!("Failed to move resource from {:?}", addr)));
+            },
+        };
         self.operand_stack.push(resource)?;
         Ok(())
     }
