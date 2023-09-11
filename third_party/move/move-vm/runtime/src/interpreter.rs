@@ -576,7 +576,9 @@ impl Interpreter {
             TypeWithLoader { ty, loader },
             res.is_ok(),
         )?;
-        self.operand_stack.push(res?)?;
+        self.operand_stack.push(res.map_err(|err| {
+            err.with_message(format!("Failed to borrow global resource from {:?}", addr))
+        })?)?;
         Ok(())
     }
 
@@ -620,7 +622,7 @@ impl Interpreter {
                 Err(err) => {
                     let val: Option<&Value> = None;
                     gas_meter.charge_move_from(is_generic, TypeWithLoader { ty, loader }, val)?;
-                    return Err(err);
+                    return Err(err.with_message(format!("Failed to move resource from {:?}", addr)));
                 },
             };
         self.operand_stack.push(resource)?;
@@ -658,7 +660,7 @@ impl Interpreter {
                     &resource,
                     false,
                 )?;
-                Err(err)
+                Err(err.with_message(format!("Failed to move resource into {:?}", addr)))
             },
         }
     }
