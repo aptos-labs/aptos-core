@@ -566,7 +566,10 @@ where
 
     fn convert_to_value(
         &self,
-        _view: &impl TStateView<Key = K>,
+        _view: &(impl TResourceView<Key = K, Layout = MoveTypeLayout>
+              + TModuleView<Key = K>
+              + StateStorageView
+              + TAggregatorView<Identifier = K>),
         _key: &K,
         _maybe_blob: Option<Vec<u8>>,
         _creation: bool,

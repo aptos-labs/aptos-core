@@ -8,8 +8,7 @@ use aptos_types::state_store::{
     state_storage_usage::StateStorageUsage,
     state_value::{StateValue, StateValueMetadata},
 };
-use move_core_types::value::MoveTypeLayout;
-use move_core_types::language_storage::StructTag;
+use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 
 /// Allows to query resources from the state storage.
 pub trait TResourceView {
@@ -82,7 +81,6 @@ pub trait ExecutorView:
     + TModuleView<Key = StateKey>
     + TAggregatorView<Identifier = AggregatorID>
     + StateStorageView
-    + ResourceGroupResolver
 {
 }
 
@@ -90,8 +88,7 @@ impl<
         T: TResourceView<Key = StateKey, Layout = MoveTypeLayout>
             + TModuleView<Key = StateKey>
             + TAggregatorView<Identifier = AggregatorID>
-            + StateStorageView
-            + ResourceGroupResolver,
+            + StateStorageView,
     > ExecutorView for T
 {
 }
@@ -102,12 +99,12 @@ pub type StateValueMetadataKind = Option<StateValueMetadata>;
 
 /// Allows to query storage metadata in the VM session. Needed for storage refunds.
 pub trait StateValueMetadataResolver {
-    /// Returns metadata for a given state value:
-    ///   - None             if state value does not exist,
-    ///   - Some(None)       if state value has no metadata,
-    ///   - Some(Some(..))   otherwise.
-    // TODO: Nested options are ugly, refactor.
-    fn get_state_value_metadata(
+    fn get_module_state_value_metadata(
+        &self,
+        state_key: &StateKey,
+    ) -> anyhow::Result<Option<StateValueMetadataKind>>;
+
+    fn get_resource_state_value_metadata(
         &self,
         state_key: &StateKey,
     ) -> anyhow::Result<Option<StateValueMetadataKind>>;

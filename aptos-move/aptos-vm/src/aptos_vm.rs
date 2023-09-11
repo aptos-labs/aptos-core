@@ -9,7 +9,7 @@ use crate::{
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     counters::*,
-    data_cache::StorageAdapter,
+    data_cache::{AsMoveResolver, StorageAdapter},
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, RespawnedSession, SessionExt, SessionId},
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
@@ -123,12 +123,13 @@ impl AptosVM {
     }
 
     pub fn new_from_executor_view(executor_view: &impl ExecutorView) -> Self {
-        Self(AptosVMImpl::new(&StorageAdapter::borrow(executor_view)))
+        Self(AptosVMImpl::new(&StorageAdapter::from_borrowed(
+            executor_view,
+        )))
     }
 
     pub fn new_from_state_view(state_view: &impl StateView) -> Self {
-        let executor_view = state_view.as_executor_view();
-        Self(AptosVMImpl::new(&StorageAdapter::new(executor_view)))
+        Self(AptosVMImpl::new(&state_view.as_move_resolver()))
     }
 
     pub fn new_for_validation(state_view: &impl StateView) -> Self {
@@ -263,7 +264,7 @@ impl AptosVM {
         &self,
         executor_view: &'r R,
     ) -> StorageAdapter<'r, R> {
-        StorageAdapter::borrow_with_cached_config(
+        StorageAdapter::from_borrowed_with_cached_config(
             executor_view,
             self.0.get_gas_feature_version(),
             self.0.get_features(),
@@ -1408,7 +1409,7 @@ impl AptosVM {
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(executor_view.id(), 0);
 
-        let resolver = StorageAdapter::borrow_with_cached_config(
+        let resolver = StorageAdapter::from_borrowed_with_cached_config(
             executor_view,
             simulation_vm.0 .0.get_gas_feature_version(),
             simulation_vm.0 .0.get_features(),

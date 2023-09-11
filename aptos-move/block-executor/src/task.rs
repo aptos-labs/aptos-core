@@ -76,7 +76,10 @@ pub trait ExecutorTask: Sync {
     /// Trait that allows converting blobs to proper values.
     fn convert_to_value(
         &self,
-        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        view: &(impl TResourceView<Key = <Self::Txn as Transaction>::Key, Layout = MoveTypeLayout>
+              + TModuleView<Key = <Self::Txn as Transaction>::Key>
+              + TAggregatorView<Identifier = <Self::Txn as Transaction>::Identifier>
+              + StateStorageView),
         key: &<Self::Txn as Transaction>::Key,
         maybe_blob: Option<Vec<u8>>,
         creation: bool,

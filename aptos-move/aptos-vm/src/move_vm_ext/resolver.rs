@@ -3,9 +3,10 @@
 
 use aptos_aggregator::resolver::AggregatorResolver;
 use aptos_table_natives::TableResolver;
-
 use aptos_types::{on_chain_config::ConfigStorage, state_store::state_key::StateKey};
-use aptos_vm_types::resolver::{ResourceGroupResolver, StateValueMetadataResolver};
+use aptos_vm_types::resolver::{
+    ExecutorView, ResourceGroupResolver, StateStorageView, StateValueMetadataResolver,
+};
 use move_core_types::{language_storage::StructTag, resolver::MoveResolver};
 use std::collections::{BTreeMap, HashMap};
 
@@ -18,7 +19,8 @@ pub trait AptosMoveResolver:
     + TableResolver
     + StateValueMetadataResolver
     + StateStorageView
-    + AsExecutorView    
+    + ResourceGroupResolver
+    + AsExecutorView
 {
     fn release_resource_group_cache(&self) -> HashMap<StateKey, BTreeMap<StructTag, Vec<u8>>>;
 }

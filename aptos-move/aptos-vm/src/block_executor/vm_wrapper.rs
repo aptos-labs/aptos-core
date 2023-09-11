@@ -6,8 +6,9 @@ use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
-    storage_adapter::AsExecutorView,
+    data_cache::StorageAdapter,
     move_vm_ext::write_op_converter::WriteOpConverter,
+    storage_adapter::AsExecutorView,
 };
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
@@ -120,9 +121,10 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         maybe_blob: Option<Vec<u8>>,
         creation: bool,
     ) -> anyhow::Result<WriteOp> {
-        let storage_adapter = self.vm.as_move_resolver(executor_view);
+        // TODO(george): this is a problem for performance because configs are re-fetched all the time!
+        let resolver = StorageAdapter::from_borrowed(executor_view);
         let wop_converter =
-            WriteOpConverter::new(&storage_adapter, self.vm.is_storage_slot_metadata_enabled());
+            WriteOpConverter::new(&resolver, self.vm.is_storage_slot_metadata_enabled());
 
         let move_op = match maybe_blob {
             Some(blob) => {
@@ -135,8 +137,9 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             None => MoveStorageOp::Delete,
         };
 
+        // TODO(george): can we assume it is not a module? Make sure to check that.
         wop_converter
-            .convert(key, move_op, false)
+            .convert_resource(key, move_op, false)
             .map_err(|_| anyhow::Error::msg("Error on converting to WriteOp"))
     }
 }

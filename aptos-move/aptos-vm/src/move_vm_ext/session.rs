@@ -7,7 +7,6 @@ use crate::{
     move_vm_ext::{write_op_converter::WriteOpConverter, AptosMoveResolver},
     transaction_metadata::TransactionMetadata,
 };
-use aptos_aggregator::aggregator_extension::AggregatorID;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
@@ -20,9 +19,7 @@ use aptos_types::{
     block_metadata::BlockMetadata, contract_event::ContractEvent, on_chain_config::Features,
     state_store::state_key::StateKey, transaction::SignatureCheckedTransaction,
 };
-use aptos_vm_types::{
-    change_set::VMChangeSet, resolver::StateValueMetadataKind, storage::ChangeSetConfigs,
-};
+use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -345,7 +342,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         for (id, change) in aggregator_change_set.changes {
             match change {
                 AggregatorChange::Write(value) => {
-                    let write_op = woc.convert_aggregator_mod(&id, value)?;
+                    let write_op = woc.convert_aggregator_modification(&id, value)?;
                     aggregator_write_set.insert(id, write_op);
                 },
                 AggregatorChange::Merge(delta_op) => {
