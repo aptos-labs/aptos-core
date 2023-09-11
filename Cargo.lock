@@ -3645,7 +3645,6 @@ dependencies = [
  "rand_core 0.5.1",
  "secp256k1",
  "serde 1.0.149",
- "thiserror",
  "tiny-keccak 1.5.0",
 ]
 

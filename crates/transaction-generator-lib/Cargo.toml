@@ -21,8 +21,8 @@ aptos-sdk = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
-ethereum-types = { version = "0.14.1" }
 ethereum-tx-sign = { version = "6.1.2" }
+ethereum-types = { version = "0.14.1" }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 once_cell = { workspace = true }
@@ -31,4 +31,3 @@ rand_core = { workspace = true }
 secp256k1 = { version = "0.27.0", features = ["rand"] }
 serde = { workspace = true }
 tiny-keccak = { version = "1.4" }
-thiserror = "1.0.48"

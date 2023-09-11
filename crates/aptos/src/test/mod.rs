@@ -72,7 +72,6 @@ use std::{
     time::Duration,
 };
 use tempfile::TempDir;
-use thiserror::__private::PathAsDisplay;
 #[cfg(feature = "cli-framework-test-move")]
 use thiserror::__private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
@@ -973,7 +972,7 @@ impl CliTestFramework {
         let source_path = temp_dir.path().join("script.move");
         write_to_file(
             source_path.as_path(),
-            &source_path.as_display().to_string(),
+            &source_path.display().to_string(),
             script_contents.as_bytes(),
         )
         .unwrap();

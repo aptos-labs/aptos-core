@@ -1,29 +1,23 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::{TransactionGenerator, TransactionGeneratorCreator};
+use crate::{
+    p2p_transaction_generator::{BasicSampler, BurnAndRecycleSampler, Sampler, SamplingMode},
+    TransactionGenerator, TransactionGeneratorCreator,
+};
 use aptos_infallible::RwLock;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use rand::{
-    prelude::SliceRandom,
-    rngs::StdRng,
-    SeedableRng,
-};
+use aptos_types::transaction::{EntryFunction, TransactionPayload};
+use ethereum_tx_sign::{LegacyTransaction, Transaction};
+use ethereum_types::H160;
+use move_core_types::{ident_str, language_storage::ModuleId};
+use rand::{prelude::SliceRandom, rngs::StdRng, SeedableRng};
 use secp256k1::{PublicKey, SecretKey};
 use std::sync::Arc;
-use aptos_types::transaction::{EntryFunction, TransactionPayload};
-
-use ethereum_types::H160;
-use ethereum_tx_sign::{LegacyTransaction, Transaction};
 use tiny_keccak::keccak256;
-use crate::p2p_transaction_generator::{Sampler, SamplingMode, BasicSampler, BurnAndRecycleSampler};
-use move_core_types::{
-    ident_str,
-    language_storage::ModuleId,
-};
 
 pub type EthereumAddress = H160;
 
@@ -53,13 +47,17 @@ impl EthereumWallet {
         EthereumWallet {
             secret_key: *secret_key,
             public_key: *public_key,
-            public_address
+            public_address,
         }
     }
 }
 
 /// Transfers `amount` of coins `CoinType` from `from` to `to`.
-pub fn ethereum_coin_transfer(from: &EthereumWallet, to: &EthereumWallet, amount: u128) -> TransactionPayload {
+pub fn ethereum_coin_transfer(
+    from: &EthereumWallet,
+    to: &EthereumWallet,
+    amount: u128,
+) -> TransactionPayload {
     let eth_txn = LegacyTransaction {
         chain: 1,
         nonce: 0,
@@ -111,7 +109,7 @@ impl EthereumP2PTransactionGenerator {
             txn_factory,
             _aptos_addresses: aptos_addresses,
             sampler,
-            ethereum_wallets
+            ethereum_wallets,
         }
     }
 
@@ -124,8 +122,7 @@ impl EthereumP2PTransactionGenerator {
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction {
         aptos_signer.sign_with_transaction_builder(
-            txn_factory.payload(ethereum_coin_transfer(from, to, num_coins))
-            // txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins)),
+            txn_factory.payload(ethereum_coin_transfer(from, to, num_coins)), // txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins)),
         )
     }
 }
@@ -141,19 +138,33 @@ impl TransactionGenerator for EthereumP2PTransactionGenerator {
         // [0... num_to_create) are senders    [num_to_create,..., 2*num_to_create) are receivers
         let sampled_wallets: Vec<EthereumWallet> = {
             let mut ethereum_wallets = self.ethereum_wallets.write();
-            self.sampler.sample_from_pool(&mut self.rng, ethereum_wallets.as_mut(), 2*num_to_create)
+            self.sampler.sample_from_pool(
+                &mut self.rng,
+                ethereum_wallets.as_mut(),
+                2 * num_to_create,
+            )
         };
 
         assert!(
-            sampled_wallets.len() >= 2*num_to_create,
+            sampled_wallets.len() >= 2 * num_to_create,
             "failed: {} >= {}",
             sampled_wallets.len(),
-            2*num_to_create
+            2 * num_to_create
         );
         for i in 0..num_to_create {
-            let sender = sampled_wallets.get(i).expect("ethereum_wallets can't be empty");
-            let receiver = sampled_wallets.get(i+num_to_create).expect("ethereum_wallets can't be empty");
-            let request = self.gen_single_txn(account, sender, receiver, self.send_amount, &self.txn_factory);
+            let sender = sampled_wallets
+                .get(i)
+                .expect("ethereum_wallets can't be empty");
+            let receiver = sampled_wallets
+                .get(i + num_to_create)
+                .expect("ethereum_wallets can't be empty");
+            let request = self.gen_single_txn(
+                account,
+                sender,
+                receiver,
+                self.send_amount,
+                &self.txn_factory,
+            );
             requests.push(request);
         }
         requests
@@ -201,7 +212,7 @@ impl TransactionGeneratorCreator for EthereumP2PTransactionGeneratorCreator {
                     let (secret_key, public_key) = generate_keypair();
                     EthereumWallet::new(&secret_key, &public_key)
                 })
-                .collect()
+                .collect(),
         ));
         Box::new(EthereumP2PTransactionGenerator::new(
             rng,
@@ -209,7 +220,7 @@ impl TransactionGeneratorCreator for EthereumP2PTransactionGeneratorCreator {
             self.txn_factory.clone(),
             self.aptos_addresses.clone(),
             sampler,
-            ethereum_wallets
+            ethereum_wallets,
         ))
     }
 }
