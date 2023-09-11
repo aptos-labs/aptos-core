@@ -9,7 +9,10 @@ use crate::{
 use move_binary_format::{
     access::ModuleAccess,
     errors::{PartialVMError, PartialVMResult},
-    file_format::{AbilitySet, Bytecode, CompiledModule, FunctionDefinitionIndex, Visibility},
+    file_format::{
+        AbilitySet, Bytecode, CompiledModule, FunctionDefinition, FunctionDefinitionIndex,
+        Signature, VirtualFunctionInstantiation, Visibility,
+    },
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_types::loaded_data::runtime_types::Type;
@@ -228,10 +231,18 @@ pub(crate) struct FunctionInstantiation {
     // index to `ModuleCache::functions` global table
     pub(crate) handle: FunctionHandle,
     pub(crate) instantiation: Vec<Type>,
+    pub(crate) vtable_instantiation: Vec<VirtualFunctionInstantiation>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) enum FunctionHandle {
     Local(Arc<Function>),
     Remote { module: ModuleId, name: Identifier },
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct InstantiatedFunction {
+    pub(crate) func: Arc<Function>,
+    pub(crate) ty_args: Vec<Type>,
+    pub(crate) vtable: Vec<InstantiatedFunction>,
 }

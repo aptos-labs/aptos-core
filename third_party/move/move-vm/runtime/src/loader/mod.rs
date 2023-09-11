@@ -15,6 +15,7 @@ use move_binary_format::{
         FieldHandleIndex, FieldInstantiationIndex, FunctionDefinitionIndex, FunctionHandleIndex,
         FunctionInstantiationIndex, Signature, SignatureIndex, StructDefInstantiationIndex,
         StructDefinitionIndex, StructFieldInformation, TableIndex, TypeParameterIndex,
+        VirtualFunctionInstantiation,
     },
     IndexKind,
 };
@@ -38,7 +39,9 @@ mod function;
 mod modules;
 mod type_loader;
 
-pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
+pub(crate) use function::{
+    Function, FunctionHandle, FunctionInstantiation, InstantiatedFunction, LoadedFunction, Scope,
+};
 pub(crate) use modules::{Module, ModuleCache};
 use type_loader::intern_type;
 
@@ -1268,6 +1271,41 @@ impl<'a> Resolver<'a> {
         Ok(instantiation)
     }
 
+    pub(crate) fn instantiate_virtual_function(
+        &self,
+        idx: FunctionInstantiationIndex,
+        type_params: &[Type],
+        vtable: &[InstantiatedFunction],
+    ) -> PartialVMResult<Vec<InstantiatedFunction>> {
+        let func_inst = match &self.binary {
+            BinaryType::Module(module) => module.function_instantiation_at(idx.0),
+            BinaryType::Script(script) => script.function_instantiation_at(idx.0),
+        };
+
+        // TODO: Add proper counting logic here
+        let mut instantiation = vec![];
+        for inst in &func_inst.vtable_instantiation {
+            instantiation.push(match inst {
+                VirtualFunctionInstantiation::Defined(idx) => InstantiatedFunction {
+                    func: self.function_from_handle(*idx)?,
+                    ty_args: vec![],
+                    vtable: vec![],
+                },
+                VirtualFunctionInstantiation::Inherited(_, idx) => vtable[*idx as usize].clone(),
+                VirtualFunctionInstantiation::Instantiated(idx) => {
+                    let ty_args = self.instantiate_generic_function(*idx, type_params)?;
+                    let vtable = self.instantiate_virtual_function(*idx, &ty_args, vtable)?;
+                    InstantiatedFunction {
+                        func: self.loader.function_at(&func_inst.handle)?,
+                        ty_args,
+                        vtable,
+                    }
+                },
+            })
+        }
+        Ok(instantiation)
+    }
+
     #[allow(unused)]
     pub(crate) fn type_params_count(&self, idx: FunctionInstantiationIndex) -> usize {
         let func_inst = match &self.binary {
@@ -1591,6 +1629,7 @@ impl Script {
             function_instantiations.push(FunctionInstantiation {
                 handle,
                 instantiation,
+                vtable_instantiation: func_inst.vtable_instantiation.clone(),
             });
         }
 

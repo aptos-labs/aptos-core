@@ -404,6 +404,7 @@ impl Module {
                 function_instantiations.push(FunctionInstantiation {
                     handle,
                     instantiation: signature_table[func_inst.type_parameters.0 as usize].clone(),
+                    vtable_instantiation: func_inst.vtable_instantiation.clone(),
                 });
             }
 

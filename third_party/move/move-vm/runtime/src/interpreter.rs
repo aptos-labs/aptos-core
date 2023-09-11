@@ -4,7 +4,7 @@
 
 use crate::{
     data_cache::TransactionDataCache,
-    loader::{Function, Loader, Resolver},
+    loader::{Function, InstantiatedFunction, Loader, Resolver},
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
     trace,
@@ -12,7 +12,9 @@ use crate::{
 use fail::fail_point;
 use move_binary_format::{
     errors::*,
-    file_format::{Ability, AbilitySet, Bytecode, FunctionHandleIndex, FunctionInstantiationIndex, VTableIndex},
+    file_format::{
+        Ability, AbilitySet, Bytecode, FunctionHandleIndex, FunctionInstantiationIndex, VTableIndex,
+    },
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -220,6 +222,13 @@ impl Interpreter {
                     let ty_args = resolver
                         .instantiate_generic_function(idx, current_frame.ty_args())
                         .map_err(|e| set_err_info!(current_frame, e))?;
+                    let vtable = resolver
+                        .instantiate_virtual_function(
+                            idx,
+                            current_frame.ty_args(),
+                            &current_frame.vtables,
+                        )
+                        .map_err(|e| set_err_info!(current_frame, e))?;
                     let func = resolver
                         .function_from_instantiation(idx)
                         .map_err(|e| self.set_location(e))?;
@@ -255,9 +264,8 @@ impl Interpreter {
                         current_frame.pc += 1; // advance past the Call instruction in the caller
                         continue;
                     }
-                    let vtable = resolver.function_from_instantiation(idx)
                     let frame = self
-                        .make_call_frame(loader, func, ty_args)
+                        .make_call_frame(loader, func, ty_args, vtable)
                         .map_err(|e| self.set_location(e))
                         .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
                     self.call_stack.push(current_frame).map_err(|frame| {
@@ -267,7 +275,55 @@ impl Interpreter {
                     })?;
                     current_frame = frame;
                 },
-                ExitCode::CallVirtual(_) => unimplemented!(),
+                ExitCode::CallVirtual(v_idx) => {
+                    let v_func = current_frame.vtables[v_idx as usize].clone();
+                    // TODO(Gas): We should charge gas as we do type substitution...
+                    let ty_args = v_func.ty_args;
+                    let vtable = v_func.vtable;
+                    let func = v_func.func;
+
+                    if self.paranoid_type_checks {
+                        self.check_friend_or_private_call(&current_frame.function, &func)?;
+                    }
+
+                    // Charge gas
+                    let module_id = func
+                        .module_id()
+                        .ok_or_else(|| {
+                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                                .with_message("Failed to get native function module id".to_string())
+                        })
+                        .map_err(|e| set_err_info!(current_frame, e))?;
+                    gas_meter
+                        .charge_call_generic(
+                            module_id,
+                            func.name(),
+                            ty_args.iter().map(|ty| TypeWithLoader { ty, loader }),
+                            self.operand_stack
+                                .last_n(func.arg_count())
+                                .map_err(|e| set_err_info!(current_frame, e))?,
+                            (func.local_count() as u64).into(),
+                        )
+                        .map_err(|e| set_err_info!(current_frame, e))?;
+
+                    if func.is_native() {
+                        self.call_native(
+                            &resolver, data_store, gas_meter, extensions, func, ty_args,
+                        )?;
+                        current_frame.pc += 1; // advance past the Call instruction in the caller
+                        continue;
+                    }
+                    let frame = self
+                        .make_call_frame(loader, func, ty_args, vtable)
+                        .map_err(|e| self.set_location(e))
+                        .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
+                    self.call_stack.push(current_frame).map_err(|frame| {
+                        let err = PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW);
+                        let err = set_err_info!(frame, err);
+                        self.maybe_core_dump(err, &frame)
+                    })?;
+                    current_frame = frame;
+                },
             }
         }
     }
@@ -282,7 +338,7 @@ impl Interpreter {
         loader: &Loader,
         func: Arc<Function>,
         ty_args: Vec<Type>,
-        vtable: Vec<(Arc<Function>,Vec<Type>)>,
+        vtable: Vec<InstantiatedFunction>,
     ) -> PartialVMResult<Frame> {
         let mut locals = Locals::new(func.local_count());
         let arg_count = func.arg_count();
@@ -321,7 +377,7 @@ impl Interpreter {
         function: Arc<Function>,
         ty_args: Vec<Type>,
         locals: Locals,
-        vtables: Vec<(Arc<Function>,Vec<Type>)>,
+        vtables: Vec<InstantiatedFunction>,
     ) -> PartialVMResult<Frame> {
         let local_tys = if self.paranoid_type_checks {
             if ty_args.is_empty() {
@@ -343,7 +399,7 @@ impl Interpreter {
             function,
             ty_args,
             local_tys,
-            vtables
+            vtables,
         })
     }
 
@@ -1098,7 +1154,7 @@ struct Frame {
     function: Arc<Function>,
     ty_args: Vec<Type>,
     local_tys: Vec<Type>,
-    vtables: Vec<(Arc<Function>,Vec<Type>)>,
+    vtables: Vec<InstantiatedFunction>,
 }
 
 /// An `ExitCode` from `execute_code_unit`.
