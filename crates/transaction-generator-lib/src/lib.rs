@@ -28,18 +28,18 @@ pub mod args;
 mod batch_transfer;
 mod call_custom_modules;
 mod entry_points;
-mod p2p_transaction_generator;
 mod ethereum_p2p_transaction_generator;
+mod p2p_transaction_generator;
 pub mod publish_modules;
 mod publishing;
 mod transaction_mix_generator;
 use self::{
     account_generator::AccountGeneratorCreator,
     call_custom_modules::CustomModulesDelegationGeneratorCreator,
-    p2p_transaction_generator::P2PTransactionGeneratorCreator,
     ethereum_p2p_transaction_generator::EthereumP2PTransactionGeneratorCreator,
+    p2p_transaction_generator::P2PTransactionGeneratorCreator,
     publish_modules::PublishPackageCreator,
-    transaction_mix_generator::PhasedTxnMixGeneratorCreator
+    transaction_mix_generator::PhasedTxnMixGeneratorCreator,
 };
 use crate::{
     accounts_pool_wrapper::AccountsPoolWrapperCreator,
@@ -251,7 +251,7 @@ pub async fn create_txn_generator_creator(
                 ),
                 TransactionType::EthereumCoinTransfer {
                     num_ethereum_accounts,
-                    sender_use_account_pool
+                    sender_use_account_pool,
                 } => wrap_accounts_pool(
                     Box::new(EthereumP2PTransactionGeneratorCreator::new(
                         txn_factory.clone(),
