@@ -1741,7 +1741,14 @@ objects may have cyclic dependencies.
     <b>let</b> current_address = <a href="object.md#0x1_object">object</a>.owner;
 
     <b>let</b> count = 0;
-    <b>while</b> (owner != current_address) {
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>;
+            <b>invariant</b> <b>forall</b> i in 0..count:
+                <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address) && <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address).allow_ungated_transfer;
+        };
+        owner != current_address
+    }) {
         <b>let</b> count = count + 1;
         <b>assert</b>!(count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="object.md#0x1_object_EMAXIMUM_NESTING">EMAXIMUM_NESTING</a>));
 
@@ -1881,7 +1888,14 @@ Return true if the provided address has indirect or direct ownership of the prov
     <b>let</b> current_address = <a href="object.md#0x1_object">object</a>.owner;
 
     <b>let</b> count = 0;
-    <b>while</b> (owner != current_address) {
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>;
+            <b>invariant</b> <b>forall</b> i in 0..count:
+                owner != current_address && <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address);
+        };
+        owner != current_address
+    }) {
         <b>let</b> count = count + 1;
         <b>assert</b>!(count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="object.md#0x1_object_EMAXIMUM_NESTING">EMAXIMUM_NESTING</a>));
         <b>if</b> (!<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address)) {
@@ -1906,6 +1920,19 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>pragma</b> aborts_if_is_strict;
+<b>apply</b> <a href="object.md#0x1_object_AddressNoChange">AddressNoChange</a> <b>to</b> * <b>except</b> delete;
+</code></pre>
+
+
+
+
+<a name="0x1_object_AddressNoChange"></a>
+
+
+<pre><code><b>schema</b> <a href="object.md#0x1_object_AddressNoChange">AddressNoChange</a> {
+    <b>ensures</b> <b>forall</b> addr: <b>address</b> <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(addr)):
+        <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(addr);
+}
 </code></pre>
 
 
@@ -1915,6 +1942,33 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>fun</b> <a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool;
+</code></pre>
+
+
+
+
+<a name="0x1_object_spec_create_object_address"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_object_address">spec_create_object_address</a>(source: <b>address</b>, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>;
+</code></pre>
+
+
+
+
+<a name="0x1_object_spec_create_user_derived_object_address"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_user_derived_object_address">spec_create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>;
+</code></pre>
+
+
+
+
+<a name="0x1_object_spec_create_guid_object_address"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_guid_object_address">spec_create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b>;
 </code></pre>
 
 
@@ -1932,6 +1986,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
 <b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>);
+<b>ensures</b> result == <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; { inner: <a href="object.md#0x1_object">object</a> };
 </code></pre>
 
 
@@ -2022,6 +2077,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="object.md#0x1_object">object</a>.inner;
 </code></pre>
 
 
@@ -2039,6 +2095,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
 <b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;Y&gt;(<a href="object.md#0x1_object">object</a>.inner);
+<b>ensures</b> result == <a href="object.md#0x1_object_Object">Object</a>&lt;Y&gt; { inner: <a href="object.md#0x1_object">object</a>.inner };
 </code></pre>
 
 
@@ -2057,6 +2114,22 @@ Return true if the provided address has indirect or direct ownership of the prov
 <pre><code><b>let</b> creator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator);
 <b>let</b> obj_addr = <a href="object.md#0x1_object_spec_create_object_address">spec_create_object_address</a>(creator_address, seed);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
+<b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+        owner: creator_address,
+        allow_ungated_transfer: <b>true</b>,
+        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+            counter: 0,
+            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                    addr: obj_addr,
+                }
+            }
+        }
+};
+<b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: obj_addr, can_delete: <b>false</b> };
 </code></pre>
 
 
@@ -2074,6 +2147,22 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 <pre><code><b>let</b> obj_addr = <a href="object.md#0x1_object_spec_create_user_derived_object_address">spec_create_user_derived_object_address</a>(creator_address, derive_ref.self);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
+<b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+        owner: creator_address,
+        allow_ungated_transfer: <b>true</b>,
+        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+            counter: 0,
+            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                    addr: obj_addr,
+                }
+            }
+        }
+};
+<b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: obj_addr, can_delete: <b>false</b> };
 </code></pre>
 
 
@@ -2090,8 +2179,25 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> unique_address = <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">transaction_context::spec_generate_unique_address</a>();
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_APTOS_UNIQUE_IDENTIFIERS">features::APTOS_UNIQUE_IDENTIFIERS</a>);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">transaction_context::spec_generate_unique_address</a>());
+<b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(unique_address);
+<b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(unique_address);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(unique_address) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+        owner: owner_address,
+        allow_ungated_transfer: <b>true</b>,
+        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+            counter: 0,
+            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                    addr: unique_address,
+                }
+            }
+        }
+};
+<b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: unique_address, can_delete: <b>true</b> };
 </code></pre>
 
 
@@ -2108,8 +2214,25 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> unique_address = <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">transaction_context::spec_generate_unique_address</a>();
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_APTOS_UNIQUE_IDENTIFIERS">features::APTOS_UNIQUE_IDENTIFIERS</a>);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">transaction_context::spec_generate_unique_address</a>());
+<b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(unique_address);
+<b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(unique_address);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(unique_address) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+        owner: owner_address,
+        allow_ungated_transfer: <b>true</b>,
+        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+            counter: 0,
+            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                    addr: unique_address,
+                }
+            }
+        }
+};
+<b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: unique_address, can_delete: <b>false</b> };
 </code></pre>
 
 
@@ -2139,11 +2262,28 @@ Return true if the provided address has indirect or direct ownership of the prov
     }
 };
 <b>let</b> bytes_spec = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(<a href="guid.md#0x1_guid">guid</a>);
-<b>let</b> bytes = concat(bytes_spec,vec&lt;u8&gt;(<a href="object.md#0x1_object_OBJECT_FROM_GUID_ADDRESS_SCHEME">OBJECT_FROM_GUID_ADDRESS_SCHEME</a>));
+<b>let</b> bytes = concat(bytes_spec, vec&lt;u8&gt;(<a href="object.md#0x1_object_OBJECT_FROM_GUID_ADDRESS_SCHEME">OBJECT_FROM_GUID_ADDRESS_SCHEME</a>));
 <b>let</b> hash_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(bytes);
 <b>let</b> obj_addr = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;<b>address</b>&gt;(hash_bytes);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;<b>address</b>&gt;(hash_bytes);
+<b>ensures</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr).guid_creation_num == <b>old</b>(<b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr)).guid_creation_num + 1;
+<b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+        owner: addr,
+        allow_ungated_transfer: <b>true</b>,
+        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+            counter: 0,
+            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                    addr: obj_addr,
+                }
+            }
+        }
+};
+<b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: obj_addr, can_delete: <b>true</b> };
 </code></pre>
 
 
@@ -2172,11 +2312,28 @@ Return true if the provided address has indirect or direct ownership of the prov
     }
 };
 <b>let</b> bytes_spec = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(<a href="guid.md#0x1_guid">guid</a>);
-<b>let</b> bytes = concat(bytes_spec,vec&lt;u8&gt;(<a href="object.md#0x1_object_OBJECT_FROM_GUID_ADDRESS_SCHEME">OBJECT_FROM_GUID_ADDRESS_SCHEME</a>));
+<b>let</b> bytes = concat(bytes_spec, vec&lt;u8&gt;(<a href="object.md#0x1_object_OBJECT_FROM_GUID_ADDRESS_SCHEME">OBJECT_FROM_GUID_ADDRESS_SCHEME</a>));
 <b>let</b> hash_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(bytes);
 <b>let</b> obj_addr = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;<b>address</b>&gt;(hash_bytes);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;<b>address</b>&gt;(hash_bytes);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(addr).guid_creation_num == <b>old</b>(<b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(addr)).guid_creation_num + 1;
+<b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+        owner: addr,
+        allow_ungated_transfer: <b>true</b>,
+        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+            counter: 0,
+            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                    addr: obj_addr,
+                }
+            }
+        }
+};
+<b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: obj_addr, can_delete: <b>true</b> };
 </code></pre>
 
 
@@ -2193,11 +2350,27 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>let</b> bytes_spec = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(<a href="guid.md#0x1_guid">guid</a>);
-<b>let</b> bytes = concat(bytes_spec,vec&lt;u8&gt;(<a href="object.md#0x1_object_OBJECT_FROM_GUID_ADDRESS_SCHEME">OBJECT_FROM_GUID_ADDRESS_SCHEME</a>));
+<b>let</b> bytes = concat(bytes_spec, vec&lt;u8&gt;(<a href="object.md#0x1_object_OBJECT_FROM_GUID_ADDRESS_SCHEME">OBJECT_FROM_GUID_ADDRESS_SCHEME</a>));
 <b>let</b> hash_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(bytes);
 <b>let</b> obj_addr = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;<b>address</b>&gt;(hash_bytes);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;<b>address</b>&gt;(hash_bytes);
+<b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+        owner: creator_address,
+        allow_ungated_transfer: <b>true</b>,
+        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+            counter: 0,
+            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                    addr: obj_addr,
+                }
+            }
+        }
+};
+<b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: obj_addr, can_delete: <b>true</b> };
 </code></pre>
 
 
@@ -2214,6 +2387,22 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
+<b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+        owner: creator_address,
+        allow_ungated_transfer: <b>true</b>,
+        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+            counter: 0,
+            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                    addr: <a href="object.md#0x1_object">object</a>,
+                }
+            }
+        }
+};
+<b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: <a href="object.md#0x1_object">object</a>, can_delete };
 </code></pre>
 
 
@@ -2230,6 +2419,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>aborts_if</b> !ref.can_delete;
+<b>ensures</b> result == <a href="object.md#0x1_object_DeleteRef">DeleteRef</a> { self: ref.self };
 </code></pre>
 
 
@@ -2247,6 +2437,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
 <b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T&gt;(ref.self);
+<b>ensures</b> result == <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; { inner: ref.self };
 </code></pre>
 
 
@@ -2265,6 +2456,12 @@ Return true if the provided address has indirect or direct ownership of the prov
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="object.md#0x1_object">object</a>));
 <b>let</b> object_data = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="object.md#0x1_object">object</a>));
 <b>aborts_if</b> object_data.guid_creation_num + 1 &gt; MAX_U64;
+<b>ensures</b> result == <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+    id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+        creation_num: object_data.guid_creation_num,
+        addr: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="object.md#0x1_object">object</a>)
+    }
+};
 </code></pre>
 
 
@@ -2283,6 +2480,16 @@ Return true if the provided address has indirect or direct ownership of the prov
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="object.md#0x1_object">object</a>));
 <b>let</b> object_data = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="object.md#0x1_object">object</a>));
 <b>aborts_if</b> object_data.guid_creation_num + 1 &gt; MAX_U64;
+<b>let</b> <a href="guid.md#0x1_guid">guid</a> = <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+    id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+        creation_num: object_data.guid_creation_num,
+        addr: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="object.md#0x1_object">object</a>)
+    }
+};
+<b>ensures</b> result == <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt; {
+    counter: 0,
+    <a href="guid.md#0x1_guid">guid</a>,
+};
 </code></pre>
 
 
@@ -2300,6 +2507,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
 <b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T&gt;(ref.self);
+<b>ensures</b> result == <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; { inner: ref.self };
 </code></pre>
 
 
@@ -2316,6 +2524,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<b>ensures</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
 </code></pre>
 
 
@@ -2332,6 +2541,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).allow_ungated_transfer == <b>false</b>;
 </code></pre>
 
 
@@ -2348,6 +2558,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).allow_ungated_transfer == <b>true</b>;
 </code></pre>
 
 
@@ -2364,6 +2575,11 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<b>let</b> owner = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).owner;
+<b>ensures</b> result == <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a> {
+    self: ref.self,
+    owner,
+};
 </code></pre>
 
 
@@ -2382,6 +2598,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 <pre><code><b>let</b> <a href="object.md#0x1_object">object</a> = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
 <b>aborts_if</b> <a href="object.md#0x1_object">object</a>.owner != ref.owner;
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).owner == <b>to</b>;
 </code></pre>
 
 
@@ -2494,6 +2711,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
+<b>ensures</b> result == <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner).allow_ungated_transfer;
 </code></pre>
 
 
@@ -2510,6 +2728,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
+<b>ensures</b> result == <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner).owner;
 </code></pre>
 
 
@@ -2526,6 +2745,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
+<b>ensures</b> result == (<b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner).owner == owner);
 </code></pre>
 
 
@@ -2542,33 +2762,10 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>aborts_if</b> <a href="object.md#0x1_object">object</a>.inner != owner && !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
-</code></pre>
-
-
-
-
-<a name="0x1_object_spec_create_object_address"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_object_address">spec_create_object_address</a>(source: <b>address</b>, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>;
-</code></pre>
-
-
-
-
-<a name="0x1_object_spec_create_user_derived_object_address"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_user_derived_object_address">spec_create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>;
-</code></pre>
-
-
-
-
-<a name="0x1_object_spec_create_guid_object_address"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_guid_object_address">spec_create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b>;
+<b>let</b> current_address_0 = <a href="object.md#0x1_object">object</a>.inner;
+<b>let</b> object_0 = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address_0);
+<b>let</b> current_address = object_0.owner;
+<b>ensures</b> current_address_0 == owner ==&gt; result == <b>true</b>;
 </code></pre>
 
 
