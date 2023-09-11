@@ -66,7 +66,7 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
   poetry install
   ```
 
-  Run the Python [`simple-nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple-nft.py) example:
+  Run the Python [`simple-nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple_nft.py) example:
   ```bash
   poetry run python -m examples.simple-nft
   ```
@@ -164,7 +164,7 @@ See [`simple_nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/
   <TabItem value="python" label="Python">
 
 :::tip See the full code
-See [`simple-nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple-nft.py) for the complete code as you follow the below steps.
+See [`simple-nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple_nft.py) for the complete code as you follow the below steps.
 :::
   </TabItem>
   <TabItem value="rust" label="Rust">
@@ -202,7 +202,7 @@ Using the API client we can create a `TokenClient` that we use for common token 
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/simple-nft.py section_1
+:!: static/sdks/python/examples/simple_nft.py section_1
 ```
 
 [`common.py`](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/python/sdk/examples/common.py) initializes these values as follows:
@@ -254,7 +254,7 @@ The next step is to create two accounts locally. [Accounts](../concepts/accounts
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/simple-nft.py section_2
+:!: static/sdks/python/examples/simple_nft.py section_2
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">
@@ -282,7 +282,7 @@ In Aptos, each account must have an on-chain representation in order to receive 
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/simple-nft.py section_3
+:!: static/sdks/python/examples/simple_nft.py section_3
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">
@@ -318,7 +318,7 @@ The is the function signature of `createCollection`. It returns a transaction ha
 
 Your application will call `create_collection`:
 ```python
-:!: static/sdks/python/examples/simple-nft.py section_4
+:!: static/sdks/python/examples/simple_nft.py section_4
 ```
 
 This is the function signature of `create_collection`. It returns a transaction hash:
@@ -355,7 +355,7 @@ The is the function signature of `createToken`. It returns a transaction hash:
 
 Your application will call `create_token`:
 ```python
-:!: static/sdks/python/examples/simple-nft.py section_5
+:!: static/sdks/python/examples/simple_nft.py section_5
 ```
 
 The is the function signature of `create_token`. It returns a transaction hash:
@@ -398,12 +398,12 @@ Here's how `getTokenData` queries the token metadata:
 
 To read a collection's metadata:
 ```python
-:!: static/sdks/python/examples/simple-nft.py section_6
+:!: static/sdks/python/examples/simple_nft.py section_6
 ```
 
 To read a token's metadata:
 ```python
-:!: static/sdks/python/examples/simple-nft.py section_8
+:!: static/sdks/python/examples/simple_nft.py section_8
 ```
 
 Here's how `get_token_data` queries the token metadata:
@@ -434,7 +434,7 @@ Each token within Aptos is a distinct asset. The assets owned by the user are st
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/simple-nft.py section_7
+:!: static/sdks/python/examples/simple_nft.py section_7
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">
@@ -461,7 +461,7 @@ To offer a token:
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/simple-nft.py section_9
+:!: static/sdks/python/examples/simple_nft.py section_9
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">
@@ -482,7 +482,7 @@ To claim a token:
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/simple-nft.py section_10
+:!: static/sdks/python/examples/simple_nft.py section_10
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">
@@ -507,7 +507,7 @@ To support safe unilateral transfers of a token, the sender may first ask the re
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/simple-nft.py section_11
+:!: static/sdks/python/examples/simple_nft.py section_11
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">

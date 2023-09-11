@@ -119,6 +119,7 @@ impl ReleaseTarget {
                 }),
                 skip_fetch_latest_git_deps: true,
                 bytecode_version: None,
+                compiler_version: None,
                 skip_attribute_checks: false,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
             },

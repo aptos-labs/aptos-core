@@ -4,10 +4,13 @@
 
 use crate::{
     access_path_cache::AccessPathCache,
-    data_cache::StorageAdapter,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
-    move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
-    system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
+    move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionExt, SessionId},
+    system_module_names::{
+        EMIT_FEE_STATEMENT, MULTISIG_ACCOUNT_MODULE, TRANSACTION_FEE_MODULE,
+        VALIDATE_MULTISIG_TRANSACTION,
+    },
+    testing::{maybe_raise_injected_error, InjectedError},
     transaction_metadata::TransactionMetadata,
     transaction_validation::APTOS_TRANSACTION_VALIDATION,
 };
@@ -17,14 +20,14 @@ use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_state_view::{StateView, StateViewId};
+use aptos_state_view::StateViewId;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     chain_id::ChainId,
     fee_statement::FeeStatement,
     on_chain_config::{
-        ApprovedExecutionHashes, ConfigurationResource, FeatureFlag, Features, GasSchedule,
-        GasScheduleV2, OnChainConfig, TimedFeatures, Version,
+        ApprovedExecutionHashes, ConfigStorage, ConfigurationResource, FeatureFlag, Features,
+        GasSchedule, GasScheduleV2, OnChainConfig, TimedFeatures, Version,
     },
     transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
@@ -55,10 +58,13 @@ pub struct AptosVMImpl {
     storage_gas_params: Result<StorageGasParameters, String>,
     version: Option<Version>,
     features: Features,
+    timed_features: TimedFeatures,
 }
 
-pub fn gas_config(storage: &impl MoveResolverExt) -> (Result<AptosGasParameters, String>, u64) {
-    match GasScheduleV2::fetch_config(storage) {
+pub fn gas_config(
+    config_storage: &impl ConfigStorage,
+) -> (Result<AptosGasParameters, String>, u64) {
+    match GasScheduleV2::fetch_config(config_storage) {
         Some(gas_schedule) => {
             let feature_version = gas_schedule.feature_version;
             let map = gas_schedule.to_btree_map();
@@ -67,7 +73,7 @@ pub fn gas_config(storage: &impl MoveResolverExt) -> (Result<AptosGasParameters,
                 feature_version,
             )
         },
-        None => match GasSchedule::fetch_config(storage) {
+        None => match GasSchedule::fetch_config(config_storage) {
             Some(gas_schedule) => {
                 let map = gas_schedule.to_btree_map();
                 (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
@@ -79,16 +85,14 @@ pub fn gas_config(storage: &impl MoveResolverExt) -> (Result<AptosGasParameters,
 
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
-    pub fn new(state: &impl StateView) -> Self {
-        let storage = StorageAdapter::new(state);
-
+    pub fn new(config_storage: &impl ConfigStorage) -> Self {
         // Get the gas parameters
-        let (mut gas_params, gas_feature_version) = gas_config(&storage);
+        let (mut gas_params, gas_feature_version) = gas_config(config_storage);
 
         let storage_gas_params = match &mut gas_params {
             Ok(gas_params) => {
                 let storage_gas_params =
-                    StorageGasParameters::new(gas_feature_version, gas_params, &storage);
+                    StorageGasParameters::new(gas_feature_version, gas_params, config_storage);
 
                 // Overwrite table io gas parameters with global io pricing.
                 let g = &mut gas_params.natives.table;
@@ -131,12 +135,12 @@ impl AptosVMImpl {
             Err(_) => (NativeGasParameters::zeros(), MiscGasParameters::zeros()),
         };
 
-        let features = Features::fetch_config(&storage).unwrap_or_default();
+        let features = Features::fetch_config(config_storage).unwrap_or_default();
 
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
-        let chain_id = ChainId::fetch_config(&storage).unwrap_or_else(ChainId::test);
+        let chain_id = ChainId::fetch_config(config_storage).unwrap_or_else(ChainId::test);
 
-        let timestamp = ConfigurationResource::fetch_config(&storage)
+        let timestamp = ConfigurationResource::fetch_config(config_storage)
             .map(|config| config.last_reconfiguration_time())
             .unwrap_or(0);
 
@@ -151,11 +155,11 @@ impl AptosVMImpl {
             gas_feature_version,
             chain_id.id(),
             features.clone(),
-            timed_features,
+            timed_features.clone(),
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
-        let version = Version::fetch_config(&storage);
+        let version = Version::fetch_config(config_storage);
 
         Self {
             move_vm,
@@ -164,6 +168,7 @@ impl AptosVMImpl {
             storage_gas_params,
             version,
             features,
+            timed_features,
         }
     }
 
@@ -213,9 +218,13 @@ impl AptosVMImpl {
         &self.features
     }
 
+    pub fn get_timed_features(&self) -> &TimedFeatures {
+        &self.timed_features
+    }
+
     pub fn check_gas(
         &self,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -500,16 +509,15 @@ impl AptosVMImpl {
             .or_else(|err| convert_prologue_error(err, log_context))
     }
 
-    fn run_epiloque(
+    fn run_epilogue(
         &self,
         session: &mut SessionExt,
         gas_remaining: Gas,
+        fee_statement: FeeStatement,
         txn_data: &TransactionMetadata,
     ) -> VMResult<()> {
         let txn_gas_price = txn_data.gas_unit_price();
         let txn_max_gas_units = txn_data.max_gas_amount();
-        // TODO(aldenhu): repurpose this to be the amount of the storage fee refund.
-        let unused = 0;
 
         // We can unconditionally do this as this condition can only be true if the prologue
         // accepted it, in which case the gas payer feature is enabled.
@@ -521,7 +529,7 @@ impl AptosVMImpl {
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::Address(fee_payer),
-                    MoveValue::U64(unused),
+                    MoveValue::U64(fee_statement.storage_fee_refund()),
                     MoveValue::U64(txn_gas_price.into()),
                     MoveValue::U64(txn_max_gas_units.into()),
                     MoveValue::U64(gas_remaining.into()),
@@ -536,7 +544,7 @@ impl AptosVMImpl {
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
-                    MoveValue::U64(unused),
+                    MoveValue::U64(fee_statement.storage_fee_refund()),
                     MoveValue::U64(txn_gas_price.into()),
                     MoveValue::U64(txn_max_gas_units.into()),
                     MoveValue::U64(gas_remaining.into()),
@@ -545,7 +553,32 @@ impl AptosVMImpl {
             )
         }
         .map(|_return_vals| ())
-        .map_err(expect_no_verification_errors)
+        .map_err(expect_no_verification_errors)?;
+
+        // Emit the FeeStatement event
+        if self.features.is_emit_fee_statement_enabled() {
+            self.emit_fee_statement(session, fee_statement)?;
+        }
+
+        maybe_raise_injected_error(InjectedError::EndOfRunEpilogue)?;
+
+        Ok(())
+    }
+
+    fn emit_fee_statement(
+        &self,
+        session: &mut SessionExt,
+        fee_statement: FeeStatement,
+    ) -> VMResult<()> {
+        session
+            .execute_function_bypass_visibility(
+                &TRANSACTION_FEE_MODULE,
+                EMIT_FEE_STATEMENT,
+                vec![],
+                vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
+                &mut UnmeteredGasMeter,
+            )
+            .map(|_return_vals| ())
     }
 
     /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
@@ -554,6 +587,7 @@ impl AptosVMImpl {
         &self,
         session: &mut SessionExt,
         gas_remaining: Gas,
+        fee_statement: FeeStatement,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -564,7 +598,7 @@ impl AptosVMImpl {
             ))
         });
 
-        self.run_epiloque(session, gas_remaining, txn_data)
+        self.run_epilogue(session, gas_remaining, fee_statement, txn_data)
             .or_else(|err| convert_epilogue_error(err, log_context))
     }
 
@@ -574,10 +608,11 @@ impl AptosVMImpl {
         &self,
         session: &mut SessionExt,
         gas_remaining: Gas,
+        fee_statement: FeeStatement,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        self.run_epiloque(session, gas_remaining, txn_data)
+        self.run_epilogue(session, gas_remaining, fee_statement, txn_data)
             .or_else(|e| {
                 expect_only_successful_execution(
                     e,
@@ -612,7 +647,7 @@ impl AptosVMImpl {
 
     pub fn new_session<'r>(
         &self,
-        resolver: &'r impl MoveResolverExt,
+        resolver: &'r impl AptosMoveResolver,
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
         self.move_vm.new_session(resolver, session_id)
@@ -621,7 +656,7 @@ impl AptosVMImpl {
     pub fn load_module(
         &self,
         module_id: &ModuleId,
-        resolver: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
     ) -> VMResult<Arc<CompiledModule>> {
         self.move_vm.load_module(module_id, resolver)
     }

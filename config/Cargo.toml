@@ -27,6 +27,7 @@ byteorder = { workspace = true }
 cfg-if = { workspace = true }
 cfg_block = { workspace = true }
 get_if_addrs = { workspace = true }
+maplit = { workspace = true }
 mirai-annotations = { workspace = true }
 num_cpus = { workspace = true }
 poem-openapi = { workspace = true }

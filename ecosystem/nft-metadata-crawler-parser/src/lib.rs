@@ -5,11 +5,17 @@ pub mod schema;
 pub mod utils;
 pub mod worker;
 
+use anyhow::Context;
 use reqwest::{header, Client};
+use std::time::Duration;
+use utils::constants::MAX_HEAD_REQUEST_RETRY_SECONDS;
 
 /// HEAD request to get MIME type and size of content
 pub async fn get_uri_metadata(url: String) -> anyhow::Result<(String, u32)> {
-    let client = Client::new();
+    let client = Client::builder()
+        .timeout(Duration::from_secs(MAX_HEAD_REQUEST_RETRY_SECONDS))
+        .build()
+        .context("Failed to build reqwest client")?;
     let request = client.head(&url);
     let response = request.send().await?;
     let headers = response.headers();

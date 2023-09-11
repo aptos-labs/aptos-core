@@ -215,10 +215,14 @@ pub struct PrintBytecodeCommand {
     /// The kind of input: either a script, or a module.
     #[clap(long = "input", value_enum, ignore_case = true, default_value_t = PrintBytecodeInputChoice::Script)]
     pub input: PrintBytecodeInputChoice,
+    /// Select Move source ("move") source or MoveIR ("mvir").  Is inferred from filename if absent.
+    #[clap(long = "syntax")]
+    pub syntax: Option<SyntaxChoice>,
 }
 
 #[derive(Debug, Parser)]
 pub struct InitCommand {
+    /// Supply a space-separated list of name=number addresses.
     #[clap(
         long = "addresses",
         value_parser = move_compiler::shared::parse_named_address,

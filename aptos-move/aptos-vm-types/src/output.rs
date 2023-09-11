@@ -74,7 +74,7 @@ impl VMOutput {
         // First, check if output of transaction should be discarded or delta
         // change set is empty. In both cases, we do not need to apply any
         // deltas and can return immediately.
-        if self.status().is_discarded() || self.change_set().aggregator_delta_set().is_empty() {
+        if self.status().is_discarded() || self.change_set().aggregator_v1_delta_set().is_empty() {
             return Ok(self);
         }
 
@@ -96,7 +96,7 @@ impl VMOutput {
         debug_assert!(
             materialized_output
                 .change_set()
-                .aggregator_delta_set()
+                .aggregator_v1_delta_set()
                 .is_empty(),
             "Aggregator deltas must be empty after materialization."
         );
@@ -114,12 +114,12 @@ impl VMOutput {
         // We should have a materialized delta for every delta in the output.
         assert_eq!(
             materialized_deltas.len(),
-            self.change_set().aggregator_delta_set().len()
+            self.change_set().aggregator_v1_delta_set().len()
         );
         debug_assert!(
             materialized_deltas
                 .iter()
-                .all(|(k, _)| self.change_set().aggregator_delta_set().contains_key(k)),
+                .all(|(k, _)| self.change_set().aggregator_v1_delta_set().contains_key(k)),
             "Materialized aggregator writes contain a key which does not exist in delta set."
         );
         self.change_set

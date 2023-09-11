@@ -299,7 +299,7 @@ impl SubmissionWorker {
         );
         let accounts = self
             .accounts
-            .iter_mut()
+            .iter()
             .choose_multiple(&mut self.rng, batch_size);
 
         accounts

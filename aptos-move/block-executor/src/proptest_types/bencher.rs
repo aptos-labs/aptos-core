@@ -40,7 +40,7 @@ pub(crate) struct BencherState<
     Vec<u8>: From<V>,
 {
     transactions: Vec<MockTransaction<KeyType<K>, ValueType<V>, E>>,
-    baseline_output: BaselineOutput<ValueType<V>>,
+    baseline_output: BaselineOutput<KeyType<K>, ValueType<V>>,
 }
 
 impl<K, V, E> Bencher<K, V, E>

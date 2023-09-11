@@ -184,6 +184,7 @@ fn test_executor_status_consensus_only() {
         .execute_block(
             (block_id, block(vec![txn0, txn1, txn2], BLOCK_GAS_LIMIT)).into(),
             parent_block_id,
+            BLOCK_GAS_LIMIT,
         )
         .unwrap();
 
@@ -625,6 +626,7 @@ fn test_reconfig_suffix_empty_blocks() {
         .unwrap();
 
     let ledger_info = gen_ledger_info(20002, output.root_hash(), block_d.id, 1);
+
     executor
         .commit_blocks(
             vec![block_a.id, block_b.id, block_c.id, block_d.id],

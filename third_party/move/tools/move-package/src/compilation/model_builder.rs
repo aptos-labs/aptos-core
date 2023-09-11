@@ -115,8 +115,16 @@ impl ModelBuilder {
             ),
         };
 
-        let skip_attribute_checks = self.resolution_graph.build_options.skip_attribute_checks;
-        let known_attributes = &self.resolution_graph.build_options.known_attributes;
+        let skip_attribute_checks = self
+            .resolution_graph
+            .build_options
+            .compiler_config
+            .skip_attribute_checks;
+        let known_attributes = &self
+            .resolution_graph
+            .build_options
+            .compiler_config
+            .known_attributes;
         run_model_builder_with_options(
             all_targets,
             all_deps,

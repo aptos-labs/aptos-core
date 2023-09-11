@@ -2,61 +2,45 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_partitioner::ShardedBlockPartitioner;
-use aptos_types::block_executor::partitioner::RoundId;
+pub mod v2;
 
-pub mod sharded_block_partitioner;
 pub mod test_utils;
 
-pub struct BlockPartitionerConfig {
-    num_shards: usize,
-    max_partitioning_rounds: RoundId,
-    cross_shard_dep_avoid_threshold: f32,
-    partition_last_round: bool,
+use aptos_types::{
+    block_executor::partitioner::{PartitionedTransactions, ShardId},
+    transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
+};
+use move_core_types::account_address::AccountAddress;
+use std::{
+    collections::hash_map::DefaultHasher,
+    fmt::Debug,
+    hash::{Hash, Hasher},
+};
+
+pub mod pre_partition;
+
+pub trait PartitionerConfig: Debug {
+    fn build(&self) -> Box<dyn BlockPartitioner>;
 }
 
-impl BlockPartitionerConfig {
-    pub fn new() -> Self {
-        BlockPartitionerConfig {
-            num_shards: 0,
-            max_partitioning_rounds: 3,
-            cross_shard_dep_avoid_threshold: 0.9,
-            partition_last_round: false,
-        }
-    }
+#[cfg(test)]
+mod tests;
 
-    pub fn num_shards(mut self, num_shards: usize) -> Self {
-        self.num_shards = num_shards;
-        self
-    }
-
-    pub fn max_partitioning_rounds(mut self, max_partitioning_rounds: RoundId) -> Self {
-        self.max_partitioning_rounds = max_partitioning_rounds;
-        self
-    }
-
-    pub fn cross_shard_dep_avoid_threshold(mut self, threshold: f32) -> Self {
-        self.cross_shard_dep_avoid_threshold = threshold;
-        self
-    }
-
-    pub fn partition_last_round(mut self, partition_last_round: bool) -> Self {
-        self.partition_last_round = partition_last_round;
-        self
-    }
-
-    pub fn build(self) -> ShardedBlockPartitioner {
-        ShardedBlockPartitioner::new(
-            self.num_shards,
-            self.max_partitioning_rounds,
-            self.cross_shard_dep_avoid_threshold,
-            self.partition_last_round,
-        )
-    }
+pub trait BlockPartitioner: Send {
+    fn partition(
+        &self,
+        transactions: Vec<AnalyzedTransaction>,
+        num_shards: usize, //TODO: rethink about whether this is needed as part of `BlockPartitioner` API.
+    ) -> PartitionedTransactions;
 }
 
-impl Default for BlockPartitionerConfig {
-    fn default() -> Self {
-        Self::new()
-    }
+/// When multiple transactions access the same storage location,
+/// use this function to pick a shard as the anchor/leader and resolve conflicts.
+/// Used by `ShardedBlockPartitioner` and `V2Partitioner`.
+fn get_anchor_shard_id(storage_location: &StorageLocation, num_shards: usize) -> ShardId {
+    let mut hasher = DefaultHasher::new();
+    storage_location.hash(&mut hasher);
+    (hasher.finish() % num_shards as u64) as usize
 }
+
+type Sender = Option<AccountAddress>;
