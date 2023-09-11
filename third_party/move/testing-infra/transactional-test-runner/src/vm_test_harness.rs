@@ -88,12 +88,18 @@ pub struct AdapterPublishArgs {
     #[clap(long)]
     /// is skip the check friend link, if true, treat `friend` as `private`
     pub skip_check_friend_linking: bool,
+    /// print more complete information for VMErrors on publish
+    #[clap(long)]
+    pub verbose: bool,
 }
 
 #[derive(Debug, Parser)]
 pub struct AdapterExecuteArgs {
     #[clap(long)]
     pub check_runtime_types: bool,
+    /// print more complete information for VMErrors on run
+    #[clap(long)]
+    pub verbose: bool,
 }
 
 fn move_test_debug() -> bool {
@@ -226,7 +232,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             Err(vm_error) => Err(anyhow!(
                 "Unable to publish module '{}'. Got VMError: {}",
                 module.self_id(),
-                vm_error.format_test_output(move_test_debug(), self.comparison_mode)
+                vm_error.format_test_output(
+                    move_test_debug() || extra_args.verbose,
+                    self.comparison_mode
+                )
             )),
         }
     }
@@ -269,7 +278,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map_err(|vm_error| {
                 anyhow!(
                     "Script execution failed with VMError: {}",
-                    vm_error.format_test_output(move_test_debug(), self.comparison_mode)
+                    vm_error.format_test_output(
+                        move_test_debug() || extra_args.verbose,
+                        self.comparison_mode
+                    )
                 )
             })?;
         Ok((None, serialized_return_values))
@@ -313,7 +325,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map_err(|vm_error| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
-                    vm_error.format_test_output(move_test_debug(), self.comparison_mode)
+                    vm_error.format_test_output(
+                        move_test_debug() || extra_args.verbose,
+                        self.comparison_mode
+                    )
                 )
             })?;
         Ok((None, serialized_return_values))
