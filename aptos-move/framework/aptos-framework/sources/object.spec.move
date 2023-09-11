@@ -7,7 +7,7 @@ spec aptos_framework::object {
 
     spec schema AddressNoChange {
         // property 4: Objects may never change the address which houses them.
-        ensures forall addr: address where old(exists<ObjectCore>(addr)): 
+        ensures forall addr: address where old(exists<ObjectCore>(addr)):
             exists<ObjectCore>(addr);
     }
 
@@ -272,7 +272,7 @@ spec aptos_framework::object {
         // property 1: Creating an object twice on the same address must never occur.
         aborts_if exists<ObjectCore>(object);
         ensures exists<ObjectCore>(object);
-        // property 6: Object addresses must not overlap with other addresses in different domains. 
+        // property 6: Object addresses must not overlap with other addresses in different domains.
         ensures global<ObjectCore>(object) == ObjectCore {
                 guid_creation_num: INIT_GUID_CREATION_NUM + 1,
                 owner: creator_address,
@@ -427,42 +427,7 @@ spec aptos_framework::object {
         // TODO: Verify the link list loop in verify_ungated_and_descendant
         aborts_if !exists<ObjectCore>(destination);
         aborts_if !global<ObjectCore>(destination).allow_ungated_transfer;
-
-        // let current_address = global<ObjectCore>(destination).owner;
-        // aborts_if exists i in 0..rec_num(owner, current_address, 0): 
-        //     {
-        //         let v_empty = vec<address>();
-        //         let v = rec_add(owner, current_address, v_empty);
-        //         !exists<ObjectCore>(v[i]) || !global<ObjectCore>(v[i]).allow_ungated_transfer
-        //     };
-        // aborts_if rec_num(owner, current_address, 0) >= MAXIMUM_OBJECT_NESTING; 
-        // ensures forall i in 0..rec_num(owner, current_address, 0): 
-        //     {
-        //         let v_empty = vec<address>();
-        //         let v = rec_add(owner, current_address, v_empty);
-        //         exists<ObjectCore>(v[i]) && global<ObjectCore>(v[i]).allow_ungated_transfer
-        //     };
     }
-
-    // spec fun rec_num(owner: address, current_address: address, count: u64): u64 {
-    //     if (owner != current_address) {
-    //         let object = global<ObjectCore>(current_address);
-    //         let current_address = object.owner;
-    //         rec_num(owner, current_address, count + 1)
-    //     } else {
-    //         count
-    //     }
-    // }
-
-    // spec fun rec_add(owner: address, current_address: address, v: vector<address>): vector<address> {
-    //     if (owner != current_address) {
-    //         let current_address_new = global<ObjectCore>(current_address).owner;
-    //         let v_new = concat(v, vec<address>(current_address_new));
-    //         rec_add(owner, current_address, v_new)
-    //     } else {
-    //         v
-    //     }
-    // }
 
     spec ungated_transfer_allowed<T: key>(object: Object<T>): bool {
         aborts_if !exists<ObjectCore>(object.inner);
@@ -487,28 +452,7 @@ spec aptos_framework::object {
         let object_0 = global<ObjectCore>(current_address_0);
         let current_address = object_0.owner;
         ensures current_address_0 == owner ==> result == true;
-        // Something wrong with recur() helper function.
-        // ensures current_address_0 != owner ==> result == recur(owner, current_address);
-        // ensures if (current_address_0 == owner) {
-        //     result == true
-        // } else {
-        //     result == recur(owner, current_address)
-        // };
     }
-
-    // spec fun recur(owner: address, current_address: address): bool {
-    //     if (owner != current_address) {
-    //         if (!exists<ObjectCore>(current_address)) {
-    //             false
-    //         } else {
-    //             let object = global<ObjectCore>(current_address);
-    //             let current_address = object.owner;
-    //             recur(owner, current_address)
-    //         }
-    //     } else {
-    //         true
-    //     }
-    // }
 
     // Helper function
     spec fun spec_create_object_address(source: address, seed: vector<u8>): address;
