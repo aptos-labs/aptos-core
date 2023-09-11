@@ -49,7 +49,7 @@ impl JSONParser {
 
         let op = || {
             async {
-                info!(token_uri = uri, "Sending request for token_uri");
+                info!(asset_uri = uri, "Sending request for asset_uri");
 
                 let client = Client::builder()
                     .timeout(Duration::from_secs(MAX_JSON_REQUEST_RETRY_SECONDS))

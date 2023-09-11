@@ -158,7 +158,7 @@ async fn test_module_events() {
     context
         .api_execute_entry_function(
             &mut user,
-            &format!("0x{}::event::emit", user_addr),
+            &format!("0x{}::event::emit", user_addr.to_hex()),
             json!([]),
             json!(["7"]),
         )

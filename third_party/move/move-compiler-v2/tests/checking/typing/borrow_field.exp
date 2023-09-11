@@ -3,7 +3,10 @@ module 0x8675309::M {
     struct S {
         f: u64,
     }
-    private fun t0(s: &M::S,s_mut: &mut M::S,s_mut2: &mut M::S) {
+    private fun t0(s: &M::S,s_mut: &mut M::S,s_mut2: &mut M::S): (&u64, &u64, &mut u64) {
         Tuple(Borrow(Immutable)(select M::S.f(s)), Borrow(Immutable)(select M::S.f(s_mut)), Borrow(Mutable)(select M::S.f(s_mut2)))
+    }
+    spec fun $t0(s: M::S,s_mut: M::S,s_mut2: M::S): (&u64, &u64, &mut u64) {
+        Tuple(select M::S.f(s), select M::S.f(s_mut), select M::S.f(s_mut2))
     }
 } // end 0x8675309::M

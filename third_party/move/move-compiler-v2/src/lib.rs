@@ -76,18 +76,28 @@ pub fn run_move_compiler(
 pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
     // Run the model builder, which performs context checking.
     let addrs = move_model::parse_addresses_from_options(options.named_address_mapping.clone())?;
-    let env = move_model::run_model_builder_in_compiler_mode(
+    let mut env = move_model::run_model_builder_in_compiler_mode(
         PackageInfo {
             sources: options.sources.clone(),
             address_map: addrs.clone(),
         },
         vec![PackageInfo {
             sources: options.dependencies.clone(),
-            address_map: addrs,
+            address_map: addrs.clone(),
         }],
         options.skip_attribute_checks,
-        KnownAttribute::get_all_attribute_names(),
+        if !options.skip_attribute_checks && options.known_attributes.is_empty() {
+            KnownAttribute::get_all_attribute_names()
+        } else {
+            &options.known_attributes
+        },
     )?;
+    // Store address aliases
+    let map = addrs
+        .into_iter()
+        .map(|(s, a)| (env.symbol_pool().make(&s), a.into_inner()))
+        .collect();
+    env.set_address_alias_map(map);
     // Store options in env, for later access
     env.set_extension(options);
     Ok(env)

@@ -15,4 +15,5 @@ module 0x42::M {
           }
         }
     }
+    spec fun $t0();
 } // end 0x42::M
