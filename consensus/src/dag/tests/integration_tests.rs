@@ -26,8 +26,9 @@ use aptos_network::{
 use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_state::EpochState,
+    ledger_info::generate_ledger_info_with_sig,
     validator_signer::ValidatorSigner,
-    validator_verifier::{random_validator_verifier, ValidatorVerifier}, ledger_info::generate_ledger_info_with_sig,
+    validator_verifier::{random_validator_verifier, ValidatorVerifier},
 };
 use claims::assert_gt;
 use futures::{

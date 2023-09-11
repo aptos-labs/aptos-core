@@ -114,7 +114,7 @@ async fn test_certified_node_handler() {
         dag.clone(),
         aptos_time_service::TimeService::mock(),
     );
-    let fetch_requester = Arc::new(fetch_requester); 
+    let fetch_requester = Arc::new(fetch_requester);
 
     let mut driver = DagDriver::new(
         signers[0].author(),

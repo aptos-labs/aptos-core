@@ -453,7 +453,7 @@ impl TDAGMessage for CertifiedNodeMessage {
         self.inner.verify(verifier)?;
 
         self.ledger_info
-            .verify_signatures(&verifier)
+            .verify_signatures(verifier)
             .map_err(|e| anyhow::anyhow!("unable to verify ledger info: {}", e))
     }
 }
