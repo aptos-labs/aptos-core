@@ -37,7 +37,7 @@ use std::{
         Arc,
     },
 };
-use crate::executor_common::BlockExecutor;
+use crate::executor_traits::BlockExecutor;
 
 struct CommitGuard<'a> {
     post_commit_txs: &'a Vec<Sender<u32>>,
@@ -727,7 +727,7 @@ where
     }
 }
 
-impl<T, E, S, L, X> BlockExecutor for BlockSTMExecutor<T, E, S, L, X>
+impl<T, E, S, L> BlockExecutor for BlockSTMExecutor<T, E, S, L>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
@@ -738,7 +738,6 @@ where
     type Transaction = T;
     type ExecutorTask = E;
     type StateView = S;
-    type Executable = X;
     type Error = Error<E::Error>;
 
     fn execute_block(

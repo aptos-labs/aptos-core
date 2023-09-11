@@ -12,7 +12,7 @@ use aptos_state_view::TStateView;
 use aptos_types::executable::Executable;
 use crate::counters::PARALLEL_EXECUTION_SECONDS;
 use crate::errors::{Error, Result};
-use crate::executor_common::BlockExecutor;
+use crate::executor_traits::BlockExecutor;
 use crate::task::{ExecutionStatus, ExecutorTask, Transaction};
 
 /// A `BlockExecutor` that simply runs all the transactions in the block once, all in parallel,

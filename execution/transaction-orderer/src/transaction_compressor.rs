@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::common::PTransaction;
+use aptos_block_executor::hints::TransactionHints;
 use std::{collections::HashMap, hash::Hash, rc::Rc};
 
 pub type CompressedKey = u32;
@@ -14,7 +14,7 @@ pub struct CompressedPTransactionInner<T> {
 
 pub type CompressedPTransaction<T> = Rc<CompressedPTransactionInner<T>>;
 
-impl<T> PTransaction for CompressedPTransaction<T> {
+impl<T> TransactionHints for CompressedPTransaction<T> {
     type Key = CompressedKey;
     type ReadSetIter<'a> = std::slice::Iter<'a, Self::Key> where T: 'a;
     type WriteSetIter<'a> = std::slice::Iter<'a, Self::Key> where T: 'a;
@@ -62,7 +62,7 @@ impl<K: Hash + Clone + Eq> TransactionCompressor<K> {
 
     pub fn compress_transactions<T, I>(&mut self, block: I) -> Vec<CompressedPTransaction<T>>
     where
-        T: PTransaction<Key = K>,
+        T: TransactionHints<Key = K>,
         I: IntoIterator<Item = T>,
     {
         let mut res = vec![];
@@ -85,7 +85,7 @@ impl<K: Hash + Clone + Eq> TransactionCompressor<K> {
 
 pub fn compress_transactions<T>(block: Vec<T>) -> Vec<CompressedPTransaction<T>>
 where
-    T: PTransaction,
+    T: TransactionHints,
     T::Key: Hash + Clone + Eq,
 {
     let mut compressor = TransactionCompressor::new();

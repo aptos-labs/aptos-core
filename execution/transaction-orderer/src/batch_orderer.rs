@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    common::PTransaction,
     reservation_table::{HashMapReservationTable, ReservationTable},
 };
 use aptos_types::block_executor::partitioner::{ITxnIndex, TxnIndex};
 use std::{collections::BTreeSet, hash::Hash};
+use aptos_block_executor::hints::TransactionHints;
 
 /// Creates batches of non-conflicting transactions.
 /// Each time `commit_prefix` is called, returns a sequence of transactions
@@ -77,7 +77,7 @@ impl SelectedPosition {
     }
 }
 
-pub struct SequentialDynamicAriaOrderer<T: PTransaction> {
+pub struct SequentialDynamicAriaOrderer<T: TransactionHints> {
     txn_info: Vec<TxnInfo<T>>,
     active_txns_count: usize,
 
@@ -87,7 +87,7 @@ pub struct SequentialDynamicAriaOrderer<T: PTransaction> {
     read_reservations: HashMapReservationTable<T::Key, TxnIndex>,
 }
 
-impl<T: PTransaction> Default for SequentialDynamicAriaOrderer<T> {
+impl<T: TransactionHints> Default for SequentialDynamicAriaOrderer<T> {
     // NB: unfortunately, Rust cannot derive Default for generic structs
     // with type parameters that do not implement Default.
     // See: https://github.com/rust-lang/rust/issues/26925
@@ -106,7 +106,7 @@ impl<T: PTransaction> Default for SequentialDynamicAriaOrderer<T> {
 
 impl<T> SequentialDynamicAriaOrderer<T>
 where
-    T: PTransaction + Clone,
+    T: TransactionHints + Clone,
     T::Key: Hash + Eq + Clone,
 {
     fn satisfy_pending_read_table_request(&mut self, idx: TxnIndex) {
@@ -134,7 +134,7 @@ where
 
 impl<T> BatchOrderer for SequentialDynamicAriaOrderer<T>
 where
-    T: PTransaction + Clone,
+    T: TransactionHints + Clone,
     T::Key: Hash + Eq + Clone,
 {
     type Txn = T;

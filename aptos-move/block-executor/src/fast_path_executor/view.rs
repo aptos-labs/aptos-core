@@ -8,11 +8,13 @@ use std::ops::Deref;
 use anyhow::Result;
 use dashmap::DashMap;
 use dashmap::mapref::entry::Entry;
-use parking_lot::{RwLock, RwLockWriteGuard};
+use smallvec::SmallVec;
 
-use aptos_aggregator::delta_change_set::{DeltaOp, deserialize, serialize};
+use aptos_aggregator::delta_change_set::{DeltaOp, serialize};
+use aptos_aggregator::transaction::AggregatorValue;
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_state_view::in_memory_state_view::InMemoryStateView;
+use aptos_types::serde_helper::vec_bytes::deserialize;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::state_store::state_value::StateValue;
 use aptos_types::write_set::TransactionWrite;
@@ -53,10 +55,6 @@ impl<'a, WV: WritableStateView> TStateView for NonWritableView<'a, WV> {
 
     fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>> {
         self.0.get_state_value(state_key)
-    }
-
-    fn is_genesis(&self) -> bool {
-        self.0.is_genesis()
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
@@ -119,10 +117,6 @@ where
         self.base_view.get_state_value(state_key)
     }
 
-    fn is_genesis(&self) -> bool {
-        self.base_view.is_genesis()
-    }
-
     fn get_usage(&self) -> Result<StateStorageUsage> {
         self.base_view.get_usage()
     }
@@ -177,7 +171,7 @@ where
     fn get_state_value_u128(&self, state_key: &Self::Key) -> Result<Option<u128>> {
         if let Some(value_ref) = self.updates.get(state_key) {
             match value_ref.value() {
-                CachedValue::RawValue(v) => Ok(Some(deserialize(&v.extract_raw_bytes().unwrap()))),
+                CachedValue::RawValue(v) => Ok(Some(AggregatorValue::from_write(v).unwrap().into())),
                 CachedValue::Accumulator(v) => Ok(Some(*v)),
             }
         } else {
@@ -205,10 +199,6 @@ where
         } else {
             self.base_view.get_state_value(state_key)
         }
-    }
-
-    fn is_genesis(&self) -> bool {
-        self.base_view.is_genesis()
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
@@ -240,8 +230,8 @@ where
                 // `k` is already present in the hash map
                 let old_value = match entry.get() {
                     CachedValue::RawValue(raw_value) => {
-                        let old_value_bytes = raw_value.extract_raw_bytes().unwrap(); // TODO: check if unwrap is appropriate here.
-                        deserialize(&old_value_bytes)
+                        // TODO: check if unwrap is appropriate here.
+                        AggregatorValue::from_write(raw_value).unwrap().into()
                     },
                     CachedValue::Accumulator(int_value) => *int_value,
                 };
@@ -252,8 +242,8 @@ where
             },
             Entry::Vacant(entry) => {
                 // `k` is not present in the hash map
-                let base_value_bytes = self.base_view.get_state_value_bytes(k)?.unwrap(); // TODO: check if unwrap is appropriate here.
-                let base_value = deserialize(&base_value_bytes);
+                // TODO: check if unwrap is appropriate here.
+                let base_value = self.base_view.get_state_value_u128(k)?.unwrap();
                 let new_value = delta.apply_to(base_value)?;
                 entry.insert(CachedValue::Accumulator(new_value));
                 Ok(new_value)
@@ -280,10 +270,6 @@ impl<K> TStateView for EmptyStateView<K> {
 
     fn get_state_value(&self, _state_key: &Self::Key) -> Result<Option<StateValue>> {
         Ok(None)
-    }
-
-    fn is_genesis(&self) -> bool {
-        false
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {

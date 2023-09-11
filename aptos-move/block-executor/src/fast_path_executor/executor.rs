@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{marker::PhantomData, sync::Arc};
+use std::collections::LinkedList;
 
 use futures::channel::oneshot;
 use futures::SinkExt;
@@ -19,33 +20,32 @@ use anyhow::Result;
 use crossbeam::atomic::AtomicCell;
 
 use crate::{
-    executor_common::BlockExecutor,
+    executor_traits::BlockExecutor,
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
 };
+use crate::executor_traits::{BlockExecutorBase, HintedBlockExecutor};
 use crate::fast_path_executor::{
     reservation_table::{DashMapReservationTable, ReservationTable},
     view::ReadSetCapturingStateView,
 };
 use crate::fast_path_executor::reservation_table::OptimisticDashMapReservationTable;
 use crate::fast_path_executor::view::{DashMapStateView, EmptyStateView, WritableStateView};
+use crate::hints::{TransactionHints, TransactionWithHints};
 
-pub struct FastPathBlockExecutor<T: Transaction, E, S, X, FB> {
+pub struct FastPathBlockExecutor<T: Transaction, E, FB> {
     executor_thread_pool: Arc<ThreadPool>,
     maybe_block_gas_limit: Option<u64>,
     fallback: FB,
 
-    phantom: PhantomData<(T, E, S, X)>,
+    phantom: PhantomData<(T, E)>,
 }
 
-impl<T, E, S, X, FB> FastPathBlockExecutor<T, E, S, X, FB>
+impl<T, E, FB> FastPathBlockExecutor<T, E, FB>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T> + Send + Sync + 'static,
-    E::Error: std::error::Error,
     E::Output: Send,
-    S: TStateView<Key = T::Key> + Sync,
-    X: Executable + 'static,
-    FB: BlockExecutor<Transaction = T, ExecutorTask = E, StateView = S, Executable = X>,
+    FB: HintedBlockExecutor<TransactionWithHints<T>, ExecutorTask = E>,
 {
     pub fn new(
         executor_thread_pool: Arc<ThreadPool>,
@@ -61,7 +61,7 @@ where
     }
 
     fn execute_transaction(
-        txn: &T,
+        txn: T,
         txn_idx: TxnIndex,
         executor_task: &E,
         state_view: &impl TStateView<Key = T::Key>,
@@ -69,13 +69,15 @@ where
         write_reservations: &impl ReservationTable<T::Key>,
         delta_reservations: &impl ReservationTable<T::Key>,
     ) -> Result<TxnExecutionInfo<E>> {
-        // TODO: eventually, we may need to add extra logic to preserve source order.
+        // TODO: eventually, we may need to add extra logic to preserve source order if
+        //       we change the commit rule. For now, the current commit rule ensures it
+        //       out of the box.
 
         let read_set_capturing_view = ReadSetCapturingStateView::with_capacity(state_view, 10);
 
         let execute_result = executor_task.execute_transaction(
             &read_set_capturing_view,
-            txn,
+            &txn,
             txn_idx,
             false
         );
@@ -87,11 +89,13 @@ where
         };
 
 
-        for (k, _) in output.get_writes().into_iter() {
+        let write_keys = (output.resource_write_set().into_keys())
+            .chain(output.aggregator_v1_delta_set().into_keys());
+        for k in write_keys {
             write_reservations.make_reservation(k, txn_idx);
         }
 
-        for (k, _) in output.get_deltas() {
+        for k in output.aggregator_v1_delta_set().into_keys() {
             // As accumulators can be highly contended, first check if the snapshot
             // of this accumulator has already been made and only proceed to making
             // the snapshot otherwise.
@@ -105,6 +109,7 @@ where
         }
 
         Ok(TxnExecutionInfo {
+            transaction: txn,
             read_set: read_set_capturing_view.clone_read_set(),
             output,
             skip_rest,
@@ -113,7 +118,7 @@ where
         })
     }
 
-    fn execute_transactions_in_parallel<'data, Txns, Idx>(
+    fn execute_transactions_in_parallel<Txns, Idx>(
         transactions: Txns,
         indices: Idx,
         worker_states: &ThreadLocal<E>,
@@ -124,7 +129,7 @@ where
         delta_reservations: &(impl ReservationTable<T::Key> + Sync),
     ) -> Result<Vec<TxnExecutionInfo<E>>>
     where
-        Txns: IntoParallelIterator<Item = &'data T>,
+        Txns: IntoParallelIterator<Item = T>,
         Txns::Iter: IndexedParallelIterator,
         Idx: IntoParallelIterator<Item = TxnIndex>,
         Idx::Iter: IndexedParallelIterator,
@@ -156,8 +161,6 @@ where
     ) -> bool {
         let txn_idx = execution_info.txn_idx;
         for k in execution_info.read_set.iter() {
-            let k: &T::Key = k; // help the IDE figure out the type of `k`
-
             // A transaction cannot be committed if it reads a location that is written by
             // a smaller-id transaction in the same batch.
             if let Some(reservation) = write_reservations.get_reservation(k) {
@@ -175,9 +178,6 @@ where
             }
         }
 
-        // NB: We do not need to track write-write conflicts as each transaction always
-        // reads a key before writing to it.
-
         // TODO: later we will need to add accumulator overflow detection
         true
     }
@@ -186,11 +186,14 @@ where
         txn_output: &E::Output,
         state: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
     ) -> Result<()> {
-        for (k, v) in txn_output.get_writes() {
+        let txn_writes = (txn_output.resource_write_set().into_iter())
+            .chain(txn_output.aggregator_v1_write_set());
+
+        for (k, v) in txn_writes {
             state.write_value(k, v);
         }
 
-        for (k, delta_op) in txn_output.get_deltas() {
+        for (k, delta_op) in txn_output.aggregator_v1_delta_set() {
             state.apply_delta(&k, &delta_op)?;
         }
 
@@ -201,9 +204,12 @@ where
         execution_results: Vec<TxnExecutionInfo<E>>,
         write_reservations: &(impl ReservationTable<T::Key> + Sync),
         delta_reservations: &(impl ReservationTable<T::Key> + Sync),
-        writable_view: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
-    ) -> Result<(Vec<TxnExecutionInfo<E>>, Vec<TxnExecutionInfo<E>>)> {
+        output_view: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
+    ) -> Result<Vec<TxnExecutionInfo<E>>> {
         let mut err: AtomicCell<Option<anyhow::Error>> = AtomicCell::new(None);
+
+        let selected_info = Vec::new();
+        ()
 
         let (committed_info, other_info): (Vec<_>, Vec<_>) =
             execution_results
@@ -216,7 +222,7 @@ where
                     );
 
                     if commit {
-                        if let Err(e) = Self::apply_transaction_output(&execution_result.output, writable_view) {
+                        if let Err(e) = Self::apply_transaction_output(&execution_result.output, output_view) {
                             err.store(Some(e));
                         }
                     }
@@ -238,13 +244,12 @@ where
         let updated_view = DashMapStateView::<_, T::Value, _>::new(base_view);
 
         for output in outputs_in_serialization_order {
-            let deltas = output.get_deltas();
-            let mut delta_writes = Vec::with_capacity(deltas.len());
-
-            for (k, delta) in deltas {
-                let new_value = updated_view.apply_delta(&k, &delta)?;
-                delta_writes.push((k, WriteOp::Modification(serialize(&new_value))))
-            }
+            let delta_writes = output.aggregator_v1_delta_set()
+                .into_iter()
+                .map(|(k, delta)| {
+                    let new_value = updated_view.apply_delta(&k, &delta)?;
+                    Ok((k, WriteOp::Modification(serialize(&new_value))))
+                }).collect::<Result<Vec<_>>>()?;
 
             output.incorporate_delta_writes(delta_writes);
         }
@@ -257,7 +262,8 @@ where
         transactions: &[T],
         executor_arguments: &E::Argument,
         writable_view: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
-    ) -> Result<BatchExecutionOutput<E>> {
+        discarded_txns: &mut Vec<TransactionWithHints<T>>,
+    ) -> Result<oneshot::Receiver<Vec<E::Output>>> {
         let transaction_count = transactions.len();
 
         let write_reservations = DashMapReservationTable::with_capacity(transaction_count * 2);
@@ -280,7 +286,7 @@ where
             &delta_reservations,
         )?;
 
-        let (committed_results, other_results) = Self::validate_and_apply_transactions_in_parallel(
+        let selected_results = Self::validate_and_apply_transactions_in_parallel(
             execution_results,
             &write_reservations,
             &delta_reservations,
@@ -294,18 +300,14 @@ where
         // return it via the channel.
         rayon::spawn(move || {
             Self::materialize_deltas(
-                committed_results.iter().map(|info| &info.output),
+                selected_results.iter().map(|info| &info.output),
                 accumulators_snapshot
             ).unwrap();  // TODO: potentially handle the materialization errors
 
-            done_tx.send(committed_results.into_iter().map(|info| info.output).collect()).unwrap();
+            done_tx.send(selected_results.into_iter().map(|info| info.output).collect()).unwrap();
         });
 
-        Ok(BatchExecutionOutput{
-            committed_info_receiver: done_rx,
-            discarded_info: other_results,
-            phantom: PhantomData,
-        })
+        Ok(done_rx)
     }
 
     /// This function should be executed in the context of the thread pool via
@@ -314,7 +316,7 @@ where
         &self,
         executor_arguments: E::Argument,
         signature_verified_block: Vec<T>,
-        base_view: &S,
+        base_view: &(impl TStateView<Key = T::Key> + Sync),
     ) -> Result<Vec<E::Output>> {
         let block_size = signature_verified_block.len();
         let batch_size = (block_size / 10).min(MAX_BATCH_SIZE).max(MIN_BATCH_SIZE);
@@ -323,19 +325,19 @@ where
         let state = DashMapStateView::with_capacity(base_view, block_size);
 
         let mut committed_outputs_receivers = vec![];
-        // let mut discarded_txns_info = Vec::<TxnExecutionInfo<_>>::with_capacity(block_size);
+        let mut discarded_txns = Vec::<TransactionWithHints<T>>::with_capacity(block_size);
 
         for batch_idx in 0..batch_count {
             let batch_begin = batch_idx * batch_size;
             let batch_end = ((batch_idx + 1) * batch_size).min(block_size);
             let batch_transactions = &signature_verified_block[batch_begin..batch_end];
-            let batch_res = self.process_batch(
+            let committed_output_receiver = self.process_batch(
                 batch_transactions,
                 &executor_arguments,
                 &state,
+                &mut discarded_txns,
             )?;
-            let BatchExecutionOutput{committed_info_receiver, discarded_info, ..} = batch_res;
-            committed_outputs_receivers.push(committed_info_receiver);
+            committed_outputs_receivers.push(committed_output_receiver);
         }
 
         // Wait for all materialization tasks to finish.
@@ -347,13 +349,19 @@ where
             }
         }).collect();
 
-        // TODO: execute the fallback
+        // Execute the discarded transactions with the fallback executor.
+        let fallback_outputs = self.fallback.execute_block_hinted(
+            executor_arguments,
+            todo,
+            &state
+        )?;
 
         Ok(committed_outputs.into_par_iter().flatten().collect())
     }
 }
 
 struct TxnExecutionInfo<E: ExecutorTask> {
+    transaction: E::Txn,
     read_set: Vec<<E::Txn as Transaction>::Key>,
     output: E::Output,
     skip_rest: bool,
@@ -362,37 +370,34 @@ struct TxnExecutionInfo<E: ExecutorTask> {
     phantom: PhantomData<E>,
 }
 
-struct BatchExecutionOutput<E: ExecutorTask> {
-    committed_info_receiver: oneshot::Receiver<Vec<E::Output>>,
-    discarded_info: Vec<TxnExecutionInfo<E>>,
-
-    phantom: PhantomData<E>,
-}
-
 const MAX_BATCH_SIZE: usize = 2000;
 const MIN_BATCH_SIZE: usize = 200;
 
-impl<T, E, S, X, FB> BlockExecutor for FastPathBlockExecutor<T, E, S, X, FB>
+impl<T, E, FB> BlockExecutorBase for FastPathBlockExecutor<T, E, FB>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T> + Send + 'static,
-    E::Error: std::error::Error,
-    S: TStateView<Key = T::Key> + Sync,
-    X: Executable + 'static,
-    FB: BlockExecutor<Transaction = T, ExecutorTask = E, StateView = S, Executable = X> + Sync,
 {
-    type Transaction = T;
+    type Txn = T;
     type ExecutorTask = E;
-    type StateView = S;
-    type Executable = X;
     type Error = anyhow::Error;
+}
 
-    fn execute_block(
+impl<T, E, FB> BlockExecutor for FastPathBlockExecutor<T, E, FB>
+where
+    T: Transaction,
+    E: ExecutorTask<Txn = T> + Send + 'static,
+    FB: HintedBlockExecutor<TransactionWithHints<T>, ExecutorTask = E>,
+{
+    fn execute_block<S>(
         &self,
         executor_arguments: E::Argument,
         signature_verified_block: Vec<T>,
         base_view: &S,
-    ) -> Result<Vec<E::Output>> {
+    ) -> Result<Vec<E::Output>>
+    where
+        S: TStateView<Key = T::Key> + Sync,
+    {
         self.executor_thread_pool.install(|| {
             self.execute_block_impl(executor_arguments, signature_verified_block, base_view)
         })

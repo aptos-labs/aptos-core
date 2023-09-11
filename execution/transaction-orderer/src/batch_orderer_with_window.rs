@@ -2,7 +2,6 @@
 
 use crate::{
     batch_orderer::BatchOrderer,
-    common::PTransaction,
     reservation_table::{HashMapReservationTable, ReservationTable},
 };
 use aptos_types::block_executor::partitioner::TxnIndex;
@@ -10,6 +9,7 @@ use std::{
     collections::{BTreeSet, HashMap, HashSet, VecDeque},
     hash::Hash,
 };
+use aptos_block_executor::hints::TransactionHints;
 
 /// Returns batches of non-conflicting transactions that additionally do not have dependencies
 /// on transactions in recently returned batches. The exact set of transactions that the returned
@@ -57,7 +57,7 @@ struct RecentWriteInfo {
     dependencies: HashSet<TxnIndex>,
 }
 
-pub struct SequentialDynamicWindowOrderer<T: PTransaction> {
+pub struct SequentialDynamicWindowOrderer<T: TransactionHints> {
     txn_info: Vec<TxnInfo<T>>,
     active_txns_count: usize,
 
@@ -70,7 +70,7 @@ pub struct SequentialDynamicWindowOrderer<T: PTransaction> {
     recent_writes: HashMap<T::Key, RecentWriteInfo>,
 }
 
-impl<T: PTransaction> Default for SequentialDynamicWindowOrderer<T> {
+impl<T: TransactionHints> Default for SequentialDynamicWindowOrderer<T> {
     // NB: unfortunately, Rust cannot derive Default for generic structs
     // with type parameters that do not implement Default.
     // See: https://github.com/rust-lang/rust/issues/26925
@@ -92,7 +92,7 @@ impl<T: PTransaction> Default for SequentialDynamicWindowOrderer<T> {
 
 impl<T> SequentialDynamicWindowOrderer<T>
 where
-    T: PTransaction + Clone,
+    T: TransactionHints + Clone,
     T::Key: Hash + Eq + Clone,
 {
     fn satisfy_pending_read_table_request(&mut self, idx: TxnIndex) {
@@ -140,7 +140,7 @@ where
 
 impl<T> BatchOrderer for SequentialDynamicWindowOrderer<T>
 where
-    T: PTransaction + Clone,
+    T: TransactionHints + Clone,
     T::Key: Hash + Eq + Clone,
 {
     type Txn = T;
@@ -259,7 +259,7 @@ where
 
 impl<T> BatchOrdererWithWindow for SequentialDynamicWindowOrderer<T>
 where
-    T: PTransaction + Clone,
+    T: TransactionHints + Clone,
     T::Key: Hash + Eq + Clone,
 {
     fn forget_prefix(&mut self, count: usize) {

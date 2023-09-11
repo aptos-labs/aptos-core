@@ -34,6 +34,14 @@ pub trait Transaction: Sync + Send + Clone + 'static {
     type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }
 
+
+/// Trait for objects that can be converted into transactions.
+pub trait IntoTransaction {
+    type Txn: Transaction;
+
+    fn into_transaction(self) -> Self::Txn;
+}
+
 /// Inference result of a transaction.
 pub struct Accesses<K> {
     pub keys_read: Vec<K>,

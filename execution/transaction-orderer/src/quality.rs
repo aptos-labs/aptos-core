@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::common::PTransaction;
+use aptos_block_executor::hints::TransactionHints;
 use std::{collections::HashMap, hash::Hash, ops::Deref};
 
 /// A simple cost function for a dependency between two transactions.
@@ -16,7 +16,7 @@ pub fn amortized_inverse_dependency_cost_function(a: f64) -> impl Fn(usize, usiz
 /// The total cost of the ordering is the sum of the costs of all closest dependencies.
 pub fn order_total_cost<T, I, WF>(txns: I, cost_function: WF) -> f64
 where
-    T: PTransaction,
+    T: TransactionHints,
     T::Key: Eq + Hash + Clone,
     I: IntoIterator,
     I::Item: Deref<Target = T>,
