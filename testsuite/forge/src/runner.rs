@@ -240,6 +240,7 @@ impl ForgeConfig {
             .clone()
             .map(|config_fn| Self::override_node_config_from_fn(config_fn));
         let multi_region_config = self.multi_region_config;
+        let existing_db_tag = self.existing_db_tag.clone();
 
         Some(Arc::new(move |helm_values: &mut serde_yaml::Value| {
             if let Some(override_config) = &validator_override_node_config {
@@ -256,6 +257,12 @@ impl ForgeConfig {
                 helm_values["service"]["validator"]["internal"]["headless"] = true.into();
                 helm_values["service"]["fullnode"]["internal"]["type"] = "ClusterIP".into();
                 helm_values["service"]["fullnode"]["internal"]["headless"] = true.into();
+            }
+            if let Some(existing_db_tag) = &existing_db_tag {
+                helm_values["validator"]["storage"]["labels"]["tag"] =
+                    existing_db_tag.clone().into();
+                helm_values["fullnode"]["storage"]["labels"]["tag"] =
+                    existing_db_tag.clone().into();
             }
         }))
     }
