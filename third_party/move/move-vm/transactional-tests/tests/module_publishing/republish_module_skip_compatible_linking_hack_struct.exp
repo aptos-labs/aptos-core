@@ -16,6 +16,8 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     location: undefined,
     indices: [],
     offsets: [],
+    message: Module Update Failure: Public function/struct signature of new module differs from existing module,
+    exec_state: None,
 }
 
 task 4 'run'. lines 47-47:

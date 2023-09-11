@@ -7,4 +7,6 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     location: undefined,
     indices: [],
     offsets: [],
+    message: Module Update Failure: Friend signature of new module differs from existing module,
+    exec_state: None,
 }

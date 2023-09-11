@@ -7,6 +7,8 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     location: undefined,
     indices: [],
     offsets: [],
+    message: Module Update Failure: Public function/struct signature of new module differs from existing module,
+    exec_state: None,
 }
 
 task 3 'publish'. lines 27-33:
@@ -16,6 +18,8 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     location: undefined,
     indices: [],
     offsets: [],
+    message: Module Update Failure: Public function/struct signature of new module differs from existing module,
+    exec_state: None,
 }
 
 task 5 'publish'. lines 43-49:
@@ -25,4 +29,6 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     location: undefined,
     indices: [],
     offsets: [],
+    message: Module Update Failure: Friend signature of new module differs from existing module,
+    exec_state: None,
 }

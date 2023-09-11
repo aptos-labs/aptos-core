@@ -7,6 +7,8 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
+    message: Add overflow,
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 
 task 2 'run'. lines 24-29:
@@ -16,6 +18,8 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
+    message: Add overflow,
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 
 task 4 'run'. lines 48-53:
@@ -25,6 +29,8 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
+    message: Subtract overflow,
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 
 task 5 'run'. lines 55-60:
@@ -34,6 +40,8 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
+    message: Subtract overflow,
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 
 task 7 'run'. lines 77-82:
@@ -43,6 +51,8 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
+    message: Multiplication overflow,
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 
 task 8 'run'. lines 84-89:
@@ -52,6 +62,8 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
+    message: Multiplication overflow,
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 
 task 10 'run'. lines 108-113:
@@ -61,6 +73,8 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
+    message: Division by zero,
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 
 task 11 'run'. lines 115-120:
@@ -70,6 +84,8 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
+    message: Division by zero,
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 
 task 12 'run'. lines 122-127:
@@ -79,6 +95,8 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
+    message: Division by zero,
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 
 task 14 'run'. lines 146-151:
@@ -88,6 +106,8 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
+    message: Integer remainder by zero,
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 
 task 15 'run'. lines 153-158:
@@ -97,6 +117,8 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
+    message: Integer remainder by zero,
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 
 task 16 'run'. lines 160-165:
@@ -106,4 +128,6 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
+    message: Integer remainder by zero,
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }
