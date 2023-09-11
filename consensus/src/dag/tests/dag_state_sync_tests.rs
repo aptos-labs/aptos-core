@@ -200,8 +200,5 @@ async fn test_dag_state_sync() {
     assert_eq!(new_dag.lowest_round(), (LI_ROUNDS - DAG_WINDOW) as Round);
     assert_eq!(new_dag.highest_round(), (NUM_ROUNDS - 1) as Round);
     assert_none!(new_dag.highest_ordered_anchor_round(),);
-    assert_eq!(
-        new_dag.highest_committed_anchor_round(),
-        LI_ROUNDS as Round
-    );
+    assert_eq!(new_dag.highest_committed_anchor_round(), LI_ROUNDS as Round);
 }

@@ -22,10 +22,7 @@ use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::{
-    block_info::{Round},
-    epoch_state::EpochState,
-};
+use aptos_types::{block_info::Round, epoch_state::EpochState};
 use futures::{
     future::{AbortHandle, Abortable},
     FutureExt,

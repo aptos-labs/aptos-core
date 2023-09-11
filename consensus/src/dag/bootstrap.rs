@@ -12,7 +12,7 @@ use super::{
     order_rule::OrderRule,
     rb_handler::NodeBroadcastHandler,
     storage::DAGStorage,
-    types::DAGMessage,
+    types::{CertifiedNodeMessage, DAGMessage},
 };
 use crate::{
     dag::{adapter::NotifierAdapter, dag_fetcher::DagFetcher},
@@ -195,18 +195,10 @@ impl DagBootstrapper {
         let mut shutdown_rx = shutdown_rx.into_stream();
 
         loop {
-            let (rebootstrap_notification_tx, mut rebootstrap_notification_rx) =
-                tokio::sync::mpsc::channel(1);
-
-            // TODO: fix
             let (dag_store, order_rule) =
                 self.bootstrap_dag_store(ledger_info.ledger_info().clone(), adapter.clone());
 
-            let state_sync_trigger = StateSyncTrigger::new(
-                dag_store.clone(),
-                adapter.clone(),
-                rebootstrap_notification_tx,
-            );
+            let state_sync_trigger = StateSyncTrigger::new(dag_store.clone(), adapter.clone());
 
             let (handler, fetch_service) =
                 self.bootstrap_components(dag_store.clone(), order_rule, state_sync_trigger);
@@ -221,17 +213,16 @@ impl DagBootstrapper {
                     let _ = df_handle.await;
                     return Ok(());
                 },
-                Some(node) = rebootstrap_notification_rx.recv() => {
+                certified_node_msg = handler.run(&mut dag_rpc_rx) => {
                     df_handle.abort();
                     let _ = df_handle.await;
 
                     let dag_fetcher = DagFetcher::new(self.epoch_state.clone(), self.dag_network_sender.clone(), self.time_service.clone());
 
-                    if let Err(e) = sync_manager.sync_dag_to(&node, dag_fetcher, dag_store.clone()).await {
+                    if let Err(e) = sync_manager.sync_dag_to(&certified_node_msg, dag_fetcher, dag_store.clone()).await {
                         error!(error = ?e, "unable to sync");
                     }
-                },
-                _ = handler.start(&mut dag_rpc_rx) => {}
+                }
             }
         }
     }
@@ -249,7 +240,7 @@ pub(super) fn bootstrap_dag_for_test(
     payload_client: Arc<dyn PayloadClient>,
     state_computer: Arc<dyn StateComputer>,
 ) -> (
-    JoinHandle<()>,
+    JoinHandle<CertifiedNodeMessage>,
     JoinHandle<()>,
     aptos_channel::Sender<Author, IncomingDAGRequest>,
     UnboundedReceiver<OrderedBlocks>,
@@ -269,21 +260,16 @@ pub(super) fn bootstrap_dag_for_test(
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
     let adapter = Arc::new(NotifierAdapter::new(ordered_nodes_tx, storage.clone()));
     let (dag_rpc_tx, mut dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
-    let (rebootstrap_notification_tx, _rebootstrap_notification_rx) = tokio::sync::mpsc::channel(1);
 
     let (dag_store, order_rule) =
         bootstraper.bootstrap_dag_store(latest_ledger_info, adapter.clone());
 
-    let state_sync_trigger = StateSyncTrigger::new(
-        dag_store.clone(),
-        adapter.clone(),
-        rebootstrap_notification_tx,
-    );
+    let state_sync_trigger = StateSyncTrigger::new(dag_store.clone(), adapter.clone());
 
     let (handler, fetch_service) =
         bootstraper.bootstrap_components(dag_store.clone(), order_rule, state_sync_trigger);
 
-    let dh_handle = tokio::spawn(async move { handler.start(&mut dag_rpc_rx).await });
+    let dh_handle = tokio::spawn(async move { handler.run(&mut dag_rpc_rx).await });
     let df_handle = tokio::spawn(fetch_service.start());
 
     (dh_handle, df_handle, dag_rpc_tx, ordered_nodes_rx)

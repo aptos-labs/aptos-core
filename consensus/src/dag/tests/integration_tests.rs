@@ -2,14 +2,12 @@
 
 use super::dag_test;
 use crate::{
-    dag::bootstrap::bootstrap_dag_for_test,
+    dag::{bootstrap::bootstrap_dag_for_test, types::CertifiedNodeMessage},
     experimental::buffer_manager::OrderedBlocks,
     network::{DAGNetworkSenderImpl, IncomingDAGRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
-    test_utils::{
-        consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStorage,
-    },
+    test_utils::{consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStorage},
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
@@ -43,7 +41,7 @@ use std::sync::Arc;
 use tokio::task::JoinHandle;
 
 struct DagBootstrapUnit {
-    nh_task_handle: JoinHandle<()>,
+    nh_task_handle: JoinHandle<CertifiedNodeMessage>,
     df_task_handle: JoinHandle<()>,
     dag_rpc_tx: aptos_channel::Sender<Author, IncomingDAGRequest>,
     network_events:

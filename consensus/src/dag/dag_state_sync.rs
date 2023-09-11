@@ -23,40 +23,39 @@ use std::sync::Arc;
 pub const DAG_WINDOW: usize = 1;
 pub const STATE_SYNC_WINDOW_MULTIPLIER: usize = 30;
 
+pub(super) enum StateSyncStatus {
+    NeedsSync(CertifiedNodeMessage),
+    Synced,
+}
+
 pub(super) struct StateSyncTrigger {
     dag_store: Arc<RwLock<Dag>>,
     downstream_notifier: Arc<dyn Notifier>,
-    bootstrap_notifier: tokio::sync::mpsc::Sender<CertifiedNodeMessage>,
 }
 
 impl StateSyncTrigger {
-    pub(super) fn new(
-        dag_store: Arc<RwLock<Dag>>,
-        downstream_notifier: Arc<dyn Notifier>,
-        bootstrap_notifier: tokio::sync::mpsc::Sender<CertifiedNodeMessage>,
-    ) -> Self {
+    pub(super) fn new(dag_store: Arc<RwLock<Dag>>, downstream_notifier: Arc<dyn Notifier>) -> Self {
         Self {
             dag_store,
             downstream_notifier,
-            bootstrap_notifier,
         }
     }
 
     /// This method checks if a state sync is required, and if so,
     /// notifies the bootstraper and yields the current task infinitely,
     /// to let the bootstraper can abort this task.
-    pub(super) async fn check(&self, node: CertifiedNodeMessage) -> anyhow::Result<CertifiedNodeMessage> {
+    pub(super) async fn check(
+        &self,
+        node: CertifiedNodeMessage,
+    ) -> (StateSyncStatus, Option<CertifiedNodeMessage>) {
         let ledger_info = node.ledger_info();
 
         self.notify_commit_proof(ledger_info).await;
 
         if self.need_sync_for_ledger_info(ledger_info) {
-            self.bootstrap_notifier.send(node).await?;
-            loop {
-                tokio::task::yield_now().await;
-            }
+            return (StateSyncStatus::NeedsSync(node), None);
         }
-        Ok(node)
+        (StateSyncStatus::Synced, Some(node))
     }
 
     /// Fast forward in the decoupled-execution pipeline if the block exists there
