@@ -337,6 +337,36 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    LockstreamClaim {
+        base_type: TypeTag,
+        quote_type: TypeTag,
+        creator: AccountAddress,
+    },
+
+    /// All times in UNIX seconds.
+    LockstreamCreate {
+        base_type: TypeTag,
+        quote_type: TypeTag,
+        initial_base_locked: u64,
+        stream_start_time: u64,
+        stream_end_time: u64,
+        claim_last_call_time: u64,
+        premier_sweep_last_call_time: u64,
+    },
+
+    LockstreamLock {
+        base_type: TypeTag,
+        quote_type: TypeTag,
+        creator: AccountAddress,
+        quote_lock_amount: u64,
+    },
+
+    LockstreamSweep {
+        base_type: TypeTag,
+        quote_type: TypeTag,
+        creator: AccountAddress,
+    },
+
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     ManagedCoinBurn {
         coin_type: TypeTag,
@@ -1060,6 +1090,39 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_withdraw(pool_address, amount),
+            LockstreamClaim {
+                base_type,
+                quote_type,
+                creator,
+            } => lockstream_claim(base_type, quote_type, creator),
+            LockstreamCreate {
+                base_type,
+                quote_type,
+                initial_base_locked,
+                stream_start_time,
+                stream_end_time,
+                claim_last_call_time,
+                premier_sweep_last_call_time,
+            } => lockstream_create(
+                base_type,
+                quote_type,
+                initial_base_locked,
+                stream_start_time,
+                stream_end_time,
+                claim_last_call_time,
+                premier_sweep_last_call_time,
+            ),
+            LockstreamLock {
+                base_type,
+                quote_type,
+                creator,
+                quote_lock_amount,
+            } => lockstream_lock(base_type, quote_type, creator, quote_lock_amount),
+            LockstreamSweep {
+                base_type,
+                quote_type,
+                creator,
+            } => lockstream_sweep(base_type, quote_type, creator),
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -2244,6 +2307,97 @@ pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> Tr
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
+    ))
+}
+
+pub fn lockstream_claim(
+    base_type: TypeTag,
+    quote_type: TypeTag,
+    creator: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("lockstream").to_owned(),
+        ),
+        ident_str!("claim").to_owned(),
+        vec![base_type, quote_type],
+        vec![bcs::to_bytes(&creator).unwrap()],
+    ))
+}
+
+/// All times in UNIX seconds.
+pub fn lockstream_create(
+    base_type: TypeTag,
+    quote_type: TypeTag,
+    initial_base_locked: u64,
+    stream_start_time: u64,
+    stream_end_time: u64,
+    claim_last_call_time: u64,
+    premier_sweep_last_call_time: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("lockstream").to_owned(),
+        ),
+        ident_str!("create").to_owned(),
+        vec![base_type, quote_type],
+        vec![
+            bcs::to_bytes(&initial_base_locked).unwrap(),
+            bcs::to_bytes(&stream_start_time).unwrap(),
+            bcs::to_bytes(&stream_end_time).unwrap(),
+            bcs::to_bytes(&claim_last_call_time).unwrap(),
+            bcs::to_bytes(&premier_sweep_last_call_time).unwrap(),
+        ],
+    ))
+}
+
+pub fn lockstream_lock(
+    base_type: TypeTag,
+    quote_type: TypeTag,
+    creator: AccountAddress,
+    quote_lock_amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("lockstream").to_owned(),
+        ),
+        ident_str!("lock").to_owned(),
+        vec![base_type, quote_type],
+        vec![
+            bcs::to_bytes(&creator).unwrap(),
+            bcs::to_bytes(&quote_lock_amount).unwrap(),
+        ],
+    ))
+}
+
+pub fn lockstream_sweep(
+    base_type: TypeTag,
+    quote_type: TypeTag,
+    creator: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("lockstream").to_owned(),
+        ),
+        ident_str!("sweep").to_owned(),
+        vec![base_type, quote_type],
+        vec![bcs::to_bytes(&creator).unwrap()],
     ))
 }
 
@@ -4383,6 +4537,59 @@ mod decoder {
         }
     }
 
+    pub fn lockstream_claim(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::LockstreamClaim {
+                base_type: script.ty_args().get(0)?.clone(),
+                quote_type: script.ty_args().get(1)?.clone(),
+                creator: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn lockstream_create(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::LockstreamCreate {
+                base_type: script.ty_args().get(0)?.clone(),
+                quote_type: script.ty_args().get(1)?.clone(),
+                initial_base_locked: bcs::from_bytes(script.args().get(0)?).ok()?,
+                stream_start_time: bcs::from_bytes(script.args().get(1)?).ok()?,
+                stream_end_time: bcs::from_bytes(script.args().get(2)?).ok()?,
+                claim_last_call_time: bcs::from_bytes(script.args().get(3)?).ok()?,
+                premier_sweep_last_call_time: bcs::from_bytes(script.args().get(4)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn lockstream_lock(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::LockstreamLock {
+                base_type: script.ty_args().get(0)?.clone(),
+                quote_type: script.ty_args().get(1)?.clone(),
+                creator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                quote_lock_amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn lockstream_sweep(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::LockstreamSweep {
+                base_type: script.ty_args().get(0)?.clone(),
+                quote_type: script.ty_args().get(1)?.clone(),
+                creator: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn managed_coin_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinBurn {
@@ -5517,6 +5724,22 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_withdraw".to_string(),
             Box::new(decoder::delegation_pool_withdraw),
+        );
+        map.insert(
+            "lockstream_claim".to_string(),
+            Box::new(decoder::lockstream_claim),
+        );
+        map.insert(
+            "lockstream_create".to_string(),
+            Box::new(decoder::lockstream_create),
+        );
+        map.insert(
+            "lockstream_lock".to_string(),
+            Box::new(decoder::lockstream_lock),
+        );
+        map.insert(
+            "lockstream_sweep".to_string(),
+            Box::new(decoder::lockstream_sweep),
         );
         map.insert(
             "managed_coin_burn".to_string(),

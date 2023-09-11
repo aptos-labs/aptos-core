@@ -3,6 +3,7 @@ module aptos_std::big_vector {
     use std::vector;
     use aptos_std::table_with_length::{Self, TableWithLength};
     friend aptos_std::smart_vector;
+    friend aptos_framework::lockstream;
 
     /// Vector index is out of bounds
     const EINDEX_OUT_OF_BOUNDS: u64 = 1;

@@ -5,6 +5,7 @@ module aptos_framework::lockstream {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::timestamp;
     use aptos_std::math64;
+    use aptos_std::big_vector::{Self, BigVector};
     use aptos_std::table::{Self, Table};
     use aptos_std::type_info::{Self, TypeInfo};
     use std::signer;
@@ -16,6 +17,7 @@ module aptos_framework::lockstream {
     > has key {
         base_locked: Coin<BaseType>,
         quote_locked: Coin<QuoteType>,
+        locker_addresses: BigVector<address>,
         lockers: Table<address, LockerInfo>,
         initial_base_locked: u64,
         initial_quote_locked: u64,
@@ -101,6 +103,12 @@ module aptos_framework::lockstream {
         sweep_event_handle: EventHandle<LockstreamSweepEvent>,
     }
 
+    /// Minimum number of bytes required to encode the number of
+    /// elements in a vector (for a vector with less than 128 elements).
+    const MIN_BYTES_BCS_SEQUENCE_LENGTH: u64 = 1;
+    /// Free number of bytes for a global storage write.
+    const FREE_WRITE_BYTES_QUOTA: u64 = 1024;
+
     /// Time window bounds provided by creator are invalid.
     const E_TIME_WINDOWS_INVALID: u64 = 0;
     /// Quote type provided by creator is not a coin type.
@@ -168,9 +176,13 @@ module aptos_framework::lockstream {
             claim_last_call_time,
             premier_sweep_last_call_time,
         });
+        let big_vector_bucket_size =
+            (FREE_WRITE_BYTES_QUOTA - MIN_BYTES_BCS_SEQUENCE_LENGTH) /
+            type_info::size_of_val(&@0x0);
         move_to(creator, LockstreamPool<BaseType, QuoteType> {
             base_locked: coin::withdraw(creator, initial_base_locked),
             quote_locked: coin::zero(),
+            locker_addresses: big_vector::empty(big_vector_bucket_size),
             lockers: table::new(),
             initial_base_locked,
             initial_quote_locked: 0,
@@ -232,6 +244,10 @@ module aptos_framework::lockstream {
                 base_claimed: 0,
                 quote_claimed: 0,
             });
+            big_vector::push_back(
+                &mut pool_ref_mut.locker_addresses,
+                locker_addr
+            );
             quote_lock_amount
         };
         let lock_event = LockstreamLockEvent {
