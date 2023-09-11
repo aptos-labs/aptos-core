@@ -399,6 +399,14 @@ impl CertifiedNode {
     pub fn certificate(&self) -> NodeCertificate {
         NodeCertificate::new(self.node.metadata.clone(), self.signatures.clone())
     }
+
+    pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(self.digest() == self.calculate_digest(), "invalid digest");
+
+        verifier
+            .verify_multi_signatures(self.metadata(), self.certificate().signatures())
+            .map_err(|e| anyhow::anyhow!("unable to verify: {}", e))
+    }
 }
 
 impl Deref for CertifiedNode {
@@ -406,16 +414,6 @@ impl Deref for CertifiedNode {
 
     fn deref(&self) -> &Self::Target {
         &self.node
-    }
-}
-
-impl TDAGMessage for CertifiedNode {
-    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        ensure!(self.digest() == self.calculate_digest(), "invalid digest");
-
-        verifier
-            .verify_multi_signatures(self.metadata(), self.certificate().signatures())
-            .map_err(|e| anyhow::anyhow!("unable to verify: {}", e))
     }
 }
 
@@ -436,6 +434,10 @@ impl CertifiedNodeMessage {
     pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
         &self.ledger_info
     }
+
+    pub fn certified_node(self) -> CertifiedNode {
+        self.inner
+    }
 }
 
 impl Deref for CertifiedNodeMessage {
@@ -443,6 +445,16 @@ impl Deref for CertifiedNodeMessage {
 
     fn deref(&self) -> &Self::Target {
         &self.inner
+    }
+}
+
+impl TDAGMessage for CertifiedNodeMessage {
+    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.inner.verify(verifier)?;
+
+        self.ledger_info
+            .verify_signatures(verifier)
+            .map_err(|e| anyhow::anyhow!("unable to verify ledger info: {}", e))
     }
 }
 
@@ -533,7 +545,7 @@ impl CertifiedAck {
 impl BroadcastStatus<DAGMessage> for CertificateAckState {
     type Ack = CertifiedAck;
     type Aggregated = ();
-    type Message = CertifiedNode;
+    type Message = CertifiedNodeMessage;
 
     fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
         self.received.insert(peer);
@@ -647,7 +659,7 @@ impl core::fmt::Debug for DAGNetworkMessage {
 pub enum DAGMessage {
     NodeMsg(Node),
     VoteMsg(Vote),
-    CertifiedNodeMsg(CertifiedNode),
+    CertifiedNodeMsg(CertifiedNodeMessage),
     CertifiedAckMsg(CertifiedAck),
     FetchRequest(RemoteFetchRequest),
     FetchResponse(FetchResponse),

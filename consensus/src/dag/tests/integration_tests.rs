@@ -26,6 +26,7 @@ use aptos_network::{
 use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_state::EpochState,
+    ledger_info::generate_ledger_info_with_sig,
     validator_signer::ValidatorSigner,
     validator_verifier::{random_validator_verifier, ValidatorVerifier},
 };
@@ -57,12 +58,14 @@ impl DagBootstrapUnit {
         network_events: Box<
             Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>,
         >,
+        all_signers: Vec<ValidatorSigner>,
     ) -> (Self, UnboundedReceiver<OrderedBlocks>) {
         let epoch_state = EpochState {
             epoch,
             verifier: storage.get_validator_set().into(),
         };
-        let dag_storage = dag_test::MockStorage::new();
+        let ledger_info = generate_ledger_info_with_sig(&all_signers, storage.get_ledger_info());
+        let dag_storage = dag_test::MockStorage::new_with_ledger_info(ledger_info);
 
         let network = Arc::new(DAGNetworkSenderImpl::new(Arc::new(network)));
 
@@ -186,6 +189,7 @@ fn bootstrap_nodes(
                 network,
                 aptos_time_service::TimeService::real(),
                 network_events,
+                signers.clone(),
             )
         })
         .unzip();
