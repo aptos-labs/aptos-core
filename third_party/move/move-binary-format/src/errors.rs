@@ -234,6 +234,53 @@ impl VMError {
             offsets,
         }))
     }
+
+    pub fn format_test_output(&self, verbose: bool, comparison_mode: bool) -> String {
+        let location_string = match &self.location() {
+            Location::Undefined => "undefined".to_owned(),
+            Location::Script => "script".to_owned(),
+            Location::Module(id) => {
+                format!("0x{}::{}", id.address().short_str_lossless(), id.name())
+            },
+        };
+        let message_str = if verbose {
+            match &self.message() {
+                Some(message_str) => message_str,
+                None => "None",
+            }
+        } else {
+            "redacted"
+        };
+        format!(
+            "{{
+    message: {message},
+    major_status: {major_status:?},
+    sub_status: {sub_status:?},
+    location: {location_string},
+    indices: {indices},
+    offsets: {offsets},
+    exec_state: {exec_state:?},
+}}",
+            message = message_str,
+            major_status = self.major_status(),
+            sub_status = self.sub_status(),
+            location_string = location_string,
+            exec_state = self.exec_state(),
+            // TODO maybe include source map info?
+            indices = if comparison_mode {
+                // During comparison testing, abstract this data.
+                "redacted".to_string()
+            } else {
+                format!("{:?}", self.indices())
+            },
+            offsets = if comparison_mode {
+                // During comparison testing, abstract this data.
+                "redacted".to_string()
+            } else {
+                format!("{:?}", self.offsets())
+            },
+        )
+    }
 }
 
 impl fmt::Debug for VMError {

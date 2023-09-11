@@ -15,7 +15,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_command_line_common::{
-    address::ParsedAddress, files::verify_and_create_named_address_mapping,
+    address::ParsedAddress, env::read_bool_env_var, files::verify_and_create_named_address_mapping,
 };
 use move_compiler::{
     compiled_unit::AnnotatedCompiledUnit,
@@ -94,6 +94,11 @@ pub struct AdapterPublishArgs {
 pub struct AdapterExecuteArgs {
     #[clap(long)]
     pub check_runtime_types: bool,
+}
+
+fn move_test_debug() -> bool {
+    static MOVE_TEST_DEBUG: Lazy<bool> = Lazy::new(|| read_bool_env_var("MOVE_TEST_DEBUG"));
+    *MOVE_TEST_DEBUG
 }
 
 impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
@@ -218,10 +223,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             VMConfig::production(),
         ) {
             Ok(()) => Ok((None, module)),
-            Err(e) => Err(anyhow!(
+            Err(vm_error) => Err(anyhow!(
                 "Unable to publish module '{}'. Got VMError: {}",
                 module.self_id(),
-                format_vm_error(&e, self.comparison_mode)
+                vm_error.format_test_output(move_test_debug(), self.comparison_mode)
             )),
         }
     }
@@ -261,10 +266,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 },
                 VMConfig::from(extra_args),
             )
-            .map_err(|e| {
+            .map_err(|vm_error| {
                 anyhow!(
                     "Script execution failed with VMError: {}",
-                    format_vm_error(&e, self.comparison_mode)
+                    vm_error.format_test_output(move_test_debug(), self.comparison_mode)
                 )
             })?;
         Ok((None, serialized_return_values))
@@ -305,10 +310,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 },
                 VMConfig::from(extra_args),
             )
-            .map_err(|e| {
+            .map_err(|vm_error| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
-                    format_vm_error(&e, self.comparison_mode)
+                    vm_error.format_test_output(move_test_debug(), self.comparison_mode)
                 )
             })?;
         Ok((None, serialized_return_values))
@@ -327,39 +332,6 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     fn handle_subcommand(&mut self, _: TaskInput<Self::Subcommand>) -> Result<Option<String>> {
         unreachable!()
     }
-}
-
-pub fn format_vm_error(e: &VMError, comparison_mode: bool) -> String {
-    let location_string = match e.location() {
-        Location::Undefined => "undefined".to_owned(),
-        Location::Script => "script".to_owned(),
-        Location::Module(id) => format!("0x{}::{}", id.address().short_str_lossless(), id.name()),
-    };
-    format!(
-        "{{
-    major_status: {major_status:?},
-    sub_status: {sub_status:?},
-    location: {location_string},
-    indices: {indices},
-    offsets: {offsets},
-}}",
-        major_status = e.major_status(),
-        sub_status = e.sub_status(),
-        location_string = location_string,
-        // TODO maybe include source map info?
-        indices = if comparison_mode {
-            // During comparison testing, abstract this data.
-            "redacted".to_string()
-        } else {
-            format!("{:?}", e.indices())
-        },
-        offsets = if comparison_mode {
-            // During comparison testing, abstract this data.
-            "redacted".to_string()
-        } else {
-            format!("{:?}", e.offsets())
-        },
-    )
 }
 
 impl<'a> SimpleVMTestAdapter<'a> {
