@@ -8,6 +8,7 @@ module aptos_framework::lockstream {
     use aptos_std::big_vector::{Self, BigVector};
     use aptos_std::table::{Self, Table};
     use aptos_std::type_info::{Self, TypeInfo};
+    use std::option::{Self, Option};
     use std::signer;
 
     /// All times in UNIX seconds.
@@ -213,10 +214,9 @@ module aptos_framework::lockstream {
         LockstreamLockerEventHandles,
         LockstreamPool
     {
+        let (pool_id, pool_ref_mut) =
+            get_pool_id_and_mutable_reference<BaseType, QuoteType>(creator);
         assert!(quote_lock_amount > 0, E_NO_QUOTE_LOCK_AMOUNT);
-        let pool_id = pool_id<BaseType, QuoteType>(creator);
-        let pool_ref_mut =
-            borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(creator);
         let lock_time = timestamp::now_seconds();
         assert!(
             lock_time < pool_ref_mut.stream_start_time,
@@ -312,9 +312,8 @@ module aptos_framework::lockstream {
         LockstreamLockerEventHandles,
         LockstreamPool
     {
-        let pool_id = pool_id<BaseType, QuoteType>(creator);
-        let pool_ref_mut =
-            borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(creator);
+        let (pool_id, pool_ref_mut) =
+            get_pool_id_and_mutable_reference<BaseType, QuoteType>(creator);
         let lockers_ref_mut = &mut pool_ref_mut.lockers;
         let locker_addr = signer::address_of(locker);
         assert!(
@@ -407,9 +406,8 @@ module aptos_framework::lockstream {
         LockstreamLockerEventHandles,
         LockstreamPool
     {
-        let pool_id = pool_id<BaseType, QuoteType>(creator);
-        let pool_ref_mut =
-            borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(creator);
+        let (pool_id, pool_ref_mut) =
+            get_pool_id_and_mutable_reference<BaseType, QuoteType>(creator);
         let lockers_ref_mut = &mut pool_ref_mut.lockers;
         let locker_addr = signer::address_of(locker);
         assert!(
@@ -466,21 +464,34 @@ module aptos_framework::lockstream {
         );
     }
 
+    inline fun get_pool_id_and_mutable_reference<
+        BaseType,
+        QuoteType
+    >(creator: address): (
+        LockstreamPoolID,
+        &mut LockstreamPool<BaseType, QuoteType>
+    ) acquires LockstreamPool {
+        let pool_id_option = pool_id<BaseType, QuoteType>(creator);
+        assert!(option::is_some(&pool_id_option), E_NO_LOCKSTREAM_POOL);
+        (
+            option::destroy_some(pool_id_option),
+            borrow_global_mut<LockstreamPool<BaseType, QuoteType>>(creator)
+        )
+    }
+
     #[view]
     public fun pool_id<
         BaseType,
         QuoteType
     >(creator: address):
-    LockstreamPoolID {
-        assert!(
-            exists<LockstreamPool<BaseType, QuoteType>>(creator),
-            E_NO_LOCKSTREAM_POOL
-        );
-        LockstreamPoolID {
-            creator,
-            base_type: type_info::type_of<BaseType>(),
-            quote_type: type_info::type_of<QuoteType>(),
-        }
+    Option<LockstreamPoolID> {
+        if (exists<LockstreamPool<BaseType, QuoteType>>(creator)) {
+            option::some(LockstreamPoolID {
+                creator,
+                base_type: type_info::type_of<BaseType>(),
+                quote_type: type_info::type_of<QuoteType>(),
+            })
+        } else option::none()
     }
 
 }
