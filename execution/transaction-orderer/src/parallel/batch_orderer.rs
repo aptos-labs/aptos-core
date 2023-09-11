@@ -1,76 +1,39 @@
 // Copyright © Aptos Foundation
 
-use std::{
-    hash::Hash,
-};
+use std::hash::Hash;
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
+use std::fmt::Debug;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::RwLock;
-use itertools::{Either};
 
+use itertools::Either;
 use rayon::{prelude::*};
 
 use aptos_types::block_executor::partitioner::TxnIndex;
 use aptos_types::rayontools::ExtendRef;
 
 use crate::{
-    common::{PTransaction},
+    common::PTransaction,
     parallel::reservation_table::{
-        DashMapReservationTable, ParallelReservationTable, RequestsPhaseTrait,
-        ReservationsPhaseTrait,
+        DashMapReservationTable, MakeReservationsPhaseTrait, ParallelReservationTable,
+        RequestsPhaseTrait,
     },
 };
-
-/// Creates batches of non-conflicting transactions.
-/// Each time `commit_prefix` is called, returns a sequence of transactions
-/// such that none of them read any location written by an earlier transaction in the same batch.
-pub trait BatchOrderer {
-    type Txn;
-
-    /// Adds transactions to the orderer for consideration.
-    fn add_transactions(&mut self, txns: Vec<Self::Txn>);
-
-    /// Returns the number of transactions that have been added to the orderer but not yet ordered.
-    fn count_active_transactions(&self) -> usize;
-
-    /// Returns `true` if all added transactions were ordered.
-    /// Equivalent to `self.count_active_transactions() == 0`.
-    fn is_empty(&self) -> bool {
-        self.count_active_transactions() == 0
-    }
-
-    /// Returns the maximum size of a batch of non-conflicting transactions that the orderer is
-    /// ready to produce.
-    fn count_selected(&self) -> usize;
-
-    /// Calls `callback` on a sequence of non-conflicting transactions and removes them from
-    /// the orderer. This may lead to an increase of `count_selected()` as transactions that
-    /// conflict with the returned transactions can now be selected.
-    fn commit_prefix_callback<F, R>(&mut self, count: usize, callback: F) -> R
-    where
-        F: FnOnce(Vec<Self::Txn>) -> R;
-
-    /// Returns a sequence of non-conflicting transactions and removes them from the orderer.
-    fn commit_prefix(&mut self, count: usize) -> Vec<Self::Txn> {
-        let mut committed = Vec::new();
-        self.commit_prefix_callback(count, |txns| committed = txns);
-        committed
-    }
-}
+use crate::batch_orderer::BatchOrderer;
+use crate::parallel::min_heap::MinHeap;
+use crate::parallel::reservation_table::RemoveReservationsPhaseTrait;
 
 struct PendingTxnInfo<T> {
     transaction: T,
-    pending_write_table_requests: AtomicUsize,
+    pending_requests: AtomicUsize,
 }
-
 
 impl<T> PendingTxnInfo<T> {
     fn new(transaction: T, pending_write_table_requests: usize) -> Self {
         Self {
             transaction,
-            pending_write_table_requests: pending_write_table_requests.into(),
+            pending_requests: pending_write_table_requests.into(),
         }
     }
 }
@@ -117,7 +80,7 @@ pub struct ParallelDynamicToposortOrderer<T: PTransaction> {
 
     // FIXME: all operations on `BTreeSet` are sequential, even with rayon.
     //        Consider using a skip list instead.
-    selected: BTreeSet<SelectedTxnInfo<T>>,
+    selected: MinHeap<SelectedTxnInfo<T>>,
 
     write_reservations: DashMapReservationTable<T::Key, TxnIndex>,
 }
@@ -150,22 +113,34 @@ where
 impl<T> BatchOrderer for ParallelDynamicToposortOrderer<T>
 where
     T: PTransaction + Send + Sync,
-    T::Key: Hash + Eq + Clone + Send + Sync,
+    T::Key: Hash + Eq + Clone + Send + Sync + Debug,
 {
     type Txn = T;
 
-    fn add_transactions(&mut self, txns: Vec<Self::Txn>) {
+    fn add_transactions<TS>(&mut self, txns: TS)
+    where
+        TS: IntoIterator<Item = Self::Txn>,
+    {
+        // FIXME: this `collect` can be avoided, but doing so would require a separate
+        //        trait for the parallel `BatchOrderer`.
+        let txns: Vec<_>  = txns.into_iter().collect();
+
         let n_new_txns = txns.len();
         let new_ids = self.pending.len()..self.pending.len() + n_new_txns;
 
         // reservations phase
         {
-            let write_table_handle = self.write_reservations.reservations_phase();
+            let write_table_handle = self.write_reservations.make_reservations_phase();
 
             new_ids.clone()
                 .into_par_iter()
                 .zip_eq(txns.par_iter())
                 .for_each(|(idx, tx)| {
+                    // if idx % 1000 == 174 {
+                    //     println!("================\n\n\tread_set: {:?}\n\twrite_set: {:?}\n\n================",
+                    //              tx.read_set().collect::<Vec<_>>(),
+                    //              tx.write_set().collect::<Vec<_>>());
+                    // }
                     write_table_handle.make_reservations(idx, tx.write_set());
                 });
         }
@@ -226,13 +201,13 @@ where
         // This is possible to implement, but does not seem to be readily available in any
         // widely used Rust crate.
         let committed: Vec<SelectedTxnInfo<T>> = (0..count)
-            .map(|_| self.selected.pop_first().unwrap())
+            .map(|_| self.selected.pop().unwrap())
             .collect();
 
         // Update the internal data structures.
         self.active_txns_count -= count;
 
-        let table_handle = self.write_reservations.reservations_phase();
+        let table_handle = self.write_reservations.remove_reservations_phase();
 
         let new_selected = committed.par_iter()
             .flat_map(|tx_info| {
@@ -245,7 +220,7 @@ where
                         let selected = {
                             let read_lock = self.pending[idx].read().unwrap();
                             let pending_info = read_lock.as_ref().unwrap();
-                            let prev = pending_info.pending_write_table_requests.fetch_sub(1, SeqCst);
+                            let prev = pending_info.pending_requests.fetch_sub(1, SeqCst);
                             prev == 1
                         };
 
@@ -262,7 +237,7 @@ where
                     })
             });
 
-        // NB: this step is done sequentially.
+        // NB: the insertion to the `BTreeSet` is done sequentially by rayon.
         self.selected.par_extend(new_selected);
 
         callback(committed.into_par_iter().map(|info| info.transaction).collect())

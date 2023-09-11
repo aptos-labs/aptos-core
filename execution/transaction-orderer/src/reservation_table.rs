@@ -121,7 +121,7 @@ where
         if !self.is_satisfied(idx, key) {
             let requests = &mut self.0.get_mut(key).unwrap().requests;
             debug_assert!(requests.back().map_or(true, |&last| last <= idx));
-            self.0.get_mut(key).unwrap().requests.push_back(idx);
+            requests.push_back(idx);
             true
         } else {
             false

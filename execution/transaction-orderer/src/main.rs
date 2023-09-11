@@ -11,7 +11,7 @@ use aptos_transaction_orderer::{
         IdentityBlockOrderer,
     },
     quality::{amortized_inverse_dependency_cost_function, order_total_cost},
-    transaction_compressor::{compress_transactions, CompressedPTransaction},
+    transaction_compressor::compress_transactions,
 };
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use clap::{Parser, ValueEnum};
@@ -23,11 +23,16 @@ use std::{
     sync::Mutex,
     time::{Duration, Instant},
 };
+use std::hash::Hash;
+use aptos_transaction_orderer::common::PTransaction;
+use aptos_transaction_orderer::parallel::batch_orderer::ParallelDynamicToposortOrderer;
+use aptos_transaction_orderer::parallel::transaction_compressor::compress_transactions_in_parallel;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 enum Orderer {
     Aria,
     Window,
+    Parallel,
     Identity,
 }
 
@@ -46,38 +51,16 @@ struct Args {
     pub orderer: Orderer,
 }
 
-fn run_benchmark<O>(args: Args, block_orderer: O)
+fn run_benchmark<T, O>(txns: Vec<T>, args: Args, block_orderer: O)
 where
-    O: BlockOrderer<Txn = CompressedPTransaction<AnalyzedTransaction>>,
+    T: PTransaction + Clone,
+    T::Key: Eq + Hash + Clone,
+    O: BlockOrderer<Txn = T>,
 {
-    let num_accounts = args.num_accounts;
-    println!("Creating {} accounts", num_accounts);
-    let accounts: Vec<Mutex<TestAccount>> = (0..num_accounts)
-        .into_par_iter()
-        .map(|_i| Mutex::new(generate_test_account()))
-        .collect();
-    println!("Created {} accounts", num_accounts);
-    println!("Creating {} transactions", args.block_size);
-    let transactions: Vec<AnalyzedTransaction> = (0..args.block_size)
-        .map(|_| {
-            // randomly select a sender and receiver from accounts
-            let mut rng = OsRng;
-
-            let indices = rand::seq::index::sample(&mut rng, num_accounts, 2);
-            let receiver = accounts[indices.index(1)].lock().unwrap();
-            let mut sender = accounts[indices.index(0)].lock().unwrap();
-            create_signed_p2p_transaction(&mut sender, vec![&receiver]).remove(0)
-        })
-        .collect();
-
-    let now = Instant::now();
-    let transactions = compress_transactions(transactions);
-    println!("Mapping time: {:?}", now.elapsed());
-
     let min_ordered_transaction_before_execution = min(100, args.block_size);
 
     for _ in 0..args.num_blocks {
-        let transactions = transactions.clone();
+        let txns = txns.clone();
         println!("Starting to order");
         let now = Instant::now();
 
@@ -91,7 +74,7 @@ where
         let mut results = Vec::new();
 
         block_orderer
-            .order_transactions(transactions, |ordered_txns| -> Result<(), io::Error> {
+            .order_transactions(txns, |ordered_txns| -> Result<(), io::Error> {
                 count_ordered += ordered_txns.len();
                 if latency.is_none() && count_ordered >= min_ordered_transaction_before_execution {
                     latency = Some(now.elapsed());
@@ -135,17 +118,45 @@ where
 fn main() {
     let args = Args::parse();
 
+    let num_accounts = args.num_accounts;
+    println!("Creating {} accounts", num_accounts);
+    let accounts: Vec<Mutex<TestAccount>> = (0..num_accounts)
+        .into_par_iter()
+        .map(|_i| Mutex::new(generate_test_account()))
+        .collect();
+    println!("Created {} accounts", num_accounts);
+    println!("Creating {} transactions", args.block_size);
+    let transactions: Vec<AnalyzedTransaction> = (0..args.block_size)
+        .map(|_| {
+            // randomly select a sender and receiver from accounts
+            let mut rng = OsRng;
+
+            let indices = rand::seq::index::sample(&mut rng, num_accounts, 2);
+            let receiver = accounts[indices.index(1)].lock().unwrap();
+            let mut sender = accounts[indices.index(0)].lock().unwrap();
+            create_signed_p2p_transaction(&mut sender, vec![&receiver]).remove(0)
+        })
+        .collect();
+
     match args.orderer {
         Orderer::Aria => {
+            let now = Instant::now();
+            let transactions = compress_transactions(transactions);
+            println!("Mapping time: {:?}", now.elapsed());
+
             let min_ordered_transaction_before_execution = min(100, args.block_size);
             let block_orderer = BatchedBlockOrdererWithoutWindow::new(
                 SequentialDynamicAriaOrderer::default(),
                 min_ordered_transaction_before_execution * 5,
             );
 
-            run_benchmark(args, block_orderer);
+            run_benchmark(transactions, args, block_orderer);
         },
         Orderer::Window => {
+            let now = Instant::now();
+            let transactions = compress_transactions(transactions);
+            println!("Mapping time: {:?}", now.elapsed());
+
             let min_ordered_transaction_before_execution = min(100, args.block_size);
             let block_orderer = BatchedBlockOrdererWithWindow::new(
                 SequentialDynamicWindowOrderer::default(),
@@ -153,12 +164,29 @@ fn main() {
                 1000,
             );
 
-            run_benchmark(args, block_orderer);
+            run_benchmark(transactions, args, block_orderer);
         },
+        Orderer::Parallel => {
+            let now = Instant::now();
+            let transactions = compress_transactions_in_parallel(transactions);
+            println!("Mapping time: {:?}", now.elapsed());
+
+            let min_ordered_transaction_before_execution = min(100, args.block_size);
+            let block_orderer = BatchedBlockOrdererWithoutWindow::new(
+                ParallelDynamicToposortOrderer::default(),
+                min_ordered_transaction_before_execution * 5,
+            );
+
+            run_benchmark(transactions, args, block_orderer);
+        }
         Orderer::Identity => {
+            let now = Instant::now();
+            let transactions = compress_transactions(transactions);
+            println!("Mapping time: {:?}", now.elapsed());
+
             let block_orderer = IdentityBlockOrderer::default();
 
-            run_benchmark(args, block_orderer);
+            run_benchmark(transactions, args, block_orderer);
         },
     }
 }

@@ -4,10 +4,12 @@ use std::{
     collections::{HashSet, VecDeque},
     hash::Hash,
 };
+use std::collections::BTreeSet;
 
 use dashmap::DashMap;
+use crate::parallel::min_heap::{MinHeap, MinHeapWithRemove};
 
-pub trait ReservationsPhaseTrait {
+pub trait MakeReservationsPhaseTrait {
     type Key;
     type TxnId: Copy;
 
@@ -24,6 +26,11 @@ pub trait ReservationsPhaseTrait {
             self.make_reservation(idx, key);
         }
     }
+}
+
+pub trait RemoveReservationsPhaseTrait {
+    type Key;
+    type TxnId: Copy;
 
     // TODO: consider returning an iterator instead of a vector
     /// Removes a reservation from the table and returns the requests that
@@ -96,33 +103,48 @@ pub trait RequestsPhaseTrait {
 /// When a reservation is removed, returns the set of satisfied requests and removes them
 /// from the reservation table.
 ///
-/// The table can be in two phases: reservations phase and requests phase.
-/// The disjointness between the two is ensured automatically by the borrow checker.
+/// The table can be in three phases:
+/// making reservations, removing reservations, and making requests.
+/// The disjointness between the phases is ensured automatically by the borrow checker.
+/// Hence, the implementation can assume no concurrent operations from other phases.
 pub trait ParallelReservationTable {
     type Key;
     type TxnId: Copy;
 
-    type ReservationsPhase<'a>: ReservationsPhaseTrait<Key = Self::Key, TxnId = Self::TxnId>
+    type MakeReservationsPhase<'a>: MakeReservationsPhaseTrait<Key = Self::Key, TxnId = Self::TxnId>
     where
         Self: 'a;
+
+    type RemoveReservationsPhase<'a>: RemoveReservationsPhaseTrait<Key = Self::Key, TxnId = Self::TxnId>
+    where
+        Self: 'a;
+
     type RequestsPhase<'a>: RequestsPhaseTrait<Key = Self::Key, TxnId = Self::TxnId>
     where
         Self: 'a;
 
-    /// Returns a handle that allows adding and removing reservations from the table.
-    /// While the handle is held, no requests can be added to the table.
-    fn reservations_phase(&mut self) -> Self::ReservationsPhase<'_>;
+    /// Returns a handle that allows adding reservations to the table.
+    fn make_reservations_phase(&mut self) -> Self::MakeReservationsPhase<'_>;
 
-    /// Returns a handle that allows adding requests to the table.
-    /// While the handle is held, reservations cannot be added or removed.
+    /// Returns a handle that allows removing reservations from the table.
+    fn remove_reservations_phase(&mut self) -> Self::RemoveReservationsPhase<'_>;
+
+    /// Returns a handle that allows making requests to the table.
     fn requests_phase(&mut self) -> Self::RequestsPhase<'_>;
 }
 
-#[derive(Default)]
 struct TableEntry<Id> {
-    reservations: VecDeque<Id>,
-    requests: VecDeque<Id>,
-    delayed_removes: HashSet<Id>,
+    reservations: MinHeapWithRemove<Id>,
+    requests: MinHeap<Id>,
+}
+
+impl<Id: Ord> Default for TableEntry<Id> {
+    fn default() -> Self {
+        Self {
+            reservations: Default::default(),
+            requests: Default::default(),
+        }
+    }
 }
 
 /// A parallel reservation table implemented on top of [`DashMap`].
@@ -151,11 +173,16 @@ where
 {
     type Key = K;
     type RequestsPhase<'a> = DashMapRequestsPhase<'a, K, Id> where Self: 'a;
-    type ReservationsPhase<'a> = DashMapReservationsPhase<'a, K, Id> where Self: 'a;
+    type MakeReservationsPhase<'a> = DashMapMakeReservationsPhase<'a, K, Id> where Self: 'a;
+    type RemoveReservationsPhase<'a> = DashMapRemoveReservationsPhase<'a, K, Id> where Self: 'a;
     type TxnId = Id;
 
-    fn reservations_phase(&mut self) -> Self::ReservationsPhase<'_> {
-        DashMapReservationsPhase { inner: self }
+    fn make_reservations_phase(&mut self) -> Self::MakeReservationsPhase<'_> {
+        DashMapMakeReservationsPhase { inner: self }
+    }
+
+    fn remove_reservations_phase(&mut self) -> Self::RemoveReservationsPhase<'_> {
+        DashMapRemoveReservationsPhase { inner: self }
     }
 
     fn requests_phase(&mut self) -> Self::RequestsPhase<'_> {
@@ -163,11 +190,11 @@ where
     }
 }
 
-pub struct DashMapReservationsPhase<'a, K, Id> {
+pub struct DashMapMakeReservationsPhase<'a, K, Id> {
     inner: &'a mut DashMapReservationTable<K, Id>,
 }
 
-impl<'a, K, Id> ReservationsPhaseTrait for DashMapReservationsPhase<'a, K, Id>
+impl<'a, K, Id> MakeReservationsPhaseTrait for DashMapMakeReservationsPhase<'a, K, Id>
 where
     K: Hash + Eq + Clone,
     Id: Ord + Eq + Hash + Default + Copy,
@@ -176,42 +203,46 @@ where
     type TxnId = Id;
 
     fn make_reservation(&self, idx: Id, key: &K) {
-        let reservations = &mut self
+        self
             .inner
             .table
             .entry(key.clone())
             .or_default()
-            .reservations;
-        debug_assert!(reservations.back().map_or(true, |&last| last <= idx));
-        reservations.push_back(idx);
+            .reservations
+            .push(idx);
     }
+}
+
+pub struct DashMapRemoveReservationsPhase<'a, K, Id> {
+    inner: &'a mut DashMapReservationTable<K, Id>,
+}
+
+impl<'a, K, Id> RemoveReservationsPhaseTrait for DashMapRemoveReservationsPhase<'a, K, Id>
+where
+    K: Hash + Eq + Clone,
+    Id: Ord + Eq + Hash + Default + Copy,
+{
+    type Key = K;
+    type TxnId = Id;
 
     fn remove_reservation(&self, idx: Id, key: &K) -> Vec<Id> {
         let mut entry = self.inner.table.get_mut(key).unwrap();
-        entry.delayed_removes.insert(idx);
+        entry.reservations.remove(idx);
 
-        while let Some(&first_reservation) = entry.reservations.front() {
-            if !entry.delayed_removes.contains(&first_reservation) {
-                break;
-            }
-            entry.delayed_removes.remove(&first_reservation);
-            entry.reservations.pop_front();
-        }
-
-        match entry.reservations.front() {
+        match entry.reservations.peek() {
             None => {
-                let mut res = VecDeque::new();
+                let mut res = Default::default();
                 std::mem::swap(&mut res, &mut entry.requests);
-                res.into()
+                res.into_iter().collect()
             },
             Some(&first_reservation) => {
                 let mut res = Vec::new();
 
-                while let Some(&first_request) = entry.requests.front() {
+                while let Some(&first_request) = entry.requests.peek() {
                     if first_request > first_reservation {
                         break;
                     }
-                    res.push(entry.requests.pop_front().unwrap());
+                    res.push(entry.requests.pop().unwrap());
                 }
 
                 res
@@ -235,13 +266,7 @@ where
     fn make_request(&self, idx: Id, key: &K) -> bool {
         if !self.is_satisfied(idx, key) {
             let requests = &mut self.inner.table.get_mut(key).unwrap().requests;
-            debug_assert!(requests.back().map_or(true, |&last| last <= idx));
-            self.inner
-                .table
-                .get_mut(key)
-                .unwrap()
-                .requests
-                .push_back(idx);
+            requests.push(idx);
             true
         } else {
             false
@@ -250,7 +275,7 @@ where
 
     fn is_satisfied(&self, idx: Id, request_key: &K) -> bool {
         let Some(entry) = self.inner.table.get(request_key) else { return true };
-        let Some(&first_reservation) = entry.reservations.front() else { return true };
+        let Some(&first_reservation) = entry.reservations.peek() else { return true };
         first_reservation >= idx
     }
 }
