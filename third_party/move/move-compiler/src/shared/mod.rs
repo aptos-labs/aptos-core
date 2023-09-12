@@ -11,7 +11,6 @@ use clap::*;
 use move_command_line_common::env::read_bool_env_var;
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
-
 use once_cell::sync::Lazy;
 use petgraph::{algo::astar as petgraph_astar, graphmap::DiGraphMap};
 use std::{
@@ -114,13 +113,13 @@ pub fn shortest_cycle<'a, T: Ord + Hash>(
             );
             match (shortest_path, path_opt) {
                 (p, None) | (None, p) => p,
-                (Some((acc_len, acc_path)), Some((cur_len, cur_path))) => {
-                    Some(if cur_len < acc_len {
+                (Some((acc_len, acc_path)), Some((cur_len, cur_path))) => Some(
+                    if cur_len < acc_len {
                         (cur_len, cur_path)
                     } else {
                         (acc_len, acc_path)
-                    })
-                },
+                    },
+                ),
             }
         });
     let (_, mut path) = shortest_path.unwrap();
