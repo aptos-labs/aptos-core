@@ -127,9 +127,15 @@ EXAMPLE_DIR=./aptos-move/move-examples/lockstream
 docker build . -f "$EXAMPLE_DIR/Dockerfile" -t lockstream-example
 ```
 
-Run the Docker image:
+Start a local chain, then run the Python script against it:
 
 ```sh
-# From aptos-core root
-docker run -v $EXAMPLE_DIR:/app/script lockstream-example
+chain_container=$(docker run --detach lockstream-example \
+    aptos node run-local-testnet --test-dir /app/data)
+docker run \
+    --volume $EXAMPLE_DIR:/app/scripts \
+    --workdir /app \
+    lockstream-example \
+    poetry run python scripts/example.py
+docker stop $chain_container
 ```
