@@ -119,15 +119,17 @@ These result in the following periods:
 
 Build the Docker image:
 
+> This might take a while, since it compiles several Aptos binaries from source.
+
 ```sh
 # From aptos-core root
 EXAMPLE_DIR=./aptos-move/move-examples/lockstream
 docker build . -f "$EXAMPLE_DIR/Dockerfile" -t lockstream-example
-docker run -v $EXAMPLE_DIR:/app/script lockstream-example
 ```
 
 Run the Docker image:
 
 ```sh
 # From aptos-core root
+docker run -v $EXAMPLE_DIR:/app/script lockstream-example
 ```

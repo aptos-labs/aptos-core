@@ -1,9 +1,21 @@
 /// Can be minted to anyone's account.
-module assets::usdc {
-    use aptos_framework::coin;
+module dee::usdc {
+    use aptos_std::coin::{
+        Self,
+        BurnCapability,
+        FreezeCapability,
+        MintCapability,
+    };
+    use aptos_std::signer;
     use aptos_std::string;
 
     struct USDC {}
+
+    struct CapabilityStore<phantom CoinType> has key {
+        burn_cap: BurnCapability<CoinType>,
+        freeze_cap: FreezeCapability<CoinType>,
+        mint_cap: MintCapability<CoinType>,
+    }
 
     const NAME: vector<u8> = b"USD Coin";
     const SYMBOL: vector<u8> = b"USDC";
@@ -11,14 +23,14 @@ module assets::usdc {
     const MONITOR_SUPPLY: bool = false;
 
     fun init_module(account: &signer) {
-        let (burn_cap, freeze_cap, mint_cap) = coin::initialize<DeeCoin>(
+        let (burn_cap, freeze_cap, mint_cap) = coin::initialize<USDC>(
             account,
-            NAME,
-            SYMBOL,
+            string::utf8(NAME),
+            string::utf8(SYMBOL),
             DECIMALS,
             MONITOR_SUPPLY,
         );
-        move_to(account, CapabilityStore<CoinType> {
+        move_to(account, CapabilityStore<USDC> {
             burn_cap,
             freeze_cap,
             mint_cap,
@@ -29,7 +41,7 @@ module assets::usdc {
         account: &signer,
         amount: u64,
     ) acquires CapabilityStore {
-        let account_addr = address_of(account);
+        let account_addr = signer::address_of(account);
         if (!coin::is_account_registered<CoinType>(account_addr)) {
             coin::register<CoinType>(account)
         };

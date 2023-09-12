@@ -34,7 +34,7 @@ RUN poetry install --directory /app/
 # Initialize chain state with funded accounts, mint authority.
 FROM run-cli AS init-chain-state
 COPY aptos-move/move-examples/lockstream/accounts /accounts/
-COPY aptos-move/move-examples/lockstream/assets /assets
+COPY . /aptos-core/
 RUN aptos node run-local-testnet \
         --test-dir /app/data \
         --with-faucet \
@@ -48,7 +48,7 @@ RUN aptos node run-local-testnet \
         --included-artifacts none \
         --named-addresses dee=$(cat accounts/dee.address) \
         --override-size-check \
-        --package-dir assets \
+        --package-dir /aptos-core/aptos-move/move-examples/lockstream/assets \
         --profile dee
 
 # Copy over chain state and accounts.
@@ -62,7 +62,7 @@ ENTRYPOINT [ \
     "/usr/local/bin/aptos", "node", "run-local-testnet", \
     "--test-dir", "/app/data", \
     "--with-faucet" \
-    "&&" \
+    "&&", \
     "/root/.local/bin/poetry", "run", "python", \
     "script/example.py" \
 ]

@@ -7,4 +7,4 @@ upgrade_policy = 'compatible'
 dee = "_"
 
 [dependencies.AptosFramework]
- local = "../../framework/aptos-framework"
+local = "../../../framework/aptos-framework"
