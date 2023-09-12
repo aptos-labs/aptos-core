@@ -627,6 +627,18 @@ module aptos_framework::voting {
         from_bcs::to_bool(*simple_map::borrow(&proposal.metadata, &is_multi_step_in_execution_key))
     }
 
+    #[view]
+    /// Return metadata given attribute key.
+    public fun get_proposal_metadata<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+        metadata_key: String,
+    ): vector<u8> acquires VotingForum {
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
+        *simple_map::borrow(&proposal.metadata, &metadata_key)
+    }
+
     /// Return true if the voting period of the given proposal has already ended.
     fun is_voting_period_over<ProposalType: store>(proposal: &Proposal<ProposalType>): bool {
         timestamp::now_seconds() > proposal.expiration_secs
