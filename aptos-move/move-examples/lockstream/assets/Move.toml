@@ -1,0 +1,10 @@
+[package]
+name = "LockstreamAssets"
+version = '1.0.0'
+upgrade_policy = 'compatible'
+
+[addresses]
+dee = "_"
+
+[dependencies.AptosFramework]
+ local = "../../framework/aptos-framework"

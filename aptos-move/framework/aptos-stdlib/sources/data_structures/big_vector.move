@@ -3,7 +3,6 @@ module aptos_std::big_vector {
     use std::vector;
     use aptos_std::table_with_length::{Self, TableWithLength};
     friend aptos_std::smart_vector;
-    friend aptos_framework::lockstream;
 
     /// Vector index is out of bounds
     const EINDEX_OUT_OF_BOUNDS: u64 = 1;
@@ -25,7 +24,7 @@ module aptos_std::big_vector {
     /// Regular Vector API
 
     /// Create an empty vector.
-    public(friend) fun empty<T: store>(bucket_size: u64): BigVector<T> {
+    public fun empty<T: store>(bucket_size: u64): BigVector<T> {
         assert!(bucket_size > 0, error::invalid_argument(EZERO_BUCKET_SIZE));
         BigVector {
             buckets: table_with_length::new(),
