@@ -119,9 +119,6 @@ pub fn program(
     let mut units = vec![];
 
     let (orderings, sdecls, fdecls) = extract_decls(compilation_env, pre_compiled_lib, &prog);
-    if compilation_env.flags().debug() {
-        eprintln!("Bytecode: = {:?}", prog);
-    }
     let G::Program {
         modules: gmodules,
         scripts: gscripts,
