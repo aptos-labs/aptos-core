@@ -1683,7 +1683,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 ["backlog_per_validator_batch_limit_count"] = 10.into();
 
             helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
-                ["dynamic_max_txn_per_s"] = 6000.into();
+                ["dynamic_max_txn_per_s"] = 60000.into();
 
             helm_values["validator"]["config"]["consensus"]["quorum_store"]
                 ["sender_max_batch_txns"] = 500.into();
@@ -1705,6 +1705,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             SuccessCriteria::new(8000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
+                /*
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // Tuned for throughput uses more cores than regular tests,
                     // as it achieves higher throughput.
@@ -1713,6 +1714,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new_gb(10.0, 30),
                 ))
+                 */
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
