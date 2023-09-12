@@ -288,12 +288,10 @@ impl VMError {
     location: {location_string},
     indices: {indices},
     offsets: {offsets},
-    exec_state: {exec_state:?},
 }}",
                 major_status = self.major_status(),
                 sub_status = self.sub_status(),
                 location_string = location_string,
-                exec_state = self.exec_state(),
                 // TODO maybe include source map info?
                 indices = indices,
                 offsets = offsets,
