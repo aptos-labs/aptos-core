@@ -377,8 +377,10 @@ impl TestFailure {
         };
 
         static MOVE_TEST_DEBUG: Lazy<bool> = Lazy::new(|| read_bool_env_var("MOVE_TEST_DEBUG"));
-        let full_vm_error_description = vm_error.format_test_output(*MOVE_TEST_DEBUG, false);
-        diags = diags + &full_vm_error_description;
+        if *MOVE_TEST_DEBUG {
+            let full_vm_error_description = vm_error.format_test_output(*MOVE_TEST_DEBUG, false);
+            diags = diags + &full_vm_error_description;
+        }
 
         match vm_error.exec_state() {
             None => diags,
