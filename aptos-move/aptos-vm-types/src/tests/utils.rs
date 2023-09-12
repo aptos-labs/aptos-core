@@ -61,6 +61,7 @@ pub(crate) fn build_change_set(
         HashMap::from_iter(module_write_set),
         HashMap::from_iter(aggregator_write_set),
         HashMap::from_iter(aggregator_delta_set),
+        HashMap::new(),
         vec![],
         &MockChangeSetChecker,
     )
