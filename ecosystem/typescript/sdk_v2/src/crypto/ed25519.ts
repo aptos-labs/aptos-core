@@ -10,11 +10,12 @@ export class Ed25519PublicKey {
 
   readonly value: Hex;
 
-  constructor(value: HexInput) {
-    if (value.length !== Ed25519PublicKey.LENGTH) {
+  constructor(hexInput: HexInput) {
+    const hex = Hex.fromHexInput({ hexInput });
+    if (hex.toUint8Array().length !== Ed25519PublicKey.LENGTH) {
       throw new Error(`Ed25519PublicKey length should be ${Ed25519PublicKey.LENGTH}`);
     }
-    this.value = Hex.fromHexInput({ hexInput: value });
+    this.value = hex;
   }
 
   toUint8Array(): Uint8Array {

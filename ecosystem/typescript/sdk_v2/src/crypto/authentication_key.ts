@@ -26,10 +26,11 @@ export class AuthenticationKey {
   readonly data: Hex;
 
   constructor(hexInput: HexInput) {
-    if (hexInput.length !== AuthenticationKey.LENGTH) {
-      throw new Error("Expected a byte array of length 32");
+    const hex = Hex.fromHexInput({ hexInput });
+    if (hex.toUint8Array().length !== AuthenticationKey.LENGTH) {
+      throw new Error("Expected a hexinput of length 32");
     }
-    this.data = Hex.fromHexInput({ hexInput });
+    this.data = hex;
   }
 
   /**
