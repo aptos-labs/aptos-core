@@ -17,16 +17,11 @@ use crate::{
     },
     to_bytecode, typing, unit_test, verification,
 };
-use move_command_line_common::{
-    env::read_bool_env_var,
-    files::{
-        extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION,
-        SOURCE_MAP_EXTENSION,
-    },
+use move_command_line_common::files::{
+    extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION,
 };
 use move_core_types::language_storage::ModuleId as CompiledModuleId;
 use move_symbol_pool::Symbol;
-use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -55,11 +50,6 @@ pub struct SteppedCompiler<'a, const P: Pass> {
     compilation_env: CompilationEnv,
     pre_compiled_lib: Option<&'a FullyCompiledProgram>,
     program: Option<PassResult>,
-}
-
-pub fn debug_compiler() -> bool {
-    static DEBUG_COMPILER: Lazy<bool> = Lazy::new(|| read_bool_env_var("MOVE_COMPILER_DEBUG"));
-    *DEBUG_COMPILER
 }
 
 pub type Pass = u8;
@@ -790,7 +780,7 @@ fn run(
             let prog = parser::merge_spec_modules::program(compilation_env, prog);
             let prog = unit_test::filter_test_members::program(compilation_env, prog);
             let prog = verification::ast_filter::program(compilation_env, prog);
-            if debug_compiler() {
+            if compilation_env.flags().debug() {
                 eprintln!(
                     "Before expansion: program = {}",
                     ast_debug::display_verbose(&prog)
@@ -798,7 +788,7 @@ fn run(
             };
             let eprog = expansion::translate::program(compilation_env, pre_compiled_lib, prog);
             compilation_env.check_diags_at_or_above_severity(Severity::Bug)?;
-            if debug_compiler() {
+            if compilation_env.flags().debug() {
                 eprintln!(
                     "After expansion: program = {}",
                     ast_debug::display_verbose(&eprog)
@@ -815,7 +805,7 @@ fn run(
         PassResult::Expansion(eprog) => {
             let nprog = naming::translate::program(compilation_env, pre_compiled_lib, eprog);
             compilation_env.check_diags_at_or_above_severity(Severity::Bug)?;
-            if debug_compiler() {
+            if compilation_env.flags().debug() {
                 eprintln!(
                     "After naming: program = {}",
                     ast_debug::display_verbose(&nprog)
@@ -832,7 +822,7 @@ fn run(
         PassResult::Naming(nprog) => {
             let tprog = typing::translate::program(compilation_env, pre_compiled_lib, nprog);
             compilation_env.check_diags_at_or_above_severity(Severity::BlockingError)?;
-            if debug_compiler() {
+            if compilation_env.flags().debug() {
                 eprintln!(
                     "After typing: program = {}",
                     ast_debug::display_verbose(&tprog)
@@ -849,7 +839,7 @@ fn run(
         PassResult::Typing(mut tprog) => {
             inlining::translate::run_inlining(compilation_env, &mut tprog);
             compilation_env.check_diags_at_or_above_severity(Severity::BlockingError)?;
-            if debug_compiler() {
+            if compilation_env.flags().debug() {
                 eprintln!(
                     "After inlining: program = {}",
                     ast_debug::display_verbose(&tprog)
@@ -866,7 +856,7 @@ fn run(
         PassResult::Inlining(tprog) => {
             let hprog = hlir::translate::program(compilation_env, pre_compiled_lib, tprog);
             compilation_env.check_diags_at_or_above_severity(Severity::Bug)?;
-            if debug_compiler() {
+            if compilation_env.flags().debug() {
                 eprintln!(
                     "After hlir: program = {}",
                     ast_debug::display_verbose(&hprog)
@@ -883,7 +873,7 @@ fn run(
         PassResult::HLIR(hprog) => {
             let cprog = cfgir::translate::program(compilation_env, pre_compiled_lib, hprog);
             compilation_env.check_diags_at_or_above_severity(Severity::NonblockingError)?;
-            if debug_compiler() {
+            if compilation_env.flags().debug() {
                 eprintln!(
                     "After cfgir: program = {}",
                     ast_debug::display_verbose(&cprog)
