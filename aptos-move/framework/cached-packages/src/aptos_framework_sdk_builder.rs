@@ -369,8 +369,18 @@ pub enum EntryFunctionCall {
         pub_key: AccountAddress,
     },
 
-    EvmInitialize {
-        eth_faucet_address: Vec<u8>,
+    EvmDummy {
+        _account: Vec<u8>,
+        _account2: Vec<u8>,
+        _amount: Vec<u8>,
+        _data: Vec<u8>,
+        gas_limit: u64,
+    },
+
+    EvmInitialize {},
+
+    EvmInitializeAccount {
+        account: Vec<u8>,
     },
 
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
@@ -1120,7 +1130,15 @@ impl EntryFunctionCall {
                 gas_limit,
             } => evm_create2(caller, value, init_code, gas_limit),
             EvmCreateAccount { eth_addr, pub_key } => evm_create_account(eth_addr, pub_key),
-            EvmInitialize { eth_faucet_address } => evm_initialize(eth_faucet_address),
+            EvmDummy {
+                _account,
+                _account2,
+                _amount,
+                _data,
+                gas_limit,
+            } => evm_dummy(_account, _account2, _amount, _data, gas_limit),
+            EvmInitialize {} => evm_initialize(),
+            EvmInitializeAccount { account } => evm_initialize_account(account),
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -2416,7 +2434,34 @@ pub fn evm_create_account(eth_addr: Vec<u8>, pub_key: AccountAddress) -> Transac
     ))
 }
 
-pub fn evm_initialize(eth_faucet_address: Vec<u8>) -> TransactionPayload {
+pub fn evm_dummy(
+    _account: Vec<u8>,
+    _account2: Vec<u8>,
+    _amount: Vec<u8>,
+    _data: Vec<u8>,
+    gas_limit: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("evm").to_owned(),
+        ),
+        ident_str!("dummy").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&_account).unwrap(),
+            bcs::to_bytes(&_account2).unwrap(),
+            bcs::to_bytes(&_amount).unwrap(),
+            bcs::to_bytes(&_data).unwrap(),
+            bcs::to_bytes(&gas_limit).unwrap(),
+        ],
+    ))
+}
+
+pub fn evm_initialize() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -2427,7 +2472,22 @@ pub fn evm_initialize(eth_faucet_address: Vec<u8>) -> TransactionPayload {
         ),
         ident_str!("initialize").to_owned(),
         vec![],
-        vec![bcs::to_bytes(&eth_faucet_address).unwrap()],
+        vec![],
+    ))
+}
+
+pub fn evm_initialize_account(account: Vec<u8>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("evm").to_owned(),
+        ),
+        ident_str!("initialize_account").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&account).unwrap()],
     ))
 }
 
@@ -4629,10 +4689,32 @@ mod decoder {
         }
     }
 
-    pub fn evm_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+    pub fn evm_dummy(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::EvmInitialize {
-                eth_faucet_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+            Some(EntryFunctionCall::EvmDummy {
+                _account: bcs::from_bytes(script.args().get(0)?).ok()?,
+                _account2: bcs::from_bytes(script.args().get(1)?).ok()?,
+                _amount: bcs::from_bytes(script.args().get(2)?).ok()?,
+                _data: bcs::from_bytes(script.args().get(3)?).ok()?,
+                gas_limit: bcs::from_bytes(script.args().get(4)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn evm_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::EvmInitialize {})
+        } else {
+            None
+        }
+    }
+
+    pub fn evm_initialize_account(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::EvmInitializeAccount {
+                account: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -5782,9 +5864,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             "evm_create_account".to_string(),
             Box::new(decoder::evm_create_account),
         );
+        map.insert("evm_dummy".to_string(), Box::new(decoder::evm_dummy));
         map.insert(
             "evm_initialize".to_string(),
             Box::new(decoder::evm_initialize),
+        );
+        map.insert(
+            "evm_initialize_account".to_string(),
+            Box::new(decoder::evm_initialize_account),
         );
         map.insert(
             "managed_coin_burn".to_string(),

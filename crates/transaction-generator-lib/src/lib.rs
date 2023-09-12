@@ -259,6 +259,7 @@ pub async fn create_txn_generator_creator(
                         addresses_pool.clone(),
                         SamplingMode::Basic,
                         *num_ethereum_accounts,
+                        txn_executor,
                     )),
                     *sender_use_account_pool,
                     accounts_pool.clone(),

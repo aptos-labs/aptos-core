@@ -23,17 +23,14 @@ module aptos_framework::evm {
         pub_keys: Table<vector<u8>, address>,
     }
 
-    public entry fun initialize(aptos_framework: &signer, eth_faucet_address: vector<u8>) {
+    public entry fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         if (exists<EvmData>(@aptos_framework)) {
             return;
         };
         let balance = table::new();
-        table::upsert(&mut balance, eth_faucet_address, 1000000000000);
         let nonce = table::new();
-        table::upsert(&mut nonce, eth_faucet_address, 1);
         let code = table::new();
-        table::upsert(&mut code, eth_faucet_address, vector::empty<u8>());
         move_to<EvmData>(aptos_framework, EvmData {
             nonce: nonce,
             balance: balance,
@@ -41,6 +38,22 @@ module aptos_framework::evm {
             storage: table::new(),
             pub_keys: table::new(),
         });
+    }
+
+    public entry fun dummy(_account: vector<u8>, _account2: vector<u8>, _amount: vector<u8>, _data: vector<u8>, gas_limit: u64) {
+        let x = 1;
+        x = x + 1;
+    }
+
+    public entry fun initialize_account(account: vector<u8>) acquires EvmData {
+        assert!(
+            exists<EvmData>(@aptos_framework),
+            error::not_found(ENO_ETH_DATA),
+        );
+        let data_ref = borrow_global_mut<EvmData>(@aptos_framework);
+        table::upsert(&mut data_ref.balance, account, 1000000000000);
+        table::upsert(&mut data_ref.nonce, account, 1);
+        table::upsert(&mut data_ref.code, account, vector::empty<u8>());   
     }
 
     public entry fun create_account(eth_addr: vector<u8>, pub_key: address) acquires EvmData {

@@ -4,6 +4,7 @@ use crate::{
     p2p_transaction_generator::{BasicSampler, BurnAndRecycleSampler, Sampler, SamplingMode},
     TransactionGenerator, TransactionGeneratorCreator,
 };
+use super::ReliableTransactionSubmitter;
 use aptos_infallible::RwLock;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -34,6 +35,17 @@ pub fn public_key_address(public_key: &PublicKey) -> EthereumAddress {
     EthereumAddress::from_slice(&hash[12..])
 }
 
+fn u128_to_bytes(u: u128) -> Vec<u8> {
+    let mut result = Vec::new();
+
+    for i in (0..16).rev() {
+        let byte = ((u >> (i * 8)) & 0xFF) as u8;
+        result.push(byte);
+    }
+
+    result
+}
+
 #[derive(Debug, Clone)]
 pub struct EthereumWallet {
     pub secret_key: SecretKey,
@@ -53,7 +65,7 @@ impl EthereumWallet {
 }
 
 /// Transfers `amount` of coins `CoinType` from `from` to `to`.
-pub fn ethereum_coin_transfer(
+pub fn _ethereum_coin_transfer(
     from: &EthereumWallet,
     to: &EthereumWallet,
     amount: u128,
@@ -80,6 +92,51 @@ pub fn ethereum_coin_transfer(
         ident_str!("call").to_owned(),
         vec![],
         vec![eth_txn_bytes],
+    ))
+}
+
+/// Transfers `amount` of coins `CoinType` from `from` to `to`.
+pub fn ethereum_direct_coin_transfer(
+    from: &EthereumWallet,
+    to: &EthereumWallet,
+    _amount: u128,
+) -> TransactionPayload {
+    // let addr: Vec<u8> = vec![
+    //     147, 139, 107, 200, 81, 82, 65, 97, 55, 231, 218, 108, 56, 9, 146, 20, 74, 222, 241, 104,
+    // ];
+    let amount: Vec<u8> = vec![2];
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("evm").to_owned(),
+        ),
+        ident_str!("call2").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&from.public_address.as_bytes().to_vec()).unwrap(),
+            bcs::to_bytes(&to.public_address.as_bytes().to_vec()).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+            bcs::to_bytes::<Vec<u8>>(&vec![]).unwrap(),
+            bcs::to_bytes::<u64>(&100000).unwrap(),
+        ],
+    ))
+}
+
+pub fn ethereum_iniatialize_account(account: &EthereumWallet) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("evm").to_owned(),
+        ),
+        ident_str!("initialize_account").to_owned(),
+        vec![],
+        vec![account.public_address.as_bytes().to_vec()],
     ))
 }
 
@@ -122,7 +179,7 @@ impl EthereumP2PTransactionGenerator {
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction {
         aptos_signer.sign_with_transaction_builder(
-            txn_factory.payload(ethereum_coin_transfer(from, to, num_coins)), // txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins)),
+            txn_factory.payload(ethereum_direct_coin_transfer(from, to, num_coins)), // txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins)),
         )
     }
 }
@@ -133,6 +190,7 @@ impl TransactionGenerator for EthereumP2PTransactionGenerator {
         account: &mut LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
+        println!("Generating {} transactions", num_to_create);
         let mut requests = Vec::with_capacity(num_to_create);
 
         // [0... num_to_create) are senders    [num_to_create,..., 2*num_to_create) are receivers
@@ -177,6 +235,7 @@ pub struct EthereumP2PTransactionGeneratorCreator {
     aptos_addresses: Arc<RwLock<Vec<AccountAddress>>>,
     sampling_mode: SamplingMode,
     num_ethereum_accounts: usize,
+    txn_executor: &dyn ReliableTransactionSubmitter,
 }
 
 impl EthereumP2PTransactionGeneratorCreator {
@@ -186,6 +245,7 @@ impl EthereumP2PTransactionGeneratorCreator {
         aptos_addresses: Arc<RwLock<Vec<AccountAddress>>>,
         sampling_mode: SamplingMode,
         num_ethereum_accounts: usize,
+        txn_executor: &dyn ReliableTransactionSubmitter,
     ) -> Self {
         Self {
             txn_factory,
@@ -193,12 +253,13 @@ impl EthereumP2PTransactionGeneratorCreator {
             aptos_addresses,
             sampling_mode,
             num_ethereum_accounts,
+            txn_executor
         }
     }
 }
 
 impl TransactionGeneratorCreator for EthereumP2PTransactionGeneratorCreator {
-    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         let rng = StdRng::from_entropy();
         let sampler: Box<dyn Sampler<EthereumWallet>> = match self.sampling_mode {
             SamplingMode::Basic => Box::new(BasicSampler::new()),
@@ -206,6 +267,7 @@ impl TransactionGeneratorCreator for EthereumP2PTransactionGeneratorCreator {
                 Box::new(BurnAndRecycleSampler::new(recycle_batch_size))
             },
         };
+        println!("Generating ethereum wallets");
         let ethereum_wallets: Arc<RwLock<Vec<EthereumWallet>>> = Arc::new(RwLock::new(
             (0..self.num_ethereum_accounts)
                 .map(|_| {
@@ -214,6 +276,14 @@ impl TransactionGeneratorCreator for EthereumP2PTransactionGeneratorCreator {
                 })
                 .collect(),
         ));
+        println!("Done generating ethereum wallets {}", ethereum_wallets.read().len());
+        // Initialize each ethereum account
+        let txns = ethereum_wallets.read().iter().map(|ethereum_account| self.aptos_addresses[0].sign_with_transaction_builder(
+                self.txn_factory.payload(ethereum_iniatialize_account(ethereum_account))
+            )
+        ).collect();
+        self.txn_executor.execute_transactions(txns).await.unwrap();
+
         Box::new(EthereumP2PTransactionGenerator::new(
             rng,
             self.amount,

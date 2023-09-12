@@ -20,6 +20,7 @@ aptos-logger = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
+bcs = { workspace = true }
 clap = { workspace = true }
 ethereum-tx-sign = { version = "6.1.2" }
 ethereum-types = { version = "0.14.1" }

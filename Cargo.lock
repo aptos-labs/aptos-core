@@ -3738,6 +3738,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-types",
  "async-trait",
+ "bcs 0.1.4",
  "clap 4.3.21",
  "ethereum-tx-sign",
  "ethereum-types 0.14.1",
@@ -3747,7 +3748,7 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "secp256k1",
- "serde 1.0.149",
+ "serde",
  "tiny-keccak 1.5.0",
 ]
 
@@ -6477,10 +6478,10 @@ checksum = "ec2ec9f896f5eafbbfab1da8369ff02660c50eca7b635e185fb0c104dde54574"
 dependencies = [
  "bytes",
  "hex",
- "num-traits 0.2.15",
+ "num-traits",
  "rlp",
  "secp256k1",
- "serde 1.0.149",
+ "serde",
  "serde_derive",
  "tiny-keccak 2.0.2",
 ]
@@ -10251,7 +10252,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "225d3389fb3509a24c93f5c29eb6bde2586b98d9f016636dff58d7c6f7569cd9"
 dependencies = [
  "autocfg",
- "num-traits 0.2.15",
+ "num-traits",
 ]
 
 [[package]]
@@ -11333,7 +11334,7 @@ dependencies = [
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "rand_xorshift",
- "regex-syntax",
+ "regex-syntax 0.6.27",
  "rusty-fork",
  "tempfile",
 ]
@@ -13490,6 +13491,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "532826ff75199d5833b9d2c5fe410f29235e25704ee5f0ef599fb51c21f4a4da"
 dependencies = [
  "autocfg",
+ "backtrace",
  "bytes",
  "libc",
  "mio",
