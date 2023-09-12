@@ -29,6 +29,7 @@ criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
+itertools = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 num_cpus = { workspace = true }
@@ -41,7 +42,6 @@ thread_local = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
-itertools = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }

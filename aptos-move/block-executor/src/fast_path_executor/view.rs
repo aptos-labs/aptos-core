@@ -1,23 +1,18 @@
 // Copyright © Aptos Foundation
 
-use std::cell::RefCell;
-use std::hash::Hash;
-use std::marker::PhantomData;
-use std::ops::Deref;
-
 use anyhow::Result;
-use dashmap::DashMap;
-use dashmap::mapref::entry::Entry;
-use smallvec::SmallVec;
-
-use aptos_aggregator::delta_change_set::{DeltaOp, serialize};
-use aptos_aggregator::transaction::AggregatorValue;
-use aptos_state_view::{StateViewId, TStateView};
-use aptos_state_view::in_memory_state_view::InMemoryStateView;
-use aptos_types::serde_helper::vec_bytes::deserialize;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::state_store::state_value::StateValue;
-use aptos_types::write_set::TransactionWrite;
+use aptos_aggregator::{
+    delta_change_set::{serialize, DeltaOp},
+    transaction::AggregatorValue,
+};
+use aptos_state_view::{in_memory_state_view::InMemoryStateView, StateViewId, TStateView};
+use aptos_types::{
+    serde_helper::vec_bytes::deserialize,
+    state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
+    write_set::TransactionWrite,
+};
+use dashmap::{mapref::entry::Entry, DashMap};
+use std::{cell::RefCell, hash::Hash, marker::PhantomData, ops::Deref};
 
 pub trait WritableStateView: TStateView {
     type Value;
@@ -171,7 +166,9 @@ where
     fn get_state_value_u128(&self, state_key: &Self::Key) -> Result<Option<u128>> {
         if let Some(value_ref) = self.updates.get(state_key) {
             match value_ref.value() {
-                CachedValue::RawValue(v) => Ok(Some(AggregatorValue::from_write(v).unwrap().into())),
+                CachedValue::RawValue(v) => {
+                    Ok(Some(AggregatorValue::from_write(v).unwrap().into()))
+                },
                 CachedValue::Accumulator(v) => Ok(Some(*v)),
             }
         } else {

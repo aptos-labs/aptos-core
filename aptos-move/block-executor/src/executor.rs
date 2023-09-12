@@ -9,6 +9,7 @@ use crate::{
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
+    executor_traits::{BlockExecutor, BlockExecutorBase},
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
@@ -37,7 +38,6 @@ use std::{
         Arc,
     },
 };
-use crate::executor_traits::BlockExecutor;
 
 struct CommitGuard<'a> {
     post_commit_txs: &'a Vec<Sender<u32>>,
@@ -70,7 +70,7 @@ enum CommitRole {
     Worker(Receiver<TxnIndex>),
 }
 
-pub struct BlockSTMExecutor<T, E, S, L, X> {
+pub struct BlockSTMExecutor<T, E, L, X> {
     // number of active concurrent tasks, corresponding
     // to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
@@ -78,14 +78,13 @@ pub struct BlockSTMExecutor<T, E, S, L, X> {
     executor_thread_pool: Arc<ThreadPool>,
     maybe_block_gas_limit: Option<u64>,
     transaction_commit_hook: Option<L>,
-    phantom: PhantomData<(T, E, S, L, X)>,
+    phantom: PhantomData<(T, E, L, X)>,
 }
 
-impl<T, E, S, L, X> BlockSTMExecutor<T, E, S, L, X>
+impl<T, E, L, X> BlockSTMExecutor<T, E, L, X>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
-    S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
     X: Executable + 'static,
 {
@@ -118,7 +117,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
         executor: &E,
-        base_view: &S,
+        base_view: &(impl TStateView<Key = T::Key> + Sync),
         latest_view: ParallelState<T, X>,
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
@@ -365,7 +364,7 @@ where
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        base_view: &S,
+        base_view: &(impl TStateView<Key = T::Key> + Sync),
     ) {
         let delta_keys = last_input_output.delta_keys(txn_idx);
         let _events = last_input_output.events(txn_idx);
@@ -423,7 +422,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
-        base_view: &S,
+        base_view: &(impl TStateView<Key = T::Key> + Sync),
         shared_counter: &AtomicU32,
         role: CommitRole,
     ) {
@@ -520,7 +519,7 @@ where
         &self,
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
-        base_view: &S,
+        base_view: &(impl TStateView<Key = T::Key> + Sync),
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
@@ -616,7 +615,7 @@ where
         }
     }
 
-    pub(crate) fn execute_transactions_sequential(
+    pub(crate) fn execute_transactions_sequential<S: TStateView<Key = T::Key> + Sync>(
         &self,
         executor_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
@@ -727,20 +726,25 @@ where
     }
 }
 
-impl<T, E, S, L> BlockExecutor for BlockSTMExecutor<T, E, S, L>
+impl<T, E, L, X> BlockExecutorBase for BlockSTMExecutor<T, E, L, X>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
-    S: TStateView<Key = T::Key> + Sync,
+    L: TransactionCommitHook<Output = E::Output>,
+{
+    type Error = Error<E::Error>;
+    type ExecutorTask = E;
+    type Txn = T;
+}
+
+impl<T, E, L, X> BlockExecutor for BlockSTMExecutor<T, E, L, X>
+where
+    T: Transaction,
+    E: ExecutorTask<Txn = T>,
     L: TransactionCommitHook<Output = E::Output>,
     X: Executable + 'static,
 {
-    type Transaction = T;
-    type ExecutorTask = E;
-    type StateView = S;
-    type Error = Error<E::Error>;
-
-    fn execute_block(
+    fn execute_block<S: TStateView<Key = T::Key> + Sync>(
         &self,
         executor_arguments: E::Argument,
         signature_verified_block: Vec<T>,

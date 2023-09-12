@@ -16,7 +16,7 @@ use crate::{
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_block_executor::{
     errors::Error,
-    executor::BlockExecutor,
+    executor::{BlockExecutor, BlockSTMExecutor},
     task::{
         Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
@@ -39,7 +39,6 @@ use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::{collections::HashMap, sync::Arc};
-use aptos_block_executor::executor::BlockSTMExecutor;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;

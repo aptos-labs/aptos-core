@@ -34,7 +34,6 @@ pub trait Transaction: Sync + Send + Clone + 'static {
     type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }
 
-
 /// Trait for objects that can be converted into transactions.
 pub trait IntoTransaction {
     type Txn: Transaction;

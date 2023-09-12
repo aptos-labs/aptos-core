@@ -2,36 +2,34 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::marker::PhantomData;
-use std::sync::Arc;
-use rayon::ThreadPool;
-use rayon::prelude::*;
-use thread_local::ThreadLocal;
+use crate::{
+    counters::PARALLEL_EXECUTION_SECONDS,
+    errors::{Error, Result},
+    executor_traits::{BlockExecutor, BlockExecutorBase},
+    task::{ExecutionStatus, ExecutorTask, Transaction},
+};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::TStateView;
 use aptos_types::executable::Executable;
-use crate::counters::PARALLEL_EXECUTION_SECONDS;
-use crate::errors::{Error, Result};
-use crate::executor_traits::BlockExecutor;
-use crate::task::{ExecutionStatus, ExecutorTask, Transaction};
+use rayon::{prelude::*, ThreadPool};
+use std::{marker::PhantomData, sync::Arc};
+use thread_local::ThreadLocal;
 
 /// A `BlockExecutor` that simply runs all the transactions in the block once, all in parallel,
 /// using the `par_iter` API of `rayon`.
 /// Provides a kind of a lower bound on the execution time of any `BlockExecutor`.
 /// The execution result is *not* serializable.
 /// This `BlockExecutor` is meant to be used only for performance testing.
-pub struct RunAllOnceInParallel<T, E, S, X> {
+pub struct RunAllOnceInParallel<T, E> {
     executor_thread_pool: Arc<ThreadPool>,
 
-    phantom: PhantomData<(T, E, S, X)>,
+    phantom: PhantomData<(T, E)>,
 }
 
-impl<T, E, S, X> RunAllOnceInParallel<T, E, S, X>
+impl<T, E> RunAllOnceInParallel<T, E>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T> + Send,
-    S: TStateView<Key = T::Key> + Sync,
-    X: Executable + 'static,
 {
     pub fn new(executor_thread_pool: Arc<ThreadPool>) -> Self {
         Self {
@@ -46,29 +44,25 @@ where
         transactions_indices: Idx,
         executor_tasks: &ThreadLocal<E>,
         executor_arguments: &E::Argument,
-        state_view: &S,
+        state_view: &(impl TStateView<Key = T::Key> + Sync),
     ) -> Result<Vec<E::Output>, E::Error>
     where
         Idx: IntoParallelIterator<Item = TxnIndex>,
         Idx::Iter: IndexedParallelIterator,
     {
-        transactions.par_iter()
+        transactions
+            .par_iter()
             .zip(transactions_indices)
             .map_init(
                 || executor_tasks.get_or(|| E::init(*executor_arguments)),
                 |executor_task, (txn, txn_idx)| {
-                    let execute_result = executor_task.execute_transaction(
-                        state_view,
-                        txn,
-                        txn_idx,
-                        true);
+                    let execute_result =
+                        executor_task.execute_transaction(state_view, txn, txn_idx, true);
                     match execute_result {
                         ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                             Ok(output)
                         },
-                        ExecutionStatus::Abort(err) => {
-                            Err(Error::UserError(err))
-                        }
+                        ExecutionStatus::Abort(err) => Err(Error::UserError(err)),
                     }
                 },
             )
@@ -76,20 +70,22 @@ where
     }
 }
 
-impl<T, E, S, X> BlockExecutor for RunAllOnceInParallel<T, E, S, X>
-    where
-        T: Transaction,
-        E: ExecutorTask<Txn = T> + Send,
-        S: TStateView<Key = T::Key> + Sync,
-        X: Executable + 'static,
+impl<T, E> BlockExecutorBase for RunAllOnceInParallel<T, E>
+where
+    T: Transaction,
+    E: ExecutorTask<Txn = T> + Send,
 {
-    type Transaction = T;
-    type ExecutorTask = E;
-    type StateView = S;
-    type Executable = X;
     type Error = Error<E::Error>;
+    type ExecutorTask = E;
+    type Txn = T;
+}
 
-    fn execute_block(
+impl<T, E> BlockExecutor for RunAllOnceInParallel<T, E>
+where
+    T: Transaction,
+    E: ExecutorTask<Txn = T> + Send,
+{
+    fn execute_block<S: TStateView<Key = T::Key> + Sync>(
         &self,
         executor_arguments: E::Argument,
         signature_verified_block: Vec<T>,

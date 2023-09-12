@@ -90,7 +90,7 @@ pub static PRE_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         "The time spent in seconds in pre-execution",
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub static FAST_PATH_COMMIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
@@ -101,7 +101,7 @@ pub static FAST_PATH_COMMIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         "The time spent in seconds committing transactions on the fast path",
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub static PARALLEL_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {

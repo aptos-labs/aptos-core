@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 
+use crate::task::{IntoTransaction, Transaction};
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
 };
-use crate::task::{IntoTransaction, Transaction};
 
 /// Provide hints about the keys accessed by a transaction.
 pub trait TransactionHints {
@@ -47,11 +47,10 @@ impl<T: Transaction> IntoTransaction for TransactionWithHints<T> {
 }
 
 impl<T: Transaction> TransactionHints for TransactionWithHints<T> {
+    type DeltaSetIter<'a> = std::slice::Iter<'a, T::Key>;
     type Key = T::Key;
-
     type ReadSetIter<'a> = std::slice::Iter<'a, T::Key>;
     type WriteSetIter<'a> = std::slice::Iter<'a, T::Key>;
-    type DeltaSetIter<'a> = std::slice::Iter<'a, T::Key>;
 
     fn read_set(&self) -> Self::ReadSetIter<'_> {
         self.read_set.iter()
@@ -67,12 +66,12 @@ impl<T: Transaction> TransactionHints for TransactionWithHints<T> {
 }
 
 impl TransactionHints for AnalyzedTransaction {
+    type DeltaSetIter<'a> = std::iter::Empty<&'a StateKey>;
     type Key = StateKey;
     type ReadSetIter<'a> =
         std::iter::Map<std::slice::Iter<'a, StorageLocation>, fn(&StorageLocation) -> &StateKey>;
     type WriteSetIter<'a> =
         std::iter::Map<std::slice::Iter<'a, StorageLocation>, fn(&StorageLocation) -> &StateKey>;
-    type DeltaSetIter<'a> = std::iter::Empty<&'a StateKey>;
 
     fn read_set(&self) -> Self::ReadSetIter<'_> {
         self.read_hints().iter().map(StorageLocation::state_key)

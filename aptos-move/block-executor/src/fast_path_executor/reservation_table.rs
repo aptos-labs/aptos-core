@@ -2,10 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::hash::Hash;
-use std::sync::atomic::{AtomicU32, Ordering};
-
 use dashmap::mapref::entry::Entry;
+use std::{
+    hash::Hash,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 /// TxnOrder represents the priorities of transactions.
 /// The smaller the order, the higher the priority.
