@@ -185,6 +185,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
             let mut remote_dependencies: HashMap<TxnIndex, HashSet<StateKey>> = HashMap::new();
             for &global_idx in global_idxs.iter() {
                 for (dep_txn_idx, required_keys) in dependency_sets[global_idx as usize].iter() {
+                    if shard_idxs_by_txn[(*dep_txn_idx) as usize] == shard_id { continue; }
                     remote_dependencies.entry(*dep_txn_idx).or_insert_with(HashSet::new).extend(required_keys.clone());
                 }
             }

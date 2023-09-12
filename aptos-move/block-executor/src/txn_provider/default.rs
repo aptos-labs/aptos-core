@@ -9,13 +9,21 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::executable::Executable;
 use crate::task::{Transaction, TransactionOutput};
 use crate::txn_last_input_output::TxnOutput;
-use crate::txn_provider::{TxnProviderTrait, TxnProviderTrait2};
+use crate::txn_provider::{TxnProviderTrait1, TxnProviderTrait2};
 
-struct DefaultTxnProvider<T> {
+pub struct DefaultTxnProvider<T> {
     txns: Vec<T>,
 }
 
-impl<T> TxnProviderTrait for DefaultTxnProvider<T> {
+impl<T> DefaultTxnProvider<T> {
+    pub fn new(txns: Vec<T>) -> Self {
+        Self {
+            txns
+        }
+    }
+}
+
+impl<T> TxnProviderTrait1 for DefaultTxnProvider<T> {
     fn end_txn_idx(&self) -> TxnIndex {
         self.txns.len() as TxnIndex
     }
@@ -50,6 +58,14 @@ impl<T> TxnProviderTrait for DefaultTxnProvider<T> {
 
     fn txn_output_has_arrived(&self, txn_idx: TxnIndex) -> bool {
         unreachable!()
+    }
+
+    fn block_idx(&self) -> u8 {
+        0
+    }
+
+    fn shard_idx(&self) -> usize {
+        0
     }
 }
 

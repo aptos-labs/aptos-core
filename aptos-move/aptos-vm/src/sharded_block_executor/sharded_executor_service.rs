@@ -98,9 +98,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         });
         drop(signature_verification_timer);
 
-        let sharding_provider = ShardedTxnProvider::new(
+        let txn_provider = ShardedTxnProvider::new(
             block_id,
-            true,
             num_shards,
             shard_id.unwrap(),
             rx,
@@ -114,7 +113,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
 
         let ret = BlockAptosVM::execute_block(
             executor_thread_pool,
-            sharding_provider,
+            txn_provider,
             state_view,
             concurrency_level,
             maybe_block_gas_limit,

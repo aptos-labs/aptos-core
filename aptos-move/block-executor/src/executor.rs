@@ -38,7 +38,7 @@ use std::{
     },
 };
 use crate::txn_provider::sharded::ShardedTxnProvider;
-use crate::txn_provider::{TxnProviderTrait, TxnProviderTrait2};
+use crate::txn_provider::{TxnProviderTrait1, TxnProviderTrait2};
 
 struct CommitGuard<'a> {
     post_commit_txs: &'a Vec<Sender<u32>>,
@@ -89,7 +89,7 @@ where
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
     X: Executable + 'static,
-    TP: TxnProviderTrait + TxnProviderTrait2<T, E::Output, E::Error> + Send + Sync,
+    TP: TxnProviderTrait1 + TxnProviderTrait2<T, E::Output, E::Error> + Send + Sync + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
@@ -115,7 +115,7 @@ where
 
     fn execute(
         version: Version,
-        txn_provider: Arc<TP>,
+        txn_provider: &TP,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler<TP>,
@@ -125,6 +125,7 @@ where
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let (idx_to_execute, incarnation) = version;
+        info!("execute() started for txn {}.", idx_to_execute);
         let txn = txn_provider.txn(idx_to_execute);
 
         // VM execution.
@@ -221,6 +222,7 @@ where
 
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let (idx_to_validate, incarnation) = version_to_validate;
+        info!("validate() started for txn {idx_to_validate} incar {incarnation}.");
         let read_set = last_input_output
             .read_set(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
@@ -262,9 +264,12 @@ where
                     }
                 }
             }
-            scheduler.finish_abort(idx_to_validate, incarnation)
+            let ret = scheduler.finish_abort(idx_to_validate, incarnation);
+            info!("validate() finished with finish_abort() for txn {} incar {}", idx_to_validate, incarnation);
+            ret
         } else {
             scheduler.finish_validation(idx_to_validate, validation_wave);
+            info!("validate() finished with NoTask for txn {} incar {}", idx_to_validate, incarnation);
             SchedulerTask::NoTask
         }
     }
@@ -279,7 +284,7 @@ where
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         accumulated_fee_statement: &mut FeeStatement,
         txn_fee_statements: &mut Vec<FeeStatement>,
-        txn_provider: Arc<TP>,
+        txn_provider: &TP,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
             // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
@@ -287,7 +292,7 @@ where
                 CommitGuard::new(post_commit_txs, *worker_idx, txn_idx);
             // Iterate round robin over workers to do commit_hook.
             *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
-            info!("Will ask worker {} to commit txn {}.", *worker_idx, txn_idx);
+            info!("block={}, shard={}, will ask worker {} to commit txn {}.", txn_provider.block_idx(), txn_provider.shard_idx(), *worker_idx, txn_idx);
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
                 // For committed txns with Success status, calculate the accumulated gas costs.
                 accumulated_fee_statement.add_fee_statement(&fee_statement);
@@ -368,7 +373,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         base_view: &S,
-        txn_provider: Arc<TP>,
+        txn_provider: &TP,
     ) {
         let delta_keys = last_input_output.delta_keys(txn_idx);
         let _events = last_input_output.events(txn_idx);
@@ -410,7 +415,7 @@ where
     fn work_task_with_scope(
         &self,
         executor_arguments: &E::Argument,
-        txn_provider: Arc<TP>,
+        txn_provider: &TP,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler<TP>,
@@ -445,7 +450,7 @@ where
                         last_input_output,
                         &mut accumulated_fee_statement,
                         &mut txn_fee_statements,
-                        txn_provider.clone(),
+                        txn_provider,
                     );
                 },
                 CommitRole::Worker(rx) => {
@@ -455,7 +460,7 @@ where
                             versioned_cache,
                             last_input_output,
                             base_view,
-                            txn_provider.clone(),
+                            txn_provider,
                         );
                     }
                 },
@@ -472,7 +477,7 @@ where
                 SchedulerTask::ExecutionTask(version_to_execute, ExecutionTaskType::Execution) => {
                     Self::execute(
                         version_to_execute,
-                        txn_provider.clone(),
+                        txn_provider,
                         last_input_output,
                         versioned_cache,
                         scheduler,
@@ -520,7 +525,7 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        txn_provider: Arc<TP>,
+        txn_provider: &TP,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
@@ -563,13 +568,12 @@ where
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
-            let txn_provider_clone = txn_provider.clone();
-            s.spawn(move |_| {
-                txn_provider_clone.run_sharding_msg_loop(&versioned_cache);
+            s.spawn(|_| {
+                txn_provider.run_sharding_msg_loop(&versioned_cache);
             });
 
             // The rest BlockSTM threads.
-            for _ in 0..self.concurrency_level {
+            for worker_idx in (0..self.concurrency_level).rev() {
                 let role = roles.pop().expect("Role must be set for all threads");
                 s.spawn(|_| {
                     self.work_task_with_scope(
@@ -611,10 +615,10 @@ where
             ret
         };
 
+        drop(scheduler);
         self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
             drop(last_input_output);
-            drop(scheduler);
             // TODO: re-use the code cache.
             drop(versioned_cache);
         });
@@ -631,7 +635,7 @@ where
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
-        txn_provider: Arc<TP>,
+        txn_provider: &TP,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = txn_provider.num_txns();
@@ -741,19 +745,19 @@ where
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        txn_provider: Arc<TP>,
+        txn_provider: TP,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
-                txn_provider,
+                &txn_provider,
                 base_view,
             )
         } else {
             self.execute_transactions_sequential(
                 executor_arguments,
-                txn_provider,
+                &txn_provider,
                 base_view,
             )
         };
@@ -767,14 +771,14 @@ where
 
             ret = self.execute_transactions_sequential(
                 executor_arguments,
-                txn_provider,
+                &txn_provider,
                 base_view,
             )
         }
-        // self.executor_thread_pool.spawn(move || {
-        //     // Explicit async drops.
-        //     drop(txn_provider);
-        // });
+        self.executor_thread_pool.spawn(move || {
+            // Explicit async drops.
+            drop(txn_provider);
+        });
         ret
     }
 }

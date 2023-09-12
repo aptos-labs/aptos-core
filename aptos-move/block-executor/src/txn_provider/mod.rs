@@ -30,7 +30,7 @@ pub enum ShardingMsg<TO: TransactionOutput, TE: Debug> {
     Shutdown,
 }
 
-pub trait TxnProviderTrait {
+pub trait TxnProviderTrait1 {
     fn end_txn_idx(&self) -> TxnIndex;
     fn num_txns(&self) -> usize;
     fn first_txn(&self) -> TxnIndex;
@@ -40,6 +40,8 @@ pub trait TxnProviderTrait {
     fn local_rank(&self, idx: TxnIndex) -> usize;
     fn is_local(&self, idx: TxnIndex) -> bool;
     fn txn_output_has_arrived(&self, txn_idx: TxnIndex) -> bool;
+    fn block_idx(&self) -> u8; //debug only
+    fn shard_idx(&self) -> usize;
 }
 
 pub trait TxnProviderTrait2<T: Transaction, TO, TE>
@@ -54,7 +56,6 @@ where
     fn txn(&self, idx: TxnIndex) -> &T;
     fn on_local_commit(&self, txn_idx: TxnIndex, txn_output: Arc<TxnOutput<TO, TE>>);
 }
-
 
 pub mod default;
 pub mod sharded;

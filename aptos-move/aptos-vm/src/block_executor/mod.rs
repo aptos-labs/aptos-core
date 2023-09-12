@@ -40,7 +40,7 @@ use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::{collections::HashMap, sync::Arc};
 use aptos_block_executor::txn_provider::sharded::ShardedTxnProvider;
-use aptos_block_executor::txn_provider::{TxnProviderTrait, TxnProviderTrait2};
+use aptos_block_executor::txn_provider::{TxnProviderTrait1, TxnProviderTrait2};
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
@@ -194,10 +194,10 @@ impl BlockAptosVM {
     pub fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
-        TP: TxnProviderTrait + TxnProviderTrait2<PreprocessedTransaction, AptosTransactionOutput, VMStatus>
+        TP: TxnProviderTrait1 + TxnProviderTrait2<PreprocessedTransaction, AptosTransactionOutput, VMStatus> + Send + Sync + 'static
     >(
         executor_thread_pool: Arc<ThreadPool>,
-        txn_provider: Arc<TP>,
+        txn_provider: TP,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
@@ -209,7 +209,7 @@ impl BlockAptosVM {
         // sequentially while executing the transactions.
         // TODO: state sync runs this code but doesn't need to verify signatures
 
-        let num_txns = txn_provider.num_local_txns();
+        let num_txns = txn_provider.num_txns();
         if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.

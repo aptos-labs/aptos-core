@@ -9,7 +9,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_aggregator::delta_change_set::serialize;
-use aptos_logger::error;
+use aptos_logger::{error, info};
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, MVModulesError, MVModulesOutput, TxnIndex},
     unsync_map::UnsyncMap,
@@ -30,7 +30,7 @@ use std::{
 };
 use std::collections::HashMap;
 use crate::txn_provider::sharded::ShardedTxnProvider;
-use crate::txn_provider::TxnProviderTrait;
+use crate::txn_provider::TxnProviderTrait1;
 
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.
@@ -48,14 +48,14 @@ pub(crate) enum ReadResult<V> {
     None,
 }
 
-pub(crate) struct ParallelState<'a, T: Transaction, X: Executable, P: TxnProviderTrait> {
+pub(crate) struct ParallelState<'a, T: Transaction, X: Executable, P: TxnProviderTrait1> {
     versioned_map: &'a MVHashMap<T::Key, T::Value, X>,
-    scheduler: &'a Scheduler<P>,
+    scheduler: &'a Scheduler<'a, P>,
     _counter: &'a AtomicU32,
     captured_reads: RefCell<Vec<ReadDescriptor<T::Key>>>,
 }
 
-impl<'a, T: Transaction, X: Executable, P: TxnProviderTrait> ParallelState<'a, T, X, P> {
+impl<'a, T: Transaction, X: Executable, P: TxnProviderTrait1> ParallelState<'a, T, X, P> {
     pub(crate) fn new(
         shared_map: &'a MVHashMap<T::Key, T::Value, X>,
         shared_scheduler: &'a Scheduler<P>,
@@ -119,6 +119,7 @@ impl<'a, T: Transaction, X: Executable, P: TxnProviderTrait> ParallelState<'a, T
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
                     match self.scheduler.wait_for_dependency(txn_idx, dep_idx) {
                         DependencyResult::Dependency(dep_condition) => {
+                            info!("txn {} is blocked by {}", txn_idx, dep_idx);
                             let _timer = counters::DEPENDENCY_WAIT_SECONDS.start_timer();
                             // Wait on a condition variable corresponding to the encountered
                             // read dependency. Once the dep_idx finishes re-execution, scheduler
@@ -139,6 +140,7 @@ impl<'a, T: Transaction, X: Executable, P: TxnProviderTrait> ParallelState<'a, T
                             while let DependencyStatus::Unresolved = *dep_resolved {
                                 dep_resolved = cvar.wait(dep_resolved).unwrap();
                             }
+                            info!("txn {} is unblocked by {}", txn_idx, dep_idx);
                             if let DependencyStatus::ExecutionHalted = *dep_resolved {
                                 return ReadResult::ExecutionHalted;
                             }
@@ -168,7 +170,7 @@ pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) _counter: &'a u32,
 }
 
-pub(crate) enum ViewState<'a, T: Transaction, X: Executable, P: TxnProviderTrait> {
+pub(crate) enum ViewState<'a, T: Transaction, X: Executable, P: TxnProviderTrait1> {
     Sync(ParallelState<'a, T, X, P>),
     Unsync(SequentialState<'a, T, X>),
 }
@@ -178,13 +180,13 @@ pub(crate) enum ViewState<'a, T: Transaction, X: Executable, P: TxnProviderTrait
 /// all necessary traits, LatestView is provided to the VM and used to intercept the reads.
 /// In the Sync case, also records captured reads for later validation. latest_txn_idx
 /// must be set according to the latest transaction that the worker was / is executing.
-pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, P: TxnProviderTrait> {
+pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, P: TxnProviderTrait1> {
     base_view: &'a S,
     latest_view: ViewState<'a, T, X, P>,
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, P: TxnProviderTrait> LatestView<'a, T, S, X, P> {
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, P: TxnProviderTrait1> LatestView<'a, T, S, X, P> {
     pub(crate) fn new(
         base_view: &'a S,
         latest_view: ViewState<'a, T, X, P>,
@@ -224,7 +226,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, P: TxnProvi
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, P: TxnProviderTrait> TStateView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, P: TxnProviderTrait1> TStateView
     for LatestView<'a, T, S, X, P>
 {
     type Key = T::Key;

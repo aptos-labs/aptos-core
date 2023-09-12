@@ -50,8 +50,9 @@ impl BlockPartitioningStage {
                 let timer = TIMER.with_label_values(&["partition"]).start_timer();
                 let partitioned_txns = partitioner.partition(block_id_short, analyzed_txns, self.num_executor_shards);
                 println!("block={}, global_idxs={:?}", block_id_short, partitioned_txns.global_idxs);
-                println!("block={}, partitioned_txns.shard_idxs_by_txn={:?}", block_id_short, partitioned_txns.shard_idxs_by_txn);
-                println!("block={}, partitioned_txns.dependency_sets={:?}", block_id_short, partitioned_txns.dependency_sets);
+                for (txn_idx, dep_set) in partitioned_txns.dependency_sets.iter().enumerate() {
+                    println!("block={}, partitioned_txns.dependency_sets[{}]={:?}", block_id_short, txn_idx, dep_set.keys().copied());
+                }
                 timer.stop_and_record();
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(partitioned_txns))
             }

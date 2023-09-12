@@ -12,7 +12,7 @@ use aptos_mvhashmap::MVHashMap;
 use aptos_types::executable::Executable;
 use crate::task::{ExecutionStatus, Transaction, TransactionOutput};
 use crate::txn_last_input_output::{TxnLastInputOutput, TxnOutput};
-use crate::txn_provider::{RemoteCommit, ShardingMsg, TxnProviderTrait, TxnProviderTrait2};
+use crate::txn_provider::{RemoteCommit, ShardingMsg, TxnProviderTrait1, TxnProviderTrait2};
 
 pub struct ShardedTxnProvider<T: Transaction, TO: TransactionOutput, TE: Debug> {
     pub block_id: u8,
@@ -115,7 +115,7 @@ where
     }
 }
 
-impl<TX, TO, TE> TxnProviderTrait for ShardedTxnProvider<TX, TO, TE>
+impl<TX, TO, TE> TxnProviderTrait1 for ShardedTxnProvider<TX, TO, TE>
 where
     TX: Transaction,
     TO: TransactionOutput<Txn = TX>,
@@ -158,6 +158,14 @@ where
 
     fn txn_output_has_arrived(&self, txn_idx: TxnIndex) -> bool {
         self.remote_committed_txns.contains(&txn_idx)
+    }
+
+    fn block_idx(&self) -> u8 {
+        self.block_id
+    }
+
+    fn shard_idx(&self) -> usize {
+        self.shard_id
     }
 }
 
