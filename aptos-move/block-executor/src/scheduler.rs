@@ -4,7 +4,7 @@
 
 use crate::counters::GET_NEXT_TASK_SECONDS;
 use aptos_infallible::Mutex;
-use aptos_mvhashmap::types::{END_TXN_INDEX, Incarnation, TxnIndex, Version};
+use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
 use crossbeam::utils::CachePadded;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
@@ -12,14 +12,14 @@ use std::{
     hint,
     ops::DerefMut,
     sync::{
-        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
-        Arc, Condvar,
+        Arc,
+        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering}, Condvar,
     },
 };
 use std::collections::HashMap;
 use aptos_logger::info;
-use crate::index_mapping::IndexHelper;
-use crate::sharding::TxnProvider;
+use crate::txn_provider::TxnProviderTrait;
+use crate::txn_provider::sharded::ShardedTxnProvider;
 
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
 
@@ -202,8 +202,8 @@ impl ValidationStatus {
     }
 }
 
-pub struct Scheduler {
-    index_helper: Arc<IndexHelper>,
+pub struct Scheduler<P> {
+    txn_provider: Arc<P>,
     /// An index i maps to indices of other transactions that depend on transaction i, i.e. they
     /// should be re-executed once transaction i's next incarnation finishes.
     txn_dependency: HashMap<TxnIndex, CachePadded<Mutex<Vec<TxnIndex>>>>,
@@ -243,19 +243,19 @@ pub struct Scheduler {
 }
 
 /// Public Interfaces for the Scheduler
-impl Scheduler {
-    pub fn new(index_helper: Arc<IndexHelper>) -> Self {
+impl<P: TxnProviderTrait> Scheduler<P> {
+    pub fn new(txn_provider: Arc<P>) -> Self {
         // Empty block should early return and not create a scheduler.
-        assert!(index_helper.num_txns() > 0, "No scheduler needed for 0 transactions");
+        assert!(txn_provider.num_txns() > 0, "No scheduler needed for 0 transactions");
         Self {
-            index_helper: index_helper.clone(),
-            txn_dependency: index_helper.txns_and_deps()
-                .map(|idx| (*idx, CachePadded::new(Mutex::new(Vec::new()))))
+            txn_provider,
+            txn_dependency: txn_provider.txns_and_deps().into_iter()
+                .map(|idx| (idx, CachePadded::new(Mutex::new(Vec::new()))))
                 .collect(),
-            txn_status: index_helper.txns()
+            txn_status: txn_provider.txns().into_iter()
                 .map(|idx| {
                     (
-                        *idx,
+                        idx,
                         CachePadded::new((
                             RwLock::new(ExecutionStatus::Ready(0, ExecutionTaskType::Execution)),
                             RwLock::new(ValidationStatus::new()),
@@ -263,15 +263,15 @@ impl Scheduler {
                     )
                 })
                 .collect(),
-            commit_state: CachePadded::new(Mutex::new((index_helper.first_txn(), 0))),
-            execution_idx: AtomicU32::new(index_helper.first_txn()),
-            validation_idx: AtomicU64::new(index_helper.first_txn() as u64),// wave is 0!
+            commit_state: CachePadded::new(Mutex::new((txn_provider.first_txn(), 0))),
+            execution_idx: AtomicU32::new(txn_provider.first_txn()),
+            validation_idx: AtomicU64::new(txn_provider.first_txn() as u64),// wave is 0!
             done_marker: CachePadded::new(AtomicBool::new(false)),
         }
     }
 
     pub fn next_txn(&self, idx: TxnIndex) -> TxnIndex {
-        self.index_helper.next_txn(idx)
+        self.txn_provider.next_txn(idx)
     }
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
     /// The current implementation has one dedicated thread to try_commit.
@@ -303,7 +303,7 @@ impl Scheduler {
                             *status_write = ExecutionStatus::Committed(incarnation);
                             let old_commit_idx = *commit_idx;
                             *commit_idx = self.next_txn(*commit_idx);
-                            if *commit_idx == END_TXN_INDEX {
+                            if *commit_idx == self.txn_provider.end_txn_idx() {
                                 // All txns have been committed, the parallel execution can finish.
                                 self.done_marker.store(true, Ordering::SeqCst);
                             }
@@ -356,10 +356,10 @@ impl Scheduler {
                 Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
             let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
 
-            let prefer_validate = idx_to_validate < min(idx_to_execute, END_TXN_INDEX)
+            let prefer_validate = idx_to_validate < min(idx_to_execute, self.txn_provider.end_txn_idx())
                 && !self.never_executed(idx_to_validate);
 
-            if !prefer_validate && idx_to_execute == END_TXN_INDEX {
+            if !prefer_validate && idx_to_execute == self.txn_provider.end_txn_idx() {
                 return if self.done() {
                     // Check again to avoid commit delay due to a race.
                     SchedulerTask::Done
@@ -577,7 +577,7 @@ impl Scheduler {
         // resolving the conditional variables, to help other theads that may be pending
         // on the read dependency. See the comment of the function resolve_condvar().
         if !self.done_marker.swap(true, Ordering::SeqCst) {
-            for &txn_idx in self.index_helper.txns() {
+            for txn_idx in self.txn_provider.txns() {
                 self.resolve_condvar(txn_idx);
             }
         }
@@ -610,7 +610,7 @@ impl Scheduler {
 }
 
 /// Private functions of the Scheduler
-impl Scheduler {
+impl<P: TxnProviderTrait> Scheduler<P> {
     fn unpack_validation_idx(validation_idx: u64) -> (TxnIndex, Wave) {
         (
             (validation_idx & TXN_IDX_MASK) as TxnIndex,
@@ -621,7 +621,7 @@ impl Scheduler {
     /// Decreases the validation index, adjusting the wave and validation status as needed.
     fn decrease_validation_idx(&self, target_idx: TxnIndex) -> Option<Wave> {
         // We only call with txn_idx + 1, so it can equal num_txns, but not be strictly larger.
-        if target_idx == END_TXN_INDEX {
+        if target_idx == self.txn_provider.end_txn_idx() {
             return None;
         }
 
@@ -660,7 +660,7 @@ impl Scheduler {
     /// An unsuccessful incarnation returns None. Since incarnation numbers never decrease
     /// for each transaction, incarnate function may not succeed more than once per version.
     fn try_incarnate(&self, txn_idx: TxnIndex) -> Option<(Incarnation, ExecutionTaskType)> {
-        if txn_idx == END_TXN_INDEX {
+        if txn_idx == self.txn_provider.end_txn_idx() {
             return None;
         }
 
@@ -687,20 +687,28 @@ impl Scheduler {
     /// and a committed (in between) txn does not need to be scheduled for validation -
     /// so can return None.
     fn is_executed(&self, txn_idx: TxnIndex, include_committed: bool) -> Option<Incarnation> {
-        let status_wrapper = self.txn_status.get(&txn_idx).unwrap(); //sharding todo: txn_idx may be remote, so can't directly unwrap().
-        let status = status_wrapper.0.read();
-        match *status {
-            ExecutionStatus::Executed(incarnation) => Some(incarnation),
-            ExecutionStatus::Committed(incarnation) => {
-                if include_committed {
-                    // Committed txns are also considered executed for dependency resolution purposes.
-                    Some(incarnation)
-                } else {
-                    // Committed txns do not need to be scheduled for validation in try_validate_next_version.
-                    None
-                }
-            },
-            _ => None,
+        if self.txn_provider.is_local(txn_idx) {
+            let status_wrapper = self.txn_status.get(&txn_idx).unwrap();
+            let status = status_wrapper.0.read();
+            match *status {
+                ExecutionStatus::Executed(incarnation) => Some(incarnation),
+                ExecutionStatus::Committed(incarnation) => {
+                    if include_committed {
+                        // Committed txns are also considered executed for dependency resolution purposes.
+                        Some(incarnation)
+                    } else {
+                        // Committed txns do not need to be scheduled for validation in try_validate_next_version.
+                        None
+                    }
+                },
+                _ => None,
+            }
+        } else {
+            if self.txn_provider.txn_output_has_arrived(txn_idx) {
+                Some(0)
+            } else {
+                None
+            }
         }
     }
 
@@ -764,9 +772,9 @@ impl Scheduler {
     /// return the version to the caller for the corresponding ExecutionTask.
     /// - Otherwise, return None.
     fn try_execute_next_version(&self) -> Option<(Version, ExecutionTaskType)> {
-        let idx_to_execute = self.execution_idx.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |v|Some(self.index_helper.next_txn(v))).unwrap();
+        let idx_to_execute = self.execution_idx.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |v|Some(self.txn_provider.next_txn(v))).unwrap();
 
-        if idx_to_execute == END_TXN_INDEX {
+        if idx_to_execute == self.txn_provider.end_txn_idx() {
             return None;
         }
 

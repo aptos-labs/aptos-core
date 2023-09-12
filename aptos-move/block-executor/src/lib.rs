@@ -148,5 +148,4 @@ pub mod txn_last_input_output;
 #[cfg(test)]
 mod unit_tests;
 pub mod view;
-pub mod sharding;
-pub mod index_mapping;
+pub mod txn_provider;

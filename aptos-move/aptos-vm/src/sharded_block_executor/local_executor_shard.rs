@@ -1,21 +1,21 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_executor::{coordinator_client::CoordinatorClient, counters::WAIT_FOR_SHARDED_OUTPUT_SECONDS, cross_shard_client::CrossShardClient, executor_client::{ExecutorClient, ShardedExecutionOutput}, global_executor::GlobalExecutor, messages::CrossShardMsg, sharded_executor_service::ShardedExecutorService, ExecutorShardCommand, TxnProviderArgs};
+use crate::sharded_block_executor::{coordinator_client::CoordinatorClient, counters::WAIT_FOR_SHARDED_OUTPUT_SECONDS, cross_shard_client::CrossShardClient, executor_client::{ExecutorClient, ShardedExecutionOutput}, ExecutorShardCommand, global_executor::GlobalExecutor, messages::CrossShardMsg, sharded_executor_service::ShardedExecutorService, TxnProviderArgs};
 use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{
-        PartitionedTransactions, RoundId, ShardId, GLOBAL_ROUND_ID, MAX_ALLOWED_PARTITIONING_ROUNDS,
+        GLOBAL_ROUND_ID, MAX_ALLOWED_PARTITIONING_ROUNDS, PartitionedTransactions, RoundId, ShardId,
     },
     transaction::TransactionOutput,
 };
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, unbounded};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::{mpsc, Mutex};
-use aptos_block_executor::sharding::{TxnProvider};
+use aptos_block_executor::txn_provider::sharded::ShardedTxnProvider;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::state_store::state_key::StateKey;
 

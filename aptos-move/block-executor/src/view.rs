@@ -29,7 +29,8 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 use std::collections::HashMap;
-use crate::sharding::TxnProvider;
+use crate::txn_provider::sharded::ShardedTxnProvider;
+use crate::txn_provider::TxnProviderTrait;
 
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.
@@ -47,17 +48,17 @@ pub(crate) enum ReadResult<V> {
     None,
 }
 
-pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
+pub(crate) struct ParallelState<'a, T: Transaction, X: Executable, P: TxnProviderTrait> {
     versioned_map: &'a MVHashMap<T::Key, T::Value, X>,
-    scheduler: &'a Scheduler,
+    scheduler: &'a Scheduler<P>,
     _counter: &'a AtomicU32,
     captured_reads: RefCell<Vec<ReadDescriptor<T::Key>>>,
 }
 
-impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
+impl<'a, T: Transaction, X: Executable, P: TxnProviderTrait> ParallelState<'a, T, X, P> {
     pub(crate) fn new(
         shared_map: &'a MVHashMap<T::Key, T::Value, X>,
-        shared_scheduler: &'a Scheduler,
+        shared_scheduler: &'a Scheduler<P>,
         shared_counter: &'a AtomicU32,
     ) -> Self {
         Self {
@@ -167,8 +168,8 @@ pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) _counter: &'a u32,
 }
 
-pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
-    Sync(ParallelState<'a, T, X>),
+pub(crate) enum ViewState<'a, T: Transaction, X: Executable, P: TxnProviderTrait> {
+    Sync(ParallelState<'a, T, X, P>),
     Unsync(SequentialState<'a, T, X>),
 }
 
@@ -177,16 +178,16 @@ pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
 /// all necessary traits, LatestView is provided to the VM and used to intercept the reads.
 /// In the Sync case, also records captured reads for later validation. latest_txn_idx
 /// must be set according to the latest transaction that the worker was / is executing.
-pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
+pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, P: TxnProviderTrait> {
     base_view: &'a S,
-    latest_view: ViewState<'a, T, X>,
+    latest_view: ViewState<'a, T, X, P>,
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, P: TxnProviderTrait> LatestView<'a, T, S, X, P> {
     pub(crate) fn new(
         base_view: &'a S,
-        latest_view: ViewState<'a, T, X>,
+        latest_view: ViewState<'a, T, X, P>,
         txn_idx: TxnIndex,
     ) -> Self {
         Self {
@@ -223,8 +224,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
-    for LatestView<'a, T, S, X>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, P: TxnProviderTrait> TStateView
+    for LatestView<'a, T, S, X, P>
 {
     type Key = T::Key;
 

@@ -21,7 +21,7 @@ use std::collections::btree_set::BTreeSet;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
-use aptos_block_executor::sharding::ShardingMsg;
+use aptos_block_executor::txn_provider::ShardingMsg;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::state_store::state_key::StateKey;
 use crate::block_executor::AptosTransactionOutput;
