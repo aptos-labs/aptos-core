@@ -159,7 +159,7 @@ impl TransactionTypeArg {
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::EthereumCoinTransfer => TransactionType::EthereumCoinTransfer {
-                num_ethereum_accounts: 1000000,
+                num_ethereum_accounts: 10000,
                 sender_use_account_pool,
             },
         }

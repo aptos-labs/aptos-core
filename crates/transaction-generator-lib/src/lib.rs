@@ -253,14 +253,17 @@ pub async fn create_txn_generator_creator(
                     num_ethereum_accounts,
                     sender_use_account_pool,
                 } => wrap_accounts_pool(
-                    Box::new(EthereumP2PTransactionGeneratorCreator::new(
-                        txn_factory.clone(),
-                        SEND_AMOUNT as u128,
-                        addresses_pool.clone(),
-                        SamplingMode::Basic,
-                        *num_ethereum_accounts,
-                        txn_executor,
-                    )),
+                    Box::new(
+                        EthereumP2PTransactionGeneratorCreator::new(
+                            txn_factory.clone(),
+                            SEND_AMOUNT as u128,
+                            source_accounts,
+                            SamplingMode::Basic,
+                            *num_ethereum_accounts,
+                            txn_executor,
+                        )
+                        .await,
+                    ),
                     *sender_use_account_pool,
                     accounts_pool.clone(),
                 ),

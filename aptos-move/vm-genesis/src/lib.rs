@@ -483,18 +483,12 @@ fn initialize_core_resources_and_aptos_coin(
 
 /// Create and initialize Association and Core Code accounts.
 fn initialize_evm(session: &mut SessionExt) {
-    let addr: Vec<u8> = vec![
-        147, 139, 107, 200, 81, 82, 65, 97, 55, 231, 218, 108, 56, 9, 146, 20, 74, 222, 241, 104,
-    ];
     exec_function(
         session,
         EVM_MODULE_NAME,
         "initialize",
         vec![],
-        serialize_values(&vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS),
-            MoveValue::vector_u8(addr),
-        ]),
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
     );
 }
 

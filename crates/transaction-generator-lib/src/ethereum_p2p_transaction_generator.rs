@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
+use super::ReliableTransactionSubmitter;
 use crate::{
     p2p_transaction_generator::{BasicSampler, BurnAndRecycleSampler, Sampler, SamplingMode},
     TransactionGenerator, TransactionGeneratorCreator,
 };
-use super::ReliableTransactionSubmitter;
 use aptos_infallible::RwLock;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -35,16 +35,16 @@ pub fn public_key_address(public_key: &PublicKey) -> EthereumAddress {
     EthereumAddress::from_slice(&hash[12..])
 }
 
-fn u128_to_bytes(u: u128) -> Vec<u8> {
-    let mut result = Vec::new();
+// fn u128_to_bytes(u: u128) -> Vec<u8> {
+//     let mut result = Vec::new();
 
-    for i in (0..16).rev() {
-        let byte = ((u >> (i * 8)) & 0xFF) as u8;
-        result.push(byte);
-    }
+//     for i in (0..16).rev() {
+//         let byte = ((u >> (i * 8)) & 0xFF) as u8;
+//         result.push(byte);
+//     }
 
-    result
-}
+//     result
+// }
 
 #[derive(Debug, Clone)]
 pub struct EthereumWallet {
@@ -136,7 +136,9 @@ pub fn ethereum_iniatialize_account(account: &EthereumWallet) -> TransactionPayl
         ),
         ident_str!("initialize_account").to_owned(),
         vec![],
-        vec![account.public_address.as_bytes().to_vec()],
+        vec![
+            bcs::to_bytes(&account.public_address.as_bytes().to_vec()).unwrap()
+        ],
     ))
 }
 
@@ -144,7 +146,6 @@ pub struct EthereumP2PTransactionGenerator {
     rng: StdRng,
     send_amount: u128,
     txn_factory: TransactionFactory,
-    _aptos_addresses: Arc<RwLock<Vec<AccountAddress>>>,
     ethereum_wallets: Arc<RwLock<Vec<EthereumWallet>>>,
     sampler: Box<dyn Sampler<EthereumWallet>>,
 }
@@ -154,17 +155,14 @@ impl EthereumP2PTransactionGenerator {
         mut rng: StdRng,
         send_amount: u128,
         txn_factory: TransactionFactory,
-        aptos_addresses: Arc<RwLock<Vec<AccountAddress>>>,
         sampler: Box<dyn Sampler<EthereumWallet>>,
         ethereum_wallets: Arc<RwLock<Vec<EthereumWallet>>>,
     ) -> Self {
-        aptos_addresses.write().shuffle(&mut rng);
         ethereum_wallets.write().shuffle(&mut rng);
         Self {
             rng,
             send_amount,
             txn_factory,
-            _aptos_addresses: aptos_addresses,
             sampler,
             ethereum_wallets,
         }
@@ -232,34 +230,55 @@ impl TransactionGenerator for EthereumP2PTransactionGenerator {
 pub struct EthereumP2PTransactionGeneratorCreator {
     txn_factory: TransactionFactory,
     amount: u128,
-    aptos_addresses: Arc<RwLock<Vec<AccountAddress>>>,
     sampling_mode: SamplingMode,
-    num_ethereum_accounts: usize,
-    txn_executor: &dyn ReliableTransactionSubmitter,
+    ethereum_wallets: Arc<RwLock<Vec<EthereumWallet>>>,
 }
 
 impl EthereumP2PTransactionGeneratorCreator {
-    pub fn new(
+    pub async fn new(
         txn_factory: TransactionFactory,
         amount: u128,
-        aptos_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+        aptos_accounts: &mut [LocalAccount],
         sampling_mode: SamplingMode,
         num_ethereum_accounts: usize,
         txn_executor: &dyn ReliableTransactionSubmitter,
     ) -> Self {
+        println!("Generating ethereum wallets");
+        let ethereum_wallets: Arc<RwLock<Vec<EthereumWallet>>> = Arc::new(RwLock::new(
+            (0..num_ethereum_accounts)
+                .map(|_| {
+                    let (secret_key, public_key) = generate_keypair();
+                    EthereumWallet::new(&secret_key, &public_key)
+                })
+                .collect(),
+        ));
+        println!(
+            "Done generating ethereum wallets {}",
+            ethereum_wallets.read().len()
+        );
+        // Initialize each ethereum account
+        let txns = ethereum_wallets
+            .read()
+            .iter()
+            .map(|ethereum_account| {
+                aptos_accounts[0].sign_with_transaction_builder(
+                    txn_factory.payload(ethereum_iniatialize_account(ethereum_account)),
+                )
+            })
+            .collect::<Vec<SignedTransaction>>();
+        txn_executor.execute_transactions(&txns).await.unwrap();
+        println!("Initialized ethereum wallets");
         Self {
             txn_factory,
             amount,
-            aptos_addresses,
             sampling_mode,
-            num_ethereum_accounts,
-            txn_executor
+            ethereum_wallets,
         }
     }
 }
 
 impl TransactionGeneratorCreator for EthereumP2PTransactionGeneratorCreator {
-    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         let rng = StdRng::from_entropy();
         let sampler: Box<dyn Sampler<EthereumWallet>> = match self.sampling_mode {
             SamplingMode::Basic => Box::new(BasicSampler::new()),
@@ -267,30 +286,13 @@ impl TransactionGeneratorCreator for EthereumP2PTransactionGeneratorCreator {
                 Box::new(BurnAndRecycleSampler::new(recycle_batch_size))
             },
         };
-        println!("Generating ethereum wallets");
-        let ethereum_wallets: Arc<RwLock<Vec<EthereumWallet>>> = Arc::new(RwLock::new(
-            (0..self.num_ethereum_accounts)
-                .map(|_| {
-                    let (secret_key, public_key) = generate_keypair();
-                    EthereumWallet::new(&secret_key, &public_key)
-                })
-                .collect(),
-        ));
-        println!("Done generating ethereum wallets {}", ethereum_wallets.read().len());
-        // Initialize each ethereum account
-        let txns = ethereum_wallets.read().iter().map(|ethereum_account| self.aptos_addresses[0].sign_with_transaction_builder(
-                self.txn_factory.payload(ethereum_iniatialize_account(ethereum_account))
-            )
-        ).collect();
-        self.txn_executor.execute_transactions(txns).await.unwrap();
 
         Box::new(EthereumP2PTransactionGenerator::new(
             rng,
             self.amount,
             self.txn_factory.clone(),
-            self.aptos_addresses.clone(),
             sampler,
-            ethereum_wallets,
+            self.ethereum_wallets.clone(),
         ))
     }
 }
