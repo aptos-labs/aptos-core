@@ -170,7 +170,7 @@ impl EthereumP2PTransactionGenerator {
 
     fn gen_single_txn(
         &self,
-        aptos_signer: &mut LocalAccount,
+        aptos_signer: &LocalAccount,
         from: &EthereumWallet,
         to: &EthereumWallet,
         num_coins: u128,
@@ -185,7 +185,7 @@ impl EthereumP2PTransactionGenerator {
 impl TransactionGenerator for EthereumP2PTransactionGenerator {
     fn generate_transactions(
         &mut self,
-        account: &mut LocalAccount,
+        account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         println!("Generating {} transactions", num_to_create);

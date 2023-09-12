@@ -5,6 +5,7 @@ use crate::{
     move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
     natives::aptos_natives_with_builder,
 };
+use aptos_framework::natives::event::NativeEventContext;
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext,
     code::NativeCodeContext,
