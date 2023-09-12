@@ -4,7 +4,7 @@
 use crate::{
     diag,
     expansion::ast::{AbilitySet, ModuleIdent, ModuleIdent_, SpecId, Visibility},
-    inlining::visitor::{Dispatcher, TypedDispatcher, TypedVisitor, Visitor, VisitorContinuation},
+    inlining::visitor::{Dispatcher, Visitor, VisitorContinuation},
     naming,
     naming::ast::{
         FunctionSignature, StructDefinition, StructTypeParameter, TParam, TParamID, Type,
@@ -19,6 +19,7 @@ use crate::{
             SpecLambdaLiftedFunction, UnannotatedExp_,
         },
         core::{infer_abilities, InferAbilityContext, Subst},
+        translate::lvalues_expected_types,
     },
 };
 use move_ir_types::location::{sp, Loc};
@@ -230,7 +231,8 @@ struct SubstitutionVisitor<'l, 'r> {
 
 impl<'l, 'r> Visitor for SubstitutionVisitor<'l, 'r> {
     fn type_(&mut self, ty: &mut Type) -> VisitorContinuation {
-        visit_type(&self.type_arguments, ty)
+        visit_type(&self.type_arguments, ty);
+        VisitorContinuation::Descend
     }
 
     fn exp(&mut self, ex: &mut Exp) -> VisitorContinuation {
@@ -304,7 +306,7 @@ impl<'l, 'r> Visitor for SubstitutionVisitor<'l, 'r> {
         self.shadowed.pop_front();
     }
 
-    fn var_decl(&mut self, var: &mut Var) {
+    fn var_decl(&mut self, _ty: &mut Type, var: &mut Var) {
         self.shadowed
             .front_mut()
             .expect("scoped")
@@ -517,7 +519,7 @@ impl<'l, 'r> Visitor for RenamingVisitor<'l, 'r> {
         }
     }
 
-    fn var_decl(&mut self, var: &mut Var) {
+    fn var_decl(&mut self, _ty: &mut Type, var: &mut Var) {
         let new_name = Symbol::from(format!("{}#{}", var.0.value, self.inliner.rename_counter));
         self.inliner.rename_counter += 1;
         self.renamings
@@ -527,7 +529,7 @@ impl<'l, 'r> Visitor for RenamingVisitor<'l, 'r> {
         var.0.value = new_name;
     }
 
-    fn var_use(&mut self, var: &mut Var) {
+    fn var_use(&mut self, _ty: &mut Type, var: &mut Var) {
         for mapping in &self.renamings {
             if let Some(new_name) = mapping.get(&var.0.value) {
                 var.0.value = *new_name
@@ -548,8 +550,8 @@ struct SignatureExtractionVisitor<'l, 'r> {
     used_type_params: BTreeSet<TParam>,
 }
 
-impl<'l, 'r> TypedVisitor for SignatureExtractionVisitor<'l, 'r> {
-    fn ty(&mut self, t: &mut Type) -> VisitorContinuation {
+impl<'l, 'r> Visitor for SignatureExtractionVisitor<'l, 'r> {
+    fn type_(&mut self, t: &mut Type) -> VisitorContinuation {
         if let Type_::Param(param) = &t.value {
             self.used_type_params.insert(param.clone());
         }
@@ -634,23 +636,43 @@ impl<'l> Inliner<'l> {
                     mcall.name.0.value
                 ),
             };
-            let type_arguments = fdef
+            let type_arguments: BTreeMap<TParamID, Type> = fdef
                 .signature
                 .type_parameters
                 .iter()
                 .zip(mcall.type_arguments.iter())
                 .map(|(p, t)| (p.id, t.clone()))
                 .collect();
+
             let mut inliner_visitor = OuterVisitor { inliner: self };
             let mut inlined_args = mcall.arguments.clone();
             Dispatcher::new(&mut inliner_visitor).exp(&mut inlined_args);
-            let mapped_params = fdef
+
+            // Expand Type formal params in types of other params.
+            let mut param_visitor = TypeSubstitutionVisitor {
+                type_arguments: type_arguments.clone(),
+            };
+            let mut param_dispatcher = Dispatcher::new(&mut param_visitor);
+            let fix_types = |(var, mut spanned_type): (Var, Type)| {
+                param_dispatcher.type_(&mut spanned_type);
+                self.infer_abilities(&mut spanned_type);
+                (var, spanned_type)
+            };
+            let mapped_params: Vec<_> = fdef
                 .signature
                 .parameters
                 .iter()
                 .cloned()
-                .zip(get_args_from_exp(&inlined_args));
-            let (decls_for_let, bindings) = self.process_parameters(call_loc, mapped_params);
+                .map(fix_types)
+                .zip(get_args_from_exp(&inlined_args))
+                .collect();
+            let (decls_for_let, bindings) =
+                self.process_parameters(call_loc, mapped_params.into_iter());
+
+            // Expand Type formal params in result type
+            let mut result_type = fdef.signature.return_type.clone();
+            param_dispatcher.type_(&mut result_type);
+            self.infer_abilities(&mut result_type);
 
             // Expand the body in its own independent visitor
             self.inline_stack.push_front(global_name); // for cycle detection
@@ -666,7 +688,16 @@ impl<'l> Inliner<'l> {
             for decl in decls_for_let.into_iter().rev() {
                 seq.push_front(decl)
             }
-            Some(UnannotatedExp_::Block(seq))
+
+            let body_loc = fdef.body.loc;
+            let block_expr = sp(body_loc, UnannotatedExp_::Block(seq));
+            Some(UnannotatedExp_::Annotate(
+                Box::new(Exp {
+                    exp: block_expr,
+                    ty: result_type.clone(),
+                }),
+                Box::new(result_type),
+            ))
         } else {
             None
         }
@@ -685,27 +716,36 @@ impl<'l> Inliner<'l> {
         let mut tys = vec![];
         let mut exps = vec![];
 
-        for ((var, _), e) in params {
-            let ty = e.ty.clone();
+        for ((var, ty), e) in params {
             if ty.value.is_fun() {
                 bindings.insert(var.0.value, e);
             } else {
                 lvalues.push(sp(loc, LValue_::Var(var, Box::new(ty.clone()))));
-                tys.push(ty);
+                tys.push(ty.clone());
                 exps.push(e);
             }
         }
-
-        let opt_tys = tys.iter().map(|t| Some(t.clone())).collect();
 
         let exp = match exps.len() {
             0 => Exp {
                 ty: sp(loc, Type_::Unit),
                 exp: sp(loc, UnannotatedExp_::Unit { trailing: false }),
             },
-            1 => exps.pop().unwrap(),
+            1 => {
+                let exp1 = exps.pop().unwrap();
+                let mut ty = tys.pop().unwrap();
+                self.infer_abilities(&mut ty);
+
+                Exp {
+                    ty: ty.clone(),
+                    exp: sp(
+                        loc,
+                        UnannotatedExp_::Annotate(Box::new(exp1), Box::new(ty.clone())),
+                    ),
+                }
+            },
             _ => {
-                let mut ty = Type_::multiple(loc, tys);
+                let mut ty = Type_::multiple(loc, tys.clone());
                 self.infer_abilities(&mut ty);
 
                 Exp {
@@ -714,9 +754,21 @@ impl<'l> Inliner<'l> {
                         loc,
                         UnannotatedExp_::ExpList(
                             exps.into_iter()
-                                .map(|e| {
-                                    let ty = e.ty.clone();
-                                    ExpListItem::Single(e, Box::new(ty))
+                                .zip(tys.into_iter())
+                                .map(|(e, ty)| {
+                                    ExpListItem::Single(
+                                        Exp {
+                                            exp: sp(
+                                                loc,
+                                                UnannotatedExp_::Annotate(
+                                                    Box::new(e),
+                                                    Box::new(ty.clone()),
+                                                ),
+                                            ),
+                                            ty: ty.clone(),
+                                        },
+                                        Box::new(ty.clone()),
+                                    )
                                 })
                                 .collect(),
                         ),
@@ -725,9 +777,12 @@ impl<'l> Inliner<'l> {
             },
         };
 
+        let spanned_lvalues = sp(loc, lvalues);
+        let lvalue_ty = lvalues_expected_types(&spanned_lvalues);
+
         let decl = sp(
             loc,
-            SequenceItem_::Bind(sp(loc, lvalues), opt_tys, Box::new(exp)),
+            SequenceItem_::Bind(spanned_lvalues, lvalue_ty, Box::new(exp)),
         );
         (vec![decl], bindings)
     }
@@ -879,7 +934,7 @@ fn lift_lambda_as_function(
         used_local_vars: BTreeMap::new(),
         used_type_params: BTreeSet::new(),
     };
-    TypedDispatcher::new(&mut extraction_visitor).exp(&mut lambda);
+    Dispatcher::new(&mut extraction_visitor).exp(&mut lambda);
     let SignatureExtractionVisitor {
         inliner: _,
         declared_vars: _,
@@ -966,4 +1021,14 @@ fn visit_type(subs: &BTreeMap<TParamID, Type>, ty: &mut Type) -> VisitorContinua
         }
     }
     VisitorContinuation::Descend
+}
+
+struct TypeSubstitutionVisitor {
+    type_arguments: BTreeMap<TParamID, Type>,
+}
+
+impl Visitor for TypeSubstitutionVisitor {
+    fn type_(&mut self, ty: &mut Type) -> VisitorContinuation {
+        visit_type(&self.type_arguments, ty)
+    }
 }
