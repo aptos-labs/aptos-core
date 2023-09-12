@@ -177,30 +177,27 @@ pub fn aggregate_and_update_total_supply<S: StateView>(
     // the delta for the global shard
     let mut aggr_total_supply_delta = vec![DeltaU128::default(); num_shards * num_rounds + 1];
 
-    // No need to parallelize this as the runtime is O(num_shards)
+    // No need to parallelize this as the runtime is O(num_shards * num_rounds)
     // TODO: Get this from the individual shards while getting 'sharded_output'
-    sharded_output
-        .iter()
-        .enumerate()
-        .for_each(|(shard_id, shard_output)| {
-            for (round, txn_outputs) in shard_output.iter().enumerate() {
-                // Though we expect all the txn_outputs to have total_supply, there can be
-                // exceptions like 'block meta' (first txn in the block) and 'chkpt info' (last txn
-                // in the block) which may not have total supply. Hence we iterate till we find the
-                // last txn with total supply.
-                for txn in txn_outputs.iter().rev() {
-                    if let Some(last_txn_total_supply) = txn.write_set().get_total_supply() {
-                        aggr_total_supply_delta[round * num_shards + shard_id + 1] =
-                            DeltaU128::get_delta(last_txn_total_supply, TOTAL_SUPPLY_AGGR_BASE_VAL);
-                        break;
-                    }
+    let mut aggr_ts_idx = 1;
+    for round in 0..num_rounds {
+        sharded_output.iter().for_each(|shard_output| {
+            let mut curr_delta = DeltaU128::default();
+            // Though we expect all the txn_outputs to have total_supply, there can be
+            // exceptions like 'block meta' (first txn in the block) and 'chkpt info' (last txn
+            // in the block) which may not have total supply. Hence we iterate till we find the
+            // last txn with total supply.
+            for txn in shard_output[round].iter().rev() {
+                if let Some(last_txn_total_supply) = txn.write_set().get_total_supply() {
+                    curr_delta =
+                        DeltaU128::get_delta(last_txn_total_supply, TOTAL_SUPPLY_AGGR_BASE_VAL);
+                    break;
                 }
             }
+            aggr_total_supply_delta[aggr_ts_idx] =
+                curr_delta + aggr_total_supply_delta[aggr_ts_idx - 1];
+            aggr_ts_idx += 1;
         });
-
-    for idx in 1..aggr_total_supply_delta.len() - 1 {
-        aggr_total_supply_delta[idx + 1] =
-            aggr_total_supply_delta[idx + 1] + aggr_total_supply_delta[idx];
     }
 
     // The txn_outputs contain 'txn_total_supply' with
@@ -224,12 +221,18 @@ pub fn aggregate_and_update_total_supply<S: StateView>(
                 for (round, txn_outputs) in shard_output.iter_mut().enumerate() {
                     let delta_for_round =
                         aggr_total_supply_delta_ref[round * num_shards + shard_id] + base_val_delta;
-                    txn_outputs.par_iter_mut().for_each(|txn_output| {
-                        if let Some(txn_total_supply) = txn_output.write_set().get_total_supply() {
-                            txn_output
-                                .update_total_supply(delta_for_round.add_delta(txn_total_supply));
-                        }
-                    });
+                    txn_outputs
+                        .par_iter_mut()
+                        .with_min_len(25)
+                        .for_each(|txn_output| {
+                            if let Some(txn_total_supply) =
+                                txn_output.write_set().get_total_supply()
+                            {
+                                txn_output.update_total_supply(
+                                    delta_for_round.add_delta(txn_total_supply),
+                                );
+                            }
+                        });
                 }
             });
     });

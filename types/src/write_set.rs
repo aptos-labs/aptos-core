@@ -317,10 +317,14 @@ impl WriteSetV0 {
     //       VM execution such that to 'TransactionOutput' is materialized after updating
     //       total_supply.
     pub fn update_total_supply(&mut self, value: u128) {
-        self.0.write_set.insert(
-            TOTAL_SUPPLY_STATE_KEY.clone(),
-            WriteOp::Modification(bcs::to_bytes(&value).unwrap()),
-        );
+        assert!(self
+            .0
+            .write_set
+            .insert(
+                TOTAL_SUPPLY_STATE_KEY.clone(),
+                WriteOp::Modification(bcs::to_bytes(&value).unwrap())
+            )
+            .is_some());
     }
 }
 
