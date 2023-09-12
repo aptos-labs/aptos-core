@@ -10,8 +10,8 @@ use crate::{
         },
         view::{DashMapStateView, EmptyStateView, ReadSetCapturingStateView, WritableStateView},
     },
-    hints::TransactionWithHints,
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
+    transaction_hints::TransactionWithHints,
 };
 use anyhow::Result;
 use aptos_aggregator::delta_change_set::serialize;
@@ -29,6 +29,7 @@ use rayon::{
 use std::{marker::PhantomData, sync::Arc};
 use thread_local::ThreadLocal;
 
+#[allow(dead_code)] // TODO: handle `maybe_block_gas_limit` properly
 pub struct FastPathBlockExecutor<T: Transaction, E, FB> {
     // TODO: consider getting rid of a fixed batch size.
     batch_size: usize,
@@ -109,7 +110,7 @@ where
 
         Ok(TxnExecutionInfo {
             transaction: txn,
-            read_set: read_set_capturing_view.clone_read_set(),
+            read_set: read_set_capturing_view.take_read_set(),
             output,
             skip_rest,
             txn_idx,
@@ -198,7 +199,7 @@ where
         output_view: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
         discarded_txns: &mut Vec<TransactionWithHints<T>>,
     ) -> Result<Vec<TxnExecutionInfo<E>>> {
-        let mut error: AtomicCell<Option<anyhow::Error>> = AtomicCell::new(None);
+        let error: AtomicCell<Option<anyhow::Error>> = AtomicCell::new(None);
 
         let mut selected_txns_info = Vec::new();
 
@@ -374,6 +375,7 @@ where
     }
 }
 
+#[allow(dead_code)] // TODO: handle skip_rest properly
 struct TxnExecutionInfo<E: ExecutorTask> {
     transaction: E::Txn,
     read_set: Vec<<E::Txn as Transaction>::Key>,

@@ -1,20 +1,20 @@
 // Copyright © Aptos Foundation
 
-use aptos_block_executor::hints::TransactionHints;
-use std::{collections::HashMap, hash::Hash, rc::Rc};
+use aptos_block_executor::transaction_hints::TransactionHints;
+use std::{collections::HashMap, hash::Hash, sync::Arc};
 
 pub type CompressedKey = u32;
 
-#[derive(Default)]
-pub struct CompressedPTransactionInner<T> {
-    pub original: Box<T>,
+#[derive(Clone, Default)]
+pub struct CompressedHintsTransaction<T> {
+    pub original: Arc<T>,
     pub read_set: Vec<CompressedKey>,
     pub write_set: Vec<CompressedKey>,
+    pub delta_set: Vec<CompressedKey>,
 }
 
-pub type CompressedPTransaction<T> = Rc<CompressedPTransactionInner<T>>;
-
-impl<T> TransactionHints for CompressedPTransaction<T> {
+impl<T> TransactionHints for CompressedHintsTransaction<T> {
+    type DeltaSetIter<'a> = std::slice::Iter<'a, Self::Key> where T: 'a;
     type Key = CompressedKey;
     type ReadSetIter<'a> = std::slice::Iter<'a, Self::Key> where T: 'a;
     type WriteSetIter<'a> = std::slice::Iter<'a, Self::Key> where T: 'a;
@@ -25,6 +25,10 @@ impl<T> TransactionHints for CompressedPTransaction<T> {
 
     fn write_set(&self) -> Self::WriteSetIter<'_> {
         self.write_set.iter()
+    }
+
+    fn delta_set(&self) -> Self::DeltaSetIter<'_> {
+        self.delta_set.iter()
     }
 }
 
@@ -60,7 +64,7 @@ impl<K: Hash + Clone + Eq> TransactionCompressor<K> {
         }
     }
 
-    pub fn compress_transactions<T, I>(&mut self, block: I) -> Vec<CompressedPTransaction<T>>
+    pub fn compress_transactions<T, I>(&mut self, block: I) -> Vec<CompressedHintsTransaction<T>>
     where
         T: TransactionHints<Key = K>,
         I: IntoIterator<Item = T>,
@@ -69,21 +73,22 @@ impl<K: Hash + Clone + Eq> TransactionCompressor<K> {
 
         for tx in block.into_iter() {
             let read_set = tx.read_set().map(|key| self.map_key(key)).collect();
-
             let write_set = tx.write_set().map(|key| self.map_key(key)).collect();
+            let delta_set = tx.delta_set().map(|key| self.map_key(key)).collect();
 
-            res.push(Rc::new(CompressedPTransactionInner {
-                original: Box::new(tx),
+            res.push(CompressedHintsTransaction {
+                original: Arc::new(tx),
                 read_set,
                 write_set,
-            }));
+                delta_set,
+            });
         }
 
         res
     }
 }
 
-pub fn compress_transactions<T>(block: Vec<T>) -> Vec<CompressedPTransaction<T>>
+pub fn compress_transactions<T>(block: Vec<T>) -> Vec<CompressedHintsTransaction<T>>
 where
     T: TransactionHints,
     T::Key: Hash + Clone + Eq,

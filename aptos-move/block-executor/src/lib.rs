@@ -141,12 +141,12 @@ pub mod errors;
 pub mod executor;
 pub mod executor_traits;
 pub mod fast_path_executor;
-pub mod hints;
 pub mod mock_executors;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
 mod scheduler;
 pub mod task;
+pub mod transaction_hints;
 pub mod txn_commit_hook;
 pub mod txn_last_input_output;
 #[cfg(test)]

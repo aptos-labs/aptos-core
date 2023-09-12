@@ -1,11 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::{
-    reservation_table::{HashMapReservationTable, ReservationTable},
-};
+use crate::reservation_table::{HashMapReservationTable, ReservationTable};
+use aptos_block_executor::transaction_hints::TransactionHints;
 use aptos_types::block_executor::partitioner::{ITxnIndex, TxnIndex};
 use std::{collections::BTreeSet, hash::Hash};
-use aptos_block_executor::hints::TransactionHints;
 
 /// Creates batches of non-conflicting transactions.
 /// Each time `commit_prefix` is called, returns a sequence of transactions

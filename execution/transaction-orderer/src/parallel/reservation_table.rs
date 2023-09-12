@@ -1,13 +1,8 @@
 // Copyright © Aptos Foundation
 
-use std::{
-    collections::{HashSet, VecDeque},
-    hash::Hash,
-};
-use std::collections::BTreeSet;
-
-use dashmap::DashMap;
 use crate::parallel::min_heap::{MinHeap, MinHeapWithRemove};
+use dashmap::DashMap;
+use std::hash::Hash;
 
 pub trait MakeReservationsPhaseTrait {
     type Key;
@@ -35,20 +30,12 @@ pub trait RemoveReservationsPhaseTrait {
     // TODO: consider returning an iterator instead of a vector
     /// Removes a reservation from the table and returns the requests that
     /// are now satisfied and removes them from the table.
-    fn remove_reservation(
-        &self,
-        idx: Self::TxnId,
-        keys: &Self::Key,
-    ) -> Vec<Self::TxnId>;
+    fn remove_reservation(&self, idx: Self::TxnId, keys: &Self::Key) -> Vec<Self::TxnId>;
 
     // TODO: consider returning an iterator instead of a vector
     /// Removes reservations from the table and returns the requests that
     /// are now satisfied and removes them from the table.
-    fn remove_reservations<'a, KS>(
-        &self,
-        idx: Self::TxnId,
-        keys: KS,
-    ) -> Vec<Self::TxnId>
+    fn remove_reservations<'a, KS>(&self, idx: Self::TxnId, keys: KS) -> Vec<Self::TxnId>
     where
         Self::Key: 'a,
         KS: IntoIterator<Item = &'a Self::Key>,
@@ -115,7 +102,10 @@ pub trait ParallelReservationTable {
     where
         Self: 'a;
 
-    type RemoveReservationsPhase<'a>: RemoveReservationsPhaseTrait<Key = Self::Key, TxnId = Self::TxnId>
+    type RemoveReservationsPhase<'a>: RemoveReservationsPhaseTrait<
+        Key = Self::Key,
+        TxnId = Self::TxnId,
+    >
     where
         Self: 'a;
 
@@ -172,9 +162,9 @@ where
     Id: Ord + Eq + Hash + Default + Copy,
 {
     type Key = K;
-    type RequestsPhase<'a> = DashMapRequestsPhase<'a, K, Id> where Self: 'a;
     type MakeReservationsPhase<'a> = DashMapMakeReservationsPhase<'a, K, Id> where Self: 'a;
     type RemoveReservationsPhase<'a> = DashMapRemoveReservationsPhase<'a, K, Id> where Self: 'a;
+    type RequestsPhase<'a> = DashMapRequestsPhase<'a, K, Id> where Self: 'a;
     type TxnId = Id;
 
     fn make_reservations_phase(&mut self) -> Self::MakeReservationsPhase<'_> {
@@ -203,8 +193,7 @@ where
     type TxnId = Id;
 
     fn make_reservation(&self, idx: Id, key: &K) {
-        self
-            .inner
+        self.inner
             .table
             .entry(key.clone())
             .or_default()

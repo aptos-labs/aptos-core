@@ -4,12 +4,12 @@ use crate::{
     batch_orderer::BatchOrderer,
     reservation_table::{HashMapReservationTable, ReservationTable},
 };
+use aptos_block_executor::transaction_hints::TransactionHints;
 use aptos_types::block_executor::partitioner::TxnIndex;
 use std::{
     collections::{BTreeSet, HashMap, HashSet, VecDeque},
     hash::Hash,
 };
-use aptos_block_executor::hints::TransactionHints;
 
 /// Returns batches of non-conflicting transactions that additionally do not have dependencies
 /// on transactions in recently returned batches. The exact set of transactions that the returned

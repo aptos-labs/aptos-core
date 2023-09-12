@@ -1,9 +1,8 @@
 // Copyright © Aptos Foundation
-
-use std::cmp::Reverse;
-use std::collections::BinaryHeap;
+#![allow(dead_code)]
 
 use rayon::prelude::*;
+use std::{cmp::Reverse, collections::BinaryHeap};
 
 pub struct MinHeap<T> {
     inner: BinaryHeap<Reverse<T>>,
@@ -13,7 +12,10 @@ impl<T> ParallelExtend<T> for MinHeap<T>
 where
     T: Ord + Send,
 {
-    fn par_extend<I>(&mut self, par_iter: I) where I: IntoParallelIterator<Item=T> {
+    fn par_extend<I>(&mut self, par_iter: I)
+    where
+        I: IntoParallelIterator<Item = T>,
+    {
         self.inner.par_extend(par_iter.into_par_iter().map(Reverse));
     }
 }
@@ -49,8 +51,9 @@ impl<T: Ord> MinHeap<T> {
 }
 
 impl<T> IntoIterator for MinHeap<T> {
+    type IntoIter =
+        std::iter::Map<std::collections::binary_heap::IntoIter<Reverse<T>>, fn(Reverse<T>) -> T>;
     type Item = T;
-    type IntoIter = std::iter::Map<std::collections::binary_heap::IntoIter<Reverse<T>>, fn(Reverse<T>) -> T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.inner.into_iter().map(|Reverse(x)| x)

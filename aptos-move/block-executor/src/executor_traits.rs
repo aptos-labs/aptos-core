@@ -3,11 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    hints::TransactionHints,
     task::{ExecutorTask, IntoTransaction, Transaction},
+    transaction_hints::TransactionHints,
 };
 use aptos_state_view::TStateView;
-use aptos_types::executable::Executable;
 
 /// The base trait for all block executors.
 pub trait BlockExecutorBase {

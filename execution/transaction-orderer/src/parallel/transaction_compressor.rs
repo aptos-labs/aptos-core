@@ -1,33 +1,16 @@
 // Copyright © Aptos Foundation
 
-use crate::common::PTransaction;
-use std::hash::Hash;
-use std::sync::atomic::AtomicU32;
-use std::sync::atomic::Ordering::SeqCst;
+use crate::transaction_compressor::{CompressedHintsTransaction, CompressedKey};
+use aptos_block_executor::transaction_hints::TransactionHints;
 use dashmap::DashMap;
-use crate::transaction_compressor::CompressedKey;
 use rayon::prelude::*;
-
-#[derive(Clone)]
-pub struct ParallelCompressedPTransaction<T> {
-    pub original: Box<T>,
-    pub read_set: Vec<CompressedKey>,
-    pub write_set: Vec<CompressedKey>,
-}
-
-impl<T> PTransaction for ParallelCompressedPTransaction<T> {
-    type Key = CompressedKey;
-    type ReadSetIter<'a> = std::slice::Iter<'a, Self::Key> where T: 'a;
-    type WriteSetIter<'a> = std::slice::Iter<'a, Self::Key> where T: 'a;
-
-    fn read_set(&self) -> Self::ReadSetIter<'_> {
-        self.read_set.iter()
-    }
-
-    fn write_set(&self) -> Self::WriteSetIter<'_> {
-        self.write_set.iter()
-    }
-}
+use std::{
+    hash::Hash,
+    sync::{
+        atomic::{AtomicU32, Ordering::SeqCst},
+        Arc,
+    },
+};
 
 pub struct ParallelTransactionCompressor<K> {
     key_mapping: DashMap<K, CompressedKey>,
@@ -57,34 +40,40 @@ impl<K: Hash + Clone + Eq + Send + Sync> ParallelTransactionCompressor<K> {
             let mapped_key = self.next_key.fetch_add(1, SeqCst);
             // The resulting key may be different from `mapped_key` due to concurrency.
             // This may create "holes" in the key space, but that's fine.
-            *self.key_mapping.entry(key.clone())
+            *self
+                .key_mapping
+                .entry(key.clone())
                 .or_insert(mapped_key)
                 .value()
         }
     }
 
-    pub fn compress_transactions<T, I>(&mut self, block: I) -> Vec<ParallelCompressedPTransaction<T>>
+    pub fn compress_transactions<T, I>(&mut self, block: I) -> Vec<CompressedHintsTransaction<T>>
     where
-        T: PTransaction<Key = K> + Send,
+        T: TransactionHints<Key = K> + Send + Sync,
         I: IntoParallelIterator<Item = T>,
     {
-        block.into_par_iter().map(|tx| {
-            let read_set = tx.read_set().map(|key| self.map_key(key)).collect();
+        block
+            .into_par_iter()
+            .map(|tx| {
+                let read_set = tx.read_set().map(|key| self.map_key(key)).collect();
+                let write_set = tx.write_set().map(|key| self.map_key(key)).collect();
+                let delta_set = tx.delta_set().map(|key| self.map_key(key)).collect();
 
-            let write_set = tx.write_set().map(|key| self.map_key(key)).collect();
-
-            ParallelCompressedPTransaction {
-                original: Box::new(tx),
-                read_set,
-                write_set,
-            }
-        }).collect()
+                CompressedHintsTransaction {
+                    original: Arc::new(tx),
+                    read_set,
+                    write_set,
+                    delta_set,
+                }
+            })
+            .collect()
     }
 }
 
-pub fn compress_transactions_in_parallel<T>(block: Vec<T>) -> Vec<ParallelCompressedPTransaction<T>>
+pub fn compress_transactions_in_parallel<T>(block: Vec<T>) -> Vec<CompressedHintsTransaction<T>>
 where
-    T: PTransaction + Send,
+    T: TransactionHints + Send + Sync,
     T::Key: Hash + Clone + Eq + Send + Sync,
 {
     let mut compressor = ParallelTransactionCompressor::new();

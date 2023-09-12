@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+#![allow(dead_code)]
 
 use anyhow::Result;
 use aptos_aggregator::{
@@ -7,12 +8,11 @@ use aptos_aggregator::{
 };
 use aptos_state_view::{in_memory_state_view::InMemoryStateView, StateViewId, TStateView};
 use aptos_types::{
-    serde_helper::vec_bytes::deserialize,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::TransactionWrite,
 };
 use dashmap::{mapref::entry::Entry, DashMap};
-use std::{cell::RefCell, hash::Hash, marker::PhantomData, ops::Deref};
+use std::{cell::RefCell, hash::Hash, marker::PhantomData};
 
 pub trait WritableStateView: TStateView {
     type Value;
@@ -68,6 +68,7 @@ pub struct ReadSetCapturingStateView<'view, K, S> {
 }
 
 impl<'view, K: Clone, S> ReadSetCapturingStateView<'view, K, S> {
+    /// Creates a new `ReadSetCapturingStateView` with the default capacity.
     pub fn new(base_view: &'view S) -> Self {
         Self {
             base_view,
@@ -75,6 +76,7 @@ impl<'view, K: Clone, S> ReadSetCapturingStateView<'view, K, S> {
         }
     }
 
+    /// Creates a new `ReadSetCapturingStateView` with the given capacity.
     pub fn with_capacity(base_view: &'view S, capacity: usize) -> Self {
         Self {
             base_view,
@@ -82,17 +84,9 @@ impl<'view, K: Clone, S> ReadSetCapturingStateView<'view, K, S> {
         }
     }
 
-    /// Clears the information about the captured read set without deallocating the memory.
-    pub fn clear_read_set(&self) {
-        self.captured_reads.borrow_mut().clear();
-    }
-
-    pub fn get_read_set(&self) -> impl Deref<Target = Vec<K>> + '_ {
-        self.captured_reads.borrow()
-    }
-
-    pub fn clone_read_set(&self) -> Vec<K> {
-        self.captured_reads.borrow().clone()
+    /// Returns the captured read set and clears it.
+    pub fn take_read_set(&self) -> Vec<K> {
+        self.captured_reads.replace(Vec::new())
     }
 }
 

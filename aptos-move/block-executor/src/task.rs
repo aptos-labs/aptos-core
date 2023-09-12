@@ -38,6 +38,7 @@ pub trait Transaction: Sync + Send + Clone + 'static {
 pub trait IntoTransaction {
     type Txn: Transaction;
 
+    /// Convert self into a transaction.
     fn into_transaction(self) -> Self::Txn;
 }
 

@@ -10,7 +10,6 @@ use crate::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::TStateView;
-use aptos_types::executable::Executable;
 use rayon::{prelude::*, ThreadPool};
 use std::{marker::PhantomData, sync::Arc};
 use thread_local::ThreadLocal;

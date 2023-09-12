@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use aptos_block_executor::transaction_hints::TransactionHints;
 use aptos_block_partitioner::test_utils::{
     create_signed_p2p_transaction, generate_test_account, TestAccount,
 };
@@ -10,6 +11,10 @@ use aptos_transaction_orderer::{
         BatchedBlockOrdererWithWindow, BatchedBlockOrdererWithoutWindow, BlockOrderer,
         IdentityBlockOrderer,
     },
+    parallel::{
+        batch_orderer::ParallelDynamicToposortOrderer,
+        transaction_compressor::compress_transactions_in_parallel,
+    },
     quality::{amortized_inverse_dependency_cost_function, order_total_cost},
     transaction_compressor::compress_transactions,
 };
@@ -19,14 +24,11 @@ use rand::rngs::OsRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     cmp::min,
+    hash::Hash,
     io,
     sync::Mutex,
     time::{Duration, Instant},
 };
-use std::hash::Hash;
-use aptos_transaction_orderer::common::PTransaction;
-use aptos_transaction_orderer::parallel::batch_orderer::ParallelDynamicToposortOrderer;
-use aptos_transaction_orderer::parallel::transaction_compressor::compress_transactions_in_parallel;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 enum Orderer {
@@ -53,7 +55,7 @@ struct Args {
 
 fn run_benchmark<T, O>(txns: Vec<T>, args: Args, block_orderer: O)
 where
-    T: PTransaction + Clone,
+    T: TransactionHints + Clone,
     T::Key: Eq + Hash + Clone,
     O: BlockOrderer<Txn = T>,
 {
@@ -74,7 +76,7 @@ where
         let mut results = Vec::new();
 
         block_orderer
-            .order_transactions(txns, |ordered_txns| -> Result<(), io::Error> {
+            .order_transactions(txns, |ordered_txns: Vec<T>| -> Result<(), io::Error> {
                 count_ordered += ordered_txns.len();
                 if latency.is_none() && count_ordered >= min_ordered_transaction_before_execution {
                     latency = Some(now.elapsed());
@@ -178,7 +180,7 @@ fn main() {
             );
 
             run_benchmark(transactions, args, block_orderer);
-        }
+        },
         Orderer::Identity => {
             let now = Instant::now();
             let transactions = compress_transactions(transactions);

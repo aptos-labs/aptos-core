@@ -1,9 +1,6 @@
 // Copyright © Aptos Foundation
 
-use rayon::{
-    iter::ParallelExtend,
-    prelude::{IntoParallelIterator, ParallelIterator},
-};
+use rayon::{iter::ParallelExtend, prelude::IntoParallelIterator};
 use std::marker::PhantomData;
 
 /// Adds method `by_ref()` to `ParallelExtend` that returns a wrapper around `&mut A`

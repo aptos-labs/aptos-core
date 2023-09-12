@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use aptos_block_executor::hints::TransactionHints;
+use aptos_block_executor::transaction_hints::TransactionHints;
 use std::{collections::HashMap, hash::Hash, ops::Deref};
 
 /// A simple cost function for a dependency between two transactions.
