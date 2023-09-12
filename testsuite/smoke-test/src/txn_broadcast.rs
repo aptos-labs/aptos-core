@@ -21,7 +21,7 @@ use std::{
 async fn test_txn_broadcast() {
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
-        .with_init_config(Arc::new(|_, conf| {
+        .with_init_config(Arc::new(|_, conf, _| {
             conf.api.failpoints_enabled = true;
         }))
         .build()

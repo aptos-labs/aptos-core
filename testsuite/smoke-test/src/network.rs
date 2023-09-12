@@ -182,7 +182,7 @@ async fn test_file_discovery() {
     let discovery_file_for_closure = discovery_file.clone();
     let swarm = SwarmBuilder::new_local(1)
         .with_aptos()
-        .with_init_config(Arc::new(move |_, config| {
+        .with_init_config(Arc::new(move |_, config, _| {
             let discovery_file_for_closure2 = discovery_file_for_closure.clone();
             modify_network_config(config, &NetworkId::Validator, move |network| {
                 network.discovery_method = DiscoveryMethod::None;
@@ -217,7 +217,7 @@ async fn test_peer_monitoring_service_enabled() {
     // Create a swarm of 4 validators with peer monitoring enabled
     let swarm = SwarmBuilder::new_local(4)
         .with_aptos()
-        .with_init_config(Arc::new(|_, config| {
+        .with_init_config(Arc::new(|_, config, _| {
             config.peer_monitoring_service.enable_peer_monitoring_client = true;
         }))
         .build()
@@ -234,7 +234,7 @@ async fn test_network_performance_monitoring() {
     // Create a swarm of 4 validators with peer monitoring enabled
     let swarm = SwarmBuilder::new_local(4)
         .with_aptos()
-        .with_init_config(Arc::new(|_, config| {
+        .with_init_config(Arc::new(|_, config, _| {
             config.peer_monitoring_service.enable_peer_monitoring_client = true;
             config
                 .peer_monitoring_service
