@@ -82,11 +82,8 @@ pub enum FeatureFlag {
     AggregatorApi,
     SignatureCheckerV2ScriptFix,
     SaferResourceGroups,
-<<<<<<< HEAD
     SaferMetadata,
-=======
     AggregatorExecution,
->>>>>>> 9241860c90 (agg v2 natives flag)
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -219,11 +216,8 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::AggregatorApi => AptosFeatureFlag::AGGREGATOR_API,
             FeatureFlag::SaferResourceGroups => AptosFeatureFlag::SAFER_RESOURCE_GROUPS,
-<<<<<<< HEAD
             FeatureFlag::SaferMetadata => AptosFeatureFlag::SAFER_METADATA,
-=======
             FeatureFlag::AggregatorExecution => AptosFeatureFlag::AGGREGATOR_EXECUTION,
->>>>>>> 9241860c90 (agg v2 natives flag)
         }
     }
 }

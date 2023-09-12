@@ -128,7 +128,9 @@ The enabled features, represented by a bitset stored on chain.
 
 <a name="0x1_features_AGGREGATOR_API"></a>
 
-Whether the aggregator API feature is enabled.
+Whether the aggregator API feature is enabled - i.e. whether
+Aggregator and AggregatorSnapshot objects can be created
+(and consequently interacted with).
 Lifetime: transient
 
 
@@ -139,6 +141,10 @@ Lifetime: transient
 
 <a name="0x1_features_AGGREGATOR_EXECUTION"></a>
 
+Whether the efficient and concurrent execution of aggregators is enabled.
+Without this flags, aggregators are executed sequentially, creating
+read/write conflicts.
+After this flag is enabled, aggregators modifications stop creating conflict, as possible.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_EXECUTION">AGGREGATOR_EXECUTION</a>: u64 = 32;

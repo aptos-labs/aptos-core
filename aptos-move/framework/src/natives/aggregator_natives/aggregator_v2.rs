@@ -54,7 +54,7 @@ fn is_string_type(context: &SafeNativeContext, type_arg: &Type) -> SafeNativeRes
     Ok(false)
 }
 
-/// Given the list of native function arguments and a type, pop the next argument if it is of given type
+/// Given the list of native function arguments and a type, pop the next argument if it is of given type.
 pub fn pop_value_by_type(ty_arg: &Type, args: &mut VecDeque<Value>) -> SafeNativeResult<u128> {
     match ty_arg {
         Type::U128 => Ok(safely_pop_arg!(args, u128)),
@@ -108,7 +108,7 @@ fn native_create_aggregator(
         let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
         let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
         let id = aggregator_data.generate_id();
-        let aggregator_id = AggregatorID::ephemeral(aggregator_data.generate_id());
+        let aggregator_id = AggregatorID::ephemeral(id);
         aggregator_data.create_new_aggregator(aggregator_id, limit);
         id as u128
     } else {
