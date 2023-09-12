@@ -21,10 +21,9 @@ use move_binary_format::errors::{Location, PartialVMResult};
 /// Represents an update from aggregator's operation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct DeltaOp {
-    /// Histroy computed during the transaction execution
+    /// History computed during the transaction execution.
     history: DeltaHistory,
-    /// Postcondition: delta overflows on exceeding this max_value or going below
-    /// zero.
+    /// The maximum value the aggregator can reach.
     max_value: u128,
     /// Delta which is the result of the execution.
     update: DeltaValue,
