@@ -100,7 +100,7 @@ async fn test_old_indexer() {
 
     let mut swarm = crate::smoke_test_environment::SwarmBuilder::new_local(1)
         .with_aptos()
-        .with_init_config(Arc::new(|_, config, _| {
+        .with_init_config(Arc::new(|_, config| {
             config.storage.enable_indexer = true;
 
             config.indexer.enabled = true;

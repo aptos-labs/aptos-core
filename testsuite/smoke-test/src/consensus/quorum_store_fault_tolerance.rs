@@ -180,7 +180,7 @@ async fn test_onchain_config_quorum_store_enabled_and_disabled() {
 async fn test_remote_batch_reads() {
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
-        .with_init_config(Arc::new(|_, conf, _| {
+        .with_init_config(Arc::new(|_, conf| {
             conf.api.failpoints_enabled = true;
         }))
         // TODO: remove when quorum store becomes the in-code default
@@ -315,7 +315,7 @@ async fn test_batch_id_on_restart_wiped_db() {
 async fn test_swarm_with_bad_non_qs_node() {
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
-        .with_init_config(Arc::new(|_, conf, _| {
+        .with_init_config(Arc::new(|_, conf| {
             conf.api.failpoints_enabled = true;
         }))
         // TODO: remove when quorum store becomes the in-code default
