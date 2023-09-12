@@ -3635,6 +3635,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-types",
  "async-trait",
+ "bcs 0.1.4",
  "clap 4.3.21",
  "ethereum-tx-sign",
  "ethereum-types 0.14.1",

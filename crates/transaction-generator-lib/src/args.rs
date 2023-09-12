@@ -30,6 +30,7 @@ pub enum TransactionTypeArg {
     TokenV1FTMintAndStore,
     TokenV1FTMintAndTransfer,
     TokenV2AmbassadorMint,
+    EthereumCoinTransfer,
 }
 
 impl TransactionTypeArg {
@@ -156,6 +157,10 @@ impl TransactionTypeArg {
                 entry_point: EntryPoints::TokenV2AmbassadorMint,
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::EthereumCoinTransfer => TransactionType::EthereumCoinTransfer {
+                num_ethereum_accounts: 1000000,
+                sender_use_account_pool,
             },
         }
     }

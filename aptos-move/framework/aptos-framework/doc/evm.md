@@ -9,6 +9,8 @@
 -  [Resource `EvmData`](#0x1_evm_EvmData)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_evm_initialize)
+-  [Function `dummy`](#0x1_evm_dummy)
+-  [Function `initialize_account`](#0x1_evm_initialize_account)
 -  [Function `create_account`](#0x1_evm_create_account)
 -  [Function `create`](#0x1_evm_create)
 -  [Function `call`](#0x1_evm_call)
@@ -141,7 +143,7 @@ Aptos framework doesn't have ETH Data resource
 
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="evm.md#0x1_evm_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, eth_faucet_address: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>public</b> entry <b>fun</b> <a href="evm.md#0x1_evm_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -150,17 +152,14 @@ Aptos framework doesn't have ETH Data resource
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="evm.md#0x1_evm_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, eth_faucet_address: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
+<pre><code><b>public</b> entry <b>fun</b> <a href="evm.md#0x1_evm_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>if</b> (<b>exists</b>&lt;<a href="evm.md#0x1_evm_EvmData">EvmData</a>&gt;(@aptos_framework)) {
         <b>return</b>;
     };
     <b>let</b> balance = <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>();
-    <a href="../../aptos-stdlib/doc/table.md#0x1_table_upsert">table::upsert</a>(&<b>mut</b> balance, eth_faucet_address, 1000000000000);
     <b>let</b> nonce = <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>();
-    <a href="../../aptos-stdlib/doc/table.md#0x1_table_upsert">table::upsert</a>(&<b>mut</b> nonce, eth_faucet_address, 1);
     <b>let</b> <a href="code.md#0x1_code">code</a> = <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>();
-    <a href="../../aptos-stdlib/doc/table.md#0x1_table_upsert">table::upsert</a>(&<b>mut</b> <a href="code.md#0x1_code">code</a>, eth_faucet_address, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;());
     <b>move_to</b>&lt;<a href="evm.md#0x1_evm_EvmData">EvmData</a>&gt;(aptos_framework, <a href="evm.md#0x1_evm_EvmData">EvmData</a> {
         nonce: nonce,
         balance: balance,
@@ -168,6 +167,62 @@ Aptos framework doesn't have ETH Data resource
         storage: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>(),
         pub_keys: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>(),
     });
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_evm_dummy"></a>
+
+## Function `dummy`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="evm.md#0x1_evm_dummy">dummy</a>(_account: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, _account2: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, _amount: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, _data: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gas_limit: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="evm.md#0x1_evm_dummy">dummy</a>(_account: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, _account2: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, _amount: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, _data: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gas_limit: u64) {
+    <b>let</b> x = 1;
+    x = x + 1;
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_evm_initialize_account"></a>
+
+## Function `initialize_account`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="evm.md#0x1_evm_initialize_account">initialize_account</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="evm.md#0x1_evm_initialize_account">initialize_account</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="evm.md#0x1_evm_EvmData">EvmData</a> {
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="evm.md#0x1_evm_EvmData">EvmData</a>&gt;(@aptos_framework),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="evm.md#0x1_evm_ENO_ETH_DATA">ENO_ETH_DATA</a>),
+    );
+    <b>let</b> data_ref = <b>borrow_global_mut</b>&lt;<a href="evm.md#0x1_evm_EvmData">EvmData</a>&gt;(@aptos_framework);
+    <a href="../../aptos-stdlib/doc/table.md#0x1_table_upsert">table::upsert</a>(&<b>mut</b> data_ref.balance, <a href="account.md#0x1_account">account</a>, 1000000000000);
+    <a href="../../aptos-stdlib/doc/table.md#0x1_table_upsert">table::upsert</a>(&<b>mut</b> data_ref.nonce, <a href="account.md#0x1_account">account</a>, 1);
+    <a href="../../aptos-stdlib/doc/table.md#0x1_table_upsert">table::upsert</a>(&<b>mut</b> data_ref.<a href="code.md#0x1_code">code</a>, <a href="account.md#0x1_account">account</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;());
 }
 </code></pre>
 
