@@ -10,7 +10,7 @@ import {
   MAX_U8_NUMBER,
   MAX_U256_BIG_INT,
 } from "./consts";
-import { AnyNumber, Uint16, Uint32, Uint8 } from "./types";
+import { AnyNumber, Uint16, Uint32, Uint8 } from "../types";
 
 export interface Serializable {
   serialize(serializer: Serializer): void;
