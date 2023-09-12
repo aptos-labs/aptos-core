@@ -55,14 +55,3 @@ RUN aptos node run-local-testnet \
 FROM run-cli
 COPY --from=init-chain-state /app/data /app/data
 COPY --from=init-chain-state /accounts /app/accounts
-
-# Serve local testnet, run example script.
-WORKDIR /app/
-ENTRYPOINT [ \
-    "/usr/local/bin/aptos", "node", "run-local-testnet", \
-    "--test-dir", "/app/data", \
-    "--with-faucet" \
-    "&&", \
-    "/root/.local/bin/poetry", "run", "python", \
-    "script/example.py" \
-]
