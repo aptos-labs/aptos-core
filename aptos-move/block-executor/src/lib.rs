@@ -149,3 +149,4 @@ pub mod txn_last_input_output;
 mod unit_tests;
 pub mod view;
 pub mod sharding;
+pub mod index_mapping;

@@ -37,6 +37,7 @@ use std::{
         Arc,
     },
 };
+use aptos_mvhashmap::types::END_TXN_INDEX;
 use crate::sharding::TxnProvider;
 
 struct CommitGuard<'a> {
@@ -123,13 +124,11 @@ where
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let (idx_to_execute, incarnation) = version;
-        let global_txn_idx = sharding_provider.global_idx_from_local(idx_to_execute);
-        info!("execute() for txn {}.", global_txn_idx);
         let txn = sharding_provider.txn(idx_to_execute);
 
         // VM execution.
-        let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), global_txn_idx);
-        let execute_result = executor.execute_transaction(&sync_view, txn, global_txn_idx, false);
+        let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), idx_to_execute);
+        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute, false);
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute)
@@ -139,7 +138,7 @@ where
         let mut updates_outside = false;
         let mut apply_updates = |output: &E::Output| {
             // First, apply writes.
-            let write_version = (global_txn_idx, incarnation);
+            let write_version = (idx_to_execute, incarnation);
             for (k, v) in output
                 .resource_write_set()
                 .into_iter()
@@ -155,7 +154,7 @@ where
                 if prev_modified_keys.remove(&k).is_none() {
                     updates_outside = true;
                 }
-                versioned_cache.modules().write(k, global_txn_idx, v);
+                versioned_cache.modules().write(k, idx_to_execute, v);
             }
 
             // Then, apply deltas.
@@ -163,7 +162,7 @@ where
                 if prev_modified_keys.remove(&k).is_none() {
                     updates_outside = true;
                 }
-                versioned_cache.add_delta(k, global_txn_idx, d);
+                versioned_cache.add_delta(k, idx_to_execute, d);
             }
         };
 
@@ -191,9 +190,9 @@ where
         // Remove entries from previous write/delta set that were not overwritten.
         for (k, is_module) in prev_modified_keys {
             if is_module {
-                versioned_cache.modules().delete(&k, global_txn_idx);
+                versioned_cache.modules().delete(&k, idx_to_execute);
             } else {
-                versioned_cache.data().delete(&k, global_txn_idx);
+                versioned_cache.data().delete(&k, idx_to_execute);
             }
         }
 
@@ -206,7 +205,6 @@ where
             scheduler.halt();
             return SchedulerTask::NoTask;
         }
-        info!("finish_execute() for txn {}.", global_txn_idx);
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
     }
 
@@ -324,10 +322,10 @@ where
             }
 
             // Committed the last transaction, BlockSTM finishes execution.
-            if txn_idx + 1 == scheduler.num_txns()
+            if scheduler.next_txn(txn_idx) == END_TXN_INDEX
                 || last_input_output.block_truncated_at_idx(txn_idx)
             {
-                if txn_idx + 1 == scheduler.num_txns() {
+                if scheduler.next_txn(txn_idx) == END_TXN_INDEX {
                     assert!(
                         !matches!(scheduler_task, SchedulerTask::ExecutionTask(_, _)),
                         "All transactions can be committed, can't have execution task"
@@ -351,8 +349,8 @@ where
                 info!(
                     "[BlockSTM]: Parallel execution completed. {} out of {} txns committed. \
 		     accumulated_non_storage_gas = {}, limit = {:?}",
-                    txn_idx + 1,
-                    scheduler.num_txns(),
+                    txn_provider.local_rank(txn_idx) + 1,
+                    txn_provider.num_local_txns(),
                     accumulated_non_storage_gas,
                     maybe_block_gas_limit,
                 );
@@ -486,7 +484,7 @@ where
                         scheduler,
                         &executor,
                         base_view,
-                        ParallelState::new(versioned_cache, scheduler, shared_counter, &txn_provider.local_idxs_by_global),
+                        ParallelState::new(versioned_cache, scheduler, shared_counter),
                     )
                 },
                 SchedulerTask::ExecutionTask(_, ExecutionTaskType::Wakeup(condvar)) => {
@@ -528,7 +526,7 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        sharding_provider: &TxnProvider<T, E::Output, E::Error>,
+        txn_provider: &TxnProvider<T, E::Output, E::Error>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
@@ -539,7 +537,7 @@ where
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_cache = MVHashMap::new();
-        for (global_txn_idx, keys) in sharding_provider.remote_dependencies.iter() {
+        for (global_txn_idx, keys) in txn_provider.remote_dependencies.iter() {
             for key in keys.iter() {
                 versioned_cache.data().force_mark_estimate(key.clone(), *global_txn_idx);
                 //sharding todo: what about `versioned_cache.modules()`?
@@ -548,13 +546,13 @@ where
 
         let shared_counter = AtomicU32::new(0);
 
-        if sharding_provider.num_local_txns() == 0 {
+        if txn_provider.num_local_txns() == 0 {
             return Ok(vec![]);
         }
 
-        let num_txns = sharding_provider.num_local_txns() as u32;
-        let last_input_output = TxnLastInputOutput::new(num_txns);
-        let scheduler = Scheduler::new(num_txns);
+        let num_txns = txn_provider.num_local_txns();
+        let last_input_output = TxnLastInputOutput::new(txn_provider.index_helper().clone());
+        let scheduler = Scheduler::new(txn_provider.index_helper().clone());
 
         let mut roles: Vec<CommitRole> = vec![];
         let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);
@@ -573,7 +571,7 @@ where
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
             s.spawn(|_| {
-                sharding_provider.run_sharding_msg_loop(&versioned_cache);
+                txn_provider.run_sharding_msg_loop(&versioned_cache);
             });
 
             // The rest BlockSTM threads.
@@ -582,7 +580,7 @@ where
                 s.spawn(|_| {
                     self.work_task_with_scope(
                         &executor_initial_arguments,
-                        sharding_provider,
+                        txn_provider,
                         &last_input_output,
                         &versioned_cache,
                         &scheduler,
@@ -595,7 +593,6 @@ where
         });
         drop(timer);
 
-        let num_txns = num_txns as usize;
         // TODO: for large block sizes and many cores, extract outputs in parallel.
         let mut final_results = Vec::with_capacity(num_txns);
 
@@ -604,8 +601,8 @@ where
             Some(Error::ModulePathReadWrite)
         } else {
             let mut ret = None;
-            for idx in 0..num_txns {
-                match last_input_output.take_output(idx as TxnIndex) {
+            for &idx in txn_provider.index_helper().txns() {
+                match last_input_output.take_output(idx) {
                     ExecutionStatus::Success(t) => final_results.push(t),
                     ExecutionStatus::SkipRest(t) => {
                         final_results.push(t);

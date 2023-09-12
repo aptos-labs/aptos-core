@@ -15,7 +15,8 @@ use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::{mpsc, Mutex};
-use aptos_block_executor::sharding::{GlobalTxnIndex, TxnProvider};
+use aptos_block_executor::sharding::{TxnProvider};
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::state_store::state_key::StateKey;
 
 /// Executor service that runs on local machine and waits for commands from the coordinator and executes
@@ -179,9 +180,9 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         }
 
         for (shard_id, ((rx, txns), global_idxs)) in rxs.into_iter().zip(sharded_txns.into_iter()).zip(global_idxs.into_iter()).enumerate() {
-            let local_idxs_by_global = global_idxs.iter().enumerate().map(|(local_idx, global_idx)| (*global_idx, local_idx as u32)).collect();
+            let local_idxs_by_global = global_idxs.iter().enumerate().map(|(local_idx, global_idx)| (*global_idx, local_idx)).collect();
 
-            let mut remote_dependencies: HashMap<GlobalTxnIndex, HashSet<StateKey>> = HashMap::new();
+            let mut remote_dependencies: HashMap<TxnIndex, HashSet<StateKey>> = HashMap::new();
             for &global_idx in global_idxs.iter() {
                 for (dep_txn_idx, required_keys) in dependency_sets[global_idx as usize].iter() {
                     remote_dependencies.entry(*dep_txn_idx).or_insert_with(HashSet::new).extend(required_keys.clone());
