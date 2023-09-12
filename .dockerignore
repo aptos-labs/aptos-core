@@ -23,6 +23,7 @@
 !aptos-move/aptos-release-builder/data/proposals/*
 !aptos-move/framework/
 !aptos-move/move-examples/hello_blockchain/
+!aptos-move/move-examples/lockstream/
 !crates/aptos/src/move_tool/*.bpl
 !crates/aptos-faucet/doc/
 !api/doc/
