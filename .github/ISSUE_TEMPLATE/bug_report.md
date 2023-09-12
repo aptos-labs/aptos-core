@@ -9,8 +9,8 @@ assignees: ''
 
 # 🐛 Bug
 
-<!-- A clear and concise description of what the bug is.
-To report a security issue, please email security@aptoslabs.com. -->
+A clear and concise description of what the bug is.
+To report a security issue, please email security@aptoslabs.com.
 
 ## To reproduce
 
@@ -27,14 +27,14 @@ To report a security issue, please email security@aptoslabs.com. -->
 
 ## Expected Behavior
 
-<!-- A clear and concise description of what you expected to happen. -->
+A clear and concise description of what you expected to happen.
 
 ## System information
 
 **Please complete the following information:**
-- <!-- Aptos Core Version -->
-- <!-- Rust Version -->
-- <!-- Computer OS -->
+- Aptos Core Version
+- Rust Version
+- Computer OS
 
 
 ## Additional context

@@ -5,7 +5,7 @@ use super::{
     dag_fetcher::FetchRequester,
     order_rule::OrderRule,
     storage::DAGStorage,
-    types::{CertifiedAck, DAGMessage, Extensions},
+    types::{CertifiedAck, CertifiedNodeMessage, DAGMessage, Extensions},
     RpcHandler,
 };
 use crate::{
@@ -151,12 +151,19 @@ impl DagDriver {
         let signature_builder =
             SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone());
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
+        let latest_ledger_info = self
+            .storage
+            .get_latest_ledger_info()
+            .expect("latest ledger info must exist");
         let task = self
             .reliable_broadcast
             .broadcast(node.clone(), signature_builder)
             .then(move |certificate| {
                 let certified_node = CertifiedNode::new(node, certificate.signatures().to_owned());
-                rb.broadcast(certified_node, cert_ack_set)
+
+                let certified_node_msg =
+                    CertifiedNodeMessage::new(certified_node, latest_ledger_info);
+                rb.broadcast(certified_node_msg, cert_ack_set)
             });
         tokio::spawn(Abortable::new(task, abort_registration));
         if let Some(prev_handle) = self.rb_abort_handle.replace(abort_handle) {

@@ -86,7 +86,11 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             address_map: addrs.clone(),
         }],
         options.skip_attribute_checks,
-        KnownAttribute::get_all_attribute_names(),
+        if !options.skip_attribute_checks && options.known_attributes.is_empty() {
+            KnownAttribute::get_all_attribute_names()
+        } else {
+            &options.known_attributes
+        },
     )?;
     // Store address aliases
     let map = addrs

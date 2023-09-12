@@ -37,6 +37,7 @@ aptos-utils = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
+claims = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
 fail = { workspace = true }

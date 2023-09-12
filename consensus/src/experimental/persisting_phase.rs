@@ -59,6 +59,8 @@ impl StatelessPipeline for PersistingPhase {
     type Request = PersistingRequest;
     type Response = PersistingResponse;
 
+    const NAME: &'static str = "persisting";
+
     async fn process(&self, req: PersistingRequest) -> PersistingResponse {
         let PersistingRequest {
             blocks,
