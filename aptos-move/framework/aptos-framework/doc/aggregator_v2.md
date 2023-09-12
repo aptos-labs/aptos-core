@@ -410,6 +410,9 @@ Returns a value stored in this aggregator.
 
 ## Function `string_concat`
 
+Concatenates <code>before</code>, <code>snapshot</code> and <code>after</code> into a single string.
+snapshot passed needs to have integer type - currently supported types are u64 and u128.
+raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_string_concat">string_concat</a>&lt;Element&gt;(before: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;Element&gt;, after: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;

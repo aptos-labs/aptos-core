@@ -3,9 +3,7 @@
 
 use aptos_aggregator::{
     aggregator_change_set::AggregatorChange,
-    aggregator_extension::{
-        AggregatorData, AggregatorSnapshotState, AggregatorState, SnapshotValue,
-    },
+    aggregator_extension::{AggregatorData, AggregatorState},
     delta_change_set::DeltaOp,
     resolver::AggregatorResolver,
     types::{AggregatorID, AggregatorVersionedID},
@@ -65,7 +63,7 @@ impl<'a> NativeAggregatorContext<'a> {
         let NativeAggregatorContext {
             aggregator_data, ..
         } = self;
-        let (_, destroyed_aggregators, aggregators, snapshots) =
+        let (_, destroyed_aggregators, aggregators, _snapshots) =
             aggregator_data.into_inner().into();
 
         let mut aggregator_v1_changes = HashMap::new();
@@ -77,7 +75,7 @@ impl<'a> NativeAggregatorContext<'a> {
             match id {
                 AggregatorVersionedID::V1(state_key) => {
                     let change = match state {
-                        AggregatorState::Data { value } => AggregatorChangeV1::Write(value),
+                        AggregatorState::Create { value } => AggregatorChangeV1::Write(value),
                         AggregatorState::Delta { delta, history, .. } => {
                             let delta_op = DeltaOp::new(delta, max_value, history);
                             AggregatorChangeV1::Merge(delta_op)
@@ -87,7 +85,7 @@ impl<'a> NativeAggregatorContext<'a> {
                 },
                 AggregatorVersionedID::V2(id) => {
                     let change = match state {
-                        AggregatorState::Data { value } => AggregatorChange::Data { value },
+                        AggregatorState::Create { value } => AggregatorChange::Data { value },
                         // TODO - read creates a change, remove it?
                         AggregatorState::Delta { delta, history, .. } => {
                             AggregatorChange::AggregatorDelta {
@@ -99,31 +97,6 @@ impl<'a> NativeAggregatorContext<'a> {
                     };
                     aggregator_v2_changes.insert(id, change);
                 },
-            }
-        }
-
-        for (id, snapshot) in snapshots {
-            let state = snapshot.into();
-            let change = match state {
-                AggregatorSnapshotState::Data {
-                    value: SnapshotValue::Integer(value),
-                } => Some(AggregatorChange::Data { value }),
-                AggregatorSnapshotState::Data {
-                    value: SnapshotValue::String(value),
-                } => Some(AggregatorChange::StringData { value }),
-                AggregatorSnapshotState::Delta {
-                    base_aggregator,
-                    delta,
-                    formula,
-                } => Some(AggregatorChange::SnapshotDelta {
-                    delta,
-                    base_aggregator,
-                    formula,
-                }),
-                AggregatorSnapshotState::Reference { .. } => None,
-            };
-            if let Some(change) = change {
-                aggregator_v2_changes.insert(id, change);
             }
         }
 

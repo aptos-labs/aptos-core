@@ -73,6 +73,9 @@ module aptos_framework::aggregator_v2 {
 
     public native fun read_snapshot<Element>(snapshot: &AggregatorSnapshot<Element>): Element;
 
+    /// Concatenates `before`, `snapshot` and `after` into a single string.
+    /// snapshot passed needs to have integer type - currently supported types are u64 and u128.
+    /// raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
     public native fun string_concat<Element>(before: String, snapshot: &AggregatorSnapshot<Element>, after: String): AggregatorSnapshot<String>;
 
     // #[test(fx = @std)]

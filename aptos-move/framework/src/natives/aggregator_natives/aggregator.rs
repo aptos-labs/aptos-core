@@ -68,7 +68,7 @@ fn native_read(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id.clone(), limit)?;
 
-    let value = aggregator.read_most_recent_aggregator_value(aggregator_context.resolver)?;
+    let value = aggregator.read_aggregated_aggregator_value(aggregator_context.resolver)?;
 
     Ok(smallvec![Value::u128(value)])
 }
