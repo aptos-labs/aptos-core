@@ -4,9 +4,10 @@
 use crate::{
     aggregator_v2::{
         check, initialize, materialize, materialize_and_try_add, materialize_and_try_sub, new,
-        try_add, try_add_and_materialize, try_sub, try_sub_add, try_sub_and_materialize,
-        verify_copy_snapshot, verify_copy_string_snapshot, verify_string_concat,
-        verify_string_snapshot_concat,
+        read_snapshot_u128, read_snapshot_u64, snapshot, snapshot_with_u64_limit, try_add,
+        try_add_and_materialize, try_add_and_read_snapshot_u128, try_sub, try_sub_add,
+        try_sub_and_materialize, verify_copy_snapshot, verify_copy_string_snapshot,
+        verify_string_concat, verify_string_snapshot_concat,
     },
     assert_abort, assert_success,
     tests::common,
@@ -187,4 +188,22 @@ fn test_aggregator_materialize_overflow() {
     // Overflow on materialized value leads to abort with EAGGREGATOR_OVERFLOW.
     assert_success!(h.run(txn1));
     assert_abort!(h.run(txn2), 131073);
+}
+
+#[test]
+fn test_aggregator_snapshot() {
+    let (mut h, acc) = setup();
+    let txn1 = new(&mut h, &acc, 0, 400);
+    let txn2 = snapshot(&mut h, &acc, 0);
+    let txn3 = snapshot_with_u64_limit(&mut h, &acc, 0);
+    let txn4 = read_snapshot_u128(&mut h, &acc, 0);
+    let txn5 = read_snapshot_u64(&mut h, &acc, 0);
+    let txn6 = try_add_and_read_snapshot_u128(&mut h, &acc, 0, 100);
+
+    assert_success!(h.run(txn1));
+    assert_success!(h.run(txn2));
+    assert_success!(h.run(txn3));
+    assert_success!(h.run(txn4));
+    assert_success!(h.run(txn5));
+    assert_success!(h.run(txn6));
 }
