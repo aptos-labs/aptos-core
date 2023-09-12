@@ -1,3 +1,5 @@
+import asyncio
+
 from aptos_sdk.account import Account
 from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.async_client import RestClient
@@ -15,6 +17,7 @@ from decimal import Decimal
 
 from pathlib import Path
 
+import time
 import subprocess
 
 # Client setup
@@ -27,29 +30,33 @@ DECIMALS_USDC = 6
 DEE_COIN_MINT_NOMINAL = 100_000_000
 
 def coin_nominal_to_subunit(amount: str, decimals: int) -> int:
-    int(Decimal(amount) * Decimal(10 ** decimals))
+    return int(Decimal(amount) * Decimal(10 ** decimals))
 
 
 # Accounts.
-
-
-#ace = Account.load("accounts/ace.key")
-#bee = Account.load("accounts/bee.key")
-#cad = Account.load("accounts/cad.key")
-#dee = Account.load("accounts/dee.key")
-aptos_framework = AccountAddress.from_str("0x1")
+ace = Account.load_key(Path("accounts/ace.key").read_text())
+bee = Account.load_key(Path("accounts/bee.key").read_text())
+cad = Account.load_key(Path("accounts/cad.key").read_text())
+dee = Account.load_key(Path("accounts/dee.key").read_text())
 
 # Mint to Dee coin to Dee.
-#client.submit_transaction(
+#time.sleep(30)
+#ace_balance = asyncio.run(client.account_balance(ace.address()))
+
+print(asyncio.run(client.account_resources(dee.address())))
+
+
+#tx_hash = await client.submit_transaction(
     #dee,
-    #entry_function = EntryFunction.natural(
+    #EntryFunction.natural(
         #module=f"{dee.address()}::dee_coin",
         #function="mint",
         #ty_args=[],
         #args=[
             #TransactionArgument(
                 #coin_nominal_to_subunit(DEE_COIN_MINT_NOMINAL, DECIMALS_DEE_COIN),
-                #Serializer.u64),
+                #Serializer.u64
+            #),
         #],
     #)
 #)

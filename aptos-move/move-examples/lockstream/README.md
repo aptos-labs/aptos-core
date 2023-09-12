@@ -130,10 +130,14 @@ docker build . -f "$EXAMPLE_DIR/Dockerfile" -t lockstream-example
 Start a local chain, then run the Python script against it:
 
 ```sh
-chain_container=$(docker run --detach lockstream-example \
+chain_container=$(docker run \
+    --detach \
+    --publish 8080:8080 \
+    lockstream-example \
     aptos node run-local-testnet --test-dir /app/data)
 docker run \
     --volume $EXAMPLE_DIR:/app/scripts \
+    --network host \
     --workdir /app \
     lockstream-example \
     poetry run python scripts/example.py
