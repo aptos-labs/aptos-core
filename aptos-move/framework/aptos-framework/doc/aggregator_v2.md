@@ -11,6 +11,7 @@ This module provides an interface for aggregators (version 2).
 -  [Constants](#@Constants_0)
 -  [Function `max_value`](#0x1_aggregator_v2_max_value)
 -  [Function `create_aggregator`](#0x1_aggregator_v2_create_aggregator)
+-  [Function `create_unbounded_aggregator`](#0x1_aggregator_v2_create_unbounded_aggregator)
 -  [Function `try_add`](#0x1_aggregator_v2_try_add)
 -  [Function `add`](#0x1_aggregator_v2_add)
 -  [Function `try_sub`](#0x1_aggregator_v2_try_sub)
@@ -193,6 +194,33 @@ EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 
 <pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;IntElement: <b>copy</b> + drop&gt;(max_value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_aggregator_v2_create_unbounded_aggregator"></a>
+
+## Function `create_unbounded_aggregator`
+
+Creates new aggregator, without any 'max_value' on top of the implicit bound restriction
+due to the width of the type (i.e. MAX_U64 for u64, MAX_U128 for u128).
+
+Currently supported types for Element are u64 and u128.
+EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;Element: <b>copy</b>, drop&gt;(): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;Element&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;Element: <b>copy</b> + drop&gt;(): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;Element&gt;;
 </code></pre>
 
 

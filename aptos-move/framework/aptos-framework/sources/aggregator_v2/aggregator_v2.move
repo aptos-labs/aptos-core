@@ -2,6 +2,7 @@
 module aptos_framework::aggregator_v2 {
     use std::error;
     use std::string::String;
+    use aptos_std::type_info;
 
     /// The value of aggregator overflows. Raised by uncoditional add() call
     const EAGGREGATOR_OVERFLOW: u64 = 1;
@@ -17,6 +18,9 @@ module aptos_framework::aggregator_v2 {
 
     /// The generic type supplied to the aggregator is not supported.
     const EUNSUPPORTED_AGGREGATOR_TYPE: u64 = 7;
+
+    const MAX_U64: u64 = 18446744073709551615;
+    const MAX_U128: u128 = 340282366920938463463374607431768211455;
 
     /// Represents an integer which supports parallel additions and subtractions
     /// across multiple transactions. See the module description for more details.
@@ -41,6 +45,21 @@ module aptos_framework::aggregator_v2 {
     /// Currently supported types for Element are u64 and u128.
     /// EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
     public native fun create_aggregator<IntElement: copy + drop>(max_value: IntElement): Aggregator<IntElement>;
+
+    /// Creates new aggregator, without any 'max_value' on top of the implicit bound restriction
+    /// due to the width of the type (i.e. MAX_U64 for u64, MAX_U128 for u128).
+    ///
+    /// Currently supported types for Element are u64 and u128.
+    /// EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
+    public fun create_unbounded_aggregator<Element: copy + drop>(): Aggregator<Element> {
+        if (type_info::type_of<Element>() == type_info::type_of<u64>()) {
+            create_aggregator(MAX_U64)
+        } else if (type_info::type_of<Element>() == type_info::type_of<u128>()) {
+            create_aggregator(MAX_U128)
+        } else {
+            abort error::invalid_argument(EUNSUPPORTED_AGGREGATOR_TYPE);
+        }
+    }
 
     /// Adds `value` to aggregator.
     /// If addition would exceed the max_value, `false` is returned, and aggregator value is left unchanged.
