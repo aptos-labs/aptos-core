@@ -188,7 +188,7 @@ pub fn sharded_block_executor_with_random_transfers<E: ExecutorClient<FakeDataSt
     let mut rng = OsRng;
     let max_accounts = 200;
     let max_txns = 1000;
-    let num_accounts = rng.gen_range(1, max_accounts);
+    let num_accounts = rng.gen_range(2, max_accounts);
     let mut accounts = Vec::new();
     let mut executor = FakeExecutor::from_head_genesis();
 

@@ -7,7 +7,7 @@ use crate::{
     state_replication::{StateComputer, StateComputerCommitCallBackType},
 };
 use aptos_consensus_types::executed_block::ExecutedBlock;
-use aptos_executor_types::Error;
+use aptos_executor_types::ExecutorResult;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use async_trait::async_trait;
 use std::{
@@ -42,7 +42,7 @@ impl Display for PersistingRequest {
     }
 }
 
-pub type PersistingResponse = Result<(), Error>;
+pub type PersistingResponse = ExecutorResult<()>;
 
 pub struct PersistingPhase {
     persisting_handle: Arc<dyn StateComputer>,
