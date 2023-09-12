@@ -6,7 +6,7 @@ import {
   MoveResource,
   MoveResourceType,
   PaginationArgs,
-  Transaction,
+  TransactionResponse,
   HexInput,
 } from "../types";
 import { getInfo, getModule, getModules, getResource, getResources, getTransactions } from "../internal/account";
@@ -91,7 +91,10 @@ export class Account {
    *
    * @returns The account transactions
    */
-  async getAccountTransactions(args: { accountAddress: HexInput; options?: PaginationArgs }): Promise<Transaction[]> {
+  async getAccountTransactions(args: {
+    accountAddress: HexInput;
+    options?: PaginationArgs;
+  }): Promise<TransactionResponse[]> {
     const transactions = await getTransactions({ aptosConfig: this.config, ...args });
     return transactions;
   }
