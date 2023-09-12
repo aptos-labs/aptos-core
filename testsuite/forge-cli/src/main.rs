@@ -1647,7 +1647,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         // as no useful transaction reach their mempool.
         // something to potentially improve upon.
         // So having VFNs for all validators
-        .with_initial_fullnode_count(12)
+        //////// .with_initial_fullnode_count(12)
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
             mempool_backlog: 500_000,
@@ -1683,7 +1683,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 ["backlog_per_validator_batch_limit_count"] = 10.into();
 
             helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
-                ["dynamic_max_txn_per_s"] = 60000.into();
+                ["dynamic_max_txn_per_s"] = 6000.into();
 
             helm_values["validator"]["config"]["consensus"]["quorum_store"]
                 ["sender_max_batch_txns"] = 500.into();
