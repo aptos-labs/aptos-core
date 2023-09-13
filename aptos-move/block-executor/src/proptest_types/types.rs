@@ -4,7 +4,7 @@
 
 use crate::task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput};
 use aptos_aggregator::{
-    delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
+    delta_change_set::{delta_add_for_test, delta_sub_for_test, serialize, DeltaOp},
     transaction::AggregatorValue,
 };
 use aptos_mvhashmap::types::TxnIndex;
@@ -431,9 +431,9 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 if val % 10 == 0 {
                     None
                 } else if val % 10 < 5 {
-                    Some(delta_sub(val % 100, u128::MAX))
+                    Some(delta_sub_for_test(val % 100, u128::MAX))
                 } else {
-                    Some(delta_add(val % 100, u128::MAX))
+                    Some(delta_add_for_test(val % 100, u128::MAX))
                 }
             } else {
                 None

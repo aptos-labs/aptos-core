@@ -134,7 +134,7 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::delta_change_set::{delta_add, serialize};
+    use aptos_aggregator::delta_change_set::{delta_add_for_test, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::write_set::WriteOp;
     use aptos_vm_types::check_change_set::CheckChangeSet;
@@ -190,7 +190,7 @@ mod test {
         ]);
 
         let aggregator_delta_set =
-            HashMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
+            HashMap::from([(key("aggregator_delta_set"), delta_add_for_test(1, 1000))]);
 
         let change_set = VMChangeSet::new(
             resource_write_set,

@@ -271,13 +271,11 @@ pub fn serialize(value: &u128) -> Vec<u8> {
     bcs::to_bytes(value).expect("unexpected serialization error in aggregator")
 }
 
-// Helper for tests, #[cfg(test)] doesn't work for cross-crate.
-pub fn delta_sub(v: u128, limit: u128) -> DeltaOp {
+pub fn delta_sub_for_test(v: u128, limit: u128) -> DeltaOp {
     DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v)
 }
 
-// Helper for tests, #[cfg(test)] doesn't work for cross-crate.
-pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
+pub fn delta_add_for_test(v: u128, limit: u128) -> DeltaOp {
     DeltaOp::new(DeltaUpdate::Plus(v), limit, v, 0)
 }
 
@@ -293,14 +291,14 @@ mod test {
     use once_cell::sync::Lazy;
 
     fn delta_add_with_history(v: u128, limit: u128, max: u128, min: u128) -> DeltaOp {
-        let mut delta = delta_add(v, limit);
+        let mut delta = delta_add_for_test(v, limit);
         delta.max_positive = max;
         delta.min_negative = min;
         delta
     }
 
     fn delta_sub_with_history(v: u128, limit: u128, max: u128, min: u128) -> DeltaOp {
-        let mut delta = delta_sub(v, limit);
+        let mut delta = delta_sub_for_test(v, limit);
         delta.max_positive = max;
         delta.min_negative = min;
         delta
@@ -309,7 +307,7 @@ mod test {
     #[test]
     fn test_delta_application() {
         // Testing a fresh delta of +5.
-        let mut add5 = delta_add(5, 100);
+        let mut add5 = delta_add_for_test(5, 100);
         assert_ok_eq!(add5.apply_to(0), 5);
         assert_ok_eq!(add5.apply_to(95), 100);
         assert_err!(add5.apply_to(96));
@@ -324,7 +322,7 @@ mod test {
         assert_ok_eq!(add5.apply_to(50), 55);
 
         // Testing a fresh delta of -5.
-        let mut sub5 = delta_sub(5, 100);
+        let mut sub5 = delta_sub_for_test(5, 100);
         assert_ok_eq!(sub5.apply_to(5), 0);
         assert_ok_eq!(sub5.apply_to(100), 95);
         assert_err!(sub5.apply_to(0));
@@ -348,7 +346,7 @@ mod test {
         // Explanation: value becomes +2+1 = +3, history remains unchanged
         // because +4 > +2+1 and -3 < 0.
         let a = delta_add_with_history(2, 100, 4, 3);
-        let mut b = delta_add(1, 100);
+        let mut b = delta_add_for_test(1, 100);
         let mut c = a;
         let d = b;
 
@@ -392,8 +390,8 @@ mod test {
 
         // Case 4: overflow on value.
         // Explanation: value overflows because +51+50 > 100.
-        let a = delta_add(51, 100);
-        let mut b = delta_add(50, 100);
+        let a = delta_add_for_test(51, 100);
+        let mut b = delta_add_for_test(50, 100);
         let mut c = a;
         let d = b;
 
@@ -415,8 +413,8 @@ mod test {
         // test history here and onwards, because that code is shared by
         // plus-plus and plus-minus cases.
         // Explanation: +24-23 = +1
-        let a = delta_add(24, 100);
-        let mut b = delta_sub(23, 100);
+        let a = delta_add_for_test(24, 100);
+        let mut b = delta_sub_for_test(23, 100);
         let mut c = a;
         let d = b;
 
@@ -427,7 +425,7 @@ mod test {
 
         // Case 7: updating value with changing the sign.
         // Explanation: +23-24 = -1
-        let a = delta_add(23, 100);
+        let a = delta_add_for_test(23, 100);
         let mut b = delta_sub_with_history(24, 100, 20, 20);
         let mut c = a;
         let d = b;
@@ -446,7 +444,7 @@ mod test {
         // Explanation: value becomes -20-20 = -40, history remains unchanged
         // because +1 > 0 and -40 <= -20-0.
         let a = delta_sub_with_history(20, 100, 1, 40);
-        let mut b = delta_sub(20, 100);
+        let mut b = delta_sub_for_test(20, 100);
         let mut c = a;
         let d = b;
 
@@ -490,8 +488,8 @@ mod test {
         // Case 4: underflow on value.
         // Explanation: value underflows because -50-51 clearly should have
         // never happened.
-        let a = delta_sub(50, 100);
-        let mut b = delta_sub(51, 100);
+        let a = delta_sub_for_test(50, 100);
+        let mut b = delta_sub_for_test(51, 100);
         let mut c = a;
         let d = b;
 
@@ -510,8 +508,8 @@ mod test {
 
         // Case 6: updating value with changing the sign.
         // Explanation: -24+23 = -1.
-        let a = delta_sub(24, 100);
-        let mut b = delta_add(23, 100);
+        let a = delta_sub_for_test(24, 100);
+        let mut b = delta_add_for_test(23, 100);
         let mut c = a;
         let d = b;
 
@@ -522,7 +520,7 @@ mod test {
 
         // Case 7: updating value with changing the sign.
         // Explanation: +23-24 = +1.
-        let a = delta_add(23, 100);
+        let a = delta_add_for_test(23, 100);
         let mut b = delta_sub_with_history(24, 100, 20, 20);
         let mut c = a;
         let d = b;
@@ -538,7 +536,7 @@ mod test {
     #[test]
     fn test_failed_write_op_conversion_because_of_empty_storage() {
         let state_view = AggregatorStore::default();
-        let delta_op = delta_add(10, 1000);
+        let delta_op = delta_add_for_test(10, 1000);
         assert_matches!(
             delta_op.try_into_write_op(&state_view, &KEY),
             Err(VMStatus::Error {
@@ -569,7 +567,7 @@ mod test {
     #[test]
     fn test_failed_write_op_conversion_because_of_storage_error() {
         let state_view = BadStorage;
-        let delta_op = delta_add(10, 1000);
+        let delta_op = delta_add_for_test(10, 1000);
         assert_matches!(
             delta_op.try_into_write_op(&state_view, &KEY),
             Err(VMStatus::Error {
@@ -586,8 +584,8 @@ mod test {
         state_view.set_from_state_key(KEY.clone(), 100);
 
         // Both addition and subtraction should succeed!
-        let add_op = delta_add(100, 200);
-        let sub_op = delta_sub(100, 200);
+        let add_op = delta_add_for_test(100, 200);
+        let sub_op = delta_sub_for_test(100, 200);
 
         let add_result = add_op.try_into_write_op(&state_view, &KEY);
         assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200)));
@@ -602,8 +600,8 @@ mod test {
         state_view.set_from_state_key(KEY.clone(), 100);
 
         // Both addition and subtraction should fail!
-        let add_op = delta_add(15, 100);
-        let sub_op = delta_sub(101, 1000);
+        let add_op = delta_add_for_test(15, 100);
+        let sub_op = delta_sub_for_test(101, 1000);
 
         assert_matches!(
             add_op.try_into_write_op(&state_view, &KEY),

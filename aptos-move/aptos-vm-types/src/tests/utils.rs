@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{change_set::VMChangeSet, check_change_set::CheckChangeSet, output::VMOutput};
-use aptos_aggregator::delta_change_set::{delta_add, serialize, DeltaOp};
+use aptos_aggregator::delta_change_set::{delta_add_for_test, serialize, DeltaOp};
 use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
@@ -47,7 +47,7 @@ pub(crate) fn mock_delete(k: impl ToString) -> (StateKey, WriteOp) {
 
 pub(crate) fn mock_add(k: impl ToString, v: u128) -> (StateKey, DeltaOp) {
     const DUMMY_LIMIT: u128 = 1000;
-    (as_state_key!(k), delta_add(v, DUMMY_LIMIT))
+    (as_state_key!(k), delta_add_for_test(v, DUMMY_LIMIT))
 }
 
 pub(crate) fn build_change_set(

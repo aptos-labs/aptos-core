@@ -8,7 +8,7 @@ use super::{
 };
 use crate::unit_tests::KeyType;
 use aptos_aggregator::{
-    delta_change_set::{delta_add, delta_sub, DeltaOp},
+    delta_change_set::{delta_add_for_test, delta_sub_for_test, DeltaOp},
     transaction::AggregatorValue,
 };
 use aptos_types::{
@@ -165,9 +165,9 @@ fn operator_strategy<V: Arbitrary + Clone>() -> impl Strategy<Value = Operator<V
         4 => any::<u32>().prop_map(|v| {
             // TODO: Is there a proptest way of doing that?
             if v % 2 == 0 {
-                Operator::Update(delta_sub(v as u128, u32::MAX as u128))
+                Operator::Update(delta_sub_for_test(v as u128, u32::MAX as u128))
             } else {
-        Operator::Update(delta_add(v as u128, u32::MAX as u128))
+        Operator::Update(delta_add_for_test(v as u128, u32::MAX as u128))
             }
         }),
         1 => Just(Operator::Remove),

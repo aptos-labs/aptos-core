@@ -8,7 +8,7 @@ use super::{
     *,
 };
 use aptos_aggregator::{
-    delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate},
+    delta_change_set::{delta_add_for_test, delta_sub_for_test, DeltaOp, DeltaUpdate},
     transaction::AggregatorValue,
 };
 use aptos_types::{
@@ -127,9 +127,9 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Ok(Versioned((10, 1), arc_value_for(10, 1))), r_10);
 
     // More deltas.
-    mvtbl.add_delta(ap1.clone(), 11, delta_add(11, u128::MAX));
-    mvtbl.add_delta(ap1.clone(), 12, delta_add(12, u128::MAX));
-    mvtbl.add_delta(ap1.clone(), 13, delta_sub(74, u128::MAX));
+    mvtbl.add_delta(ap1.clone(), 11, delta_add_for_test(11, u128::MAX));
+    mvtbl.add_delta(ap1.clone(), 12, delta_add_for_test(12, u128::MAX));
+    mvtbl.add_delta(ap1.clone(), 13, delta_sub_for_test(74, u128::MAX));
 
     // Reads have to go traverse deltas until a write is found.
     let r_sum = mvtbl.fetch_data(&ap1, 14);
@@ -192,8 +192,8 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Ok(Versioned((10, 2), arc_value_for(10, 2))), r_10);
 
     // Both delta-write and delta-delta application failures are detected.
-    mvtbl.add_delta(ap1.clone(), 30, delta_add(30, 32));
-    mvtbl.add_delta(ap1.clone(), 31, delta_add(31, 32));
+    mvtbl.add_delta(ap1.clone(), 30, delta_add_for_test(30, 32));
+    mvtbl.add_delta(ap1.clone(), 31, delta_add_for_test(31, 32));
     let r_33 = mvtbl.fetch_data(&ap1, 33);
     assert_eq!(Err(DeltaApplicationFailure), r_33);
 
@@ -201,7 +201,11 @@ fn create_write_read_placeholder_struct() {
     // sub base sub_for for which should underflow.
     let sub_base = AggregatorValue::from_write(&val).unwrap().into();
     mvtbl.data().write(ap2.clone(), (10, 3), val);
-    mvtbl.add_delta(ap2.clone(), 30, delta_sub(30 + sub_base, u128::MAX));
+    mvtbl.add_delta(
+        ap2.clone(),
+        30,
+        delta_sub_for_test(30 + sub_base, u128::MAX),
+    );
     let r_31 = mvtbl.fetch_data(&ap2, 31);
     assert_eq!(Err(DeltaApplicationFailure), r_31);
 }
@@ -214,9 +218,9 @@ fn materialize_delta_shortcut() {
     let ap = KeyType(b"/foo/b".to_vec());
     let limit = 10000;
 
-    vd.add_delta(ap.clone(), 5, delta_add(10, limit));
-    vd.add_delta(ap.clone(), 8, delta_add(20, limit));
-    vd.add_delta(ap.clone(), 11, delta_add(30, limit));
+    vd.add_delta(ap.clone(), 5, delta_add_for_test(10, limit));
+    vd.add_delta(ap.clone(), 8, delta_add_for_test(20, limit));
+    vd.add_delta(ap.clone(), 11, delta_add_for_test(30, limit));
 
     match_unresolved(vd.fetch_data(&ap, 10), DeltaUpdate::Plus(30));
     assert_err_eq!(
@@ -233,11 +237,11 @@ fn materialize_delta_shortcut() {
 
     // Make sure shortcut is committed by adding a delta at a lower txn idx
     // and ensuring tha fetch_data output no longer changes.
-    vd.add_delta(ap.clone(), 6, delta_add(15, limit));
+    vd.add_delta(ap.clone(), 6, delta_add_for_test(15, limit));
     assert_eq!(vd.fetch_data(&ap, 10), Ok(Resolved(35)));
 
     // However, if we add a delta at txn_idx = 9, it should have an effect.
-    vd.add_delta(ap.clone(), 9, delta_add(15, limit));
+    vd.add_delta(ap.clone(), 9, delta_add_for_test(15, limit));
     assert_eq!(vd.fetch_data(&ap, 10), Ok(Resolved(50)));
 }
 
@@ -278,7 +282,7 @@ fn commit_without_entry() {
     let vd: VersionedData<KeyType<Vec<u8>>, Value> = VersionedData::new();
     let ap = KeyType(b"/foo/b".to_vec());
 
-    vd.add_delta(ap.clone(), 8, delta_add(20, 1000));
+    vd.add_delta(ap.clone(), 8, delta_add_for_test(20, 1000));
     vd.set_aggregator_base_value(&ap, 10);
 
     // Must panic as there is no delta at provided index.

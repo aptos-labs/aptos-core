@@ -14,7 +14,9 @@ use crate::{
     scheduler::{DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask},
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
+use aptos_aggregator::delta_change_set::{
+    delta_add_for_test, delta_sub_for_test, DeltaOp, DeltaUpdate,
+};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     contract_event::ReadWriteEvent,
@@ -100,7 +102,7 @@ fn delta_counters() {
             reads: vec![key],
             writes: vec![],
             events: vec![],
-            deltas: vec![(key, delta_add(5, u128::MAX))],
+            deltas: vec![(key, delta_add_for_test(5, u128::MAX))],
             gas: 1,
         }));
     }
@@ -126,7 +128,7 @@ fn delta_counters() {
             reads: vec![key],
             writes: vec![],
             events: vec![],
-            deltas: vec![(key, delta_sub(2, u128::MAX))],
+            deltas: vec![(key, delta_sub_for_test(2, u128::MAX))],
             gas: 1,
         }));
     }
