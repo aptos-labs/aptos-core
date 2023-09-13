@@ -1193,10 +1193,11 @@ async fn parse_operations_from_write_set(
         },
     };
 
-    let data = match write_op.bytes() {
+    let bytes = match write_op.bytes() {
         Some(bytes) => bytes,
         None => return Ok(vec![]),
     };
+    let data = &bytes;
 
     // Determine operation
     match (

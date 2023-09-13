@@ -60,4 +60,8 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
             maybe_block_gas_limit,
         )
     }
+
+    pub fn get_executor_thread_pool(&self) -> Arc<rayon::ThreadPool> {
+        self.executor_thread_pool.clone()
+    }
 }

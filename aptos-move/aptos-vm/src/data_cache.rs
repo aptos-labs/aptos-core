@@ -26,6 +26,7 @@ use aptos_types::{
     },
 };
 use aptos_vm_types::resolver::{StateValueMetadataResolver, TResourceGroupResolver};
+use bytes::Bytes;
 use claims::assert_none;
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
@@ -64,7 +65,7 @@ pub struct StorageAdapter<'a, S> {
     // the serialized sizes of the tags. This avoids dependency on group serialization.
     group_byte_count_as_sum: bool,
     max_binary_format_version: u32,
-    resource_group_cache: RefCell<HashMap<StateKey, BTreeMap<StructTag, Vec<u8>>>>,
+    resource_group_cache: RefCell<HashMap<StateKey, BTreeMap<StructTag, Bytes>>>,
 }
 
 impl<'a, S> StorageAdapter<'a, S> {
@@ -111,7 +112,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         s.init(&features, gas_feature_version)
     }
 
-    pub fn get(&self, access_path: AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
+    pub fn get(&self, access_path: AccessPath) -> PartialVMResult<Option<Bytes>> {
         self.state_store
             .get_state_value_bytes(&StateKey::access_path(access_path))
             .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
@@ -122,7 +123,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<(Option<Vec<u8>>, usize), VMError> {
+    ) -> Result<(Option<Bytes>, usize), VMError> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             let key = StateKey::access_path(AccessPath::resource_group_access_path(
@@ -160,7 +161,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> AptosMoveResolver for StorageAdapter<'a, S> {
-    fn release_resource_group_cache(&self) -> HashMap<StateKey, BTreeMap<StructTag, Vec<u8>>> {
+    fn release_resource_group_cache(&self) -> HashMap<StateKey, BTreeMap<StructTag, Bytes>> {
         self.resource_group_cache.take()
     }
 }
@@ -174,11 +175,11 @@ impl<'a, S: StateView> TResourceGroupResolver for StorageAdapter<'a, S> {
         key: &StateKey,
         resource_tag: &StructTag,
         return_group_size: bool,
-    ) -> anyhow::Result<(Option<Vec<u8>>, Option<usize>)> {
+    ) -> anyhow::Result<(Option<Bytes>, Option<usize>)> {
         // Resolve directly from state store (StateView interface).
         let group_data = self.state_store.get_state_value_bytes(key)?;
         if let Some(group_data_blob) = group_data {
-            let group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&group_data_blob)
+            let group_data: BTreeMap<StructTag, Bytes> = bcs::from_bytes(&group_data_blob)
                 .map_err(|_| anyhow::Error::msg("Resource group deserialization error"))?;
 
             let maybe_group_size = if return_group_size {
@@ -225,7 +226,7 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
+    ) -> anyhow::Result<(Option<Bytes>, usize)> {
         Ok(self.get_any_resource(address, struct_tag, metadata)?)
     }
 }
@@ -246,7 +247,7 @@ impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
         module.metadata
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Error> {
         // REVIEW: cache this?
         let ap = AccessPath::from(module_id);
         Ok(self.get(ap).map_err(|e| e.finish(Location::Undefined))?)
@@ -258,7 +259,7 @@ impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
         &self,
         handle: &TableHandle,
         key: &[u8],
-    ) -> Result<Option<Vec<u8>>, Error> {
+    ) -> Result<Option<Bytes>, Error> {
         self.get_state_value_bytes(&StateKey::table_item((*handle).into(), key.to_vec()))
     }
 }
@@ -285,7 +286,7 @@ impl<'a, S: StateView> AggregatorResolver for StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> ConfigStorage for StorageAdapter<'a, S> {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
+    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes> {
         self.get(access_path).ok()?
     }
 }
@@ -390,7 +391,7 @@ mod tests {
             Ok(self
                 .group
                 .get(state_key)
-                .map(|entry| StateValue::new_legacy(entry.blob.clone())))
+                .map(|entry| StateValue::new_legacy(entry.blob.clone().into())))
         }
 
         fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {

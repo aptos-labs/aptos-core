@@ -745,7 +745,7 @@ impl DbReader for FakeAptosDB {
                 EventHandle::new(EventKey::new(1, account_address), 0),
             );
             let bytes = bcs::to_bytes(&account)?;
-            Ok(Some(StateValue::new_legacy(bytes)))
+            Ok(Some(StateValue::new_legacy(bytes.into())))
         } else {
             self.inner.get_state_value_by_version(state_key, version)
         }

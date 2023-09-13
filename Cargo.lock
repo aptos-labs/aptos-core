@@ -578,6 +578,7 @@ dependencies = [
  "aptos-vm-logging",
  "arc-swap",
  "bcs 0.1.4",
+ "bytes",
  "claims",
  "criterion",
  "crossbeam",
@@ -1041,6 +1042,7 @@ dependencies = [
  "aptos-vm",
  "bcs 0.1.4",
  "byteorder",
+ "bytes",
  "move-core-types",
  "move-resource-viewer",
  "num-derive",
@@ -1188,6 +1190,7 @@ dependencies = [
  "aptos-vm-genesis",
  "arr_macro",
  "bcs 0.1.4",
+ "bytes",
  "dashmap",
  "fail 0.5.0",
  "itertools",
@@ -2216,6 +2219,7 @@ dependencies = [
  "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
+ "bytes",
  "goldenfile",
  "hex",
  "move-binary-format",
@@ -2434,6 +2438,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-types",
  "bcs 0.1.4",
+ "bytes",
  "claims",
  "crossbeam",
  "dashmap",
@@ -3340,6 +3345,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-types",
  "bcs 0.1.4",
+ "bytes",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3361,6 +3367,7 @@ dependencies = [
  "arr_macro",
  "assert_unordered",
  "bcs 0.1.4",
+ "bytes",
  "crossbeam-channel",
  "dashmap",
  "itertools",
@@ -3735,6 +3742,7 @@ dependencies = [
  "aptos-crypto-derive",
  "arr_macro",
  "bcs 0.1.4",
+ "bytes",
  "chrono",
  "claims",
  "derivative",
@@ -3829,6 +3837,7 @@ dependencies = [
  "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
+ "bytes",
  "claims",
  "crossbeam-channel",
  "dashmap",
@@ -3885,6 +3894,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-types",
  "bcs 0.1.4",
+ "bytes",
  "move-core-types",
  "move-vm-types",
  "once_cell",
@@ -3948,6 +3958,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "bcs 0.1.4",
+ "bytes",
  "claims",
  "either",
  "move-binary-format",
@@ -4939,9 +4950,12 @@ checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
 name = "bytes"
-version = "1.2.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec8a7b6a70fde80372154c65702f00a0f56f3e1c36abbc6c440484be248856db"
+checksum = "89b2fd2a0dcf38d7971e2194b6b6eebab45ae01067456a7fd93d5547a61b70be"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bzip2-sys"
@@ -8822,6 +8836,7 @@ dependencies = [
  "anyhow",
  "bcs 0.1.4",
  "better_any",
+ "bytes",
  "datatest-stable",
  "itertools",
  "move-binary-format",
@@ -8922,6 +8937,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs 0.1.4",
+ "bytes",
  "clap 4.3.21",
  "codespan-reporting",
  "colored",
@@ -9060,6 +9076,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "bcs 0.1.4",
+ "bytes",
  "ethnum",
  "hex",
  "num 0.4.0",
@@ -9525,6 +9542,7 @@ dependencies = [
  "anyhow",
  "bcs 0.1.4",
  "better_any",
+ "bytes",
  "move-binary-format",
  "move-cli",
  "move-core-types",
@@ -9656,6 +9674,7 @@ name = "move-vm-integration-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bytes",
  "memory-stats",
  "move-binary-format",
  "move-bytecode-verifier",
@@ -9684,6 +9703,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "better_any",
+ "bytes",
  "fail 0.4.0",
  "hex",
  "move-binary-format",
@@ -9704,6 +9724,7 @@ name = "move-vm-test-utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bytes",
  "move-binary-format",
  "move-core-types",
  "move-table-extension",
