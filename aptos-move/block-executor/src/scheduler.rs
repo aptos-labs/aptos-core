@@ -287,8 +287,6 @@ impl<'a, P: TxnProviderTrait1> Scheduler<'a, P> {
             {
                 // Acquired the execution status read lock, which can be upgrade to write lock if necessary.
                 if let ExecutionStatus::Executed(incarnation) = *status {
-                    info!("try_commit() saw txn {} executed.", *commit_idx);
-
                     // Status is executed and we are holding the lock.
 
                     // Note we update the wave inside commit_state only with max_triggered_wave,
@@ -299,7 +297,6 @@ impl<'a, P: TxnProviderTrait1> Scheduler<'a, P> {
                     if let Some(validated_wave) = validation_status.maybe_max_validated_wave {
                         if validated_wave >= max(*commit_wave, validation_status.required_wave) {
                             let old_commit_idx = *commit_idx;
-                            info!("try_commit() decided to commit txn {}", old_commit_idx);
                             let mut status_write = RwLockUpgradableReadGuard::upgrade(status);
                             // Upgrade the execution status read lock to write lock.
                             // Can commit.
@@ -309,13 +306,10 @@ impl<'a, P: TxnProviderTrait1> Scheduler<'a, P> {
                                 // All txns have been committed, the parallel execution can finish.
                                 self.done_marker.store(true, Ordering::SeqCst);
                             }
-                            info!("try_commit() finished with {}.", old_commit_idx);
                             return Some(old_commit_idx);
                         }
                     }
                 }
-            } else {
-                info!("try_commit(): not yet executed");
             }
         }
         None
@@ -334,7 +328,6 @@ impl<'a, P: TxnProviderTrait1> Scheduler<'a, P> {
     /// returns false. Since incarnation numbers never decrease, this also ensures
     /// that the same version may not successfully abort more than once.
     pub fn try_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> bool {
-        info!("try_abort() started for txn {} incar {}", txn_idx, incarnation);
         // lock the execution status.
         // Note: we could upgradable read, then upgrade and write. Similar for other places.
         // However, it is likely an overkill (and overhead to actually upgrade),
@@ -450,14 +443,12 @@ impl<'a, P: TxnProviderTrait1> Scheduler<'a, P> {
     }
 
     pub fn finish_validation(&self, txn_idx: TxnIndex, wave: Wave) {
-        info!("finish_validation() started for txn {} wave {}", txn_idx, wave);
         let mut validation_status = self.txn_status.get(&txn_idx).unwrap().1.write();
         validation_status.maybe_max_validated_wave = Some(
             validation_status
                 .maybe_max_validated_wave
                 .map_or(wave, |prev_wave| max(prev_wave, wave)),
         );
-        info!("finish_validation() finished for txn {} wave {}", txn_idx, wave);
     }
 
     /// After txn is executed, schedule its dependencies for re-execution.
@@ -470,7 +461,6 @@ impl<'a, P: TxnProviderTrait1> Scheduler<'a, P> {
         incarnation: Incarnation,
         revalidate_suffix: bool,
     ) -> SchedulerTask {
-        info!("finish_execution() started for txn {}.", txn_idx);
         // Note: It is preferable to hold the validation lock throughout the finish_execution,
         // in particular before updating execution status. The point was that we don't want
         // any validation to come before the validation status is correspondingly updated.
@@ -539,7 +529,6 @@ impl<'a, P: TxnProviderTrait1> Scheduler<'a, P> {
             std::mem::take(&mut stored_deps)
         };
 
-        info!("Txn {} fast-resuming txns {:?}.", blocker, dependents);
         // Mark dependencies as resolved and find the minimum index among them.
         for dependent in dependents {
             // Mark the status of dependencies as 'Ready' since dependency on
@@ -565,7 +554,6 @@ impl<'a, P: TxnProviderTrait1> Scheduler<'a, P> {
     /// Finalize a validation task of version (txn_idx, incarnation). In some cases,
     /// may return a re-execution task back to the caller (otherwise, NoTask).
     pub fn finish_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> SchedulerTask {
-        info!("finish_abort() started for txn {} incar {}", txn_idx, incarnation);
         {
             // acquire exclusive lock on the validation status of txn_idx, and hold the lock
             // while calling decrease_validation_idx below. Otherwise, this thread might get
@@ -596,14 +584,12 @@ impl<'a, P: TxnProviderTrait1> Scheduler<'a, P> {
             // nothing to do, as another thread must have succeeded to incarnate and
             // obtain the task for re-execution.
             if let Some((new_incarnation, execution_task_type)) = self.try_incarnate(txn_idx) {
-                info!("finish_abort() finished with ExecutionTask for txn {} incar {}", txn_idx, incarnation);
                 return SchedulerTask::ExecutionTask(
                     (txn_idx, new_incarnation),
                     execution_task_type,
                 );
             }
         }
-        info!("finish_abort() finished with NoTask for txn {} incar {}", txn_idx, incarnation);
         SchedulerTask::NoTask
     }
 

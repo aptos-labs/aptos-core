@@ -53,16 +53,16 @@ impl BlockPartitioningStage {
                 let partitioned_txns = partitioner.partition(block_id_short, analyzed_txns, self.num_executor_shards);
                 timer.stop_and_record();
                 //debugging stuff
-                println!("block={}, global_idxs={:?}", block_id_short, partitioned_txns.global_idxs);
-                for (txn_idx, dep_set) in partitioned_txns.dependency_sets.iter().enumerate() {
-                    println!("block={}, partitioned_txns.dependency_sets[{}]={:?}", block_id_short, txn_idx, dep_set.keys().copied());
-                }
-                let txns = PartitionedTransactions::flatten(partitioned_txns.clone());
-                for (txn_idx, txn) in txns.into_iter().enumerate() {
-                    for x in txn.write_hints() {
-                        println!("block={}, txn={}, key={}", block_id_short, txn_idx, x.state_key().hash().to_hex());
-                    }
-                }
+                // println!("block={}, global_idxs={:?}", block_id_short, partitioned_txns.global_idxs);
+                // for (txn_idx, dep_set) in partitioned_txns.dependency_sets.iter().enumerate() {
+                //     println!("block={}, partitioned_txns.dependency_sets[{}]={:?}", block_id_short, txn_idx, dep_set.keys().copied());
+                // }
+                // let txns = PartitionedTransactions::flatten(partitioned_txns.clone());
+                // for (txn_idx, txn) in txns.into_iter().enumerate() {
+                //     for x in txn.write_hints() {
+                //         println!("block={}, txn={}, key={}", block_id_short, txn_idx, x.state_key().hash().to_hex());
+                //     }
+                // }
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(partitioned_txns))
             }
         };

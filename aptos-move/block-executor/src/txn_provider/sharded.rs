@@ -195,7 +195,6 @@ where
             match msg {
                 ShardingMsg::RemoteCommit(msg) => {
                     let RemoteCommit { global_txn_idx, txn_output } = msg;
-                    info!("block={}, shard={}, op=recv, txn_received={}.", self.block_id, self.shard_id, global_txn_idx);
                     match txn_output.output_status() {
                         ExecutionStatus::Success(output) => {
                             self.apply_updates_to_mv(mv, global_txn_idx, output);
@@ -207,7 +206,6 @@ where
                             //sharding todo: anything to do here?
                         }
                     }
-                    info!("block={}, shard={}, op=recv, txn_received={}.", self.block_id, self.shard_id, global_txn_idx);
                     self.remote_committed_txns.insert(global_txn_idx);
                     scheduler.fast_resume_dependents(global_txn_idx);
                 },
@@ -228,7 +226,6 @@ where
     }
 
     fn on_local_commit(&self, txn_idx: TxnIndex, txn_output: Arc<TxnOutput<TO, TE>>) {
-        info!("block={}, shard={}, op=send, txn_to_be_sent={}", self.block_id, self.shard_id, txn_idx);
         let txn_local_rank = self.local_rank(txn_idx);
         for &shard_id in &self.following_shard_sets[txn_local_rank] {
             let msg = ShardingMsg::RemoteCommit(RemoteCommit {

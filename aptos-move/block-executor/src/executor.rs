@@ -121,7 +121,6 @@ where
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let (idx_to_execute, incarnation) = version;
-        info!("execute() started for txn {}.", idx_to_execute);
         let txn = txn_provider.txn(idx_to_execute);
 
         // VM execution.
@@ -218,7 +217,6 @@ where
 
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let (idx_to_validate, incarnation) = version_to_validate;
-        info!("validate() started for txn {idx_to_validate} incar {incarnation}.");
         let read_set = last_input_output
             .read_set(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
@@ -261,11 +259,9 @@ where
                 }
             }
             let ret = scheduler.finish_abort(idx_to_validate, incarnation);
-            info!("validate() finished with finish_abort() for txn {} incar {}", idx_to_validate, incarnation);
             ret
         } else {
             scheduler.finish_validation(idx_to_validate, validation_wave);
-            info!("validate() finished with NoTask for txn {} incar {}", idx_to_validate, incarnation);
             SchedulerTask::NoTask
         }
     }
@@ -533,7 +529,6 @@ where
         while !shutdown {
             while let Some(txn_idx) = scheduler.try_commit() {
                 // Iterate round robin over workers to do commit_hook.
-                info!("block={}, shard={}, will commit txn {}.", txn_provider.block_idx(), txn_provider.shard_idx(), txn_idx);
                 self.worker_commit_hook(txn_idx, versioned_cache, last_input_output, base_view, txn_provider);
 
                 if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {

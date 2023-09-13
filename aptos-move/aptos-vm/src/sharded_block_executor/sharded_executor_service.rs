@@ -50,7 +50,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 .thread_name(move |index|format!("shard-{}-worker-{}", shard_id, index))
                 // We need two extra threads for the cross-shard commit receiver and the thread
                 // that is blocked on waiting for execute block to finish.
-                .num_threads(num_threads + 2)
+                .num_threads(num_threads)
                 .build()
                 .unwrap(),
         );
