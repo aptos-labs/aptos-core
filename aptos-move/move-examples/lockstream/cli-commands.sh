@@ -1,20 +1,32 @@
+# Load in/print account addresses.
 ACCOUNTS_DIR=/app/accounts
+ACE_ADDR=$(cat $ACCOUNTS_DIR/ace.address)
+BEE_ADDR=$(cat $ACCOUNTS_DIR/bee.address)
+CAD_ADDR=$(cat $ACCOUNTS_DIR/cad.address)
+DEE_ADDR=$(cat $ACCOUNTS_DIR/dee.address)
+echo "Accounts:
+Ace: $ACE_ADDR
+Bee: $BEE_ADDR
+Cad: $CAD_ADDR
+Dee: $DEE_ADDR\n\n"
 
-ACE_ADDR=$(cat $ACCOUNTS/ace.address)
-BEE_ADDR=$(cat $ACCOUNTS/bee.address)
-CAD_ADDR=$(cat $ACCOUNTS/cad.address)
-DEE_ADDR=$(cat $ACCOUNTS/dee.address)
+echo $(cat .aptos/config.yaml)
 
-DEE_COIN_MINT=10000
+# Declare functions.
+MINT_DEE_COIN=$DEE_ADDR::dee_coin::mint
 
-echo Accounts:
-echo Ace: $ACE_ADDR
-echo Bee: $BEE_ADDR
-echo Cad: $CAD_ADDR
-echo Dee: $DEE_ADDR
+# Declare types.
+DEE_COIN_TYPE=$DEE_ADDR::dee_coin::DeeCoin
 
-wait 5
+#wait 5
 
-echo Minting $DEE_COIN_MINT DeeCoin to Dee
+DEE_COIN_MINT_AMOUNT=10000
+echo Minting $DEE_COIN_MINT_AMOUNT DeeCoin to Dee
+aptos move run \
+    --args u64:$DEE_COIN_MINT_AMOUNT \
+    --assume-yes \
+    --function-id $MINT_DEE_COIN \
+    --profile dee \
+    --type-args $DEE_COIN_TYPE
 
 

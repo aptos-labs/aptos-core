@@ -60,6 +60,8 @@ RUN aptos node run-local-testnet \
 
 # Copy over chain state, accounts and profile info.
 FROM run-cli
+ARG ACCOUNTS
 COPY --from=init-chain-state /app/data /app/data
 COPY --from=init-chain-state $ACCOUNTS /app/accounts
 COPY --from=init-chain-state /.aptos /.aptos
+RUN sed -i 's/localhost/chain/' .aptos/config.yaml

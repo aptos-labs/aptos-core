@@ -126,3 +126,12 @@ Start the Docker compose:
 docker compose --file aptos-move/move-examples/lockstream/docker-compose.yaml up
 ```
 Then press Ctrl+C to shut down the local testnet.
+
+To clear all containers and images, running only from build cache:
+
+```sh
+docker rm -vf $(docker ps -aq)
+docker rmi -f $(docker images -aq)
+clear
+docker compose --file aptos-move/move-examples/lockstream/docker-compose.yaml up
+```
