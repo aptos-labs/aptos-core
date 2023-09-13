@@ -1096,6 +1096,7 @@ All times in UNIX seconds.
     );
     <b>let</b> total_quote_locked_for_pool =
         <a href="coin.md#0x1_coin_value">coin::value</a>(&pool_ref_mut.quote_locked);
+    pool_ref_mut.initial_quote_locked = total_quote_locked_for_pool;
     <b>let</b> lockers_ref_mut = &<b>mut</b> pool_ref_mut.lockers;
     <b>let</b> locker_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(locker);
     <b>let</b> locking_more = <a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(lockers_ref_mut, locker_addr);

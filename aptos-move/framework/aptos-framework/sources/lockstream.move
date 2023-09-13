@@ -261,6 +261,7 @@ module aptos_framework::lockstream {
         );
         let total_quote_locked_for_pool =
             coin::value(&pool_ref_mut.quote_locked);
+        pool_ref_mut.initial_quote_locked = total_quote_locked_for_pool;
         let lockers_ref_mut = &mut pool_ref_mut.lockers;
         let locker_addr = signer::address_of(locker);
         let locking_more = table::contains(lockers_ref_mut, locker_addr);
