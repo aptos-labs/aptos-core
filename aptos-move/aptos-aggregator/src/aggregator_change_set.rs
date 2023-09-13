@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     aggregator_extension::{
@@ -47,10 +48,8 @@ impl AggregatorChange {
         }
     }
 
-    /// Applies self on top of previous delta, merging them together. Note
-    /// that the strict ordering here is crucial for catching overflows
-    /// correctly.
-    ///
+    /// Applies self on top of previous change, merging them together. Note
+    /// that the strict ordering here is crucial for catching overflows correctly.
     /// TODO: What happens if the base aggregator is not none?
     pub fn merge_with_previous_aggregator_change(
         &mut self,
