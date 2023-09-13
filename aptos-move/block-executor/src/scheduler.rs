@@ -202,7 +202,7 @@ impl ValidationStatus {
     }
 }
 
-pub struct Scheduler<'a, P> {
+pub struct Scheduler<'a, P: ?Sized> {
     txn_provider: &'a P,
     /// An index i maps to indices of other transactions that depend on transaction i, i.e. they
     /// should be re-executed once transaction i's next incarnation finishes.
@@ -277,20 +277,17 @@ impl<'a, P: TxnProviderTrait1> Scheduler<'a, P> {
     /// The current implementation has one dedicated thread to try_commit.
     /// Should not be called after the last transaction is committed.
     pub fn try_commit(&self) -> Option<TxnIndex> {
-        info!("try_commit() started.");
         let mut commit_state_mutex = self.commit_state.lock();
         let commit_state = commit_state_mutex.deref_mut();
         let (commit_idx, commit_wave) = (&mut commit_state.0, &mut commit_state.1);
-        info!("try_commit(): commit_idx={}, commit_wave={}", *commit_idx, *commit_wave);
         let pair = self.txn_status.get(commit_idx).unwrap();
         if let Some(validation_status) = pair.1.try_read() {
-            info!("try_commit(): validation_status={:?}", *validation_status);
             // Acquired the validation status read lock.
             if let Some(status) = pair.0.try_upgradable_read()
             {
                 // Acquired the execution status read lock, which can be upgrade to write lock if necessary.
                 if let ExecutionStatus::Executed(incarnation) = *status {
-                    info!("try_commit(): executed");
+                    info!("try_commit() saw txn {} executed.", *commit_idx);
 
                     // Status is executed and we are holding the lock.
 
@@ -530,6 +527,41 @@ impl<'a, P: TxnProviderTrait1> Scheduler<'a, P> {
         SchedulerTask::NoTask
     }
 
+    /// Resume any transaction blocked by a given txn `blocker` by notifying their condvars.
+    /// Clear the blocking status (`self.txn_dependency`).
+    /// Return the minimum txn index that is resumed, if any.
+    ///
+    /// Only used in sharded execution mode.
+    pub fn fast_resume_dependents(&self, blocker: TxnIndex) {
+        let dependents: Vec<TxnIndex> = {
+            let mut stored_deps = self.txn_dependency.get(&blocker).unwrap().lock();
+            // Holding the lock, take dependency vector.
+            std::mem::take(&mut stored_deps)
+        };
+
+        info!("Txn {} fast-resuming txns {:?}.", blocker, dependents);
+        // Mark dependencies as resolved and find the minimum index among them.
+        for dependent in dependents {
+            // Mark the status of dependencies as 'Ready' since dependency on
+            // transaction txn_idx is now resolved.
+            // self.resume(dep);
+            let mut status = self.txn_status.get(&dependent).unwrap().0.write();
+            match &*status {
+                ExecutionStatus::ExecutionHalted => {
+                    //Nothing to do?
+                },
+                ExecutionStatus::Suspended(incarnation, dep_condvar) => {
+                    let (dep_status_lock, cvar) = &*dep_condvar.clone();
+                    *dep_status_lock.lock() = DependencyStatus::Resolved;
+                    cvar.notify_one();
+                    *status = ExecutionStatus::Executing(*incarnation);// sharding todo: is this really needed?
+                },
+                _ => {
+                    unreachable!()
+                }
+            }
+        }
+    }
     /// Finalize a validation task of version (txn_idx, incarnation). In some cases,
     /// may return a re-execution task back to the caller (otherwise, NoTask).
     pub fn finish_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> SchedulerTask {

@@ -16,6 +16,7 @@ use aptos_types::executable::Executable;
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::write_set::WriteOp;
 use crate::errors::Error;
+use crate::scheduler::Scheduler;
 use crate::task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput};
 use crate::txn_last_input_output::{TxnLastInputOutput, TxnOutput};
 
@@ -51,7 +52,7 @@ where
     TE: Debug + Send + Clone,
 {
     fn remote_dependencies(&self) -> Vec<(TxnIndex, T::Key)>;
-    fn run_sharding_msg_loop<X: Executable + 'static>(&self, mv_cache: &MVHashMap<T::Key, T::Value, X>);
+    fn run_sharding_msg_loop<X: Executable + 'static>(&self, mv_cache: &MVHashMap<T::Key, T::Value, X>, scheduler: &Scheduler<Self>);
     fn shutdown_receiver(&self);
     fn txn(&self, idx: TxnIndex) -> &T;
     fn on_local_commit(&self, txn_idx: TxnIndex, txn_output: Arc<TxnOutput<TO, TE>>);

@@ -169,7 +169,14 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ShardedExecutionOutput, VMStatus> {
         assert_eq!(transactions.num_shards(), self.num_shards());
-        let PartitionedTransactions {block_id, sharded_txns, global_idxs, shard_idxs_by_txn, dependency_sets, follower_sets } = transactions;
+        let PartitionedTransactions {
+            block_id,
+            sharded_txns,
+            global_idxs,
+            shard_idxs_by_txn,
+            dependency_sets,
+            follower_sets
+        } = transactions;
         let num_shards = sharded_txns.len();
         let mut txs = Vec::with_capacity(num_shards);
         let mut rxs = Vec::with_capacity(num_shards);

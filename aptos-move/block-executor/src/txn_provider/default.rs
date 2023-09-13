@@ -7,10 +7,12 @@ use std::sync::Arc;
 use aptos_mvhashmap::MVHashMap;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::executable::Executable;
+use crate::scheduler::Scheduler;
 use crate::task::{Transaction, TransactionOutput};
 use crate::txn_last_input_output::TxnOutput;
 use crate::txn_provider::{TxnProviderTrait1, TxnProviderTrait2};
 
+/// Some logic of vanilla BlockSTM.
 pub struct DefaultTxnProvider<T> {
     txns: Vec<T>,
 }
@@ -79,7 +81,7 @@ where
         vec![]
     }
 
-    fn run_sharding_msg_loop<X: Executable + 'static>(&self, _mv_cache: &MVHashMap<T::Key, T::Value, X>) {
+    fn run_sharding_msg_loop<X: Executable + 'static>(&self, mv_cache: &MVHashMap<T::Key, T::Value, X>, scheduler: &Scheduler<Self>) {
         // Nothing to do.
     }
 

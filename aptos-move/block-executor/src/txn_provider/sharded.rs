@@ -10,14 +10,18 @@ use dashmap::DashSet;
 use aptos_logger::info;
 use aptos_mvhashmap::MVHashMap;
 use aptos_types::executable::Executable;
+use crate::scheduler::Scheduler;
 use crate::task::{ExecutionStatus, Transaction, TransactionOutput};
 use crate::txn_last_input_output::{TxnLastInputOutput, TxnOutput};
 use crate::txn_provider::{RemoteCommit, ShardingMsg, TxnProviderTrait1, TxnProviderTrait2};
 
+/// A BlockSTM plug-in that allows distributed execution with multiple BlockSTM instances.
 pub struct ShardedTxnProvider<T: Transaction, TO: TransactionOutput, TE: Debug> {
     pub block_id: u8,
     pub num_shards: usize,
     pub shard_id: usize,
+
+    // sharding todo: change these to proper communication client.
     pub rx: Arc<Mutex<Receiver<ShardingMsg<TO, TE>>>>,
     pub senders: Vec<Mutex<Sender<ShardingMsg<TO, TE>>>>,
 
@@ -184,7 +188,7 @@ where
             .collect()
     }
 
-    fn run_sharding_msg_loop<X: Executable + 'static>(&self, mv: &MVHashMap<TX::Key, TX::Value, X>) {
+    fn run_sharding_msg_loop<X: Executable + 'static>(&self, mv: &MVHashMap<TX::Key, TX::Value, X>, scheduler: &Scheduler<Self>) {
         let listener = self.rx.lock().unwrap();
         loop {
             let msg = listener.recv().unwrap();
@@ -203,9 +207,9 @@ where
                             //sharding todo: anything to do here?
                         }
                     }
-
+                    info!("block={}, shard={}, op=recv, txn_received={}.", self.block_id, self.shard_id, global_txn_idx);
                     self.remote_committed_txns.insert(global_txn_idx);
-                    //sharding todo: notify those who were blocked, and anything else?
+                    scheduler.fast_resume_dependents(global_txn_idx);
                 },
                 ShardingMsg::Shutdown => {
                     break;

@@ -10,11 +10,13 @@ use aptos_types::{
     transaction::Transaction,
 };
 use std::time::Instant;
+use aptos_crypto::hash::CryptoHash;
 use aptos_streaming_partitioner::{PartitionerV3, SerializationIdx, StreamingTransactionPartitioner, transaction_graph_partitioner};
 use aptos_streaming_partitioner::transaction_graph_partitioner::TransactionGraphPartitioner;
 use aptos_types::batched_stream::BatchedStream;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use aptos_transaction_orderer::transaction_compressor::CompressedPTransaction;
+use aptos_types::block_executor::partitioner::PartitionedTransactions;
 
 pub(crate) struct BlockPartitioningStage {
     num_executor_shards: usize,
@@ -49,11 +51,18 @@ impl BlockPartitioningStage {
                 let analyzed_txns: Vec<AnalyzedTransaction> = txns.into_iter().map(AnalyzedTransaction::from).collect();
                 let timer = TIMER.with_label_values(&["partition"]).start_timer();
                 let partitioned_txns = partitioner.partition(block_id_short, analyzed_txns, self.num_executor_shards);
+                timer.stop_and_record();
+                //debugging stuff
                 println!("block={}, global_idxs={:?}", block_id_short, partitioned_txns.global_idxs);
                 for (txn_idx, dep_set) in partitioned_txns.dependency_sets.iter().enumerate() {
                     println!("block={}, partitioned_txns.dependency_sets[{}]={:?}", block_id_short, txn_idx, dep_set.keys().copied());
                 }
-                timer.stop_and_record();
+                let txns = PartitionedTransactions::flatten(partitioned_txns.clone());
+                for (txn_idx, txn) in txns.into_iter().enumerate() {
+                    for x in txn.write_hints() {
+                        println!("block={}, txn={}, key={}", block_id_short, txn_idx, x.state_key().hash().to_hex());
+                    }
+                }
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(partitioned_txns))
             }
         };

@@ -569,7 +569,8 @@ where
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
             s.spawn(|_| {
-                txn_provider.run_sharding_msg_loop(&versioned_cache);
+
+                txn_provider.run_sharding_msg_loop(&versioned_cache, &scheduler);
             });
 
             // The rest BlockSTM threads.
