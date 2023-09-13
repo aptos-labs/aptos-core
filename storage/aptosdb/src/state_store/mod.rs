@@ -78,7 +78,7 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * (buffered_state::ASYNC_COMMIT_CHANNEL_BUFFER_SIZE + 2 + 1/*  Rendezvous channel */)
     * 2;
 
-const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 100000;
+pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 100000;
 
 pub(crate) struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
@@ -305,11 +305,13 @@ impl StateStore {
         empty_buffered_state_for_restore: bool,
         skip_usage: bool,
     ) -> Self {
-        Self::sync_commit_progress(
-            Arc::clone(&ledger_db),
-            Arc::clone(&state_kv_db),
-            /*crash_if_difference_is_too_large=*/ true,
-        );
+        if !hack_for_tests {
+            Self::sync_commit_progress(
+                Arc::clone(&ledger_db),
+                Arc::clone(&state_kv_db),
+                /*crash_if_difference_is_too_large=*/ true,
+            );
+        }
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
@@ -379,29 +381,24 @@ impl StateStore {
                 .expect_version();
             assert_ge!(state_kv_commit_progress, overall_commit_progress);
 
-            if ledger_commit_progress != overall_commit_progress {
-                info!(
-                    ledger_commit_progress = ledger_commit_progress,
-                    "Start truncation...",
-                );
-                let difference = ledger_commit_progress - overall_commit_progress;
-                if crash_if_difference_is_too_large {
-                    assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
-                }
-                // TODO(grao): Support truncation for splitted ledger DBs.
-                truncate_ledger_db(
-                    ledger_db,
-                    ledger_commit_progress,
-                    overall_commit_progress,
-                    difference as usize,
-                )
-                .expect("Failed to truncate ledger db.");
+            // LedgerCommitProgress was not guaranteed to commit after all ledger changes finish,
+            // have to attempt truncating every column family.
+            info!(
+                ledger_commit_progress = ledger_commit_progress,
+                "Attempt ledger truncation...",
+            );
+            let difference = ledger_commit_progress - overall_commit_progress;
+            if crash_if_difference_is_too_large {
+                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
             }
+            // TODO(grao): Support truncation for split ledger DBs.
+            truncate_ledger_db(ledger_db, overall_commit_progress)
+                .expect("Failed to truncate ledger db.");
 
             if state_kv_commit_progress != overall_commit_progress {
                 info!(
                     state_kv_commit_progress = state_kv_commit_progress,
-                    "Start truncation..."
+                    "Start state KV truncation..."
                 );
                 let difference = state_kv_commit_progress - overall_commit_progress;
                 if crash_if_difference_is_too_large {
