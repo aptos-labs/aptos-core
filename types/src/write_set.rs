@@ -11,12 +11,26 @@ use crate::state_store::{
 };
 use anyhow::{bail, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{btree_map, BTreeMap},
-    ops::Deref,
+    ops::{Deref, DerefMut},
 };
 
+// Note: in case this changes in the future, it doesn't have to be a constant, and can be read from
+// genesis directly if necessary.
+pub static TOTAL_SUPPLY_STATE_KEY: Lazy<StateKey> = Lazy::new(|| {
+    StateKey::table_item(
+        "1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca"
+            .parse()
+            .unwrap(),
+        vec![
+            6, 25, 220, 41, 160, 170, 200, 250, 20, 103, 20, 5, 142, 141, 214, 210, 208, 243, 189,
+            245, 246, 51, 25, 7, 191, 145, 243, 172, 216, 30, 105, 53,
+        ],
+    )
+});
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
     Creation(#[serde(with = "serde_bytes")] Vec<u8>),
@@ -258,6 +272,14 @@ impl Deref for WriteSet {
     }
 }
 
+impl DerefMut for WriteSet {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            Self::V0(write_set) => write_set,
+        }
+    }
+}
+
 /// `WriteSet` contains all access paths that one transaction modifies. Each of them is a `WriteOp`
 /// where `Value(val)` means that serialized representation should be updated to `val`, and
 /// `Deletion` means that we are going to delete this access path.
@@ -279,6 +301,30 @@ impl WriteSetV0 {
 
     pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {
         self.0.get(key)
+    }
+
+    pub fn get_total_supply(&self) -> Option<u128> {
+        let value = self
+            .0
+            .get(&TOTAL_SUPPLY_STATE_KEY)
+            .and_then(|op| op.bytes())
+            .map(bcs::from_bytes);
+        value.transpose().map_err(anyhow::Error::msg).unwrap()
+    }
+
+    // This is a temporary method to update the total supply in the write set.
+    // TODO: get rid of this func() and use WriteSetMut instead; for that we need to change
+    //       VM execution such that to 'TransactionOutput' is materialized after updating
+    //       total_supply.
+    pub fn update_total_supply(&mut self, value: u128) {
+        assert!(self
+            .0
+            .write_set
+            .insert(
+                TOTAL_SUPPLY_STATE_KEY.clone(),
+                WriteOp::Modification(bcs::to_bytes(&value).unwrap())
+            )
+            .is_some());
     }
 }
 
