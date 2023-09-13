@@ -5,5 +5,6 @@
 mod executor;
 mod reservation_table;
 mod view;
+mod stats;
 
 pub use executor::FastPathBlockExecutor;
