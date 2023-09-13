@@ -8,7 +8,7 @@ use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
-use aptos_transaction_generator_lib::TransactionGeneratorCreator;
+use aptos_transaction_generator_lib::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_types::{
     account_address::AccountAddress, account_config::aptos_test_root_address,
     account_view::AccountView, chain_id::ChainId, transaction::Transaction,
@@ -74,7 +74,7 @@ struct P2pTestCase {
     num_accounts: usize,
 }
 
-pub struct TransactionGenerator {
+pub struct BenchmarkTransactionGenerator {
     /// The current state of the accounts. The main purpose is to keep track of the sequence number
     /// so generated transactions are guaranteed to be successfully executed.
     main_signer_accounts: Option<AccountCache>,
@@ -105,7 +105,7 @@ pub struct TransactionGenerator {
     worker_pool: ThreadPool,
 }
 
-impl TransactionGenerator {
+impl BenchmarkTransactionGenerator {
     fn gen_account_cache(
         generator: AccountGenerator,
         num_accounts: usize,
@@ -180,7 +180,7 @@ impl TransactionGenerator {
         num_main_signer_accounts: Option<usize>,
         num_workers: usize,
     ) -> Self {
-        let num_existing_accounts = TransactionGenerator::read_meta(&db_dir);
+        let num_existing_accounts = BenchmarkTransactionGenerator::read_meta(&db_dir);
 
         Self {
             seed_accounts_cache: None,
@@ -288,17 +288,19 @@ impl TransactionGenerator {
 
     pub fn run_workload(
         &mut self,
+        db: DbReaderWriter,
         block_size: usize,
         num_blocks: usize,
         mut transaction_generator_creator: Box<dyn TransactionGeneratorCreator>,
         transactions_per_sender: usize,
-    ) {
+    ) ->  Box<dyn TransactionGenerator> {
         assert!(self.block_sender.is_some());
         let num_senders_per_block =
             (block_size + transactions_per_sender - 1) / transactions_per_sender;
         let account_pool_size = self.main_signer_accounts.as_ref().unwrap().accounts.len();
         let mut transaction_generator =
             transaction_generator_creator.create_transaction_generator();
+        transaction_generator.pre_generate(db.clone());
         for _ in 0..num_blocks {
             let transactions: Vec<_> = rand::seq::index::sample(
                 &mut thread_rng(),
@@ -318,6 +320,8 @@ impl TransactionGenerator {
                 sender.send(transactions).unwrap();
             }
         }
+
+        transaction_generator
     }
 
     pub fn create_seed_accounts(
@@ -580,7 +584,7 @@ impl TransactionGenerator {
             let num_signer_accounts = self.main_signer_accounts.as_ref().unwrap().accounts.len();
             let rng = &mut self.main_signer_accounts.as_mut().unwrap().rng;
             let transfer_indices: Vec<_> =
-                TransactionGenerator::get_conflicting_grps_transfer_indices(
+                BenchmarkTransactionGenerator::get_conflicting_grps_transfer_indices(
                     rng,
                     num_signer_accounts,
                     block_size,
@@ -782,7 +786,7 @@ fn test_get_conflicting_grps_transfer_indices() {
         // we check for (i) block_size not divisible by connected_txn_grps (ii) when divisible
         // (iii) when all txns in the block are independent (iv) all txns are dependent
         for connected_txn_grps in [3, block_size / 10, block_size, 1] {
-            let transfer_indices = TransactionGenerator::get_conflicting_grps_transfer_indices(
+            let transfer_indices = BenchmarkTransactionGenerator::get_conflicting_grps_transfer_indices(
                 &mut rng,
                 num_signer_accounts,
                 block_size,

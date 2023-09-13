@@ -9,6 +9,7 @@ use aptos_sdk::{
 };
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use std::sync::Arc;
+use aptos_storage_interface::DbReaderWriter;
 
 pub struct BatchTransferTransactionGenerator {
     rng: StdRng,
@@ -37,6 +38,9 @@ impl BatchTransferTransactionGenerator {
 }
 
 impl TransactionGenerator for BatchTransferTransactionGenerator {
+    fn pre_generate(&self, _db: DbReaderWriter) {
+    }
+
     fn generate_transactions(
         &mut self,
         account: &LocalAccount,
@@ -61,6 +65,9 @@ impl TransactionGenerator for BatchTransferTransactionGenerator {
         }
 
         requests
+    }
+
+    fn post_generate(&self, _db: DbReaderWriter) {
     }
 }
 

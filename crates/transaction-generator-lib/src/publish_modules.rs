@@ -8,6 +8,7 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
+use aptos_storage_interface::DbReaderWriter;
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
 
@@ -32,6 +33,9 @@ impl PublishPackageGenerator {
 }
 
 impl TransactionGenerator for PublishPackageGenerator {
+    fn pre_generate(&self, _db: DbReaderWriter) {
+    }
+
     fn generate_transactions(
         &mut self,
         account: &LocalAccount,
@@ -60,6 +64,9 @@ impl TransactionGenerator for PublishPackageGenerator {
         // let txn = package.publish_transaction(account, &self.txn_factory);
         // requests.push(txn);
         requests
+    }
+
+    fn post_generate(&self, _db: DbReaderWriter) {
     }
 }
 

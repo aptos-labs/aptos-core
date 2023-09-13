@@ -29,7 +29,7 @@ pub fn initialize(_path: PathBuf) -> (MoveHarness, Account) {
     ];
     assert_success!(harness.run_entry_function(
         &account,
-        str::parse("0x1::evm::initialize").unwrap(),
+        str::parse("0x1::evm::initialize_account").unwrap(),
         vec![],
         vec![bcs::to_bytes(&addr.clone()).unwrap()],
     ));
@@ -103,6 +103,8 @@ pub fn initialize(_path: PathBuf) -> (MoveHarness, Account) {
         bcs::to_bytes(&new_account).unwrap(),
     );
     let v1 = harness.read_state_value_bytes(state_key).unwrap();
+    let v1_256 : move_core_types::u256::U256 = bcs::from_bytes(&v1).unwrap();
+    println!("v1_256: {:?}", v1_256);
     let v2 = move_core_types::u256::U256::from_str_radix("2", 10).unwrap();
     assert_eq!(
         v1,

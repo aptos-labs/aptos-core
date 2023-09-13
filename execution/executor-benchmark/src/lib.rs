@@ -17,7 +17,7 @@ pub mod transaction_generator;
 
 use crate::{
     db_access::DbAccessUtil, pipeline::Pipeline, transaction_committer::TransactionCommitter,
-    transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
+    transaction_executor::TransactionExecutor, transaction_generator::BenchmarkTransactionGenerator,
 };
 use aptos_block_executor::counters as block_executor_counters;
 use aptos_block_partitioner::v2::counters::BLOCK_PARTITIONING_SECONDS;
@@ -135,7 +135,7 @@ pub fn run_benchmark<V>(
 
     let (db, executor) = init_db_and_executor::<V>(&config);
     let transaction_generator_creator = transaction_mix.clone().map(|transaction_mix| {
-        let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
+        let num_existing_accounts = BenchmarkTransactionGenerator::read_meta(&source_dir);
         let num_accounts_to_be_loaded = std::cmp::min(
             num_existing_accounts,
             num_main_signer_accounts + num_additional_dst_pool_accounts,
@@ -155,7 +155,7 @@ pub fn run_benchmark<V>(
         }
 
         let accounts_cache =
-            TransactionGenerator::gen_user_account_cache(db.reader.clone(), num_accounts_to_be_loaded, num_accounts_to_skip);
+            BenchmarkTransactionGenerator::gen_user_account_cache(db.reader.clone(), num_accounts_to_be_loaded, num_accounts_to_skip);
         let (main_signer_accounts, burner_accounts) =
             accounts_cache.split(num_main_signer_accounts);
 
@@ -192,7 +192,7 @@ pub fn run_benchmark<V>(
             }
         }
     }
-    let mut generator = TransactionGenerator::new_with_existing_db(
+    let mut generator = BenchmarkTransactionGenerator::new_with_existing_db(
         db.clone(),
         genesis_key,
         block_sender,
@@ -233,13 +233,15 @@ pub fn run_benchmark<V>(
     let start_commit_total = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum();
 
     let start_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
-    if let Some(transaction_generator_creator) = transaction_generator_creator {
-        generator.run_workload(
+    let txn_generator = if let Some(transaction_generator_creator) = transaction_generator_creator {
+        let generator = generator.run_workload(
+            db.clone(),
             block_size,
             num_blocks,
             transaction_generator_creator,
             transactions_per_sender,
         );
+        Some(generator)
     } else {
         generator.run_transfer(
             block_size,
@@ -249,7 +251,9 @@ pub fn run_benchmark<V>(
             shuffle_connected_txns,
             hotspot_probability,
         );
-    }
+        None
+    };
+    txn_generator.as_ref().unwrap().pre_generate(db.clone());
     if pipeline_config.delay_execution_start {
         start_time = Instant::now();
     }
@@ -257,6 +261,7 @@ pub fn run_benchmark<V>(
     generator.drop_sender();
     pipeline.join();
 
+    txn_generator.unwrap().post_generate(db.clone());
     let elapsed = start_time.elapsed().as_secs_f64();
     let delta_v = (db.reader.get_latest_version().unwrap() - version) as f64;
     let (delta_gas, delta_gas_count) = start_gas_measurement.end();
@@ -359,7 +364,7 @@ where
     );
 
     let runtime = Runtime::new().unwrap();
-    let transaction_factory = TransactionGenerator::create_transaction_factory();
+    let transaction_factory = BenchmarkTransactionGenerator::create_transaction_factory();
 
     let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {
         let phase = Arc::new(AtomicUsize::new(0));
@@ -455,7 +460,7 @@ fn add_accounts_impl<V>(
         Some(1 + num_new_accounts / block_size * 101 / 100),
     );
 
-    let mut generator = TransactionGenerator::new_with_existing_db(
+    let mut generator = BenchmarkTransactionGenerator::new_with_existing_db(
         db.clone(),
         genesis_key,
         block_sender,

@@ -14,6 +14,7 @@ use aptos_sdk::{
 use async_trait::async_trait;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use std::sync::Arc;
+use aptos_storage_interface::DbReaderWriter;
 
 // Fn + Send + Sync, as it will be called from multiple threads simultaneously
 // if you need any coordination, use Arc<RwLock<X>> fields
@@ -80,6 +81,9 @@ impl CustomModulesDelegationGenerator {
 }
 
 impl TransactionGenerator for CustomModulesDelegationGenerator {
+    fn pre_generate(&self, _db: DbReaderWriter) {
+    }
+
     fn generate_transactions(
         &mut self,
         account: &LocalAccount,
@@ -99,6 +103,9 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
             requests.push(request);
         }
         requests
+    }
+
+    fn post_generate(&self, _db: DbReaderWriter) {
     }
 }
 

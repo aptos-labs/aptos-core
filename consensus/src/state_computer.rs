@@ -13,6 +13,7 @@ use crate::{
     transaction_shuffler::TransactionShuffler,
     txn_notifier::TxnNotifier,
 };
+use aptos_executor_types::ExecutorError;
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};

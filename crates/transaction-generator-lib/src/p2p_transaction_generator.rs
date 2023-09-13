@@ -17,6 +17,7 @@ use std::{
     cmp::{max, min},
     sync::Arc,
 };
+use aptos_storage_interface::DbReaderWriter;
 
 pub enum SamplingMode {
     /// See `BasicSampler`.
@@ -249,6 +250,9 @@ impl Distribution<InvalidTransactionType> for Standard {
 }
 
 impl TransactionGenerator for P2PTransactionGenerator {
+    fn pre_generate(&self, _db: DbReaderWriter) {
+    }
+
     fn generate_transactions(
         &mut self,
         account: &LocalAccount,
@@ -291,6 +295,9 @@ impl TransactionGenerator for P2PTransactionGenerator {
             requests.push(request);
         }
         requests
+    }
+
+    fn post_generate(&self, _db: DbReaderWriter) {
     }
 }
 

@@ -152,4 +152,5 @@ impl DbAccessUtil {
     pub fn get_total_supply(state_view: &impl StateView) -> Result<Option<u128>> {
         Self::get_value(&TOTAL_SUPPLY_STATE_KEY, state_view)
     }
+
 }

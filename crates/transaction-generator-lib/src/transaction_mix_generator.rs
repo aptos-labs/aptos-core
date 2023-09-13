@@ -7,6 +7,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
+use aptos_storage_interface::DbReaderWriter;
 
 pub struct PhasedTxnMixGenerator {
     rng: StdRng,
@@ -36,6 +37,12 @@ impl PhasedTxnMixGenerator {
 }
 
 impl TransactionGenerator for PhasedTxnMixGenerator {
+    fn pre_generate(&self, _db: DbReaderWriter) {
+        for (gen, _) in &self.txn_mix_per_phase[0] {
+            gen.pre_generate(_db.clone());
+        }
+    }
+
     fn generate_transactions(
         &mut self,
         account: &LocalAccount,
@@ -59,6 +66,12 @@ impl TransactionGenerator for PhasedTxnMixGenerator {
             "Picked {} out of {}, at phase {}, couldn't find correct generator",
             picked, self.total_weight_per_phase[phase], phase,
         );
+    }
+
+    fn post_generate(&self, _db: DbReaderWriter) {
+        for (gen, _) in &self.txn_mix_per_phase[0] {
+            gen.post_generate(_db.clone());
+        }
     }
 }
 

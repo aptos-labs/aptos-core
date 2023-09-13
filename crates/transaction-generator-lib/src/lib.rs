@@ -11,6 +11,7 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
+use aptos_storage_interface::{DbReaderWriter};
 use args::TransactionTypeArg;
 use async_trait::async_trait;
 use std::{
@@ -89,11 +90,18 @@ impl Default for TransactionType {
 }
 
 pub trait TransactionGenerator: Sync + Send {
+
+    fn pre_generate(&self,  db: DbReaderWriter);
+
     fn generate_transactions(
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction>;
+
+
+    fn post_generate(&self,  db: DbReaderWriter);
+
 }
 
 #[async_trait]

@@ -10,6 +10,7 @@ use aptos_sdk::{
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{sync::Arc, time::Duration};
+use aptos_storage_interface::DbReaderWriter;
 
 pub struct AccountGenerator {
     rng: StdRng,
@@ -72,6 +73,9 @@ fn add_to_sized_pool<T>(
 }
 
 impl TransactionGenerator for AccountGenerator {
+    fn pre_generate(&self, _db: DbReaderWriter) {
+    }
+
     fn generate_transactions(
         &mut self,
         account: &LocalAccount,
@@ -109,6 +113,9 @@ impl TransactionGenerator for AccountGenerator {
             );
         }
         requests
+    }
+
+    fn post_generate(&self, _db: DbReaderWriter) {
     }
 }
 

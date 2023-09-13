@@ -3736,6 +3736,8 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-sdk",
+ "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-types",
  "async-trait",
  "bcs 0.1.4",
