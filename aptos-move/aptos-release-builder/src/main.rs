@@ -3,6 +3,7 @@
 
 use anyhow::Context;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, ValidCryptoMaterialStringExt};
+use aptos_framework::natives::code::PackageRegistry;
 use aptos_release_builder::{
     components::fetch_config,
     initialize_aptos_core_path,
@@ -61,6 +62,18 @@ pub enum Commands {
         #[clap(short, long)]
         print_gas_schedule: bool,
     },
+    /// Print out package metadata.
+    PrintPackageMetadata {
+        /// Url endpoint for the desired network. e.g: https://fullnode.mainnet.aptoslabs.com/v1.
+        #[clap(short, long)]
+        endpoint: url::Url,
+        /// The address under which the package is published
+        #[clap(long)]
+        package_address: String,
+        /// The name of the package
+        #[clap(long)]
+        package_name: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -84,7 +97,7 @@ pub enum InputOptions {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     let args = Argument::parse();
     initialize_aptos_core_path(args.aptos_core_path.clone());
 
@@ -93,15 +106,21 @@ async fn main() {
         Commands::GenerateProposals {
             release_config,
             output_dir,
-        } => aptos_release_builder::ReleaseConfig::load_config(release_config.as_path())
-            .with_context(|| "Failed to load release config".to_string())
-            .unwrap()
-            .generate_release_proposal_scripts(output_dir.as_path())
-            .with_context(|| "Failed to generate release proposal scripts".to_string())
-            .unwrap(),
-        Commands::WriteDefault { output_path } => aptos_release_builder::ReleaseConfig::default()
-            .save_config(output_path.as_path())
-            .unwrap(),
+        } => {
+            aptos_release_builder::ReleaseConfig::load_config(release_config.as_path())
+                .with_context(|| "Failed to load release config".to_string())
+                .unwrap()
+                .generate_release_proposal_scripts(output_dir.as_path())
+                .with_context(|| "Failed to generate release proposal scripts".to_string())
+                .unwrap();
+            Ok(())
+        },
+        Commands::WriteDefault { output_path } => {
+            aptos_release_builder::ReleaseConfig::default()
+                .save_config(output_path.as_path())
+                .unwrap();
+            Ok(())
+        },
         Commands::ValidateProposals {
             release_config,
             input_option,
@@ -184,7 +203,8 @@ async fn main() {
             network_config
                 .set_fast_resolve(DEFAULT_RESOLUTION_TIME)
                 .await
-                .unwrap()
+                .unwrap();
+            Ok(())
         },
         Commands::PrintConfigs {
             endpoint,
@@ -218,6 +238,24 @@ async fn main() {
                 )
                 .unwrap()
             );
+            Ok(())
+        },
+        Commands::PrintPackageMetadata {
+            endpoint,
+            package_address,
+            package_name,
+        } => {
+            let client = aptos_rest_client::Client::new(endpoint);
+            let address = AccountAddress::from_str_strict(&package_address)?;
+            let packages = client
+                .get_account_resource_bcs::<PackageRegistry>(address, "0x1::code::PackageRegistry")
+                .await?;
+            for package in packages.into_inner().packages {
+                if package.name == package_name {
+                    println!("PackageMetadata:\n{}", package);
+                }
+            }
+            Ok(())
         },
     }
 }
