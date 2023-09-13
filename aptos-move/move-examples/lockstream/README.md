@@ -30,7 +30,7 @@ Period times:
 
 | Period                | Time in seconds |
 | --------------------- | --------------- |
-| Locking period        | 20              |
+| Locking period        | 40              |
 | Streaming period      | 60              |
 | Claiming grace period | 30              |
 | Premier sweep period  | 30              |

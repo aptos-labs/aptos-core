@@ -30,7 +30,7 @@ CAD_USDC_LOCK=300
 CAD_USDC_MINT=$CAD_USDC_LOCK
 
 # Period start delays, relative to prior time in sequence.
-STREAM_START_DELAY=20
+STREAM_START_DELAY=40
 STREAM_END_DELAY=60
 CLAIM_LAST_CALL_DELAY=30
 PREMIER_SWEEP_LAST_CALL_DELAY=30
@@ -108,7 +108,7 @@ aptos move run \
         $USDC_COIN_TYPE
 
 # Lock assets.
-echo "\n\n Locking $ACE_USDC_LOCK_1 USDC for Ace into pool:"
+echo "\n\nLocking $ACE_USDC_LOCK_1 USDC for Ace into pool:"
 sleep 2
 aptos move run \
     --args \
@@ -121,7 +121,7 @@ aptos move run \
         $DEE_COIN_TYPE \
         $USDC_COIN_TYPE
 
-echo "\n\n Locking $BEE_USDC_LOCK USDC for Bee into pool:"
+echo "\n\nLocking $BEE_USDC_LOCK USDC for Bee into pool:"
 sleep 2
 aptos move run \
     --args \
@@ -134,7 +134,7 @@ aptos move run \
         $DEE_COIN_TYPE \
         $USDC_COIN_TYPE
 
-echo "\n\n Locking $CAD_USDC_LOCK USDC for Cad into pool:"
+echo "\n\nLocking $CAD_USDC_LOCK USDC for Cad into pool:"
 sleep 2
 aptos move run \
     --args \
@@ -147,7 +147,7 @@ aptos move run \
         $DEE_COIN_TYPE \
         $USDC_COIN_TYPE
 
-echo "\n\n Locking $ACE_USDC_LOCK_2 more USDC for Ace into pool:"
+echo "\n\nLocking $ACE_USDC_LOCK_2 more USDC for Ace into pool:"
 sleep 2
 aptos move run \
     --args \
@@ -161,7 +161,7 @@ aptos move run \
         $USDC_COIN_TYPE
 
 # Print diagnostic info.
-echo "\n\n Pool metadata:"
+echo "\n\nPool metadata:"
 sleep 2
 aptos move view \
     --args address:$DEE_ADDR \
@@ -171,8 +171,8 @@ aptos move view \
         $USDC_COIN_TYPE \
     --profile ace
 
-echo "\n\n Locker info:"
-sleep 2
+sleep 10
+echo "\n\nLocker info:"
 aptos move view \
     --args address:$DEE_ADDR \
     --function-id $LOCKERS \
@@ -183,33 +183,19 @@ aptos move view \
 
 # Wait until lockstream has started.
 CURRENT_TIME=$(date +%s)
-DELAY=$(expr $STREAMING_PERIOD_START - $CURRENT_TIME)
-echo "\n\n The time is now $CURRENT_TIME
-The streaming period starts at $STREAMING_PERIOD_START
+DELAY=$(expr $STREAM_START_TIME - $CURRENT_TIME)
+echo "\n\nThe time is now $CURRENT_TIME
+The streaming period starts at $STREAM_START_TIME
 Waiting $DELAY seconds"
 sleep $DELAY
 
-# Wait another second.
-echo "\n\n The streaming period has begun
-Waiting another second"
-sleep 1
-
-echo "\n\n Locker info:"
-aptos move view \
-    --args address:$DEE_ADDR \
-    --function-id $LOCKERS \
-    --type-args \
-        $DEE_COIN_TYPE \
-        $USDC_COIN_TYPE \
-    --profile ace
-
 # Make Ace's first claim.
-echo "\n\n Waiting for $ACE_CLAIM_TIME_1 seconds into stream for Ace's claim 1"
+echo "\n\nWaiting for $ACE_CLAIM_TIME_1 seconds into stream for Ace's claim 1"
 CURRENT_TIME=$(date +%s)
-DELAY=$(expr $STREAMING_PERIOD_START + $ACE_CLAIM_TIME_1 - $CURRENT_TIME)
+DELAY=$(expr $STREAM_START_TIME + $ACE_CLAIM_TIME_1 - $CURRENT_TIME)
 sleep $DELAY
 
-echo "\n\n Claiming for Ace:"
+echo "\n\nClaiming for Ace:"
 aptos move run \
     --args \
         address:$DEE_ADDR \
@@ -220,7 +206,7 @@ aptos move run \
         $DEE_COIN_TYPE \
         $USDC_COIN_TYPE
 
-echo "\n\n Ace's DeeCoin balance:"
+echo "\n\nAce's DeeCoin balance:"
 aptos move view \
     --args address:$ACE_ADDR \
     --function-id $BALANCE \
@@ -228,12 +214,12 @@ aptos move view \
     --profile ace
 
 # Make Bee's claim.
-echo "\n\n Waiting for $BEE_CLAIM_TIME_1 seconds into stream for Bee's claim 1"
+echo "\n\nWaiting for $BEE_CLAIM_TIME_1 seconds into stream for Bee's claim 1"
 CURRENT_TIME=$(date +%s)
-DELAY=$(expr $STREAMING_PERIOD_START + $BEE_CLAIM_TIME_1 - $CURRENT_TIME)
+DELAY=$(expr $STREAM_START_TIME + $BEE_CLAIM_TIME_1 - $CURRENT_TIME)
 sleep $DELAY
 
-echo "\n\n Claiming for Bee:"
+echo "\n\nClaiming for Bee:"
 aptos move run \
     --args \
         address:$DEE_ADDR \
@@ -244,7 +230,7 @@ aptos move run \
         $DEE_COIN_TYPE \
         $USDC_COIN_TYPE
 
-echo "\n\n Bee's DeeCoin balance:"
+echo "\n\nBee's DeeCoin balance:"
 aptos move view \
     --args address:$BEE_ADDR \
     --function-id $BALANCE \
@@ -252,12 +238,12 @@ aptos move view \
     --profile bee
 
 # Make Cad's claim.
-echo "\n\n Waiting for $CAD_CLAIM_TIME seconds into stream for Cad's claim"
+echo "\n\nWaiting for $CAD_CLAIM_TIME seconds into stream for Cad's claim"
 CURRENT_TIME=$(date +%s)
-DELAY=$(expr $STREAMING_PERIOD_START + $CAD_CLAIM_TIME - $CURRENT_TIME)
+DELAY=$(expr $STREAM_START_TIME + $CAD_CLAIM_TIME - $CURRENT_TIME)
 sleep $DELAY
 
-echo "\n\n Claiming for Cad:"
+echo "\n\nClaiming for Cad:"
 aptos move run \
     --args \
         address:$DEE_ADDR \
@@ -268,7 +254,7 @@ aptos move run \
         $DEE_COIN_TYPE \
         $USDC_COIN_TYPE
 
-echo "\n\n Cad's DeeCoin balance:"
+echo "\n\nCad's DeeCoin balance:"
 aptos move view \
     --args address:$CAD_ADDR \
     --function-id $BALANCE \
@@ -276,12 +262,12 @@ aptos move view \
     --profile cad
 
 # Make Ace's second claim.
-echo "\n\n Wait for $ACE_CLAIM_TIME_2 seconds after stream start for Ace's claim 2"
+echo "\n\nWait for $ACE_CLAIM_TIME_2 seconds after stream start for Ace's claim 2"
 CURRENT_TIME=$(date +%s)
-DELAY=$(expr $STREAMING_PERIOD_START + $ACE_CLAIM_TIME_2 - $CURRENT_TIME)
+DELAY=$(expr $STREAM_START_TIME + $ACE_CLAIM_TIME_2 - $CURRENT_TIME)
 sleep $DELAY
 
-echo "\n\n Claiming for Ace:"
+echo "\n\nClaiming for Ace:"
 aptos move run \
     --args \
         address:$DEE_ADDR \
@@ -292,7 +278,7 @@ aptos move run \
         $DEE_COIN_TYPE \
         $USDC_COIN_TYPE
 
-echo "\n\n Ace's DeeCoin balance:"
+echo "\n\nAce's DeeCoin balance:"
 aptos move view \
     --args address:$ACE_ADDR \
     --function-id $BALANCE \
@@ -300,12 +286,12 @@ aptos move view \
     --profile ace
 
 # Make Bee's claim.
-echo "\n\n Waiting for $BEE_CLAIM_TIME_2 seconds after stream start Bee's claim 2"
+echo "\n\nWaiting for $BEE_CLAIM_TIME_2 seconds after stream start Bee's claim 2"
 CURRENT_TIME=$(date +%s)
-DELAY=$(expr $STREAMING_PERIOD_START + $BEE_CLAIM_TIME_2 - $CURRENT_TIME)
+DELAY=$(expr $STREAM_START_TIME + $BEE_CLAIM_TIME_2 - $CURRENT_TIME)
 sleep $DELAY
 
-echo "\n\n Claiming for Bee:"
+echo "\n\nClaiming for Bee:"
 aptos move run \
     --args \
         address:$DEE_ADDR \
@@ -316,7 +302,7 @@ aptos move run \
         $DEE_COIN_TYPE \
         $USDC_COIN_TYPE
 
-echo "\n\n Bee's DeeCoin balance:"
+echo "\n\nBee's DeeCoin balance:"
 aptos move view \
     --args address:$BEE_ADDR \
     --function-id $BALANCE \
@@ -324,7 +310,7 @@ aptos move view \
     --profile bee
 
 # Print diagnostic info.
-echo "\n\n Pool metadata:"
+echo "\n\nPool metadata:"
 sleep 2
 aptos move view \
     --args address:$DEE_ADDR \
@@ -334,8 +320,8 @@ aptos move view \
         $USDC_COIN_TYPE \
     --profile ace
 
-echo "\n\n Locker info:"
-sleep 2
+sleep 10
+echo "\n\nLocker info:"
 aptos move view \
     --args address:$DEE_ADDR \
     --function-id $LOCKERS \
@@ -346,7 +332,7 @@ aptos move view \
 
 # Quote claim amounts.
 
-echo "\n\n Ace's USDC balance:"
+echo "\n\nAce's USDC balance:"
 sleep 2
 aptos move view \
     --args address:$ACE_ADDR \
@@ -354,7 +340,7 @@ aptos move view \
     --type-args $USDC_COIN_TYPE \
     --profile ace
 
-echo "\n\n Bee's USDC balance:"
+echo "\n\nBee's USDC balance:"
 sleep 2
 aptos move view \
     --args address:$BEE_ADDR \
@@ -362,7 +348,7 @@ aptos move view \
     --type-args $USDC_COIN_TYPE \
     --profile bee
 
-echo "\n\n Cad's USDC balance:"
+echo "\n\nCad's USDC balance:"
 sleep 2
 aptos move view \
     --args address:$BEE_ADDR \
