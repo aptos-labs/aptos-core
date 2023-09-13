@@ -576,7 +576,9 @@ impl Interpreter {
             TypeWithLoader { ty, loader },
             res.is_ok(),
         )?;
-        self.operand_stack.push(res?)?;
+        self.operand_stack.push(res.map_err(|err| {
+            err.with_message(format!("Failed to borrow global resource from {:?}", addr))
+        })?)?;
         Ok(())
     }
 
@@ -607,22 +609,23 @@ impl Interpreter {
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let resource =
-            match Self::load_resource(loader, data_store, gas_meter, addr, ty)?.move_from() {
-                Ok(resource) => {
-                    gas_meter.charge_move_from(
-                        is_generic,
-                        TypeWithLoader { ty, loader },
-                        Some(&resource),
-                    )?;
-                    resource
-                },
-                Err(err) => {
-                    let val: Option<&Value> = None;
-                    gas_meter.charge_move_from(is_generic, TypeWithLoader { ty, loader }, val)?;
-                    return Err(err);
-                },
-            };
+        let resource = match Self::load_resource(loader, data_store, gas_meter, addr, ty)?
+            .move_from()
+        {
+            Ok(resource) => {
+                gas_meter.charge_move_from(
+                    is_generic,
+                    TypeWithLoader { ty, loader },
+                    Some(&resource),
+                )?;
+                resource
+            },
+            Err(err) => {
+                let val: Option<&Value> = None;
+                gas_meter.charge_move_from(is_generic, TypeWithLoader { ty, loader }, val)?;
+                return Err(err.with_message(format!("Failed to move resource from {:?}", addr)));
+            },
+        };
         self.operand_stack.push(resource)?;
         Ok(())
     }
@@ -658,7 +661,7 @@ impl Interpreter {
                     &resource,
                     false,
                 )?;
-                Err(err)
+                Err(err.with_message(format!("Failed to move resource into {:?}", addr)))
             },
         }
     }
