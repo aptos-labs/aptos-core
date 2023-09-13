@@ -21,7 +21,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use aptos_block_executor::sharding::TxnProvider;
+use aptos_block_executor::txn_provider::sharded::ShardedTxnProvider;
 use crate::adapter_common::PreprocessedTransaction;
 use crate::block_executor::vm_wrapper::AptosExecutorTask;
 

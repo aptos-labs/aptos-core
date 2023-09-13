@@ -23,7 +23,7 @@ use std::{
     },
 };
 use std::collections::HashMap;
-use crate::index_mapping::IndexHelper;
+use crate::txn_provider::TxnProviderTrait1;
 
 type TxnInput<K> = Vec<ReadDescriptor<K>>;
 // When a transaction is committed, the output delta writes must be populated by
@@ -149,13 +149,13 @@ pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
 }
 
 impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputOutput<K, T, E> {
-    pub fn new(index_helper: Arc<IndexHelper>) -> Self {
+    pub fn new<P: TxnProviderTrait1>(txn_provider: &P) -> Self {
         Self {
-            inputs: index_helper.txns()
-                .map(|idx| (*idx, CachePadded::new(ArcSwapOption::empty())))
+            inputs: txn_provider.txns().into_iter()
+                .map(|idx| (idx, CachePadded::new(ArcSwapOption::empty())))
                 .collect(),
-            outputs: index_helper.txns()
-                .map(|idx| (*idx, CachePadded::new(ArcSwapOption::empty())))
+            outputs: txn_provider.txns().into_iter()
+                .map(|idx| (idx, CachePadded::new(ArcSwapOption::empty())))
                 .collect(),
             module_writes: DashSet::new(),
             module_reads: DashSet::new(),

@@ -1,21 +1,21 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_executor::{coordinator_client::CoordinatorClient, counters::WAIT_FOR_SHARDED_OUTPUT_SECONDS, cross_shard_client::CrossShardClient, executor_client::{ExecutorClient, ShardedExecutionOutput}, global_executor::GlobalExecutor, messages::CrossShardMsg, sharded_executor_service::ShardedExecutorService, ExecutorShardCommand, TxnProviderArgs};
+use crate::sharded_block_executor::{coordinator_client::CoordinatorClient, counters::WAIT_FOR_SHARDED_OUTPUT_SECONDS, cross_shard_client::CrossShardClient, executor_client::{ExecutorClient, ShardedExecutionOutput}, ExecutorShardCommand, global_executor::GlobalExecutor, messages::CrossShardMsg, sharded_executor_service::ShardedExecutorService, TxnProviderArgs};
 use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{
-        PartitionedTransactions, RoundId, ShardId, GLOBAL_ROUND_ID, MAX_ALLOWED_PARTITIONING_ROUNDS,
+        GLOBAL_ROUND_ID, MAX_ALLOWED_PARTITIONING_ROUNDS, PartitionedTransactions, RoundId, ShardId,
     },
     transaction::TransactionOutput,
 };
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, unbounded};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::{mpsc, Mutex};
-use aptos_block_executor::sharding::{TxnProvider};
+use aptos_block_executor::txn_provider::sharded::ShardedTxnProvider;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::state_store::state_key::StateKey;
 
@@ -169,7 +169,14 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ShardedExecutionOutput, VMStatus> {
         assert_eq!(transactions.num_shards(), self.num_shards());
-        let PartitionedTransactions {block_id, sharded_txns, global_idxs, shard_idxs_by_txn, dependency_sets, follower_sets } = transactions;
+        let PartitionedTransactions {
+            block_id,
+            sharded_txns,
+            global_idxs,
+            shard_idxs_by_txn,
+            dependency_sets,
+            follower_sets
+        } = transactions;
         let num_shards = sharded_txns.len();
         let mut txs = Vec::with_capacity(num_shards);
         let mut rxs = Vec::with_capacity(num_shards);
@@ -185,6 +192,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
             let mut remote_dependencies: HashMap<TxnIndex, HashSet<StateKey>> = HashMap::new();
             for &global_idx in global_idxs.iter() {
                 for (dep_txn_idx, required_keys) in dependency_sets[global_idx as usize].iter() {
+                    if shard_idxs_by_txn[(*dep_txn_idx) as usize] == shard_id { continue; }
                     remote_dependencies.entry(*dep_txn_idx).or_insert_with(HashSet::new).extend(required_keys.clone());
                 }
             }

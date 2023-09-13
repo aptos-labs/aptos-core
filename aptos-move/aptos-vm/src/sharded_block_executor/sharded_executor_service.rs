@@ -24,7 +24,7 @@ use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::sync::{Arc, Condvar, Mutex};
-use aptos_block_executor::sharding::TxnProvider;
+use aptos_block_executor::txn_provider::sharded::ShardedTxnProvider;
 use aptos_types::state_store::state_key::StateKey;
 use crate::counters::BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS;
 use crate::sharded_block_executor::TxnProviderArgs;
@@ -98,9 +98,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         });
         drop(signature_verification_timer);
 
-        let sharding_provider = TxnProvider::new_sharded(
+        let txn_provider = ShardedTxnProvider::new(
             block_id,
-            true,
             num_shards,
             shard_id.unwrap(),
             rx,
@@ -114,7 +113,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
 
         let ret = BlockAptosVM::execute_block(
             executor_thread_pool,
-            sharding_provider,
+            txn_provider,
             state_view,
             concurrency_level,
             maybe_block_gas_limit,

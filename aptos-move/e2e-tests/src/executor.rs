@@ -72,7 +72,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Instant,
 };
-use aptos_block_executor::sharding::TxnProvider;
+use aptos_block_executor::txn_provider::sharded::ShardedTxnProvider;
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
@@ -450,7 +450,7 @@ impl FakeExecutor {
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let pre_processed_txns = BlockAptosVM::verify_transactions(txn_block);
-        let sharding_provider = TxnProvider::new_unsharded(pre_processed_txns);
+        let sharding_provider = ShardedTxnProvider::new_unsharded(pre_processed_txns);
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
             sharding_provider,

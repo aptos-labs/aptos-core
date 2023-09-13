@@ -7,8 +7,6 @@ use aptos_types::executable::ExecutableDescriptor;
 use std::sync::Arc;
 
 pub type TxnIndex = u32;
-pub const END_TXN_INDEX: TxnIndex = u32::MAX;
-
 pub type Incarnation = u32;
 pub type Version = (TxnIndex, Incarnation);
 

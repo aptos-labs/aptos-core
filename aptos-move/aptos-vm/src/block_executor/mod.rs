@@ -39,7 +39,8 @@ use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::{collections::HashMap, sync::Arc};
-use aptos_block_executor::sharding::TxnProvider;
+use aptos_block_executor::txn_provider::sharded::ShardedTxnProvider;
+use aptos_block_executor::txn_provider::{TxnProviderTrait1, TxnProviderTrait2};
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
@@ -193,9 +194,10 @@ impl BlockAptosVM {
     pub fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
+        TP: TxnProviderTrait1 + TxnProviderTrait2<PreprocessedTransaction, AptosTransactionOutput, VMStatus> + Send + Sync + 'static
     >(
         executor_thread_pool: Arc<ThreadPool>,
-        sharding_provider: TxnProvider<PreprocessedTransaction, AptosTransactionOutput, VMStatus>,
+        txn_provider: TP,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
@@ -207,7 +209,7 @@ impl BlockAptosVM {
         // sequentially while executing the transactions.
         // TODO: state sync runs this code but doesn't need to verify signatures
 
-        let num_txns = sharding_provider.num_local_txns();
+        let num_txns = txn_provider.num_txns();
         if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.
@@ -221,13 +223,14 @@ impl BlockAptosVM {
             S,
             L,
             ExecutableTestType,
+            TP,
         >::new(
             concurrency_level,
             executor_thread_pool,
             maybe_block_gas_limit,
             transaction_commit_listener,
         );
-        let ret = executor.execute_block(state_view, sharding_provider, state_view);
+        let ret = executor.execute_block(state_view, txn_provider, state_view);
         match ret {
             Ok(outputs) => {
                 let output_vec: Vec<TransactionOutput> = outputs
