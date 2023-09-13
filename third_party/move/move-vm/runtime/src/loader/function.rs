@@ -11,12 +11,12 @@ use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
         AbilitySet, Bytecode, CompiledModule, FunctionDefinition, FunctionDefinitionIndex,
-        Signature, VirtualFunctionInstantiation, Visibility,
+        Signature, VirtualFunctionInstantiation, Visibility, StructDefinitionIndex,
     },
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_types::loaded_data::runtime_types::Type;
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, sync::Arc, collections::BTreeSet};
 
 // A simple wrapper for the "owner" of the function (Module or Script)
 #[derive(Clone, Debug)]
@@ -43,6 +43,7 @@ pub(crate) struct Function {
     pub(crate) return_types: Vec<Type>,
     pub(crate) local_types: Vec<Type>,
     pub(crate) parameter_types: Vec<Type>,
+    pub(crate) acquired_resources: BTreeSet<StructDefinitionIndex>,
 }
 
 // This struct must be treated as an identifier for a function and not somehow relying on
@@ -107,6 +108,7 @@ impl Function {
         let parameter_types = signature_table[handle.parameters.0 as usize].clone();
 
         Self {
+            acquired_resources: def.acquires_global_resources.iter().cloned().collect(),
             file_format_version: module.version(),
             index,
             code,

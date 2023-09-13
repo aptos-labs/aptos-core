@@ -13,13 +13,13 @@ use fail::fail_point;
 use move_binary_format::{
     errors::*,
     file_format::{
-        Ability, AbilitySet, Bytecode, FunctionHandleIndex, FunctionInstantiationIndex, VTableIndex,
+        Ability, AbilitySet, Bytecode, FunctionHandleIndex, FunctionInstantiationIndex, VTableIndex, StructDefinitionIndex,
     },
 };
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{NumArgs, NumBytes},
-    language_storage::TypeTag,
+    language_storage::{TypeTag, ModuleId},
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_types::{
@@ -32,7 +32,7 @@ use move_vm_types::{
     },
     views::TypeView,
 };
-use std::{cmp::min, collections::VecDeque, fmt::Write, sync::Arc};
+use std::{cmp::min, collections::{VecDeque, BTreeMap, BTreeSet}, fmt::Write, sync::Arc};
 
 macro_rules! debug_write {
     ($($toks: tt)*) => {
@@ -157,6 +157,9 @@ impl Interpreter {
                         .map_err(|e| self.set_location(e))?;
 
                     if let Some(frame) = self.call_stack.pop() {
+                        if let Some(module_id) = frame.function.module_id() {
+                            self.call_stack.remove_acquired_resources(module_id, &frame.function.acquired_resources);
+                        }
                         // Note: the caller will find the callee's return values at the top of the shared operand stack
                         current_frame = frame;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
@@ -205,6 +208,9 @@ impl Interpreter {
                         current_frame.pc += 1; // advance past the Call instruction in the caller
                         continue;
                     }
+                    self.call_stack.add_and_check_acquired_resources(module_id.clone(), &func.acquired_resources)
+                        .map_err(|e| e.with_message(format!("Reentrancy detected in {:?}::{}", module_id, func.name)))
+                        .map_err(|e| self.set_location(e))?;
                     let frame = self
                         .make_call_frame(loader, func, vec![], vec![])
                         .map_err(|e| self.set_location(e))
@@ -264,6 +270,10 @@ impl Interpreter {
                         current_frame.pc += 1; // advance past the Call instruction in the caller
                         continue;
                     }
+                    self.call_stack.add_and_check_acquired_resources(module_id.clone(), &func.acquired_resources)
+                        .map_err(|e| e.with_message(format!("Reentrancy detected in {:?}::{}", module_id, func.name)))
+                        .map_err(|e| self.set_location(e))?;
+
                     let frame = self
                         .make_call_frame(loader, func, ty_args, vtable)
                         .map_err(|e| self.set_location(e))
@@ -839,7 +849,7 @@ impl Interpreter {
         loader: &Loader,
     ) -> PartialVMResult<()> {
         debug_writeln!(buf, "Call Stack:")?;
-        for (i, frame) in self.call_stack.0.iter().enumerate() {
+        for (i, frame) in self.call_stack.frames.iter().enumerate() {
             self.debug_print_frame(buf, loader, i, frame)?;
         }
         debug_writeln!(buf, "Operand Stack:")?;
@@ -861,7 +871,7 @@ impl Interpreter {
     /// of an execution.
     fn internal_state_str(&self, current_frame: &Frame) -> String {
         let mut internal_state = "Call stack:\n".to_string();
-        for (i, frame) in self.call_stack.0.iter().enumerate() {
+        for (i, frame) in self.call_stack.frames.iter().enumerate() {
             internal_state.push_str(
                 format!(
                     " frame #{}: {} [pc = {}]\n",
@@ -875,7 +885,7 @@ impl Interpreter {
         internal_state.push_str(
             format!(
                 "*frame #{}: {} [pc = {}]:\n",
-                self.call_stack.0.len(),
+                self.call_stack.frames.len(),
                 current_frame.function.pretty_string(),
                 current_frame.pc,
             )
@@ -921,7 +931,7 @@ impl Interpreter {
         // is the last one)
         let stack_trace = self
             .call_stack
-            .0
+            .frames
             .iter()
             .rev()
             .take(count)
@@ -1045,31 +1055,54 @@ impl Stack {
 
 /// A call stack.
 // #[derive(Debug)]
-struct CallStack(Vec<Frame>);
+struct CallStack {
+    frames: Vec<Frame>,
+    acquired_resources: BTreeMap<ModuleId, BTreeSet<StructDefinitionIndex>>,
+}
 
 impl CallStack {
     /// Create a new empty call stack.
     fn new() -> Self {
-        CallStack(vec![])
+        CallStack {
+            frames: vec![],
+            acquired_resources: BTreeMap::new(),
+        }
     }
 
     /// Push a `Frame` on the call stack.
     fn push(&mut self, frame: Frame) -> ::std::result::Result<(), Frame> {
-        if self.0.len() < CALL_STACK_SIZE_LIMIT {
-            self.0.push(frame);
+        if self.frames.len() < CALL_STACK_SIZE_LIMIT {
+            self.frames.push(frame);
             Ok(())
         } else {
             Err(frame)
         }
     }
 
+    fn add_and_check_acquired_resources(&mut self, module: ModuleId, acquired_resources: &BTreeSet<StructDefinitionIndex>) -> PartialVMResult<()> {
+        let entry = self.acquired_resources.entry(module).or_default();
+        if entry.is_disjoint(acquired_resources) {
+            return Err(PartialVMError::new(StatusCode::REENTRANT_FUNCTION_CALL));
+        }
+        entry.extend(acquired_resources.iter().cloned());
+        Ok(())
+    }
+
+    fn remove_acquired_resources(&mut self, module: &ModuleId, acquired_resources: &BTreeSet<StructDefinitionIndex>) {
+        self.acquired_resources.get_mut(module).map(|set| {
+            for idx in acquired_resources {
+                set.remove(idx);
+            }
+        });
+    }
+
     /// Pop a `Frame` off the call stack.
     fn pop(&mut self) -> Option<Frame> {
-        self.0.pop()
+        self.frames.pop()
     }
 
     fn current_location(&self) -> Location {
-        let location_opt = self.0.last().map(|frame| frame.location());
+        let location_opt = self.frames.last().map(|frame| frame.location());
         location_opt.unwrap_or(Location::Undefined)
     }
 }
