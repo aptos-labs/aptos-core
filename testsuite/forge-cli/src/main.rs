@@ -1682,7 +1682,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 200.into();
 
             helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
-                ["backlog_txn_limit_count"] = u64::MAX.into();
+                ["backlog_txn_limit_count"] = 200000.into();
             helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
                 ["backlog_per_validator_batch_limit_count"] = 10.into();
 
