@@ -14,12 +14,13 @@ pub fn run_and_assert_universe(universe: DepGraph) {
 }
 
 proptest! {
-    // These tests are pretty slow but quite comprehensive, so run a smaller number of them.
     #![proptest_config(ProptestConfig::with_cases(32))]
     #[test]
     fn all_transactions(
         universe in DepGraph::strategy(
+            // Number of modules
             20,
+            // Number of dependency edges
             30..150,
             log_balance_strategy(1_000_000),
         )

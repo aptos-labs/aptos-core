@@ -8,10 +8,7 @@ use crate::{account::AccountData, executor::FakeExecutor};
 use aptos_proptest_helpers::Index;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 use move_ir_compiler::Compiler;
-use petgraph::{
-    algo::{is_cyclic_directed, toposort},
-    Direction, Graph,
-};
+use petgraph::{algo::toposort, Direction, Graph};
 use proptest::{
     collection::{vec, SizeRange},
     prelude::*,
@@ -30,6 +27,56 @@ pub struct Node {
 #[derive(Debug)]
 pub struct DepGraph(Graph<Node, ()>);
 
+/// This module generates a sets of modules that could be used to test the loader.
+///
+/// To generate the module, a DAG is first generated. The node in this graph represents a module and the edge in this graph represents a dependency
+/// between modules. For example if you generate the following DAG:
+///
+///          M1
+///         /  \
+///        M2  M3
+///
+/// This will generate three modules: M1, M2 and M3. Where each module will look like following:
+///
+/// module 0x3cf3846156a51da7251ccc84b5e4be10c5ab33049b7692d1164fd2c73ef3638b.M2 {
+/// public entry foo(): u64 {
+///     let a: u64;
+/// label b0:
+///     a = 49252;                          // randomly generated integer for self node.
+///     assert(copy(a) == 49252, 42);       // assert execution result matches expected value. Expected value can be derived from traversing the DAG.
+///     return move(a);
+/// }
+/// }
+///
+/// module e57d457d2ffacab8f46dea9779f8ad8135c68fd3574eb2902b3da0cfa67cf9d1.M3 {
+/// public entry foo(): u64 {
+///     let a: u64;
+/// label b0:
+///     a = 41973;                          // randomly generated integer for self node.
+///     assert(copy(a) == 41973, 42);       // assert execution result matches expected value. Expected value can be derived from traversing the DAG.
+///     return move(a);
+/// }
+/// }
+///
+/// M2 and M3 are leaf nodes so the it should be a no-op function call. M1 will look like following:
+///
+/// module 0x61da74259dae2c25beb41d11e43c6f5c00cc72d151d8a4f382b02e4e6c420d17.M1 {
+/// import 0x3cf3846156a51da7251ccc84b5e4be10c5ab33049b7692d1164fd2c73ef3638b.M2;
+/// import e57d457d2ffacab8f46dea9779f8ad8135c68fd3574eb2902b3da0cfa67cf9d1.M3;
+/// public entry foo(): u64 {
+///     let a: u64;
+/// label b0:
+///     a = 27856 + M2.foo()+ M3.foo();  // The dependency edge will be converted invokaction into dependent module.
+///     assert(copy(a) == 119081, 42);   // The expected value is the sum of self and all its dependent modules.
+///     return move(a);
+/// }
+/// }
+///
+/// By using this strategy, we can generate a set of modules with complex depenency relationship and assert that the new loader is always
+/// linking the call to the right module.
+///
+/// The next step is to randomly generate module upgrade request to change the structure of DAG to make sure the VM will be able to handle
+/// invaldation properly.
 impl DepGraph {
     /// Returns a [`Strategy`] that generates a universe of accounts with pre-populated initial
     /// balances.
@@ -67,13 +114,11 @@ impl DepGraph {
         for (lhs_idx, rhs_idx) in edges {
             let lhs = lhs_idx.get(&indices);
             let rhs = rhs_idx.get(&indices);
-            let edge_idx = graph.add_edge(lhs.to_owned(), rhs.to_owned(), ());
-            if is_cyclic_directed(&graph) {
-                graph.remove_edge(edge_idx);
-                let edge_idx = graph.add_edge(rhs.to_owned(), lhs.to_owned(), ());
-                if is_cyclic_directed(&graph) {
-                    graph.remove_edge(edge_idx);
-                }
+
+            if lhs > rhs {
+                graph.add_edge(lhs.to_owned(), rhs.to_owned(), ());
+            } else if lhs < rhs {
+                graph.add_edge(rhs.to_owned(), lhs.to_owned(), ());
             }
         }
         Self(graph)
