@@ -1,0 +1,30 @@
+[package]
+name = "aptos-network-benchmark"
+description = "Aptos network benchmark"
+version = "0.1.0"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-config = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-metrics-core = { workspace = true }
+aptos-network = { workspace = true }
+aptos-runtimes = { workspace = true }
+aptos-time-service = { workspace = true }
+aptos-types = { workspace = true }
+async-channel = { workspace = true }
+bytes = { workspace = true }
+futures = { workspace = true }
+once_cell = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }

@@ -12,7 +12,7 @@ use crate::{
     expansion, hlir, inlining, interface_generator, naming, parser,
     parser::{comments::*, *},
     shared::{
-        CompilationEnv, Flags, IndexedPackagePath, NamedAddressMap, NamedAddressMaps,
+        ast_debug, CompilationEnv, Flags, IndexedPackagePath, NamedAddressMap, NamedAddressMaps,
         NumericalAddress, PackagePaths,
     },
     to_bytecode, typing, unit_test, verification,
@@ -697,7 +697,7 @@ pub fn generate_interface_files(
     {
         let (id, interface_contents) =
             interface_generator::write_file_to_string(module_to_named_address, &path)?;
-        let addr_dir = dir_path!(all_addr_dir.clone(), format!("{}", id.address()));
+        let addr_dir = dir_path!(all_addr_dir.clone(), format!("{}", id.address().to_hex()));
         let file_path = file_path!(addr_dir.clone(), format!("{}", id.name()), MOVE_EXTENSION);
         result.push(IndexedPackagePath {
             path: Symbol::from(file_path.clone().into_os_string().into_string().unwrap()),
@@ -780,8 +780,20 @@ fn run(
             let prog = parser::merge_spec_modules::program(compilation_env, prog);
             let prog = unit_test::filter_test_members::program(compilation_env, prog);
             let prog = verification::ast_filter::program(compilation_env, prog);
+            if compilation_env.flags().debug() {
+                eprintln!(
+                    "Before expansion: program = {}",
+                    ast_debug::display_verbose(&prog)
+                )
+            };
             let eprog = expansion::translate::program(compilation_env, pre_compiled_lib, prog);
             compilation_env.check_diags_at_or_above_severity(Severity::Bug)?;
+            if compilation_env.flags().debug() {
+                eprintln!(
+                    "After expansion: program = {}",
+                    ast_debug::display_verbose(&eprog)
+                )
+            };
             run(
                 compilation_env,
                 pre_compiled_lib,
@@ -793,6 +805,12 @@ fn run(
         PassResult::Expansion(eprog) => {
             let nprog = naming::translate::program(compilation_env, pre_compiled_lib, eprog);
             compilation_env.check_diags_at_or_above_severity(Severity::Bug)?;
+            if compilation_env.flags().debug() {
+                eprintln!(
+                    "After naming: program = {}",
+                    ast_debug::display_verbose(&nprog)
+                )
+            };
             run(
                 compilation_env,
                 pre_compiled_lib,
@@ -804,6 +822,12 @@ fn run(
         PassResult::Naming(nprog) => {
             let tprog = typing::translate::program(compilation_env, pre_compiled_lib, nprog);
             compilation_env.check_diags_at_or_above_severity(Severity::BlockingError)?;
+            if compilation_env.flags().debug() {
+                eprintln!(
+                    "After typing: program = {}",
+                    ast_debug::display_verbose(&tprog)
+                )
+            };
             run(
                 compilation_env,
                 pre_compiled_lib,
@@ -815,6 +839,12 @@ fn run(
         PassResult::Typing(mut tprog) => {
             inlining::translate::run_inlining(compilation_env, &mut tprog);
             compilation_env.check_diags_at_or_above_severity(Severity::BlockingError)?;
+            if compilation_env.flags().debug() {
+                eprintln!(
+                    "After inlining: program = {}",
+                    ast_debug::display_verbose(&tprog)
+                )
+            };
             run(
                 compilation_env,
                 pre_compiled_lib,
@@ -826,6 +856,12 @@ fn run(
         PassResult::Inlining(tprog) => {
             let hprog = hlir::translate::program(compilation_env, pre_compiled_lib, tprog);
             compilation_env.check_diags_at_or_above_severity(Severity::Bug)?;
+            if compilation_env.flags().debug() {
+                eprintln!(
+                    "After hlir: program = {}",
+                    ast_debug::display_verbose(&hprog)
+                )
+            };
             run(
                 compilation_env,
                 pre_compiled_lib,
@@ -837,6 +873,12 @@ fn run(
         PassResult::HLIR(hprog) => {
             let cprog = cfgir::translate::program(compilation_env, pre_compiled_lib, hprog);
             compilation_env.check_diags_at_or_above_severity(Severity::NonblockingError)?;
+            if compilation_env.flags().debug() {
+                eprintln!(
+                    "After cfgir: program = {}",
+                    ast_debug::display_verbose(&cprog)
+                )
+            };
             run(
                 compilation_env,
                 pre_compiled_lib,

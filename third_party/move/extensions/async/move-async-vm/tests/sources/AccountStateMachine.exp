@@ -5,10 +5,10 @@ publishing vector
 publishing AccountStateMachine
 actor 0x4 created from 0x3::AccountStateMachine
   SUCCESS
-  commit 0x3::AccountStateMachine::AccountStateMachine[0x4] := New("[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00]")
+  commit 0x3::AccountStateMachine::AccountStateMachine[0x4] := New("b\"\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\"")
 actor 0x5 created from 0x3::AccountStateMachine
   SUCCESS
-  commit 0x3::AccountStateMachine::AccountStateMachine[0x5] := New("[00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00]")
+  commit 0x3::AccountStateMachine::AccountStateMachine[0x5] := New("b\"\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\"")
 actor 0x4 handling 0x3::AccountStateMachine::start (hash=0xD6E3904B884A26E2)
   SUCCESS
   sent 0x4 <- 0xC4FB1F887A3B60A6 argc=1
@@ -20,28 +20,28 @@ actor 0x5 handling 0x3::AccountStateMachine::start (hash=0xD6E3904B884A26E2)
   SUCCESS
 actor 0x4 handling 0x3::AccountStateMachine::deposit (hash=0xC4FB1F887A3B60A6)
   SUCCESS
-  commit 0x3::AccountStateMachine::AccountStateMachine[0x4] := Modify("[64, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00]")
+  commit 0x3::AccountStateMachine::AccountStateMachine[0x4] := Modify("b\"d\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\"")
 actor 0x5 handling 0x3::AccountStateMachine::deposit (hash=0xC4FB1F887A3B60A6)
   SUCCESS
-  commit 0x3::AccountStateMachine::AccountStateMachine[0x5] := Modify("[64, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00]")
+  commit 0x3::AccountStateMachine::AccountStateMachine[0x5] := Modify("b\"d\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\"")
 actor 0x4 handling 0x3::AccountStateMachine::xfer (hash=0x477572D21970BF04)
   SUCCESS
   sent 0x5 <- 0x8EEEA8A2C8DCFA6D argc=3
-  commit 0x3::AccountStateMachine::AccountStateMachine[0x4] := Modify("[64, 00, 00, 00, 00, 00, 00, 00, 01, 00, 00, 00, 00, 00, 00, 00, 01, 00, 00, 00, 00, 00, 00, 00, 00, 14, 00, 00, 00, 00, 00, 00, 00, A0, 69, 62, 02, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00]")
+  commit 0x3::AccountStateMachine::AccountStateMachine[0x4] := Modify("b\"d\\0\\0\\0\\0\\0\\0\\0\\x01\\0\\0\\0\\0\\0\\0\\0\\x01\\0\\0\\0\\0\\0\\0\\0\\0\\x14\\0\\0\\0\\0\\0\\0\\0\\xa0ib\\x02\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\"")
 actor 0x4 handling 0x3::AccountStateMachine::cleanup (hash=0xFC3DE2B500D5B460)
   SUCCESS
-  commit 0x3::AccountStateMachine::AccountStateMachine[0x4] := Modify("[64, 00, 00, 00, 00, 00, 00, 00, 01, 00, 00, 00, 00, 00, 00, 00, 01, 00, 00, 00, 00, 00, 00, 00, 00, 14, 00, 00, 00, 00, 00, 00, 00, A0, 69, 62, 02, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00]")
+  commit 0x3::AccountStateMachine::AccountStateMachine[0x4] := Modify("b\"d\\0\\0\\0\\0\\0\\0\\0\\x01\\0\\0\\0\\0\\0\\0\\0\\x01\\0\\0\\0\\0\\0\\0\\0\\0\\x14\\0\\0\\0\\0\\0\\0\\0\\xa0ib\\x02\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\"")
 actor 0x5 handling 0x3::AccountStateMachine::cleanup (hash=0xFC3DE2B500D5B460)
   SUCCESS
-  commit 0x3::AccountStateMachine::AccountStateMachine[0x5] := Modify("[64, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00]")
+  commit 0x3::AccountStateMachine::AccountStateMachine[0x5] := Modify("b\"d\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\"")
 actor 0x5 handling 0x3::AccountStateMachine::xfer_deposit (hash=0x8EEEA8A2C8DCFA6D)
   SUCCESS
   sent 0x4 <- 0x9D2FDA886DFF001 argc=1
-  commit 0x3::AccountStateMachine::AccountStateMachine[0x5] := Modify("[78, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00]")
+  commit 0x3::AccountStateMachine::AccountStateMachine[0x5] := Modify("b\"x\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\"")
 actor 0x4 handling 0x3::AccountStateMachine::xfer_finish (hash=0x9D2FDA886DFF001)
   SUCCESS
   sent 0x4 <- 0xDAF369BA2554ECF1 argc=0
-  commit 0x3::AccountStateMachine::AccountStateMachine[0x4] := Modify("[50, 00, 00, 00, 00, 00, 00, 00, 01, 00, 00, 00, 00, 00, 00, 00, 00]")
+  commit 0x3::AccountStateMachine::AccountStateMachine[0x4] := Modify("b\"P\\0\\0\\0\\0\\0\\0\\0\\x01\\0\\0\\0\\0\\0\\0\\0\\0\"")
 actor 0x4 handling 0x3::AccountStateMachine::end (hash=0xDAF369BA2554ECF1)
   SUCCESS
   sent 0x4 <- 0x2BAA2A2D643B5C3B argc=1

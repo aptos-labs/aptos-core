@@ -15,7 +15,7 @@ use aptos_consensus_types::{
     executed_block::ExecutedBlock,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::{Error as ExecutionError, StateComputeResult};
+use aptos_executor_types::{ExecutorResult, StateComputeResult};
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
 use futures::future::BoxFuture;
 use std::{sync::Arc, time::Duration};
@@ -56,7 +56,7 @@ pub trait StateComputer: Send + Sync {
         block: &Block,
         // The parent block root hash.
         parent_block_id: HashValue,
-    ) -> Result<StateComputeResult, ExecutionError>;
+    ) -> ExecutorResult<StateComputeResult>;
 
     /// Send a successful commit. A future is fulfilled when the state is finalized.
     async fn commit(
@@ -64,7 +64,7 @@ pub trait StateComputer: Send + Sync {
         blocks: &[Arc<ExecutedBlock>],
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
-    ) -> Result<(), ExecutionError>;
+    ) -> ExecutorResult<()>;
 
     /// Best effort state synchronization to the given target LedgerInfo.
     /// In case of success (`Result::Ok`) the LI of storage is at the given target.

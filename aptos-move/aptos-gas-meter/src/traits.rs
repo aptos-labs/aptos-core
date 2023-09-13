@@ -106,6 +106,9 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// Calculates the storage fee for a state slot allocation.
     fn storage_fee_for_state_slot(&self, op: &WriteOp) -> Fee;
 
+    /// Calculates the storage fee refund for a state slot deallocation.
+    fn storage_fee_refund_for_state_slot(&self, op: &WriteOp) -> Fee;
+
     /// Calculates the storage fee for state bytes.
     fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee;
 
@@ -131,29 +134,32 @@ pub trait AptosGasMeter: MoveGasMeter {
         change_set: &mut VMChangeSet,
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
-    ) -> VMResult<()> {
+    ) -> VMResult<Fee> {
         // The new storage fee are only active since version 7.
         if self.feature_version() < 7 {
-            return Ok(());
+            return Ok(0.into());
         }
 
         // TODO(Gas): right now, some of our tests use a unit price of 0 and this is a hack
         // to avoid causing them issues. We should revisit the problem and figure out a
         // better way to handle this.
         if gas_unit_price.is_zero() {
-            return Ok(());
+            return Ok(0.into());
         }
 
         // Calculate the storage fees.
-        let write_fee = change_set
-            .write_set_iter_mut()
-            .fold(Fee::new(0), |acc, (key, op)| {
-                let slot_fee = self.storage_fee_for_state_slot(op);
-                let bytes_fee = self.storage_fee_for_state_bytes(key, op);
-                Self::maybe_record_storage_deposit(op, slot_fee);
+        let mut write_fee = Fee::new(0);
+        let mut total_refund = Fee::new(0);
+        for (key, op) in change_set.write_set_iter_mut() {
+            let slot_fee = self.storage_fee_for_state_slot(op);
+            let refund = self.storage_fee_refund_for_state_slot(op);
+            let bytes_fee = self.storage_fee_for_state_bytes(key, op);
 
-                acc + slot_fee + bytes_fee
-            });
+            Self::maybe_record_storage_deposit(op, slot_fee);
+            total_refund += refund;
+
+            write_fee += slot_fee + bytes_fee
+        }
         let event_fee = change_set.events().iter().fold(Fee::new(0), |acc, event| {
             acc + self.storage_fee_per_event(event)
         });
@@ -167,7 +173,7 @@ pub trait AptosGasMeter: MoveGasMeter {
         self.charge_storage_fee(fee, gas_unit_price)
             .map_err(|err| err.finish(Location::Undefined))?;
 
-        Ok(())
+        Ok(total_refund)
     }
 
     // The slot fee is refundable, we record it on the WriteOp itself and it'll end up in
@@ -235,13 +241,6 @@ pub trait AptosGasMeter: MoveGasMeter {
     fn io_gas_used(&self) -> Gas {
         self.algebra()
             .io_gas_used()
-            .to_unit_round_up_with_params(&self.vm_gas_params().txn)
-    }
-
-    /// Return the total gas used for storage.
-    fn storage_fee_used_in_gas_units(&self) -> Gas {
-        self.algebra()
-            .storage_fee_used_in_gas_units()
             .to_unit_round_up_with_params(&self.vm_gas_params().txn)
     }
 

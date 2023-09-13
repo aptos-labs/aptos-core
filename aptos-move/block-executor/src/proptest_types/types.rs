@@ -19,13 +19,14 @@ use aptos_types::{
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
+use bytes::Bytes;
 use claims::assert_ok;
 use move_core_types::language_storage::TypeTag;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
 use std::{
-    collections::{hash_map::DefaultHasher, BTreeSet},
+    collections::{hash_map::DefaultHasher, BTreeSet, HashMap},
     convert::TryInto,
     fmt::Debug,
     hash::{Hash, Hasher},
@@ -35,7 +36,6 @@ use std::{
         Arc,
     },
 };
-
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
 // TODO: extend to delta failures.
 pub(crate) const STORAGE_AGGREGATOR_VALUE: u128 = 100001;
@@ -54,9 +54,9 @@ where
 
     /// Gets the state value for a given state key.
     fn get_state_value(&self, _: &K) -> anyhow::Result<Option<StateValue>> {
-        Ok(Some(StateValue::new_legacy(serialize(
-            &STORAGE_AGGREGATOR_VALUE,
-        ))))
+        Ok(Some(StateValue::new_legacy(
+            serialize(&STORAGE_AGGREGATOR_VALUE).into(),
+        )))
     }
 
     fn id(&self) -> StateViewId {
@@ -140,11 +140,11 @@ pub struct ValueType<V: Into<Vec<u8>> + Debug + Clone + Eq + Arbitrary>(
 impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> TransactionWrite
     for ValueType<V>
 {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+    fn extract_raw_bytes(&self) -> Option<Bytes> {
         if self.1 {
             let mut v = self.0.clone().into();
             v.resize(16, 1);
-            Some(v)
+            Some(v.into())
         } else {
             None
         }
@@ -529,19 +529,19 @@ where
                 let behavior = &incarnation_behaviors[idx % incarnation_behaviors.len()];
 
                 // Reads
-                let mut reads_result = vec![];
+                let mut read_results = vec![];
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
                     match view.get_state_value_bytes(k) {
-                        Ok(v) => reads_result.push(v),
-                        Err(_) => reads_result.push(None),
+                        Ok(v) => read_results.push(v.map(Into::into)),
+                        Err(_) => read_results.push(None),
                     }
                 }
                 ExecutionStatus::Success(MockOutput {
                     writes: behavior.writes.clone(),
                     deltas: behavior.deltas.clone(),
                     events: behavior.events.to_vec(),
-                    read_results: reads_result,
+                    read_results,
                     materialized_delta_writes: OnceCell::new(),
                     total_gas: behavior.gas,
                 })
@@ -550,12 +550,21 @@ where
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
     }
+
+    fn convert_to_value(
+        &self,
+        _view: &impl TStateView<Key = K>,
+        _key: &K,
+        _maybe_blob: Option<Bytes>,
+        _creation: bool,
+    ) -> anyhow::Result<V> {
+        unimplemented!("TODO: implement for AggregatorV2 testing");
+    }
 }
 
 #[derive(Debug)]
 
 pub(crate) struct MockOutput<K, V, E> {
-    // TODO: Split writes into resources & modules.
     pub(crate) writes: Vec<(K, V)>,
     pub(crate) deltas: Vec<(K, DeltaOp)>,
     pub(crate) events: Vec<E>,
@@ -572,12 +581,30 @@ where
 {
     type Txn = MockTransaction<K, V, E>;
 
-    fn get_writes(&self) -> Vec<(K, V)> {
-        self.writes.clone()
+    fn resource_write_set(&self) -> HashMap<K, V> {
+        self.writes
+            .iter()
+            .filter(|(k, _)| k.module_path().is_none())
+            .cloned()
+            .collect()
     }
 
-    fn get_deltas(&self) -> Vec<(K, DeltaOp)> {
-        self.deltas.clone()
+    fn module_write_set(&self) -> HashMap<K, V> {
+        self.writes
+            .iter()
+            .filter(|(k, _)| k.module_path().is_some())
+            .cloned()
+            .collect()
+    }
+
+    // Aggregator v1 writes are included in resource_write_set for tests (writes are produced
+    // for all keys including ones for v1_aggregators without distinguishing).
+    fn aggregator_v1_write_set(&self) -> HashMap<K, V> {
+        HashMap::new()
+    }
+
+    fn aggregator_v1_delta_set(&self) -> HashMap<K, DeltaOp> {
+        self.deltas.iter().cloned().collect()
     }
 
     fn get_events(&self) -> Vec<E> {

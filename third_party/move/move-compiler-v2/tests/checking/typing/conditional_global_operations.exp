@@ -26,7 +26,11 @@ module 0x42::M {
         BorrowGlobal(Mutable)<M::Pair<M::S, M::K>>(a1);
         Tuple()
     }
-    private fun ignore<T>(_x: T) {
+    private fun ignore<T>(_x: #0) {
+        Abort(0)
+    }
+    spec fun $ex<T>(s: &signer,a1: address);
+    spec fun $ignore<T>(_x: #0) {
         Abort(0)
     }
 } // end 0x42::M

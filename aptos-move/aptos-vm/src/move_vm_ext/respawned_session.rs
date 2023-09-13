@@ -7,6 +7,7 @@ use crate::{
     move_vm_ext::{SessionExt, SessionId},
 };
 use anyhow::{bail, Result};
+use aptos_gas_algebra::Fee;
 use aptos_state_view::{StateView, StateViewId, TStateView};
 use aptos_types::{
     state_store::{
@@ -30,6 +31,7 @@ pub struct RespawnedSession<'r, 'l> {
     #[borrows(resolver)]
     #[not_covariant]
     session: Option<SessionExt<'this, 'l>>,
+    pub storage_refund: Fee,
 }
 
 impl<'r, 'l> RespawnedSession<'r, 'l> {
@@ -38,6 +40,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         session_id: SessionId,
         base_state_view: &'r dyn StateView,
         previous_session_change_set: VMChangeSet,
+        storage_refund: Fee,
     ) -> Result<Self, VMStatus> {
         let state_view = ChangeSetStateView::new(base_state_view, previous_session_change_set)?;
 
@@ -51,6 +54,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
                 )
             },
             session_builder: |resolver| Some(vm.new_session(resolver, session_id)),
+            storage_refund,
         }
         .build())
     }
@@ -77,6 +81,10 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
             })?;
         Ok(change_set)
     }
+
+    pub fn get_storage_fee_refund(&self) -> Fee {
+        *self.borrow_storage_refund()
+    }
 }
 
 /// A state view as if a change set is applied on top of the base state view.
@@ -100,7 +108,7 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
 
     fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>> {
         // TODO: `get_state_value` should differentiate between different write types.
-        match self.change_set.aggregator_delta_set().get(state_key) {
+        match self.change_set.aggregator_v1_delta_set().get(state_key) {
             Some(delta_op) => Ok(delta_op
                 .try_into_write_op(self.base, state_key)?
                 .as_state_value()),
@@ -126,11 +134,11 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::delta_change_set::{delta_add, deserialize, serialize};
+    use aptos_aggregator::delta_change_set::{delta_add, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::write_set::WriteOp;
     use aptos_vm_types::check_change_set::CheckChangeSet;
-    use std::collections::BTreeMap;
+    use std::collections::HashMap;
 
     /// A mock for testing. Always succeeds on checking a change set.
     struct NoOpChangeSetChecker;
@@ -146,12 +154,11 @@ mod test {
     }
 
     fn write(v: u128) -> WriteOp {
-        WriteOp::Modification(serialize(&v))
+        WriteOp::Modification(serialize(&v).into())
     }
 
     fn read(view: &ChangeSetStateView, s: impl ToString) -> u128 {
-        let bytes = view.get_state_value(&key(s)).unwrap().unwrap().into_bytes();
-        deserialize(&bytes)
+        view.get_state_value_u128(&key(s)).unwrap().unwrap()
     }
 
     #[test]
@@ -167,23 +174,23 @@ mod test {
         base_view.set_legacy(key("aggregator_both"), serialize(&60));
         base_view.set_legacy(key("aggregator_delta_set"), serialize(&70));
 
-        let resource_write_set = BTreeMap::from([
+        let resource_write_set = HashMap::from([
             (key("resource_both"), write(80)),
             (key("resource_write_set"), write(90)),
         ]);
 
-        let module_write_set = BTreeMap::from([
+        let module_write_set = HashMap::from([
             (key("module_both"), write(100)),
             (key("module_write_set"), write(110)),
         ]);
 
-        let aggregator_write_set = BTreeMap::from([
+        let aggregator_write_set = HashMap::from([
             (key("aggregator_both"), write(120)),
             (key("aggregator_write_set"), write(130)),
         ]);
 
         let aggregator_delta_set =
-            BTreeMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
+            HashMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
         let change_set = VMChangeSet::new(
             resource_write_set,

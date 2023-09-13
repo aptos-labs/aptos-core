@@ -187,13 +187,12 @@ impl DeltaOp {
     ) -> anyhow::Result<WriteOp, VMStatus> {
         // In case storage fails to fetch the value, return immediately.
         let maybe_value = state_view
-            .get_state_value_bytes(state_key)
+            .get_state_value_u128(state_key)
             .map_err(|e| VMStatus::error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?;
 
         // Otherwise we have to apply delta to the storage value.
         match maybe_value {
-            Some(bytes) => {
-                let base = deserialize(&bytes);
+            Some(base) => {
                 self.apply_to(base)
                     .map_err(|partial_error| {
                         // If delta application fails, transform partial VM
@@ -202,7 +201,7 @@ impl DeltaOp {
                             .finish(Location::Module(AGGREGATOR_MODULE.clone()))
                             .into_vm_status()
                     })
-                    .map(|result| WriteOp::Modification(serialize(&result)))
+                    .map(|result| WriteOp::Modification(serialize(&result).into()))
             },
             // Something is wrong, the value to which we apply delta should
             // always exist. Guard anyway.
@@ -272,11 +271,6 @@ pub fn serialize(value: &u128) -> Vec<u8> {
     bcs::to_bytes(value).expect("unexpected serialization error in aggregator")
 }
 
-/// Deserializes value for delta application.
-pub fn deserialize(value_bytes: &[u8]) -> u128 {
-    bcs::from_bytes(value_bytes).expect("unexpected deserialization error in aggregator")
-}
-
 // Helper for tests, #[cfg(test)] doesn't work for cross-crate.
 pub fn delta_sub(v: u128, limit: u128) -> DeltaOp {
     DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v)
@@ -290,7 +284,7 @@ pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_language_e2e_tests::data_store::FakeDataStore;
+    use crate::AggregatorStore;
     use aptos_state_view::TStateView;
     use aptos_types::state_store::{
         state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -543,7 +537,7 @@ mod test {
 
     #[test]
     fn test_failed_write_op_conversion_because_of_empty_storage() {
-        let state_view = FakeDataStore::default();
+        let state_view = AggregatorStore::default();
         let delta_op = delta_add(10, 1000);
         assert_matches!(
             delta_op.try_into_write_op(&state_view, &KEY),
@@ -588,24 +582,24 @@ mod test {
 
     #[test]
     fn test_successful_write_op_conversion() {
-        let mut state_view = FakeDataStore::default();
-        state_view.set_legacy(KEY.clone(), serialize(&100));
+        let mut state_view = AggregatorStore::default();
+        state_view.set_from_state_key(KEY.clone(), 100);
 
         // Both addition and subtraction should succeed!
         let add_op = delta_add(100, 200);
         let sub_op = delta_sub(100, 200);
 
         let add_result = add_op.try_into_write_op(&state_view, &KEY);
-        assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200)));
+        assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200).into()));
 
         let sub_result = sub_op.try_into_write_op(&state_view, &KEY);
-        assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0)));
+        assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0).into()));
     }
 
     #[test]
     fn test_unsuccessful_write_op_conversion() {
-        let mut state_view = FakeDataStore::default();
-        state_view.set_legacy(KEY.clone(), serialize(&100));
+        let mut state_view = AggregatorStore::default();
+        state_view.set_from_state_key(KEY.clone(), 100);
 
         // Both addition and subtraction should fail!
         let add_op = delta_add(15, 100);

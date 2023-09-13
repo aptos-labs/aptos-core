@@ -16,6 +16,7 @@ use std::sync::Arc;
 pub struct GlobalExecutor<S: StateView + Sync + Send + 'static> {
     global_cross_shard_client: Arc<GlobalCrossShardClient>,
     executor_thread_pool: Arc<rayon::ThreadPool>,
+    concurrency_level: usize,
     phantom: std::marker::PhantomData<S>,
 }
 
@@ -33,6 +34,7 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
             global_cross_shard_client: cross_shard_client,
             executor_thread_pool,
             phantom: std::marker::PhantomData,
+            concurrency_level: num_threads,
         }
     }
 
@@ -40,7 +42,6 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
         &self,
         transactions: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
         state_view: &S,
-        concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         trace!("executing the last round in global executor",);
@@ -55,8 +56,12 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
             None,
             GLOBAL_ROUND_ID,
             state_view,
-            concurrency_level,
+            self.concurrency_level,
             maybe_block_gas_limit,
         )
+    }
+
+    pub fn get_executor_thread_pool(&self) -> Arc<rayon::ThreadPool> {
+        self.executor_thread_pool.clone()
     }
 }

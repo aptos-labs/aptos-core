@@ -61,6 +61,8 @@ impl StatelessPipeline for SigningPhase {
     type Request = SigningRequest;
     type Response = SigningResponse;
 
+    const NAME: &'static str = "signing";
+
     async fn process(&self, req: SigningRequest) -> SigningResponse {
         let SigningRequest {
             ordered_ledger_info,
