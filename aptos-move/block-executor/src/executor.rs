@@ -509,7 +509,7 @@ where
                                 versioned_cache,
                                 last_input_output,
                                 base_view,
-                                txn_provider.clone(),
+                                txn_provider,
                             );
                         }
                     }
