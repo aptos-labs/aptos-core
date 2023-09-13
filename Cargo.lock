@@ -1269,6 +1269,7 @@ dependencies = [
  "bcs 0.1.4",
  "clap 4.3.21",
  "crossbeam-channel",
+ "dashmap",
  "itertools",
  "num_cpus",
  "rand 0.7.3",

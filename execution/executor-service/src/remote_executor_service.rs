@@ -3,10 +3,9 @@
 
 use crate::{
     remote_cordinator_client::RemoteCoordinatorClient,
-    remote_cross_shard_client::RemoteCrossShardClient,
+    remote_cross_shard_client::RemoteCrossShardClient, remote_state_view::RemoteStateViewClient,
 };
 use aptos_secure_net::network_controller::NetworkController;
-use aptos_state_view::in_memory_state_view::InMemoryStateView;
 use aptos_types::block_executor::partitioner::ShardId;
 use aptos_vm::sharded_block_executor::sharded_executor_service::ShardedExecutorService;
 use std::{net::SocketAddr, sync::Arc};
@@ -15,7 +14,7 @@ use std::{net::SocketAddr, sync::Arc};
 /// the remote executor client and executes the block locally and returns the result.
 pub struct ExecutorService {
     controller: NetworkController,
-    executor_service: Arc<ShardedExecutorService<InMemoryStateView>>,
+    executor_service: Arc<ShardedExecutorService<RemoteStateViewClient>>,
 }
 
 impl ExecutorService {

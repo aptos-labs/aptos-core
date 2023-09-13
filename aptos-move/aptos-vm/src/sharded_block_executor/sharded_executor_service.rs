@@ -45,6 +45,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             rayon::ThreadPoolBuilder::new()
                 // We need two extra threads for the cross-shard commit receiver and the thread
                 // that is blocked on waiting for execute block to finish.
+                .thread_name(move |i| format!("sharded-executor-shard-{}-{}", shard_id, i))
                 .num_threads(num_threads + 2)
                 .build()
                 .unwrap(),
