@@ -122,6 +122,7 @@ members = [
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
     "mempool",
+    "network/benchmark",
     "network/builder",
     "network/discovery",
     "network/framework",
@@ -351,6 +352,7 @@ aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
 aptos-network = { path = "network/framework" }
+aptos-network-benchmark = { path = "network/benchmark" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
@@ -433,6 +435,7 @@ ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
 assert_approx_eq = "1.1.0"
 assert_unordered = "0.3.5"
+async-channel = "1.7.1"
 async-stream = "0.3"
 async-trait = "0.1.53"
 axum = "0.5.16"

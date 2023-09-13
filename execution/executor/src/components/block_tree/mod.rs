@@ -14,7 +14,7 @@ use crate::{
 use anyhow::{anyhow, ensure, Result};
 use aptos_consensus_types::block::Block as ConsensusBlock;
 use aptos_crypto::HashValue;
-use aptos_executor_types::{execution_output::ExecutionOutput, Error, LedgerUpdateOutput};
+use aptos_executor_types::{execution_output::ExecutionOutput, ExecutorError, LedgerUpdateOutput};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
@@ -204,7 +204,7 @@ impl BlockTree {
         let lookup_result = self.block_lookup.multi_get(ids)?;
 
         itertools::zip_eq(ids, lookup_result)
-            .map(|(id, res)| res.ok_or_else(|| Error::BlockNotFound(*id).into()))
+            .map(|(id, res)| res.ok_or_else(|| ExecutorError::BlockNotFound(*id).into()))
             .collect()
     }
 
