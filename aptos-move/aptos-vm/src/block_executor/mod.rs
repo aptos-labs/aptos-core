@@ -42,14 +42,20 @@ use std::{collections::HashMap, sync::Arc};
 use aptos_block_executor::executor_traits::BlockExecutor;
 use aptos_block_executor::fast_path_executor::FastPathBlockExecutor;
 use aptos_transaction_orderer::batch_orderer_with_window::SequentialDynamicWindowOrderer;
-use aptos_transaction_orderer::block_orderer::BatchedBlockOrdererWithWindow;
+use aptos_transaction_orderer::block_orderer::{BatchedBlockOrdererWithWindow, IdentityBlockOrderer};
 use aptos_transaction_orderer::orderer_adapters::{keep_last, parallel_compress_then_order};
 use aptos_transaction_orderer::reorder_then_execute::ReorderThenExecute;
+use move_core_types::account_address::AccountAddress;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
     type Key = StateKey;
     type Value = WriteOp;
+
+    fn sender_and_sequence_number(&self) -> Option<(AccountAddress, u64)> {
+        let PreprocessedTransaction::UserTransaction(txn) = self else { return None };
+        Some((txn.sender(), txn.sequence_number()))
+    }
 }
 
 // Wrapper to avoid orphan rule
@@ -237,14 +243,18 @@ impl BlockAptosVM {
             transaction_commit_listener,
         );
 
+        // let orderer = parallel_compress_then_order(
+        //     keep_last(BatchedBlockOrdererWithWindow::new(
+        //         SequentialDynamicWindowOrderer::default(),
+        //         num_txns,
+        //         1000,
+        //     )),
+        // );
+
+        let orderer = IdentityBlockOrderer::default();
+
         let reordered_block_stm = ReorderThenExecute::new(
-            parallel_compress_then_order(
-                keep_last(BatchedBlockOrdererWithWindow::new(
-                    SequentialDynamicWindowOrderer::default(),
-                    num_txns,
-                    1000,
-                )),
-            ),
+            orderer,
             block_stm,
         );
 

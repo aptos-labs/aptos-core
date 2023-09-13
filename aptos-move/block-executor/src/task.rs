@@ -12,6 +12,7 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp},
 };
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
+use move_core_types::account_address::AccountAddress;
 
 /// The execution result of a transaction
 #[derive(Debug)]
@@ -32,6 +33,8 @@ pub trait Transaction: Sync + Send + Clone + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
     type Value: Send + Sync + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
+
+    fn sender_and_sequence_number(&self) -> Option<(AccountAddress, u64)>;
 }
 
 /// Trait for objects that can be converted into transactions.
