@@ -351,7 +351,7 @@ aptos move view \
 echo "\n\nCad's USDC balance:"
 sleep 2
 aptos move view \
-    --args address:$BEE_ADDR \
+    --args address:$CAD_ADDR \
     --function-id $BALANCE \
     --type-args $USDC_COIN_TYPE \
     --profile cad
