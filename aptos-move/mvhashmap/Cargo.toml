@@ -24,6 +24,7 @@ crossbeam = { workspace = true }
 dashmap = { workspace = true }
 
 [dev-dependencies]
+aptos-aggregator = { workspace = true, features = ["testing"] }
 claims = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }

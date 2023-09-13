@@ -25,7 +25,7 @@ aptos-secure-net = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
-aptos-vm = { workspace = true, features = ["testing"] }
+aptos-vm = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 crossbeam-channel = { workspace = true }

@@ -192,6 +192,11 @@ pub fn start(
     // Instantiate the global logger
     let (remote_log_receiver, logger_filter_update) = logger::create_logger(&config, log_file);
 
+    assert!(
+        !cfg!(feature = "testing") && !cfg!(feature = "fuzzing"),
+        "Testing features shouldn't be compiled"
+    );
+
     // Ensure failpoints are configured correctly
     if fail::has_failpoints() {
         warn!("Failpoints are enabled!");

@@ -39,6 +39,7 @@ proptest-derive = { workspace = true, optional = true }
 rayon = { workspace = true }
 
 [dev-dependencies]
+aptos-aggregator = { workspace = true, features = ["testing"] }
 criterion = { workspace = true }
 itertools = { workspace = true }
 proptest = { workspace = true }
