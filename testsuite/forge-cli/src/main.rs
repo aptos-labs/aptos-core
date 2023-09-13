@@ -1658,6 +1658,10 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             helm_values["validator"]["resources"]["requests"]["cpu"] = 48.into();
             helm_values["validator"]["resources"]["limits"]["memory"] = "72Gi".into();
             helm_values["validator"]["resources"]["requests"]["memory"] = "72Gi".into();
+            helm_values["fullnode"]["resources"]["limits"]["cpu"] = 48.into();
+            helm_values["fullnode"]["resources"]["requests"]["cpu"] = 48.into();
+            helm_values["fullnode"]["resources"]["limits"]["memory"] = "72Gi".into();
+            helm_values["fullnode"]["resources"]["requests"]["memory"] = "72Gi".into();
 
             // higher concurrency level
             helm_values["validator"]["config"]["execution"]["concurrency_level"] = 32.into();
@@ -1678,7 +1682,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 200.into();
 
             helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
-                ["backlog_txn_limit_count"] = 100000.into();
+                ["backlog_txn_limit_count"] = u64::MAX.into();
             helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
                 ["backlog_per_validator_batch_limit_count"] = 10.into();
 
