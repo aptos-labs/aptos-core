@@ -117,29 +117,12 @@ These result in the following periods:
 
 # Demo script
 
-Build the Docker image:
+Start the Docker compose:
 
-> This might take a while, since it compiles several Aptos binaries from source.
+> This might take a while the first time, since it compiles several Aptos binaries from source.
 
 ```sh
 # From aptos-core root
-EXAMPLE_DIR=./aptos-move/move-examples/lockstream
-docker build . -f "$EXAMPLE_DIR/Dockerfile" -t lockstream-example
+docker compose --file aptos-move/move-examples/lockstream/docker-compose.yaml up
 ```
-
-Start a local chain, then run the Python script against it:
-
-```sh
-chain_container=$(docker run \
-    --detach \
-    --publish 8080:8080 \
-    lockstream-example \
-    aptos node run-local-testnet --test-dir /app/data)
-docker run \
-    --volume $EXAMPLE_DIR:/app/scripts \
-    --network host \
-    --workdir /app \
-    lockstream-example \
-    poetry run python scripts/example.py
-docker stop $chain_container
-```
+Then press Ctrl+C to shut down the local testnet.

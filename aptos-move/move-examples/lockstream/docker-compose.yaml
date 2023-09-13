@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+
+  chain:
+    build:
+      context: ../../../
+      dockerfile: aptos-move/move-examples/lockstream/Dockerfile
+    command: aptos node run-local-testnet --test-dir /app/data/
+    ports: ["8080:8080"]
+
+  cli:
+    build:
+      context: ../../../
+      dockerfile: aptos-move/move-examples/lockstream/Dockerfile
+    command: /bin/sh -c ". /cli-commands.sh"
+    depends_on: [chain]
+    volumes: ["./cli-commands.sh:/cli-commands.sh"]

@@ -1,9 +1,0 @@
-[tool.poetry]
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-description = "Lockstream example"
-name = "lockstream-example"
-version = "0.1.0"
-
-[tool.poetry.dependencies]
-aptos-sdk = "0.7.1"
-python = ">=3.8.1,<4.0"
