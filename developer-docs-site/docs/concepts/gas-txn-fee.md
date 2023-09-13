@@ -28,7 +28,7 @@ See [How Base Gas Works](./base-gas.md) for a detailed description of gas fee ty
 👉 A **unit of gas** is a dimensionless number or a unit that is not associated with any one item such as a coin, expressed as an integer. The total gas units consumed by your transaction depend on the complexity of your transaction. The **gas price**, on the other hand, is expressed in terms of Aptos blockchain’s native coin (Octas). Also see [Transactions and States](txns-states.md) for how a transaction submitted to the Aptos blockchain looks like.
 :::
 
-## <a name="fee_statement" />The Fee Statement
+## The Fee Statement
 
 Starting from Aptos Framework release 1.7, the break down of the fee charges and refund relavent to a user transaction is represented by struct `0x1::transaction_fee::FeeStatement` and emitted as a module event.
 
@@ -133,7 +133,7 @@ We are aware of the confusion this might create, and plan to present these as se
 
 If a transaction deletes state items, a refund is issued to the transaction payer for the released storage slots. Currently a full refund for the fee charged for the slot is issued, not including any fee charged for the execess bytes beyond a configurable quota (for e.g. 1KB). There's no refund for storage fee charged for event emittions.
 
-Note that the amount of refund is in APT value, and is not converted to gas units or reflected as part of the total `gas_used`. The amount is separately represented in the `storage_fee_refund_octas` field of the [`FeeStatement`](#fee_statement). As a result, the net effect of a transaction to the transaction payer's APT balance is `gas_used * gas_unit_price - storage_refund` -- a charge off the account balance if this number is positive or a deposit if it's negative. 
+Note that the amount of refund is in APT value, and is not converted to gas units or reflected as part of the total `gas_used`. The amount is separately represented in the `storage_fee_refund_octas` field of the [`FeeStatement`](#the-fee-statement). As a result, the net effect of a transaction to the transaction payer's APT balance is `gas_used * gas_unit_price - storage_refund` -- a charge off the account balance if this number is positive or a deposit if it's negative. 
 
 
 ## Examples
