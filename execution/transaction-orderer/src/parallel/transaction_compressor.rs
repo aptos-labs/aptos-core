@@ -8,12 +8,12 @@ use std::{
     hash::Hash,
     sync::{
         atomic::{AtomicU32, Ordering::SeqCst},
-        Arc,
     },
 };
 
 pub struct ParallelTransactionCompressor<K> {
     key_mapping: DashMap<K, CompressedKey>,
+    // TODO: consider using thread-local counters instead of atomic.
     next_key: AtomicU32,
 }
 
@@ -61,7 +61,7 @@ impl<K: Hash + Clone + Eq + Send + Sync> ParallelTransactionCompressor<K> {
                 let delta_set = tx.delta_set().map(|key| self.map_key(key)).collect();
 
                 CompressedHintsTransaction {
-                    original: Arc::new(tx),
+                    original: tx,
                     read_set,
                     write_set,
                     delta_set,

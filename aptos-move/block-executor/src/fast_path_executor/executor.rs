@@ -13,11 +13,10 @@ use crate::{
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     transaction_hints::TransactionWithHints,
 };
-use anyhow::Result;
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::TStateView;
-use aptos_types::{rayontools::ExtendRef, write_set::WriteOp};
+use aptos_types::{write_set::WriteOp};
 use crossbeam::atomic::AtomicCell;
 use futures::channel::oneshot;
 use itertools::Itertools;
@@ -28,15 +27,21 @@ use rayon::{
 };
 use std::{marker::PhantomData, sync::Arc};
 use thread_local::ThreadLocal;
+use aptos_infallible::Mutex;
+use aptos_types::rayontools::ParExtendByRefTrait;
+use crate::errors::Error;
 
 #[allow(dead_code)] // TODO: handle `maybe_block_gas_limit` properly
 pub struct FastPathBlockExecutor<T: Transaction, E, FB> {
     // TODO: consider getting rid of a fixed batch size.
     batch_size: usize,
 
+    // TODO: maybe remove this parameter and expect caller to install the thread pool they want?
     executor_thread_pool: Arc<ThreadPool>,
     maybe_block_gas_limit: Option<u64>,
-    fallback: FB,
+
+    // Mutex is used to avoid having to require FB to implement `Sync`
+    fallback: Mutex<FB>,
 
     phantom: PhantomData<(T, E)>,
 }
@@ -44,10 +49,14 @@ pub struct FastPathBlockExecutor<T: Transaction, E, FB> {
 impl<T, E, FB> FastPathBlockExecutor<T, E, FB>
 where
     T: Transaction + Send + Sync,
-    E: ExecutorTask<Txn = T> + Send + Sync + 'static,
+    E: ExecutorTask<Txn = T> + Send + Sync,
     E::Output: Send,
-    FB: HintedBlockExecutor<TransactionWithHints<T>, Txn = T, ExecutorTask = E>,
-    anyhow::Error: From<E::Error> + From<FB::Error>,
+    FB: Send + HintedBlockExecutor<
+        HintedTxn = TransactionWithHints<T>,
+        Txn = T,
+        ExecutorTask = E,
+        Error = Error<E::Error>,
+    >,
 {
     pub fn new(
         batch_size: usize,
@@ -59,7 +68,7 @@ where
             batch_size,
             executor_thread_pool,
             maybe_block_gas_limit,
-            fallback,
+            fallback: Mutex::new(fallback),
             phantom: PhantomData,
         }
     }
@@ -69,10 +78,10 @@ where
         txn_idx: TxnIndex,
         executor_task: &E,
         state_view: &impl TStateView<Key = T::Key>,
-        accumulators_snapshot: &impl WritableStateView<Key = T::Key, Value = T::Value>,
+        aggregators_snapshot: &impl WritableStateView<Key = T::Key, Value = T::Value>,
         write_reservations: &impl ReservationTable<T::Key>,
         delta_reservations: &impl ReservationTable<T::Key>,
-    ) -> Result<TxnExecutionInfo<E>> {
+    ) -> Result<TxnExecutionInfo<E>, Error<E::Error>> {
         // TODO: eventually, we may need to add extra logic to preserve source order if
         //       we change the commit rule. For now, the current commit rule ensures it
         //       out of the box.
@@ -85,7 +94,9 @@ where
         let (skip_rest, output) = match execute_result {
             ExecutionStatus::Success(output) => (false, output),
             ExecutionStatus::SkipRest(output) => (true, output),
-            ExecutionStatus::Abort(err) => return Err(err.into()),
+
+            // TODO: check if this is correct.
+            ExecutionStatus::Abort(err) => return Err(Error::UserError(err)),
         };
 
         let write_keys = (output.resource_write_set().into_keys())
@@ -95,14 +106,16 @@ where
         }
 
         for k in output.aggregator_v1_delta_set().into_keys() {
-            // As accumulators can be highly contended, first check if the snapshot
-            // of this accumulator has already been made and only proceed to making
+            // As aggregators can be highly contended, first check if the snapshot
+            // of this aggregator has already been made and only proceed to making
             // the snapshot otherwise.
-            if let None = accumulators_snapshot.get_state_value_u128(&k)? {
+            // TODO: check if `expect` is justified here.
+            if let None = aggregators_snapshot.get_state_value_u128(&k).expect("Failed to read an aggregator") {
                 let val = state_view
-                    .get_state_value_u128(&k)?
-                    .ok_or(anyhow::Error::msg("Writing to a non-existent accumulator"))?;
-                accumulators_snapshot.write_u128(k.clone(), val);
+                    .get_state_value_u128(&k)
+                    .expect("Failed to read an aggregator")
+                    .expect("Writing to a non-existent aggregator");
+                aggregators_snapshot.write_u128(k.clone(), val);
             }
 
             delta_reservations.make_reservation(k, txn_idx);
@@ -114,7 +127,7 @@ where
             output,
             skip_rest,
             txn_idx,
-            phantom: PhantomData,
+            _phantom: PhantomData,
         })
     }
 
@@ -123,10 +136,10 @@ where
         worker_states: &ThreadLocal<E>,
         executor_arguments: &E::Argument,
         state_view: &(impl TStateView<Key = T::Key> + Sync),
-        accumulators_snapshot: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
+        aggregators_snapshot: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
         write_reservations: &(impl ReservationTable<T::Key> + Sync),
         delta_reservations: &(impl ReservationTable<T::Key> + Sync),
-    ) -> Result<Vec<TxnExecutionInfo<E>>> {
+    ) -> Result<Vec<TxnExecutionInfo<E>>, Error<E::Error>> {
         transactions
             .into_par_iter()
             .map_init(
@@ -137,7 +150,7 @@ where
                         txn_idx as TxnIndex,
                         executor_task,
                         state_view,
-                        accumulators_snapshot,
+                        aggregators_snapshot,
                         write_reservations,
                         delta_reservations,
                     )
@@ -161,7 +174,7 @@ where
                 }
             }
 
-            // A transaction cannot be committed if it reads an accumulator that was updated
+            // A transaction cannot be committed if it reads an aggregator that was updated
             // by a smaller-id transaction in the same batch.
             if let Some(reservation) = delta_reservations.get_reservation(k) {
                 if reservation < txn_idx {
@@ -170,14 +183,14 @@ where
             }
         }
 
-        // TODO: later we will need to add accumulator overflow detection
+        // TODO: later we will need to add aggregator overflow detection
         true
     }
 
     fn apply_transaction_output(
         txn_output: &E::Output,
         state: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
-    ) -> Result<()> {
+    ) -> Result<(), Error<E::Error>> {
         let txn_writes = (txn_output.resource_write_set().into_iter())
             .chain(txn_output.aggregator_v1_write_set());
 
@@ -186,7 +199,8 @@ where
         }
 
         for (k, delta_op) in txn_output.aggregator_v1_delta_set() {
-            state.apply_delta(&k, &delta_op)?;
+            // TODO: check if `expect` is justified here.
+            state.apply_delta(&k, &delta_op).expect("Aggregator application error");
         }
 
         Ok(())
@@ -198,13 +212,12 @@ where
         delta_reservations: &(impl ReservationTable<T::Key> + Sync),
         output_view: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
         discarded_txns: &mut Vec<TransactionWithHints<T>>,
-    ) -> Result<Vec<TxnExecutionInfo<E>>> {
-        let error: AtomicCell<Option<anyhow::Error>> = AtomicCell::new(None);
+    ) -> Result<Vec<E::Output>, Error<E::Error>> {
+        let error: AtomicCell<Option<Error<E::Error>>> = AtomicCell::new(None);
 
-        let mut selected_txns_info = Vec::new();
+        let mut selected_txn_outputs = Vec::with_capacity(execution_results.len());
 
-        let discarded_txns = ExtendRef::new(discarded_txns);
-        (ExtendRef::new(&mut selected_txns_info), discarded_txns).par_extend(
+        (selected_txn_outputs.by_ref(), discarded_txns.by_ref()).par_extend(
             execution_results.into_par_iter().map(|exec_info| {
                 let commit =
                     Self::validate_transaction(&exec_info, write_reservations, delta_reservations);
@@ -214,7 +227,7 @@ where
                     if let Err(e) = err {
                         error.store(Some(e));
                     }
-                    Left(exec_info)
+                    Left(exec_info.output)
                 } else {
                     let TxnExecutionInfo {
                         transaction,
@@ -239,13 +252,13 @@ where
             return Err(e);
         }
 
-        Ok(selected_txns_info)
+        Ok(selected_txn_outputs)
     }
 
-    fn materialize_deltas<'data>(
-        outputs_in_serialization_order: impl IntoIterator<Item = &'data E::Output>,
+    fn materialize_deltas(
+        outputs_in_serialization_order: &Vec<E::Output>,
         base_view: impl TStateView<Key = T::Key>,
-    ) -> Result<()> {
+    ) -> Result<(), Error<E::Error>> {
         let updated_view = DashMapStateView::<_, T::Value, _>::new(base_view);
 
         for output in outputs_in_serialization_order {
@@ -253,10 +266,12 @@ where
                 .aggregator_v1_delta_set()
                 .into_iter()
                 .map(|(k, delta)| {
-                    let new_value = updated_view.apply_delta(&k, &delta)?;
+                    // TODO: check if `expect` is justified here.
+                    let new_value = updated_view.apply_delta(&k, &delta)
+                        .expect("Delta application error");
                     Ok((k, WriteOp::Modification(serialize(&new_value))))
                 })
-                .collect::<Result<Vec<_>>>()?;
+                .collect::<Result<Vec<_>, Error<E::Error>>>()?;
 
             output.incorporate_delta_writes(delta_writes);
         }
@@ -270,28 +285,28 @@ where
         executor_arguments: &E::Argument,
         writable_view: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
         discarded_txns: &mut Vec<TransactionWithHints<T>>,
-    ) -> Result<oneshot::Receiver<Vec<E::Output>>> {
+    ) -> Result<oneshot::Receiver<Vec<E::Output>>, Error<E::Error>> {
         let write_reservations = DashMapReservationTable::with_capacity(4 * self.batch_size);
-        // Accumulators are often highly contended. Using OptimisticDashMapReservationTable allows
+        // Aggregators are often highly contended. Using OptimisticDashMapReservationTable allows
         // avoiding having all transactions compete for the same write lock.
         let delta_reservations =
             OptimisticDashMapReservationTable::with_capacity(2 * self.batch_size);
 
         let worker_states = ThreadLocal::new();
 
-        let accumulators_snapshot = DashMapStateView::new(EmptyStateView::new());
+        let aggregators_snapshot = DashMapStateView::new(EmptyStateView::new());
 
         let execution_results = Self::execute_transactions_in_parallel(
             transactions,
             &worker_states,
             executor_arguments,
             &writable_view.as_state_view(),
-            &accumulators_snapshot,
+            &aggregators_snapshot,
             &write_reservations,
             &delta_reservations,
         )?;
 
-        let selected_results = Self::validate_and_apply_transactions_in_parallel(
+        let selected_outputs = Self::validate_and_apply_transactions_in_parallel(
             execution_results,
             &write_reservations,
             &delta_reservations,
@@ -302,23 +317,17 @@ where
         let (done_tx, done_rx) = oneshot::channel::<Vec<E::Output>>();
 
         // Materialize deltas asynchronously, off the critical path.
-        // Take the ownership of the committed outputs for the materialization and then
+        // Take the ownership of the selected outputs for the materialization and then
         // return it via the channel.
         rayon::spawn(move || {
+            // TODO: potentially handle the materialization errors.
             Self::materialize_deltas(
-                selected_results.iter().map(|info| &info.output),
-                accumulators_snapshot,
+                &selected_outputs,
+                aggregators_snapshot,
             )
-            .unwrap(); // TODO: potentially handle the materialization errors
+            .expect("Failed to materialize aggregators");
 
-            done_tx
-                .send(
-                    selected_results
-                        .into_iter()
-                        .map(|info| info.output)
-                        .collect(),
-                )
-                .unwrap();
+            done_tx.send(selected_outputs).unwrap();
         });
 
         Ok(done_rx)
@@ -331,7 +340,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: Vec<T>,
         base_view: &(impl TStateView<Key = T::Key> + Sync),
-    ) -> Result<Vec<E::Output>> {
+    ) -> Result<Vec<E::Output>, Error<E::Error>> {
         let block_size = signature_verified_block.len();
         let batch_count = (block_size + self.batch_size - 1) / self.batch_size;
 
@@ -365,9 +374,8 @@ where
             .collect();
 
         // Execute the discarded transactions with the fallback executor.
-        let fallback_outputs =
-            self.fallback
-                .execute_block_hinted(executor_arguments, discarded_txns, &state)?;
+        let fallback_outputs = (self.fallback.lock())
+            .execute_block_hinted(executor_arguments, discarded_txns, &state)?;
 
         committed_outputs.push(fallback_outputs);
 
@@ -383,15 +391,15 @@ struct TxnExecutionInfo<E: ExecutorTask> {
     skip_rest: bool,
     txn_idx: TxnIndex,
 
-    phantom: PhantomData<E>,
+    _phantom: PhantomData<E>,
 }
 
 impl<T, E, FB> BlockExecutorBase for FastPathBlockExecutor<T, E, FB>
 where
     T: Transaction,
-    E: ExecutorTask<Txn = T> + Send + 'static,
+    E: ExecutorTask<Txn = T> + Send,
 {
-    type Error = anyhow::Error;
+    type Error = Error<E::Error>;
     type ExecutorTask = E;
     type Txn = T;
 }
@@ -399,16 +407,20 @@ where
 impl<T, E, FB> BlockExecutor for FastPathBlockExecutor<T, E, FB>
 where
     T: Transaction,
-    E: ExecutorTask<Txn = T> + Send + 'static,
-    FB: HintedBlockExecutor<TransactionWithHints<T>, Txn = T, ExecutorTask = E> + Sync,
-    anyhow::Error: From<E::Error> + From<FB::Error>,
+    E: ExecutorTask<Txn = T> + Send,
+    FB: Send + HintedBlockExecutor<
+        HintedTxn = TransactionWithHints<T>,
+        Txn = T,
+        ExecutorTask = E,
+        Error = Error<E::Error>,
+    >,
 {
     fn execute_block<S: TStateView<Key = T::Key> + Sync>(
         &self,
         executor_arguments: E::Argument,
         signature_verified_block: Vec<T>,
         base_view: &S,
-    ) -> Result<Vec<E::Output>> {
+    ) -> Result<Vec<E::Output>, Error<E::Error>> {
         self.executor_thread_pool.install(|| {
             self.execute_block_impl(executor_arguments, signature_verified_block, base_view)
         })

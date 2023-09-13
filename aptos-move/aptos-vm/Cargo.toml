@@ -32,6 +32,7 @@ aptos-mvhashmap = { workspace = true }
 aptos-native-interface = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-table-natives = { workspace = true }
+aptos-transaction-orderer = { workspace = true }
 aptos-types = { workspace = true }
 aptos-utils = { workspace = true }
 aptos-vm-logging = { workspace = true }

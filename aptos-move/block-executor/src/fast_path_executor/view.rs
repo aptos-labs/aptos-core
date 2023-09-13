@@ -22,7 +22,7 @@ pub trait WritableStateView: TStateView {
     fn write_u128(&self, k: Self::Key, v: u128);
 
     /// Applies the delta to the value associated with key `k`.
-    /// Returns the new value of the accumulator or an error in case of an overflow.
+    /// Returns the new value of the aggregator or an error in case of an overflow.
     fn apply_delta(&self, k: &Self::Key, delta: &DeltaOp) -> Result<u128>;
 
     fn as_state_view(&self) -> NonWritableView<Self> {
@@ -117,11 +117,11 @@ pub struct DashMapStateView<K, V, S> {
     updates: DashMap<K, CachedValue<V>>,
 }
 
-/// If a value is an accumulator, it is stored as an integer to avoid repeated
+/// If a value is an aggregator, it is stored as an integer to avoid repeated
 /// serialization-deserialization overhead.
 enum CachedValue<V> {
     RawValue(V),
-    Accumulator(u128),
+    Aggregator(u128),
 }
 
 impl<K, V, S> DashMapStateView<K, V, S>
@@ -163,7 +163,7 @@ where
                 CachedValue::RawValue(v) => {
                     Ok(Some(AggregatorValue::from_write(v).unwrap().into()))
                 },
-                CachedValue::Accumulator(v) => Ok(Some(*v)),
+                CachedValue::Aggregator(v) => Ok(Some(*v)),
             }
         } else {
             self.base_view.get_state_value_u128(state_key)
@@ -174,7 +174,7 @@ where
         if let Some(value_ref) = self.updates.get(state_key) {
             match value_ref.value() {
                 CachedValue::RawValue(v) => Ok(v.extract_raw_bytes()),
-                CachedValue::Accumulator(v) => Ok(Some(serialize(v))),
+                CachedValue::Aggregator(v) => Ok(Some(serialize(v))),
             }
         } else {
             self.base_view.get_state_value_bytes(state_key)
@@ -185,7 +185,7 @@ where
         if let Some(value_ref) = self.updates.get(state_key) {
             match value_ref.value() {
                 CachedValue::RawValue(v) => Ok(v.as_state_value()),
-                CachedValue::Accumulator(v) => Ok(Some(StateValue::new_legacy(serialize(v)))),
+                CachedValue::Aggregator(v) => Ok(Some(StateValue::new_legacy(serialize(v)))),
             }
         } else {
             self.base_view.get_state_value(state_key)
@@ -210,11 +210,11 @@ where
     }
 
     fn write_u128(&self, k: K, v: u128) {
-        self.updates.insert(k, CachedValue::Accumulator(v));
+        self.updates.insert(k, CachedValue::Aggregator(v));
     }
 
     /// Applies the delta to the value associated with key `k`.
-    /// Returns the new value of the accumulator or an error in case of an overflow.
+    /// Returns the new value of the aggregator or an error in case of an overflow.
     fn apply_delta(&self, k: &K, delta: &DeltaOp) -> Result<u128> {
         match self.updates.entry(k.clone()) {
             Entry::Occupied(mut entry) => {
@@ -224,11 +224,11 @@ where
                         // TODO: check if unwrap is appropriate here.
                         AggregatorValue::from_write(raw_value).unwrap().into()
                     },
-                    CachedValue::Accumulator(int_value) => *int_value,
+                    CachedValue::Aggregator(int_value) => *int_value,
                 };
 
                 let new_value = delta.apply_to(old_value)?;
-                entry.insert(CachedValue::Accumulator(new_value));
+                entry.insert(CachedValue::Aggregator(new_value));
                 Ok(new_value)
             },
             Entry::Vacant(entry) => {
@@ -236,7 +236,7 @@ where
                 // TODO: check if unwrap is appropriate here.
                 let base_value = self.base_view.get_state_value_u128(k)?.unwrap();
                 let new_value = delta.apply_to(base_value)?;
-                entry.insert(CachedValue::Accumulator(new_value));
+                entry.insert(CachedValue::Aggregator(new_value));
                 Ok(new_value)
             },
         }

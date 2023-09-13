@@ -6,17 +6,17 @@ pub(crate) mod vm_wrapper;
 
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
+    AptosVM,
     block_executor::vm_wrapper::AptosExecutorTask,
     counters::{
         BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS,
         BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS,
     },
-    AptosVM,
 };
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_block_executor::{
     errors::Error,
-    executor::{BlockExecutor, BlockSTMExecutor},
+    executor::BlockSTMExecutor,
     task::{
         Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
@@ -39,6 +39,12 @@ use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::{collections::HashMap, sync::Arc};
+use aptos_block_executor::executor_traits::BlockExecutor;
+use aptos_block_executor::fast_path_executor::FastPathBlockExecutor;
+use aptos_transaction_orderer::batch_orderer_with_window::SequentialDynamicWindowOrderer;
+use aptos_transaction_orderer::block_orderer::BatchedBlockOrdererWithWindow;
+use aptos_transaction_orderer::orderer_adapters::{keep_last, parallel_compress_then_order};
+use aptos_transaction_orderer::reorder_then_execute::ReorderThenExecute;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
@@ -219,31 +225,35 @@ impl BlockAptosVM {
 
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
 
-        let executor = BlockSTMExecutor::<
+        let block_stm = BlockSTMExecutor::<
             PreprocessedTransaction,
             AptosExecutorTask<S>,
-            S,
             L,
             ExecutableTestType,
         >::new(
             concurrency_level,
-            executor_thread_pool,
+            executor_thread_pool.clone(),
             maybe_block_gas_limit,
             transaction_commit_listener,
         );
 
-        // let fast_path_executor = FastPathBlockExecutor::with_fallback(
-        //     executor_thread_pool,
-        //     maybe_block_gas_limit,
-        //     fallback_executor,
-        // );
+        let reordered_block_stm = ReorderThenExecute::new(
+            parallel_compress_then_order(
+                keep_last(BatchedBlockOrdererWithWindow::new(
+                    SequentialDynamicWindowOrderer::default(),
+                    num_txns,
+                    1000,
+                )),
+            ),
+            block_stm,
+        );
 
-        // let executor = aptos_block_executor::mock_executors::RunAllOnceInParallel::<
-        //     PreprocessedTransaction,
-        //     AptosExecutorTask<S>,
-        //     S,
-        //     ExecutableTestType,
-        // >::new(executor_thread_pool);
+        let executor = FastPathBlockExecutor::new(
+            (num_txns / 20).min(50).max(1000),
+            executor_thread_pool.clone(),
+            maybe_block_gas_limit,
+            reordered_block_stm,
+        );
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {

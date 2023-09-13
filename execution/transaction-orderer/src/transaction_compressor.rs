@@ -1,13 +1,13 @@
 // Copyright © Aptos Foundation
 
 use aptos_block_executor::transaction_hints::TransactionHints;
-use std::{collections::HashMap, hash::Hash, sync::Arc};
+use std::{collections::HashMap, hash::Hash};
 
 pub type CompressedKey = u32;
 
 #[derive(Clone, Default)]
 pub struct CompressedHintsTransaction<T> {
-    pub original: Arc<T>,
+    pub original: T,
     pub read_set: Vec<CompressedKey>,
     pub write_set: Vec<CompressedKey>,
     pub delta_set: Vec<CompressedKey>,
@@ -77,7 +77,7 @@ impl<K: Hash + Clone + Eq> TransactionCompressor<K> {
             let delta_set = tx.delta_set().map(|key| self.map_key(key)).collect();
 
             res.push(CompressedHintsTransaction {
-                original: Arc::new(tx),
+                original: tx,
                 read_set,
                 write_set,
                 delta_set,

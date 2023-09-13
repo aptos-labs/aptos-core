@@ -20,6 +20,7 @@ aptos-block-partitioner = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }

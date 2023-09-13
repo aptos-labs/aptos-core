@@ -32,14 +32,14 @@ pub trait BlockExecutor: BlockExecutorBase {
 }
 
 /// Trait for block executors that accept transactions with hints about the keys they may access.
-pub trait HintedBlockExecutor<HT>: BlockExecutorBase
-where
-    HT: TransactionHints<Key = <Self::Txn as Transaction>::Key> + IntoTransaction<Txn = Self::Txn>,
-{
+pub trait HintedBlockExecutor: BlockExecutorBase {
+    type HintedTxn: TransactionHints<Key = <Self::Txn as Transaction>::Key>
+        + IntoTransaction<Txn = Self::Txn>;
+
     fn execute_block_hinted<S: TStateView<Key = <Self::Txn as Transaction>::Key> + Sync>(
         &self,
         executor_arguments: <Self::ExecutorTask as ExecutorTask>::Argument,
-        hinted_transactions: Vec<HT>,
+        hinted_transactions: Vec<Self::HintedTxn>,
         base_view: &S,
     ) -> Result<Vec<<Self::ExecutorTask as ExecutorTask>::Output>, Self::Error>;
 }
