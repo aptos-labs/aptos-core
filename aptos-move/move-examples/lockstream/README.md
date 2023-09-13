@@ -164,22 +164,28 @@ Period times:
 
 ## Running the example
 
-Start the Docker compose:
+Running the Docker compose your first time:
 
 > This might take a while the first time, since it compiles several Aptos binaries from source.
 
 ```sh
-# From aptos-core root
-docker compose --file aptos-move/move-examples/lockstream/docker-compose.yaml up
+# From inside aptos-move/move-examples/lockstream
+docker compose --file docker-compose.yaml up
 ```
 
 Then press Ctrl+C to shut down the local testnet.
 
-(Pro tip) If you want to experiment with the example use the following to clear all containers and images, composing directly from the Docker build cache:
+To run the example again with new containers (fresh chain state) each time:
+
+```sh
+# From inside aptos-move/move-examples/lockstream
+docker compose --file docker-compose.yaml up --force-recreate
+```
+
+(Pro tip) If you want to experiment with the example, use the following to clear all containers and images, composing directly from the Docker build cache:
 
 ```sh
 docker rm -vf $(docker ps -aq)
 docker rmi -f $(docker images -aq)
-clear
-docker compose --file aptos-move/move-examples/lockstream/docker-compose.yaml up
+docker compose --file docker-compose.yaml up
 ```
