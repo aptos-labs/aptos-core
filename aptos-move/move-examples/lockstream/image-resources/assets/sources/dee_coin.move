@@ -40,13 +40,13 @@ module dee::dee_coin {
         coin::register<DeeCoin>(account)
     }
 
-    public entry fun mint<CoinType>(
+    public entry fun mint(
         account: &signer,
         amount: u64,
     ) acquires CapabilityStore {
         assert!(signer::address_of(account) == @dee, E_NOT_DEE);
         let mint_cap_ref =
-            &borrow_global<CapabilityStore<CoinType>>(@dee).mint_cap;
+            &borrow_global<CapabilityStore<DeeCoin>>(@dee).mint_cap;
         coin::deposit(@dee, coin::mint(amount, mint_cap_ref));
     }
 }

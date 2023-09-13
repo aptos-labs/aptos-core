@@ -58,7 +58,7 @@ RUN aptos node run-local-testnet \
         --package-dir $ASSETS_PACKAGE \
         --profile dee
 
-# Copy over chain state, accounts and profile info.
+# Copy chain state and accounts, update REST URL for docker compose.
 FROM run-cli
 ARG ACCOUNTS
 COPY --from=init-chain-state /app/data /app/data

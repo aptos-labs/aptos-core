@@ -115,7 +115,54 @@ These result in the following periods:
 | Premier sweep period   | Claim last call time $< t \leq$ Premier sweep last call time |
 | Mercenary sweep period | Premier sweep last call time $< t$                           |
 
-# Demo script
+# Example demo
+
+## Overview
+
+The example demo compiles an Aptos CLI from source and uses it to run a local testnet.
+
+Local vanity address keys for `Ace`, `Bee`, `Cad`, and `Dee` (generated using [Econia Labs `optivanity`](<>), and used to fund the accounts with `APT` during the image build phase.
+
+The coin types `DeeCoin` and `USDC` are published under `Dee`'s account, which creates the Lockstream and seeds it with `10000` `DeeCoin`.
+
+Ace, Bee, and Cad lock `USDC` as follows:
+
+|                   | Ace | Bee | Cad |
+| ----------------- | --- | --- | --- |
+| Lock txn 1        | 100 |     |     |
+| Lock txn 2        |     | 200 |     |
+| Lock txn 3        |     |     | 300 |
+| Lock txn 4        | 400 |     |     |
+| Total USDC locked | 500 | 200 | 300 |
+
+Hence each locker is entitled to their pro rata share of `DeeCoin`:
+
+| Ace  | Bee  | Cad  |
+| ---- | ---- | ---- |
+| 5000 | 2000 | 3000 |
+
+Period times:
+
+| Period                | Time in seconds |
+| --------------------- | --------------- |
+| Locking period        | 20              |
+| Streaming period      | 60              |
+| Claiming grace period | 30              |
+| Premier sweep period  | 30              |
+
+(For simplicity, sweep operations are not demonstrated during the demo).
+
+`DeeCoin` claim amounts
+
+| Time (s) since stream period start | Ace  | Bee  | Cad  |
+| ---------------------------------- | ---- | ---- | ---- |
+| 15                                 | 1250 |      |      |
+| 30                                 |      | 1000 |      |
+| 45                                 |      |      | 2250 |
+| 60                                 | 3750 |      |      |
+| 70                                 |      | 1000 |      |
+
+## Running the example
 
 Start the Docker compose:
 
@@ -125,9 +172,10 @@ Start the Docker compose:
 # From aptos-core root
 docker compose --file aptos-move/move-examples/lockstream/docker-compose.yaml up
 ```
+
 Then press Ctrl+C to shut down the local testnet.
 
-To clear all containers and images, running only from build cache:
+(Pro tip) If you want to experiment with the example use the following to clear all containers and images, composing directly from the Docker build cache:
 
 ```sh
 docker rm -vf $(docker ps -aq)

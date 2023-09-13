@@ -37,16 +37,16 @@ module dee::usdc {
         });
     }
 
-    public entry fun mint<CoinType>(
+    public entry fun mint(
         account: &signer,
         amount: u64,
     ) acquires CapabilityStore {
         let account_addr = signer::address_of(account);
-        if (!coin::is_account_registered<CoinType>(account_addr)) {
-            coin::register<CoinType>(account)
+        if (!coin::is_account_registered<USDC>(account_addr)) {
+            coin::register<USDC>(account)
         };
         let mint_cap_ref =
-            &borrow_global<CapabilityStore<CoinType>>(@dee).mint_cap;
+            &borrow_global<CapabilityStore<USDC>>(@dee).mint_cap;
         coin::deposit(account_addr, coin::mint(amount, mint_cap_ref));
     }
 }
