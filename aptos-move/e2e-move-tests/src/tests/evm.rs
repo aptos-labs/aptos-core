@@ -103,7 +103,7 @@ pub fn initialize(_path: PathBuf) -> (MoveHarness, Account) {
         bcs::to_bytes(&new_account).unwrap(),
     );
     let v1 = harness.read_state_value_bytes(state_key).unwrap();
-    let v1_256 : move_core_types::u256::U256 = bcs::from_bytes(&v1).unwrap();
+    let v1_256: move_core_types::u256::U256 = bcs::from_bytes(&v1).unwrap();
     println!("v1_256: {:?}", v1_256);
     let v2 = move_core_types::u256::U256::from_str_radix("2", 10).unwrap();
     assert_eq!(

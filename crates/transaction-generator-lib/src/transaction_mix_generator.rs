@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use aptos_storage_interface::DbReaderWriter;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
-use aptos_storage_interface::DbReaderWriter;
 
 pub struct PhasedTxnMixGenerator {
     rng: StdRng,

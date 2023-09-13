@@ -17,7 +17,8 @@ pub mod transaction_generator;
 
 use crate::{
     db_access::DbAccessUtil, pipeline::Pipeline, transaction_committer::TransactionCommitter,
-    transaction_executor::TransactionExecutor, transaction_generator::BenchmarkTransactionGenerator,
+    transaction_executor::TransactionExecutor,
+    transaction_generator::BenchmarkTransactionGenerator,
 };
 use aptos_block_executor::counters as block_executor_counters;
 use aptos_block_partitioner::v2::counters::BLOCK_PARTITIONING_SECONDS;

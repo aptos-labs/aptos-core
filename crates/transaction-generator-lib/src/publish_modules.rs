@@ -33,8 +33,7 @@ impl PublishPackageGenerator {
 }
 
 impl TransactionGenerator for PublishPackageGenerator {
-    fn pre_generate(&self, _db: DbReaderWriter) {
-    }
+    fn pre_generate(&self, _db: DbReaderWriter) {}
 
     fn generate_transactions(
         &mut self,
@@ -66,8 +65,7 @@ impl TransactionGenerator for PublishPackageGenerator {
         requests
     }
 
-    fn post_generate(&self, _db: DbReaderWriter) {
-    }
+    fn post_generate(&self, _db: DbReaderWriter) {}
 }
 
 pub struct PublishPackageCreator {

@@ -4,8 +4,8 @@
 use crate::{get_account_to_burn_from_pool, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_infallible::RwLock;
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
-use std::sync::Arc;
 use aptos_storage_interface::DbReaderWriter;
+use std::sync::Arc;
 
 /// Wrapper that allows inner transaction generator to have unique accounts
 /// for all transactions (instead of having 5-20 transactions per account, as default)
@@ -30,8 +30,7 @@ impl AccountsPoolWrapperGenerator {
 }
 
 impl TransactionGenerator for AccountsPoolWrapperGenerator {
-    fn pre_generate(&self, _db: DbReaderWriter) {
-    }
+    fn pre_generate(&self, _db: DbReaderWriter) {}
 
     fn generate_transactions(
         &mut self,
@@ -49,8 +48,7 @@ impl TransactionGenerator for AccountsPoolWrapperGenerator {
             .collect()
     }
 
-    fn post_generate(&self, _db: DbReaderWriter) {
-    }
+    fn post_generate(&self, _db: DbReaderWriter) {}
 }
 
 pub struct AccountsPoolWrapperCreator {

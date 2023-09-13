@@ -293,7 +293,7 @@ impl BenchmarkTransactionGenerator {
         num_blocks: usize,
         mut transaction_generator_creator: Box<dyn TransactionGeneratorCreator>,
         transactions_per_sender: usize,
-    ) ->  Box<dyn TransactionGenerator> {
+    ) -> Box<dyn TransactionGenerator> {
         assert!(self.block_sender.is_some());
         let num_senders_per_block =
             (block_size + transactions_per_sender - 1) / transactions_per_sender;
@@ -786,13 +786,14 @@ fn test_get_conflicting_grps_transfer_indices() {
         // we check for (i) block_size not divisible by connected_txn_grps (ii) when divisible
         // (iii) when all txns in the block are independent (iv) all txns are dependent
         for connected_txn_grps in [3, block_size / 10, block_size, 1] {
-            let transfer_indices = BenchmarkTransactionGenerator::get_conflicting_grps_transfer_indices(
-                &mut rng,
-                num_signer_accounts,
-                block_size,
-                connected_txn_grps,
-                true,
-            );
+            let transfer_indices =
+                BenchmarkTransactionGenerator::get_conflicting_grps_transfer_indices(
+                    &mut rng,
+                    num_signer_accounts,
+                    block_size,
+                    connected_txn_grps,
+                    true,
+                );
 
             let mut adj_list: HashMap<usize, HashSet<usize>> = HashMap::new();
             assert_eq!(

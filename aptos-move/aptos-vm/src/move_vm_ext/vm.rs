@@ -5,11 +5,11 @@ use crate::{
     move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
     natives::aptos_natives_with_builder,
 };
-use aptos_framework::natives::event::NativeEventContext;
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext,
     code::NativeCodeContext,
     cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
+    event::NativeEventContext,
     evm_natives::NativeEvmContext,
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,

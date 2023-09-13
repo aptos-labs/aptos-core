@@ -11,24 +11,25 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
-use aptos_storage_interface::{DbReaderWriter};
-use aptos_state_view::{StateView};
-use aptos_types::transaction::{EntryFunction, TransactionPayload};
+use aptos_state_view::StateView;
+use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
+use aptos_types::{
+    access_path::AccessPath,
+    state_store::{state_key::StateKey, table::TableHandle},
+    transaction::{EntryFunction, TransactionPayload},
+};
 use ethereum_tx_sign::{LegacyTransaction, Transaction};
 use ethereum_types::H160;
-use move_core_types::{ident_str, language_storage::ModuleId};
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, CORE_CODE_ADDRESS},
+    parser::parse_struct_tag,
+};
 use rand::{prelude::SliceRandom, rngs::StdRng, SeedableRng};
 use secp256k1::{PublicKey, SecretKey};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::sync::Arc;
-use serde::{Deserialize, Serialize};
-use serde::de::DeserializeOwned;
 use tiny_keccak::keccak256;
-use aptos_types::access_path::AccessPath;
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::state_store::table::TableHandle;
-use move_core_types::language_storage::CORE_CODE_ADDRESS;
-use move_core_types::parser::parse_struct_tag;
 
 pub type EthereumAddress = H160;
 
@@ -55,7 +56,6 @@ pub fn public_key_address(public_key: &PublicKey) -> EthereumAddress {
 
 //     result
 // }
-
 
 #[derive(Deserialize, Serialize)]
 struct EvmStore {
@@ -156,9 +156,7 @@ pub fn ethereum_iniatialize_account(account: &EthereumWallet) -> TransactionPayl
         ),
         ident_str!("initialize_account").to_owned(),
         vec![],
-        vec![
-            bcs::to_bytes(&account.public_address.as_bytes().to_vec()).unwrap()
-        ],
+        vec![bcs::to_bytes(&account.public_address.as_bytes().to_vec()).unwrap()],
     ))
 }
 
@@ -212,10 +210,19 @@ impl EthereumP2PTransactionGenerator {
         value.transpose().map_err(anyhow::Error::msg)
     }
 
-    fn get_eth_balance(&self, db: &impl StateView, address: &EthereumAddress) -> anyhow::Result<move_core_types::u256::U256> {
-        let evm_store_path =
-            StateKey::access_path(AccessPath::resource_access_path(CORE_CODE_ADDRESS, parse_struct_tag("0x1::evm::EvmData").unwrap()).unwrap());
-        let evm_store: EvmStore =  Self::get_value(&evm_store_path, db).unwrap().unwrap();
+    fn get_eth_balance(
+        &self,
+        db: &impl StateView,
+        address: &EthereumAddress,
+    ) -> anyhow::Result<move_core_types::u256::U256> {
+        let evm_store_path = StateKey::access_path(
+            AccessPath::resource_access_path(
+                CORE_CODE_ADDRESS,
+                parse_struct_tag("0x1::evm::EvmData").unwrap(),
+            )
+            .unwrap(),
+        );
+        let evm_store: EvmStore = Self::get_value(&evm_store_path, db).unwrap().unwrap();
         let evm_store_balance_table = evm_store.balance;
         let state_key = &StateKey::table_item(
             evm_store_balance_table,
@@ -230,7 +237,8 @@ impl EthereumP2PTransactionGenerator {
     fn get_balance_summary(&self, db: DbReaderWriter) {
         // print out the balance of 10 accounts and the total balance of all accounts
         let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
-        let mut total_balance: move_core_types::u256::U256 = move_core_types::u256::U256::from_str_radix("0", 10).unwrap();
+        let mut total_balance: move_core_types::u256::U256 =
+            move_core_types::u256::U256::from_str_radix("0", 10).unwrap();
         for i in 0..10 {
             let address = self.ethereum_wallets.read()[i].public_address;
             let balance = self.get_eth_balance(&db_state_view, &address).unwrap();
@@ -238,7 +246,9 @@ impl EthereumP2PTransactionGenerator {
         }
 
         for address in self.ethereum_wallets.read().iter() {
-            let balance = self.get_eth_balance(&db_state_view, &address.public_address).unwrap();
+            let balance = self
+                .get_eth_balance(&db_state_view, &address.public_address)
+                .unwrap();
             total_balance += balance;
         }
         println!("Total balance: {}", total_balance);
@@ -246,7 +256,6 @@ impl EthereumP2PTransactionGenerator {
 }
 
 impl TransactionGenerator for EthereumP2PTransactionGenerator {
-
     fn pre_generate(&self, db: DbReaderWriter) {
         self.get_balance_summary(db);
     }
