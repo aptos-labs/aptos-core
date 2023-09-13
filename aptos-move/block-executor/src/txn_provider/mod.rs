@@ -56,6 +56,7 @@ where
     fn shutdown_receiver(&self);
     fn txn(&self, idx: TxnIndex) -> &T;
     fn on_local_commit(&self, txn_idx: TxnIndex, txn_output: Arc<TxnOutput<TO, TE>>);
+    fn commit_strategy(&self) -> u8;
 }
 
 pub mod default;

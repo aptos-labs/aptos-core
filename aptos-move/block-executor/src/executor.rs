@@ -27,16 +27,12 @@ use aptos_types::{executable::Executable, fee_statement::FeeStatement, write_set
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use rayon::ThreadPool;
-use std::{
-    collections::HashMap,
-    marker::PhantomData,
-    sync::{
-        atomic::AtomicU32,
-        mpsc,
-        mpsc::{Receiver, Sender},
-        Arc,
-    },
-};
+use std::{collections::HashMap, hint, marker::PhantomData, sync::{
+    atomic::AtomicU32,
+    mpsc,
+    mpsc::{Receiver, Sender},
+    Arc,
+}};
 use crate::txn_provider::sharded::ShardedTxnProvider;
 use crate::txn_provider::{TxnProviderTrait1, TxnProviderTrait2};
 
@@ -522,6 +518,140 @@ where
         }
     }
 
+    fn work_task_with_scope_v2_commit(
+        &self,
+        txn_provider: &TP,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
+        scheduler: &Scheduler<TP>,
+        base_view: &S,
+    ) {
+        let mut accumulated_fee_statement = FeeStatement::zero();
+        let mut txn_fee_statements = Vec::with_capacity(txn_provider.num_txns());
+        let mut shutdown = false;
+        hint::spin_loop();
+        while !shutdown {
+            while let Some(txn_idx) = scheduler.try_commit() {
+                // Iterate round robin over workers to do commit_hook.
+                info!("block={}, shard={}, will commit txn {}.", txn_provider.block_idx(), txn_provider.shard_idx(), txn_idx);
+                self.worker_commit_hook(txn_idx, versioned_cache, last_input_output, base_view, txn_provider);
+
+                if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
+                    // For committed txns with Success status, calculate the accumulated gas costs.
+                    accumulated_fee_statement.add_fee_statement(&fee_statement);
+                    txn_fee_statements.push(fee_statement);
+
+                    if let Some(&per_block_gas_limit) = self.maybe_block_gas_limit.as_ref() {
+                        // When the accumulated execution and io gas of the committed txns exceeds
+                        // PER_BLOCK_GAS_LIMIT, early halt BlockSTM. Storage gas does not count towards
+                        // the per block gas limit, as we measure execution related cost here.
+                        let accumulated_non_storage_gas = accumulated_fee_statement
+                            .execution_gas_used()
+                            + accumulated_fee_statement.io_gas_used();
+                        if accumulated_non_storage_gas >= per_block_gas_limit {
+                            counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT
+                                .with_label_values(&[counters::Mode::PARALLEL])
+                                .inc();
+                            info!(
+                            "[BlockSTM]: Parallel execution early halted due to \
+                             accumulated_non_storage_gas {} >= PER_BLOCK_GAS_LIMIT {}",
+                            accumulated_non_storage_gas, per_block_gas_limit,
+                        );
+
+                            // Set the execution output status to be SkipRest, to skip the rest of the txns.
+                            last_input_output.update_to_skip_rest(txn_idx);
+                        }
+                    }
+                }
+
+                // Committed the last transaction, BlockSTM finishes execution.
+                if scheduler.next_txn(txn_idx) == txn_provider.end_txn_idx()
+                    || last_input_output.block_truncated_at_idx(txn_idx)
+                {
+                    // Either all txn committed, or a committed txn caused an early halt.
+                    scheduler.halt();
+
+                    counters::update_parallel_block_gas_counters(
+                        &accumulated_fee_statement,
+                        txn_provider.local_rank(txn_idx) + 1,
+                    );
+                    counters::update_parallel_txn_gas_counters(&txn_fee_statements);
+
+                    let accumulated_non_storage_gas = accumulated_fee_statement.execution_gas_used()
+                        + accumulated_fee_statement.io_gas_used();
+                    info!(
+                        "[BlockSTM]: Parallel execution completed. {} out of {} txns committed. accumulated_non_storage_gas = {}, limit = {:?}",
+                        txn_provider.local_rank(txn_idx) + 1,
+                        txn_provider.num_txns(),
+                        accumulated_non_storage_gas,
+                        self.maybe_block_gas_limit,
+                    );
+                    shutdown = true;
+                    break;
+                }
+            }
+        }
+        txn_provider.shutdown_receiver();
+    }
+
+    fn work_task_with_scope_v2_scheduler_tasks(
+        &self,
+        executor_arguments: &E::Argument,
+        txn_provider: &TP,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
+        scheduler: &Scheduler<TP>,
+        // TODO: should not need to pass base view.
+        base_view: &S,
+        shared_counter: &AtomicU32,
+    ) {
+        // Make executor for each task. TODO: fast concurrent executor.
+        let init_timer = VM_INIT_SECONDS.start_timer();
+        let executor = E::init(*executor_arguments);
+        drop(init_timer);
+
+        let mut scheduler_task = SchedulerTask::NoTask;
+        loop {
+            scheduler_task = match scheduler_task {
+                SchedulerTask::ValidationTask(version_to_validate, wave) => Self::validate(
+                    version_to_validate,
+                    wave,
+                    last_input_output,
+                    versioned_cache,
+                    scheduler,
+                ),
+                SchedulerTask::ExecutionTask(version_to_execute, ExecutionTaskType::Execution) => {
+                    Self::execute(
+                        version_to_execute,
+                        txn_provider,
+                        last_input_output,
+                        versioned_cache,
+                        scheduler,
+                        &executor,
+                        base_view,
+                        ParallelState::new(versioned_cache, scheduler, shared_counter),
+                    )
+                },
+                SchedulerTask::ExecutionTask(_, ExecutionTaskType::Wakeup(condvar)) => {
+                    let (lock, cvar) = &*condvar;
+                    // Mark dependency resolved.
+                    *lock.lock() = DependencyStatus::Resolved;
+                    // Wake up the process waiting for dependency.
+                    cvar.notify_one();
+
+                    SchedulerTask::NoTask
+                },
+                SchedulerTask::NoTask => {
+                    let new_task = scheduler.next_task(false);
+                    new_task
+                },
+                SchedulerTask::Done => {
+                    break;
+                },
+            }
+        }
+    }
+
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
@@ -542,9 +672,7 @@ where
         }
 
         let shared_counter = AtomicU32::new(0);
-
         let num_txns = txn_provider.num_txns();
-
         if num_txns == 0 {
             return Ok(vec![]);
         }
@@ -552,43 +680,58 @@ where
         let last_input_output = TxnLastInputOutput::new(txn_provider);
         let scheduler = Scheduler::new(txn_provider);
 
-        let mut roles: Vec<CommitRole> = vec![];
-        let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);
-        for _ in 0..(self.concurrency_level - 1) {
-            let (tx, rx) = mpsc::channel();
-            roles.push(CommitRole::Worker(rx));
-            senders.push(tx);
-        }
-        // Add the coordinator role. Coordinator is responsible for committing
-        // indices and assigning post-commit work per index to other workers.
-        // Note: It is important that the Coordinator is the first thread that
-        // picks up a role will be a coordinator. Hence, if multiple parallel
-        // executors are running concurrently, they will all have active coordinator.
-        roles.push(CommitRole::Coordinator(senders));
-
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
-            s.spawn(|_| {
+            match txn_provider.commit_strategy() {
+                0 => {
+                    let mut roles: Vec<CommitRole> = vec![];
+                    let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);
+                    for _ in 0..(self.concurrency_level - 1) {
+                        let (tx, rx) = mpsc::channel();
+                        roles.push(CommitRole::Worker(rx));
+                        senders.push(tx);
+                    }
+                    // Add the coordinator role. Coordinator is responsible for committing
+                    // indices and assigning post-commit work per index to other workers.
+                    // Note: It is important that the Coordinator is the first thread that
+                    // picks up a role will be a coordinator. Hence, if multiple parallel
+                    // executors are running concurrently, they will all have active coordinator.
+                    roles.push(CommitRole::Coordinator(senders));
 
-                txn_provider.run_sharding_msg_loop(&versioned_cache, &scheduler);
-            });
+                    for _ in 0..self.concurrency_level {
+                        let role = roles.pop().expect("Role must be set for all threads");
+                        s.spawn(|_| {
+                            self.work_task_with_scope(
+                                &executor_initial_arguments,
+                                txn_provider,
+                                &last_input_output,
+                                &versioned_cache,
+                                &scheduler,
+                                base_view,
+                                &shared_counter,
+                                role,
+                            );
+                        });
+                    }
+                }
+                1 => {
+                    s.spawn(|_| {
+                        txn_provider.run_sharding_msg_loop(&versioned_cache, &scheduler);
+                    });
+                    s.spawn(|_| {
+                        self.work_task_with_scope_v2_commit(txn_provider, &last_input_output, &versioned_cache, &scheduler, base_view);
+                    });
+                    for _ in 2..self.concurrency_level {
+                        s.spawn(|_|{
+                            self.work_task_with_scope_v2_scheduler_tasks(&executor_initial_arguments, txn_provider, &last_input_output, &versioned_cache, &scheduler, base_view, &shared_counter);
+                        });
+                    }
 
-            // The rest BlockSTM threads.
-            for worker_idx in (0..self.concurrency_level).rev() {
-                let role = roles.pop().expect("Role must be set for all threads");
-                s.spawn(|_| {
-                    self.work_task_with_scope(
-                        &executor_initial_arguments,
-                        txn_provider,
-                        &last_input_output,
-                        &versioned_cache,
-                        &scheduler,
-                        base_view,
-                        &shared_counter,
-                        role,
-                    );
-                });
-            }
+                }
+                _ => {
+                    unreachable!()
+                }
+            };
         });
         drop(timer);
 

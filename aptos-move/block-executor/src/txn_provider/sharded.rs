@@ -239,4 +239,8 @@ where
             sender.send(msg).unwrap();
         }
     }
+
+    fn commit_strategy(&self) -> u8 {
+        1
+    }
 }

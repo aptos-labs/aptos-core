@@ -96,4 +96,8 @@ where
     fn on_local_commit(&self, _txn_idx: TxnIndex, _txn_output: Arc<TxnOutput<TO, TE>>) {
         // Nothing to do.
     }
+
+    fn commit_strategy(&self) -> u8 {
+        0
+    }
 }
