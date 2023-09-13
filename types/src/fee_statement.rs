@@ -7,14 +7,26 @@ use serde::{Deserialize, Serialize};
 /// The structure is:
 ///
 /// - Net charge or refund (not in the statement)
-///   - total charge: total_charge_gas_units, matches `gas_used` in the on-chain `TransactionInfo`.
-///     - gas charge for execution (CPU time): execution_gas_units
-///     - gas charge for IO (storage random access): io_gas_units
-///     - storage fee charge (storage space): storage_fee_octas, when included in total_charge, this number is converted to gas units according to the user specified gas unit price.
-///   - storage deletion refund: storage_fee_refund_octas, this is not included in `gas_used` or `total_charge_gas_units`, the net charge / refund is calculated by total_charge_gas_units * gas_unit_price - storage_fee_refund_octas.
+///    - total charge: total_charge_gas_units, matches `gas_used` in the on-chain `TransactionInfo`.
+///      This is the sum of the sub-items below. Notice that there's potential precision loss when
+///      the conversion between internal and external gas units and between native token and gas
+///      units, so it's possible that the numbers don't add up exactly. -- This number is the final
+///      charge, while the break down is merely informational.
+///        - gas charge for execution (CPU time): `execution_gas_units`
+///        - gas charge for IO (storage random access): `io_gas_units`
+///        - storage fee charge (storage space): `storage_fee_octas`, to be included in
+///          `total_charge_gas_unit`, this number is converted to gas units according to the user
+///          specified `gas_unit_price` on the transaction.
+///    - storage deletion refund: `storage_fee_refund_octas`, this is not included in `gas_used` or
+///      `total_charge_gas_units`, the net charge / refund is calculated by
+///      `total_charge_gas_units` * `gas_unit_price` - `storage_fee_refund_octas`.
+///
+/// This is meant to emitted as a module event.
+///
+/// (keep this doc in sync with the `struct FeeStatement` in Move.)
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FeeStatement {
-    /// Total gas charge, not including
+    /// Total gas charge.
     total_charge_gas_units: u64,
     /// Execution gas charge.
     execution_gas_units: u64,
