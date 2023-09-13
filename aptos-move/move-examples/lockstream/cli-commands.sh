@@ -187,12 +187,12 @@ DELAY=$(expr $STREAMING_PERIOD_START - $CURRENT_TIME)
 echo "\n\n The time is now $CURRENT_TIME
 The streaming period starts at $STREAMING_PERIOD_START
 Waiting $DELAY seconds"
-wait $DELAY
+sleep $DELAY
 
 # Wait another second.
 echo "\n\n The streaming period has begun
 Waiting another second"
-wait 1
+sleep 1
 
 echo "\n\n Locker info:"
 aptos move view \
@@ -207,7 +207,7 @@ aptos move view \
 echo "\n\n Waiting for $ACE_CLAIM_TIME_1 seconds into stream for Ace's claim 1"
 CURRENT_TIME=$(date +%s)
 DELAY=$(expr $STREAMING_PERIOD_START + $ACE_CLAIM_TIME_1 - $CURRENT_TIME)
-wait $DELAY
+sleep $DELAY
 
 echo "\n\n Claiming for Ace:"
 aptos move run \
@@ -231,7 +231,7 @@ aptos move view \
 echo "\n\n Waiting for $BEE_CLAIM_TIME_1 seconds into stream for Bee's claim 1"
 CURRENT_TIME=$(date +%s)
 DELAY=$(expr $STREAMING_PERIOD_START + $BEE_CLAIM_TIME_1 - $CURRENT_TIME)
-wait $DELAY
+sleep $DELAY
 
 echo "\n\n Claiming for Bee:"
 aptos move run \
@@ -255,7 +255,7 @@ aptos move view \
 echo "\n\n Waiting for $CAD_CLAIM_TIME seconds into stream for Cad's claim"
 CURRENT_TIME=$(date +%s)
 DELAY=$(expr $STREAMING_PERIOD_START + $CAD_CLAIM_TIME - $CURRENT_TIME)
-wait $DELAY
+sleep $DELAY
 
 echo "\n\n Claiming for Cad:"
 aptos move run \
@@ -279,7 +279,7 @@ aptos move view \
 echo "\n\n Wait for $ACE_CLAIM_TIME_2 seconds after stream start for Ace's claim 2"
 CURRENT_TIME=$(date +%s)
 DELAY=$(expr $STREAMING_PERIOD_START + $ACE_CLAIM_TIME_2 - $CURRENT_TIME)
-wait $DELAY
+sleep $DELAY
 
 echo "\n\n Claiming for Ace:"
 aptos move run \
@@ -303,7 +303,7 @@ aptos move view \
 echo "\n\n Waiting for $BEE_CLAIM_TIME_2 seconds after stream start Bee's claim 2"
 CURRENT_TIME=$(date +%s)
 DELAY=$(expr $STREAMING_PERIOD_START + $BEE_CLAIM_TIME_2 - $CURRENT_TIME)
-wait $DELAY
+sleep $DELAY
 
 echo "\n\n Claiming for Bee:"
 aptos move run \
