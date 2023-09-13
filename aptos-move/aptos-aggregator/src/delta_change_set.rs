@@ -271,12 +271,12 @@ pub fn serialize(value: &u128) -> Vec<u8> {
     bcs::to_bytes(value).expect("unexpected serialization error in aggregator")
 }
 
-// Helper for tests, #[cfg(test)] doesn't work for cross-crate.
+#[cfg(any(test, feature = "testing"))]
 pub fn delta_sub(v: u128, limit: u128) -> DeltaOp {
     DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v)
 }
 
-// Helper for tests, #[cfg(test)] doesn't work for cross-crate.
+#[cfg(any(test, feature = "testing"))]
 pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
     DeltaOp::new(DeltaUpdate::Plus(v), limit, v, 0)
 }
