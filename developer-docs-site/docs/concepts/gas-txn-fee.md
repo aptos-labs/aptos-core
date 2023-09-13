@@ -11,8 +11,8 @@ Any transaction execution on the Aptos blockchain requires a processing fee. As 
   - It is measured in Gas Units whose price may fluctuate according to the load of the network. This allows execution & io costs to be low when the network is less busy.
 2. Storage fees
   - This covers the cost to persistently store validated record in the distributed blockchain storage.
-  - It is measured in fixed APT prices.
-  - In the future, such fees will evolve into deposits that are refundable, should you choose to delete the data you stored. The refunds can be full or partial, depending on the time frame.
+  - It is measured in fixed APT prices, so permenant storage cost stays stable while the gas unit price fluctuates with transient load of the network.
+  - Storage Fee is refundable upon deletion of the allocated storage space, fully or partially, depending on the size and age of the occupied storage space.
 
 :::tip
 Conceptually, this fee can be thought of as quite similar to how we pay for our home electric or water utilities.
@@ -27,6 +27,45 @@ See [How Base Gas Works](./base-gas.md) for a detailed description of gas fee ty
 :::tip Unit of gas
 👉 A **unit of gas** is a dimensionless number or a unit that is not associated with any one item such as a coin, expressed as an integer. The total gas units consumed by your transaction depend on the complexity of your transaction. The **gas price**, on the other hand, is expressed in terms of Aptos blockchain’s native coin (Octas). Also see [Transactions and States](txns-states.md) for how a transaction submitted to the Aptos blockchain looks like.
 :::
+
+## <a name="fee_statement" />The Fee Statement
+
+Starting from Aptos Framework release 1.7, the break down of the fee charges and refund relavent to a user transaction is represented by struct `0x1::transaction_fee::FeeStatement` and emitted as a module event.
+
+```Rust
+    #[event]
+    /// Breakdown of fee charge and refund for a transaction.
+    /// The structure is:
+    ///
+    /// - Net charge or refund (not in the statement)
+    ///    - total charge: total_charge_gas_units, matches `gas_used` in the on-chain `TransactionInfo`.
+    ///      This is the sum of the sub-items below. Notice that there's potential precision loss when
+    ///      the conversion between internal and external gas units and between native token and gas
+    ///      units, so it's possible that the numbers don't add up exactly. -- This number is the final
+    ///      charge, while the break down is merely informational.
+    ///        - gas charge for execution (CPU time): `execution_gas_units`
+    ///        - gas charge for IO (storage random access): `io_gas_units`
+    ///        - storage fee charge (storage space): `storage_fee_octas`, to be included in
+    ///          `total_charge_gas_unit`, this number is converted to gas units according to the user
+    ///          specified `gas_unit_price` on the transaction.
+    ///    - storage deletion refund: `storage_fee_refund_octas`, this is not included in `gas_used` or
+    ///      `total_charge_gas_units`, the net charge / refund is calculated by
+    ///      `total_charge_gas_units` * `gas_unit_price` - `storage_fee_refund_octas`.
+    ///
+    /// This is meant to emitted as a module event.
+    struct FeeStatement has drop, store {
+        /// Total gas charge.
+        total_charge_gas_units: u64,
+        /// Execution gas charge.
+        execution_gas_units: u64,
+        /// IO gas charge.
+        io_gas_units: u64,
+        /// Storage fee charge.
+        storage_fee_octas: u64,
+        /// Storage fee refund.
+        storage_fee_refund_octas: u64,
+    }
+```
 
 ## Gas price and prioritizing transactions
 
@@ -89,6 +128,13 @@ Here is an example. Suppose we have a transaction that costs `100` gas units in 
 - `100 + 5000 / 200 = 125` gas units if the unit price is `200`.
 
 We are aware of the confusion this might create, and plan to present these as separate items in the future. However this will require some changes to the transaction output format and downstream clients, so please be patient while we work hard to make this happen.
+
+## Calculating Storage Deletion Refund
+
+If a transaction deletes state items, a refund is issued to the transaction payer for the released storage slots. Currently a full refund for the fee charged for the slot is issued, not including any fee charged for the execess bytes beyond a configurable quota (for e.g. 1KB). There's no refund for storage fee charged for event emittions.
+
+Note that the amount of refund is in APT value, and is not converted to gas units or reflected as part of the total `gas_used`. The amount is separately represented in the `storage_fee_refund_octas` field of the [`FeeStatement`](#fee_statement). As a result, the net effect of a transaction to the transaction payer's APT balance is `gas_used * gas_unit_price - storage_refund` -- a charge off the account balance if this number is positive or a deposit if it's negative. 
+
 
 ## Examples
 
