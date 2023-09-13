@@ -190,28 +190,27 @@ Basic instruction gas parameters are defined at [`instr.rs`] and include the fol
 
 Additional storage gas parameters are defined in [`table.rs`], [`move_stdlib.rs`], and other assorted source files in [`aptos-gas-schedule/src/`].
 
-## Storage gas
+## IO and Storage charges
 
-Storage gas is defined in [`storage_gas.move`], which is accompanied by a comprehensive and internally-linked DocGen file at [`storage_gas.md`].
+To reflect cost relavent to transient storage device resources, including disk IOPS and bandwdith, these gas parameters are charged.
 
+| Parameter                       | Meaning                                                            |
+|---------------------------------|--------------------------------------------------------------------|
+| storage_io_per_state_slot_write | charged per state write op in the transaction output               |
+| storage_io_per_state_byte_write | charged per byte in all state write ops in the transaction output  |
+| storage_io_per_state_slot_read  | charged per item loaded from global state                          |
+| storage_io_per_state_byte_read  | charged per byte loaded from global state                          |
 
-In short:
+To reflect disk space and structural cost on the Aptos authenticated data structure imposed by storing things on the blockchain, including creating things in the global state, emitting events, etc. storage fee is charged, in absolute APT values.
 
-1. In [`initialize()`], [`base_8192_exponential_curve()`] is used to generate an exponential curve whereby per-item and per-byte costs increase rapidly as utilization approaches an upper bound.
-2. Parameters are reconfigured each epoch via [`on_reconfig()`], based on item-wise and byte-wise utilization ratios.
-3. Reconfigured parameters are stored in [`StorageGas`], which contains the following fields:
-
-| Field             | Meaning                                     |
-|-------------------|---------------------------------------------|
-| `per_item_read`   | Cost to read an item from global storage    |
-| `per_item_create` | Cost to create an item in global storage    |
-| `per_item_write`  | Cost to overwrite an item in global storage |
-| `per_byte_read`   | Cost to read a byte from global storage     |
-| `per_byte_create` | Cost to create a byte in global storage     |
-| `per_byte_write`  | Cost to overwrite a byte in global storage  |
-
-Here, an *item* is either a resource having the `key` attribute, or an entry in a table, and notably, per-byte costs are assessed on the *entire* size of an item.
-As stated in [`storage_gas.md`], for example, if an operation mutates a `u8` field in a resource that has five other `u128` fields, the per-byte gas write cost will account for $(5 * 128) / 8 + 1 = 81$ bytes.
+| Parameter                         | Meaning                                                                                |
+|-----------------------------------|----------------------------------------------------------------------------------------|
+| free_write_bytes_quota            | 1KB (configurable) free bytes per state slot. (*Subject to short-term change.*)        |
+| free_event_bytes_quota            | 1KB (configurable) free event bytes per transaction. (*Subject to short-term change.*) |
+| storage_fee_per_state_slot_create | allocating a state slot, by `move_to()`, `table::add()`, etc                           |
+| storage_fee_per_excess_state_byte | per byte beyond `free_write_bytes_quota` per state slot. Notice this is charged every time the slot is written to, not only at allocation time.  |
+| storage_fee_per_event_byte        | per byte beyond `free_event_bytes_quota` per transaction.                              |
+| storage_fee_per_transaction_byte  | each transaction byte beyond `large_transaction_cutoff`. (search in the page)          |
 
 ### Vectors
 
@@ -257,50 +256,20 @@ As of the time of this writing, `min_price_per_gas_unit` in [`transaction.rs`](h
 
 See [Payload gas](#payload-gas) for the meaning of these constants.
 
-### Storage gas
+### Storage Fee
 
-As of the time of this writing, [`initialize()`] sets the following minimum storage gas amounts:
+When the network load is low,vthe gas unit price is expected to be low, as a result all of other aspects of the transaction cost are expected to be cheap. Except for the transaction fee, which is priced in terms of absolute APT value. Usually the transaction fee is the dominant aspect of the whole transaction cost, as long as the transaction allocates state slots or write to large state items, emit many or large events, or the transaction itself is large -- all of which occupy disk space on all Aptos nodes, hence charged accordingly.
 
-| Data style | Operation | Symbol | Minimum internal gas |
-|------------|-----------|--------|----------------------|
-| Per item   | Read      | $r_i$  | 300,000              |
-| Per item   | Create    | $c_i$  | 300,000              |
-| Per item   | Write     | $w_i$  | 300,000              |
-| Per byte   | Read      | $r_b$  | 300                  |
-| Per byte   | Create    | $c_b$  | 5,000                |
-| Per byte   | Write     | $w_b$  | 5,000                |
+On the other hand, releasing state slots by deleting state items are incentivized by the storage refund. For now state slot fee is fully refunded uppon slot deallocation, and the excess state byte fee is not refundable. This is to be changed shortly by distinguishing permanent bytes (those in the global state) and reletive ephemeral bytes (those goes through the ledger history).
 
-Maximum amounts are 100 times the minimum amounts, which means that for a utilization ratio of 40% or less, total gas costs will be on the order of 1 to 1.5 times the minimum amounts (see [`base_8192_exponential_curve()`] for supporting calculations).
-Hence, in terms of octas, initial mainnet gas costs can be estimated as follows (divide internal gas by scaling factor, then multiply by minimum gas price):
+1. Minimize state item creation.
+2. Minimize event emission.
+3. Avoid large state items, events and transactions.
+4. Cleaning up state items when no longer used.
+5. If two fields are always updated together, group them into the same resoruce or resource group.
+6. If a struct is large and only a few of the fields get updated frequently, separate out the fields to a separate resource / resource group.
 
-| Operation       | Operation | Minimum octas |
-|-----------------|-----------|---------------|
-| Per-item read   | $r_i$     | 3000          |
-| Per-item create | $c_i$     | 50,000          |
-| Per-item write  | $w_i$     | 3000          |
-| Per-byte read   | $r_b$     | 3             |
-| Per-byte create | $c_b$     | 50            |
-| Per-byte write  | $w_b$     | 50            |
-
-Here, the most expensive per-item operation by far is creating a new item (via either `move_to<T>()` or adding to a table), which costs nearly 17 times as much as reading or overwriting an old item: $c_i = 16.\overline{6} r_i = 16.\overline{6} w_i$. Additionally:
-
-* Writes cost the same as reads on a per-item basis: $w_i = r_i$
-* On a per-byte basis, however, writes cost the same as creates: $w_b = c_b$
-* Per-byte writes and creates cost nearly 17 times as much as per-byte reads: $w_b = c_b = 16.\overline{6} r_b$
-* Per-item reads cost 1000 times as much as per-byte reads: $r_i = 1000 r_b$
-* Per-item creates cost 1000 times as much as per-byte creates: $c_i = 1000 c_b$
-* Per-item writes cost 60 times as much as per-byte writes: $w_i = 60 w_b$
-
-Hence per-item operations cost 1000 times more than per-byte operations for both reads and creates, but only 60 times more for writes.
-
-Thus, in the absence of a legitimate economic incentive to deallocate from global storage (via either `move_from<T>()` or by removing from a table), the most effective storage gas optimization strategy is as follows:
-
-1. Minimize per-item creations
-2. Track unused items and overwrite them, rather than creating new items, when possible
-3. Contain per-item writes to as few items as possible
-4. Read, rather than write, whenever possible
-5. Minimize the number of bytes in all operations, especially writes
-
+   
 ### Instruction gas
 
 As of the time of this writing, all instruction gas operations are multiplied by the `EXECUTION_GAS_MULTIPLIER` defined in [`gas_meter.rs`], which is set to 20.
