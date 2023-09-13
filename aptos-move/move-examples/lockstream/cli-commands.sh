@@ -9,7 +9,7 @@ DEE_ADDR=$(cat $ACCOUNTS_DIR/dee.address)
 MINT_DEE_COIN=$DEE_ADDR::dee_coin::mint
 MINT_USDC=$DEE_ADDR::usdc::mint
 CREATE_POOL=0x1::lockstream::create
-LOCK=0x1:lockstream:lock
+LOCK=0x1::lockstream::lock
 
 # Types.
 DEE_COIN_TYPE=$DEE_ADDR::dee_coin::DeeCoin
@@ -72,13 +72,16 @@ aptos move run \
     --profile cad \
 
 # Calculate period times relative to creation time.
+sleep 2
 CREATION_TIME=$(date +%s)
 STREAM_START_TIME=$(expr $CREATION_TIME + $STREAM_START_DELAY)
 STREAM_END_TIME=$(expr $STREAM_START_TIME + $STREAM_END_DELAY)
 CLAIM_LAST_CALL_TIME=$(expr $STREAM_END_TIME + $CLAIM_LAST_CALL_DELAY)
 PREMIER_SWEEP_LAST_CALL_TIME=$(
     expr $CLAIM_LAST_CALL_TIME + $PREMIER_SWEEP_LAST_CALL_DELAY)
-echo Creating pool at $CREATION_TIME:
+
+# Create pool.
+echo "\n\nCreating pool at $CREATION_TIME:"
 aptos move run \
     --args \
         u64:$DEE_COIN_MINT \
@@ -96,6 +99,7 @@ aptos move run \
 # Lock assets.
 
 echo "\n\n Locking $ACE_USDC_LOCK_1 USDC for Ace into pool:"
+sleep 2
 aptos move run \
     --args \
         address:$DEE_ADDR \
@@ -108,6 +112,7 @@ aptos move run \
         $USDC_COIN_TYPE
 
 echo "\n\n Locking $BEE_USDC_LOCK USDC for Bee into pool:"
+sleep 2
 aptos move run \
     --args \
         address:$DEE_ADDR \
@@ -120,13 +125,30 @@ aptos move run \
         $USDC_COIN_TYPE
 
 echo "\n\n Locking $CAD_USDC_LOCK USDC for Cad into pool:"
+sleep 2
 aptos move run \
     --args \
         address:$DEE_ADDR \
-        u64:$BEE_USDC_LOCK_1 \
+        u64:$CAD_USDC_LOCK \
     --assume-yes \
     --function-id $LOCK \
-    --profile bee \
+    --profile cad \
     --type-args \
         $DEE_COIN_TYPE \
         $USDC_COIN_TYPE
+
+echo "\n\n Locking $ACE_USDC_LOCK_2 more USDC for Ace into pool:"
+sleep 2
+aptos move run \
+    --args \
+        address:$DEE_ADDR \
+        u64:$ACE_USDC_LOCK_2 \
+    --assume-yes \
+    --function-id $LOCK \
+    --profile ace \
+    --type-args \
+        $DEE_COIN_TYPE \
+        $USDC_COIN_TYPE
+
+echo "\n\n Pool metadata:"
+sleep 2
