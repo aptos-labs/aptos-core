@@ -5,6 +5,7 @@
 mod adapter;
 mod anchor_election;
 mod bootstrap;
+mod commit_signer;
 mod dag_driver;
 mod dag_fetcher;
 mod dag_handler;
