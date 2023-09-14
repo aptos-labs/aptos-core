@@ -135,7 +135,7 @@ impl ApiConfig {
 
 impl ConfigSanitizer for ApiConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn test_sanitize_disabled_api() {
         // Create a node config with the API disabled
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             api: ApiConfig {
                 enabled: false,
                 failpoints_enabled: true,
@@ -186,13 +186,13 @@ mod tests {
         };
 
         // Sanitize the config and verify that it succeeds
-        ApiConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet()).unwrap();
+        ApiConfig::sanitize(&node_config, NodeType::Validator, ChainId::mainnet()).unwrap();
     }
 
     #[test]
     fn test_sanitize_failpoints_on_mainnet() {
         // Create a node config with failpoints enabled
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             api: ApiConfig {
                 enabled: true,
                 failpoints_enabled: true,
@@ -203,15 +203,15 @@ mod tests {
 
         // Sanitize the config and verify that it fails because
         // failpoints are not supported on mainnet.
-        let error = ApiConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
-            .unwrap_err();
+        let error =
+            ApiConfig::sanitize(&node_config, NodeType::Validator, ChainId::mainnet()).unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 
     #[test]
     fn test_sanitize_invalid_workers() {
         // Create a node config with failpoints enabled
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             api: ApiConfig {
                 enabled: true,
                 max_runtime_workers: None,
@@ -223,8 +223,8 @@ mod tests {
 
         // Sanitize the config and verify that it fails because
         // the runtime worker multiplier is invalid.
-        let error = ApiConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
-            .unwrap_err();
+        let error =
+            ApiConfig::sanitize(&node_config, NodeType::Validator, ChainId::mainnet()).unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 }
