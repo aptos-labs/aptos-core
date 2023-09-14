@@ -14,8 +14,9 @@ use crate::{
         dag_fetcher::TFetchRequester,
         dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
-        types::{CertificateAckState, CertifiedNode, Node, NodeCertificate, SignatureBuilder},
+        types::{CertificateAckState, CertifiedNode, Node, SignatureBuilder},
     },
+    payload_manager::PayloadManager,
     state_replication::PayloadClient,
 };
 use anyhow::bail;
@@ -45,6 +46,7 @@ pub(crate) struct DagDriver {
     author: Author,
     epoch_state: Arc<EpochState>,
     dag: Arc<RwLock<Dag>>,
+    payload_manager: Arc<PayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
     current_round: Round,
@@ -61,6 +63,7 @@ impl DagDriver {
         author: Author,
         epoch_state: Arc<EpochState>,
         dag: Arc<RwLock<Dag>>,
+        payload_manager: Arc<PayloadManager>,
         payload_client: Arc<dyn PayloadClient>,
         reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
         time_service: TimeService,
@@ -73,23 +76,24 @@ impl DagDriver {
             .get_pending_node()
             .expect("should be able to read dag storage");
         let highest_round = dag.read().highest_round();
-        let current_round = dag
+        let highest_strong_links_round = dag
             .read()
             .get_strong_links_for_round(highest_round, &epoch_state.verifier)
             .map_or_else(|| highest_round.saturating_sub(1), |_| highest_round);
 
         debug!(
             "highest_round: {}, current_round: {}",
-            highest_round, current_round
+            highest_round, highest_strong_links_round
         );
 
         let mut driver = Self {
             author,
             epoch_state,
             dag,
+            payload_manager,
             payload_client,
             reliable_broadcast,
-            current_round,
+            current_round: highest_strong_links_round,
             time_service,
             rb_abort_handle: None,
             storage,
@@ -99,25 +103,21 @@ impl DagDriver {
         };
 
         // If we were broadcasting the node for the round already, resume it
-        if let Some(node) = pending_node.filter(|node| node.round() == current_round + 1) {
+        if let Some(node) =
+            pending_node.filter(|node| node.round() == highest_strong_links_round + 1)
+        {
             driver.current_round = node.round();
             driver.broadcast_node(node);
         } else {
             // kick start a new round
-            let strong_links = driver
-                .dag
-                .read()
-                .get_strong_links_for_round(current_round, &driver.epoch_state.verifier)
-                .unwrap_or(vec![]);
-            block_on(driver.enter_new_round(current_round + 1, strong_links));
+            block_on(driver.enter_new_round(highest_strong_links_round + 1));
         }
         driver
     }
 
     pub async fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
-        let maybe_strong_links = {
+        let highest_strong_links_round = {
             let mut dag_writer = self.dag.write();
-            let round = node.metadata().round();
 
             if !dag_writer.all_exists(node.parents_metadata()) {
                 if let Err(err) = self.fetch_requester.request_for_certified_node(node) {
@@ -126,24 +126,32 @@ impl DagDriver {
                 bail!(DagDriverError::MissingParents);
             }
 
+            self.payload_manager
+                .prefetch_payload_data(node.payload(), node.metadata().timestamp());
             dag_writer.add_node(node)?;
-            if self.current_round == round {
-                dag_writer
-                    .get_strong_links_for_round(self.current_round, &self.epoch_state.verifier)
-            } else {
-                None
-            }
+
+            let highest_round = dag_writer.highest_round();
+            dag_writer
+                .get_strong_links_for_round(highest_round, &self.epoch_state.verifier)
+                .map_or_else(|| highest_round.saturating_sub(1), |_| highest_round)
         };
 
-        if let Some(strong_links) = maybe_strong_links {
-            self.enter_new_round(self.current_round + 1, strong_links)
-                .await;
+        if self.current_round <= highest_strong_links_round {
+            self.enter_new_round(highest_strong_links_round + 1).await;
         }
         Ok(())
     }
 
-    pub async fn enter_new_round(&mut self, new_round: Round, strong_links: Vec<NodeCertificate>) {
+    pub async fn enter_new_round(&mut self, new_round: Round) {
         debug!("entering new round {}", new_round);
+        let strong_links = self
+            .dag
+            .read()
+            .get_strong_links_for_round(new_round - 1, &self.epoch_state.verifier)
+            .unwrap_or_else(|| {
+                assert_eq!(new_round, 1, "Only expect empty strong links for round 1");
+                vec![]
+            });
         let payload_filter = {
             let dag_reader = self.dag.read();
             let highest_commit_round = self
@@ -168,8 +176,8 @@ impl DagDriver {
             .payload_client
             .pull_payload(
                 Duration::from_secs(1),
-                100,
                 1000,
+                10 * 1024 * 1024,
                 payload_filter,
                 Box::pin(async {}),
                 false,
@@ -180,18 +188,26 @@ impl DagDriver {
         {
             Ok(payload) => payload,
             Err(e) => {
-                error!("error pulling payload: {}", e);
-                return;
+                // TODO: return empty payload instead
+                panic!("error pulling payload: {}", e);
             },
         };
         // TODO: need to wait to pass median of parents timestamp
-        let timestamp = self.time_service.now_unix_time();
+        let highest_parent_timestamp = strong_links
+            .iter()
+            .map(|node| node.metadata().timestamp())
+            .max()
+            .unwrap_or(0);
+        let timestamp = std::cmp::max(
+            self.time_service.now_unix_time().as_micros() as u64,
+            highest_parent_timestamp + 1,
+        );
         self.current_round = new_round;
         let new_node = Node::new(
             self.epoch_state.epoch,
             self.current_round,
             self.author,
-            timestamp.as_micros() as u64,
+            timestamp,
             payload,
             strong_links,
             Extensions::empty(),
@@ -209,7 +225,8 @@ impl DagDriver {
             SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone());
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
         let latest_ledger_info = self.ledger_info_provider.get_latest_ledger_info();
-        let task = self
+        let round = node.round();
+        let core_task = self
             .reliable_broadcast
             .broadcast(node.clone(), signature_builder)
             .then(move |certificate| {
@@ -218,6 +235,11 @@ impl DagDriver {
                     CertifiedNodeMessage::new(certified_node, latest_ledger_info);
                 rb.broadcast(certified_node_msg, cert_ack_set)
             });
+        let task = async move {
+            debug!("Start reliable broadcast for round {}", round);
+            core_task.await;
+            debug!("Finish reliable broadcast for round {}", round);
+        };
         tokio::spawn(Abortable::new(task, abort_registration));
         if let Some(prev_handle) = self.rb_abort_handle.replace(abort_handle) {
             prev_handle.abort();

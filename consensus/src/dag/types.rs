@@ -21,7 +21,13 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
-use std::{cmp::min, collections::HashSet, ops::Deref, sync::Arc};
+use std::{
+    cmp::min,
+    collections::HashSet,
+    fmt::{Display, Formatter},
+    ops::Deref,
+    sync::Arc,
+};
 
 pub trait TDAGMessage: Into<DAGMessage> + TryFrom<DAGMessage> {
     fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()>;
@@ -346,6 +352,16 @@ impl NodeId {
 
     pub fn author(&self) -> &Author {
         &self.author
+    }
+}
+
+impl Display for NodeId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "NodeId: [epoch: {}, round: {}, author: {}]",
+            self.epoch, self.round, self.author
+        )
     }
 }
 

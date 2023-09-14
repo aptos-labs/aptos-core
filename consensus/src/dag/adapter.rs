@@ -3,6 +3,7 @@
 
 use crate::{
     consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
+    counters::update_counters_for_committed_blocks,
     dag::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
@@ -167,6 +168,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                     ledger_info_provider
                         .write()
                         .notify_commit_proof(commit_decision);
+                    update_counters_for_committed_blocks(committed_blocks);
                     for executed_block in committed_blocks {
                         if let Some(node_digests) = executed_block.block().block_data().dag_nodes()
                         {
