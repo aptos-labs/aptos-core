@@ -8,6 +8,7 @@
 //! See [`README.md`](../README.md) for integration into an adapter.
 
 use better_any::{Tid, TidAble};
+use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -82,7 +83,7 @@ pub struct TableChangeSet {
 
 /// A change of a single table.
 pub struct TableChange {
-    pub entries: BTreeMap<Vec<u8>, Op<Vec<u8>>>,
+    pub entries: BTreeMap<Vec<u8>, Op<Bytes>>,
 }
 
 /// A table resolver which needs to be provided by the environment. This allows to lookup
@@ -92,7 +93,7 @@ pub trait TableResolver {
         &self,
         handle: &TableHandle,
         key: &[u8],
-    ) -> Result<Option<Vec<u8>>, anyhow::Error>;
+    ) -> Result<Option<Bytes>, anyhow::Error>;
 }
 
 /// The native table context extension. This needs to be attached to the NativeContextExtensions
@@ -176,11 +177,11 @@ impl<'a> NativeTableContext<'a> {
                 match op {
                     Op::New(val) => {
                         let bytes = serialize(&value_layout, &val)?;
-                        entries.insert(key, Op::New(bytes));
+                        entries.insert(key, Op::New(bytes.into()));
                     },
                     Op::Modify(val) => {
                         let bytes = serialize(&value_layout, &val)?;
-                        entries.insert(key, Op::Modify(bytes));
+                        entries.insert(key, Op::Modify(bytes.into()));
                     },
                     Op::Delete => {
                         entries.insert(key, Op::Delete);
@@ -211,8 +212,8 @@ impl TableData {
     ) -> PartialVMResult<&mut Table> {
         Ok(match self.tables.entry(handle) {
             Entry::Vacant(e) => {
-                let key_layout = get_type_layout(context, key_ty)?;
-                let value_layout = get_type_layout(context, value_ty)?;
+                let key_layout = context.type_to_type_layout(key_ty)?;
+                let value_layout = context.type_to_type_layout(value_ty)?;
                 let table = Table {
                     handle,
                     key_layout,
@@ -696,10 +697,4 @@ fn deserialize(layout: &MoveTypeLayout, bytes: &[u8]) -> PartialVMResult<Value> 
 
 fn partial_extension_error(msg: impl ToString) -> PartialVMError {
     PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(msg.to_string())
-}
-
-fn get_type_layout(context: &NativeContext, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-    context
-        .type_to_type_layout(ty)?
-        .ok_or_else(|| partial_extension_error("cannot determine type layout"))
 }

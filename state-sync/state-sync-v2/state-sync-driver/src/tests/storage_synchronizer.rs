@@ -32,7 +32,6 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_notifications::StorageServiceNotificationListener;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
     transaction::{TransactionOutputListWithProof, Version},
 };
 use claims::assert_matches;
@@ -82,7 +81,7 @@ async fn test_apply_transaction_outputs() {
     // Subscribe to the expected event
     let mut event_listener = event_subscription_service
         .lock()
-        .subscribe_to_events(vec![*event_to_commit.key()])
+        .subscribe_to_events(vec![*event_to_commit.v1().unwrap().key()])
         .unwrap();
 
     // Attempt to apply a chunk of outputs
@@ -215,7 +214,7 @@ async fn test_execute_transactions() {
     // Subscribe to the expected event
     let mut event_listener = event_subscription_service
         .lock()
-        .subscribe_to_events(vec![*event_to_commit.key()])
+        .subscribe_to_events(vec![*event_to_commit.v1().unwrap().key()])
         .unwrap();
 
     // Attempt to execute a chunk of transactions
@@ -538,10 +537,9 @@ fn create_storage_synchronizer(
     let (error_notification_sender, error_notification_listener) = ErrorNotificationListener::new();
 
     // Create the event subscription service
-    let event_subscription_service = Arc::new(Mutex::new(EventSubscriptionService::new(
-        ON_CHAIN_CONFIG_REGISTRY,
-        Arc::new(RwLock::new(mock_reader_writer.clone())),
-    )));
+    let event_subscription_service = Arc::new(Mutex::new(EventSubscriptionService::new(Arc::new(
+        RwLock::new(mock_reader_writer.clone()),
+    ))));
 
     // Create the mempool notification handler
     let (mempool_notification_sender, mempool_notification_listener) =

@@ -32,7 +32,7 @@ Parameters:
 All the parameters could be adjusted as appropriate.
 
 ## Create tokens
-The fungible token in Aptos has an unique `TokenId`, a set of creator, collection name, token name and property version.
+The fungible token in Aptos has a unique `TokenId`, a set of creator, collection name, token name and property version.
 For fungible tokens, the property version is always 0. To create a token named "Silver Coin", you run:
 ```bash
 aptos move run --function-id 0x3::token::create_token_script --args string:"Game Coins" string:"Silver Coin" string:"The currency in my game" u64:100 u64:0 string:$TOKEN_URL address:$YOUR_ADDRESS u64:0 u64:0 'bool:[false,false,false,false,false]' raw:00 raw:00 raw:00
@@ -42,7 +42,7 @@ Parameters:
 - token name: "Silver Coin".
 - token description: "The currency in my game".
 - maximum: 0. 0 means there is no maximum supply of this token.
-- uri: Your token url can point to anything. Usually it is an arweave or ipfs url pointing to an token image or JSON
+- uri: Your token url can point to anything. Usually it is an arweave or ipfs url pointing to a token image or JSON
   file containing the required metadata. 
 - royalty_payee_address: Used for NFT. For FT, it is recommended to set the creator address. 
 - royalty_points_denominator: Used for NFT. Set to 0 as N/A. 

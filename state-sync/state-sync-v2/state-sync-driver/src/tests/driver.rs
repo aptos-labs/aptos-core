@@ -16,7 +16,8 @@ use aptos_data_client::client::AptosDataClient;
 use aptos_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
 use aptos_db::AptosDB;
 use aptos_event_notifications::{
-    EventNotificationListener, EventSubscriptionService, ReconfigNotificationListener,
+    DbBackedOnChainConfig, EventNotificationListener, EventSubscriptionService,
+    ReconfigNotificationListener,
 };
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_executor_test_helpers::bootstrap_genesis;
@@ -29,7 +30,7 @@ use aptos_storage_service_notifications::StorageServiceNotificationListener;
 use aptos_time_service::TimeService;
 use aptos_types::{
     event::EventKey,
-    on_chain_config::{new_epoch_event_key, ON_CHAIN_CONFIG_REGISTRY},
+    on_chain_config::new_epoch_event_key,
     transaction::{Transaction, WriteSetPayload},
     waypoint::Waypoint,
 };
@@ -279,7 +280,7 @@ async fn create_validator_driver(
     UnboundedSender<CommitNotification>,
     ConsensusNotifier,
     MempoolNotificationListener,
-    ReconfigNotificationListener,
+    ReconfigNotificationListener<DbBackedOnChainConfig>,
     EventNotificationListener,
     StorageServiceNotificationListener,
     TimeService,
@@ -302,7 +303,7 @@ async fn create_full_node_driver(
     UnboundedSender<CommitNotification>,
     ConsensusNotifier,
     MempoolNotificationListener,
-    ReconfigNotificationListener,
+    ReconfigNotificationListener<DbBackedOnChainConfig>,
     EventNotificationListener,
     StorageServiceNotificationListener,
     TimeService,
@@ -323,7 +324,7 @@ async fn create_driver_for_tests(
     UnboundedSender<CommitNotification>,
     ConsensusNotifier,
     MempoolNotificationListener,
-    ReconfigNotificationListener,
+    ReconfigNotificationListener<DbBackedOnChainConfig>,
     EventNotificationListener,
     StorageServiceNotificationListener,
     TimeService,
@@ -342,10 +343,8 @@ async fn create_driver_for_tests(
     bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn).unwrap();
 
     // Create the event subscription service and subscribe to events and reconfigurations
-    let mut event_subscription_service = EventSubscriptionService::new(
-        ON_CHAIN_CONFIG_REGISTRY,
-        Arc::new(RwLock::new(db_rw.clone())),
-    );
+    let mut event_subscription_service =
+        EventSubscriptionService::new(Arc::new(RwLock::new(db_rw.clone())));
     let mut reconfiguration_subscriber = event_subscription_service
         .subscribe_to_reconfigurations()
         .unwrap();

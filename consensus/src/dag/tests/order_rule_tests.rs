@@ -3,22 +3,25 @@
 
 use crate::{
     dag::{
+        adapter::Notifier,
         anchor_election::RoundRobinAnchorElection,
+        dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
         order_rule::OrderRule,
-        tests::{dag_test::MockStorage, helpers::new_certified_node},
-        types::NodeCertificate,
+        tests::{dag_test::MockStorage, helpers::generate_dag_nodes},
+        types::NodeMetadata,
         CertifiedNode,
     },
     test_utils::placeholder_ledger_info,
 };
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
-    aggregate_signature::AggregateSignature, epoch_state::EpochState,
+    epoch_change::EpochChangeProof, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
     validator_verifier::random_validator_verifier,
 };
-use futures_channel::mpsc::{unbounded, UnboundedReceiver};
+use async_trait::async_trait;
+use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use proptest::prelude::*;
 use std::sync::Arc;
 
@@ -77,44 +80,27 @@ fn generate_permutations(
     )
 }
 
-/// Generate certified nodes for dag given the virtual dag
-fn generate_dag_nodes(
-    dag: &[Vec<Option<Vec<bool>>>],
-    validators: &[Author],
-) -> Vec<Vec<Option<CertifiedNode>>> {
-    let mut nodes = vec![];
-    let mut previous_round: Vec<Option<CertifiedNode>> = vec![];
-    for (round, round_nodes) in dag.iter().enumerate() {
-        let mut nodes_at_round = vec![];
-        for (idx, author) in validators.iter().enumerate() {
-            if let Some(bitmask) = &round_nodes[idx] {
-                // the bitmask is compressed (without the holes), we need to flatten the previous round nodes
-                // to match the index
-                let parents: Vec<_> = previous_round
-                    .iter()
-                    .flatten()
-                    .enumerate()
-                    .filter(|(idx, _)| *bitmask.get(*idx).unwrap_or(&false))
-                    .map(|(_, node)| {
-                        NodeCertificate::new(node.metadata().clone(), AggregateSignature::empty())
-                    })
-                    .collect();
-                if round > 1 {
-                    assert_eq!(parents.len(), NUM_VALIDATORS * 2 / 3 + 1);
-                }
-                nodes_at_round.push(Some(new_certified_node(
-                    (round + 1) as u64,
-                    *author,
-                    parents,
-                )));
-            } else {
-                nodes_at_round.push(None);
-            }
-        }
-        previous_round = nodes_at_round.clone();
-        nodes.push(nodes_at_round);
+pub struct TestNotifier {
+    pub tx: UnboundedSender<Vec<Arc<CertifiedNode>>>,
+}
+
+#[async_trait]
+impl Notifier for TestNotifier {
+    fn send_ordered_nodes(
+        &mut self,
+        ordered_nodes: Vec<Arc<CertifiedNode>>,
+        _failed_authors: Vec<(Round, Author)>,
+    ) -> anyhow::Result<()> {
+        Ok(self.tx.unbounded_send(ordered_nodes)?)
     }
-    nodes
+
+    async fn send_epoch_change(&self, _proof: EpochChangeProof) {
+        unimplemented!()
+    }
+
+    async fn send_commit_proof(&self, _ledger_info: LedgerInfoWithSignatures) {
+        unimplemented!()
+    }
 }
 
 fn create_order_rule(
@@ -127,19 +113,26 @@ fn create_order_rule(
     ));
     let (tx, rx) = unbounded();
     (
-        OrderRule::new(epoch_state, ledger_info, dag, anchor_election, tx),
+        OrderRule::new(
+            epoch_state,
+            ledger_info,
+            dag,
+            anchor_election,
+            Box::new(TestNotifier { tx }),
+            Arc::new(MockStorage::new()),
+        ),
         rx,
     )
 }
 
 const NUM_HOLES: usize = 1;
-const NUM_VALIDATORS: usize = 4;
+const NUM_VALIDATORS: usize = 5;
 const NUM_ROUNDS: u64 = 50;
 const NUM_PERMUTATION: usize = 100;
 
 proptest! {
     #[test]
-    fn test_order_rule(
+    fn test_order_rule_safety(
         mut dag_with_holes in generate_virtual_dag(NUM_VALIDATORS, NUM_HOLES, NUM_ROUNDS),
         mut dag in generate_virtual_dag(NUM_VALIDATORS, 0, NUM_ROUNDS),
         sequences in generate_permutations(NUM_PERMUTATION, (NUM_VALIDATORS - NUM_HOLES) * NUM_ROUNDS as usize)
@@ -153,7 +146,7 @@ proptest! {
             epoch: 1,
             verifier: validator_verifier,
         });
-        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()));
+        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 0, DAG_WINDOW);
         for round_nodes in &nodes {
             for node in round_nodes.iter().flatten() {
                 dag.add_node(node.clone()).unwrap();
@@ -167,7 +160,7 @@ proptest! {
                     let dag = Arc::new(RwLock::new(dag.clone()));
                     let (mut order_rule, mut receiver) = create_order_rule(epoch_state.clone(), dag);
                     for idx in seq {
-                        order_rule.process_new_node(&flatten_nodes[idx]);
+                        order_rule.process_new_node(flatten_nodes[idx].metadata());
                     }
                     let mut ordered = vec![];
                     while let Ok(Some(mut ordered_nodes)) = receiver.try_next() {
@@ -177,13 +170,107 @@ proptest! {
                 });
             }
         });
+        // order produced by process_all
+        let dag = Arc::new(RwLock::new(dag.clone()));
+        let (mut order_rule, mut receiver) = create_order_rule(epoch_state.clone(), dag);
+        order_rule.process_all();
+        let mut ordered = vec![];
+        while let Ok(Some(mut ordered_nodes)) = receiver.try_next() {
+            ordered.append(&mut ordered_nodes);
+        }
         let display = |node: &Arc<CertifiedNode>| {
             (node.metadata().round(), *author_indexes.get(node.metadata().author()).unwrap())
         };
-        let longest: Vec<_> = all_ordered.lock().iter().max_by(|v1, v2| v1.len().cmp(&v2.len())).unwrap().iter().map(display).collect();
+        let longest: Vec<_> = ordered.iter().map(display).collect();
+
         for ordered in all_ordered.lock().iter() {
             let a: Vec<_> = ordered.iter().map(display).collect();
             assert_eq!(a, longest[..a.len()]);
         }
+    }
+}
+
+#[test]
+fn test_order_rule_basic() {
+    let dag = vec![
+        vec![Some(vec![]), Some(vec![]), Some(vec![]), Some(vec![])],
+        vec![
+            Some(vec![false, true, true, true]),
+            Some(vec![true, true, true, false]),
+            Some(vec![false, true, true, true]),
+            None,
+        ],
+        vec![
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+        ],
+        vec![
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+            Some(vec![true, false, true, true]),
+            None,
+        ],
+        vec![
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+            None,
+        ],
+        vec![
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+            None,
+        ],
+    ];
+    let (_, validator_verifier) = random_validator_verifier(4, None, false);
+    let validators = validator_verifier.get_ordered_account_addresses();
+    let author_indexes = validator_verifier.address_to_validator_index().clone();
+    let nodes = generate_dag_nodes(&dag, &validators);
+    let epoch_state = Arc::new(EpochState {
+        epoch: 1,
+        verifier: validator_verifier,
+    });
+    let mut dag = Dag::new(
+        epoch_state.clone(),
+        Arc::new(MockStorage::new()),
+        0,
+        DAG_WINDOW,
+    );
+    for round_nodes in &nodes {
+        for node in round_nodes.iter().flatten() {
+            dag.add_node(node.clone()).unwrap();
+        }
+    }
+    let display = |node: &NodeMetadata| (node.round(), *author_indexes.get(node.author()).unwrap());
+    let dag = Arc::new(RwLock::new(dag.clone()));
+    let (mut order_rule, mut receiver) = create_order_rule(epoch_state, dag);
+    for node in nodes.iter().flatten().flatten() {
+        order_rule.process_new_node(node.metadata());
+    }
+    let expected_order = vec![
+        // anchor (1, 0) has 1 votes, anchor (3, 1) has 2 votes and a path to (1, 0)
+        vec![(1, 0)],
+        // anchor (2, 1) has 3 votes
+        vec![(1, 2), (1, 1), (2, 1)],
+        // anchor (3, 1) has 2 votes
+        vec![(1, 3), (2, 2), (2, 0), (3, 1)],
+        // anchor (4, 2) has 3 votes
+        vec![(3, 3), (3, 2), (3, 0), (4, 2)],
+        // anchor (5, 2) has 3 votes
+        vec![(4, 1), (4, 0), (5, 2)],
+    ];
+    let mut batch = 0;
+    while let Ok(Some(ordered_nodes)) = receiver.try_next() {
+        assert_eq!(
+            ordered_nodes
+                .iter()
+                .map(|node| display(node.metadata()))
+                .collect::<Vec<_>>(),
+            expected_order[batch]
+        );
+        batch += 1;
     }
 }

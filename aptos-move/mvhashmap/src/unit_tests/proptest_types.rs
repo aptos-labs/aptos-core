@@ -15,6 +15,7 @@ use aptos_types::{
     executable::ExecutableTestType, state_store::state_value::StateValue,
     write_set::TransactionWrite,
 };
+use bytes::Bytes;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -46,7 +47,7 @@ enum ExpectedOutput<V: Debug + Clone + PartialEq> {
 struct Value<V>(Option<V>);
 
 impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+    fn extract_raw_bytes(&self) -> Option<Bytes> {
         if self.0.is_none() {
             None
         } else {
@@ -56,7 +57,7 @@ impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
             };
 
             bytes.resize(16, 0);
-            Some(bytes)
+            Some(bytes.into())
         }
     }
 
@@ -205,8 +206,9 @@ where
         })
         .collect::<Vec<_>>();
     for (key, idx) in versions_to_write {
-        map.write(KeyType(key.clone()), (idx as TxnIndex, 0), Value(None));
-        map.mark_estimate(&KeyType(key), idx as TxnIndex);
+        map.data()
+            .write(KeyType(key.clone()), (idx as TxnIndex, 0), Value(None));
+        map.data().mark_estimate(&KeyType(key), idx as TxnIndex);
     }
 
     let current_idx = AtomicUsize::new(0);
@@ -283,10 +285,11 @@ where
                         }
                     },
                     Operator::Remove => {
-                        map.write(KeyType(key.clone()), (idx as TxnIndex, 1), Value(None));
+                        map.data()
+                            .write(KeyType(key.clone()), (idx as TxnIndex, 1), Value(None));
                     },
                     Operator::Insert(v) => {
-                        map.write(
+                        map.data().write(
                             KeyType(key.clone()),
                             (idx as TxnIndex, 1),
                             Value(Some(v.clone())),

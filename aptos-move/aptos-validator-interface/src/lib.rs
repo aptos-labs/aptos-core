@@ -151,7 +151,7 @@ async fn handler_thread<'a>(
                     .get_state_value_by_version(&key, version - 1)
                     .await
                     .ok()
-                    .and_then(|v| v.map(|s| s.into_bytes()));
+                    .and_then(|v| v.map(|s| s.bytes().to_vec()));
                 cache.lock().unwrap().put((key, version), val.clone());
                 sender.send(val)
             });
@@ -181,7 +181,7 @@ impl DebuggerStateView {
             .send((state_key.clone(), version, tx))
             .unwrap();
         let bytes_opt = rx.recv()?;
-        Ok(bytes_opt.map(StateValue::new_legacy))
+        Ok(bytes_opt.map(|bytes| StateValue::new_legacy(bytes.into())))
     }
 }
 
@@ -190,10 +190,6 @@ impl TStateView for DebuggerStateView {
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
         self.get_state_value_internal(state_key, self.version)
-    }
-
-    fn is_genesis(&self) -> bool {
-        false
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {

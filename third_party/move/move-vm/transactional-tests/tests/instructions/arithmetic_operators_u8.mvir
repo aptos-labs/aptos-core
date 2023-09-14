@@ -1,4 +1,4 @@
-//# run
+//# run --verbose
 main() {
 label b0:
     assert(0u8 + 0u8 == 0u8, 1000);
@@ -14,14 +14,14 @@ label b0:
     return;
 }
 
-//# run
+//# run --verbose
 main() {
 label b0:
     _ = 1u8 + 255u8;
     return;
 }
 
-//# run
+//# run --verbose
 main() {
 label b0:
     _ = 215u8 + 156u8;
@@ -30,7 +30,7 @@ label b0:
 
 
 
-//# run
+//# run --verbose
 main() {
 label b0:
     assert(0u8 - 0u8 == 0u8, 2000);
@@ -45,14 +45,14 @@ label b0:
     return;
 }
 
-//# run
+//# run --verbose
 main() {
 label b0:
     _ = 0u8 - 1u8;
     return;
 }
 
-//# run
+//# run --verbose
 main() {
 label b0:
     _ = 54u8 - 100u8;
@@ -60,7 +60,7 @@ label b0:
 }
 
 
-//# run
+//# run --verbose
 main() {
 label b0:
     assert(0u8 * 0u8 == 0u8, 3000);
@@ -74,14 +74,14 @@ label b0:
     return;
 }
 
-//# run
+//# run --verbose
 main() {
 label b0:
     _ = 16u8 * 16u8;
     return;
 }
 
-//# run
+//# run --verbose
 main() {
 label b0:
     _ = 128u8 * 2u8;
@@ -90,7 +90,7 @@ label b0:
 
 
 
-//# run
+//# run --verbose
 main() {
 label b0:
     assert(0u8 / 1u8 == 0u8, 4000);
@@ -105,21 +105,21 @@ label b0:
     return;
 }
 
-//# run
+//# run --verbose
 main() {
 label b0:
     _ = 0u8 / 0u8;
     return;
 }
 
-//# run
+//# run --verbose
 main() {
 label b0:
     _ = 1u8 / 0u8;
     return;
 }
 
-//# run
+//# run --verbose
 main() {
 label b0:
     _ = 255u8 / 0u8;
@@ -128,7 +128,7 @@ label b0:
 
 
 
-//# run
+//# run --verbose
 main() {
 label b0:
     assert(0u8 % 1u8 == 0u8, 5000);
@@ -143,21 +143,21 @@ label b0:
     return;
 }
 
-//# run
+//# run --verbose
 main() {
 label b0:
     _ = 0u8 % 0u8;
     return;
 }
 
-//# run
+//# run --verbose
 main() {
 label b0:
     _ = 1u8 % 0u8;
     return;
 }
 
-//# run
+//# run --verbose
 main() {
 label b0:
     _ = 255u8 % 0u8;

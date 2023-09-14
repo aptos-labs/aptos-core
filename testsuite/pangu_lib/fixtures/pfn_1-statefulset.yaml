@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    type: pfn
+  name: pfn-name-pfn
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: pfn-name-pfn
+      app.kubernetes.io/name: pfn
+      managed-by: pangu
+      type: pfn
+  serviceName: pfn-name-pfn
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: pfn-name-pfn
+        app.kubernetes.io/name: pfn
+        managed-by: pangu
+        type: pfn
+    spec:
+      containers:
+      - command:
+        - /usr/local/bin/aptos-node
+        - -f
+        - /opt/aptos/etc/pfn.yaml
+        image: pfn-image
+        name: pfn-name-pfn
+        ports:
+        - containerPort: 6182
+        - containerPort: 6186
+        - containerPort: 8081
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: pfn-cpu
+            memory: pfn-memory
+        volumeMounts:
+        - mountPath: /opt/aptos/etc
+          name: aptos-config
+        - mountPath: /opt/aptos/genesis
+          name: genesis-config
+        - mountPath: /opt/aptos/data
+          name: aptos-data
+      volumes:
+      - configMap:
+          name: pfn-name-pfn-configmap
+        name: aptos-config
+      - configMap:
+          name: genesis-artifiact-configmap-pangu
+        name: genesis-config
+      - name: aptos-data
+        persistentVolumeClaim:
+          claimName: pfn-name-pfn-pvc

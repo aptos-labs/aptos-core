@@ -29,10 +29,11 @@ jobs:
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
   run-tests-devnet:
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -47,10 +48,11 @@ jobs:
           GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
 
   run-tests-testnet:
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -65,10 +67,11 @@ jobs:
           GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
 
   run-tests-mainnet:
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}

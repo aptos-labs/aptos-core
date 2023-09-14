@@ -4,10 +4,14 @@
 /// Currently this module does not support modules that are larger than 63KB as that is the maximum
 /// that can fit within a transaction and this framework does not split up individual modules.
 module large_packages::large_packages {
+    use std::error;
     use std::signer;
     use std::vector;
 
     use aptos_framework::code;
+
+    /// code_indices and code_chunks should be the same length.
+    const ECODE_MISMATCH: u64 = 1;
 
     struct StagingArea has drop, key {
         metadata_serialized: vector<u8>,
@@ -17,9 +21,15 @@ module large_packages::large_packages {
     public entry fun stage_code(
         owner: &signer,
         metadata_serialized: vector<u8>,
-        code: vector<vector<u8>>,
+        code_indices: vector<u16>,
+        code_chunks: vector<vector<u8>>,
         publish: bool,
     ) acquires StagingArea {
+        assert!(
+            vector::length(&code_indices) == vector::length(&code_chunks),
+            error::invalid_argument(ECODE_MISMATCH),
+        );
+
         let owner_address = signer::address_of(owner);
 
         if (!exists<StagingArea>(owner_address)) {
@@ -31,7 +41,16 @@ module large_packages::large_packages {
 
         let staging_area = borrow_global_mut<StagingArea>(owner_address);
         vector::append(&mut staging_area.metadata_serialized, metadata_serialized);
-        vector::append(&mut staging_area.code, code);
+
+        while (!vector::is_empty(&code_chunks)) {
+            let inner_code = vector::pop_back(&mut code_chunks);
+            let idx = (vector::pop_back(&mut code_indices) as u64);
+            while (vector::length(&staging_area.code) <= idx) {
+                vector::push_back(&mut staging_area.code, vector::empty());
+            };
+            let source_code = vector::borrow_mut(&mut staging_area.code, idx);
+            vector::append(source_code, inner_code)
+        };
 
         let _ = staging_area;
 

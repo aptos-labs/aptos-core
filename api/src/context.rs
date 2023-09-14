@@ -43,9 +43,10 @@ use aptos_types::{
     },
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
+use aptos_utils::aptos_try;
 use aptos_vm::{
     data_cache::{AsMoveResolver, StorageAdapter},
-    move_vm_ext::MoveResolverExt,
+    move_vm_ext::AptosMoveResolver,
 };
 use futures::{channel::oneshot, SinkExt};
 use move_core_types::language_storage::{ModuleId, StructTag};
@@ -258,9 +259,11 @@ impl Context {
     }
 
     pub fn get_state_value(&self, state_key: &StateKey, version: u64) -> Result<Option<Vec<u8>>> {
-        self.db
+        Ok(self
+            .db
             .state_view_at_version(Some(version))?
-            .get_state_value_bytes(state_key)
+            .get_state_value_bytes(state_key)?
+            .map(|val| val.to_vec()))
     }
 
     pub fn get_state_value_poem<E: InternalError>(
@@ -317,11 +320,11 @@ impl Context {
                     StateKeyInner::AccessPath(AccessPath { address: _, path }) => {
                         match Path::try_from(path.as_slice()) {
                             Ok(Path::Resource(struct_tag)) => {
-                                Some(Ok((struct_tag, v.into_bytes())))
+                                Some(Ok((struct_tag, v.bytes().to_vec())))
                             }
                             // TODO: Consider expanding to Path::Resource
                             Ok(Path::ResourceGroup(struct_tag)) => {
-                                Some(Ok((struct_tag, v.into_bytes())))
+                                Some(Ok((struct_tag, v.bytes().to_vec())))
                             }
                             Ok(Path::Code(_)) => None,
                             Err(e) => Some(Err(anyhow::Error::from(e))),
@@ -347,7 +350,23 @@ impl Context {
         let kvs = kvs
             .into_iter()
             .map(|(key, value)| {
-                if state_view.as_move_resolver().is_resource_group(&key) {
+                let is_resource_group =
+                    |resolver: &dyn AptosMoveResolver, struct_tag: &StructTag| -> bool {
+                        aptos_try!({
+                            let md = aptos_framework::get_metadata(
+                                &resolver.get_module_metadata(&struct_tag.module_id()),
+                            )?;
+                            md.struct_attributes
+                                .get(struct_tag.name.as_ident_str().as_str())?
+                                .iter()
+                                .find(|attr| attr.is_resource_group())?;
+                            Some(())
+                        })
+                        .is_some()
+                    };
+
+                let resolver = state_view.as_move_resolver();
+                if is_resource_group(&resolver, &key) {
                     // An error here means a storage invariant has been violated
                     bcs::from_bytes::<ResourceGroup>(&value)
                         .map(|map| {
@@ -393,7 +412,7 @@ impl Context {
                 Ok((k, v)) => match k.inner() {
                     StateKeyInner::AccessPath(AccessPath { address: _, path }) => {
                         match Path::try_from(path.as_slice()) {
-                            Ok(Path::Code(module_id)) => Some(Ok((module_id, v.into_bytes()))),
+                            Ok(Path::Code(module_id)) => Some(Ok((module_id, v.bytes().to_vec()))),
                             Ok(Path::Resource(_)) | Ok(Path::ResourceGroup(_)) => None,
                             Err(e) => Some(Err(anyhow::Error::from(e))),
                         }

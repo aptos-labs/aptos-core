@@ -19,7 +19,7 @@ use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CORE_CODE_ADDRESS},
-    on_chain_config::{ExecutionConfigV2, OnChainExecutionConfig},
+    on_chain_config::{ExecutionConfigV2, OnChainExecutionConfig, TransactionShufflerType},
     transaction::{authenticator::AuthenticationKey, SignedTransaction, Transaction},
 };
 use std::{convert::TryFrom, str::FromStr, sync::Arc, time::Duration};
@@ -44,7 +44,7 @@ async fn test_basic_client() {
     //            test to pass.
     //            Is this caused by us increasing the default max gas amount in
     //            testsuite/forge/src/interface/aptos.rs?
-    let mut account1 = info
+    let account1 = info
         .create_and_fund_user_account(10_000_000_000)
         .await
         .unwrap();
@@ -209,8 +209,8 @@ async fn test_gas_estimation_gas_used_limit() {
     let mut swarm = SwarmBuilder::new_local(1)
         .with_init_genesis_config(Arc::new(|conf| {
             conf.execution_config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
+                transaction_shuffler_type: TransactionShufflerType::NoShuffling,
                 block_gas_limit: Some(1),
-                ..Default::default()
             });
         }))
         .with_init_config(Arc::new(|_, conf, _| {
@@ -526,4 +526,18 @@ async fn test_bcs() {
         json_events.first().unwrap().version.0,
         bcs_events.first().unwrap().transaction_version
     );
+
+    // Test that more than 25 transactions can be retrieved
+    let json_txns = client
+        .get_transactions(Some(0), Some(30))
+        .await
+        .unwrap()
+        .into_inner();
+    let bcs_txns = client
+        .get_transactions_bcs(Some(0), Some(30))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(json_txns.len(), 30);
+    assert_eq!(json_txns.len(), bcs_txns.len());
 }

@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    type: pfn
+  name: pfn-name-pfn
+spec:
+  ports:
+  - name: api
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  - name: aptosnet
+    port: 6182
+    protocol: TCP
+  - name: backup
+    port: 6186
+    protocol: TCP
+  - name: metrics
+    port: 9101
+    protocol: TCP
+  selector:
+    app.kubernetes.io/instance: pfn-name-pfn
+    app.kubernetes.io/name: pfn
+    managed-by: pangu
+    type: pfn

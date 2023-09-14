@@ -463,7 +463,11 @@ where
     delegate! {
         fn algebra(&self) -> &Self::Algebra;
 
-        fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee;
+        fn storage_fee_for_state_slot(&self, op: &WriteOp) -> Fee;
+
+        fn storage_fee_refund_for_state_slot(&self, op: &WriteOp) -> Fee;
+
+        fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee;
 
         fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
 

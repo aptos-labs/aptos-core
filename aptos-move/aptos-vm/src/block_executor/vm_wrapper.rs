@@ -6,13 +6,18 @@ use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
+    data_cache::StorageAdapter,
+    move_vm_ext::write_op_converter::WriteOpConverter,
 };
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
+use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use bytes::Bytes;
 use move_core_types::{
+    effects::Op as MoveStorageOp,
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::VMStatus,
@@ -30,7 +35,12 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     type Txn = PreprocessedTransaction;
 
     fn init(argument: &'a S) -> Self {
-        let vm = AptosVM::new(argument);
+        // AptosVM has to be initialized using configs from storage.
+        // Using adapter allows us to fetch those.
+        // TODO: with new adapter we can relax trait bounds on S and avoid
+        // creating `StorageAdapter` here.
+        let config_storage = StorageAdapter::new(argument);
+        let vm = AptosVM::new(&config_storage);
 
         // Loading `0x1::account` and its transitive dependency into the code cache.
         //
@@ -69,7 +79,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         {
             Ok((vm_status, mut vm_output, sender)) => {
                 if materialize_deltas {
-                    // TODO: Integrate delta application failure.
+                    // TODO: Integrate aggregator v2.
                     vm_output = vm_output
                         .try_materialize(view)
                         .expect("Delta materialization failed");
@@ -104,5 +114,32 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             },
             Err(err) => ExecutionStatus::Abort(err),
         }
+    }
+
+    fn convert_to_value(
+        &self,
+        view: &impl StateView,
+        key: &StateKey,
+        maybe_blob: Option<Bytes>,
+        creation: bool,
+    ) -> anyhow::Result<WriteOp> {
+        let storage_adapter = self.vm.as_move_resolver(view);
+        let wop_converter =
+            WriteOpConverter::new(&storage_adapter, self.vm.is_storage_slot_metadata_enabled());
+
+        let move_op = match maybe_blob {
+            Some(blob) => {
+                if creation {
+                    MoveStorageOp::New(blob)
+                } else {
+                    MoveStorageOp::Modify(blob)
+                }
+            },
+            None => MoveStorageOp::Delete,
+        };
+
+        wop_converter
+            .convert(key, move_op, false)
+            .map_err(|_| anyhow::Error::msg("Error on converting to WriteOp"))
     }
 }

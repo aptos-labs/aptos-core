@@ -7,7 +7,7 @@ use anyhow::Error;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_logger::Schema;
 use aptos_mempool_notifications::MempoolCommitNotification;
-use aptos_types::{account_address::AccountAddress, on_chain_config::OnChainConfigPayload};
+use aptos_types::account_address::AccountAddress;
 use serde::Serialize;
 use std::{fmt, fmt::Write, time::SystemTime};
 
@@ -103,8 +103,6 @@ pub struct LogSchema<'a> {
     peer: Option<&'a PeerNetworkId>,
     is_upstream_peer: Option<bool>,
     #[schema(display)]
-    reconfig_update: Option<OnChainConfigPayload>,
-    #[schema(display)]
     txns: Option<TxnsLog>,
     account: Option<AccountAddress>,
     #[schema(display)]
@@ -116,6 +114,7 @@ pub struct LogSchema<'a> {
     #[schema(debug)]
     batch_id: Option<&'a MultiBatchId>,
     backpressure: Option<bool>,
+    num_txns: Option<usize>,
 }
 
 impl<'a> LogSchema<'a> {
@@ -134,7 +133,6 @@ impl<'a> LogSchema<'a> {
             error: None,
             peer: None,
             is_upstream_peer: None,
-            reconfig_update: None,
             account: None,
             txns: None,
             quorum_store_msg: None,
@@ -143,6 +141,7 @@ impl<'a> LogSchema<'a> {
             upstream_network: None,
             batch_id: None,
             backpressure: None,
+            num_txns: None,
         }
     }
 }

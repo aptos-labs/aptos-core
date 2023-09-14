@@ -7,6 +7,7 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
+use aptos_types::on_chain_config::FeatureFlag;
 use ark_std::iterable::Iterable;
 use move_core_types::{
     account_address::AccountAddress,
@@ -175,13 +176,30 @@ fn native_format_impl(
             write!(out, "@{}", str).unwrap();
         },
         MoveTypeLayout::Signer => {
-            let addr = val.value_as::<move_core_types::account_address::AccountAddress>()?;
+            let fix_enabled = context
+                .context
+                .get_feature_flags()
+                .is_enabled(FeatureFlag::SIGNER_NATIVE_FORMAT_FIX);
+            let addr = if fix_enabled {
+                val.value_as::<Struct>()?
+                    .unpack()?
+                    .next()
+                    .unwrap()
+                    .value_as::<move_core_types::account_address::AccountAddress>()?
+            } else {
+                val.value_as::<move_core_types::account_address::AccountAddress>()?
+            };
+
             let str = if context.canonicalize {
                 addr.to_canonical_string()
             } else {
                 addr.to_hex_literal()
             };
-            write!(out, "signer({})", str).unwrap();
+            if fix_enabled {
+                write!(out, "signer(@{})", str).unwrap();
+            } else {
+                write!(out, "signer({})", str).unwrap();
+            }
         },
         MoveTypeLayout::Vector(ty) => {
             if let MoveTypeLayout::U8 = ty.as_ref() {
@@ -299,7 +317,7 @@ pub(crate) fn native_format_debug(
     ty: &Type,
     v: Value,
 ) -> SafeNativeResult<String> {
-    let layout = context.deref().type_to_fully_annotated_layout(ty)?.unwrap();
+    let layout = context.deref().type_to_fully_annotated_layout(ty)?;
     let mut format_context = FormatContext {
         context,
         should_charge_gas: false,
@@ -323,8 +341,7 @@ fn native_format(
     debug_assert!(ty_args.len() == 1);
     let ty = context
         .deref()
-        .type_to_fully_annotated_layout(&ty_args[0])?
-        .unwrap();
+        .type_to_fully_annotated_layout(&ty_args[0])?;
     let include_int_type = safely_pop_arg!(arguments, bool);
     let single_line = safely_pop_arg!(arguments, bool);
     let canonicalize = safely_pop_arg!(arguments, bool);
@@ -413,9 +430,7 @@ fn native_format_list(
                 val = it.next().unwrap();
                 list_ty = &ty_args[1];
 
-                let ty = context
-                    .type_to_fully_annotated_layout(&ty_args[0])?
-                    .unwrap();
+                let ty = context.type_to_fully_annotated_layout(&ty_args[0])?;
                 let mut format_context = FormatContext {
                     context,
                     should_charge_gas: true,

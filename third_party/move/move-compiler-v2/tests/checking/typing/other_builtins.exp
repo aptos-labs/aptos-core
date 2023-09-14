@@ -1,21 +1,25 @@
 // ---- Model Dump
 module 0x8675309::M {
-    private fun any<T>() {
+    private fun any<T>(): #0 {
         Abort(0)
     }
     private fun foo(x: &mut u64) {
         Freeze<u64>(x);
         Freeze<vector<bool>>(Borrow(Mutable)(M::any<vector<bool>>()));
         if And(true, false) {
-          Abort(Deref(x))
-        } else {
           Tuple()
+        } else {
+          Abort(Deref(x))
         };
         if Or(true, false) {
-          Abort(Cast(0))
-        } else {
           Tuple()
+        } else {
+          Abort(Cast(0))
         };
         Tuple()
     }
+    spec fun $any<T>(): #0 {
+        Abort(0)
+    }
+    spec fun $foo(x: &mut u64);
 } // end 0x8675309::M

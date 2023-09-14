@@ -5,18 +5,19 @@ module 0x2::X {
     }
 } // end 0x2::X
 module 0x2::M {
+    use 0x2::X; // resolved as: 0x2::X
     private fun foo(_x: u64) {
         Tuple()
     }
-    private fun t0() {
+    private fun t0(): X::R {
         loop {
           Tuple()
         }
     }
-    private fun t1() {
+    private fun t1(): u64 {
         loop {
           {
-            let x: () = 0;
+            let x: u64 = 0;
             x;
             Tuple()
           }
@@ -27,7 +28,7 @@ module 0x2::M {
           Tuple()
         })
     }
-    private fun t3() {
+    private fun t3(): X::R {
         {
           let x: X::R = loop {
             0;
@@ -37,6 +38,38 @@ module 0x2::M {
         }
     }
     private fun t4() {
+        {
+          let () = loop {
+            break
+          };
+          {
+            let () = loop {
+              if false {
+                break
+              } else {
+                Tuple()
+              }
+            };
+            Tuple()
+          }
+        }
+    }
+    spec fun $foo(_x: u64) {
+        Tuple()
+    }
+    spec fun $t0(): X::R {
+        loop {
+          Tuple()
+        }
+    }
+    spec fun $t1(): u64;
+    spec fun $t2() {
+        M::$foo(loop {
+          Tuple()
+        })
+    }
+    spec fun $t3(): X::R;
+    spec fun $t4() {
         {
           let () = loop {
             break

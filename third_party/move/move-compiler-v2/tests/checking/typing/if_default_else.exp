@@ -15,7 +15,7 @@ module 0x8675309::M {
           {
             let () = if cond {
               {
-                let x: () = 0;
+                let x: u64 = 0;
                 x;
                 Tuple()
               }
@@ -26,4 +26,5 @@ module 0x8675309::M {
           }
         }
     }
+    spec fun $t0(cond: bool);
 } // end 0x8675309::M

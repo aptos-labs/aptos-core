@@ -14,7 +14,8 @@
 version: "3.8"
 services:
   redis:
-    image: ${REDIS_IMAGE_REPO:-redis}:6.2
+    image: ${REDIS_IMAGE_REPO:-redis}:7.2
+    command: redis-server --appendonly yes
     networks:
       shared:
         ipv4_address:  172.16.1.12
@@ -25,7 +26,7 @@ services:
       - 6379:6379
 
   redis-replica:
-    image: ${REDIS_IMAGE_REPO:-redis}:6.2
+    image: ${REDIS_IMAGE_REPO:-redis}:7.2
     command: redis-server --replicaof redis 6379
     networks:
       shared:
@@ -89,12 +90,19 @@ services:
       - type: bind
         source: ./data-service-config.yaml
         target: /opt/aptos/data-service-config.yaml
+      - type: bind
+        source: ./data-service-grpc-server.key
+        target: /opt/aptos/certs/data-service-grpc-server.key
+      - type: bind
+        source: ./data-service-grpc-server.crt
+        target: /opt/aptos/certs/data-service-grpc-server.crt
     command:
       - '/usr/local/bin/aptos-indexer-grpc-data-service'
       - '--config-path'
       - '/opt/aptos/data-service-config.yaml'
     ports:
-      - "50052:50052" # GRPC
+      - "50052:50052" # GRPC non-secure
+      - "50053:50053" # GRPC secure
       - "18084:8084" # health
     depends_on:
       - indexer-grpc-cache-worker

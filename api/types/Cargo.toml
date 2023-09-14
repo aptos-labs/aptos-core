@@ -29,7 +29,9 @@ indoc = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-resource-viewer = { workspace = true }
+once_cell = { workspace = true }
 poem = { workspace = true }
 poem-openapi = { workspace = true }
+poem-openapi-derive = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

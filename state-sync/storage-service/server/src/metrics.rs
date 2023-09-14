@@ -14,6 +14,9 @@ pub const LRU_CACHE_HIT: &str = "lru_cache_hit";
 pub const LRU_CACHE_PROBE: &str = "lru_cache_probe";
 pub const OPTIMISTIC_FETCH_ADD: &str = "optimistic_fetch_add";
 pub const OPTIMISTIC_FETCH_EXPIRE: &str = "optimistic_fetch_expire";
+pub const SUBSCRIPTION_ADD: &str = "subscription_add";
+pub const SUBSCRIPTION_EXPIRE: &str = "subscription_expire";
+pub const SUBSCRIPTION_FAILURE: &str = "subscription_failure";
 
 /// Gauge for tracking the number of actively ignored peers
 pub static IGNORED_PEER_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
@@ -46,6 +49,16 @@ pub static NETWORK_FRAME_OVERFLOW: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Gauge for tracking the number of active optimistic fetches
+pub static OPTIMISTIC_FETCH_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_storage_service_server_optimistic_fetch_count",
+        "Gauge for tracking the number of active optimistic fetches",
+        &["network_id"]
+    )
+    .unwrap()
+});
+
 /// Counter for optimistic fetch request events
 pub static OPTIMISTIC_FETCH_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -56,7 +69,7 @@ pub static OPTIMISTIC_FETCH_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Time it takes to process a storage request
+/// Time it takes to process an optimistic fetch request
 pub static OPTIMISTIC_FETCH_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_storage_service_server_optimistic_fetch_latency",
@@ -111,6 +124,36 @@ pub static STORAGE_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(||
     register_histogram_vec!(
         "aptos_storage_service_server_request_latency",
         "Time it takes to process a storage service request",
+        &["network_id", "request_type"]
+    )
+    .unwrap()
+});
+
+/// Gauge for tracking the number of active subscriptions
+pub static SUBSCRIPTION_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_storage_service_server_subscription_count",
+        "Gauge for tracking the number of active subscriptions",
+        &["network_id"]
+    )
+    .unwrap()
+});
+
+/// Counter for subscription events
+pub static SUBSCRIPTION_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_storage_service_server_subscription_event",
+        "Counters related to subscription events",
+        &["network_id", "event"]
+    )
+    .unwrap()
+});
+
+/// Time it takes to process a subscription request
+pub static SUBSCRIPTION_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_storage_service_server_subscription_latency",
+        "Time it takes to process a subscription request",
         &["network_id", "request_type"]
     )
     .unwrap()

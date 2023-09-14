@@ -12,17 +12,21 @@ use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
+    contract_event::ReadWriteEvent,
+    event::EventKey,
     executable::ModulePath,
     fee_statement::FeeStatement,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
+use bytes::Bytes;
 use claims::assert_ok;
+use move_core_types::language_storage::TypeTag;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
 use std::{
-    collections::{hash_map::DefaultHasher, BTreeSet},
+    collections::{hash_map::DefaultHasher, BTreeSet, HashMap},
     convert::TryInto,
     fmt::Debug,
     hash::{Hash, Hasher},
@@ -32,7 +36,6 @@ use std::{
         Arc,
     },
 };
-
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
 // TODO: extend to delta failures.
 pub(crate) const STORAGE_AGGREGATOR_VALUE: u128 = 100001;
@@ -51,17 +54,13 @@ where
 
     /// Gets the state value for a given state key.
     fn get_state_value(&self, _: &K) -> anyhow::Result<Option<StateValue>> {
-        Ok(Some(StateValue::new_legacy(serialize(
-            &STORAGE_AGGREGATOR_VALUE,
-        ))))
+        Ok(Some(StateValue::new_legacy(
+            serialize(&STORAGE_AGGREGATOR_VALUE).into(),
+        )))
     }
 
     fn id(&self) -> StateViewId {
         StateViewId::Miscellaneous
-    }
-
-    fn is_genesis(&self) -> bool {
-        unreachable!();
     }
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
@@ -87,10 +86,6 @@ where
 
     fn id(&self) -> StateViewId {
         StateViewId::Miscellaneous
-    }
-
-    fn is_genesis(&self) -> bool {
-        unreachable!();
     }
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
@@ -145,11 +140,11 @@ pub struct ValueType<V: Into<Vec<u8>> + Debug + Clone + Eq + Arbitrary>(
 impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> TransactionWrite
     for ValueType<V>
 {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+    fn extract_raw_bytes(&self) -> Option<Bytes> {
         if self.1 {
             let mut v = self.0.clone().into();
             v.resize(16, 1);
-            Some(v)
+            Some(v.into())
         } else {
             None
         }
@@ -203,13 +198,15 @@ pub(crate) struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + 
 /// Then we can generate the baseline by sequentially executing the behavior prescribed for
 /// those latest incarnations.
 #[derive(Clone, Debug)]
-pub(crate) struct MockIncarnation<K, V> {
+pub(crate) struct MockIncarnation<K, V, E> {
     /// A vector of keys to be read during mock incarnation execution.
     pub(crate) reads: Vec<K>,
     /// A vector of keys and corresponding values to be written during mock incarnation execution.
     pub(crate) writes: Vec<(K, V)>,
     /// A vector of keys and corresponding deltas to be produced during mock incarnation execution.
     pub(crate) deltas: Vec<(K, DeltaOp)>,
+    // A vector of events.
+    pub(crate) events: Vec<E>,
     /// total execution gas to be charged for mock incarnation execution.
     pub(crate) gas: u64,
 }
@@ -220,7 +217,7 @@ pub(crate) struct MockIncarnation<K, V> {
 /// counter value. Each execution of the transaction increments the incarnation counter, and its
 /// value determines the index for choosing the read & write sets of the particular execution.
 #[derive(Clone, Debug)]
-pub(crate) enum MockTransaction<K, V> {
+pub(crate) enum MockTransaction<K, V, E> {
     Write {
         /// Incarnation counter, increased during each mock (re-)execution. Allows tracking the final
         /// incarnation for each mock transaction, whose behavior should be reproduced for baseline.
@@ -228,7 +225,7 @@ pub(crate) enum MockTransaction<K, V> {
         incarnation_counter: Arc<AtomicUsize>,
         /// A vector of mock behaviors prescribed for each incarnation of the transaction, chosen
         /// round robin depending on the incarnation counter value).
-        incarnation_behaviors: Vec<MockIncarnation<K, V>>,
+        incarnation_behaviors: Vec<MockIncarnation<K, V, E>>,
     },
     /// Skip the execution of trailing transactions.
     SkipRest,
@@ -236,20 +233,31 @@ pub(crate) enum MockTransaction<K, V> {
     Abort,
 }
 
-impl<K, V> MockTransaction<K, V> {
-    pub(crate) fn from_behavior(behavior: MockIncarnation<K, V>) -> Self {
+impl<K, V, E> MockTransaction<K, V, E> {
+    pub(crate) fn from_behavior(behavior: MockIncarnation<K, V, E>) -> Self {
         Self::Write {
             incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: vec![behavior],
         }
     }
 
-    pub(crate) fn from_behaviors(behaviors: Vec<MockIncarnation<K, V>>) -> Self {
+    pub(crate) fn from_behaviors(behaviors: Vec<MockIncarnation<K, V, E>>) -> Self {
         Self::Write {
             incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: behaviors,
         }
     }
+}
+
+impl<
+        K: Debug + Hash + Ord + Clone + Send + Sync + ModulePath + 'static,
+        V: Clone + Send + Sync + TransactionWrite + 'static,
+        E: Debug + Clone + Send + Sync + ReadWriteEvent + 'static,
+    > Transaction for MockTransaction<K, V, E>
+{
+    type Event = E;
+    type Key = K;
+    type Value = V;
 }
 
 // TODO: try and test different strategies.
@@ -277,8 +285,8 @@ impl Default for TransactionGenParams {
 // TODO: consider adding writes to reads (read-before-write). Similar behavior to the Move-VM
 // and may force more testing (since we check read results).
 impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> TransactionGen<V> {
-    // TODO: disentangle writes and deltas.
     fn writes_and_deltas_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
+        // TODO: disentangle writes and deltas.
         universe: &[K],
         gen: Vec<Vec<(Index, V)>>,
         module_write_fn: &dyn Fn(usize) -> bool,
@@ -347,14 +355,14 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             .collect()
     }
 
-    fn new_mock_write_txn<K: Clone + Hash + Debug + Eq + Ord>(
+    fn new_mock_write_txn<K: Clone + Hash + Debug + Eq + Ord, E: Debug + Clone + ReadWriteEvent>(
         self,
         universe: &[K],
         module_read_fn: &dyn Fn(usize) -> bool,
         module_write_fn: &dyn Fn(usize) -> bool,
         delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
         allow_deletes: bool,
-    ) -> MockTransaction<KeyType<K>, ValueType<V>> {
+    ) -> MockTransaction<KeyType<K>, ValueType<V>, E> {
         let reads = Self::reads_from_gen(universe, self.reads, &module_read_fn);
         let gas = Self::gas_from_gen(self.gas);
 
@@ -372,6 +380,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             reads,
             writes,
             deltas,
+            events: vec![],
             gas,
         })
         .collect();
@@ -379,12 +388,15 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         MockTransaction::from_behaviors(behaviors)
     }
 
-    pub(crate) fn materialize<K: Clone + Hash + Debug + Eq + Ord>(
+    pub(crate) fn materialize<
+        K: Clone + Hash + Debug + Eq + Ord,
+        E: Send + Sync + Debug + Clone + ReadWriteEvent,
+    >(
         self,
         universe: &[K],
         // Are writes and reads module access (same access path).
         module_access: (bool, bool),
-    ) -> MockTransaction<KeyType<K>, ValueType<V>> {
+    ) -> MockTransaction<KeyType<K>, ValueType<V>, E> {
         let is_module_read = |_| -> bool { module_access.1 };
         let is_module_write = |_| -> bool { module_access.0 };
         let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
@@ -400,12 +412,15 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         )
     }
 
-    pub(crate) fn materialize_with_deltas<K: Clone + Hash + Debug + Eq + Ord>(
+    pub(crate) fn materialize_with_deltas<
+        K: Clone + Hash + Debug + Eq + Ord,
+        E: Send + Sync + Debug + Clone + ReadWriteEvent,
+    >(
         self,
         universe: &[K],
         delta_threshold: usize,
         allow_deletes: bool,
-    ) -> MockTransaction<KeyType<K>, ValueType<V>> {
+    ) -> MockTransaction<KeyType<K>, ValueType<V>, E> {
         let is_module_read = |_| -> bool { false };
         let is_module_write = |_| -> bool { false };
         let is_delta = |i, v: &V| -> Option<DeltaOp> {
@@ -434,7 +449,10 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         )
     }
 
-    pub(crate) fn materialize_disjoint_module_rw<K: Clone + Hash + Debug + Eq + Ord>(
+    pub(crate) fn materialize_disjoint_module_rw<
+        K: Clone + Hash + Debug + Eq + Ord,
+        E: Send + Sync + Debug + Clone + ReadWriteEvent,
+    >(
         self,
         universe: &[K],
         // keys generated with indices from read_threshold to write_threshold will be
@@ -443,7 +461,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         // writes. This way there will be module accesses but no intersection.
         read_threshold: usize,
         write_threshold: usize,
-    ) -> MockTransaction<KeyType<K>, ValueType<V>> {
+    ) -> MockTransaction<KeyType<K>, ValueType<V>, E> {
         assert!(read_threshold < universe.len());
         assert!(write_threshold > read_threshold);
         assert!(write_threshold < universe.len());
@@ -462,37 +480,29 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     }
 }
 
-impl<K, V> Transaction for MockTransaction<K, V>
-where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
-    V: Debug + Send + Sync + Debug + Clone + TransactionWrite + 'static,
-{
-    type Key = K;
-    type Value = V;
-}
-
 ///////////////////////////////////////////////////////////////////////////
 // Mock transaction executor implementation.
 ///////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
-pub(crate) struct MockTask<K, V>(PhantomData<(K, V)>);
+pub(crate) struct MockTask<K, V, E>(PhantomData<(K, V, E)>);
 
-impl<K, V> MockTask<K, V> {
+impl<K, V, E> MockTask<K, V, E> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<K, V> ExecutorTask for MockTask<K, V>
+impl<K, V, E> ExecutorTask for MockTask<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
 {
     type Argument = ();
     type Error = usize;
-    type Output = MockOutput<K, V>;
-    type Txn = MockTransaction<K, V>;
+    type Output = MockOutput<K, V, E>;
+    type Txn = MockTransaction<K, V, E>;
 
     fn init(_argument: Self::Argument) -> Self {
         Self::new()
@@ -519,72 +529,137 @@ where
                 let behavior = &incarnation_behaviors[idx % incarnation_behaviors.len()];
 
                 // Reads
-                let mut reads_result = vec![];
+                let mut read_results = vec![];
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
                     match view.get_state_value_bytes(k) {
-                        Ok(v) => reads_result.push(v),
-                        Err(_) => reads_result.push(None),
+                        Ok(v) => read_results.push(v.map(Into::into)),
+                        Err(_) => read_results.push(None),
                     }
                 }
-                ExecutionStatus::Success(MockOutput(
-                    behavior.writes.clone(),
-                    behavior.deltas.clone(),
-                    reads_result,
-                    OnceCell::new(),
-                    behavior.gas,
-                ))
+                ExecutionStatus::Success(MockOutput {
+                    writes: behavior.writes.clone(),
+                    deltas: behavior.deltas.clone(),
+                    events: behavior.events.to_vec(),
+                    read_results,
+                    materialized_delta_writes: OnceCell::new(),
+                    total_gas: behavior.gas,
+                })
             },
             MockTransaction::SkipRest => ExecutionStatus::SkipRest(MockOutput::skip_output()),
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
     }
+
+    fn convert_to_value(
+        &self,
+        _view: &impl TStateView<Key = K>,
+        _key: &K,
+        _maybe_blob: Option<Bytes>,
+        _creation: bool,
+    ) -> anyhow::Result<V> {
+        unimplemented!("TODO: implement for AggregatorV2 testing");
+    }
 }
 
 #[derive(Debug)]
-// TODO: name members.
-pub(crate) struct MockOutput<K, V>(
-    pub(crate) Vec<(K, V)>,
-    pub(crate) Vec<(K, DeltaOp)>,
-    pub(crate) Vec<Option<Vec<u8>>>,
-    pub(crate) OnceCell<Vec<(K, WriteOp)>>,
-    pub(crate) u64,
-);
 
-impl<K, V> TransactionOutput for MockOutput<K, V>
+pub(crate) struct MockOutput<K, V, E> {
+    pub(crate) writes: Vec<(K, V)>,
+    pub(crate) deltas: Vec<(K, DeltaOp)>,
+    pub(crate) events: Vec<E>,
+    pub(crate) read_results: Vec<Option<Vec<u8>>>,
+    pub(crate) materialized_delta_writes: OnceCell<Vec<(K, WriteOp)>>,
+    pub(crate) total_gas: u64,
+}
+
+impl<K, V, E> TransactionOutput for MockOutput<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
 {
-    type Txn = MockTransaction<K, V>;
+    type Txn = MockTransaction<K, V, E>;
 
-    fn get_writes(&self) -> Vec<(K, V)> {
-        self.0.clone()
+    fn resource_write_set(&self) -> HashMap<K, V> {
+        self.writes
+            .iter()
+            .filter(|(k, _)| k.module_path().is_none())
+            .cloned()
+            .collect()
     }
 
-    fn get_deltas(&self) -> Vec<(K, DeltaOp)> {
-        self.1.clone()
+    fn module_write_set(&self) -> HashMap<K, V> {
+        self.writes
+            .iter()
+            .filter(|(k, _)| k.module_path().is_some())
+            .cloned()
+            .collect()
+    }
+
+    // Aggregator v1 writes are included in resource_write_set for tests (writes are produced
+    // for all keys including ones for v1_aggregators without distinguishing).
+    fn aggregator_v1_write_set(&self) -> HashMap<K, V> {
+        HashMap::new()
+    }
+
+    fn aggregator_v1_delta_set(&self) -> HashMap<K, DeltaOp> {
+        self.deltas.iter().cloned().collect()
+    }
+
+    fn get_events(&self) -> Vec<E> {
+        self.events.clone()
     }
 
     fn skip_output() -> Self {
-        Self(
-            /*writes = */ vec![],
-            /*deltas = */ vec![],
-            /*read results = */ vec![],
-            /*materialized delta writes = */ OnceCell::new(),
-            /*gas = */ 0,
-        )
+        Self {
+            writes: vec![],
+            deltas: vec![],
+            events: vec![],
+            read_results: vec![],
+            materialized_delta_writes: OnceCell::new(),
+            total_gas: 0,
+        }
     }
 
     fn incorporate_delta_writes(&self, delta_writes: Vec<(K, WriteOp)>) {
-        assert_ok!(self.3.set(delta_writes));
+        assert_ok!(self.materialized_delta_writes.set(delta_writes));
     }
 
     fn fee_statement(&self) -> FeeStatement {
         // First argument is supposed to be total (not important for the test though).
         // Next two arguments are different kinds of execution gas that are counted
         // towards the block limit. We split the total into two pieces for these arguments.
-        // TODO: add variety to generating fee statement based on total gas (self.4).
-        FeeStatement::new(self.4, self.4 / 2, (self.4 + 1) / 2, 0, 0)
+        // TODO: add variety to generating fee statement based on total gas.
+        FeeStatement::new(
+            self.total_gas,
+            self.total_gas / 2,
+            (self.total_gas + 1) / 2,
+            0,
+            0,
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct MockEvent {
+    key: EventKey,
+    sequence_number: u64,
+    type_tag: TypeTag,
+    event_data: Vec<u8>,
+}
+
+impl ReadWriteEvent for MockEvent {
+    fn get_event_data(&self) -> (EventKey, u64, &TypeTag, &[u8]) {
+        (
+            self.key,
+            self.sequence_number,
+            &self.type_tag,
+            &self.event_data,
+        )
+    }
+
+    fn update_event_data(&mut self, event_data: Vec<u8>) {
+        self.event_data = event_data;
     }
 }

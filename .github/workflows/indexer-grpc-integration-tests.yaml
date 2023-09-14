@@ -12,15 +12,12 @@ permissions:
 
 # cancel redundant builds
 concurrency:
-  # cancel redundant builds on PRs (only on PR, not on branches)
-  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
+  # for push events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
+  # for pull_request events newer jobs cancel earlier jobs to save on CI etc.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'push' && github.sha || github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # Note on the job-level `if` conditions:
-  # This workflow is designed such that we run subsequent jobs only when a 'push'
-  # triggered the workflow or on 'pull_request's which have set auto_merge=true
-  # or have the label "CICD:run-e2e-tests".
   permission-check:
     runs-on: ubuntu-latest
     steps:
@@ -31,6 +28,7 @@ jobs:
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
   run-tests-local-testnet:
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]
     runs-on: high-perf-docker
     env:
@@ -42,6 +40,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
+      - name: Install grpcurl
+        run: curl -sSL "https://github.com/fullstorydev/grpcurl/releases/download/v1.8.7/grpcurl_1.8.7_linux_x86_64.tar.gz" | sudo tar -xz -C /usr/local/bin
 
       - name: Set up Rust
         uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
@@ -57,9 +58,14 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      - name: Run indexer gRPC dependnencies locally (${{ env.IMAGE_TAG }})
+      - uses: ./.github/actions/python-setup
+        with:
+          pyproject_directory: ./testsuite
+
+      - name: Run indexer gRPC dependencies locally (devnet)
         shell: bash
-        run: ./testsuite/indexer_grpc_local.py --verbose start --no-indexer-grpc
+        working-directory: ./testsuite
+        run: poetry run python indexer_grpc_local.py --verbose start --no-indexer-grpc
 
       - name: Run indexer gRPC integration tests
         shell: bash

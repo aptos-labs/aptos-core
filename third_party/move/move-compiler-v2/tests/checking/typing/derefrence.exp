@@ -22,4 +22,5 @@ module 0x8675309::M {
         Deref(Borrow(Mutable)(select M::S.x(s_mut)));
         Tuple()
     }
+    spec fun $t0(x: &u64,x_mut: &mut u64,s: &M::S,s_mut: &mut M::S);
 } // end 0x8675309::M

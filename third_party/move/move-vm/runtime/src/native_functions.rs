@@ -15,7 +15,7 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::TypeTag,
     value::MoveTypeLayout,
-    vm_status::{StatusCode, StatusType},
+    vm_status::StatusCode,
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
@@ -139,48 +139,16 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         Ok((exists, num_bytes))
     }
 
-    pub fn save_event(
-        &mut self,
-        guid: Vec<u8>,
-        seq_num: u64,
-        ty: Type,
-        val: Value,
-    ) -> PartialVMResult<bool> {
-        match self
-            .data_store
-            .emit_event(self.resolver.loader(), guid, seq_num, ty, val)
-        {
-            Ok(()) => Ok(true),
-            Err(e) if e.major_status().status_type() == StatusType::InvariantViolation => Err(e),
-            Err(_) => Ok(false),
-        }
-    }
-
-    pub fn emitted_events(&self, guid: Vec<u8>, ty: Type) -> PartialVMResult<Vec<Value>> {
-        self.data_store.emitted_events(guid, ty)
-    }
-
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
         self.resolver.loader().type_to_type_tag(ty)
     }
 
-    pub fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<Option<MoveTypeLayout>> {
-        match self.resolver.type_to_type_layout(ty) {
-            Ok(ty_layout) => Ok(Some(ty_layout)),
-            Err(e) if e.major_status().status_type() == StatusType::InvariantViolation => Err(e),
-            Err(_) => Ok(None),
-        }
+    pub fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+        self.resolver.type_to_type_layout(ty)
     }
 
-    pub fn type_to_fully_annotated_layout(
-        &self,
-        ty: &Type,
-    ) -> PartialVMResult<Option<MoveTypeLayout>> {
-        match self.resolver.type_to_fully_annotated_layout(ty) {
-            Ok(ty_layout) => Ok(Some(ty_layout)),
-            Err(e) if e.major_status().status_type() == StatusType::InvariantViolation => Err(e),
-            Err(_) => Ok(None),
-        }
+    pub fn type_to_fully_annotated_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+        self.resolver.type_to_fully_annotated_layout(ty)
     }
 
     pub fn extensions(&self) -> &NativeContextExtensions<'b> {

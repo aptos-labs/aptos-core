@@ -14,7 +14,8 @@ use crate::{
 use anyhow::{anyhow, ensure, Result};
 use aptos_consensus_types::block::Block as ConsensusBlock;
 use aptos_crypto::HashValue;
-use aptos_executor_types::{Error, ExecutedBlock};
+use aptos_executor_types::{execution_output::ExecutionOutput, ExecutorError, LedgerUpdateOutput};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
 use aptos_storage_interface::DbReader;
@@ -29,7 +30,7 @@ use std::{
 
 pub struct Block {
     pub id: HashValue,
-    pub output: ExecutedBlock,
+    pub output: ExecutionOutput,
     children: Mutex<Vec<Arc<Block>>>,
     block_lookup: Arc<BlockLookup>,
 }
@@ -50,7 +51,10 @@ impl Block {
     }
 
     pub fn num_persisted_transactions(&self) -> LeafCount {
-        self.output.result_view.txn_accumulator().num_leaves()
+        self.output
+            .get_ledger_update()
+            .txn_accumulator()
+            .num_leaves()
     }
 
     pub fn ensure_has_child(&self, child_id: HashValue) -> Result<()> {
@@ -94,7 +98,7 @@ impl BlockLookupInner {
     fn fetch_or_add_block(
         &mut self,
         id: HashValue,
-        output: ExecutedBlock,
+        output: ExecutionOutput,
         parent_id: Option<HashValue>,
         block_lookup: &Arc<BlockLookup>,
     ) -> Result<(Arc<Block>, bool, Option<Arc<Block>>)> {
@@ -112,10 +116,7 @@ impl BlockLookupInner {
                     .upgrade()
                     .ok_or_else(|| anyhow!("block dropped unexpected."))?;
                 ensure!(
-                    existing
-                        .output
-                        .result_view
-                        .is_same_view(&output.result_view),
+                    existing.output.is_same_state(&output),
                     "Different block with same id {:x}",
                     id,
                 );
@@ -153,7 +154,7 @@ impl BlockLookup {
     fn fetch_or_add_block(
         self: &Arc<Self>,
         id: HashValue,
-        output: ExecutedBlock,
+        output: ExecutionOutput,
         parent_id: Option<HashValue>,
     ) -> Result<Arc<Block>> {
         let (block, existing, parent_block) = self
@@ -203,7 +204,7 @@ impl BlockTree {
         let lookup_result = self.block_lookup.multi_get(ids)?;
 
         itertools::zip_eq(ids, lookup_result)
-            .map(|(id, res)| res.ok_or_else(|| Error::BlockNotFound(*id).into()))
+            .map(|(id, res)| res.ok_or_else(|| ExecutorError::BlockNotFound(*id).into()))
             .collect()
     }
 
@@ -229,7 +230,13 @@ impl BlockTree {
             ledger_info.consensus_block_id()
         };
 
-        block_lookup.fetch_or_add_block(id, ExecutedBlock::new_empty(ledger_view), None)
+        let output = ExecutionOutput::new_with_ledger_update(
+            ledger_view.state().clone(),
+            None,
+            LedgerUpdateOutput::new_empty(ledger_view.txn_accumulator().clone()),
+        );
+
+        block_lookup.fetch_or_add_block(id, output, None)
     }
 
     // Set the root to be at `ledger_info`, drop blocks that are no longer descendants of the
@@ -249,11 +256,19 @@ impl BlockTree {
                     .original_reconfiguration_block_id(committed_block_id),
                 "Updated with a new root block as a virtual block of reconfiguration block"
             );
-            self.block_lookup.fetch_or_add_block(
-                epoch_genesis_id,
-                ExecutedBlock::new_empty(last_committed_block.output.result_view.clone()),
+            let output = ExecutionOutput::new_with_ledger_update(
+                last_committed_block.output.state().clone(),
                 None,
-            )?
+                LedgerUpdateOutput::new_empty(
+                    last_committed_block
+                        .output
+                        .get_ledger_update()
+                        .txn_accumulator()
+                        .clone(),
+                ),
+            );
+            self.block_lookup
+                .fetch_or_add_block(epoch_genesis_id, output, None)?
         } else {
             info!(
                 LogSchema::new(LogEntry::SpeculationCache).root_block_id(committed_block_id),
@@ -271,7 +286,7 @@ impl BlockTree {
         // This should be the last reference to old root, spawning a drop to a different thread
         // guarantees that the drop will not happen in the current thread
         let (tx, rx) = channel::<()>();
-        rayon::spawn(move || {
+        THREAD_MANAGER.get_non_exe_cpu_pool().spawn(move || {
             let _timeer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                 .with_label_values(&["drop_old_root"])
                 .start_timer();
@@ -287,7 +302,7 @@ impl BlockTree {
         &self,
         parent_block_id: HashValue,
         id: HashValue,
-        output: ExecutedBlock,
+        output: ExecutionOutput,
     ) -> Result<Arc<Block>> {
         self.block_lookup
             .fetch_or_add_block(id, output, Some(parent_block_id))

@@ -147,7 +147,7 @@ impl MintFunder {
         let client = self.get_api_client();
 
         // Create a new random account, then delegate to it
-        let mut delegated_account = LocalAccount::generate(&mut rand::rngs::OsRng);
+        let delegated_account = LocalAccount::generate(&mut rand::rngs::OsRng);
 
         // Create the account, wait for the response.
         self.process(
@@ -170,7 +170,7 @@ impl MintFunder {
 
         // Delegate minting to the account
         {
-            let mut faucet_account = self.faucet_account.write().await;
+            let faucet_account = self.faucet_account.write().await;
             client
                 .submit_and_wait(&faucet_account.sign_with_transaction_builder(
                     transaction_factory.payload(aptos_stdlib::aptos_coin_delegate_mint_capability(
@@ -191,7 +191,7 @@ impl MintFunder {
 
         info!(
             "Successfully configured MintFunder to use delegated account: {}",
-            delegated_account.address().to_hex_literal()
+            delegated_account.address()
         );
 
         self.faucet_account = RwLock::new(delegated_account);
@@ -240,7 +240,7 @@ impl MintFunder {
 
         let txn =
             {
-                let mut faucet_account = self.faucet_account.write().await;
+                let faucet_account = self.faucet_account.write().await;
                 let transaction_factory = self.get_transaction_factory().await?;
                 faucet_account.sign_with_transaction_builder(transaction_factory.script(
                     Script::new(MINTER_SCRIPT.to_vec(), vec![], vec![

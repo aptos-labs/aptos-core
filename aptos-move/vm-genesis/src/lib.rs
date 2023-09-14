@@ -20,7 +20,7 @@ use aptos_gas_schedule::{
 use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, ContractEventV1},
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         TimedFeatures, APTOS_MAX_KNOWN_VERSION,
@@ -118,7 +118,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
     // On-chain genesis process.
     let consensus_config = OnChainConsensusConfig::default();
-    let execution_config = OnChainExecutionConfig::default();
+    let execution_config = OnChainExecutionConfig::default_for_genesis();
     let gas_schedule = default_gas_schedule();
     initialize(
         &mut session,
@@ -140,7 +140,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     emit_new_block_and_epoch_event(&mut session);
 
     let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
-    let cs1 = session.finish(&mut (), &configs).unwrap();
+    let mut change_set = session.finish(&mut (), &configs).unwrap();
 
     // Publish the framework, using a different session id, in case both scripts creates tables
     let state_view = GenesisStateView::new();
@@ -151,22 +151,24 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let id2 = HashValue::new(id2_arr);
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
     publish_framework(&mut session, framework);
-    let cs2 = session.finish(&mut (), &configs).unwrap();
-    let change_set = cs1.squash(cs2, &configs).unwrap();
-
-    let (write_set, delta_change_set, events) = change_set.unpack();
+    let additional_change_set = session.finish(&mut (), &configs).unwrap();
+    change_set
+        .squash_additional_change_set(additional_change_set, &configs)
+        .unwrap();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
     assert!(
-        delta_change_set.is_empty(),
+        change_set.aggregator_v1_delta_set().is_empty(),
         "non-empty delta change set in genesis"
     );
+    assert!(!change_set.write_set_iter().any(|(_, op)| op.is_deletion()));
+    verify_genesis_write_set(change_set.events());
 
-    assert!(!write_set.iter().any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(&events);
-    let change_set = ChangeSet::new(write_set, events);
+    let change_set = change_set
+        .try_into_storage_change_set()
+        .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis");
     Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set))
 }
 
@@ -248,7 +250,7 @@ pub fn encode_genesis_change_set(
     emit_new_block_and_epoch_event(&mut session);
 
     let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
-    let cs1 = session.finish(&mut (), &configs).unwrap();
+    let mut change_set = session.finish(&mut (), &configs).unwrap();
 
     let state_view = GenesisStateView::new();
     let data_cache = state_view.as_move_resolver();
@@ -259,22 +261,24 @@ pub fn encode_genesis_change_set(
     let id2 = HashValue::new(id2_arr);
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
     publish_framework(&mut session, framework);
-    let cs2 = session.finish(&mut (), &configs).unwrap();
-    let change_set = cs1.squash(cs2, &configs).unwrap();
-
-    let (write_set, delta_change_set, events) = change_set.unpack();
+    let additional_change_set = session.finish(&mut (), &configs).unwrap();
+    change_set
+        .squash_additional_change_set(additional_change_set, &configs)
+        .unwrap();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
     assert!(
-        delta_change_set.is_empty(),
+        change_set.aggregator_v1_delta_set().is_empty(),
         "non-empty delta change set in genesis"
     );
 
-    assert!(!write_set.iter().any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(&events);
-    ChangeSet::new(write_set, events)
+    assert!(!change_set.write_set_iter().any(|(_, op)| op.is_deletion()));
+    verify_genesis_write_set(change_set.events());
+    change_set
+        .try_into_storage_change_set()
+        .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis")
 }
 
 fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
@@ -406,14 +410,24 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::RESOURCE_GROUPS,
         FeatureFlag::MULTISIG_ACCOUNTS,
         FeatureFlag::DELEGATION_POOLS,
-        FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
-        FeatureFlag::STRUCT_CONSTRUCTORS,
         FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
         FeatureFlag::BLS12_381_STRUCTURES,
+        FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
+        FeatureFlag::STRUCT_CONSTRUCTORS,
+        FeatureFlag::SIGNATURE_CHECKER_V2,
+        FeatureFlag::STORAGE_SLOT_METADATA,
         FeatureFlag::CHARGE_INVARIANT_VIOLATION,
         FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
         FeatureFlag::GAS_PAYER_ENABLED,
         FeatureFlag::BULLETPROOFS_NATIVES,
+        FeatureFlag::SIGNER_NATIVE_FORMAT_FIX,
+        FeatureFlag::MODULE_EVENT,
+        FeatureFlag::EMIT_FEE_STATEMENT,
+        FeatureFlag::STORAGE_DELETION_REFUND,
+        FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX,
+        FeatureFlag::AGGREGATOR_SNAPSHOTS,
+        FeatureFlag::SAFER_RESOURCE_GROUPS,
+        FeatureFlag::SAFER_METADATA,
     ]
 }
 
@@ -625,16 +639,22 @@ fn emit_new_block_and_epoch_event(session: &mut SessionExt) {
 
 /// Verify the consistency of the genesis `WriteSet`
 fn verify_genesis_write_set(events: &[ContractEvent]) {
-    let new_epoch_events: Vec<&ContractEvent> = events
+    let new_epoch_events: Vec<&ContractEventV1> = events
         .iter()
-        .filter(|e| e.key() == &NewEpochEvent::event_key())
+        .filter_map(|e| {
+            if e.event_key() == Some(&NewEpochEvent::event_key()) {
+                Some(e.v1().unwrap())
+            } else {
+                None
+            }
+        })
         .collect();
     assert_eq!(
         new_epoch_events.len(),
         1,
         "There should only be exactly one NewEpochEvent"
     );
-    assert_eq!(new_epoch_events[0].sequence_number(), 0,);
+    assert_eq!(new_epoch_events[0].sequence_number(), 0);
 }
 
 /// An enum specifying whether the compiled stdlib/scripts should be used or freshly built versions
@@ -794,7 +814,7 @@ pub fn generate_test_genesis(
             employee_vesting_period_duration: 5 * 60, // 5 minutes
         },
         &OnChainConsensusConfig::default(),
-        &OnChainExecutionConfig::default(),
+        &OnChainExecutionConfig::default_for_genesis(),
         &default_gas_schedule(),
     );
     (genesis, test_validators)
@@ -816,7 +836,7 @@ pub fn generate_mainnet_genesis(
         ChainId::test(),
         &mainnet_genesis_config(),
         &OnChainConsensusConfig::default(),
-        &OnChainExecutionConfig::default(),
+        &OnChainExecutionConfig::default_for_genesis(),
         &default_gas_schedule(),
     );
     (genesis, test_validators)

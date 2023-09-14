@@ -16,7 +16,7 @@ use crate::{
     proptest_types::types::{MockOutput, MockTransaction, STORAGE_AGGREGATOR_VALUE},
 };
 use aptos_aggregator::{delta_change_set::serialize, transaction::AggregatorValue};
-use aptos_types::write_set::TransactionWrite;
+use aptos_types::{contract_event::ReadWriteEvent, write_set::TransactionWrite};
 use claims::{assert_matches, assert_none, assert_some_eq};
 use itertools::izip;
 use std::{collections::HashMap, fmt::Debug, hash::Hash, result::Result, sync::atomic::Ordering};
@@ -78,17 +78,19 @@ enum BaselineStatus {
 ///
 /// For both read_values and resolved_deltas the keys are not included because they are
 /// in the same order as the reads and deltas in the Transaction::Write.
-pub(crate) struct BaselineOutput<V> {
+pub(crate) struct BaselineOutput<K, V> {
     status: BaselineStatus,
     read_values: Vec<Result<Vec<BaselineValue<V>>, ()>>,
-    resolved_deltas: Vec<Result<Vec<u128>, ()>>,
+    resolved_deltas: Vec<Result<HashMap<K, u128>, ()>>,
 }
 
-impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
+impl<K: Debug + Hash + Clone + Eq, V: Debug + Clone + PartialEq + Eq + TransactionWrite>
+    BaselineOutput<K, V>
+{
     /// Must be invoked after parallel execution to have incarnation information set and
     /// work with dynamic read/writes.
-    pub(crate) fn generate<K: Hash + Clone + Eq>(
-        txns: &[MockTransaction<K, V>],
+    pub(crate) fn generate<E: Debug + Clone + ReadWriteEvent>(
+        txns: &[MockTransaction<K, V, E>],
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {
         let mut current_world = HashMap::<K, BaselineValue<_>>::new();
@@ -107,7 +109,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
                     // In executor, SkipRest skips from the next index. Test assumes it's an empty
                     // transaction, so create a successful empty reads and deltas.
                     read_values.push(Ok(vec![]));
-                    resolved_deltas.push(Ok(vec![]));
+                    resolved_deltas.push(Ok(HashMap::new()));
 
                     status = BaselineStatus::SkipRest;
                     break;
@@ -167,8 +169,8 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
                                 .map(|(k, v)| {
                                     // In this case transaction did not fail due to delta application
                                     // errors, and thus we should update written_ and resolved_ worlds.
-                                    current_world.insert(k, BaselineValue::Aggregator(v));
-                                    v
+                                    current_world.insert(k.clone(), BaselineValue::Aggregator(v));
+                                    (k, v)
                                 })
                                 .collect()));
 
@@ -207,9 +209,9 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
 
     // Used for testing, hence the function asserts the correctness conditions within
     // itself to be easily traceable in case of an error.
-    pub(crate) fn assert_output<K: Debug>(
+    pub(crate) fn assert_output<E: Debug>(
         &self,
-        results: &BlockExecutorResult<Vec<MockOutput<K, V>>, usize>,
+        results: &BlockExecutorResult<Vec<MockOutput<K, V, E>>, usize>,
     ) {
         match results {
             Ok(results) => {
@@ -227,19 +229,22 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
                         .as_ref()
                         .expect("Aggregator failures not yet tested")
                         .iter()
-                        .zip(output.2.iter())
+                        .zip(output.read_results.iter())
                         .for_each(|(baseline_read, result_read)| {
                             baseline_read.assert_read_result(result_read)
                         });
 
-                    resolved_deltas
+                    let baseline_deltas = resolved_deltas
                         .as_ref()
-                        .expect("Aggregator failures not yet tested")
+                        .expect("Aggregator failures not yet tested");
+                    output
+                        .materialized_delta_writes
+                        .get()
+                        .expect("Delta writes must be set")
                         .iter()
-                        .zip(output.3.get().expect("Delta writes must be set").iter())
-                        .for_each(|(baseline_delta_write, (_, result_delta_write))| {
+                        .for_each(|(k, result_delta_write)| {
                             assert_eq!(
-                                *baseline_delta_write,
+                                *baseline_deltas.get(k).expect("Baseline must contain delta"),
                                 AggregatorValue::from_write(result_delta_write)
                                     .expect("Delta to a non-existent aggregator")
                                     .into()
@@ -249,14 +254,14 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
 
                 results.iter().skip(committed).for_each(|output| {
                     // Ensure the transaction is skipped based on the output.
-                    assert_eq!(output.0.len(), 0);
-                    assert_eq!(output.1.len(), 0);
-                    assert_eq!(output.2.len(), 0);
-                    assert_eq!(output.4, 0);
+                    assert!(output.writes.is_empty());
+                    assert!(output.deltas.is_empty());
+                    assert!(output.read_results.is_empty());
+                    assert_eq!(output.total_gas, 0);
 
                     // Implies that materialize_delta_writes was never called, as should
                     // be for skipped transactions.
-                    assert_none!(output.3.get());
+                    assert_none!(output.materialized_delta_writes.get());
                 });
             },
             Err(BlockExecutorError::UserError(idx)) => {

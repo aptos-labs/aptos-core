@@ -9,16 +9,15 @@ use crate::{
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use move_binary_format::{
-    compatibility::Compatibility,
-    errors::{Location, VMError, VMResult},
-    file_format::CompiledScript,
-    CompiledModule,
+    compatibility::Compatibility, errors::VMResult, file_format::CompiledScript, CompiledModule,
 };
 use move_command_line_common::{
-    address::ParsedAddress, files::verify_and_create_named_address_mapping,
+    address::ParsedAddress, env::read_bool_env_var, files::verify_and_create_named_address_mapping,
 };
 use move_compiler::{
-    compiled_unit::AnnotatedCompiledUnit, shared::PackagePaths, FullyCompiledProgram,
+    compiled_unit::AnnotatedCompiledUnit,
+    shared::{known_attributes::KnownAttribute, Flags, PackagePaths},
+    FullyCompiledProgram,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -37,7 +36,10 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
 use once_cell::sync::Lazy;
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 const STD_ADDR: AccountAddress = AccountAddress::ONE;
 
@@ -45,6 +47,8 @@ struct SimpleVMTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
     storage: InMemoryStorage,
     default_syntax: SyntaxChoice,
+    comparison_mode: bool,
+    run_config: TestRunConfig,
 }
 
 pub fn view_resource_in_move_storage(
@@ -81,12 +85,23 @@ pub struct AdapterPublishArgs {
     #[clap(long)]
     /// is skip the check friend link, if true, treat `friend` as `private`
     pub skip_check_friend_linking: bool,
+    /// print more complete information for VMErrors on publish
+    #[clap(long)]
+    pub verbose: bool,
 }
 
 #[derive(Debug, Parser)]
 pub struct AdapterExecuteArgs {
     #[clap(long)]
     pub check_runtime_types: bool,
+    /// print more complete information for VMErrors on run
+    #[clap(long)]
+    pub verbose: bool,
+}
+
+fn move_test_debug() -> bool {
+    static MOVE_TEST_DEBUG: Lazy<bool> = Lazy::new(|| read_bool_env_var("MOVE_TEST_DEBUG"));
+    *MOVE_TEST_DEBUG
 }
 
 impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
@@ -104,8 +119,18 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         self.default_syntax
     }
 
+    fn known_attributes(&self) -> &BTreeSet<String> {
+        KnownAttribute::get_all_attribute_names()
+    }
+
+    fn run_config(&self) -> TestRunConfig {
+        self.run_config
+    }
+
     fn init(
         default_syntax: SyntaxChoice,
+        comparison_mode: bool,
+        run_config: TestRunConfig,
         pre_compiled_deps: Option<&'a FullyCompiledProgram>,
         task_opt: Option<TaskInput<(InitCommand, EmptyCommand)>>,
     ) -> (Self, Option<String>) {
@@ -129,6 +154,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let mut adapter = Self {
             compiled_state: CompiledState::new(named_address_mapping, pre_compiled_deps, None),
             default_syntax,
+            comparison_mode,
+            run_config,
             storage: InMemoryStorage::new(),
         };
 
@@ -180,6 +207,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 
         let id = module.self_id();
         let sender = *id.address();
+        let verbose = extra_args.verbose;
         match self.perform_session_action(
             gas_budget,
             |session, gas_status| {
@@ -199,10 +227,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             VMConfig::production(),
         ) {
             Ok(()) => Ok((None, module)),
-            Err(e) => Err(anyhow!(
+            Err(vm_error) => Err(anyhow!(
                 "Unable to publish module '{}'. Got VMError: {}",
                 module.self_id(),
-                format_vm_error(&e)
+                vm_error.format_test_output(move_test_debug() || verbose, self.comparison_mode)
             )),
         }
     }
@@ -234,6 +262,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map(|a| MoveValue::Signer(*a).simple_serialize().unwrap())
             .chain(args)
             .collect();
+        let verbose = extra_args.verbose;
         let serialized_return_values = self
             .perform_session_action(
                 gas_budget,
@@ -242,10 +271,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 },
                 VMConfig::from(extra_args),
             )
-            .map_err(|e| {
+            .map_err(|vm_error| {
                 anyhow!(
                     "Script execution failed with VMError: {}",
-                    format_vm_error(&e)
+                    vm_error.format_test_output(move_test_debug() || verbose, self.comparison_mode)
                 )
             })?;
         Ok((None, serialized_return_values))
@@ -276,6 +305,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map(|a| MoveValue::Signer(*a).simple_serialize().unwrap())
             .chain(args)
             .collect();
+        let verbose = extra_args.verbose;
         let serialized_return_values = self
             .perform_session_action(
                 gas_budget,
@@ -286,10 +316,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 },
                 VMConfig::from(extra_args),
             )
-            .map_err(|e| {
+            .map_err(|vm_error| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
-                    format_vm_error(&e)
+                    vm_error.format_test_output(move_test_debug() || verbose, self.comparison_mode)
                 )
             })?;
         Ok((None, serialized_return_values))
@@ -308,29 +338,6 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     fn handle_subcommand(&mut self, _: TaskInput<Self::Subcommand>) -> Result<Option<String>> {
         unreachable!()
     }
-}
-
-pub fn format_vm_error(e: &VMError) -> String {
-    let location_string = match e.location() {
-        Location::Undefined => "undefined".to_owned(),
-        Location::Script => "script".to_owned(),
-        Location::Module(id) => format!("0x{}::{}", id.address().short_str_lossless(), id.name()),
-    };
-    format!(
-        "{{
-    major_status: {major_status:?},
-    sub_status: {sub_status:?},
-    location: {location_string},
-    indices: {indices:?},
-    offsets: {offsets:?},
-}}",
-        major_status = e.major_status(),
-        sub_status = e.sub_status(),
-        location_string = location_string,
-        // TODO maybe include source map info?
-        indices = e.indices(),
-        offsets = e.offsets(),
-    )
 }
 
 impl<'a> SimpleVMTestAdapter<'a> {
@@ -364,8 +371,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
         let res = f(&mut session, &mut gas_status)?;
 
         // save changeset
-        // TODO support events
-        let (changeset, _events) = session.finish()?;
+        let changeset = session.finish()?;
         self.storage.apply(changeset).unwrap();
         Ok(res)
     }
@@ -379,7 +385,8 @@ static PRECOMPILED_MOVE_STDLIB: Lazy<FullyCompiledProgram> = Lazy::new(|| {
             named_address_map: move_stdlib::move_stdlib_named_addresses(),
         }],
         None,
-        move_compiler::Flags::empty(),
+        Flags::empty().set_skip_attribute_checks(true), // no point in checking.
+        KnownAttribute::get_all_attribute_names(),
     )
     .unwrap();
     match program_res {
@@ -396,6 +403,8 @@ static MOVE_STDLIB_COMPILED: Lazy<Vec<CompiledModule>> = Lazy::new(|| {
         move_stdlib::move_stdlib_files(),
         vec![],
         move_stdlib::move_stdlib_named_addresses(),
+        Flags::empty().set_skip_attribute_checks(true), // no point in checking here.
+        KnownAttribute::get_all_attribute_names(),
     )
     .build()
     .unwrap();
@@ -420,8 +429,22 @@ static MOVE_STDLIB_COMPILED: Lazy<Vec<CompiledModule>> = Lazy::new(|| {
     }
 });
 
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+pub enum TestRunConfig {
+    CompilerV1,
+    CompilerV2,
+    ComparisonV1V2,
+}
+
 pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_impl::<SimpleVMTestAdapter>(path, Some(&*PRECOMPILED_MOVE_STDLIB))
+    run_test_with_config(TestRunConfig::CompilerV1, path)
+}
+
+pub fn run_test_with_config(
+    config: TestRunConfig,
+    path: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    run_test_impl::<SimpleVMTestAdapter>(config, path, Some(&*PRECOMPILED_MOVE_STDLIB))
 }
 
 impl From<AdapterExecuteArgs> for VMConfig {

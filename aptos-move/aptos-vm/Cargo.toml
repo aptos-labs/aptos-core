@@ -14,7 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-aggregator = { workspace = true }
+aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-block-executor = { workspace = true }
 aptos-block-partitioner = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -37,6 +37,8 @@ aptos-utils = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
+claims = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
 fail = { workspace = true }
@@ -66,7 +68,6 @@ proptest = { workspace = true }
 
 [features]
 default = []
-mirai-contracts = []
 fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "aptos-framework/fuzzing"]
 failpoints = ["fail/failpoints", "move-vm-runtime/failpoints"]
 testing = ["move-unit-test", "aptos-framework/testing"]
