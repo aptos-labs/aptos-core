@@ -85,7 +85,8 @@ fn script_none_existing_module_dep() {
     script
         .address_identifiers
         .push(AccountAddress::new([2u8; AccountAddress::LENGTH]));
-    script.identifiers.push(Identifier::new("module").unwrap());
+    let module = Identifier::new("module").unwrap();
+    script.identifiers.push(module);
     let module_handle = ModuleHandle {
         address: AddressIdentifierIndex((script.address_identifiers.len() - 1) as u16),
         name: IdentifierIndex((script.identifiers.len() - 1) as u16),
@@ -129,7 +130,7 @@ fn script_none_existing_module_dep() {
         status.status(),
         //StatusCode::LINKER_ERROR
         Ok(ExecutionStatus::MiscellaneousError(Some(
-            StatusCode::LINKER_ERROR
+            StatusCode::LINKER_ERROR.with_message(format!("Linker Error: Transaction executed at a non-existent external module {:?}", module))
         )))
     );
     executor.apply_write_set(output.write_set());
@@ -352,7 +353,7 @@ fn script_type_argument_module_does_not_exist() {
     let status = output.status();
     assert_eq!(
         status,
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(LINKER_ERROR)))
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(LINKER_ERROR.with_message(format!("Linker Error: Transaction executed at a non-existent external module {:?}", module)))))
     );
     executor.apply_write_set(output.write_set());
 
@@ -419,7 +420,7 @@ fn script_nested_type_argument_module_does_not_exist() {
     let status = output.status();
     assert_eq!(
         status,
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(LINKER_ERROR)))
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(LINKER_ERROR.with_message(format!("Linker Error: Transaction executed at a non-existent external module {:?}", module)))))
     );
     executor.apply_write_set(output.write_set());
 

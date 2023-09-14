@@ -631,7 +631,7 @@ fn check_script() {
             .err()
             .unwrap()
             .major_status();
-        assert_eq!(status, StatusCode::LINKER_ERROR);
+        assert_eq!(status, StatusCode::LINKER_ERROR.with_message(format!("Linker Error: Signature {:?} is deprecated", signature)));
     }
 
     //
@@ -814,7 +814,7 @@ fn call_missing_item() {
         )
         .err()
         .unwrap();
-    assert_eq!(error.major_status(), StatusCode::LINKER_ERROR);
+    assert_eq!(error.major_status(), StatusCode::LINKER_ERROR.with_message(format!("Linker Error: Call to item at a non-existent external module {:?}", module)));
     assert_eq!(error.status_type(), StatusType::Verification);
     drop(session);
 
