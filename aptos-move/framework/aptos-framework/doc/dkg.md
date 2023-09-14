@@ -52,7 +52,7 @@
 
 </dd>
 <dt>
-<code>locked_new_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="stake.md#0x1_stake_ValidatorInfo">stake::ValidatorInfo</a>&gt;</code>
+<code>target_validator_set: <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a></code>
 </dt>
 <dd>
 
@@ -92,6 +92,12 @@
 </dd>
 <dt>
 <code>countdown: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>&gt;</code>
 </dt>
 <dd>
 
@@ -152,6 +158,7 @@ An invalid block time was encountered.
             target_epoch: 1,
             state_id: 0,
             countdown: 0,
+            validator_set: std::option::none(),
             serialized_transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
             events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a>&gt;(aptos_framework),
         }
@@ -242,7 +249,7 @@ An invalid block time was encountered.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(target_epoch: u64, locked_new_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="stake.md#0x1_stake_ValidatorInfo">stake::ValidatorInfo</a>&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(target_epoch: u64, new_validator_set: <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>)
 </code></pre>
 
 
@@ -251,28 +258,25 @@ An invalid block time was encountered.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(target_epoch: u64, locked_new_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorInfo&gt;) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(target_epoch: u64, new_validator_set: ValidatorSet) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
     <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"<a href="dkg.md#0x1_dkg_start">dkg::start</a>() started."));
     <b>let</b> dkg_state = <b>borrow_global_mut</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"dkg_state="));
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(dkg_state);
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"target_epoch="));
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&target_epoch);
     <b>if</b> (target_epoch == dkg_state.target_epoch + 1 && dkg_state.state_id == 0) {
         dkg_state.target_epoch = target_epoch;
         dkg_state.state_id = 1;
         dkg_state.countdown = 999999999;
+        dkg_state.validator_set = std::option::some(new_validator_set);
         <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a>&gt;(
             &<b>mut</b> dkg_state.events,
             <a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a> {
                 target_epoch,
-                locked_new_validator_set,
+                target_validator_set: new_validator_set,
             },
         );
     } <b>else</b> {
         <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"unexpected <a href="dkg.md#0x1_dkg_start">dkg::start</a>()..."));
     };
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"<a href="dkg.md#0x1_dkg_start">dkg::start</a>() finished."));
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"<a href="dkg.md#0x1_dkg_start">dkg::start</a>() finished."))
 }
 </code></pre>
 

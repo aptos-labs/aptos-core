@@ -168,7 +168,7 @@ module aptos_framework::stake {
     /// 1. join_validator_set adds to pending_active queue.
     /// 2. leave_valdiator_set moves from active to pending_inactive queue.
     /// 3. on_new_epoch processes two pending queues and refresh ValidatorInfo from the owner's address.
-    struct ValidatorSet has key {
+    struct ValidatorSet has copy, key, drop, store {
         consensus_scheme: u8,
         // Active validators for the current epoch.
         active_validators: vector<ValidatorInfo>,
@@ -1152,7 +1152,7 @@ module aptos_framework::stake {
     }
 
     /// Compute the validator set for the next epoch.
-    public(friend) fun next_validator_set(): vector<ValidatorInfo> acquires StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
+    public(friend) fun next_validator_set(): ValidatorSet acquires StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
         debug::print(&std::string::utf8(b"stake::next_validator_set() started."));
 
         // Init.
@@ -1219,8 +1219,18 @@ module aptos_framework::stake {
             candidate_idx = candidate_idx + 1;
         };
 
+        let ret = ValidatorSet {
+            consensus_scheme: cur_validator_set.consensus_scheme,
+            active_validators: new_active_validators,
+            pending_inactive: vector[],
+            pending_active: vector[],
+            total_voting_power: new_total_power,
+            total_joining_power: 0,
+        };
+
         debug::print(&std::string::utf8(b"stake::next_validator_set() finished."));
-        new_active_validators
+
+        ret
     }
 
     /// Update individual validator's stake pool

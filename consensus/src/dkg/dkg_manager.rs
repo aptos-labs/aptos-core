@@ -28,6 +28,7 @@ use rand::{rngs::StdRng, thread_rng, SeedableRng};
 use std::sync::Arc;
 use tokio_retry::strategy::ExponentialBackoff;
 use aptos_crypto::{Uniform, bls12381};
+use crate::dkg::build_dkg_pvss_config;
 
 // the transcript size is 3.25MB
 // const TRANSCRIPT_SIZE: usize = 3_250_000;
@@ -131,43 +132,17 @@ impl DKGManager {
 
     pub fn start_dkg(&mut self, dkg_events: Vec<ContractEvent>) {
         // thread::sleep(Duration::from_millis(TRANSCRIPT_COMPUTE_TIME_MS));
-        debug!("[DKG] start_dkg: liveness check 1");
         let event = StartDKGEvent::try_from(dkg_events
             .first().unwrap()).unwrap();
-        debug!("[DKG] start_dkg: first_event={:?}", event);
+        debug!("[DKG] start_dkg, target_epoch={}", event.target_epoch);
 
-        let validator_info = event.locked_new_validator_info;
-        let validator_addresses = validator_info.iter().map(|vi| vi.account_address).collect();
-        let validator_stakes: Vec<u64> = validator_info
-            .iter()
-            .map(|vi| vi.consensus_voting_power())
-            .collect();
-        let validator_consensus_keys = validator_info
-            .iter()
-            .map(|vi| vi.consensus_public_key().clone())
-            .collect();
-
-        let dkg_rounding = DKGRounding::new(validator_addresses, validator_stakes, validator_consensus_keys);
-        debug!(
-            "[DKG] Starting DKG with the following parameters: number of validators: {:?}, validator stakes: {:?}, validator weights: {:?}, validator 1/3 weights: {:?}, validator 2/3 weights: {:?}",
-            dkg_rounding.validator_stakes().len(),
-            dkg_rounding.validator_stakes(),
-            dkg_rounding.validator_weights(),
-            dkg_rounding.weighted_config_1().get_threshold_weight(),
-            dkg_rounding.weighted_config_2().get_threshold_weight(),
-        );
-
-        // dkg todo: decide whether to use consensus key as encryption key
-        let consensus_keys: Vec<<das::Transcript as Transcript>::EncryptPubKey> = dkg_rounding.validator_consensus_keys().iter().map(|k| k.to_bytes().as_slice().try_into().unwrap()).collect::<Vec<_>>();
-        let wc_1 = dkg_rounding.weighted_config_1().clone();
-        let wc_2 = dkg_rounding.weighted_config_2().clone();
-        self.dkg_rounding.replace(dkg_rounding);
+        let (dkg_rounding, dkg_pvss_config) = build_dkg_pvss_config(self.epoch_state.epoch, &event.target_validator_set);
 
         let mut rng = thread_rng();
         let seed = random_scalar(&mut rng);
         let mut rng = StdRng::from_seed(seed.to_bytes_le());
 
-        let pp = <WT as Transcript>::PvssPublicParameters::default();
+
         let s = <WT as Transcript>::InputSecret::generate(&mut rng);
         let aux = (self.epoch_state.epoch, self.author);
 
@@ -185,10 +160,10 @@ impl DKGManager {
             .expect("Unable to get private key");
 
         let trx_1 = WT::deal(
-            &wc_1,
-            &pp,
+            &dkg_pvss_config.wc_1,
+            &dkg_pvss_config.pp,
             &private_key,
-            &consensus_keys,
+            &dkg_pvss_config.eks,
             &s,
             &aux,
             &Player{ id: my_index },
@@ -196,17 +171,17 @@ impl DKGManager {
         );
 
         let trx_2 = WT::deal(
-            &wc_2,
-            &pp,
+            &dkg_pvss_config.wc_2,
+            &dkg_pvss_config.pp,
             &private_key,
-            &consensus_keys,
+            &dkg_pvss_config.eks,
             &s,
             &aux,
             &Player{ id: my_index },
             &mut rng,
         );
 
-        let dkg_pvss_config = DKGPvssConfig::new(self.epoch_state.epoch, wc_1.clone(), wc_2.clone(), pp, consensus_keys);
+        self.dkg_rounding.replace(dkg_rounding);
         self.dkg_store.add_pvss_config(dkg_pvss_config.clone());
 
         let dkg_trx_wrapper = DKGTranscriptWrapper {
@@ -214,7 +189,7 @@ impl DKGManager {
             trx_two_third: trx_2,
         };
         let dkg_node = DKGNode::new(self.epoch_state.epoch, self.author, dkg_trx_wrapper);
-        
+
         dkg_node.verify(&dkg_pvss_config, &self.epoch_state.verifier).expect("[DKG] Failed to verify own DKG Node");
 
         debug!("[DKG] Node {:?} finish computing DKG Node of epoch {:?}", self.author, dkg_node.epoch());

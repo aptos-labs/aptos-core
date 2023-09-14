@@ -6,7 +6,7 @@ module aptos_framework::dkg {
     use aptos_std::debug;
     use aptos_framework::account;
     use aptos_framework::event;
-    use aptos_framework::stake::ValidatorInfo;
+    use aptos_framework::stake::ValidatorSet;
     use aptos_framework::system_addresses;
 
     friend aptos_framework::block;
@@ -18,13 +18,14 @@ module aptos_framework::dkg {
 
     struct StartDKGEvent has drop, store {
         target_epoch: u64,
-        locked_new_validator_set: vector<ValidatorInfo>,
+        target_validator_set: ValidatorSet,
     }
 
     struct DKGState has key {
         target_epoch: u64,
         state_id: u64, // 0: done, 1: in progress,
         countdown: u64, // For debugging...
+        validator_set: Option<ValidatorSet>, // Keep a copy to make public verification easier.
         /// DKG Transcript for current epoch.
         serialized_transcript: vector<u8>,
         events: event::EventHandle<StartDKGEvent>,
@@ -39,6 +40,7 @@ module aptos_framework::dkg {
                 target_epoch: 1,
                 state_id: 0,
                 countdown: 0,
+                validator_set: std::option::none(),
                 serialized_transcript: vector[],
                 events: account::new_event_handle<StartDKGEvent>(aptos_framework),
             }
@@ -58,28 +60,25 @@ module aptos_framework::dkg {
         0
     }
 
-    public(friend) fun start(target_epoch: u64, locked_new_validator_set: vector<ValidatorInfo>) acquires DKGState {
+    public(friend) fun start(target_epoch: u64, new_validator_set: ValidatorSet) acquires DKGState {
         debug::print(&utf8(b"dkg::start() started."));
         let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
-        debug::print(&utf8(b"dkg_state="));
-        debug::print(dkg_state);
-        debug::print(&utf8(b"target_epoch="));
-        debug::print(&target_epoch);
         if (target_epoch == dkg_state.target_epoch + 1 && dkg_state.state_id == 0) {
             dkg_state.target_epoch = target_epoch;
             dkg_state.state_id = 1;
             dkg_state.countdown = 999999999;
+            dkg_state.validator_set = std::option::some(new_validator_set);
             event::emit_event<StartDKGEvent>(
                 &mut dkg_state.events,
                 StartDKGEvent {
                     target_epoch,
-                    locked_new_validator_set,
+                    target_validator_set: new_validator_set,
                 },
             );
         } else {
             debug::print(&utf8(b"unexpected dkg::start()..."));
         };
-        debug::print(&utf8(b"dkg::start() finished."));
+        debug::print(&utf8(b"dkg::start() finished."))
     }
 
     public(friend) fun on_potential_transcript(maybe_serialized_transcript: Option<vector<u8>>): bool acquires DKGState {

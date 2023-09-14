@@ -508,8 +508,8 @@ The runtime always runs this before executing the transactions in a block.
         <b>if</b> (target_epoch == cur_epoch && status == <a href="dkg.md#0x1_dkg_state_inactive">dkg::state_inactive</a>()) {
             <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"case 0."));
             <a href="staking_config.md#0x1_staking_config_lock">staking_config::lock</a>();
-            <b>let</b> validator_set_and_stake_dist = <a href="stake.md#0x1_stake_next_validator_set">stake::next_validator_set</a>();
-            <a href="dkg.md#0x1_dkg_start">dkg::start</a>(cur_epoch + 1, validator_set_and_stake_dist);
+            <b>let</b> new_validator_set = <a href="stake.md#0x1_stake_next_validator_set">stake::next_validator_set</a>();
+            <a href="dkg.md#0x1_dkg_start">dkg::start</a>(cur_epoch + 1, new_validator_set);
         } <b>else</b> <b>if</b> (target_epoch == cur_epoch + 1 && status == <a href="dkg.md#0x1_dkg_state_active">dkg::state_active</a>()) {
             <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"case 1."));
             <b>let</b> maybe_transcript = <b>if</b> (dkg_transcript_available) {

@@ -432,7 +432,7 @@ Full ValidatorSet, stored in @aptos_framework.
 3. on_new_epoch processes two pending queues and refresh ValidatorInfo from the owner's address.
 
 
-<pre><code><b>struct</b> <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> <b>has</b> key
+<pre><code><b>struct</b> <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> <b>has</b> <b>copy</b>, drop, store, key
 </code></pre>
 
 
@@ -3119,7 +3119,7 @@ power.
 Compute the validator set for the next epoch.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_next_validator_set">next_validator_set</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="stake.md#0x1_stake_ValidatorInfo">stake::ValidatorInfo</a>&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_next_validator_set">next_validator_set</a>(): <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>
 </code></pre>
 
 
@@ -3128,7 +3128,7 @@ Compute the validator set for the next epoch.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_next_validator_set">next_validator_set</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a>&gt; <b>acquires</b> <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>, <a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>, <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>, <a href="stake.md#0x1_stake_ValidatorFees">ValidatorFees</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_next_validator_set">next_validator_set</a>(): <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> <b>acquires</b> <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>, <a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>, <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>, <a href="stake.md#0x1_stake_ValidatorFees">ValidatorFees</a> {
     <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="stake.md#0x1_stake_next_validator_set">stake::next_validator_set</a>() started."));
 
     // Init.
@@ -3195,8 +3195,18 @@ Compute the validator set for the next epoch.
         candidate_idx = candidate_idx + 1;
     };
 
+    <b>let</b> ret = <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> {
+        consensus_scheme: cur_validator_set.consensus_scheme,
+        active_validators: new_active_validators,
+        pending_inactive: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
+        pending_active: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
+        total_voting_power: new_total_power,
+        total_joining_power: 0,
+    };
+
     <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="stake.md#0x1_stake_next_validator_set">stake::next_validator_set</a>() finished."));
-    new_active_validators
+
+    ret
 }
 </code></pre>
 

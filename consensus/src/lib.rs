@@ -9,7 +9,8 @@
 //! The consensus protocol implemented is AptosBFT (based on
 //! [DiemBFT](https://developers.diem.com/papers/diem-consensus-state-machine-replication-in-the-diem-blockchain/2021-08-17.pdf)).
 
-#![cfg_attr(not(feature = "fuzzing"), deny(missing_docs))]
+// dkg todo: add docs.
+// #![cfg_attr(not(feature = "fuzzing"), deny(missing_docs))]
 #![cfg_attr(feature = "fuzzing", allow(dead_code))]
 #![recursion_limit = "512"]
 
@@ -18,7 +19,7 @@ extern crate core;
 mod block_storage;
 mod consensusdb;
 mod dag;
-mod dkg;
+pub mod dkg;
 mod epoch_manager;
 mod error;
 mod experimental;

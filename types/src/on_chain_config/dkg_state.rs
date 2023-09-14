@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::event::EventHandle;
-use crate::on_chain_config::OnChainConfig;
+use crate::on_chain_config::{OnChainConfig, ValidatorSet};
 use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -9,6 +9,7 @@ pub struct DKGState {
     pub target_epoch: u64,
     pub state_id: u64,
     pub countdown: u64,
+    pub validator_set: Option<ValidatorSet>,
     pub serialized_transcript: Vec<u8>,
     pub events: EventHandle,
 }

@@ -1,16 +1,17 @@
 // Copyright © Aptos Foundation
 
-use crate::{validator_info::ValidatorInfo, validator_verifier::ValidatorVerifier};
+use crate::validator_verifier::ValidatorVerifier;
 use anyhow::Result;
 use aptos_dkg::pvss::{das, traits::Transcript, WeightedTranscript};
 use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
 use aptos_crypto::ValidCryptoMaterial;
+use crate::on_chain_config::ValidatorSet;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StartDKGEvent {
     pub target_epoch: u64,
-    pub locked_new_validator_info: Vec<ValidatorInfo>,
+    pub target_validator_set: ValidatorSet,
 }
 
 impl StartDKGEvent {
@@ -73,7 +74,7 @@ impl DKGTranscriptWrapper {
 
         let addresses = verifier.get_ordered_account_addresses();
         let dealers_addresses = dealers.iter().filter_map(|&pos| addresses.get(pos)).cloned().collect::<Vec<_>>();
-        
+
         let spks = dealers_addresses.iter().filter_map(|author| verifier.get_public_key(author)).collect::<Vec<_>>();
 
         let aux = dealers_addresses.iter().map(|address| (dkg_pvss_config.epoch, address)).collect::<Vec<_>>();

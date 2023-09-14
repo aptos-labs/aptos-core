@@ -229,8 +229,8 @@ module aptos_framework::block {
             if (target_epoch == cur_epoch && status == dkg::state_inactive()) {
                 debug::print(&std::string::utf8(b"case 0."));
                 staking_config::lock();
-                let validator_set_and_stake_dist = stake::next_validator_set();
-                dkg::start(cur_epoch + 1, validator_set_and_stake_dist);
+                let new_validator_set = stake::next_validator_set();
+                dkg::start(cur_epoch + 1, new_validator_set);
             } else if (target_epoch == cur_epoch + 1 && status == dkg::state_active()) {
                 debug::print(&std::string::utf8(b"case 1."));
                 let maybe_transcript = if (dkg_transcript_available) {
