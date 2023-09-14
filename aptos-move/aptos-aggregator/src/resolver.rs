@@ -102,13 +102,11 @@ pub mod test_utils {
                         },
                     }
                 },
-                AggregatorID::Ephemeral(_) => {
-                    match self.v2_store.get(id).map(|val| val.bytes()) {
-                        Some(bytes) => Ok(bcs::from_bytes(bytes)?),
-                        None => {
-                            anyhow::bail!("Could not find the value of the aggregator")
-                        },
-                    }
+                AggregatorID::Ephemeral(_) => match self.v2_store.get(id).map(|val| val.bytes()) {
+                    Some(bytes) => Ok(bcs::from_bytes(bytes)?),
+                    None => {
+                        anyhow::bail!("Could not find the value of the aggregator")
+                    },
                 },
             }
         }

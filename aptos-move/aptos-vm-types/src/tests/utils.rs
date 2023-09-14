@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{change_set::VMChangeSet, check_change_set::CheckChangeSet, output::VMOutput};
-use aptos_aggregator::{delta_change_set::{delta_add, serialize, DeltaOp}, aggregator_change_set::AggregatorChange, aggregator_extension::AggregatorID};
+use aptos_aggregator::{
+    aggregator_change_set::AggregatorChange,
+    aggregator_extension::AggregatorID,
+    delta_change_set::{delta_add, serialize, DeltaOp},
+};
 use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,

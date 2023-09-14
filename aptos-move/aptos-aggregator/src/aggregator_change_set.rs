@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aggregator_extension::{
-        AggregatorID, DerivedFormula,
-    },
-    bounded_math::{SignedU128, code_invariant_error, BoundedMath, expect_ok}, delta_math::{DeltaHistory, merge_data_and_delta, merge_two_deltas},
+    aggregator_extension::{AggregatorID, DerivedFormula},
+    bounded_math::{code_invariant_error, expect_ok, BoundedMath, SignedU128},
+    delta_math::{merge_data_and_delta, merge_two_deltas, DeltaHistory},
 };
 use move_binary_format::errors::PartialVMResult;
 
@@ -22,25 +21,30 @@ pub enum AggregatorChange {
         max_value: u128,
         history: DeltaHistory,
     },
+    /// Value of delta is:
+    /// formula(value of base_aggregator at the begginning of the transaction + delta)
     SnapshotDelta {
         delta: SignedU128,
         base_aggregator: AggregatorID,
         formula: DerivedFormula,
-    }
+    },
 }
 
 impl AggregatorChange {
-
     /// Returns the result of applying the AggregatorState to the base value
     /// Returns error if the aggregator behavior based on the
     /// speculative_base_value isn't consistent with the provided base value.
     pub fn apply_aggregator_change_to(&self, base: u128) -> PartialVMResult<u128> {
         match self {
             AggregatorChange::Data { value } => Ok(*value),
-            AggregatorChange::StringData { .. } => Err(code_invariant_error("There should be no base value for StringData")),
-            AggregatorChange::AggregatorDelta { delta, history, max_value } => {
-                merge_data_and_delta(base, delta, history, *max_value)
-            },
+            AggregatorChange::StringData { .. } => Err(code_invariant_error(
+                "There should be no base value for StringData",
+            )),
+            AggregatorChange::AggregatorDelta {
+                delta,
+                history,
+                max_value,
+            } => merge_data_and_delta(base, delta, history, *max_value),
             AggregatorChange::SnapshotDelta { delta, .. } => {
                 // History validation should already be done before this call.
                 expect_ok(BoundedMath::new(u128::MAX).unsigned_add_delta(base, delta))
@@ -50,7 +54,6 @@ impl AggregatorChange {
 
     /// Applies self on top of previous change, merging them together. Note
     /// that the strict ordering here is crucial for catching overflows correctly.
-    /// TODO: What happens if the base aggregator is not none?
     pub fn merge_with_previous_aggregator_change(
         &mut self,
         previous_change: &AggregatorChange,
@@ -58,32 +61,41 @@ impl AggregatorChange {
         match self {
             // If the current state is Data, then merging with previous state won't change anything.
             AggregatorChange::Data { .. } | AggregatorChange::StringData { .. } => Ok(()),
-            AggregatorChange::AggregatorDelta { delta, history, max_value } => {
-                match previous_change {
-                    AggregatorChange::Data { value: prev_value } => {
-                        let new_data = merge_data_and_delta(*prev_value, delta, history, *max_value)?;
-                        *self = AggregatorChange::Data { value: new_data };
-                        Ok(())
-                    },
-                    AggregatorChange::StringData { .. } => {
-                        Err(code_invariant_error("Base value cannot be string for an aggregator"))
-                    },
-                    AggregatorChange::AggregatorDelta { delta: prev_delta, max_value: prev_max_value, history: prev_history } => {
-                        if max_value != prev_max_value {
-                            return Err(code_invariant_error("Max value of aggregator cannot change"));
-                        }
-                        let (new_delta, new_history) = merge_two_deltas(prev_delta, prev_history, delta, history, *max_value)?;
-                        *self = AggregatorChange::AggregatorDelta {
-                            delta: new_delta,
-                            history: new_history,
-                            max_value: *max_value,
-                        };
-                        Ok(())
-                    },
-                    AggregatorChange::SnapshotDelta { .. } => {
-                        Err(code_invariant_error("SnapshotDelta cannot come before AggregatorDelta"))
-                    },
-                }
+            AggregatorChange::AggregatorDelta {
+                delta,
+                history,
+                max_value,
+            } => match previous_change {
+                AggregatorChange::Data { value: prev_value } => {
+                    let new_data = merge_data_and_delta(*prev_value, delta, history, *max_value)?;
+                    *self = AggregatorChange::Data { value: new_data };
+                    Ok(())
+                },
+                AggregatorChange::StringData { .. } => Err(code_invariant_error(
+                    "Base value cannot be string for an aggregator",
+                )),
+                AggregatorChange::AggregatorDelta {
+                    delta: prev_delta,
+                    max_value: prev_max_value,
+                    history: prev_history,
+                } => {
+                    if max_value != prev_max_value {
+                        return Err(code_invariant_error(
+                            "Max value of aggregator cannot change",
+                        ));
+                    }
+                    let (new_delta, new_history) =
+                        merge_two_deltas(prev_delta, prev_history, delta, history, *max_value)?;
+                    *self = AggregatorChange::AggregatorDelta {
+                        delta: new_delta,
+                        history: new_history,
+                        max_value: *max_value,
+                    };
+                    Ok(())
+                },
+                AggregatorChange::SnapshotDelta { .. } => Err(code_invariant_error(
+                    "SnapshotDelta cannot come before AggregatorDelta",
+                )),
             },
             AggregatorChange::SnapshotDelta { .. } => {
                 unimplemented!()
@@ -125,7 +137,7 @@ mod test {
                 min_achieved_negative_delta: 5,
                 min_overflow_positive_delta: None,
                 max_underflow_negative_delta: None,
-            }
+            },
         };
         let mut aggregator_change3 = AggregatorChange::AggregatorDelta {
             max_value: 100,

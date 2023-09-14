@@ -7,7 +7,8 @@
 
 use crate::{
     bounded_math::SignedU128,
-    module::AGGREGATOR_MODULE, delta_math::{merge_data_and_delta, merge_two_deltas, DeltaHistory},
+    delta_math::{merge_data_and_delta, merge_two_deltas, DeltaHistory},
+    module::AGGREGATOR_MODULE,
 };
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -18,7 +19,7 @@ use aptos_types::{
 use move_binary_format::errors::{Location, PartialVMResult};
 
 /// Represents an update from aggregator's operation.
-#[derive(Copy, Clonef, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct DeltaOp {
     /// History computed during the transaction execution.
     history: DeltaHistory,
@@ -57,7 +58,13 @@ impl DeltaOp {
             self.max_value, previous_delta.max_value,
             "Cannot merge deltas with different limits",
         );
-        let (new_update, new_history) = merge_two_deltas(&previous_delta.update, &previous_delta.history, &self.update, &self.history, self.max_value)?;
+        let (new_update, new_history) = merge_two_deltas(
+            &previous_delta.update,
+            &previous_delta.history,
+            &self.update,
+            &self.history,
+            self.max_value,
+        )?;
 
         self.update = new_update;
         self.history = new_history;
@@ -119,18 +126,14 @@ impl std::fmt::Debug for DeltaOp {
                 write!(
                     f,
                     "+{} ensures 0 <= result <= {}, {:?}",
-                    value,
-                    self.max_value,
-                    self.history
+                    value, self.max_value, self.history
                 )
             },
             SignedU128::Negative(value) => {
                 write!(
                     f,
                     "-{} ensures 0 <= result <= {}, {:?}",
-                    value,
-                    self.max_value,
-                    self.history
+                    value, self.max_value, self.history
                 )
             },
         }

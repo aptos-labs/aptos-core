@@ -2,15 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::bounded_math::{
-    abort_error, ok_overflow,
-    EEXPECTED_OVERFLOW, EEXPECTED_UNDERFLOW, BoundedMath, SignedU128, ok_underflow, expect_ok,
+    abort_error, expect_ok, ok_overflow, ok_underflow, BoundedMath, SignedU128, EEXPECTED_OVERFLOW,
+    EEXPECTED_UNDERFLOW,
 };
 use move_binary_format::errors::PartialVMResult;
 
 /// When merging aggregator changes of two transactions,
 /// unable to merge the histories of the transactions.
 pub(crate) const EMERGE_HISTORIES: u64 = 0x02_0008;
-
 
 /// Tracks values seen by aggregator. In particular, stores information about
 /// the biggest and the smallest deltas that were applied successfully during
@@ -25,23 +24,36 @@ pub(crate) const EMERGE_HISTORIES: u64 = 0x02_0008;
 /// execution:
 ///
 /// ```text
+///                   X
+///         X         :
+/// +C ===========================================>
+///         :         :
 /// +A ===========================================>
-///            ||
-///          ||||                               +X
+///         :  ||     :
+///         :||||     :                         +Z
 ///         |||||  ||||||                    ||||
 ///      |||||||||||||||||||||||||          |||||
 /// +0 ===========================================> time
-///                       ||||||
-///                         ||
-///                         ||
+///            :          ||||||
+///            :            ||
+///            :            ||
 /// -B ===========================================>
+///            :             :
+///            :             :
+/// -D ===========================================>
+///            X             :
+///                          :
+///                          X
 /// ```
 ///
-/// Clearly, +X succeeds if +A and -B succeed. Therefore each delta
-/// validation consists of:
+/// Clearly, +Z succeeds if +A and -B succeed, and +C and -D fail.
+/// Therefore each delta validation consists of:
 ///   1. check +A did not overflow
-///   2. check -A did not drop below zero
-/// Checking +X is irrelevant since +A >= +X.
+///   2. check -B did not drop below zero
+///   3. check +C did overflow
+///   4. check -D does drop below zero
+///
+/// Checking +X is irrelevant since +A >= +Z, and so Z is not stored here.
 #[derive(Clone, Hash, Copy, Default, PartialOrd, Ord, PartialEq, Eq)]
 pub struct DeltaHistory {
     pub max_achieved_positive_delta: u128,
@@ -66,7 +78,11 @@ impl std::fmt::Debug for DeltaHistory {
         if let Some(underflow) = self.max_underflow_negative_delta {
             write!(f, "underflow: -{}, ", underflow)?;
         };
-        write!(f, "achieved: [-{}, {}]", self.min_achieved_negative_delta, self.max_achieved_positive_delta)?;
+        write!(
+            f,
+            "achieved: [-{}, {}]",
+            self.min_achieved_negative_delta, self.max_achieved_positive_delta
+        )?;
         if let Some(overflow) = self.min_overflow_positive_delta {
             write!(f, ", overflow: -{}", overflow)?;
         };
@@ -93,7 +109,7 @@ impl DeltaHistory {
 
     /// Records observed delta in history. Should be called after an operation (addition/subtraction)
     /// is successful to record its side-effects.
-    pub (crate) fn record_success(&mut self, delta: SignedU128) {
+    pub(crate) fn record_success(&mut self, delta: SignedU128) {
         match delta {
             SignedU128::Positive(value) => {
                 self.max_achieved_positive_delta =
@@ -107,19 +123,18 @@ impl DeltaHistory {
     }
 
     fn record_failure(field: &mut Option<u128>, delta: u128) {
-        *field = (*field)
-            .map_or(Some(delta), |min| Some(u128::min(min, delta)));
+        *field = (*field).map_or(Some(delta), |min| Some(u128::min(min, delta)));
     }
 
     /// Records overflows in history. Should be called after an addition is unsuccessful
     /// to record its side-effects.
-    pub (crate) fn record_overflow(&mut self, delta: u128) {
+    pub(crate) fn record_overflow(&mut self, delta: u128) {
         Self::record_failure(&mut self.min_overflow_positive_delta, delta);
     }
 
     /// Records underflows in history. Should be called after a subtraction is unsuccessful
     /// to record its side-effects.
-    pub (crate) fn record_underflow(&mut self, delta: u128) {
+    pub(crate) fn record_underflow(&mut self, delta: u128) {
         Self::record_failure(&mut self.max_underflow_negative_delta, delta);
     }
 
@@ -176,48 +191,58 @@ impl DeltaHistory {
         Ok(())
     }
 
-    fn offset_and_merge_min_overflow(min_overflow: &Option<u128>, prev_delta: &SignedU128, prev_min_overflow: &Option<u128>, math: &BoundedMath) -> PartialVMResult<Option<u128>> {
-        let adjusted_min_overflow =
-            min_overflow.map_or(
+    fn offset_and_merge_min_overflow(
+        min_overflow: &Option<u128>,
+        prev_delta: &SignedU128,
+        prev_min_overflow: &Option<u128>,
+        math: &BoundedMath,
+    ) -> PartialVMResult<Option<u128>> {
+        let adjusted_min_overflow = min_overflow
+            .map_or(
                 Ok(None),
                 // Return Result<Option<u128>>. we want to have None on overflow,
                 // and to fail the merging on underflow
-                |min_overflow| {
-                    ok_overflow(math.unsigned_add_delta(
-                        min_overflow,
-                        prev_delta,
-                    ))
-                },
-            ).map_err(|_| abort_error(
+                |min_overflow| ok_overflow(math.unsigned_add_delta(min_overflow, prev_delta)),
+            )
+            .map_err(|_| {
+                abort_error(
                 "Unable to merge histories, due to overflow/underflow not being satisfied any more",
                 EMERGE_HISTORIES
-            ))?;
+            )
+            })?;
 
-        Ok(match (
-            adjusted_min_overflow,
-            prev_min_overflow,
-        ) {
+        Ok(match (adjusted_min_overflow, prev_min_overflow) {
             (Some(a), Some(b)) => Some(u128::min(a, *b)),
             (a, b) => a.or(*b),
         })
     }
 
-    fn offset_and_merge_max_achieved(max_achieved: u128, prev_delta: &SignedU128, prev_max_achieved: u128, math: &BoundedMath) -> PartialVMResult<u128> {
+    fn offset_and_merge_max_achieved(
+        max_achieved: u128,
+        prev_delta: &SignedU128,
+        prev_max_achieved: u128,
+        math: &BoundedMath,
+    ) -> PartialVMResult<u128> {
         Ok(
-            ok_underflow(math.unsigned_add_delta(
-                max_achieved,
-                prev_delta,
-            )).map_err(|_| abort_error(
-                "Unable to merge histories, due to achieved not being satisfied any more",
-                EMERGE_HISTORIES
-            ))?
-            .map_or(prev_max_achieved, |value| {
-                u128::max(prev_max_achieved, value)
-            })
+            ok_underflow(math.unsigned_add_delta(max_achieved, prev_delta))
+                .map_err(|_| {
+                    abort_error(
+                        "Unable to merge histories, due to achieved not being satisfied any more",
+                        EMERGE_HISTORIES,
+                    )
+                })?
+                .map_or(prev_max_achieved, |value| {
+                    u128::max(prev_max_achieved, value)
+                }),
         )
     }
 
-    pub fn offset_and_merge_history(&self, prev_delta: &SignedU128, prev_history: &Self, max_value: u128) -> PartialVMResult<DeltaHistory> {
+    pub fn offset_and_merge_history(
+        &self,
+        prev_delta: &SignedU128,
+        prev_history: &Self,
+        max_value: u128,
+    ) -> PartialVMResult<DeltaHistory> {
         let math = BoundedMath::new(max_value);
 
         let new_min_overflow = Self::offset_and_merge_min_overflow(
@@ -270,10 +295,14 @@ impl DeltaHistory {
             max_underflow_negative_delta: new_max_underflow,
         })
     }
-
 }
 
-pub fn merge_data_and_delta(prev_value: u128, delta: &SignedU128, history: &DeltaHistory, max_value: u128) -> PartialVMResult<u128> {
+pub fn merge_data_and_delta(
+    prev_value: u128,
+    delta: &SignedU128,
+    history: &DeltaHistory,
+    max_value: u128,
+) -> PartialVMResult<u128> {
     // First, validate if the current delta operation can be applied to the base.
     history.validate_against_base_value(prev_value, max_value)?;
     // Then, apply the delta. Since history was validated, this should never fail.
@@ -288,9 +317,6 @@ pub fn merge_two_deltas(
     max_value: u128,
 ) -> PartialVMResult<(SignedU128, DeltaHistory)> {
     let new_history = next_history.offset_and_merge_history(prev_delta, prev_history, max_value)?;
-    let new_delta = expect_ok(BoundedMath::new(max_value).signed_add(
-        prev_delta,
-        next_delta,
-    ))?;
+    let new_delta = expect_ok(BoundedMath::new(max_value).signed_add(prev_delta, next_delta))?;
     Ok((new_delta, new_history))
 }

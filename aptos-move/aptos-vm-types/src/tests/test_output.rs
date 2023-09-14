@@ -113,7 +113,13 @@ fn test_err_output_equality_with_deltas() {
     let mut state_view = FakeDataStore::default();
     state_view.set_legacy(as_state_key!(delta_key), serialize(&900));
 
-    let vm_output = build_vm_output(vec![], vec![], vec![], vec![mock_add(delta_key, 300)], vec![]);
+    let vm_output = build_vm_output(
+        vec![],
+        vec![],
+        vec![],
+        vec![mock_add(delta_key, 300)],
+        vec![],
+    );
 
     let vm_status_1 = assert_err!(vm_output.clone().try_materialize(&state_view));
     let vm_status_2 = assert_err!(vm_output.try_into_transaction_output(&state_view));

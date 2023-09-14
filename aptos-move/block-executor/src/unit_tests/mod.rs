@@ -16,7 +16,8 @@ use crate::{
 };
 use aptos_aggregator::{
     bounded_math::SignedU128,
-    delta_change_set::{delta_add, delta_sub, DeltaOp}, delta_math::DeltaHistory,
+    delta_change_set::{delta_add, delta_sub, DeltaOp},
+    delta_math::DeltaHistory,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{

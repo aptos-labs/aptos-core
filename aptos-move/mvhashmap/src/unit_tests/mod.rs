@@ -10,7 +10,8 @@ use super::{
 use aptos_aggregator::{
     bounded_math::SignedU128,
     delta_change_set::{delta_add, delta_sub, DeltaOp},
-    transaction::AggregatorValue, delta_math::DeltaHistory,
+    delta_math::DeltaHistory,
+    transaction::AggregatorValue,
 };
 use aptos_types::{
     access_path::AccessPath,

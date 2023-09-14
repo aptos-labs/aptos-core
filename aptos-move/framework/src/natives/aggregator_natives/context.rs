@@ -3,7 +3,9 @@
 
 use aptos_aggregator::{
     aggregator_change_set::AggregatorChange,
-    aggregator_extension::{AggregatorData, AggregatorID, AggregatorState, AggregatorSnapshotState, SnapshotValue},
+    aggregator_extension::{
+        AggregatorData, AggregatorID, AggregatorSnapshotState, AggregatorState, SnapshotValue,
+    },
     delta_change_set::DeltaOp,
     resolver::AggregatorResolver,
 };
@@ -61,7 +63,8 @@ impl<'a> NativeAggregatorContext<'a> {
         let NativeAggregatorContext {
             aggregator_data, ..
         } = self;
-        let (_, destroyed_aggregators, aggregators, snapshots) = aggregator_data.into_inner().into();
+        let (_, destroyed_aggregators, aggregators, snapshots) =
+            aggregator_data.into_inner().into();
 
         let mut aggregator_v1_changes = HashMap::new();
         let mut aggregator_v2_changes = HashMap::new();
@@ -74,7 +77,13 @@ impl<'a> NativeAggregatorContext<'a> {
                     let change = match state {
                         AggregatorState::Data { value } => AggregatorChange::Data { value },
                         // TODO - read creates a change, remove it?
-                        AggregatorState::Delta { delta, history, .. } => AggregatorChange::AggregatorDelta { delta, max_value, history },
+                        AggregatorState::Delta { delta, history, .. } => {
+                            AggregatorChange::AggregatorDelta {
+                                delta,
+                                max_value,
+                                history,
+                            }
+                        },
                     };
                     aggregator_v2_changes.insert(id, change);
                 },
@@ -94,9 +103,21 @@ impl<'a> NativeAggregatorContext<'a> {
         for (id, snapshot) in snapshots {
             let state = snapshot.into();
             let change = match state {
-                AggregatorSnapshotState::Data { value: SnapshotValue::Integer( value ) } => Some(AggregatorChange::Data { value }),
-                AggregatorSnapshotState::Data { value: SnapshotValue::String( value ) } => Some(AggregatorChange::StringData { value }),
-                AggregatorSnapshotState::Delta { base_aggregator, delta, formula } => Some(AggregatorChange::SnapshotDelta { delta, base_aggregator, formula }),
+                AggregatorSnapshotState::Data {
+                    value: SnapshotValue::Integer(value),
+                } => Some(AggregatorChange::Data { value }),
+                AggregatorSnapshotState::Data {
+                    value: SnapshotValue::String(value),
+                } => Some(AggregatorChange::StringData { value }),
+                AggregatorSnapshotState::Delta {
+                    base_aggregator,
+                    delta,
+                    formula,
+                } => Some(AggregatorChange::SnapshotDelta {
+                    delta,
+                    base_aggregator,
+                    formula,
+                }),
                 AggregatorSnapshotState::Reference { .. } => None,
             };
             if let Some(change) = change {
@@ -120,12 +141,10 @@ impl<'a> NativeAggregatorContext<'a> {
 mod test {
     use super::*;
     use aptos_aggregator::{
-        aggregator_extension::SpeculativeStartValue,
-        aggregator_v1_id_for_test,
-        bounded_math::SignedU128,
-        AggregatorStore, delta_math::DeltaHistory,
+        aggregator_v1_id_for_test, bounded_math::SignedU128, delta_math::DeltaHistory,
+        AggregatorStore,
     };
-    use claims::{assert_matches, assert_ok};
+    use claims::{assert_matches, assert_ok, assert_some_eq};
 
     fn get_test_resolver() -> AggregatorStore {
         let mut state_view = AggregatorStore::default();
@@ -298,34 +317,22 @@ mod test {
         assert!(aggregator_v2_changes.contains_key(&AggregatorID::ephemeral(900)));
         assert!(!aggregator_v2_changes.contains_key(&AggregatorID::ephemeral(1000)));
         assert!(aggregator_v2_changes.contains_key(&AggregatorID::ephemeral(1100)));
-        assert_eq!(
-            aggregator_v2_changes
-                .get(&AggregatorID::ephemeral(900))
-                .unwrap(),
-            &AggregatorChange {
+        assert_some_eq!(
+            aggregator_v2_changes.get(&AggregatorID::ephemeral(900)),
+            &AggregatorChange::AggregatorDelta {
                 max_value: 900,
-                state: AggregatorState::Delta {
-                    speculative_start_value: SpeculativeStartValue::LastCommittedValue(300),
-                    delta: SignedU128::Positive(200),
-                    history: DeltaHistory {
-                        max_achieved_positive_delta: 200,
-                        min_achieved_negative_delta: 0,
-                        min_overflow_positive_delta: Some(601),
-                        max_underflow_negative_delta: Some(301),
-                    },
+                delta: SignedU128::Positive(200),
+                history: DeltaHistory {
+                    max_achieved_positive_delta: 200,
+                    min_achieved_negative_delta: 0,
+                    min_overflow_positive_delta: Some(601),
+                    max_underflow_negative_delta: Some(301),
                 },
-                base_aggregator: None,
             }
         );
-        assert_eq!(
-            aggregator_v2_changes
-                .get(&AggregatorID::ephemeral(1100))
-                .unwrap(),
-            &AggregatorChange {
-                max_value: 1100,
-                state: AggregatorState::Data { value: 200 },
-                base_aggregator: None
-            }
-        )
+        assert_some_eq!(
+            aggregator_v2_changes.get(&AggregatorID::ephemeral(1100)),
+            &AggregatorChange::Data { value: 200 }
+        );
     }
 }

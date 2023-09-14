@@ -82,8 +82,8 @@ impl VMOutput {
         }
 
         let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
-        let materialized_change_set = change_set
-            .try_materialize_aggregator_v1_delta_set(state_view)?;
+        let materialized_change_set =
+            change_set.try_materialize_aggregator_v1_delta_set(state_view)?;
         // TODO do something
         //     .try_materialize_aggregator_v2_changes(state_view)?;
         Ok(VMOutput::new(

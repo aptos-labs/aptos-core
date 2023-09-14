@@ -342,7 +342,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
 
         for (id, change) in aggregator_change_set.aggregator_v1_changes {
-            let state_key = id.as_state_key().expect("Aggregator V1 change set should contain only Legacy AggregatorIDs");
+            let state_key = id
+                .as_state_key()
+                .expect("Aggregator V1 change set should contain only Legacy AggregatorIDs");
             match change {
                 AggregatorChangeV1::Write(value) => {
                     let write_op = woc.convert_aggregator_mod(&state_key, value)?;

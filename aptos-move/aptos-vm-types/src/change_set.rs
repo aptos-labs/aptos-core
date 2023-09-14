@@ -365,7 +365,7 @@ impl VMChangeSet {
             module_write_set: additional_module_write_set,
             aggregator_v1_write_set: additional_aggregator_write_set,
             aggregator_v1_delta_set: additional_aggregator_delta_set,
-            aggregator_v2_change_set: _additional_aggregator_change_set,
+            aggregator_v2_change_set: additional_aggregator_v2_change_set,
             events: additional_events,
         } = additional_change_set;
 
@@ -375,6 +375,9 @@ impl VMChangeSet {
             additional_aggregator_write_set,
             additional_aggregator_delta_set,
         )?;
+        if !additional_aggregator_v2_change_set.is_empty() {
+            unimplemented!("Aggregator v2 change sets are not supported yet.");
+        }
         Self::squash_additional_writes(
             &mut self.resource_write_set,
             additional_resource_write_set,

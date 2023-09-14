@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    bounded_math::{
-        expect_ok, ok_overflow, BoundedMath, SignedU128, code_invariant_error,
-    },
-    resolver::{AggregatorReadMode, AggregatorResolver}, delta_math::DeltaHistory,
+    bounded_math::{code_invariant_error, expect_ok, ok_overflow, BoundedMath, SignedU128},
+    delta_math::DeltaHistory,
+    resolver::{AggregatorReadMode, AggregatorResolver},
 };
 use aptos_types::{
     state_store::{state_key::StateKey, table::TableHandle},
@@ -60,10 +59,15 @@ impl AggregatorID {
 /// Describes how the `speculative_start_value` in `AggregatorState` was obtained.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SpeculativeStartValue {
-    // The speculative_start_value is assigned to 0.
+    // The speculative_start_value is not yet initialized
     Unset,
     // The speculative_start_value was obtained by reading
     // the last committed value of the aggregator from MVHashmap.
+    // WARNING: any use of this value should be captured as a restriction
+    // in the change set, as value received here is not track as part of the
+    // read conflict!!
+    // Only current restriction is DeltaHistory, and only correct usage is
+    // that can be returned to the caller is via try_add/try_sub methods!
     LastCommittedValue(u128),
     // The speculative_start_value was obtained by performing a read
     // procedure on the aggregator, which involves aggregating deltas
@@ -72,11 +76,16 @@ pub enum SpeculativeStartValue {
 }
 
 impl SpeculativeStartValue {
+    // WARNING: any use of this value should be captured as a restriction
+    // in the change set, as value received here is not track as part of the
+    // read conflict!!
+    // Only current restriction is DeltaHistory, and only correct usage is
+    // that can be returned to the caller is via try_add/try_sub methods!
     pub fn get_any_value(&self) -> PartialVMResult<u128> {
         match self {
-            SpeculativeStartValue::Unset => Err(
-                code_invariant_error("Tried calling get_any_value on Unset speculative value")
-            ),
+            SpeculativeStartValue::Unset => Err(code_invariant_error(
+                "Tried calling get_any_value on Unset speculative value",
+            )),
             SpeculativeStartValue::LastCommittedValue(value) => Ok(*value),
             SpeculativeStartValue::AggregatedValue(value) => Ok(*value),
         }
@@ -84,12 +93,12 @@ impl SpeculativeStartValue {
 
     pub fn get_value_for_read(&self) -> PartialVMResult<u128> {
         match self {
-            SpeculativeStartValue::Unset => Err(
-                code_invariant_error("Tried calling get_value_for_read on Unset speculative value")
-            ),
-            SpeculativeStartValue::LastCommittedValue(_) => Err(
-                code_invariant_error("Tried calling get_value_for_read on LastCommittedValue speculative value")
-            ),
+            SpeculativeStartValue::Unset => Err(code_invariant_error(
+                "Tried calling get_value_for_read on Unset speculative value",
+            )),
+            SpeculativeStartValue::LastCommittedValue(_) => Err(code_invariant_error(
+                "Tried calling get_value_for_read on LastCommittedValue speculative value",
+            )),
             SpeculativeStartValue::AggregatedValue(value) => Ok(*value),
         }
     }
@@ -118,7 +127,7 @@ pub enum SnapshotValue {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DerivedFormula {
     Identity,
-    Concat{ prefix: Vec<u8>, suffix: Vec<u8> },
+    Concat { prefix: Vec<u8>, suffix: Vec<u8> },
 }
 
 // Aggregator snapshot is immutable struct, once created - value is fixed.
@@ -216,16 +225,13 @@ impl Aggregator {
                 delta,
                 history,
             } => {
-                let cur_value = expect_ok(math.unsigned_add_delta(
-                    speculative_start_value.get_any_value()?,
-                    delta,
-                ))?;
+                let cur_value = expect_ok(
+                    math.unsigned_add_delta(speculative_start_value.get_any_value()?, delta),
+                )?;
 
                 if math.unsigned_add(cur_value, input).is_err() {
-                    let overflow_delta = expect_ok(ok_overflow(math.unsigned_add_delta(
-                        input,
-                        delta,
-                    )))?;
+                    let overflow_delta =
+                        expect_ok(ok_overflow(math.unsigned_add_delta(input, delta)))?;
 
                     // if value overflowed, we don't need to record it
                     if let Some(overflow_delta) = overflow_delta {
@@ -276,16 +282,13 @@ impl Aggregator {
                 delta,
                 history,
             } => {
-                let cur_value = expect_ok(math.unsigned_add_delta(
-                    speculative_start_value.get_any_value()?,
-                    delta,
-                ))?;
+                let cur_value = expect_ok(
+                    math.unsigned_add_delta(speculative_start_value.get_any_value()?, delta),
+                )?;
 
                 if cur_value < input {
-                    let underflow_delta = expect_ok(ok_overflow(math.unsigned_add_delta(
-                        input,
-                        &delta.minus(),
-                    )))?;
+                    let underflow_delta =
+                        expect_ok(ok_overflow(math.unsigned_add_delta(input, &delta.minus())))?;
                     // If value overflowed (delta was smaller than -max_value), we don't need to record it.
                     if let Some(underflow_delta) = underflow_delta {
                         history.record_underflow(underflow_delta);
@@ -309,6 +312,8 @@ impl Aggregator {
     /// This method has a sideffect, of updating `speculative_start_value` with
     /// `LastCommittedValue` variant.
     /// `get_any_value()` is guaranteed to succeed after this call.
+    /// This needs to be called before updating aggregator with delta's, i.e. if
+    /// aggregator is in Delta state, delta should be 0, and history should be empty.
     pub fn read_last_committed_aggregator_value(
         &mut self,
         resolver: &dyn AggregatorResolver,
@@ -317,11 +322,14 @@ impl Aggregator {
             speculative_start_value,
             delta,
             history,
-        } = &mut self.state {
+        } = &mut self.state
+        {
             // If value is Unset, we read it
             if let SpeculativeStartValue::Unset = speculative_start_value {
                 if *delta != SignedU128::Positive(0) || !history.is_empty() {
-                    return Err(code_invariant_error("Delta or history not empty with Unset speculative value"));
+                    return Err(code_invariant_error(
+                        "Delta or history not empty with Unset speculative value",
+                    ));
                 }
 
                 let value_from_storage = resolver
@@ -333,9 +341,8 @@ impl Aggregator {
                         ))
                     })?;
 
-                *speculative_start_value = SpeculativeStartValue::LastCommittedValue(
-                    value_from_storage,
-                )
+                *speculative_start_value =
+                    SpeculativeStartValue::LastCommittedValue(value_from_storage)
             }
         }
         Ok(())
@@ -365,7 +372,8 @@ impl Aggregator {
             } => {
                 let math = BoundedMath::new(self.max_value);
                 // If we performed an "expensive read" operation before, use it.
-                if let SpeculativeStartValue::AggregatedValue(start_value) = speculative_start_value {
+                if let SpeculativeStartValue::AggregatedValue(start_value) = speculative_start_value
+                {
                     return Ok(math.unsigned_add_delta(*start_value, delta)?);
                 }
 
@@ -384,9 +392,8 @@ impl Aggregator {
                 // Applyng shouldn't fail after validation
                 let result = expect_ok(math.unsigned_add_delta(value_from_storage, delta))?;
 
-                *speculative_start_value = SpeculativeStartValue::AggregatedValue(
-                    value_from_storage,
-                );
+                *speculative_start_value =
+                    SpeculativeStartValue::AggregatedValue(value_from_storage);
                 Ok(result)
             },
         }
@@ -483,24 +490,27 @@ impl AggregatorData {
     pub fn snapshot(&mut self, id: &AggregatorID) -> PartialVMResult<u64> {
         let new_id = self.generate_id();
         let snapshot_id = AggregatorID::ephemeral(new_id);
-        let aggregator = self.aggregators.get(id).ok_or_else(|| code_invariant_error("Aggregator ID not found"))?;
+        let aggregator = self
+            .aggregators
+            .get(id)
+            .ok_or_else(|| code_invariant_error("Aggregator ID not found"))?;
 
         let snapshot_state = match aggregator.state {
             // If aggregator is in Data state, we don't need to depend on it, and can just take the value.
             AggregatorState::Data { value } => AggregatorSnapshotState::Data {
-                value: SnapshotValue::Integer(value)
+                value: SnapshotValue::Integer(value),
             },
             AggregatorState::Delta { delta, .. } => AggregatorSnapshotState::Delta {
                 base_aggregator: *id,
                 delta,
-                formula: DerivedFormula::Identity
+                formula: DerivedFormula::Identity,
             },
         };
 
         self.aggregator_snapshots
             .insert(snapshot_id, AggregatorSnapshot {
                 id: snapshot_id,
-                state: snapshot_state
+                state: snapshot_state,
             });
         Ok(new_id)
     }
@@ -543,7 +553,7 @@ pub fn extension_error(message: impl ToString) -> PartialVMError {
 mod test {
     use super::*;
     use crate::{aggregator_v1_id_for_test, AggregatorStore};
-    use claims::{assert_err, assert_ok, assert_some_eq, assert_ok_eq};
+    use claims::{assert_err, assert_ok, assert_ok_eq, assert_some_eq};
     use once_cell::sync::Lazy;
 
     #[allow(clippy::redundant_closure)]
@@ -580,8 +590,7 @@ mod test {
         assert!(!aggregator.try_add(&*TEST_RESOLVER, 170).unwrap());
         assert_eq!(aggregator.state, AggregatorState::Data { value: 50 });
         assert_ok_eq!(
-            aggregator
-                .read_most_recent_aggregator_value(&*TEST_RESOLVER),
+            aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER),
             50
         );
     }
@@ -628,8 +637,7 @@ mod test {
             }
         });
         assert_ok_eq!(
-            aggregator
-                .read_most_recent_aggregator_value(&sample_resolver),
+            aggregator.read_most_recent_aggregator_value(&sample_resolver),
             30
         );
         assert_eq!(aggregator.state, AggregatorState::Delta {
@@ -769,8 +777,14 @@ mod test {
         history: DeltaHistory,
     ) {
         assert_eq!(aggregator, &AggregatorState::Delta {
-            speculative_start_value: SpeculativeStartValue::LastCommittedValue(speculative_start_value),
-            delta: if delta > 0 { SignedU128::Positive(delta as u128) } else { SignedU128::Negative((-delta) as u128) },
+            speculative_start_value: SpeculativeStartValue::LastCommittedValue(
+                speculative_start_value
+            ),
+            delta: if delta > 0 {
+                SignedU128::Positive(delta as u128)
+            } else {
+                SignedU128::Negative((-delta) as u128)
+            },
             history,
         });
     }
@@ -853,23 +867,11 @@ mod test {
                 max_underflow_negative_delta: None,
             }
         });
-        if let AggregatorState::Delta { history, ..} = aggregator.state {
-            assert_ok!(history.validate_against_base_value(
-                200,
-                aggregator.max_value,
-            ));
-            assert_err!(history.validate_against_base_value(
-                199,
-                aggregator.max_value,
-            ));
-            assert_ok!(history.validate_against_base_value(
-                300,
-                aggregator.max_value,
-            ));
-            assert_err!(history.validate_against_base_value(
-                301,
-                aggregator.max_value,
-            ));
+        if let AggregatorState::Delta { history, .. } = aggregator.state {
+            assert_ok!(history.validate_against_base_value(200, aggregator.max_value,));
+            assert_err!(history.validate_against_base_value(199, aggregator.max_value,));
+            assert_ok!(history.validate_against_base_value(300, aggregator.max_value,));
+            assert_err!(history.validate_against_base_value(301, aggregator.max_value,));
         }
     }
 
@@ -896,23 +898,11 @@ mod test {
             }
         });
 
-        if let AggregatorState::Delta { history, ..} = aggregator.state {
-            assert_err!(history.validate_against_base_value(
-                199,
-                aggregator.max_value,
-            ));
-            assert_ok!(history.validate_against_base_value(
-                200,
-                aggregator.max_value,
-            ));
-            assert_ok!(history.validate_against_base_value(
-                300,
-                aggregator.max_value,
-            ));
-            assert_err!(history.validate_against_base_value(
-                301,
-                aggregator.max_value,
-            ));
+        if let AggregatorState::Delta { history, .. } = aggregator.state {
+            assert_err!(history.validate_against_base_value(199, aggregator.max_value,));
+            assert_ok!(history.validate_against_base_value(200, aggregator.max_value,));
+            assert_ok!(history.validate_against_base_value(300, aggregator.max_value,));
+            assert_err!(history.validate_against_base_value(301, aggregator.max_value,));
         }
     }
 
@@ -940,27 +930,12 @@ mod test {
             }
         });
 
-        if let AggregatorState::Delta { history, ..} = aggregator.state {
-            assert_ok!(history.validate_against_base_value(
-                100,
-                aggregator.max_value,
-            ));
-            assert_ok!(history.validate_against_base_value(
-                199,
-                aggregator.max_value,
-            ));
-            assert_ok!(history.validate_against_base_value(
-                200,
-                aggregator.max_value,
-            ));
-            assert_err!(history.validate_against_base_value(
-                201,
-                aggregator.max_value,
-            ));
-            assert_err!(history.validate_against_base_value(
-                400,
-                aggregator.max_value,
-            ));
+        if let AggregatorState::Delta { history, .. } = aggregator.state {
+            assert_ok!(history.validate_against_base_value(100, aggregator.max_value,));
+            assert_ok!(history.validate_against_base_value(199, aggregator.max_value,));
+            assert_ok!(history.validate_against_base_value(200, aggregator.max_value,));
+            assert_err!(history.validate_against_base_value(201, aggregator.max_value,));
+            assert_err!(history.validate_against_base_value(400, aggregator.max_value,));
         }
     }
 }

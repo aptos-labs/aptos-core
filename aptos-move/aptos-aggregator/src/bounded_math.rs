@@ -40,7 +40,10 @@ pub(crate) fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
 }
 
 pub(crate) fn code_invariant_error<T: std::fmt::Debug>(message: T) -> PartialVMError {
-    error!("Aggregator code invariant broken (there is a bug in the code), {:?}", message);
+    error!(
+        "Aggregator code invariant broken (there is a bug in the code), {:?}",
+        message
+    );
     abort_error(
         format!(
             "Aggregator code invariant broken (there is a bug in the code), {:?}",
@@ -122,7 +125,11 @@ impl BoundedMath {
         }
     }
 
-    pub fn signed_add(&self, left: &SignedU128, right: &SignedU128) -> BoundedMathResult<SignedU128> {
+    pub fn signed_add(
+        &self,
+        left: &SignedU128,
+        right: &SignedU128,
+    ) -> BoundedMathResult<SignedU128> {
         // Another useful macro, this time for merging deltas with different signs, such
         // as +A-B and -A+B. In these cases we have to check which of A or B is greater
         // and possibly flip a sign.
@@ -158,10 +165,12 @@ pub enum SignedU128 {
 impl PartialEq for SignedU128 {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Positive(v1), Self::Positive(v2)) => v1 == v2,
-            (Self::Negative(v1), Self::Negative(v2)) => v1 == v2,
-            (Self::Positive(v1), Self::Negative(v2)) => *v1 == 0 && *v2 == 0,
-            (Self::Negative(v1), Self::Positive(v2)) => *v1 == 0 && *v2 == 0,
+            (Self::Positive(v1), Self::Positive(v2)) | (Self::Negative(v1), Self::Negative(v2)) => {
+                v1 == v2
+            },
+            (Self::Positive(v1), Self::Negative(v2)) | (Self::Negative(v1), Self::Positive(v2)) => {
+                *v1 == 0 && *v2 == 0
+            },
         }
     }
 }
