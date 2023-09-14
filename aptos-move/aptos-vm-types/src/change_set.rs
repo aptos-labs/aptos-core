@@ -3,6 +3,8 @@
 
 use crate::check_change_set::CheckChangeSet;
 use aptos_aggregator::{
+    aggregator_change_set::AggregatorChange,
+    aggregator_extension::AggregatorID,
     delta_change_set::{serialize, DeltaOp},
     resolver::{AggregatorReadMode, AggregatorResolver},
 };
@@ -100,8 +102,9 @@ pub struct VMChangeSet {
     // updates are merged into a single WriteOp included in the resource_write_set.
     resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
     module_write_set: BTreeMap<StateKey, WriteOp>,
-    aggregator_write_set: BTreeMap<StateKey, WriteOp>,
-    aggregator_delta_set: BTreeMap<StateKey, DeltaOp>,
+    aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
+    aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
+    aggregator_v2_change_set: BTreeMap<AggregatorID, AggregatorChange>,
     events: Vec<ContractEvent>,
 }
 
@@ -127,8 +130,9 @@ impl VMChangeSet {
             resource_write_set: BTreeMap::new(),
             resource_group_write_set: BTreeMap::new(),
             module_write_set: BTreeMap::new(),
-            aggregator_write_set: BTreeMap::new(),
-            aggregator_delta_set: BTreeMap::new(),
+            aggregator_v1_write_set: BTreeMap::new(),
+            aggregator_v1_delta_set: BTreeMap::new(),
+            aggregator_v2_change_set: BTreeMap::new(),
             events: vec![],
         }
     }
@@ -137,8 +141,9 @@ impl VMChangeSet {
         resource_write_set: BTreeMap<StateKey, WriteOp>,
         resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
         module_write_set: BTreeMap<StateKey, WriteOp>,
-        aggregator_write_set: BTreeMap<StateKey, WriteOp>,
-        aggregator_delta_set: BTreeMap<StateKey, DeltaOp>,
+        aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
+        aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
+        aggregator_v2_change_set: BTreeMap<AggregatorID, AggregatorChange>,
         events: Vec<ContractEvent>,
         checker: &dyn CheckChangeSet,
     ) -> anyhow::Result<Self, VMStatus> {
@@ -146,8 +151,9 @@ impl VMChangeSet {
             resource_write_set,
             resource_group_write_set,
             module_write_set,
-            aggregator_write_set,
-            aggregator_delta_set,
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set,
+            aggregator_v2_change_set,
             events,
         };
 
@@ -190,8 +196,9 @@ impl VMChangeSet {
             resource_write_set,
             resource_group_write_set: BTreeMap::new(),
             module_write_set,
-            aggregator_write_set: BTreeMap::new(),
-            aggregator_delta_set: BTreeMap::new(),
+            aggregator_v1_write_set: BTreeMap::new(),
+            aggregator_v1_delta_set: BTreeMap::new(),
+            aggregator_v2_change_set: BTreeMap::new(),
             events,
         };
         checker.check_change_set(&change_set)?;
@@ -203,15 +210,16 @@ impl VMChangeSet {
             resource_write_set,
             resource_group_write_set: _,
             module_write_set,
-            aggregator_write_set,
-            aggregator_delta_set: _,
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set: _,
+            aggregator_v2_change_set: _,
             events,
         } = self;
 
         let mut write_set_mut = WriteSetMut::default();
         write_set_mut.extend(resource_write_set);
         write_set_mut.extend(module_write_set);
-        write_set_mut.extend(aggregator_write_set);
+        write_set_mut.extend(aggregator_v1_write_set);
 
         let write_set = write_set_mut
             .freeze()
@@ -224,7 +232,7 @@ impl VMChangeSet {
     /// - deltas are not materialized.
     /// - resource group writes are not (combined &) converted to resource writes.
     pub fn try_into_storage_change_set(self) -> anyhow::Result<StorageChangeSet, VMStatus> {
-        if !self.aggregator_delta_set.is_empty() {
+        if !self.aggregator_v1_delta_set.is_empty() || !self.aggregator_v2_change_set.is_empty() {
             return Err(VMStatus::error(
                 StatusCode::DATA_FORMAT_ERROR,
                 err_msg(
@@ -260,7 +268,7 @@ impl VMChangeSet {
         self.resource_write_set
             .iter_mut()
             .chain(self.module_write_set.iter_mut())
-            .chain(self.aggregator_write_set.iter_mut())
+            .chain(self.aggregator_v1_write_set.iter_mut())
     }
 
     pub fn group_write_set_iter_mut(
@@ -286,25 +294,29 @@ impl VMChangeSet {
         &mut self,
         additional_aggregator_writes: impl Iterator<Item = (StateKey, WriteOp)>,
     ) {
-        self.aggregator_write_set
+        self.aggregator_v1_write_set
             .extend(additional_aggregator_writes)
     }
 
     pub fn aggregator_v1_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
-        &self.aggregator_write_set
+        &self.aggregator_v1_write_set
     }
 
     pub fn aggregator_v1_delta_set(&self) -> &BTreeMap<StateKey, DeltaOp> {
-        &self.aggregator_delta_set
+        &self.aggregator_v1_delta_set
+    }
+
+    pub fn aggregator_v2_change_set(&self) -> &BTreeMap<AggregatorID, AggregatorChange> {
+        &self.aggregator_v2_change_set
     }
 
     pub fn events(&self) -> &[ContractEvent] {
         &self.events
     }
 
-    /// Materializes this change set: all deltas are converted into writes and
-    /// are combined with existing aggregator writes.
-    pub fn try_materialize(
+    /// Materializes this change set: all aggregator v1 deltas are converted into writes and
+    /// are combined with existing aggregator writes. The aggregator v2 changeset is not touched.
+    pub fn try_materialize_aggregator_v1_delta_set(
         self,
         resolver: &impl AggregatorResolver,
     ) -> anyhow::Result<Self, VMStatus> {
@@ -312,8 +324,9 @@ impl VMChangeSet {
             resource_write_set,
             resource_group_write_set,
             module_write_set,
-            mut aggregator_write_set,
-            aggregator_delta_set,
+            mut aggregator_v1_write_set,
+            aggregator_v1_delta_set,
+            aggregator_v2_change_set,
             events,
         } = self;
 
@@ -322,39 +335,39 @@ impl VMChangeSet {
                 // Materialization is needed when committing a transaction, so
                 // we need precise mode to compute the true value of an
                 // aggregator.
-                let write = resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta, AggregatorReadMode::Precise)?;
+                let write = resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta, AggregatorReadMode::Aggregated)?;
                 Ok((state_key, write))
             };
 
-        let materialized_aggregator_delta_set =
-            aggregator_delta_set
-                .into_iter()
-                .map(into_write)
-                .collect::<anyhow::Result<BTreeMap<StateKey, WriteOp>, VMStatus>>()?;
-        aggregator_write_set.extend(materialized_aggregator_delta_set);
+        let materialized_aggregator_delta_set = aggregator_v1_delta_set
+            .into_iter()
+            .map(into_write)
+            .collect::<anyhow::Result<BTreeMap<StateKey, WriteOp>, VMStatus>>()?;
+        aggregator_v1_write_set.extend(materialized_aggregator_delta_set);
 
         Ok(Self {
             resource_write_set,
             resource_group_write_set,
             module_write_set,
-            aggregator_write_set,
-            aggregator_delta_set: BTreeMap::new(),
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set: BTreeMap::new(),
+            aggregator_v2_change_set,
             events,
         })
     }
 
     fn squash_additional_aggregator_changes(
-        aggregator_write_set: &mut BTreeMap<StateKey, WriteOp>,
-        aggregator_delta_set: &mut BTreeMap<StateKey, DeltaOp>,
-        additional_aggregator_write_set: BTreeMap<StateKey, WriteOp>,
-        additional_aggregator_delta_set: BTreeMap<StateKey, DeltaOp>,
+        aggregator_v1_write_set: &mut BTreeMap<StateKey, WriteOp>,
+        aggregator_v1_delta_set: &mut BTreeMap<StateKey, DeltaOp>,
+        additional_aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
+        additional_aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
     ) -> anyhow::Result<(), VMStatus> {
         use std::collections::btree_map::Entry::{Occupied, Vacant};
         use WriteOp::*;
 
         // First, squash deltas.
-        for (state_key, additional_delta_op) in additional_aggregator_delta_set {
-            if let Some(write_op) = aggregator_write_set.get_mut(&state_key) {
+        for (state_key, additional_delta_op) in additional_aggregator_v1_delta_set {
+            if let Some(write_op) = aggregator_v1_write_set.get_mut(&state_key) {
                 // In this case, delta follows a write op.
                 match write_op {
                     Creation(data)
@@ -384,7 +397,7 @@ impl VMChangeSet {
             } else {
                 // Otherwise, this is a either a new delta or an additional delta
                 // for the same state key.
-                match aggregator_delta_set.entry(state_key) {
+                match aggregator_v1_delta_set.entry(state_key) {
                     Occupied(entry) => {
                         // In this case, we need to merge the new incoming delta
                         // to the existing delta, ensuring the strict ordering.
@@ -403,8 +416,8 @@ impl VMChangeSet {
         }
 
         // Next, squash write ops.
-        for (state_key, additional_write_op) in additional_aggregator_write_set {
-            match aggregator_write_set.entry(state_key) {
+        for (state_key, additional_write_op) in additional_aggregator_v1_write_set {
+            match aggregator_v1_write_set.entry(state_key) {
                 Occupied(mut entry) => {
                     squash_writes_pair!(entry, additional_write_op);
                 },
@@ -412,7 +425,7 @@ impl VMChangeSet {
                     // This is a new write op. It can overwrite a delta so we
                     // have to make sure we remove such a delta from the set in
                     // this case.
-                    let removed_delta = aggregator_delta_set.remove(entry.key());
+                    let removed_delta = aggregator_v1_delta_set.remove(entry.key());
 
                     // We cannot create after modification with a delta!
                     if removed_delta.is_some() && additional_write_op.is_creation() {
@@ -504,17 +517,21 @@ impl VMChangeSet {
             resource_write_set: additional_resource_write_set,
             resource_group_write_set: additional_resource_group_write_set,
             module_write_set: additional_module_write_set,
-            aggregator_write_set: additional_aggregator_write_set,
-            aggregator_delta_set: additional_aggregator_delta_set,
+            aggregator_v1_write_set: additional_aggregator_write_set,
+            aggregator_v1_delta_set: additional_aggregator_delta_set,
+            aggregator_v2_change_set: additional_aggregator_v2_change_set,
             events: additional_events,
         } = additional_change_set;
 
         Self::squash_additional_aggregator_changes(
-            &mut self.aggregator_write_set,
-            &mut self.aggregator_delta_set,
+            &mut self.aggregator_v1_write_set,
+            &mut self.aggregator_v1_delta_set,
             additional_aggregator_write_set,
             additional_aggregator_delta_set,
         )?;
+        if !additional_aggregator_v2_change_set.is_empty() {
+            unimplemented!("Aggregator v2 change sets are not supported yet.");
+        }
         Self::squash_additional_writes(
             &mut self.resource_write_set,
             additional_resource_write_set,
