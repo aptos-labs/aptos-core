@@ -257,9 +257,11 @@ impl Aggregator {
         // In theory, any delta will be applied to existing value. However,
         // something may go wrong, so we guard by throwing an error in
         // extension.
-        let value_from_storage = resolver.get_aggregator_v1_value(id).map_err(|e| {
-            extension_error(format!("Could not find the value of the aggregator: {}", e))
-        })?;
+        let value_from_storage = resolver
+            .get_aggregator_v1_value(id.as_state_key())
+            .map_err(|e| {
+                extension_error(format!("Could not find the value of the aggregator: {}", e))
+            })?;
 
         // Validate history and apply the delta.
         self.validate_history(value_from_storage)?;

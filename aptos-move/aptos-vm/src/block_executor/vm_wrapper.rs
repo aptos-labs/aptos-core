@@ -6,7 +6,6 @@ use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
-    data_cache::StorageAdapter,
     move_vm_ext::write_op_converter::WriteOpConverter,
     storage_adapter::AsExecutorView,
 };
@@ -14,7 +13,10 @@ use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
-use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
+use aptos_types::{
+    state_store::state_key::{StateKey, StateKeyInner},
+    write_set::WriteOp,
+};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::ExecutorView;
 use move_core_types::{
@@ -114,19 +116,18 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         }
     }
 
-    fn convert_to_value(
+    fn convert_resource_group_write_to_value(
         &self,
         executor_view: &impl ExecutorView,
         key: &StateKey,
-        maybe_blob: Option<Vec<u8>>,
+        maybe_resource_group_blob: Option<Vec<u8>>,
         creation: bool,
     ) -> anyhow::Result<WriteOp> {
-        // TODO(george): this is a problem for performance because configs are re-fetched all the time!
-        let resolver = StorageAdapter::from_borrowed(executor_view);
+        let resolver = self.vm.as_move_resolver(executor_view);
         let wop_converter =
             WriteOpConverter::new(&resolver, self.vm.is_storage_slot_metadata_enabled());
 
-        let move_op = match maybe_blob {
+        let move_op = match maybe_resource_group_blob {
             Some(blob) => {
                 if creation {
                     MoveStorageOp::New(blob)
@@ -137,7 +138,10 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             None => MoveStorageOp::Delete,
         };
 
-        // TODO(george): can we assume it is not a module? Make sure to check that.
+        debug_assert!(
+            matches!(key.inner(), StateKeyInner::AccessPath(ap) if ap.is_resource_group()),
+            ""
+        );
         wop_converter
             .convert_resource(key, move_op, false)
             .map_err(|_| anyhow::Error::msg("Error on converting to WriteOp"))

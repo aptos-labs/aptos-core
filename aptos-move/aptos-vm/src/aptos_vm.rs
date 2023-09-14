@@ -1409,11 +1409,7 @@ impl AptosVM {
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(executor_view.id(), 0);
 
-        let resolver = StorageAdapter::from_borrowed_with_cached_config(
-            executor_view,
-            simulation_vm.0 .0.get_gas_feature_version(),
-            simulation_vm.0 .0.get_features(),
-        );
+        let resolver = simulation_vm.0.as_move_resolver(executor_view);
         let (vm_status, vm_output) =
             simulation_vm.simulate_signed_transaction(&resolver, txn, &log_context);
         (

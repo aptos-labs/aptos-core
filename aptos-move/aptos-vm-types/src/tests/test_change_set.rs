@@ -4,8 +4,7 @@
 use crate::{
     change_set::VMChangeSet,
     tests::utils::{
-        build_change_set, mock_add, mock_aggregator_create, mock_aggregator_delete,
-        mock_aggregator_modify, mock_create, mock_delete, mock_modify, MockChangeSetChecker,
+        build_change_set, mock_add, mock_create, mock_delete, mock_modify, MockChangeSetChecker,
     },
 };
 use aptos_types::{
@@ -112,10 +111,7 @@ fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
     let resource_write_set_1 = write_set_1!(descriptor);
     descriptor = "m";
     let module_write_set_1 = write_set_1!(descriptor);
-    let aggregator_write_set_1 = vec![
-        mock_aggregator_create("18a", 18),
-        mock_aggregator_modify("19a", 19),
-    ];
+    let aggregator_write_set_1 = vec![mock_create("18a", 18), mock_modify("19a", 19)];
     let aggregator_delta_set_1 = vec![
         mock_add("15a", 15),
         mock_add("17a", 17),
@@ -133,10 +129,7 @@ fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
     let resource_write_set_2 = write_set_2!(descriptor);
     descriptor = "m";
     let module_write_set_2 = write_set_2!(descriptor);
-    let aggregator_write_set_2 = vec![
-        mock_aggregator_modify("22a", 122),
-        mock_aggregator_delete("23a"),
-    ];
+    let aggregator_write_set_2 = vec![mock_modify("22a", 122), mock_delete("23a")];
     let aggregator_delta_set_2 = vec![
         mock_add("16a", 116),
         mock_add("17a", 117),
@@ -172,10 +165,10 @@ fn test_successful_squash() {
     );
 
     let expected_aggregator_write_set = HashMap::from([
-        mock_aggregator_create("18a", 136),
-        mock_aggregator_modify("19a", 138),
-        mock_aggregator_modify("22a", 122),
-        mock_aggregator_delete("23a"),
+        mock_create("18a", 136),
+        mock_modify("19a", 138),
+        mock_modify("22a", 122),
+        mock_delete("23a"),
     ]);
     let expected_aggregator_delta_set = HashMap::from([
         mock_add("15a", 15),
@@ -213,22 +206,6 @@ macro_rules! assert_invariant_violation {
         let cs2 = build_change_set(vec![], $w2.clone(), vec![], vec![]);
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
-    };
-}
-
-macro_rules! assert_aggregator_invariant_violation {
-    ($w1:ident, $w2:ident) => {
-        let check = |res: anyhow::Result<(), VMStatus>| {
-            assert_matches!(
-                res,
-                Err(VMStatus::Error {
-                    status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                    sub_status: None,
-                    message: Some(_),
-                })
-            );
-        };
-
         let mut cs1 = build_change_set(vec![], vec![], $w1.clone(), vec![]);
         let cs2 = build_change_set(vec![], vec![], $w2.clone(), vec![]);
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
@@ -242,10 +219,6 @@ fn test_unsuccessful_squash_create_create() {
     let write_set_1 = vec![mock_create("6", 6)];
     let write_set_2 = vec![mock_create("6", 106)];
     assert_invariant_violation!(write_set_1, write_set_2);
-
-    let write_set_1 = vec![mock_aggregator_create("6", 6)];
-    let write_set_2 = vec![mock_aggregator_create("6", 106)];
-    assert_aggregator_invariant_violation!(write_set_1, write_set_2);
 }
 
 #[test]
@@ -254,10 +227,6 @@ fn test_unsuccessful_squash_modify_create() {
     let write_set_1 = vec![mock_modify("9", 9)];
     let write_set_2 = vec![mock_create("9", 109)];
     assert_invariant_violation!(write_set_1, write_set_2);
-
-    let write_set_1 = vec![mock_aggregator_modify("9", 9)];
-    let write_set_2 = vec![mock_aggregator_create("9", 109)];
-    assert_aggregator_invariant_violation!(write_set_1, write_set_2);
 }
 
 #[test]
@@ -266,10 +235,6 @@ fn test_unsuccessful_squash_delete_modify() {
     let write_set_1 = vec![mock_delete("13")];
     let write_set_2 = vec![mock_modify("13", 113)];
     assert_invariant_violation!(write_set_1, write_set_2);
-
-    let write_set_1 = vec![mock_aggregator_delete("13")];
-    let write_set_2 = vec![mock_aggregator_modify("13", 113)];
-    assert_aggregator_invariant_violation!(write_set_1, write_set_2);
 }
 
 #[test]
@@ -278,16 +243,12 @@ fn test_unsuccessful_squash_delete_delete() {
     let write_set_1 = vec![mock_delete("14")];
     let write_set_2 = vec![mock_delete("14")];
     assert_invariant_violation!(write_set_1, write_set_2);
-
-    let write_set_1 = vec![mock_aggregator_delete("14")];
-    let write_set_2 = vec![mock_aggregator_delete("14")];
-    assert_aggregator_invariant_violation!(write_set_1, write_set_2);
 }
 
 #[test]
 fn test_unsuccessful_squash_delete_delta() {
     // delete + +120 throws an error
-    let aggregator_write_set_1 = vec![mock_aggregator_delete("20")];
+    let aggregator_write_set_1 = vec![mock_delete("20")];
     let aggregator_delta_set_2 = vec![mock_add("20", 120)];
 
     let mut change_set = build_change_set(vec![], vec![], aggregator_write_set_1, vec![]);
@@ -307,7 +268,7 @@ fn test_unsuccessful_squash_delete_delta() {
 fn test_unsuccessful_squash_delta_create() {
     // +21 + create 122 throws an error
     let aggregator_delta_set_1 = vec![mock_add("21", 21)];
-    let aggregator_write_set_2 = vec![mock_aggregator_create("21", 121)];
+    let aggregator_write_set_2 = vec![mock_create("21", 121)];
 
     let mut change_set = build_change_set(vec![], vec![], vec![], aggregator_delta_set_1);
     let additional_change_set = build_change_set(vec![], vec![], aggregator_write_set_2, vec![]);

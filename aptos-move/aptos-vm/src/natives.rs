@@ -5,7 +5,7 @@
 #[cfg(feature = "testing")]
 use anyhow::Error;
 #[cfg(feature = "testing")]
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorView};
+use aptos_aggregator::resolver::TAggregatorView;
 #[cfg(feature = "testing")]
 use aptos_framework::natives::cryptography::algebra::AlgebraContext;
 #[cfg(feature = "testing")]
@@ -14,13 +14,13 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEAT
 use aptos_native_interface::SafeNativeBuilder;
 #[cfg(feature = "testing")]
 use aptos_table_natives::{TableHandle, TableResolver};
-#[cfg(feature = "testing")]
-use aptos_types::chain_id::ChainId;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{Features, TimedFeatures},
     state_store::state_value::StateValue,
 };
+#[cfg(feature = "testing")]
+use aptos_types::{chain_id::ChainId, state_store::state_key::StateKey};
 use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]
 use {
@@ -38,11 +38,12 @@ struct AptosBlankStorage;
 
 #[cfg(feature = "testing")]
 impl TAggregatorView for AptosBlankStorage {
-    type Identifier = AggregatorID;
+    type IdentifierV1 = StateKey;
+    type IdentifierV2 = u64;
 
     fn get_aggregator_v1_state_value(
         &self,
-        _id: &Self::Identifier,
+        _id: &Self::IdentifierV1,
     ) -> anyhow::Result<Option<StateValue>> {
         Ok(None)
     }

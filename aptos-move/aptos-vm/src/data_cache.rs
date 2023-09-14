@@ -10,19 +10,20 @@ use crate::{
 };
 #[allow(unused_imports)]
 use anyhow::Error;
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorView};
+use aptos_aggregator::resolver::TAggregatorView;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::{StateValue, StateValueMetadataKind},
     },
 };
 use aptos_vm_types::resolver::{
-    ExecutorView, StateStorageView, StateValueMetadataKind, StateValueMetadataResolver,
-    TResourceGroupResolver,
+    ExecutorView, StateStorageView, StateValueMetadataResolver, TResourceGroupResolver,
 };
 use claims::assert_none;
 use move_binary_format::{errors::*, CompiledModule};
@@ -54,6 +55,8 @@ pub(crate) fn get_resource_group_from_metadata(
 // Allows to keep a single `StorageAdapter` for both borrowed or owned views.
 // For example, views are typically borrowed during block execution, but are
 // owned in tests or in indexer.
+// We also do not use `std::borrow::CoW` because otherwise `E` (which is the
+// executor view) has to implement `Clone`.
 enum ExecutorViewKind<'e, E: 'e> {
     Borrowed(&'e E),
     Owned(E),
@@ -304,11 +307,12 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
 }
 
 impl<'e, E: ExecutorView> TAggregatorView for StorageAdapter<'e, E> {
-    type Identifier = AggregatorID;
+    type IdentifierV1 = StateKey;
+    type IdentifierV2 = u64;
 
     fn get_aggregator_v1_state_value(
         &self,
-        id: &Self::Identifier,
+        id: &Self::IdentifierV1,
     ) -> anyhow::Result<Option<StateValue>> {
         self.executor_view.get_aggregator_v1_state_value(id)
     }

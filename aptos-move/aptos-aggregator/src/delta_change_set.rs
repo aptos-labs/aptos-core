@@ -243,7 +243,7 @@ pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{aggregator_extension::AggregatorID, resolver::TAggregatorView, AggregatorStore};
+    use crate::{resolver::TAggregatorView, AggregatorStore};
     use aptos_types::{
         state_store::{state_key::StateKey, state_value::StateValue},
         write_set::WriteOp,
@@ -500,8 +500,7 @@ mod test {
         let state_view = AggregatorStore::default();
         let delta_op = delta_add(10, 1000);
         assert_matches!(
-            state_view
-                .try_convert_aggregator_v2_delta_into_write_op(&KEY.clone().into(), &delta_op),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &delta_op),
             Err(VMStatus::Error {
                 status_code: StatusCode::STORAGE_ERROR,
                 message: Some(_),
@@ -513,11 +512,12 @@ mod test {
     struct BadStorage;
 
     impl TAggregatorView for BadStorage {
-        type Identifier = AggregatorID;
+        type IdentifierV1 = StateKey;
+        type IdentifierV2 = u64;
 
         fn get_aggregator_v1_state_value(
             &self,
-            _id: &Self::Identifier,
+            _id: &Self::IdentifierV1,
         ) -> anyhow::Result<Option<StateValue>> {
             Err(anyhow::Error::new(VMStatus::error(
                 StatusCode::STORAGE_ERROR,
@@ -531,8 +531,7 @@ mod test {
         let state_view = BadStorage;
         let delta_op = delta_add(10, 1000);
         assert_matches!(
-            state_view
-                .try_convert_aggregator_v2_delta_into_write_op(&KEY.clone().into(), &delta_op),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &delta_op),
             Err(VMStatus::Error {
                 status_code: StatusCode::STORAGE_ERROR,
                 message: Some(_),
@@ -550,12 +549,10 @@ mod test {
         let add_op = delta_add(100, 200);
         let sub_op = delta_sub(100, 200);
 
-        let add_result =
-            state_view.try_convert_aggregator_v2_delta_into_write_op(&KEY.clone().into(), &add_op);
+        let add_result = state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &add_op);
         assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200)));
 
-        let sub_result =
-            state_view.try_convert_aggregator_v2_delta_into_write_op(&KEY.clone().into(), &sub_op);
+        let sub_result = state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &sub_op);
         assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0)));
     }
 
@@ -569,11 +566,11 @@ mod test {
         let sub_op = delta_sub(101, 1000);
 
         assert_matches!(
-            state_view.try_convert_aggregator_v2_delta_into_write_op(&KEY.clone().into(), &add_op),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &add_op),
             Err(VMStatus::MoveAbort(_, EADD_OVERFLOW))
         );
         assert_matches!(
-            state_view.try_convert_aggregator_v2_delta_into_write_op(&KEY.clone().into(), &sub_op),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &sub_op),
             Err(VMStatus::MoveAbort(_, ESUB_UNDERFLOW))
         );
     }

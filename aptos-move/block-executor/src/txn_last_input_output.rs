@@ -290,8 +290,8 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
                     t.resource_write_set()
                         .into_keys()
-                        .chain(t.aggregator_v1_write_set().into_keys().map(|id| id.into()))
-                        .chain(t.aggregator_v1_delta_set().into_keys().map(|id| id.into()))
+                        .chain(t.aggregator_v1_write_set().into_keys())
+                        .chain(t.aggregator_v1_delta_set().into_keys())
                         .map(|k| (k, false))
                         .chain(t.module_write_set().into_keys().map(|k| (k, true))),
                 ),
@@ -306,11 +306,9 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         self.outputs[txn_idx as usize].load().as_ref().map_or(
             vec![],
             |txn_output| match &txn_output.output_status {
-                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t
-                    .aggregator_v1_delta_set()
-                    .into_keys()
-                    .map(|id| id.into())
-                    .collect(),
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    t.aggregator_v1_delta_set().into_keys().collect()
+                },
                 ExecutionStatus::Abort(_) => vec![],
             },
         )

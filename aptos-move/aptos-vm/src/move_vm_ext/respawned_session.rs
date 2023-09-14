@@ -6,7 +6,7 @@ use crate::{
     move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
     AptosVM,
 };
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorView};
+use aptos_aggregator::resolver::TAggregatorView;
 use aptos_gas_algebra::Fee;
 use aptos_state_view::StateViewId;
 use aptos_types::{
@@ -102,16 +102,17 @@ impl<'r> ExecutorViewWithChangeSet<'r> {
 }
 
 impl<'r> TAggregatorView for ExecutorViewWithChangeSet<'r> {
-    type Identifier = AggregatorID;
+    type IdentifierV1 = StateKey;
+    type IdentifierV2 = u64;
 
     fn get_aggregator_v1_state_value(
         &self,
-        id: &Self::Identifier,
+        id: &Self::IdentifierV1,
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.aggregator_v1_delta_set().get(id) {
             Some(delta_op) => Ok(self
                 .base
-                .try_convert_aggregator_v2_delta_into_write_op(id, delta_op)?
+                .try_convert_aggregator_v1_delta_into_write_op(id, delta_op)?
                 .as_state_value()),
             None => match self.change_set.aggregator_v1_write_set().get(id) {
                 Some(write_op) => Ok(write_op.as_state_value()),
@@ -193,7 +194,7 @@ mod test {
     }
 
     fn read_aggregator(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
-        view.get_aggregator_v1_value(&key(s).into()).unwrap()
+        view.get_aggregator_v1_value(&key(s)).unwrap()
     }
 
     #[test]
@@ -220,12 +221,12 @@ mod test {
         ]);
 
         let aggregator_write_set = HashMap::from([
-            (key("aggregator_both").into(), write(120)),
-            (key("aggregator_write_set").into(), write(130)),
+            (key("aggregator_both"), write(120)),
+            (key("aggregator_write_set"), write(130)),
         ]);
 
         let aggregator_delta_set =
-            HashMap::from([(key("aggregator_delta_set").into(), delta_add(1, 1000))]);
+            HashMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
         let change_set = VMChangeSet::new(
             resource_write_set,

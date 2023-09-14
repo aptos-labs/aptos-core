@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::change_set::VMChangeSet;
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::AggregatorResolver};
+use aptos_aggregator::resolver::AggregatorResolver;
 use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
@@ -120,10 +120,6 @@ impl VMOutput {
             self.change_set().aggregator_v1_delta_set().len()
         );
 
-        let materialized_deltas: Vec<(AggregatorID, WriteOp)> = materialized_deltas
-            .into_iter()
-            .map(|(state_key, write_op)| (state_key.into(), write_op))
-            .collect();
         debug_assert!(
             materialized_deltas
                 .iter()

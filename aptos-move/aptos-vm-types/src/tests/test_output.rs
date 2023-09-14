@@ -3,9 +3,7 @@
 
 use crate::{
     output::VMOutput,
-    tests::utils::{
-        as_state_key, build_vm_output, mock_add, mock_aggregator_modify, mock_create, mock_modify,
-    },
+    tests::utils::{as_state_key, build_vm_output, mock_add, mock_create, mock_modify},
 };
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_language_e2e_tests::data_store::FakeDataStore;
@@ -38,7 +36,7 @@ fn test_ok_output_equality_no_deltas() {
     let vm_output = build_vm_output(
         vec![mock_create("0", 0)],
         vec![mock_modify("1", 1)],
-        vec![mock_aggregator_modify("2", 2)],
+        vec![mock_modify("2", 2)],
         vec![],
     );
 
@@ -69,7 +67,7 @@ fn test_ok_output_equality_with_deltas() {
     let vm_output = build_vm_output(
         vec![mock_create("0", 0)],
         vec![mock_modify("1", 1)],
-        vec![mock_aggregator_modify("2", 2)],
+        vec![mock_modify("2", 2)],
         vec![mock_add(delta_key, 300)],
     );
 
@@ -79,10 +77,7 @@ fn test_ok_output_equality_with_deltas() {
         .clone()
         .into_transaction_output_with_materialized_deltas(vec![mock_modify("3", 400)]);
 
-    let expected_aggregator_write_set = HashMap::from([
-        mock_aggregator_modify("2", 2),
-        mock_aggregator_modify("3", 400),
-    ]);
+    let expected_aggregator_write_set = HashMap::from([mock_modify("2", 2), mock_modify("3", 400)]);
     assert_eq!(
         materialized_vm_output.change_set().resource_write_set(),
         vm_output.change_set().resource_write_set()

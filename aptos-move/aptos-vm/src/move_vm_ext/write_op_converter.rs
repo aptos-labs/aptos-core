@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::move_vm_ext::AptosMoveResolver;
-use aptos_aggregator::{aggregator_extension::AggregatorID, delta_change_set::serialize};
+use aptos_aggregator::delta_change_set::serialize;
 use aptos_types::{
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
-    state_store::{state_key::StateKey, state_value::StateValueMetadata},
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValueMetadata, StateValueMetadataKind},
+    },
     write_set::WriteOp,
 };
-use aptos_vm_types::resolver::StateValueMetadataKind;
 use move_core_types::{
     effects::Op as MoveStorageOp,
     vm_status::{err_msg, StatusCode, VMStatus},
@@ -67,12 +69,13 @@ impl<'r> WriteOpConverter<'r> {
 
     pub(crate) fn convert_aggregator(
         &self,
-        id: &AggregatorID,
+        state_key: &StateKey,
         move_storage_op: MoveStorageOp<Vec<u8>>,
         legacy_creation_as_modification: bool,
     ) -> Result<WriteOp, VMStatus> {
         self.convert(
-            self.remote.get_aggregator_v1_state_value_metadata(id),
+            self.remote
+                .get_aggregator_v1_state_value_metadata(state_key),
             move_storage_op,
             legacy_creation_as_modification,
         )
@@ -142,12 +145,12 @@ impl<'r> WriteOpConverter<'r> {
 
     pub(crate) fn convert_aggregator_modification(
         &self,
-        id: &AggregatorID,
+        state_key: &StateKey,
         value: u128,
     ) -> Result<WriteOp, VMStatus> {
         let maybe_existing_metadata = self
             .remote
-            .get_aggregator_v1_state_value_metadata(id)
+            .get_aggregator_v1_state_value_metadata(state_key)
             .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         let data = serialize(&value);
 

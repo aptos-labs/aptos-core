@@ -156,6 +156,10 @@ impl AccessPath {
         matches!(self.get_path(), Path::Code(_))
     }
 
+    pub fn is_resource_group(&self) -> bool {
+        matches!(self.get_path(), Path::ResourceGroup(_))
+    }
+
     pub fn size(&self) -> usize {
         self.address.as_ref().len() + self.path.len()
     }

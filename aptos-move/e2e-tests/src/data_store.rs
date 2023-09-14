@@ -6,7 +6,7 @@
 
 use crate::account::AccountData;
 use anyhow::Result;
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorView};
+use aptos_aggregator::resolver::TAggregatorView;
 use aptos_state_view::{in_memory_state_view::InMemoryStateView, StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
@@ -169,9 +169,13 @@ impl StateStorageView for FakeDataStore {
 }
 
 impl TAggregatorView for FakeDataStore {
-    type Identifier = AggregatorID;
+    type IdentifierV1 = StateKey;
+    type IdentifierV2 = u64;
 
-    fn get_aggregator_v1_state_value(&self, id: &Self::Identifier) -> Result<Option<StateValue>> {
-        self.get_state_value(id.as_state_key())
+    fn get_aggregator_v1_state_value(
+        &self,
+        state_key: &Self::IdentifierV1,
+    ) -> Result<Option<StateValue>> {
+        self.get_state_value(state_key)
     }
 }

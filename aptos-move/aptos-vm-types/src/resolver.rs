@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorView};
+use aptos_aggregator::resolver::TAggregatorView;
 use aptos_state_view::StateViewId;
 use aptos_types::state_store::{
     state_key::StateKey,
     state_storage_usage::StateStorageUsage,
-    state_value::{StateValue, StateValueMetadata},
+    state_value::{StateValue, StateValueMetadataKind},
 };
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 
@@ -17,26 +17,32 @@ pub trait TResourceView {
 
     fn get_resource_state_value(
         &self,
-        state_key: &Self::Key,
+        key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<StateValue>>;
 
     fn get_resource_bytes(
         &self,
-        state_key: &Self::Key,
+        key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Vec<u8>>> {
-        let maybe_state_value = self.get_resource_state_value(state_key, maybe_layout)?;
+        let maybe_state_value = self.get_resource_state_value(key, maybe_layout)?;
         Ok(maybe_state_value.map(StateValue::into_bytes))
     }
 
     fn get_resource_state_value_metadata(
         &self,
-        state_key: &Self::Key,
+        key: &Self::Key,
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
         // For metadata, layouts are not important.
-        let maybe_state_value = self.get_resource_state_value(state_key, None)?;
+        let maybe_state_value = self.get_resource_state_value(key, None)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
+    }
+
+    fn resource_exists(&self, key: &Self::Key) -> anyhow::Result<bool> {
+        // For existence, layouts are not important.
+        self.get_resource_state_value(key, None)
+            .map(|maybe_state_value| maybe_state_value.is_some())
     }
 }
 
@@ -48,19 +54,24 @@ impl<T: TResourceView<Key = StateKey, Layout = MoveTypeLayout>> ResourceResolver
 pub trait TModuleView {
     type Key;
 
-    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>>;
+    fn get_module_state_value(&self, key: &Self::Key) -> anyhow::Result<Option<StateValue>>;
 
-    fn get_module_bytes(&self, state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
+    fn get_module_bytes(&self, key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
+        let maybe_state_value = self.get_module_state_value(key)?;
         Ok(maybe_state_value.map(StateValue::into_bytes))
     }
 
     fn get_module_state_value_metadata(
         &self,
-        state_key: &Self::Key,
+        key: &Self::Key,
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
+        let maybe_state_value = self.get_module_state_value(key)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
+    }
+
+    fn module_exists(&self, key: &Self::Key) -> anyhow::Result<bool> {
+        self.get_module_state_value(key)
+            .map(|maybe_state_value| maybe_state_value.is_some())
     }
 }
 
@@ -79,7 +90,7 @@ pub trait StateStorageView {
 pub trait ExecutorView:
     TResourceView<Key = StateKey, Layout = MoveTypeLayout>
     + TModuleView<Key = StateKey>
-    + TAggregatorView<Identifier = AggregatorID>
+    + TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = u64>
     + StateStorageView
 {
 }
@@ -87,15 +98,11 @@ pub trait ExecutorView:
 impl<
         T: TResourceView<Key = StateKey, Layout = MoveTypeLayout>
             + TModuleView<Key = StateKey>
-            + TAggregatorView<Identifier = AggregatorID>
+            + TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = u64>
             + StateStorageView,
     > ExecutorView for T
 {
 }
-
-/// Any state value can have metadata associated with it (Some(..) or None).
-/// Having a type alias allows to avoid having nested options.
-pub type StateValueMetadataKind = Option<StateValueMetadata>;
 
 /// Allows to query storage metadata in the VM session. Needed for storage refunds.
 pub trait StateValueMetadataResolver {

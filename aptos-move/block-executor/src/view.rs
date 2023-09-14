@@ -323,14 +323,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorag
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregatorView
     for LatestView<'a, T, S, X>
 {
-    type Identifier = T::Identifier;
+    type IdentifierV1 = T::Key;
+    type IdentifierV2 = T::Identifier;
 
     fn get_aggregator_v1_state_value(
         &self,
-        id: &Self::Identifier,
+        state_key: &Self::IdentifierV1,
     ) -> anyhow::Result<Option<StateValue>> {
         // TODO: Integrate aggregators.
-        let state_key = id.clone().into();
-        self.get_resource_state_value(&state_key, None)
+        self.get_resource_state_value(state_key, None)
     }
 }

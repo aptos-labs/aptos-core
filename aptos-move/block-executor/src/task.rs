@@ -31,7 +31,7 @@ pub enum ExecutionStatus<T, E> {
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + Clone + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
-    type Identifier: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + Into<Self::Key>;
+    type Identifier: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug;
     type Value: Send + Sync + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }
@@ -66,20 +66,24 @@ pub trait ExecutorTask: Sync {
         &self,
         view: &(impl TResourceView<Key = <Self::Txn as Transaction>::Key, Layout = MoveTypeLayout>
               + TModuleView<Key = <Self::Txn as Transaction>::Key>
-              + TAggregatorView<Identifier = <Self::Txn as Transaction>::Identifier>
-              + StateStorageView),
+              + TAggregatorView<
+            IdentifierV1 = <Self::Txn as Transaction>::Key,
+            IdentifierV2 = <Self::Txn as Transaction>::Identifier,
+        > + StateStorageView),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 
-    /// Trait that allows converting blobs to proper values.
-    fn convert_to_value(
+    /// Trait that allows converting resource group blobs to proper values.
+    fn convert_resource_group_write_to_value(
         &self,
         view: &(impl TResourceView<Key = <Self::Txn as Transaction>::Key, Layout = MoveTypeLayout>
               + TModuleView<Key = <Self::Txn as Transaction>::Key>
-              + TAggregatorView<Identifier = <Self::Txn as Transaction>::Identifier>
-              + StateStorageView),
+              + TAggregatorView<
+            IdentifierV1 = <Self::Txn as Transaction>::Key,
+            IdentifierV2 = <Self::Txn as Transaction>::Identifier,
+        > + StateStorageView),
         key: &<Self::Txn as Transaction>::Key,
         maybe_blob: Option<Vec<u8>>,
         creation: bool,
@@ -103,10 +107,10 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn aggregator_v1_write_set(
         &self,
-    ) -> HashMap<<Self::Txn as Transaction>::Identifier, <Self::Txn as Transaction>::Value>;
+    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
 
     /// Get the aggregator deltas of a transaction from its output.
-    fn aggregator_v1_delta_set(&self) -> HashMap<<Self::Txn as Transaction>::Identifier, DeltaOp>;
+    fn aggregator_v1_delta_set(&self) -> HashMap<<Self::Txn as Transaction>::Key, DeltaOp>;
 
     /// Get the events of a transaction from its output.
     fn get_events(&self) -> Vec<<Self::Txn as Transaction>::Event>;

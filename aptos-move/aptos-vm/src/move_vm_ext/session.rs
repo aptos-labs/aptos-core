@@ -340,17 +340,19 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
 
         for (id, change) in aggregator_change_set.changes {
+            let state_key = id.into();
             match change {
                 AggregatorChange::Write(value) => {
-                    let write_op = woc.convert_aggregator_modification(&id, value)?;
-                    aggregator_write_set.insert(id, write_op);
+                    let write_op = woc.convert_aggregator_modification(&state_key, value)?;
+                    aggregator_write_set.insert(state_key, write_op);
                 },
                 AggregatorChange::Merge(delta_op) => {
-                    aggregator_delta_set.insert(id, delta_op);
+                    aggregator_delta_set.insert(state_key, delta_op);
                 },
                 AggregatorChange::Delete => {
-                    let write_op = woc.convert_aggregator(&id, MoveStorageOp::Delete, false)?;
-                    aggregator_write_set.insert(id, write_op);
+                    let write_op =
+                        woc.convert_aggregator(&state_key, MoveStorageOp::Delete, false)?;
+                    aggregator_write_set.insert(state_key, write_op);
                 },
             }
         }

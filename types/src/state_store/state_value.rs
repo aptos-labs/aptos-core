@@ -35,6 +35,9 @@ pub enum StateValueMetadata {
     },
 }
 
+// To avoid nested options when fetching a resource and its metadata.
+pub type StateValueMetadataKind = Option<StateValueMetadata>;
+
 impl StateValueMetadata {
     pub fn new(deposit: u64, creation_time_usecs: &CurrentTimeMicroseconds) -> Self {
         Self::V0 {

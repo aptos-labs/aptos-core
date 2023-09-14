@@ -258,7 +258,7 @@ impl<
     > Transaction for MockTransaction<K, V, E>
 {
     type Event = E;
-    type Identifier = K;
+    type Identifier = ();
     type Key = K;
     type Value = V;
 }
@@ -516,7 +516,7 @@ where
         view: &(impl TResourceView<Key = K, Layout = MoveTypeLayout>
               + TModuleView<Key = K>
               + StateStorageView
-              + TAggregatorView<Identifier = K>),
+              + TAggregatorView<IdentifierV1 = K, IdentifierV2 = ()>),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,
@@ -564,12 +564,12 @@ where
         }
     }
 
-    fn convert_to_value(
+    fn convert_resource_group_write_to_value(
         &self,
         _view: &(impl TResourceView<Key = K, Layout = MoveTypeLayout>
               + TModuleView<Key = K>
               + StateStorageView
-              + TAggregatorView<Identifier = K>),
+              + TAggregatorView<IdentifierV1 = K, IdentifierV2 = ()>),
         _key: &K,
         _maybe_blob: Option<Vec<u8>>,
         _creation: bool,
