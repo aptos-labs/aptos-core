@@ -77,12 +77,18 @@ impl VMOutput {
         // First, check if output of transaction should be discarded or delta
         // change set is empty. In both cases, we do not need to apply any
         // deltas and can return immediately.
-        if self.status().is_discarded() || self.change_set().aggregator_v1_delta_set().is_empty() {
+        if self.status().is_discarded()
+            || (self.change_set().aggregator_v1_delta_set().is_empty()
+                && self.change_set().aggregator_v2_change_set().is_empty())
+        {
             return Ok(self);
         }
 
         let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
-        let materialized_change_set = change_set.try_materialize(resolver)?;
+        let materialized_change_set =
+            change_set.try_materialize_aggregator_v1_delta_set(resolver)?;
+        // TODO do something
+        //     .try_materialize_aggregator_v2_changes(state_view)?;
         Ok(VMOutput::new(
             materialized_change_set,
             fee_statement,
