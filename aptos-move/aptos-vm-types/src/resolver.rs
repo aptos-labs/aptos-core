@@ -28,7 +28,7 @@ pub trait TResourceView {
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
         let maybe_state_value = self.get_resource_state_value(key, maybe_layout)?;
-        Ok(maybe_state_value.map(StateValue::into_bytes))
+        Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
     }
 
     fn get_resource_state_value_metadata(
@@ -59,7 +59,7 @@ pub trait TModuleView {
 
     fn get_module_bytes(&self, key: &Self::Key) -> anyhow::Result<Option<Bytes>> {
         let maybe_state_value = self.get_module_state_value(key)?;
-        Ok(maybe_state_value.map(StateValue::into_bytes))
+        Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
     }
 
     fn get_module_state_value_metadata(

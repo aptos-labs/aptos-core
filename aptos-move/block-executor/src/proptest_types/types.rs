@@ -541,12 +541,12 @@ where
                     // TODO: test aggregator reads.
                     match k.module_path() {
                         Some(_) => match view.get_module_bytes(k) {
-                            Ok(v) => reads_result.push(v.map(Into::into)),
-                            Err(_) => reads_result.push(None),
+                            Ok(v) => read_results.push(v.map(Into::into)),
+                            Err(_) => read_results.push(None),
                         },
                         None => match view.get_resource_bytes(k, None) {
-                            Ok(v) => reads_result.push(v.map(Into::into)),
-                            Err(_) => reads_result.push(None),
+                            Ok(v) => read_results.push(v.map(Into::into)),
+                            Err(_) => read_results.push(None),
                         },
                     }
                 }

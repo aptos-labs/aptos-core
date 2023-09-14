@@ -50,11 +50,12 @@ pub trait TAggregatorView {
     fn get_aggregator_v1_value(&self, id: &Self::IdentifierV1) -> anyhow::Result<u128> {
         let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
         // TODO: consider reviving Option<u128>?
-        let u128_bytes = maybe_state_value
-            .expect("Aggregator V1 cannot be deleted")
-            .into_bytes();
-        bcs::from_bytes(&u128_bytes)
-            .map_err(|_| anyhow::Error::msg("Failed to deserialize aggregator value to u128"))
+        bcs::from_bytes(
+            maybe_state_value
+                .expect("Aggregator V1 cannot be deleted")
+                .bytes(),
+        )
+        .map_err(|_| anyhow::Error::msg("Failed to deserialize aggregator value to u128"))
     }
 
     // Because aggregator V1 is a state item, it also can have metadata (for
@@ -107,7 +108,7 @@ pub trait TAggregatorView {
                     .finish(Location::Module(AGGREGATOR_MODULE.clone()))
                     .into_vm_status()
             })
-            .map(|result| WriteOp::Modification(serialize(&result)))
+            .map(|result| WriteOp::Modification(serialize(&result).into()))
     }
 }
 

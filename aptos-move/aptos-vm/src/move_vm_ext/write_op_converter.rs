@@ -58,7 +58,7 @@ impl<'r> WriteOpConverter<'r> {
     pub(crate) fn convert_module(
         &self,
         state_key: &StateKey,
-        move_storage_op: MoveStorageOp<Vec<u8>>,
+        move_storage_op: MoveStorageOp<Bytes>,
         legacy_creation_as_modification: bool,
     ) -> Result<WriteOp, VMStatus> {
         self.convert(
@@ -71,7 +71,7 @@ impl<'r> WriteOpConverter<'r> {
     pub(crate) fn convert_aggregator(
         &self,
         state_key: &StateKey,
-        move_storage_op: MoveStorageOp<Vec<u8>>,
+        move_storage_op: MoveStorageOp<Bytes>,
         legacy_creation_as_modification: bool,
     ) -> Result<WriteOp, VMStatus> {
         self.convert(
@@ -85,7 +85,7 @@ impl<'r> WriteOpConverter<'r> {
     pub fn convert(
         &self,
         state_value_metadata_result: anyhow::Result<Option<StateValueMetadataKind>>,
-        move_storage_op: MoveStorageOp<Vec<u8>>,
+        move_storage_op: MoveStorageOp<Bytes>,
         legacy_creation_as_modification: bool,
     ) -> Result<WriteOp, VMStatus> {
         use MoveStorageOp::*;

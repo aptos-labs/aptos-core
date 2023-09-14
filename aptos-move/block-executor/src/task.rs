@@ -11,8 +11,8 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceView};
-use move_core_types::value::MoveTypeLayout;
 use bytes::Bytes;
+use move_core_types::value::MoveTypeLayout;
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
