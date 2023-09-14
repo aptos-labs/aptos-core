@@ -557,6 +557,7 @@ pub struct FunctionSignature {
     pub parameters: Vec<SignatureToken>,
     /// The type formals (identified by their index into the vec) and their constraints
     pub type_parameters: Vec<AbilitySet>,
+    pub vtables: Vec<(Vec<SignatureToken>, Vec<SignatureToken>)>
 }
 
 /// A `Signature` is the list of locals used by a function.

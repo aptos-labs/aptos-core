@@ -327,6 +327,7 @@ pub struct FunctionSignature {
     pub return_type: Vec<Type>,
     /// Possibly-empty list of type parameters and their constraints
     pub type_formals: Vec<(TypeVar, BTreeSet<Ability>)>,
+    pub vtables: Vec<(Vec<Type>, Vec<Type>)>,
 }
 
 /// An explicit function dependency
@@ -459,8 +460,22 @@ pub enum FunctionCall_ {
         module: ModuleName,
         name: FunctionName,
         type_actuals: Vec<Type>,
+        vtable_instantiation: Vec<VirtualFunctionInstantiation>,
     },
+    CallVirtual(u8),
 }
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum VirtualFunctionInstantiation {
+    Defined {
+        module: ModuleName,
+        name: FunctionName,
+        type_actuals: Vec<Type>,
+        vtable_instantiation: Vec<VirtualFunctionInstantiation>,
+    },
+    Inherited(u8),
+}
+
 /// The type for a function call and its location
 pub type FunctionCall = Spanned<FunctionCall_>;
 
@@ -957,11 +972,13 @@ impl FunctionSignature {
         formals: Vec<(Var, Type)>,
         return_type: Vec<Type>,
         type_parameters: Vec<(TypeVar, BTreeSet<Ability>)>,
+        vtables: Vec<(Vec<Type>, Vec<Type>)>
     ) -> Self {
         FunctionSignature {
             formals,
             return_type,
             type_formals: type_parameters,
+            vtables
         }
     }
 }
@@ -978,8 +995,9 @@ impl Function_ {
         acquires: Vec<StructName>,
         specifications: Vec<Condition>,
         body: FunctionBody,
+        vtables: Vec<(Vec<Type>, Vec<Type>)>,
     ) -> Self {
-        let signature = FunctionSignature::new(formals, return_type, type_parameters);
+        let signature = FunctionSignature::new(formals, return_type, type_parameters, vtables);
         Function_ {
             visibility,
             is_entry,
@@ -993,11 +1011,12 @@ impl Function_ {
 
 impl FunctionCall_ {
     /// Creates a `FunctionCall::ModuleFunctionCall` variant
-    pub fn module_call(module: ModuleName, name: FunctionName, type_actuals: Vec<Type>) -> Self {
+    pub fn module_call(module: ModuleName, name: FunctionName, type_actuals: Vec<Type>, vtable_instantiation: Vec<VirtualFunctionInstantiation>) -> Self {
         FunctionCall_::ModuleFunctionCall {
             module,
             name,
             type_actuals,
+            vtable_instantiation,
         }
     }
 
@@ -1530,16 +1549,19 @@ impl fmt::Display for FunctionCall_ {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             FunctionCall_::Builtin(fun) => write!(f, "{}", fun),
+            FunctionCall_::CallVirtual(idx) => write!(f, "call_virtual({})", idx),
             FunctionCall_::ModuleFunctionCall {
                 module,
                 name,
                 type_actuals,
+                vtable_instantiation,
             } => write!(
                 f,
-                "{}.{}{}",
+                "{}.{}{}[{:?}]",
                 module,
                 name,
-                format_type_actuals(type_actuals)
+                format_type_actuals(type_actuals),
+                vtable_instantiation,
             ),
         }
     }

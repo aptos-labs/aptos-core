@@ -115,6 +115,7 @@ pub enum Tok {
     RSquare,
     PeriodPeriod,
     Nop,
+    CallVirtual,
 }
 
 impl Tok {
@@ -300,6 +301,7 @@ impl<'input> Lexer<'input> {
                             "assert" => (Tok::Assert, len + 1),
                             "copy" => (Tok::Copy, len + 1),
                             "move" => (Tok::Move, len + 1),
+                            "call_virtual" => (Tok::CallVirtual, len + 1),
                             _ => (get_name_token(name), len),
                         },
                         _ => (get_name_token(name), len),

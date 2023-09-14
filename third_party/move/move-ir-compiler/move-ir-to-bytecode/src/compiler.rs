@@ -128,16 +128,21 @@ struct FunctionFrame {
     max_stack_depth: i64,
     cur_stack_depth: i64,
     type_parameters: HashMap<TypeVar_, TypeParameterIndex>,
+    vtables: Vec<(Vec<Type>, Vec<Type>)>,
 }
 
 impl FunctionFrame {
-    fn new(type_parameters: HashMap<TypeVar_, TypeParameterIndex>) -> FunctionFrame {
+    fn new(
+        type_parameters: HashMap<TypeVar_, TypeParameterIndex>,
+        vtables: Vec<(Vec<Type>, Vec<Type>)>,
+    ) -> FunctionFrame {
         FunctionFrame {
             locals: HashMap::new(),
             local_types: Signature(vec![]),
             max_stack_depth: 0,
             cur_stack_depth: 0,
             type_parameters,
+            vtables,
         }
     }
 
@@ -709,10 +714,24 @@ fn function_signature(
         .iter()
         .map(|(_, abs)| abilities(abs))
         .collect();
+    let mut vtables = vec![];
+    for (params, return_) in f.vtables.iter() {
+        vtables.push((
+            params
+                .iter()
+                .map(|ty| compile_type(context, &m, ty))
+                .collect::<Result<_>>()?,
+            return_
+                .iter()
+                .map(|ty| compile_type(context, &m, ty))
+                .collect::<Result<_>>()?,
+        ));
+    }
     Ok(move_binary_format::file_format::FunctionSignature {
         return_,
         parameters,
         type_parameters,
+        vtables,
     })
 }
 
@@ -797,6 +816,7 @@ fn compile_function_body_impl(
             Some(compile_function_body(
                 context,
                 m,
+                ast_function.signature.vtables.clone(),
                 ast_function.signature.formals,
                 locals,
                 code,
@@ -813,6 +833,7 @@ fn compile_function_body_impl(
             Some(compile_function_body_bytecode(
                 context,
                 m,
+                ast_function.signature.vtables.clone(),
                 ast_function.signature.formals,
                 locals,
                 code,
@@ -875,11 +896,12 @@ fn compile_function(
 fn compile_function_body(
     context: &mut Context,
     type_parameters: HashMap<TypeVar_, TypeParameterIndex>,
+    vtables: Vec<(Vec<Type>, Vec<Type>)>,
     formals: Vec<(Var, Type)>,
     locals: Vec<(Var, Type)>,
     blocks: Vec<Block>,
 ) -> Result<CodeUnit> {
-    let mut function_frame = FunctionFrame::new(type_parameters);
+    let mut function_frame = FunctionFrame::new(type_parameters, vtables);
     for (var, t) in formals {
         let sig = compile_type(context, function_frame.type_parameters(), &t)?;
         function_frame.define_local(&var.value, sig.clone())?;
@@ -1529,10 +1551,24 @@ fn compile_call(
                 },
             }
         },
+        FunctionCall_::CallVirtual(idx) => {
+            push_instr!(call.loc, Bytecode::CallVirtual(idx));
+            let (args, ret) = (
+                function_frame.vtables[idx as usize].0.len(),
+                function_frame.vtables[idx as usize].1.len(),
+            );
+            for _ in 0..args {
+                function_frame.pop()?;
+            }
+            for _ in 0..ret {
+                function_frame.push()?;
+            }
+        },
         FunctionCall_::ModuleFunctionCall {
             module,
             name,
             type_actuals,
+            vtable_instantiation,
         } => {
             let ty_arg_tokens =
                 compile_types(context, function_frame.type_parameters(), &type_actuals)?;
@@ -1542,7 +1578,8 @@ fn compile_call(
             let fcall = if type_actuals.is_empty() {
                 Bytecode::Call(fh_idx)
             } else {
-                let fi_idx = context.function_instantiation_index(fh_idx, type_actuals_id)?;
+                let fi_idx =
+                    context.function_instantiation_index(fh_idx, type_actuals_id, vec![])?;
                 Bytecode::CallGeneric(fi_idx)
             };
             push_instr!(call.loc, fcall);
@@ -1589,11 +1626,12 @@ fn compile_constant(_context: &mut Context, ty: Type, value: MoveValue) -> Resul
 fn compile_function_body_bytecode(
     context: &mut Context,
     type_parameters: HashMap<TypeVar_, TypeParameterIndex>,
+    vtables: Vec<(Vec<Type>, Vec<Type>)>,
     formals: Vec<(Var, Type)>,
     locals: Vec<(Var, Type)>,
     blocks: BytecodeBlocks,
 ) -> Result<CodeUnit> {
-    let mut function_frame = FunctionFrame::new(type_parameters);
+    let mut function_frame = FunctionFrame::new(type_parameters, vtables);
     let mut locals_signature = Signature(vec![]);
     for (var, t) in formals {
         let sig = compile_type(context, function_frame.type_parameters(), &t)?;
@@ -1687,7 +1725,8 @@ fn compile_bytecode(
             if tys.is_empty() {
                 Bytecode::Call(fh_idx)
             } else {
-                let fi_idx = context.function_instantiation_index(fh_idx, type_actuals_id)?;
+                let fi_idx =
+                    context.function_instantiation_index(fh_idx, type_actuals_id, vec![])?;
                 Bytecode::CallGeneric(fi_idx)
             }
         },

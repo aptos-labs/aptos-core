@@ -476,15 +476,22 @@ fn parse_qualified_function_name(
             let f = parse_builtin(tokens)?;
             FunctionCall_::Builtin(f)
         },
+        Tok::CallVirtual => {
+            let s = tokens.content();
+            tokens.advance()?;
+            FunctionCall_::CallVirtual(u8::from_str(s).unwrap())
+        }
         Tok::DotNameValue => {
             let module_dot_name = parse_dot_name(tokens)?;
             let type_actuals = parse_type_actuals(tokens)?;
             let v: Vec<&str> = module_dot_name.split('.').collect();
+            let vtable_instantiation = parse_vtable_instantiations(tokens)?;
             assert!(v.len() == 2);
             FunctionCall_::ModuleFunctionCall {
                 module: ModuleName(Symbol::from(v[0])),
                 name: FunctionName(Symbol::from(v[1])),
                 type_actuals,
+                vtable_instantiation,
             }
         },
         t => {
@@ -1415,6 +1422,65 @@ where
     Ok((n, k))
 }
 
+fn parse_virtual_functions(
+    tokens: &mut Lexer,
+) -> Result<Vec<(Vec<Type>, Vec<Type>)>, ParseError<Loc, anyhow::Error>>
+{
+    let mut has_virtual_functions = false;
+    let k = if tokens.peek() == Tok::LSquare {
+        let list = parse_comma_list(tokens, &[Tok::RSquare], parse_virtual_function_type, true)?;
+        consume_token(tokens, Tok::RSquare)?;
+        list
+    } else {
+        vec![]
+    };
+    Ok(k)
+}
+
+fn parse_virtual_function_type(tokens: &mut Lexer) -> Result<(Vec<Type>, Vec<Type>), ParseError<Loc, anyhow::Error>> {
+    consume_token(tokens, Tok::Pipe)?;
+    let parameters = parse_comma_list(tokens, &[Tok::Pipe], parse_type, true)?;
+    adjust_token(tokens, &[Tok::Pipe])?;
+    consume_token(tokens, Tok::Pipe)?;
+    consume_token(tokens, Tok::LParen)?;
+    let return_ = parse_comma_list(tokens, &[Tok::RParen], parse_type, true)?;
+    adjust_token(tokens, &[Tok::RParen])?;
+    consume_token(tokens, Tok::RParen)?;
+    Ok((parameters, return_))
+}
+
+fn parse_vtable_instantiations(tokens: &mut Lexer,
+) -> Result<Vec<VirtualFunctionInstantiation>, ParseError<Loc, anyhow::Error>>
+{
+    let k = if tokens.peek() == Tok::LSquare {
+        let list = parse_comma_list(tokens, &[Tok::RSquare], parse_vtable_instantiation, true)?;
+        consume_token(tokens, Tok::RSquare)?;
+        list
+    } else {
+        vec![]
+    };
+    Ok(k)
+}
+
+fn parse_vtable_instantiation(tokens: &mut Lexer) -> Result<VirtualFunctionInstantiation, ParseError<Loc, anyhow::Error>> {
+    if tokens.peek() == Tok::U64Value {
+        let s = tokens.content();
+        tokens.advance()?;
+        Ok(VirtualFunctionInstantiation::Inherited(u8::from_str(s).unwrap()))
+    } else {
+        let module_dot_name = parse_dot_name(tokens)?;
+        let type_actuals = parse_type_actuals(tokens)?;
+        let v: Vec<&str> = module_dot_name.split('.').collect();
+        let vtable_instantiation = parse_vtable_instantiations(tokens)?;
+        Ok(VirtualFunctionInstantiation::Defined {
+            module: ModuleName(Symbol::from(v[0])),
+            name: FunctionName(Symbol::from(v[1])),
+            type_actuals,
+            vtable_instantiation,
+        })
+    }
+}
+
 // NameAndTypeActuals: (String, Vec<Type>) = {
 //     <n: NameBeginTy> '<' <tys: Comma<Type>> ">" => (n, tys),
 //     <n: Name> => (n, vec![]),
@@ -1897,6 +1963,7 @@ fn parse_function_decl(
     };
 
     let (name, type_parameters) = parse_name_and_type_parameters(tokens, parse_type_parameter)?;
+    let vtables = parse_virtual_functions(tokens)?;
     consume_token(tokens, Tok::LParen)?;
     let args = parse_comma_list(tokens, &[Tok::RParen], parse_arg_decl, true)?;
     consume_token(tokens, Tok::RParen)?;
@@ -1938,6 +2005,7 @@ fn parse_function_decl(
             let (locals, body) = parse_function_block_(tokens)?;
             FunctionBody::Move { locals, code: body }
         },
+        vtables,
     );
 
     let end_loc = tokens.previous_end_loc();
@@ -1993,6 +2061,7 @@ fn parse_script(tokens: &mut Lexer) -> Result<Script, ParseError<Loc, anyhow::Er
         vec![],
         vec![],
         FunctionBody::Move { locals, code },
+        vec![],
     );
     let main = spanned(tokens.file_hash(), fun_start, end_loc, main);
     let loc = make_loc(tokens.file_hash(), script_start, end_loc);

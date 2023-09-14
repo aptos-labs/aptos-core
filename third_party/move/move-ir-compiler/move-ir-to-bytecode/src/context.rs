@@ -9,9 +9,10 @@ use move_binary_format::{
         AbilitySet, AddressIdentifierIndex, CodeOffset, Constant, ConstantPoolIndex, FieldHandle,
         FieldHandleIndex, FieldInstantiation, FieldInstantiationIndex, FunctionDefinitionIndex,
         FunctionHandle, FunctionHandleIndex, FunctionInstantiation, FunctionInstantiationIndex,
-        FunctionSignature, IdentifierIndex, ModuleHandle, ModuleHandleIndex, Signature,
-        SignatureIndex, SignatureToken, StructDefInstantiation, StructDefInstantiationIndex,
-        StructDefinitionIndex, StructHandle, StructHandleIndex, StructTypeParameter, TableIndex,
+        FunctionSignature, FunctionType, IdentifierIndex, ModuleHandle, ModuleHandleIndex,
+        Signature, SignatureIndex, SignatureToken, StructDefInstantiation,
+        StructDefInstantiationIndex, StructDefinitionIndex, StructHandle, StructHandleIndex,
+        StructTypeParameter, TableIndex, VirtualFunctionInstantiation,
     },
     CompiledModule,
 };
@@ -159,6 +160,16 @@ impl<'a> CompiledDependencyView<'a> {
                     parameters: self.signature_pool[fh.parameters.0 as usize].0.clone(),
                     return_: self.signature_pool[fh.return_.0 as usize].0.clone(),
                     type_parameters: fh.type_parameters.clone(),
+                    vtables: fh
+                        .vtables
+                        .iter()
+                        .map(|ty| {
+                            (
+                                self.signature_pool[ty.parameters.0 as usize].0.clone(),
+                                self.signature_pool[ty.return_.0 as usize].0.clone(),
+                            )
+                        })
+                        .collect(),
                 })
             })
     }
@@ -457,10 +468,12 @@ impl<'a> Context<'a> {
         &mut self,
         handle: FunctionHandleIndex,
         type_parameters: SignatureIndex,
+        vtable_instantiation: Vec<VirtualFunctionInstantiation>,
     ) -> Result<FunctionInstantiationIndex> {
         let func_inst = FunctionInstantiation {
             handle,
             type_parameters,
+            vtable_instantiation,
         };
         Ok(FunctionInstantiationIndex(get_or_add_item(
             &mut self.function_instantiations,
@@ -607,12 +620,15 @@ impl<'a> Context<'a> {
     ) -> Result<StructHandleIndex> {
         let module = self.module_handle_index(&sname.module)?;
         let name = self.identifier_index(sname.name.0)?;
-        self.structs.insert(sname.clone(), StructHandle {
-            module,
-            name,
-            abilities,
-            type_parameters,
-        });
+        self.structs.insert(
+            sname.clone(),
+            StructHandle {
+                module,
+                name,
+                abilities,
+                type_parameters,
+            },
+        );
         Ok(StructHandleIndex(get_or_add_item_ref(
             &mut self.struct_handles,
             self.structs.get(&sname).unwrap(),
@@ -655,10 +671,20 @@ impl<'a> Context<'a> {
             return_,
             parameters,
             type_parameters,
+            vtables,
         } = signature;
 
         let params_idx = get_or_add_item(&mut self.signatures, Signature(parameters))?;
         let return_idx = get_or_add_item(&mut self.signatures, Signature(return_))?;
+        let mut vtable_handles = vec![];
+        for (params, return_) in vtables {
+            let params_idx = get_or_add_item(&mut self.signatures, Signature(params))?;
+            let return_idx = get_or_add_item(&mut self.signatures, Signature(return_))?;
+            vtable_handles.push(FunctionType {
+                parameters: SignatureIndex(params_idx as TableIndex),
+                return_: SignatureIndex(return_idx as TableIndex),
+            });
+        }
 
         let handle = FunctionHandle {
             module,
@@ -666,6 +692,7 @@ impl<'a> Context<'a> {
             parameters: SignatureIndex(params_idx as TableIndex),
             return_: SignatureIndex(return_idx as TableIndex),
             type_parameters,
+            vtables: vtable_handles,
         };
         // handle duplicate declarations
         // erroring on duplicates needs to be done by the bytecode verifier
@@ -824,10 +851,24 @@ impl<'a> Context<'a> {
             .map(|t| self.reindex_signature_token(dep, t))
             .collect::<Result<_>>()?;
         let type_parameters = orig.type_parameters;
+        let mut vtables = vec![];
+        for (params, return_) in orig.vtables {
+            vtables.push((
+                params
+                    .into_iter()
+                    .map(|t| self.reindex_signature_token(dep, t))
+                    .collect::<Result<_>>()?,
+                return_
+                    .into_iter()
+                    .map(|t| self.reindex_signature_token(dep, t))
+                    .collect::<Result<_>>()?,
+            ))
+        }
         Ok(FunctionSignature {
             return_,
             parameters,
             type_parameters,
+            vtables,
         })
     }
 
