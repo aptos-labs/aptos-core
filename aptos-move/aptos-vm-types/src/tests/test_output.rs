@@ -40,6 +40,7 @@ fn test_ok_output_equality_no_deltas() {
         vec![mock_modify("1", 1)],
         vec![mock_modify("2", 2)],
         vec![],
+        vec![],
     );
 
     // Different ways to materialize deltas:
@@ -74,6 +75,7 @@ fn test_ok_output_equality_with_deltas() {
         vec![mock_modify("1", 1)],
         vec![mock_modify("2", 2)],
         vec![mock_add(delta_key, 300)],
+        vec![],
     );
 
     let materialized_vm_output = assert_ok!(vm_output.clone().try_materialize(&executor_view));
@@ -119,7 +121,13 @@ fn test_err_output_equality_with_deltas() {
     state_view.set_legacy(as_state_key!(delta_key), serialize(&900));
     let executor_view = state_view.as_executor_view();
 
-    let vm_output = build_vm_output(vec![], vec![], vec![], vec![mock_add(delta_key, 300)]);
+    let vm_output = build_vm_output(
+        vec![],
+        vec![],
+        vec![],
+        vec![mock_add(delta_key, 300)],
+        vec![],
+    );
 
     let vm_status_1 = assert_err!(vm_output.clone().try_materialize(&executor_view));
     let vm_status_2 = assert_err!(vm_output.try_into_transaction_output(&executor_view));
