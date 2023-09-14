@@ -201,7 +201,7 @@ The following gas parameters are applied (i.e., charged) to represent the costs 
 | storage_io_per_state_slot_read  | charged per item loaded from global state                          |
 | storage_io_per_state_byte_read  | charged per byte loaded from global state                          |
 
-The following storage fee parameters are applied (i.e., charged in absolute APT values) to represent the disk space and structural costs associated with using the [Aptos authenticated data structure](../reference/glossary/#merkle-trees) for storing items on the blockchain. This encompasses actions such as creating things in the global state, emitting events, and similar operations:
+The following storage fee parameters are applied (i.e., charged in absolute APT values) to represent the disk space and structural costs associated with using the [Aptos authenticated data structure](../reference/glossary.md#merkle-trees) for storing items on the blockchain. This encompasses actions such as creating things in the global state, emitting events, and similar operations:
 
 | Parameter                         | Meaning                                                                                |
 |-----------------------------------|----------------------------------------------------------------------------------------|
