@@ -20,11 +20,13 @@ aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 better_any = { workspace = true }
-claims = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 once_cell = { workspace = true }
 smallvec = { workspace = true }
+
+[dev-dependencies]
+claims = { workspace = true }
 
 [features]
 default = []

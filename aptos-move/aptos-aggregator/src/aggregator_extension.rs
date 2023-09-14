@@ -6,13 +6,9 @@ use crate::{
     resolver::AggregatorResolver,
 };
 use aptos_types::{
-    state_store::{
-        state_key::{StateKey, StateKeyInner},
-        table::TableHandle,
-    },
+    state_store::{state_key::StateKey, table::TableHandle},
     vm_status::StatusCode,
 };
-use claims::assert_matches;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::account_address::AccountAddress;
 use std::collections::{BTreeMap, BTreeSet};
@@ -28,11 +24,11 @@ pub enum AggregatorState {
     NegativeDelta,
 }
 
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub struct AggregatorHandle(pub AccountAddress);
 
 /// Uniquely identifies each aggregator instance in storage.
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct AggregatorID(StateKey);
 
 impl AggregatorID {
@@ -44,18 +40,9 @@ impl AggregatorID {
     pub fn as_state_key(&self) -> &StateKey {
         &self.0
     }
-}
 
-impl From<StateKey> for AggregatorID {
-    fn from(state_key: StateKey) -> Self {
-        assert_matches!(state_key.inner(), StateKeyInner::TableItem { .. });
-        Self(state_key)
-    }
-}
-
-impl From<AggregatorID> for StateKey {
-    fn from(id: AggregatorID) -> Self {
-        id.0
+    pub fn into_state_key(self) -> StateKey {
+        self.0
     }
 }
 

@@ -349,7 +349,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
 
         for (id, change) in aggregator_change_set.changes {
-            let state_key = id.into();
+            let state_key = id.into_state_key();
             match change {
                 AggregatorChange::Write(value) => {
                     let write_op = woc.convert_aggregator_modification(&state_key, value)?;

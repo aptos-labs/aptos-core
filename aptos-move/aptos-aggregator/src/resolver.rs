@@ -143,7 +143,7 @@ pub mod test_utils {
 
     impl AggregatorStore {
         pub fn set_from_id(&mut self, id: AggregatorID, value: u128) {
-            self.set_from_state_key(id.into(), value);
+            self.set_from_state_key(id.into_state_key(), value);
         }
 
         pub fn set_from_state_key(&mut self, state_key: StateKey, value: u128) {
