@@ -5,6 +5,7 @@ use super::{types::Vote, NodeId};
 use crate::dag::{CertifiedNode, Node};
 use aptos_consensus_types::common::Author;
 use aptos_crypto::HashValue;
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
 
 pub struct CommitEvent {
     node_id: NodeId,
@@ -48,4 +49,6 @@ pub trait DAGStorage: Send + Sync {
     fn delete_ordered_anchor_ids(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()>;
 
     fn get_latest_k_committed_events(&self, k: u64) -> anyhow::Result<Vec<CommitEvent>>;
+
+    fn get_latest_ledger_info(&self) -> anyhow::Result<LedgerInfoWithSignatures>;
 }

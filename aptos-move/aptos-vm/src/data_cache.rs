@@ -25,6 +25,7 @@ use aptos_types::{
 use aptos_vm_types::resolver::{
     ExecutorView, StateStorageView, StateValueMetadataResolver, TResourceGroupResolver,
 };
+use bytes::Bytes;
 use claims::assert_none;
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
@@ -86,7 +87,7 @@ pub struct StorageAdapter<'e, E> {
     // the serialized sizes of the tags. This avoids dependency on group serialization.
     group_byte_count_as_sum: bool,
     max_binary_format_version: u32,
-    resource_group_cache: RefCell<HashMap<StateKey, BTreeMap<StructTag, Vec<u8>>>>,
+    resource_group_cache: RefCell<HashMap<StateKey, BTreeMap<StructTag, Bytes>>>,
 }
 
 impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
@@ -155,7 +156,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<(Option<Vec<u8>>, usize), VMError> {
+    ) -> Result<(Option<Bytes>, usize), VMError> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             let key = StateKey::access_path(AccessPath::resource_group_access_path(
@@ -198,7 +199,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
 }
 
 impl<'e, E: ExecutorView> AptosMoveResolver for StorageAdapter<'e, E> {
-    fn release_resource_group_cache(&self) -> HashMap<StateKey, BTreeMap<StructTag, Vec<u8>>> {
+    fn release_resource_group_cache(&self) -> HashMap<StateKey, BTreeMap<StructTag, Bytes>> {
         self.resource_group_cache.take()
     }
 }
@@ -212,11 +213,11 @@ impl<'e, E: ExecutorView> TResourceGroupResolver for StorageAdapter<'e, E> {
         key: &StateKey,
         resource_tag: &StructTag,
         return_group_size: bool,
-    ) -> anyhow::Result<(Option<Vec<u8>>, Option<usize>)> {
+    ) -> anyhow::Result<(Option<Bytes>, Option<usize>)> {
         // Resolve directly from state store (ExecutorView interface).
         let group_data = self.executor_view.get_resource_bytes(key, None)?;
         if let Some(group_data_blob) = group_data {
-            let group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&group_data_blob)
+            let group_data: BTreeMap<StructTag, Bytes> = bcs::from_bytes(&group_data_blob)
                 .map_err(|_| anyhow::Error::msg("Resource group deserialization error"))?;
 
             let maybe_group_size = if return_group_size {
@@ -263,7 +264,7 @@ impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
+    ) -> anyhow::Result<(Option<Bytes>, usize)> {
         Ok(self.get_any_resource(address, struct_tag, metadata)?)
     }
 }
@@ -284,7 +285,7 @@ impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
         module.metadata
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Error> {
         let access_path = AccessPath::from(module_id);
         Ok(self
             .executor_view
@@ -300,7 +301,7 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
         &self,
         handle: &TableHandle,
         key: &[u8],
-    ) -> Result<Option<Vec<u8>>, Error> {
+    ) -> Result<Option<Bytes>, Error> {
         self.executor_view
             .get_resource_bytes(&StateKey::table_item((*handle).into(), key.to_vec()), None)
     }
@@ -319,7 +320,7 @@ impl<'e, E: ExecutorView> TAggregatorView for StorageAdapter<'e, E> {
 }
 
 impl<'e, E: ExecutorView> ConfigStorage for StorageAdapter<'e, E> {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
+    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes> {
         self.executor_view
             .get_resource_bytes(&StateKey::access_path(access_path), None)
             .ok()?
@@ -430,7 +431,7 @@ mod tests {
             Ok(self
                 .group
                 .get(state_key)
-                .map(|entry| StateValue::new_legacy(entry.blob.clone())))
+                .map(|entry| StateValue::new_legacy(entry.blob.clone().into())))
         }
 
         fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {

@@ -17,7 +17,7 @@ use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
+use aptos_executor_types::{BlockExecutorTrait, ExecutorError, ExecutorResult, StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -108,9 +108,9 @@ impl StateComputer for ExecutionProxy {
         block: &Block,
         // The parent block id.
         parent_block_id: HashValue,
-    ) -> Result<StateComputeResult, ExecutionError> {
+    ) -> ExecutorResult<StateComputeResult> {
         fail_point!("consensus::compute", |_| {
-            Err(ExecutionError::InternalError {
+            Err(ExecutorError::InternalError {
                 error: "Injected error in compute".into(),
             })
         });
@@ -174,7 +174,7 @@ impl StateComputer for ExecutionProxy {
         blocks: &[Arc<ExecutedBlock>],
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
-    ) -> Result<(), ExecutionError> {
+    ) -> ExecutorResult<()> {
         let mut latest_logical_time = self.write_mutex.lock().await;
 
         let mut block_ids = Vec::new();
@@ -359,7 +359,7 @@ async fn test_commit_sync_race() {
             _block: ExecutableBlock,
             _parent_block_id: HashValue,
             _maybe_block_gas_limit: Option<u64>,
-        ) -> Result<StateComputeResult, ExecutionError> {
+        ) -> ExecutorResult<StateComputeResult> {
             Ok(StateComputeResult::new_dummy())
         }
 
@@ -368,7 +368,7 @@ async fn test_commit_sync_race() {
             _block: ExecutableBlock,
             _parent_block_id: HashValue,
             _maybe_block_gas_limit: Option<u64>,
-        ) -> Result<StateCheckpointOutput, ExecutionError> {
+        ) -> ExecutorResult<StateCheckpointOutput> {
             todo!()
         }
 
@@ -377,7 +377,7 @@ async fn test_commit_sync_race() {
             _block_id: HashValue,
             _parent_block_id: HashValue,
             _state_checkpoint_output: StateCheckpointOutput,
-        ) -> Result<StateComputeResult, ExecutionError> {
+        ) -> ExecutorResult<StateComputeResult> {
             todo!()
         }
 
@@ -386,7 +386,7 @@ async fn test_commit_sync_race() {
             _block_ids: Vec<HashValue>,
             ledger_info_with_sigs: LedgerInfoWithSignatures,
             _save_state_snapshots: bool,
-        ) -> Result<(), ExecutionError> {
+        ) -> ExecutorResult<()> {
             *self.time.lock() = LogicalTime::new(
                 ledger_info_with_sigs.ledger_info().epoch(),
                 ledger_info_with_sigs.ledger_info().round(),

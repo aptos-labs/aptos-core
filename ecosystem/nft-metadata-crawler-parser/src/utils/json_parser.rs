@@ -57,7 +57,7 @@ impl JSONParser {
                     .context("Failed to build reqwest client")?;
 
                 let response = client
-                    .get(&uri)
+                    .get(uri.trim())
                     .send()
                     .await
                     .context("Failed to get JSON")?;

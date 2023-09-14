@@ -7,6 +7,7 @@ use aptos_types::{on_chain_config::ConfigStorage, state_store::state_key::StateK
 use aptos_vm_types::resolver::{
     ExecutorView, ResourceGroupResolver, StateStorageView, StateValueMetadataResolver,
 };
+use bytes::Bytes;
 use move_core_types::{language_storage::StructTag, resolver::MoveResolver};
 use std::collections::{BTreeMap, HashMap};
 
@@ -22,7 +23,7 @@ pub trait AptosMoveResolver:
     + ResourceGroupResolver
     + AsExecutorView
 {
-    fn release_resource_group_cache(&self) -> HashMap<StateKey, BTreeMap<StructTag, Vec<u8>>>;
+    fn release_resource_group_cache(&self) -> HashMap<StateKey, BTreeMap<StructTag, Bytes>>;
 }
 
 pub trait AsExecutorView {

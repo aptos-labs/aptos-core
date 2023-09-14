@@ -21,6 +21,8 @@ use aptos_types::{
 };
 #[cfg(feature = "testing")]
 use aptos_types::{chain_id::ChainId, state_store::state_key::StateKey};
+#[cfg(feature = "testing")]
+use bytes::Bytes;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]
 use {
@@ -55,7 +57,7 @@ impl TableResolver for AptosBlankStorage {
         &self,
         _handle: &TableHandle,
         _key: &[u8],
-    ) -> Result<Option<Vec<u8>>, Error> {
+    ) -> Result<Option<Bytes>, Error> {
         Ok(None)
     }
 }

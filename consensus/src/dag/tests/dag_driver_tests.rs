@@ -22,7 +22,9 @@ use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfo, validator_verifier::random_validator_verifier,
+    epoch_state::EpochState,
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo},
+    validator_verifier::random_validator_verifier,
 };
 use async_trait::async_trait;
 use claims::{assert_ok, assert_ok_eq};
@@ -75,7 +77,10 @@ async fn test_certified_node_handler() {
         epoch: 1,
         verifier: validator_verifier,
     });
-    let storage = Arc::new(MockStorage::new());
+
+    let mock_ledger_info = LedgerInfo::mock_genesis(None);
+    let mock_ledger_info = generate_ledger_info_with_sig(&signers, mock_ledger_info);
+    let storage = Arc::new(MockStorage::new_with_ledger_info(mock_ledger_info));
     let dag = Arc::new(RwLock::new(Dag::new(
         epoch_state.clone(),
         storage.clone(),

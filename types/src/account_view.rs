@@ -9,11 +9,11 @@ use crate::{
     validator_config::{ValidatorConfig, ValidatorOperatorConfigResource},
 };
 use anyhow::anyhow;
+use bytes::Bytes;
 use move_core_types::{account_address::AccountAddress, move_resource::MoveResource};
 use serde::de::DeserializeOwned;
-
 pub trait AccountView {
-    fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>>;
+    fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Bytes>>;
 
     fn get_account_address(&self) -> anyhow::Result<Option<AccountAddress>>;
 

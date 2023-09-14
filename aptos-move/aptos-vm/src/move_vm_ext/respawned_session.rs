@@ -182,7 +182,7 @@ mod test {
     }
 
     fn write(v: u128) -> WriteOp {
-        WriteOp::Modification(serialize(&v))
+        WriteOp::Modification(serialize(&v).into())
     }
 
     fn read_resource(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {

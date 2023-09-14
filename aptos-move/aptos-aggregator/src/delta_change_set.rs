@@ -550,10 +550,10 @@ mod test {
         let sub_op = delta_sub(100, 200);
 
         let add_result = state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &add_op);
-        assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200)));
+        assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200).into()));
 
         let sub_result = state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &sub_op);
-        assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0)));
+        assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0).into()));
     }
 
     #[test]

@@ -12,6 +12,7 @@ use aptos_types::{
 };
 use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceView};
 use move_core_types::value::MoveTypeLayout;
+use bytes::Bytes;
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -85,7 +86,7 @@ pub trait ExecutorTask: Sync {
             IdentifierV2 = <Self::Txn as Transaction>::Identifier,
         > + StateStorageView),
         key: &<Self::Txn as Transaction>::Key,
-        maybe_blob: Option<Vec<u8>>,
+        maybe_blob: Option<Bytes>,
         creation: bool,
     ) -> anyhow::Result<<Self::Txn as Transaction>::Value>;
 }

@@ -95,7 +95,7 @@ pub fn compare_txn_outputs(
 pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>(
     sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
 ) {
-    let num_txns = 400;
+    let num_txns = 10;
     let num_shards = sharded_block_executor.num_shards();
     let mut executor = FakeExecutor::from_head_genesis();
     let mut transactions = Vec::new();

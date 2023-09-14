@@ -8,6 +8,7 @@ use aptos_types::state_store::{
     state_storage_usage::StateStorageUsage,
     state_value::{StateValue, StateValueMetadataKind},
 };
+use bytes::Bytes;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 
 /// Allows to query resources from the state storage.
@@ -25,7 +26,7 @@ pub trait TResourceView {
         &self,
         key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<Vec<u8>>> {
+    ) -> anyhow::Result<Option<Bytes>> {
         let maybe_state_value = self.get_resource_state_value(key, maybe_layout)?;
         Ok(maybe_state_value.map(StateValue::into_bytes))
     }
@@ -56,7 +57,7 @@ pub trait TModuleView {
 
     fn get_module_state_value(&self, key: &Self::Key) -> anyhow::Result<Option<StateValue>>;
 
-    fn get_module_bytes(&self, key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
+    fn get_module_bytes(&self, key: &Self::Key) -> anyhow::Result<Option<Bytes>> {
         let maybe_state_value = self.get_module_state_value(key)?;
         Ok(maybe_state_value.map(StateValue::into_bytes))
     }
@@ -126,7 +127,7 @@ pub trait TResourceGroupResolver {
         key: &Self::Key,
         resource_tag: &Self::Tag,
         return_group_size: bool,
-    ) -> anyhow::Result<(Option<Vec<u8>>, Option<usize>)>;
+    ) -> anyhow::Result<(Option<Bytes>, Option<usize>)>;
 
     /// Needed for backwards compatibility with the additional safety mechanism for resource
     /// groups, where the violation of the following invariant causes transaction failure:

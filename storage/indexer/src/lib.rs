@@ -29,6 +29,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use aptos_vm::data_cache::AsMoveResolver;
+use bytes::Bytes;
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
@@ -40,7 +41,6 @@ use std::{
     convert::TryInto,
     sync::{atomic::Ordering, Arc},
 };
-
 #[derive(Debug)]
 pub struct Indexer {
     db: DB,
@@ -155,7 +155,7 @@ struct TableInfoParser<'a, R> {
     indexer: &'a Indexer,
     annotator: &'a MoveValueAnnotator<'a, R>,
     result: HashMap<TableHandle, TableInfo>,
-    pending_on: HashMap<TableHandle, Vec<&'a [u8]>>,
+    pending_on: HashMap<TableHandle, Vec<Bytes>>,
 }
 
 impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
@@ -186,7 +186,7 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
         Ok(())
     }
 
-    fn parse_struct(&mut self, struct_tag: StructTag, bytes: &[u8]) -> Result<()> {
+    fn parse_struct(&mut self, struct_tag: StructTag, bytes: &Bytes) -> Result<()> {
         self.parse_move_value(
             &self
                 .annotator
@@ -194,8 +194,8 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
         )
     }
 
-    fn parse_resource_group(&mut self, bytes: &[u8]) -> Result<()> {
-        type ResourceGroup = BTreeMap<StructTag, Vec<u8>>;
+    fn parse_resource_group(&mut self, bytes: &Bytes) -> Result<()> {
+        type ResourceGroup = BTreeMap<StructTag, Bytes>;
 
         for (struct_tag, bytes) in bcs::from_bytes::<ResourceGroup>(bytes)? {
             self.parse_struct(struct_tag, &bytes)?;
@@ -203,7 +203,7 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
         Ok(())
     }
 
-    fn parse_table_item(&mut self, handle: TableHandle, bytes: &'a [u8]) -> Result<()> {
+    fn parse_table_item(&mut self, handle: TableHandle, bytes: &Bytes) -> Result<()> {
         match self.get_table_info(handle)? {
             Some(table_info) => {
                 self.parse_move_value(&self.annotator.view_value(&table_info.value_type, bytes)?)?;
@@ -212,7 +212,7 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
                 self.pending_on
                     .entry(handle)
                     .or_insert_with(Vec::new)
-                    .push(bytes);
+                    .push(bytes.clone());
             },
         }
         Ok(())
@@ -267,7 +267,7 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
             self.result.insert(handle, info);
             if let Some(pending_items) = self.pending_on.remove(&handle) {
                 for bytes in pending_items {
-                    self.parse_table_item(handle, bytes)?;
+                    self.parse_table_item(handle, &bytes)?;
                 }
             }
         }

@@ -19,6 +19,7 @@ use aptos_types::{
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::ExecutorView;
+use bytes::Bytes;
 use move_core_types::{
     effects::Op as MoveStorageOp,
     ident_str,
@@ -120,7 +121,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         &self,
         executor_view: &impl ExecutorView,
         key: &StateKey,
-        maybe_resource_group_blob: Option<Vec<u8>>,
+        maybe_resource_group_blob: Option<Bytes>,
         creation: bool,
     ) -> anyhow::Result<WriteOp> {
         let resolver = self.vm.as_move_resolver(executor_view);
