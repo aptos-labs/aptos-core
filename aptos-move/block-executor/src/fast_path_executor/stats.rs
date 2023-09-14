@@ -10,7 +10,6 @@ use std::time::Duration;
 pub struct ExecutorStats {
     pub total_txn_count: usize,
     pub fallback_txn_count: usize,
-    pub unique_senders_count: usize,
     pub time_stats: ExecutorTimeStats,
     pub fast_path_stats: FastPathStats,
 }
@@ -36,8 +35,6 @@ pub struct FastPathStats {
     pub execution_time: Duration,
     pub validation_time: Duration,
     pub materialization_task_spawn_time: Duration,
-    pub selected_vm_execution_time: Duration,
-    pub discarded_vm_execution_time: Duration,
     pub discard_reasons: DiscardReasonStats,
 }
 
@@ -57,8 +54,6 @@ pub struct DiscardReasonStats {
 /// However, in practice, this object is only accessed by one thread at a time.
 #[derive(Default)]
 pub struct WorkerStats {
-    pub selected_vm_execution_time_ns: AtomicU64,
-    pub discarded_vm_execution_time_ns: AtomicU64,
     pub discard_reasons: AtomicDiscardReasonStats,
 }
 
@@ -73,28 +68,6 @@ pub struct AtomicDiscardReasonStats {
     pub read_delta_conflict: AtomicU32,
     pub sequence_number: AtomicU32,
     pub vm_abort: AtomicU32,
-}
-
-impl WorkerStats {
-    pub fn selected_vm_execution_time(&self) -> Duration {
-        Duration::from_nanos(self.selected_vm_execution_time_ns.load(Ordering::Relaxed))
-    }
-
-    pub fn discarded_vm_execution_time(&self) -> Duration {
-        Duration::from_nanos(self.discarded_vm_execution_time_ns.load(Ordering::Relaxed))
-    }
-
-    pub fn add_selected_vm_execution_time(&self, duration: Duration) {
-        // Since, in practice, this object is only accessed by one thread at a time,
-        // we can use relaxed `load` and `store` instead of true atomic operations.
-        add_assign_u64(&self.selected_vm_execution_time_ns, duration.as_nanos() as u64);
-    }
-
-    pub fn add_discarded_vm_execution_time(&self, duration: Duration) {
-        // Since, in practice, this object is only accessed by one thread at a time,
-        // we can use relaxed `load` and `store` instead of true atomic operations.
-        add_assign_u64(&self.discarded_vm_execution_time_ns, duration.as_nanos() as u64);
-    }
 }
 
 impl DiscardReasonStats {
@@ -134,8 +107,6 @@ impl<'a> AddAssign<&'a WorkerStats> for FastPathStats {
     // Mutable reference tells to the compiler that there are no concurrent accesses to `rhs`.
     fn add_assign(&mut self, rhs: &'a WorkerStats) {
         self.worker_threads += 1;
-        self.selected_vm_execution_time += rhs.selected_vm_execution_time();
-        self.discarded_vm_execution_time += rhs.discarded_vm_execution_time();
         self.discard_reasons += &rhs.discard_reasons;
     }
 }
@@ -145,7 +116,6 @@ impl Display for ExecutorStats {
         writeln!(f, "ExecutorStats")?;
         writeln!(f, "    Total txn count:    {}", self.total_txn_count)?;
         writeln!(f, "    Fallback txn count: {}", self.fallback_txn_count)?;
-        writeln!(f, "    Unique senders:     {}", self.unique_senders_count)?;
         writeln!(f, "    Time stats:")?;
         writeln!(f, "        Total:         {:?}", self.time_stats.total)?;
         writeln!(f, "        Init:          {:?}", self.time_stats.init)?;
@@ -154,13 +124,11 @@ impl Display for ExecutorStats {
         writeln!(f, "        Wait:          {:?}", self.time_stats.wait)?;
         writeln!(f, "        Final output:  {:?}", self.time_stats.final_output_reconstruction)?;
         writeln!(f, "    Fast path stats:")?;
-        writeln!(f, "        VM init count: {}", self.fast_path_stats.worker_threads)?;
+        writeln!(f, "        Worker threads: {}", self.fast_path_stats.worker_threads)?;
         writeln!(f, "        Time stats:")?;
         writeln!(f, "            Total batch processing:     {:?}", self.fast_path_stats.total_batch_processing_time)?;
         writeln!(f, "            Batch init:                 {:?}", self.fast_path_stats.batch_init_time)?;
         writeln!(f, "            Execution:                  {:?}", self.fast_path_stats.execution_time)?;
-        writeln!(f, "                VM (selected):          {:?}", self.fast_path_stats.selected_vm_execution_time)?;
-        writeln!(f, "                VM (discarded):         {:?}", self.fast_path_stats.discarded_vm_execution_time)?;
         writeln!(f, "            Validation:                 {:?}", self.fast_path_stats.validation_time)?;
         writeln!(f, "            Materialization task spawn: {:?}", self.fast_path_stats.materialization_task_spawn_time)?;
         writeln!(f, "        Discard reasons:")?;
@@ -168,6 +136,7 @@ impl Display for ExecutorStats {
         writeln!(f, "            Read/delta conflict: {}", self.fast_path_stats.discard_reasons.read_delta_conflict)?;
         writeln!(f, "            Sequence number:     {}", self.fast_path_stats.discard_reasons.sequence_number)?;
         writeln!(f, "            VM abort:            {}", self.fast_path_stats.discard_reasons.vm_abort)?;
+        writeln!(f, "            Last transaction:    1")?;
 
         Ok(())
     }

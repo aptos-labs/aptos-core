@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{marker::PhantomData, sync::Arc};
-use std::sync::atomic::AtomicU32;
-use std::sync::atomic::Ordering::SeqCst;
-use std::time::Duration;
 
 use crossbeam::atomic::AtomicCell;
 use dashmap::DashMap;
@@ -90,20 +87,23 @@ where
         aggregators_snapshot: &impl WritableStateView<Key = T::Key, Value = T::Value>,
         write_reservations: &impl ReservationTable<T::Key>,
         delta_reservations: &impl ReservationTable<T::Key>,
-        sequence_numbers: &DashMap<AccountAddress, u64>,
+        sequence_numbers: &DashMap<AccountAddress, Option<u64>>,
     ) -> Result<TxnExecutionInfo<E>, Error<E::Error>> {
-        // TODO: eventually, we may need to add extra logic to preserve source order.
-
+        // NB: if we don't find the relevant sequence number in the map, there may
+        // still be other transactions with smaller sequence number in the same batch.
+        // However, source order will be preserved as two transactions from the same
+        // source account cannot be committed in the same batch as there is always
+        // a read-write conflict between them.
         if let Some((account, sn)) = txn.sender_and_sequence_number() {
-            if let Some(last_sn) = sequence_numbers.get(&account) {
-                if *last_sn + 1 != sn {
+            if let Some(opt_last_sn) = sequence_numbers.get(&account) {
+                if opt_last_sn.is_none() || opt_last_sn.unwrap() + 1 != sn {
                     worker_state.stats.discard_reasons.add_sequence_number();
                     return Ok(TxnExecutionInfo {
                         transaction: txn,
                         read_set: vec![],
                         output: None,
                         abort: true,
-                        vm_execution_time: None,
+                        // vm_execution_time: None,
                         txn_idx,
                         _phantom: PhantomData,
                     });
@@ -120,7 +120,7 @@ where
             txn_idx,
             false
         );
-        let vm_execution_time = Some(timer.elapsed());
+        // let vm_execution_time = Some(timer.elapsed());
 
         let (output, abort) = match status {
             ExecutionStatus::Success(output) => (Some(output), false),
@@ -137,7 +137,6 @@ where
             read_set: read_set_capturing_view.take_read_set(),
             output,
             abort,
-            vm_execution_time,
             txn_idx,
             _phantom: PhantomData,
         };
@@ -177,7 +176,7 @@ where
         aggregators_snapshot: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
         write_reservations: &(impl ReservationTable<T::Key> + Sync),
         delta_reservations: &(impl ReservationTable<T::Key> + Sync),
-        sequence_numbers: &DashMap<AccountAddress, u64>,
+        sequence_numbers: &DashMap<AccountAddress, Option<u64>>,
     ) -> Result<Vec<TxnExecutionInfo<E>>, Error<E::Error>> {
         transactions
             .into_par_iter()
@@ -259,7 +258,7 @@ where
         execution_results: Vec<TxnExecutionInfo<E>>,
         write_reservations: &(impl ReservationTable<T::Key> + Sync),
         delta_reservations: &(impl ReservationTable<T::Key> + Sync),
-        sequence_numbers: &DashMap<AccountAddress, u64>,
+        sequence_numbers: &DashMap<AccountAddress, Option<u64>>,
         output_view: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
         discarded_txns: &mut Vec<TransactionWithHints<T>>,
     ) -> Result<Vec<E::Output>, Error<E::Error>> {
@@ -279,11 +278,8 @@ where
                     );
 
                     if select {
-                        let vm_time = exec_info.vm_execution_time.unwrap();
-                        worker_state.stats.add_selected_vm_execution_time(vm_time);
-
                         if let Some((account, sn)) = exec_info.transaction.sender_and_sequence_number() {
-                            sequence_numbers.insert(account, sn);
+                            sequence_numbers.insert(account, Some(sn));
                         }
 
                         let output = exec_info.output.unwrap();
@@ -294,8 +290,11 @@ where
                         }
                         Left(output)
                     } else {
-                        if let Some(vm_time) = exec_info.vm_execution_time {
-                            worker_state.stats.add_discarded_vm_execution_time(vm_time);
+                        // In the current implementation, if one transaction from an account is
+                        // discarded, they all are. `None` acts as a marker of such "deactivated"
+                        // account in this case.
+                        if let Some((account, sn)) = exec_info.transaction.sender_and_sequence_number() {
+                            sequence_numbers.insert(account, None);
                         }
 
                         let write_set = exec_info.write_set().map(Iterator::collect).unwrap_or(vec![]);
@@ -339,18 +338,24 @@ where
         Ok(())
     }
 
-    fn process_batch(
+    fn process_batch<Txns>(
         &self,
-        transactions: impl IntoParallelIterator<Item = (usize, T)>,
+        transactions: Txns,
         worker_states: &ThreadLocal<WorkerState<E>>,
         executor_arguments: &E::Argument,
         writable_view: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
-        sequence_numbers: &DashMap<AccountAddress, u64>,
+        sequence_numbers: &DashMap<AccountAddress, Option<u64>>,
         discarded_txns: &mut Vec<TransactionWithHints<T>>,
         fast_path_stats: &mut FastPathStats,
-    ) -> Result<oneshot::Receiver<Vec<E::Output>>, Error<E::Error>> {
+    ) -> Result<oneshot::Receiver<Vec<E::Output>>, Error<E::Error>>
+    where
+        Txns: IntoParallelIterator<Item = (usize, T)>,
+        Txns::Iter: IndexedParallelIterator,
+    {
         let start = std::time::Instant::now();
-        let batch_size = self.batch_size;
+
+        let transactions = transactions.into_par_iter();
+        let batch_size = transactions.len();
 
         let write_reservations = DashMapReservationTable::with_capacity(4 * batch_size);
         // Aggregators are often highly contended. Using OptimisticDashMapReservationTable allows
@@ -414,6 +419,7 @@ where
         fast_path_stats.materialization_task_spawn_time += after_spawn - after_validation;
 
         // println!("Batch processing stats:");
+        // println!("\tBatch size: {}", batch_size);
         // println!("\tSelected txns: {}", _selected_txns_count);
         // println!("\tTime breakdown:");
         // println!("\t\tTotal: {:?}", after_spawn - start);
@@ -445,9 +451,9 @@ where
         let block_size = signature_verified_block.len();
         let batch_count = (block_size + self.batch_size - 1) / self.batch_size;
 
-        // FIXME: this is a dirty fix.
-        // The last transaction must not be reordered, so, as a dirty fix we ignore it in the
-        // fast path and send it as the last transaction in the fallback executor input.
+        // The last transaction must not be reordered, so, as a simple solution,
+        // we ignore it in the fast path and send it as the last transaction in the fallback
+        // executor input.
         let last_txn = signature_verified_block.pop().unwrap();
 
         // Initialize the data structures that are used across batches.
@@ -456,7 +462,6 @@ where
         let mut committed_outputs_receivers = Vec::with_capacity(batch_count + 1);
         let mut discarded_txns = Vec::<TransactionWithHints<T>>::with_capacity(block_size);
         let sequence_numbers = DashMap::with_capacity(block_size);
-        // TODO: consider dropping `worker_states` asynchronously, off the critical path.
         let mut worker_states = ThreadLocal::new();
 
         // Store the stage stats and reset the stage timer.
@@ -465,9 +470,18 @@ where
 
         // Execute the fast path.
         let mut transactions = signature_verified_block.into_iter().enumerate();
+        let mut first_batch = true;
         while transactions.len() != 0 {
+            let batch_size = if first_batch {
+                // The first transaction is special and conflicts with every other transaction.
+                // As a simple albeit inefficient solution, we execute it in a separate batch.
+                1
+            } else {
+                self.batch_size
+            };
+
             // FIXME: this collect shouldn't be necessary.
-            let batch_transactions = transactions.by_ref().take(self.batch_size).collect_vec();
+            let batch_transactions = transactions.by_ref().take(batch_size).collect_vec();
 
             let committed_output_receiver = self.process_batch(
                 batch_transactions,
@@ -480,8 +494,11 @@ where
             )?;
 
             committed_outputs_receivers.push(committed_output_receiver);
+
+            first_batch = false;
         }
 
+        // Aggregate the stats from all worker threads.
         for worker_state in worker_states.iter_mut() {
             executor_stats.fast_path_stats += &worker_state.stats;
         }
@@ -495,11 +512,14 @@ where
             delta_set: vec![],
         });
 
+        // TODO: consider doing it asynchronously, off the critical path.
+        drop(worker_states);
+        drop(sequence_numbers);
+
         // Store the stage stats and reset the stage timer.
         executor_stats.time_stats.fast_path = stage_timer.elapsed();
         executor_stats.total_txn_count = block_size;
         executor_stats.fallback_txn_count = discarded_txns.len();
-        executor_stats.unique_senders_count = sequence_numbers.len();
         let stage_timer = std::time::Instant::now();
 
         // Execute the discarded transactions with the fallback executor.
@@ -558,7 +578,6 @@ struct TxnExecutionInfo<E: ExecutorTask> {
     read_set: Vec<<E::Txn as Transaction>::Key>,
     output: Option<E::Output>,
     abort: bool,
-    vm_execution_time: Option<Duration>,
     txn_idx: TxnIndex,
 
     _phantom: PhantomData<E>,
