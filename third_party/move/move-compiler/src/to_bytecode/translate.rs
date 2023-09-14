@@ -633,6 +633,7 @@ fn function_signature(context: &mut Context, sig: H::FunctionSignature) -> IR::F
         return_type,
         formals,
         type_formals: type_parameters,
+        vtables: vec![],
     }
 }
 

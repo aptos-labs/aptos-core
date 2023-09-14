@@ -10,7 +10,7 @@ use move_binary_format::{
         Constant, FieldDefinition, FunctionDefinition, FunctionSignature, ModuleHandle, Signature,
         SignatureToken, StructDefinition, StructDefinitionIndex, StructFieldInformation,
         StructHandleIndex, StructTypeParameter, TableIndex, TypeParameterIndex, TypeSignature,
-        Visibility,
+        VirtualFunctionInstantiation as MVirtualFunctionInstantiation, Visibility,
     },
     file_format_common::VERSION_MAX,
 };
@@ -867,6 +867,7 @@ fn compile_function(
         &ast_function.value.signature.type_formals
     );
     let fh_idx = context.function_handle(*self_name, name)?.1;
+    context.set_function_handle_index(fh_idx.0);
 
     let ast_function = ast_function.value;
 
@@ -1578,8 +1579,14 @@ fn compile_call(
             let fcall = if type_actuals.is_empty() {
                 Bytecode::Call(fh_idx)
             } else {
+                let instantiation = vtable_instantiation
+                    .into_iter()
+                    .map(|inst| {
+                        compile_virtual_function_instantiation(context, function_frame, inst)
+                    })
+                    .collect::<Result<_>>()?;
                 let fi_idx =
-                    context.function_instantiation_index(fh_idx, type_actuals_id, vec![])?;
+                    context.function_instantiation_index(fh_idx, type_actuals_id, instantiation)?;
                 Bytecode::CallGeneric(fi_idx)
             };
             push_instr!(call.loc, fcall);
@@ -1588,6 +1595,46 @@ fn compile_call(
             }
             // Return value of current function is pushed onto the stack.
             function_frame.push()?;
+        },
+    })
+}
+
+fn compile_virtual_function_instantiation(
+    context: &mut Context,
+    function_frame: &mut FunctionFrame,
+    inst: ast::VirtualFunctionInstantiation,
+) -> Result<MVirtualFunctionInstantiation> {
+    Ok(match inst {
+        VirtualFunctionInstantiation::Defined {
+            module,
+            name,
+            type_actuals,
+            vtable_instantiation,
+        } => {
+            let ty_arg_tokens =
+                compile_types(context, function_frame.type_parameters(), &type_actuals)?;
+            let tokens = Signature(ty_arg_tokens);
+            let type_actuals_id = context.signature_index(tokens)?;
+            let fh_idx = context.function_handle(module, name)?.1;
+            if type_actuals.is_empty() {
+                MVirtualFunctionInstantiation::Defined(fh_idx)
+            } else {
+                let vtable_instantiations = vtable_instantiation
+                    .into_iter()
+                    .map(|inst| {
+                        compile_virtual_function_instantiation(context, function_frame, inst)
+                    })
+                    .collect::<Result<_>>()?;
+                let fi_idx = context.function_instantiation_index(
+                    fh_idx,
+                    type_actuals_id,
+                    vtable_instantiations,
+                )?;
+                MVirtualFunctionInstantiation::Instantiated(fi_idx)
+            }
+        },
+        VirtualFunctionInstantiation::Inherited(idx) => {
+            MVirtualFunctionInstantiation::Inherited(context.current_function_handle_index(), idx)
         },
     })
 }

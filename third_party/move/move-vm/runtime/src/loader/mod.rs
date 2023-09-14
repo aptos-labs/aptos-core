@@ -1296,7 +1296,7 @@ impl<'a> Resolver<'a> {
                     let ty_args = self.instantiate_generic_function(*idx, type_params)?;
                     let vtable = self.instantiate_virtual_function(*idx, &ty_args, vtable)?;
                     InstantiatedFunction {
-                        func: self.loader.function_at(&func_inst.handle)?,
+                        func: self.function_from_instantiation(*idx)?,
                         ty_args,
                         vtable,
                     }

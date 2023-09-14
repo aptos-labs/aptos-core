@@ -279,6 +279,7 @@ pub(crate) struct Context<'a> {
 
     // The current function index that we are on
     current_function_index: FunctionDefinitionIndex,
+    current_function_handle_index: FunctionHandleIndex,
 
     // Source location mapping for this module
     pub source_map: SourceMap,
@@ -315,6 +316,7 @@ impl<'a> Context<'a> {
             address_identifiers: HashMap::new(),
             constant_pool: HashMap::new(),
             current_function_index: FunctionDefinitionIndex::new(0),
+            current_function_handle_index: FunctionHandleIndex::new(0),
             source_map: SourceMap::new(decl_location, current_module_opt),
         };
 
@@ -565,6 +567,14 @@ impl<'a> Context<'a> {
 
     pub fn current_function_definition_index(&self) -> FunctionDefinitionIndex {
         self.current_function_index
+    }
+
+    pub fn set_function_handle_index(&mut self, index: TableIndex) {
+        self.current_function_handle_index = FunctionHandleIndex(index);
+    }
+
+    pub fn current_function_handle_index(&self) -> FunctionHandleIndex {
+        self.current_function_handle_index
     }
 
     pub fn current_struct_definition_index(&self) -> StructDefinitionIndex {

@@ -511,6 +511,7 @@ fn script_into_module(compiled_script: CompiledScript) -> CompiledModule {
         parameters: script.parameters,
         return_: return_sig_idx,
         type_parameters: script.type_parameters,
+        vtables: vec![],
     });
 
     // Create a function definition for the main function.

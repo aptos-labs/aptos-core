@@ -311,7 +311,8 @@ impl Interpreter {
                             ty_args.iter().map(|ty| TypeWithLoader { ty, loader }),
                             self.operand_stack
                                 .last_n(func.arg_count())
-                                .map_err(|e| set_err_info!(current_frame, e))?,
+                                // .map_err(|e| set_err_info!(current_frame, e))?,
+                                .unwrap(),
                             (func.local_count() as u64).into(),
                         )
                         .map_err(|e| set_err_info!(current_frame, e))?;
@@ -356,7 +357,7 @@ impl Interpreter {
         for i in 0..arg_count {
             locals.store_loc(
                 arg_count - i - 1,
-                self.operand_stack.pop()?,
+                self.operand_stack.pop().unwrap(),
                 loader
                     .vm_config()
                     .enable_invariant_violation_check_in_swap_loc,
@@ -1081,7 +1082,7 @@ impl CallStack {
 
     fn add_and_check_acquired_resources(&mut self, module: ModuleId, acquired_resources: &BTreeSet<StructDefinitionIndex>) -> PartialVMResult<()> {
         let entry = self.acquired_resources.entry(module).or_default();
-        if entry.is_disjoint(acquired_resources) {
+        if !entry.is_disjoint(acquired_resources) {
             return Err(PartialVMError::new(StatusCode::REENTRANT_FUNCTION_CALL));
         }
         entry.extend(acquired_resources.iter().cloned());

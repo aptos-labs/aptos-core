@@ -477,10 +477,14 @@ fn parse_qualified_function_name(
             FunctionCall_::Builtin(f)
         },
         Tok::CallVirtual => {
-            let s = tokens.content();
             tokens.advance()?;
-            FunctionCall_::CallVirtual(u8::from_str(s).unwrap())
-        }
+            consume_token(tokens, Tok::LParen)?;
+            let s = tokens.content();
+            let idx = u8::from_str(s).unwrap();
+            tokens.advance()?;
+            consume_token(tokens, Tok::RParen)?;
+            FunctionCall_::CallVirtual(idx)
+        },
         Tok::DotNameValue => {
             let module_dot_name = parse_dot_name(tokens)?;
             let type_actuals = parse_type_actuals(tokens)?;
@@ -627,7 +631,8 @@ fn parse_call_or_term_(tokens: &mut Lexer) -> Result<Exp_, ParseError<Loc, anyho
         | Tok::ToU64
         | Tok::ToU128
         | Tok::ToU256
-        | Tok::Nop => {
+        | Tok::Nop
+        | Tok::CallVirtual => {
             let f = parse_qualified_function_name(tokens)?;
             let exp = parse_call_or_term(tokens)?;
             Ok(Exp_::FunctionCall(f, Box::new(exp)))
@@ -946,10 +951,13 @@ fn parse_field_bindings(
         let v = parse_var(tokens)?;
         Ok((f, v))
     } else {
-        Ok((f.clone(), Spanned {
-            loc: f.loc,
-            value: Var_(f.value.0),
-        }))
+        Ok((
+            f.clone(),
+            Spanned {
+                loc: f.loc,
+                value: Var_(f.value.0),
+            },
+        ))
     }
 }
 
@@ -1424,10 +1432,9 @@ where
 
 fn parse_virtual_functions(
     tokens: &mut Lexer,
-) -> Result<Vec<(Vec<Type>, Vec<Type>)>, ParseError<Loc, anyhow::Error>>
-{
-    let mut has_virtual_functions = false;
+) -> Result<Vec<(Vec<Type>, Vec<Type>)>, ParseError<Loc, anyhow::Error>> {
     let k = if tokens.peek() == Tok::LSquare {
+        consume_token(tokens, Tok::LSquare)?;
         let list = parse_comma_list(tokens, &[Tok::RSquare], parse_virtual_function_type, true)?;
         consume_token(tokens, Tok::RSquare)?;
         list
@@ -1437,7 +1444,9 @@ fn parse_virtual_functions(
     Ok(k)
 }
 
-fn parse_virtual_function_type(tokens: &mut Lexer) -> Result<(Vec<Type>, Vec<Type>), ParseError<Loc, anyhow::Error>> {
+fn parse_virtual_function_type(
+    tokens: &mut Lexer,
+) -> Result<(Vec<Type>, Vec<Type>), ParseError<Loc, anyhow::Error>> {
     consume_token(tokens, Tok::Pipe)?;
     let parameters = parse_comma_list(tokens, &[Tok::Pipe], parse_type, true)?;
     adjust_token(tokens, &[Tok::Pipe])?;
@@ -1449,10 +1458,11 @@ fn parse_virtual_function_type(tokens: &mut Lexer) -> Result<(Vec<Type>, Vec<Typ
     Ok((parameters, return_))
 }
 
-fn parse_vtable_instantiations(tokens: &mut Lexer,
-) -> Result<Vec<VirtualFunctionInstantiation>, ParseError<Loc, anyhow::Error>>
-{
+fn parse_vtable_instantiations(
+    tokens: &mut Lexer,
+) -> Result<Vec<VirtualFunctionInstantiation>, ParseError<Loc, anyhow::Error>> {
     let k = if tokens.peek() == Tok::LSquare {
+        tokens.advance()?;
         let list = parse_comma_list(tokens, &[Tok::RSquare], parse_vtable_instantiation, true)?;
         consume_token(tokens, Tok::RSquare)?;
         list
@@ -1462,11 +1472,15 @@ fn parse_vtable_instantiations(tokens: &mut Lexer,
     Ok(k)
 }
 
-fn parse_vtable_instantiation(tokens: &mut Lexer) -> Result<VirtualFunctionInstantiation, ParseError<Loc, anyhow::Error>> {
+fn parse_vtable_instantiation(
+    tokens: &mut Lexer,
+) -> Result<VirtualFunctionInstantiation, ParseError<Loc, anyhow::Error>> {
     if tokens.peek() == Tok::U64Value {
         let s = tokens.content();
         tokens.advance()?;
-        Ok(VirtualFunctionInstantiation::Inherited(u8::from_str(s).unwrap()))
+        Ok(VirtualFunctionInstantiation::Inherited(
+            u8::from_str(s).unwrap(),
+        ))
     } else {
         let module_dot_name = parse_dot_name(tokens)?;
         let type_actuals = parse_type_actuals(tokens)?;

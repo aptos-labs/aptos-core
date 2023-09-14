@@ -387,6 +387,7 @@ impl ModuleGenerator {
             type_parameters,
             parameters,
             return_,
+            vtables: vec![],
         };
         let idx = if fun_env.module_env.is_script_module() {
             self.main_handle = Some(handle);
@@ -421,6 +422,7 @@ impl ModuleGenerator {
         let fun_inst = FF::FunctionInstantiation {
             handle,
             type_parameters,
+            vtable_instantiation: vec![],
         };
         let idx = FF::FunctionInstantiationIndex(ctx.checked_bound(
             loc,

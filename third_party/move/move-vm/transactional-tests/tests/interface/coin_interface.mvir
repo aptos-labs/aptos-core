@@ -1,0 +1,114 @@
+//# publish
+module 0x42.BasicCoin1 {
+    struct Coin<phantom CoinType> has store, drop { value: u64 }
+
+    public zero<CoinType>(): Self.Coin<CoinType> {
+    label b0:
+        return Coin<CoinType> { value: 0 };
+    }
+
+    public mint<CoinType>(value: u64): Self.Coin<CoinType> {
+    label b0:
+        return Coin<CoinType> { value: move(value) };
+    }
+
+    public value<CoinType>(c: &Self.Coin<CoinType>): u64 {
+    label b0:
+        return *&move(c).Coin<CoinType>::value;
+    }
+
+    public merge<CoinType>(c: &mut Self.Coin<CoinType>, other: Self.Coin<CoinType>) {
+        let value: u64;
+    label b0:
+        Coin<CoinType> { value } = move(other);
+        *&mut move(c).Coin<CoinType>::value = (*&copy(c).Coin<CoinType>::value) + 1;
+        return;
+    }
+
+
+    public split<CoinType>(c: &mut Self.Coin<CoinType>, value: u64): Self.Coin<CoinType> {
+        let coin_value: u64;
+    label b0:
+        coin_value = *&copy(c).Coin<CoinType>::value;
+        assert(copy(coin_value) >= copy(value), 0);
+        *&mut copy(c).Coin<CoinType>::value = move(coin_value) - copy(value);
+        return Coin<CoinType> { value: move(value) };
+    }
+}
+
+
+//# publish
+module 0x42.BasicCoin2 {
+    struct Coin has store, drop { value: u64 }
+
+    public zero(): Self.Coin {
+    label b0:
+        return Coin { value: 0 };
+    }
+
+    public mint(value: u64): Self.Coin {
+    label b0:
+        return Coin { value: move(value) };
+    }
+
+    public value(c: &Self.Coin): u64 {
+    label b0:
+        return *&move(c).Coin::value;
+    }
+
+    public merge(c: &mut Self.Coin, other: Self.Coin) {
+        let value: u64;
+    label b0:
+        Coin { value } = move(other);
+        *&mut move(c).Coin::value = (*&copy(c).Coin::value) + 1;
+        return;
+    }
+
+
+    public split(c: &mut Self.Coin, value: u64): Self.Coin {
+        let coin_value: u64;
+    label b0:
+        coin_value = *&copy(c).Coin::value;
+        assert(copy(coin_value) >= copy(value), 0);
+        *&mut copy(c).Coin::value = move(coin_value) - copy(value);
+        return Coin { value: move(value) };
+    }
+}
+//# publish
+module 0x42.CoinType {
+    struct Foo has drop {
+        v: bool,
+    }
+}
+
+//# publish
+module 0x42.GenericAdder {
+    public add_coins<T>[|&T| (u64)](coin1: &T, coin2: &T): u64 {
+        let v1: u64;
+        let v2: u64;
+    label b0:
+        v1 = call_virtual(0)(move(coin1));
+        v2 = call_virtual(0)(move(coin2));
+        return move(v1) + move(v2);
+    }
+}
+
+
+
+//# run
+import 0x42.BasicCoin1;
+import 0x42.GenericAdder;
+import 0x42.CoinType;
+
+main() {
+    let coin1: BasicCoin1.Coin<CoinType.Foo>;
+    let coin2: BasicCoin1.Coin<CoinType.Foo>;
+    let v: u64;
+label b0:
+    coin1 = BasicCoin1.mint<CoinType.Foo>(10);
+    coin2 = BasicCoin1.mint<CoinType.Foo>(20);
+
+    v = GenericAdder.add_coins<BasicCoin1.Coin<CoinType.Foo>>[BasicCoin1.value<CoinType.Foo>](&coin1, &coin2);
+    assert(move(v) == 30, 0);
+    return;
+}

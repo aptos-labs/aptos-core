@@ -647,6 +647,7 @@ pub fn zero_cost_instruction_table() -> Vec<(Bytecode, GasCost)> {
         (CastU16, GasCost::new(0, 0)),
         (CastU32, GasCost::new(0, 0)),
         (CastU256, GasCost::new(0, 0)),
+        (CallVirtual(0), GasCost::new(0, 0)),
     ]
 }
 
@@ -780,6 +781,7 @@ pub fn bytecode_instruction_costs() -> Vec<(Bytecode, GasCost)> {
         (CastU16, GasCost::new(2, 1)),
         (CastU32, GasCost::new(2, 1)),
         (CastU256, GasCost::new(2, 1)),
+        (CallVirtual(0), GasCost::new(582, 0)),
     ]
 }
 

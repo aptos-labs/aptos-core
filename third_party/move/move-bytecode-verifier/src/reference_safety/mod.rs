@@ -106,9 +106,6 @@ fn call_virtual_function(
     function_ty: &FunctionType,
     meter: &mut impl Meter,
 ) -> PartialVMResult<()> {
-    // The first argument is a function pointer type.
-    verifier.stack.pop().unwrap();
-
     let arguments = verifier
         .resolver
         .signature_at(function_ty.parameters)
