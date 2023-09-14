@@ -134,9 +134,28 @@ impl DagDriver {
     }
 
     pub async fn enter_new_round(&mut self, new_round: Round, strong_links: Vec<NodeCertificate>) {
-    pub fn enter_new_round(&mut self, new_round: Round, strong_links: Vec<NodeCertificate>) {
+        debug!("entering new round {}", new_round);
         // TODO: support pulling payload
-        let payload = Payload::empty(false);
+        let payload = match self
+            .payload_client
+            .pull_payload(
+                Duration::from_secs(1),
+                100,
+                1000,
+                PayloadFilter::Empty,
+                Box::pin(async {}),
+                false,
+                0,
+                0.0,
+            )
+            .await
+        {
+            Ok(payload) => payload,
+            Err(e) => {
+                error!("error pulling payload: {}", e);
+                return;
+            },
+        };
         // TODO: need to wait to pass median of parents timestamp
         let timestamp = self.time_service.now_unix_time();
         self.current_round = new_round;
