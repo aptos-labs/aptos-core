@@ -8,19 +8,13 @@ use aptos_types::PeerId;
 use itertools::{self, EitherOrBoth, Itertools};
 use std::collections::BTreeMap;
 
-/// The link stats are obtained from https://github.com/doitintl/intercloud-throughput/blob/master/results_202202/results.csv
-/// The four regions were hand-picked from the dataset to simulate a multi-region setup
-/// with high latencies and low bandwidth.
-macro_rules! TWO_REGION_LINK_STATS_CSV {
-    () => {
-        "data/two_region_link_stats.csv"
-    };
-}
+const FOUR_REGION_LINK_STATS: &[u8] = include_bytes!("data/four_region_link_stats.csv");
+const TWO_REGION_LINK_STATS: &[u8] = include_bytes!("data/two_region_link_stats.csv");
 
-fn get_link_stats_table() -> BTreeMap<String, BTreeMap<String, (u64, f64)>> {
+fn get_link_stats_table(csv: &[u8]) -> BTreeMap<String, BTreeMap<String, (u64, f64)>> {
     let mut stats_table = BTreeMap::new();
 
-    let mut rdr = csv::Reader::from_reader(include_bytes!(TWO_REGION_LINK_STATS_CSV!()).as_slice());
+    let mut rdr = csv::Reader::from_reader(csv);
     rdr.deserialize()
         .for_each(|result: Result<(String, String, u64, f64), _>| {
             if let Ok((from, to, bitrate, latency)) = result {
@@ -204,9 +198,18 @@ pub struct MultiRegionNetworkEmulationConfig {
 impl Default for MultiRegionNetworkEmulationConfig {
     fn default() -> Self {
         Self {
-            link_stats_table: get_link_stats_table(),
+            link_stats_table: get_link_stats_table(FOUR_REGION_LINK_STATS),
             inter_region_config: InterRegionNetEmConfig::default(),
             intra_region_config: Some(IntraRegionNetEmConfig::default()),
+        }
+    }
+}
+
+impl MultiRegionNetworkEmulationConfig {
+    pub fn two_region() -> Self {
+        Self {
+            link_stats_table: get_link_stats_table(TWO_REGION_LINK_STATS),
+            ..Default::default()
         }
     }
 }
