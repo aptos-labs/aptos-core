@@ -1653,6 +1653,8 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             mempool_backlog: 500_000,
         }))
         .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            const MB: usize = 1024 * 1024;
+
             // ask for more resources than normal
             helm_values["validator"]["resources"]["limits"]["cpu"] = 48.into();
             helm_values["validator"]["resources"]["requests"]["cpu"] = 48.into();
@@ -1668,7 +1670,15 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 
             // Consensus and QuorumStore tweaks
             helm_values["validator"]["config"]["consensus"]
-                ["max_sending_block_txns_quorum_store_override"] = 10000.into();
+                ["max_sending_block_txns_quorum_store_override"] = 30_000.into();
+            helm_values["validator"]["config"]["consensus"]
+                ["max_receiving_block_txns_quorum_store_override"] = 40_000.into();
+
+            helm_values["validator"]["config"]["consensus"]
+                ["max_sending_block_bytes_quorum_store_override"] = (10 * MB).into();
+            helm_values["validator"]["config"]["consensus"]
+                ["max_receiving_block_bytes_quorum_store_override"] = (12 * MB).into();
+
             helm_values["validator"]["config"]["consensus"]["pipeline_backpressure"] =
                 serde_yaml::to_value(Vec::<PipelineBackpressureValues>::new()).unwrap();
             helm_values["validator"]["config"]["consensus"]["chain_health_backoff"] =
@@ -1684,20 +1694,33 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
                 ["backlog_txn_limit_count"] = 200000.into();
             helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
-                ["backlog_per_validator_batch_limit_count"] = 10.into();
+                ["backlog_per_validator_batch_limit_count"] = 50.into();
 
             helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
-                ["dynamic_max_txn_per_s"] = 6000.into();
+                ["dynamic_min_txn_per_s"] = 2000.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
+                ["dynamic_max_txn_per_s"] = 8000.into();
 
             helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["sender_max_batch_txns"] = 500.into();
+                ["sender_max_batch_txns"] = 1000.into();
             helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["receiver_max_batch_txns"] = 500.into();
-            const MB: usize = 1024 * 1024;
+                ["sender_max_batch_bytes"] = (4 * MB).into();
             helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["sender_max_batch_bytes"] = (3 * MB).into();
+                ["sender_max_num_batches"] = 100.into();
             helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["receiver_max_batch_bytes"] = (3 * MB).into();
+                ["sender_max_total_txns"] = 4000.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["sender_max_total_bytes"] = (8 * MB).into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["receiver_max_batch_txns"] = 1000.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["receiver_max_batch_bytes"] = (4 * MB).into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["receiver_max_num_batches"] = 100.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["receiver_max_total_txns"] = 4000.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["receiver_max_total_bytes"] = (8 * MB).into();
 
             // Experimental storage optimizations
             helm_values["validator"]["config"]["storage"]["rocksdb_configs"]["split_ledger_db"] =
