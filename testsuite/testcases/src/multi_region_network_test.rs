@@ -11,17 +11,16 @@ use std::collections::BTreeMap;
 /// The link stats are obtained from https://github.com/doitintl/intercloud-throughput/blob/master/results_202202/results.csv
 /// The four regions were hand-picked from the dataset to simulate a multi-region setup
 /// with high latencies and low bandwidth.
-macro_rules! FOUR_REGION_LINK_STATS_CSV {
+macro_rules! TWO_REGION_LINK_STATS_CSV {
     () => {
-        "data/four_region_link_stats.csv"
+        "data/two_region_link_stats.csv"
     };
 }
 
 fn get_link_stats_table() -> BTreeMap<String, BTreeMap<String, (u64, f64)>> {
     let mut stats_table = BTreeMap::new();
 
-    let mut rdr =
-        csv::Reader::from_reader(include_bytes!(FOUR_REGION_LINK_STATS_CSV!()).as_slice());
+    let mut rdr = csv::Reader::from_reader(include_bytes!(TWO_REGION_LINK_STATS_CSV!()).as_slice());
     rdr.deserialize()
         .for_each(|result: Result<(String, String, u64, f64), _>| {
             if let Ok((from, to, bitrate, latency)) = result {

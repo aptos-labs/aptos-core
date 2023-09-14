@@ -525,8 +525,8 @@ fn single_test_suite(
 ) -> Result<ForgeConfig> {
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
-        "land_blocking" => net_bench(), // TODO: remove this before landing
-        "realistic_env_max_load" => net_bench(), // TODO: remove this before landing
+        "land_blocking" => net_bench_realistic_env(), // TODO: remove this before landing
+        "realistic_env_max_load" => net_bench_realistic_env(), // TODO: remove this before landing
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         // Rest of the tests:
@@ -586,6 +586,7 @@ fn single_test_suite(
         "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true),
         "gather_metrics" => gather_metrics(),
         "net_bench" => net_bench(),
+        "net_bench_realistic_env" => net_bench_realistic_env(),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -1347,23 +1348,36 @@ fn gather_metrics() -> ForgeConfig {
         .add_network_test(GatherMetrics)
 }
 
+fn netbench_config() -> NetbenchConfig {
+    NetbenchConfig {
+        enabled: true,
+        max_network_channel_size: 1000,
+        enable_direct_send_testing: true,
+        direct_send_data_size: 100000,
+        direct_send_per_second: 1000,
+        enable_rpc_testing: false,
+        rpc_data_size: 100000,
+        rpc_per_second: 1000000,
+        rpc_in_flight: 8,
+        ..Default::default()
+    }
+}
+
 fn net_bench() -> ForgeConfig {
     ForgeConfig::default()
         .add_network_test(Delay::new(180))
         .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            config.netbench = Some(NetbenchConfig {
-                enabled: true,
-                max_network_channel_size: 1000,
-                enable_direct_send_testing: true,
-                direct_send_data_size: 100000,
-                direct_send_per_second: 1000,
-                enable_rpc_testing: false,
-                rpc_data_size: 100000,
-                rpc_per_second: 1000000,
-                rpc_in_flight: 8,
-                ..Default::default()
-            });
+            config.netbench = Some(netbench_config());
+        }))
+}
+
+fn net_bench_realistic_env() -> ForgeConfig {
+    ForgeConfig::default()
+        .add_network_test(wrap_with_realistic_env(Delay::new(180)))
+        .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.netbench = Some(netbench_config());
         }))
 }
 
