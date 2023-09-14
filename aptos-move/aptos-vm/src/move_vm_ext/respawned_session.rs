@@ -212,7 +212,7 @@ mod test {
     }
 
     fn read_aggregator(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
-        view.get_aggregator_v1_value(&key(s), AggregatorReadMode::Precise)
+        view.get_aggregator_v1_value(&key(s), AggregatorReadMode::Aggregated)
             .unwrap()
             .unwrap()
     }
@@ -240,19 +240,20 @@ mod test {
             (key("module_write_set"), write(110)),
         ]);
 
-        let aggregator_write_set = HashMap::from([
+        let aggregator_v1_write_set = HashMap::from([
             (key("aggregator_both"), write(120)),
             (key("aggregator_write_set"), write(130)),
         ]);
 
-        let aggregator_delta_set =
+        let aggregator_v1_delta_set =
             HashMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
         let change_set = VMChangeSet::new(
             resource_write_set,
             module_write_set,
-            aggregator_write_set,
-            aggregator_delta_set,
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set,
+            HashMap::new(),
             vec![],
             &NoOpChangeSetChecker,
         )
