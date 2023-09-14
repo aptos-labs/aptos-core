@@ -10,7 +10,7 @@ use crate::{
 };
 #[allow(unused_imports)]
 use anyhow::Error;
-use aptos_aggregator::resolver::TAggregatorView;
+use aptos_aggregator::resolver::{AggregatorReadMode, TAggregatorView};
 use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
@@ -314,8 +314,9 @@ impl<'e, E: ExecutorView> TAggregatorView for StorageAdapter<'e, E> {
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::IdentifierV1,
+        mode: AggregatorReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
-        self.executor_view.get_aggregator_v1_state_value(id)
+        self.executor_view.get_aggregator_v1_state_value(id, mode)
     }
 }
 

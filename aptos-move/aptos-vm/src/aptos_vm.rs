@@ -1294,11 +1294,6 @@ impl AptosVM {
                 .get_resource_state_value(state_key, None)
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         }
-        for id in change_set.aggregator_v1_write_set().keys() {
-            executor_view
-                .get_aggregator_v1_state_value(id)
-                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
-        }
         Ok(())
     }
 

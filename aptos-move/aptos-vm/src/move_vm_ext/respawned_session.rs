@@ -6,7 +6,7 @@ use crate::{
     move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
     AptosVM,
 };
-use aptos_aggregator::resolver::TAggregatorView;
+use aptos_aggregator::resolver::{AggregatorReadMode, TAggregatorView};
 use aptos_gas_algebra::Fee;
 use aptos_state_view::StateViewId;
 use aptos_types::{
@@ -108,15 +108,16 @@ impl<'r> TAggregatorView for ExecutorViewWithChangeSet<'r> {
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::IdentifierV1,
+        mode: AggregatorReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.aggregator_v1_delta_set().get(id) {
             Some(delta_op) => Ok(self
                 .base
-                .try_convert_aggregator_v1_delta_into_write_op(id, delta_op)?
+                .try_convert_aggregator_v1_delta_into_write_op(id, delta_op, mode)?
                 .as_state_value()),
             None => match self.change_set.aggregator_v1_write_set().get(id) {
                 Some(write_op) => Ok(write_op.as_state_value()),
-                None => self.base.get_aggregator_v1_state_value(id),
+                None => self.base.get_aggregator_v1_state_value(id, mode),
             },
         }
     }
@@ -194,7 +195,9 @@ mod test {
     }
 
     fn read_aggregator(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
-        view.get_aggregator_v1_value(&key(s)).unwrap()
+        view.get_aggregator_v1_value(&key(s), AggregatorReadMode::Precise)
+            .unwrap()
+            .unwrap()
     }
 
     #[test]

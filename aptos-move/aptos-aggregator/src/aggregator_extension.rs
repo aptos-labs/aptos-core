@@ -3,7 +3,7 @@
 
 use crate::{
     delta_change_set::{addition, subtraction},
-    resolver::AggregatorResolver,
+    resolver::{AggregatorReadMode, AggregatorResolver},
 };
 use aptos_types::{
     state_store::{state_key::StateKey, table::TableHandle},
@@ -245,9 +245,15 @@ impl Aggregator {
         // something may go wrong, so we guard by throwing an error in
         // extension.
         let value_from_storage = resolver
-            .get_aggregator_v1_value(id.as_state_key())
+            .get_aggregator_v1_value(id.as_state_key(), AggregatorReadMode::Precise)
             .map_err(|e| {
                 extension_error(format!("Could not find the value of the aggregator: {}", e))
+            })?
+            .ok_or_else(|| {
+                extension_error(format!(
+                    "Could not read from deleted aggregator at {:?}",
+                    id
+                ))
             })?;
 
         // Validate history and apply the delta.

@@ -46,18 +46,20 @@ pub trait TAggregatorView {
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::IdentifierV1,
+        mode: AggregatorReadMode,
     ) -> anyhow::Result<Option<StateValue>>;
 
-    fn get_aggregator_v1_value(&self, id: &Self::IdentifierV1) -> anyhow::Result<u128> {
-        let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
-        // TODO: can we delete an aggregator V1? If so, the signature of this
-        //       function has to be `Result<Option<u128>>`.
-        bcs::from_bytes(
-            maybe_state_value
-                .expect("Aggregator V1 cannot be deleted")
-                .bytes(),
-        )
-        .map_err(|_| anyhow::Error::msg("Failed to deserialize aggregator value to u128"))
+    fn get_aggregator_v1_value(
+        &self,
+        id: &Self::IdentifierV1,
+        mode: AggregatorReadMode,
+    ) -> anyhow::Result<Option<u128>> {
+        let maybe_state_value = self.get_aggregator_v1_state_value(id, mode)?;
+        match maybe_state_value {
+            Some(state_value) => bcs::from_bytes(state_value.bytes())
+                .map_err(|_| anyhow::Error::msg("Failed to deserialize aggregator value to u128")),
+            None => Ok(None),
+        }
     }
 
     /// Because aggregator V1 is a state item, it also can have metadata (for
@@ -66,7 +68,10 @@ pub trait TAggregatorView {
         &self,
         id: &Self::IdentifierV1,
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
-        let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
+        // When getting state value metadata for aggregator V1, we need to do a
+        // precise read.
+        let maybe_state_value =
+            self.get_aggregator_v1_state_value(id, AggregatorReadMode::Precise)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 
@@ -91,10 +96,17 @@ pub trait TAggregatorView {
         &self,
         id: &Self::IdentifierV1,
         delta_op: &DeltaOp,
+        mode: AggregatorReadMode,
     ) -> anyhow::Result<WriteOp, VMStatus> {
         let base = self
-            .get_aggregator_v1_value(id)
-            .map_err(|e| VMStatus::error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?;
+            .get_aggregator_v1_value(id, mode)
+            .map_err(|e| VMStatus::error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?
+            .ok_or_else(|| {
+                VMStatus::error(
+                    StatusCode::STORAGE_ERROR,
+                    Some("Cannot convert delta for deleted aggregator".to_string()),
+                )
+            })?;
         delta_op
             .apply_to(base)
             .map_err(|partial_error| {
@@ -153,6 +165,7 @@ pub mod test_utils {
         fn get_aggregator_v1_state_value(
             &self,
             state_key: &Self::IdentifierV1,
+            _mode: AggregatorReadMode,
         ) -> anyhow::Result<Option<StateValue>> {
             Ok(self.0.get(state_key).cloned())
         }

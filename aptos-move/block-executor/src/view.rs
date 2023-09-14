@@ -7,7 +7,10 @@ use crate::{
     task::Transaction,
     txn_last_input_output::ReadDescriptor,
 };
-use aptos_aggregator::{delta_change_set::serialize, resolver::TAggregatorView};
+use aptos_aggregator::{
+    delta_change_set::serialize,
+    resolver::{AggregatorReadMode, TAggregatorView},
+};
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, MVModulesError, MVModulesOutput, TxnIndex},
@@ -329,6 +332,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::IdentifierV1,
+        _mode: AggregatorReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         // TODO: Integrate aggregators.
         self.get_resource_state_value(state_key, None)

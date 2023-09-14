@@ -4,7 +4,7 @@
 use crate::check_change_set::CheckChangeSet;
 use aptos_aggregator::{
     delta_change_set::{serialize, DeltaOp},
-    resolver::AggregatorResolver,
+    resolver::{AggregatorReadMode, AggregatorResolver},
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -219,7 +219,10 @@ impl VMChangeSet {
 
         let into_write =
             |(state_key, delta): (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
-                let write = resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta)?;
+                // Materialization is needed when committing a transaction, so
+                // we need precise mode to compute the true value of an
+                // aggregator.
+                let write = resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta, AggregatorReadMode::Precise)?;
                 Ok((state_key, write))
             };
 

@@ -5,6 +5,8 @@
 #[cfg(feature = "testing")]
 use anyhow::Error;
 #[cfg(feature = "testing")]
+use aptos_aggregator::resolver::AggregatorReadMode;
+#[cfg(feature = "testing")]
 use aptos_aggregator::resolver::TAggregatorView;
 #[cfg(feature = "testing")]
 use aptos_framework::natives::cryptography::algebra::AlgebraContext;
@@ -46,6 +48,7 @@ impl TAggregatorView for AptosBlankStorage {
     fn get_aggregator_v1_state_value(
         &self,
         _id: &Self::IdentifierV1,
+        _mode: AggregatorReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         Ok(None)
     }
