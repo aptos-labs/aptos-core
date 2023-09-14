@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /* eslint-disable no-bitwise */
-import { Deserializer, Serializer, Uint8 } from "../bcs";
+import { Deserializer, Serializer } from "../bcs";
+import { Uint8 } from "../types";
 import { Ed25519PublicKey, Ed25519Signature } from "./ed25519";
 
 /**
