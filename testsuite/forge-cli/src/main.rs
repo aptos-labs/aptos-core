@@ -1656,17 +1656,17 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             const MB: usize = 1024 * 1024;
 
             // ask for more resources than normal
-            helm_values["validator"]["resources"]["limits"]["cpu"] = 48.into();
-            helm_values["validator"]["resources"]["requests"]["cpu"] = 48.into();
-            helm_values["validator"]["resources"]["limits"]["memory"] = "72Gi".into();
-            helm_values["validator"]["resources"]["requests"]["memory"] = "72Gi".into();
-            helm_values["fullnode"]["resources"]["limits"]["cpu"] = 48.into();
-            helm_values["fullnode"]["resources"]["requests"]["cpu"] = 48.into();
-            helm_values["fullnode"]["resources"]["limits"]["memory"] = "72Gi".into();
-            helm_values["fullnode"]["resources"]["requests"]["memory"] = "72Gi".into();
+            helm_values["validator"]["resources"]["limits"]["cpu"] = 60.into();
+            helm_values["validator"]["resources"]["requests"]["cpu"] = 60.into();
+            helm_values["validator"]["resources"]["limits"]["memory"] = "200Gi".into();
+            helm_values["validator"]["resources"]["requests"]["memory"] = "200Gi".into();
+            helm_values["fullnode"]["resources"]["limits"]["cpu"] = 60.into();
+            helm_values["fullnode"]["resources"]["requests"]["cpu"] = 60.into();
+            helm_values["fullnode"]["resources"]["limits"]["memory"] = "200Gi".into();
+            helm_values["fullnode"]["resources"]["requests"]["memory"] = "200Gi".into();
 
             // higher concurrency level
-            helm_values["validator"]["config"]["execution"]["concurrency_level"] = 32.into();
+            helm_values["validator"]["config"]["execution"]["concurrency_level"] = 48.into();
 
             // Consensus and QuorumStore tweaks
             helm_values["validator"]["config"]["consensus"]
