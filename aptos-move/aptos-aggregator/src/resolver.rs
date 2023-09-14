@@ -8,11 +8,10 @@ use crate::aggregator_extension::AggregatorID;
 ///  logic for different reading modes.
 pub enum AggregatorReadMode {
     /// The returned value is guaranteed to be correct.
-    Precise,
-    /// The returned value is based on speculation or approximation. For
-    /// example, while reading and accumulating deltas only some of them
-    /// can be taken into account.
-    Speculative,
+    Aggregated,
+    /// The returned value is based on last committed value, ignoring
+    /// any pending changes.
+    LastCommitted,
 }
 
 /// Returns a value of an aggregator from cache or global storage.
@@ -46,7 +45,7 @@ pub mod test_utils {
     use std::collections::HashMap;
 
     /// Generates a dummy id for aggregator based on the given key. Only used for testing.
-    pub fn aggregator_id_for_test(key: u128) -> AggregatorID {
+    pub fn aggregator_v1_id_for_test(key: u128) -> AggregatorID {
         let bytes: Vec<u8> = [key.to_le_bytes(), key.to_le_bytes()]
             .iter()
             .flat_map(|b| b.to_vec())
@@ -56,17 +55,32 @@ pub mod test_utils {
     }
 
     #[derive(Default)]
-    pub struct AggregatorStore(HashMap<StateKey, StateValue>);
+    pub struct AggregatorStore {
+        v1_store: HashMap<StateKey, StateValue>,
+        v2_store: HashMap<AggregatorID, StateValue>,
+    }
 
     impl AggregatorStore {
         pub fn set_from_id(&mut self, id: AggregatorID, value: u128) {
-            let state_key = id.as_state_key().expect("Only table-based IDs are tested.");
-            self.set_from_state_key(state_key, value);
+            match id {
+                AggregatorID::Legacy { .. } => {
+                    let state_key = id
+                        .as_state_key()
+                        .expect("Should be able to extract state key for aggregator v1");
+                    self.set_from_state_key(state_key, value);
+                },
+                AggregatorID::Ephemeral(_) => self.set_from_ephemeral_id(id, value),
+            }
         }
 
         pub fn set_from_state_key(&mut self, state_key: StateKey, value: u128) {
-            self.0
+            self.v1_store
                 .insert(state_key, StateValue::new_legacy(serialize(&value)));
+        }
+
+        pub fn set_from_ephemeral_id(&mut self, aggregator_id: AggregatorID, value: u128) {
+            self.v2_store
+                .insert(aggregator_id, StateValue::new_legacy(serialize(&value)));
         }
     }
 
@@ -76,13 +90,23 @@ pub mod test_utils {
             id: &AggregatorID,
             _mode: AggregatorReadMode,
         ) -> Result<u128, anyhow::Error> {
-            let state_key = id
-                .as_state_key()
-                .expect("Only table-based IDs can be accessed in tests.");
-            match self.get_state_value_u128(&state_key)? {
-                Some(value) => Ok(value),
-                None => {
-                    anyhow::bail!("Could not find the value of the aggregator")
+            match id {
+                AggregatorID::Legacy { .. } => {
+                    let state_key = id
+                        .as_state_key()
+                        .expect("Should be able to extract state key for aggregator v1");
+                    match self.get_state_value_u128(&state_key)? {
+                        Some(value) => Ok(value),
+                        None => {
+                            anyhow::bail!("Could not find the value of the aggregator")
+                        },
+                    }
+                },
+                AggregatorID::Ephemeral(_) => match self.v2_store.get(id).map(|val| val.bytes()) {
+                    Some(bytes) => Ok(bcs::from_bytes(bytes)?),
+                    None => {
+                        anyhow::bail!("Could not find the value of the aggregator")
+                    },
                 },
             }
         }
@@ -96,12 +120,12 @@ pub mod test_utils {
         type Key = StateKey;
 
         fn get_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-            Ok(self.0.get(state_key).cloned())
+            Ok(self.v1_store.get(state_key).cloned())
         }
 
         fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
             let mut usage = StateStorageUsage::new_untracked();
-            for (k, v) in self.0.iter() {
+            for (k, v) in self.v1_store.iter() {
                 usage.add_item(k.size() + v.size())
             }
             Ok(usage)
