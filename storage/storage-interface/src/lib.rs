@@ -100,227 +100,353 @@ pub enum Order {
     Descending,
 }
 
+macro_rules! delegate_read {
+    ($(
+        $(#[$($attr:meta)*])*
+        fn $name:ident(&self $(, $arg: ident : $ty: ty $(,)?)*) -> $return_type:ty;
+    )+) => {
+        $(
+            $(#[$($attr)*])*
+            fn $name(&self, $($arg: $ty),*) -> $return_type {
+                self.get_read_delegatee().$name($($arg),*)
+            }
+        )+
+    };
+}
+
 /// Trait that is implemented by a DB that supports certain public (to client) read APIs
 /// expected of an Aptos DB
 #[allow(unused_variables)]
 pub trait DbReader: Send + Sync {
-    /// See [AptosDB::get_epoch_ending_ledger_infos].
-    ///
-    /// [AptosDB::get_epoch_ending_ledger_infos]:
-    /// ../aptosdb/struct.AptosDB.html#method.get_epoch_ending_ledger_infos
-    fn get_epoch_ending_ledger_infos(
-        &self,
-        start_epoch: u64,
-        end_epoch: u64,
-    ) -> Result<EpochChangeProof> {
-        unimplemented!()
+    fn get_read_delegatee(&self) -> &dyn DbReader {
+        unimplemented!("Implement desired method or get_delegatee().");
     }
 
-    /// See [AptosDB::get_transactions].
-    ///
-    /// [AptosDB::get_transactions]: ../aptosdb/struct.AptosDB.html#method.get_transactions
-    fn get_transactions(
-        &self,
-        start_version: Version,
-        batch_size: u64,
-        ledger_version: Version,
-        fetch_events: bool,
-    ) -> Result<TransactionListWithProof> {
-        unimplemented!()
-    }
+    delegate_read!(
+        /// See [AptosDB::get_epoch_ending_ledger_infos].
+        ///
+        /// [AptosDB::get_epoch_ending_ledger_infos]:
+        /// ../aptosdb/struct.AptosDB.html#method.get_epoch_ending_ledger_infos
+        fn get_epoch_ending_ledger_infos(
+            &self,
+            start_epoch: u64,
+            end_epoch: u64,
+        ) -> Result<EpochChangeProof>;
 
-    /// See [AptosDB::get_transaction_by_hash].
-    ///
-    /// [AptosDB::get_transaction_by_hash]: ../aptosdb/struct.AptosDB.html#method.get_transaction_by_hash
-    fn get_transaction_by_hash(
-        &self,
-        hash: HashValue,
-        ledger_version: Version,
-        fetch_events: bool,
-    ) -> Result<Option<TransactionWithProof>> {
-        unimplemented!()
-    }
+        /// See [AptosDB::get_transactions].
+        ///
+        /// [AptosDB::get_transactions]: ../aptosdb/struct.AptosDB.html#method.get_transactions
+        fn get_transactions(
+            &self,
+            start_version: Version,
+            batch_size: u64,
+            ledger_version: Version,
+            fetch_events: bool,
+        ) -> Result<TransactionListWithProof>;
 
-    /// See [AptosDB::get_transaction_by_version].
-    ///
-    /// [AptosDB::get_transaction_by_version]: ../aptosdb/struct.AptosDB.html#method.get_transaction_by_version
-    fn get_transaction_by_version(
-        &self,
-        version: Version,
-        ledger_version: Version,
-        fetch_events: bool,
-    ) -> Result<TransactionWithProof> {
-        unimplemented!()
-    }
+        /// See [AptosDB::get_transaction_by_hash].
+        ///
+        /// [AptosDB::get_transaction_by_hash]: ../aptosdb/struct.AptosDB.html#method.get_transaction_by_hash
+        fn get_transaction_by_hash(
+            &self,
+            hash: HashValue,
+            ledger_version: Version,
+            fetch_events: bool,
+        ) -> Result<Option<TransactionWithProof>>;
 
-    /// See [AptosDB::get_first_txn_version].
-    ///
-    /// [AptosDB::get_first_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_txn_version
-    fn get_first_txn_version(&self) -> Result<Option<Version>> {
-        unimplemented!()
-    }
+        /// See [AptosDB::get_transaction_by_version].
+        ///
+        /// [AptosDB::get_transaction_by_version]: ../aptosdb/struct.AptosDB.html#method.get_transaction_by_version
+        fn get_transaction_by_version(
+            &self,
+            version: Version,
+            ledger_version: Version,
+            fetch_events: bool,
+        ) -> Result<TransactionWithProof>;
 
-    /// See [AptosDB::get_first_viable_txn_version].
-    ///
-    /// [AptosDB::get_first_viable_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_viable_txn_version
-    fn get_first_viable_txn_version(&self) -> Result<Version> {
-        unimplemented!()
-    }
+        /// See [AptosDB::get_first_txn_version].
+        ///
+        /// [AptosDB::get_first_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_txn_version
+        fn get_first_txn_version(&self) -> Result<Option<Version>>;
 
-    /// See [AptosDB::get_first_write_set_version].
-    ///
-    /// [AptosDB::get_first_write_set_version]: ../aptosdb/struct.AptosDB.html#method.get_first_write_set_version
-    fn get_first_write_set_version(&self) -> Result<Option<Version>> {
-        unimplemented!()
-    }
+        /// See [AptosDB::get_first_viable_txn_version].
+        ///
+        /// [AptosDB::get_first_viable_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_viable_txn_version
+        fn get_first_viable_txn_version(&self) -> Result<Version>;
 
-    /// See [AptosDB::get_transaction_outputs].
-    ///
-    /// [AptosDB::get_transaction_outputs]: ../aptosdb/struct.AptosDB.html#method.get_transaction_outputs
-    fn get_transaction_outputs(
-        &self,
-        start_version: Version,
-        limit: u64,
-        ledger_version: Version,
-    ) -> Result<TransactionOutputListWithProof> {
-        unimplemented!()
-    }
+        /// See [AptosDB::get_first_write_set_version].
+        ///
+        /// [AptosDB::get_first_write_set_version]: ../aptosdb/struct.AptosDB.html#method.get_first_write_set_version
+        fn get_first_write_set_version(&self) -> Result<Option<Version>>;
 
-    /// Returns events by given event key
-    fn get_events(
-        &self,
-        event_key: &EventKey,
-        start: u64,
-        order: Order,
-        limit: u64,
-        ledger_version: Version,
-    ) -> Result<Vec<EventWithVersion>> {
-        unimplemented!()
-    }
+        /// See [AptosDB::get_transaction_outputs].
+        ///
+        /// [AptosDB::get_transaction_outputs]: ../aptosdb/struct.AptosDB.html#method.get_transaction_outputs
+        fn get_transaction_outputs(
+            &self,
+            start_version: Version,
+            limit: u64,
+            ledger_version: Version,
+        ) -> Result<TransactionOutputListWithProof>;
 
-    fn get_transaction_iterator(
-        &self,
-        start_version: Version,
-        limit: u64,
-    ) -> Result<Box<dyn Iterator<Item = Result<Transaction>> + '_>> {
-        unimplemented!()
-    }
+        /// Returns events by given event key
+        fn get_events(
+            &self,
+            event_key: &EventKey,
+            start: u64,
+            order: Order,
+            limit: u64,
+            ledger_version: Version,
+        ) -> Result<Vec<EventWithVersion>>;
 
-    fn get_transaction_info_iterator(
-        &self,
-        start_version: Version,
-        limit: u64,
-    ) -> Result<Box<dyn Iterator<Item = Result<TransactionInfo>> + '_>> {
-        unimplemented!()
-    }
+        fn get_transaction_iterator(
+            &self,
+            start_version: Version,
+            limit: u64,
+        ) -> Result<Box<dyn Iterator<Item = Result<Transaction>> + '_>>;
 
-    fn get_events_iterator(
-        &self,
-        start_version: Version,
-        limit: u64,
-    ) -> Result<Box<dyn Iterator<Item = Result<Vec<ContractEvent>>> + '_>> {
-        unimplemented!()
-    }
+        fn get_transaction_info_iterator(
+            &self,
+            start_version: Version,
+            limit: u64,
+        ) -> Result<Box<dyn Iterator<Item = Result<TransactionInfo>> + '_>>;
 
-    fn get_write_set_iterator(
-        &self,
-        start_version: Version,
-        limit: u64,
-    ) -> Result<Box<dyn Iterator<Item = Result<WriteSet>> + '_>> {
-        unimplemented!()
-    }
+        fn get_events_iterator(
+            &self,
+            start_version: Version,
+            limit: u64,
+        ) -> Result<Box<dyn Iterator<Item = Result<Vec<ContractEvent>>> + '_>>;
 
-    fn get_transaction_accumulator_range_proof(
-        &self,
-        start_version: Version,
-        limit: u64,
-        ledger_version: Version,
-    ) -> Result<TransactionAccumulatorRangeProof> {
-        unimplemented!()
-    }
+        fn get_write_set_iterator(
+            &self,
+            start_version: Version,
+            limit: u64,
+        ) -> Result<Box<dyn Iterator<Item = Result<WriteSet>> + '_>>;
 
-    /// See [AptosDB::get_block_timestamp].
-    ///
-    /// [AptosDB::get_block_timestamp]:
-    /// ../aptosdb/struct.AptosDB.html#method.get_block_timestamp
-    fn get_block_timestamp(&self, version: Version) -> Result<u64> {
-        unimplemented!()
-    }
+        fn get_transaction_accumulator_range_proof(
+            &self,
+            start_version: Version,
+            limit: u64,
+            ledger_version: Version,
+        ) -> Result<TransactionAccumulatorRangeProof>;
 
-    fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
-        unimplemented!()
-    }
+        /// See [AptosDB::get_block_timestamp].
+        ///
+        /// [AptosDB::get_block_timestamp]:
+        /// ../aptosdb/struct.AptosDB.html#method.get_block_timestamp
+        fn get_block_timestamp(&self, version: Version) -> Result<u64>;
 
-    /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
-    /// transaction version.
-    fn get_block_info_by_version(
-        &self,
-        version: Version,
-    ) -> Result<(Version, Version, NewBlockEvent)> {
-        unimplemented!()
-    }
+        fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)>;
 
-    /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
-    /// transaction version.
-    fn get_block_info_by_height(&self, height: u64) -> Result<(Version, Version, NewBlockEvent)> {
-        unimplemented!()
-    }
+        /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
+        /// transaction version.
+        fn get_block_info_by_version(
+            &self,
+            version: Version,
+        ) -> Result<(Version, Version, NewBlockEvent)>;
 
-    /// Gets the version of the last transaction committed before timestamp,
-    /// a committed block at or after the required timestamp must exist (otherwise it's possible
-    /// the next block committed as a timestamp smaller than the one in the request).
-    fn get_last_version_before_timestamp(
-        &self,
-        _timestamp: u64,
-        _ledger_version: Version,
-    ) -> Result<Version> {
-        unimplemented!()
-    }
+        /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
+        /// transaction version.
+        fn get_block_info_by_height(
+            &self,
+            height: u64,
+        ) -> Result<(Version, Version, NewBlockEvent)>;
 
-    /// Gets the latest epoch state currently held in storage.
-    fn get_latest_epoch_state(&self) -> Result<EpochState> {
-        unimplemented!()
-    }
+        /// Gets the version of the last transaction committed before timestamp,
+        /// a committed block at or after the required timestamp must exist (otherwise it's possible
+        /// the next block committed as a timestamp smaller than the one in the request).
+        fn get_last_version_before_timestamp(
+            &self,
+            _timestamp: u64,
+            _ledger_version: Version,
+        ) -> Result<Version>;
 
-    /// Returns the (key, value) iterator for a particular state key prefix at at desired version. This
-    /// API can be used to get all resources of an account by passing the account address as the
-    /// key prefix.
-    fn get_prefixed_state_value_iterator(
-        &self,
-        key_prefix: &StateKeyPrefix,
-        cursor: Option<&StateKey>,
-        version: Version,
-    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>> {
-        unimplemented!()
-    }
+        /// Gets the latest epoch state currently held in storage.
+        fn get_latest_epoch_state(&self) -> Result<EpochState>;
 
-    /// Returns the latest ledger info, if any.
-    fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
-        unimplemented!()
-    }
+        /// Returns the (key, value) iterator for a particular state key prefix at at desired version. This
+        /// API can be used to get all resources of an account by passing the account address as the
+        /// key prefix.
+        fn get_prefixed_state_value_iterator(
+            &self,
+            key_prefix: &StateKeyPrefix,
+            cursor: Option<&StateKey>,
+            version: Version,
+        ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>>;
+
+        /// Returns the latest ledger info, if any.
+        fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
+
+        /// Returns the latest committed version, error on on non-bootstrapped/empty DB.
+        fn get_latest_version(&self) -> Result<Version>;
+
+        /// Returns the latest state checkpoint version if any.
+        fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>>;
+
+        /// Returns the latest state snapshot strictly before `next_version` if any.
+        fn get_state_snapshot_before(
+            &self,
+            next_version: Version,
+        ) -> Result<Option<(Version, HashValue)>>;
+
+        /// Returns a transaction that is the `seq_num`-th one associated with the given account. If
+        /// the transaction with given `seq_num` doesn't exist, returns `None`.
+        fn get_account_transaction(
+            &self,
+            address: AccountAddress,
+            seq_num: u64,
+            include_events: bool,
+            ledger_version: Version,
+        ) -> Result<Option<TransactionWithProof>>;
+
+        /// Returns the list of transactions sent by an account with `address` starting
+        /// at sequence number `seq_num`. Will return no more than `limit` transactions.
+        /// Will ignore transactions with `txn.version > ledger_version`. Optionally
+        /// fetch events for each transaction when `fetch_events` is `true`.
+        fn get_account_transactions(
+            &self,
+            address: AccountAddress,
+            seq_num: u64,
+            limit: u64,
+            include_events: bool,
+            ledger_version: Version,
+        ) -> Result<AccountTransactionsWithProof>;
+
+        /// Returns proof of new state for a given ledger info with signatures relative to version known
+        /// to client
+        fn get_state_proof_with_ledger_info(
+            &self,
+            known_version: u64,
+            ledger_info: LedgerInfoWithSignatures,
+        ) -> Result<StateProof>;
+
+        /// Returns proof of new state relative to version known to client
+        fn get_state_proof(&self, known_version: u64) -> Result<StateProof>;
+
+        /// Gets the state value by state key at version.
+        /// See [AptosDB::get_state_value_by_version].
+        ///
+        /// [AptosDB::get_state_value_by_version]:
+        /// ../aptosdb/struct.AptosDB.html#method.get_state_value_by_version
+        fn get_state_value_by_version(
+            &self,
+            state_key: &StateKey,
+            version: Version,
+        ) -> Result<Option<StateValue>>;
+
+        /// Get the latest state value and its corresponding version when it's of the given key up
+        /// to the given version.
+        /// See [AptosDB::get_state_value_with_version_by_version].
+        ///
+        /// [AptosDB::get_state_value_with_version_by_version]:
+        /// ../aptosdb/struct.AptosDB.html#method.get_state_value_with_version_by_version
+        fn get_state_value_with_version_by_version(
+            &self,
+            state_key: &StateKey,
+            version: Version,
+        ) -> Result<Option<(Version, StateValue)>>;
+
+        /// Returns the proof of the given state key and version.
+        fn get_state_proof_by_version_ext(
+            &self,
+            state_key: &StateKey,
+            version: Version,
+        ) -> Result<SparseMerkleProofExt>;
+
+        /// Gets a state value by state key along with the proof, out of the ledger state indicated by the state
+        /// Merkle tree root with a sparse merkle proof proving state tree root.
+        /// See [AptosDB::get_account_state_with_proof_by_version].
+        ///
+        /// [AptosDB::get_account_state_with_proof_by_version]:
+        /// ../aptosdb/struct.AptosDB.html#method.get_account_state_with_proof_by_version
+        ///
+        /// This is used by aptos core (executor) internally.
+        fn get_state_value_with_proof_by_version_ext(
+            &self,
+            state_key: &StateKey,
+            version: Version,
+        ) -> Result<(Option<StateValue>, SparseMerkleProofExt)>;
+
+        /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.
+        /// Used by the Db-bootstrapper.
+        fn get_latest_executed_trees(&self) -> Result<ExecutedTrees>;
+
+        /// Get the ledger info of the epoch that `known_version` belongs to.
+        fn get_epoch_ending_ledger_info(
+            &self,
+            known_version: u64,
+        ) -> Result<LedgerInfoWithSignatures>;
+
+        /// Gets the transaction accumulator root hash at specified version.
+        /// Caller must guarantee the version is not greater than the latest version.
+        fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue>;
+
+        /// Gets an [`AccumulatorConsistencyProof`] starting from `client_known_version`
+        /// (or pre-genesis if `None`) until `ledger_version`.
+        ///
+        /// In other words, if the client has an accumulator summary for
+        /// `client_known_version`, they can use the result from this API to efficiently
+        /// extend their accumulator to `ledger_version` and prove that the new accumulator
+        /// is consistent with their old accumulator. By consistent, we mean that by
+        /// appending the actual `ledger_version - client_known_version` transactions
+        /// to the old accumulator summary you get the new accumulator summary.
+        ///
+        /// If the client is starting up for the first time and has no accumulator
+        /// summary yet, they can call this with `client_known_version=None`, i.e.,
+        /// pre-genesis, to get the complete accumulator summary up to `ledger_version`.
+        fn get_accumulator_consistency_proof(
+            &self,
+            _client_known_version: Option<Version>,
+            _ledger_version: Version,
+        ) -> Result<AccumulatorConsistencyProof>;
+
+        /// A convenience function for building a [`TransactionAccumulatorSummary`]
+        /// at the given `ledger_version`.
+        ///
+        /// Note: this is roughly equivalent to calling
+        /// `DbReader::get_accumulator_consistency_proof(None, ledger_version)`.
+        fn get_accumulator_summary(
+            &self,
+            ledger_version: Version,
+        ) -> Result<TransactionAccumulatorSummary>;
+
+        /// Returns total number of leaves in state store at given version.
+        fn get_state_leaf_count(&self, version: Version) -> Result<usize>;
+
+        /// Get a chunk of state store value, addressed by the index.
+        fn get_state_value_chunk_with_proof(
+            &self,
+            version: Version,
+            start_idx: usize,
+            chunk_size: usize,
+        ) -> Result<StateValueChunkWithProof>;
+
+        /// Returns if the state store pruner is enabled.
+        fn is_state_merkle_pruner_enabled(&self) -> Result<bool>;
+
+        /// Get the state prune window config value.
+        fn get_epoch_snapshot_prune_window(&self) -> Result<usize>;
+
+        /// Returns if the ledger pruner is enabled.
+        fn is_ledger_pruner_enabled(&self) -> Result<bool>;
+
+        /// Get the ledger prune window config value.
+        fn get_ledger_prune_window(&self) -> Result<usize>;
+
+        /// Get table info from the internal indexer.
+        fn get_table_info(&self, handle: TableHandle) -> Result<TableInfo>;
+
+        /// Returns whether the internal indexer DB has been enabled or not
+        fn indexer_enabled(&self) -> bool;
+
+        /// Returns state storage usage at the end of an epoch.
+        fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage>;
+    ); // end delegated
 
     /// Returns the latest ledger info.
     fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
         self.get_latest_ledger_info_option()
             .and_then(|opt| opt.ok_or_else(|| format_err!("Latest LedgerInfo not found.")))
-    }
-
-    /// Returns the latest committed version, error on on non-bootstrapped/empty DB.
-    fn get_latest_version(&self) -> Result<Version> {
-        unimplemented!()
-    }
-
-    /// Returns the latest state checkpoint version if any.
-    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
-        unimplemented!()
-    }
-
-    /// Returns the latest state snapshot strictly before `next_version` if any.
-    fn get_state_snapshot_before(
-        &self,
-        next_version: Version,
-    ) -> Result<Option<(Version, HashValue)>> {
-        unimplemented!()
     }
 
     /// Returns the latest version and committed block timestamp
@@ -330,100 +456,6 @@ pub trait DbReader: Send + Sync {
         Ok((ledger_info.version(), ledger_info.timestamp_usecs()))
     }
 
-    /// Returns a transaction that is the `seq_num`-th one associated with the given account. If
-    /// the transaction with given `seq_num` doesn't exist, returns `None`.
-    fn get_account_transaction(
-        &self,
-        address: AccountAddress,
-        seq_num: u64,
-        include_events: bool,
-        ledger_version: Version,
-    ) -> Result<Option<TransactionWithProof>> {
-        unimplemented!()
-    }
-
-    /// Returns the list of transactions sent by an account with `address` starting
-    /// at sequence number `seq_num`. Will return no more than `limit` transactions.
-    /// Will ignore transactions with `txn.version > ledger_version`. Optionally
-    /// fetch events for each transaction when `fetch_events` is `true`.
-    fn get_account_transactions(
-        &self,
-        address: AccountAddress,
-        seq_num: u64,
-        limit: u64,
-        include_events: bool,
-        ledger_version: Version,
-    ) -> Result<AccountTransactionsWithProof> {
-        unimplemented!()
-    }
-
-    /// Returns proof of new state for a given ledger info with signatures relative to version known
-    /// to client
-    fn get_state_proof_with_ledger_info(
-        &self,
-        known_version: u64,
-        ledger_info: LedgerInfoWithSignatures,
-    ) -> Result<StateProof> {
-        unimplemented!()
-    }
-
-    /// Returns proof of new state relative to version known to client
-    fn get_state_proof(&self, known_version: u64) -> Result<StateProof> {
-        unimplemented!()
-    }
-
-    /// Gets the state value by state key at version.
-    /// See [AptosDB::get_state_value_by_version].
-    ///
-    /// [AptosDB::get_state_value_by_version]:
-    /// ../aptosdb/struct.AptosDB.html#method.get_state_value_by_version
-    fn get_state_value_by_version(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<StateValue>> {
-        unimplemented!()
-    }
-
-    /// Get the latest state value and its corresponding version when it's of the given key up
-    /// to the given version.
-    /// See [AptosDB::get_state_value_with_version_by_version].
-    ///
-    /// [AptosDB::get_state_value_with_version_by_version]:
-    /// ../aptosdb/struct.AptosDB.html#method.get_state_value_with_version_by_version
-    fn get_state_value_with_version_by_version(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<(Version, StateValue)>> {
-        unimplemented!()
-    }
-
-    /// Returns the proof of the given state key and version.
-    fn get_state_proof_by_version_ext(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<SparseMerkleProofExt> {
-        unimplemented!()
-    }
-
-    /// Gets a state value by state key along with the proof, out of the ledger state indicated by the state
-    /// Merkle tree root with a sparse merkle proof proving state tree root.
-    /// See [AptosDB::get_account_state_with_proof_by_version].
-    ///
-    /// [AptosDB::get_account_state_with_proof_by_version]:
-    /// ../aptosdb/struct.AptosDB.html#method.get_account_state_with_proof_by_version
-    ///
-    /// This is used by aptos core (executor) internally.
-    fn get_state_value_with_proof_by_version_ext(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
-        unimplemented!()
-    }
-
     fn get_state_value_with_proof_by_version(
         &self,
         state_key: &StateKey,
@@ -431,106 +463,6 @@ pub trait DbReader: Send + Sync {
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
         self.get_state_value_with_proof_by_version_ext(state_key, version)
             .map(|(value, proof_ext)| (value, proof_ext.into()))
-    }
-
-    /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.
-    /// Used by the Db-bootstrapper.
-    fn get_latest_executed_trees(&self) -> Result<ExecutedTrees> {
-        unimplemented!()
-    }
-
-    /// Get the ledger info of the epoch that `known_version` belongs to.
-    fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures> {
-        unimplemented!()
-    }
-
-    /// Gets the transaction accumulator root hash at specified version.
-    /// Caller must guarantee the version is not greater than the latest version.
-    fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue> {
-        unimplemented!()
-    }
-
-    /// Gets an [`AccumulatorConsistencyProof`] starting from `client_known_version`
-    /// (or pre-genesis if `None`) until `ledger_version`.
-    ///
-    /// In other words, if the client has an accumulator summary for
-    /// `client_known_version`, they can use the result from this API to efficiently
-    /// extend their accumulator to `ledger_version` and prove that the new accumulator
-    /// is consistent with their old accumulator. By consistent, we mean that by
-    /// appending the actual `ledger_version - client_known_version` transactions
-    /// to the old accumulator summary you get the new accumulator summary.
-    ///
-    /// If the client is starting up for the first time and has no accumulator
-    /// summary yet, they can call this with `client_known_version=None`, i.e.,
-    /// pre-genesis, to get the complete accumulator summary up to `ledger_version`.
-    fn get_accumulator_consistency_proof(
-        &self,
-        _client_known_version: Option<Version>,
-        _ledger_version: Version,
-    ) -> Result<AccumulatorConsistencyProof> {
-        unimplemented!()
-    }
-
-    /// A convenience function for building a [`TransactionAccumulatorSummary`]
-    /// at the given `ledger_version`.
-    ///
-    /// Note: this is roughly equivalent to calling
-    /// `DbReader::get_accumulator_consistency_proof(None, ledger_version)`.
-    fn get_accumulator_summary(
-        &self,
-        ledger_version: Version,
-    ) -> Result<TransactionAccumulatorSummary> {
-        unimplemented!()
-    }
-
-    /// Returns total number of leaves in state store at given version.
-    fn get_state_leaf_count(&self, version: Version) -> Result<usize> {
-        unimplemented!()
-    }
-
-    /// Get a chunk of state store value, addressed by the index.
-    fn get_state_value_chunk_with_proof(
-        &self,
-        version: Version,
-        start_idx: usize,
-        chunk_size: usize,
-    ) -> Result<StateValueChunkWithProof> {
-        unimplemented!()
-    }
-
-    /// Returns if the state store pruner is enabled.
-    fn is_state_merkle_pruner_enabled(&self) -> Result<bool> {
-        unimplemented!()
-    }
-
-    /// Get the state prune window config value.
-    fn get_epoch_snapshot_prune_window(&self) -> Result<usize> {
-        unimplemented!()
-    }
-
-    /// Returns if the ledger pruner is enabled.
-    fn is_ledger_pruner_enabled(&self) -> Result<bool> {
-        unimplemented!()
-    }
-
-    /// Get the ledger prune window config value.
-    fn get_ledger_prune_window(&self) -> Result<usize> {
-        unimplemented!()
-    }
-
-    /// Get table info from the internal indexer.
-    fn get_table_info(&self, handle: TableHandle) -> Result<TableInfo> {
-        unimplemented!()
-    }
-
-    /// Returns whether the internal indexer DB has been enabled or not
-    fn indexer_enabled(&self) -> bool {
-        unimplemented!()
-    }
-
-    /// Returns state storage usage at the end of an epoch.
-    fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
-        unimplemented!()
     }
 }
 
