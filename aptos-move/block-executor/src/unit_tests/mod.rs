@@ -14,7 +14,11 @@ use crate::{
     scheduler::{DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask},
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
+use aptos_aggregator::{
+    bounded_math::SignedU128,
+    delta_change_set::{delta_add, delta_sub, DeltaOp},
+    delta_math::DeltaHistory,
+};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     contract_event::ReadWriteEvent,
@@ -155,14 +159,13 @@ fn delta_chains() {
                                 // Deterministic pattern for adds/subtracts.
                                 DeltaOp::new(
                                     if (i % 2 == 0) == (j < 5) {
-                                        DeltaUpdate::Plus(10)
+                                        SignedU128::Positive(10)
                                     } else {
-                                        DeltaUpdate::Minus(1)
+                                        SignedU128::Negative(1)
                                     },
                                     // below params irrelevant for this test.
                                     u128::MAX,
-                                    0,
-                                    0,
+                                    DeltaHistory::new(),
                                 ),
                             )),
                             false => None,
