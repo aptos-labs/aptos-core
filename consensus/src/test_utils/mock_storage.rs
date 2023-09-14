@@ -233,6 +233,10 @@ impl PersistentLivenessStorage for MockStorage {
     fn aptos_db(&self) -> Arc<dyn DbReader> {
         unimplemented!()
     }
+
+    fn consensus_db(&self) -> Arc<crate::consensusdb::ConsensusDB> {
+        unimplemented!()
+    }    
 }
 
 /// A storage that ignores any requests, used in the tests that don't care about the storage.
@@ -301,4 +305,8 @@ impl PersistentLivenessStorage for EmptyStorage {
     fn aptos_db(&self) -> Arc<dyn DbReader> {
         unimplemented!()
     }
+
+    fn consensus_db(&self) -> Arc<crate::consensusdb::ConsensusDB> {
+        unimplemented!()
+    }    
 }
