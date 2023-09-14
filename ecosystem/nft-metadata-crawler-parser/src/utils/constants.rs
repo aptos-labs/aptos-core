@@ -4,13 +4,13 @@
 pub const MAX_RETRY_TIME_SECONDS: u64 = 5;
 
 /// Allocate 5 seconds for a HEAD request
-pub const MAX_HEAD_REQUEST_RETRY_SECONDS: u64 = 5;
+pub const MAX_HEAD_REQUEST_RETRY_SECONDS: u64 = 30;
 
 /// Allocate 30 seconds for downloading large JSON files
-pub const MAX_JSON_REQUEST_RETRY_SECONDS: u64 = 30;
+pub const MAX_JSON_REQUEST_RETRY_SECONDS: u64 = 60;
 
 /// Allocate 180 seconds for downloading large image files
-pub const MAX_IMAGE_REQUEST_RETRY_SECONDS: u64 = 180;
+pub const MAX_IMAGE_REQUEST_RETRY_SECONDS: u64 = 300;
 
 /// Skip URIs that contain the following strings
 pub const URI_SKIP_LIST: [&str; 5] = [
