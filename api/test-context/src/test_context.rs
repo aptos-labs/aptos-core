@@ -965,7 +965,7 @@ impl TestContext {
             vec![0],
             vec![],
             self.fake_time_usecs,
-            vec![],
+            None,
             None,
         )
     }
