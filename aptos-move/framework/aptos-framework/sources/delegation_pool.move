@@ -1411,18 +1411,18 @@ module aptos_framework::delegation_pool {
         // unsynced are rewards and slashes routed exclusively to/out the stake pool
 
         // operator `active` rewards not persisted yet to the active shares pool
-        let commission_active = total_coins(&pool.active_shares);
-        commission_active = if (active > commission_active) {
-            math64::mul_div(active - commission_active, pool.operator_commission_percentage, MAX_FEE)
+        let pool_active = total_coins(&pool.active_shares);
+        let commission_active = if (active > pool_active) {
+            math64::mul_div(active - pool_active, pool.operator_commission_percentage, MAX_FEE)
         } else {
             // handle any slashing applied to `active` stake
             0
         };
         // operator `pending_inactive` rewards not persisted yet to the pending_inactive shares pool
-        let commission_pending_inactive = total_coins(pending_inactive_shares_pool(pool));
-        commission_pending_inactive = if (pending_inactive > commission_pending_inactive) {
+        let pool_pending_inactive = total_coins(pending_inactive_shares_pool(pool));
+        let commission_pending_inactive = if (pending_inactive > pool_pending_inactive) {
             math64::mul_div(
-                pending_inactive - commission_pending_inactive,
+                pending_inactive - pool_pending_inactive,
                 pool.operator_commission_percentage,
                 MAX_FEE
             )
