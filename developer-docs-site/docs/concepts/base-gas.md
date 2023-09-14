@@ -192,7 +192,7 @@ Additional storage gas parameters are defined in [`table.rs`], [`move_stdlib.rs`
 
 ## IO and Storage charges
 
-To reflect cost relavent to transient storage device resources, including disk IOPS and bandwdith, these gas parameters are charged.
+The following gas parameters are applied (i.e., charged) to represent the costs associated with transient storage device resources, including disk IOPS and bandwidth:
 
 | Parameter                       | Meaning                                                            |
 |---------------------------------|--------------------------------------------------------------------|
@@ -201,7 +201,7 @@ To reflect cost relavent to transient storage device resources, including disk I
 | storage_io_per_state_slot_read  | charged per item loaded from global state                          |
 | storage_io_per_state_byte_read  | charged per byte loaded from global state                          |
 
-To reflect disk space and structural cost on the Aptos authenticated data structure imposed by storing things on the blockchain, including creating things in the global state, emitting events, etc. storage fee is charged, in absolute APT values.
+The following storage fee parameters are applied (i.e., charged in absolute APT values) to represent the disk space and structural costs associated with using the [Aptos authenticated data structure](../reference/glossary/#merkle-trees) for storing items on the blockchain. This encompasses actions such as creating things in the global state, emitting events, and similar operations:
 
 | Parameter                         | Meaning                                                                                |
 |-----------------------------------|----------------------------------------------------------------------------------------|
@@ -258,18 +258,18 @@ See [Payload gas](#payload-gas) for the meaning of these constants.
 
 ### Storage Fee
 
-When the network load is low, the gas unit price is expected to be low, as a result all of other aspects of the transaction cost are expected to be cheap. Except for the storage fee, which is priced in terms of absolute APT value. Usually the transaction fee is the dominant aspect of the whole transaction cost, as long as the transaction allocates state slots or write to large state items, emit many or large events, or the transaction itself is large -- all of which occupy disk space on all Aptos nodes, hence charged accordingly.
+When the network load is low, the gas unit price is expected to be low, making most aspects of the transaction cost more affordable. However, the storage fee is an exception, as it's priced in terms of absolute APT value. In most instances, the transaction fee is the predominant component of the overall transaction cost. This is especially true when a transaction allocates state slots, writes to sizable state items, emits numerous or large events, or when the transaction itself is a large one. All of these factors consume disk space on Aptos nodes and are charged accordingly.
 
-On the other hand, releasing state slots by deleting state items are incentivized by the storage refund. For now state slot fee is fully refunded uppon slot deallocation, and the excess state byte fee is not refundable. This is to be changed shortly by distinguishing permanent bytes (those in the global state) and reletive ephemeral bytes (those goes through the ledger history).
+On the other hand, the storage refund incentivizes releasing state slots by deleting state items. The state slot fee is fully refunded upon slot deallocation, while the excess state byte fee is non-refundable. This will soon change by differentiating between permanent bytes (those in the global state) and relative ephemeral bytes (those that traverse the ledger history).
 
-Some cost optimization strategy with regard to storage fee:
+Some cost optimization strategies concerning the storage fee:
 
 1. Minimize state item creation.
-2. Minimize event emission.
-3. Avoid large state items, events and transactions.
-4. Cleaning up state items when no longer used.
-5. If two fields are always updated together, group them into the same resoruce or resource group.
-6. If a struct is large and only a few of the fields get updated frequently, separate out the fields to a separate resource / resource group.
+2. Minimize event emissions.
+3. Avoid large state items, events, and transactions.
+4. Clean up state items that are no longer in use.
+5. If two fields are consistently updated together, group them into the same resource or resource group.
+6. If a struct is large and only a few fields are updated frequently, move those fields to a separate resource or resource group.
 
    
 ### Instruction gas
