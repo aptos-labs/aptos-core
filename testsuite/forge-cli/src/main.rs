@@ -1727,6 +1727,8 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 true.into();
             helm_values["validator"]["config"]["storage"]["rocksdb_configs"]
                 ["use_sharded_state_merkle_db"] = true.into();
+            helm_values["validator"]["config"]["storage"]["rocksdb_configs"]
+                ["skip_index_and_usage"] = true.into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(8000)
