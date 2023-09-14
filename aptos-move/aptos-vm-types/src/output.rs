@@ -114,12 +114,11 @@ impl VMOutput {
         mut self,
         materialized_deltas: Vec<(StateKey, WriteOp)>,
     ) -> TransactionOutput {
-        // We should have a materialized delta for every delta in the output.
         assert_eq!(
             materialized_deltas.len(),
-            self.change_set().aggregator_v1_delta_set().len()
+            self.change_set().aggregator_v1_delta_set().len(),
+            "Different number of materialized deltas and deltas in the output."
         );
-
         debug_assert!(
             materialized_deltas
                 .iter()

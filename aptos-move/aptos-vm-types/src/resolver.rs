@@ -11,11 +11,15 @@ use aptos_types::state_store::{
 use bytes::Bytes;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 
-/// Allows to query resources from the state storage.
+/// Allows to query resources from the state.
 pub trait TResourceView {
     type Key;
     type Layout;
 
+    /// Returns
+    ///   -  Ok(None)         if the resource is not in storage,
+    ///   -  Ok(Some(...))    if the resource exists in storage,
+    ///   -  Err(...)         otherwise (e.g. storage error).
     fn get_resource_state_value(
         &self,
         key: &Self::Key,
@@ -51,10 +55,14 @@ pub trait ResourceResolver: TResourceView<Key = StateKey, Layout = MoveTypeLayou
 
 impl<T: TResourceView<Key = StateKey, Layout = MoveTypeLayout>> ResourceResolver for T {}
 
-/// Allows to query modules from the state storage.
+/// Allows to query modules from the state.
 pub trait TModuleView {
     type Key;
 
+    /// Returns
+    ///   -  Ok(None)         if the module is not in storage,
+    ///   -  Ok(Some(...))    if the module exists in storage,
+    ///   -  Err(...)         otherwise (e.g. storage error).
     fn get_module_state_value(&self, key: &Self::Key) -> anyhow::Result<Option<StateValue>>;
 
     fn get_module_bytes(&self, key: &Self::Key) -> anyhow::Result<Option<Bytes>> {
@@ -88,6 +96,20 @@ pub trait StateStorageView {
 }
 
 /// A fine-grained view of the state during execution.
+///
+/// - The `StateView` trait should be used by the storage backend, e.g. a DB.
+///   It only allows a generic key-value access and always returns bytes or
+///   state values.
+/// - The `ExecutorView` trait is used at executor level, e.g. BlockSTM. When
+///   a block is executed, the types of accesses are always known (for example,
+///   whether a resource is accessed or a module). Fine-grained structure of
+///   `ExecutorView` allows to:
+///     1. Specialize on access type,
+///     2. Separate execution and storage abstractions.
+///
+///  **WARNING:** There is no default implementation of `ExecutorView` for
+///  `StateView` in order to ensure that a correct type is always used. If
+///   conversion from state to executor view is needed, an adapter can be used.
 pub trait ExecutorView:
     TResourceView<Key = StateKey, Layout = MoveTypeLayout>
     + TModuleView<Key = StateKey>
@@ -96,12 +118,11 @@ pub trait ExecutorView:
 {
 }
 
-impl<
-        T: TResourceView<Key = StateKey, Layout = MoveTypeLayout>
-            + TModuleView<Key = StateKey>
-            + TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = ()>
-            + StateStorageView,
-    > ExecutorView for T
+impl<T> ExecutorView for T where
+    T: TResourceView<Key = StateKey, Layout = MoveTypeLayout>
+        + TModuleView<Key = StateKey>
+        + TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = ()>
+        + StateStorageView
 {
 }
 
