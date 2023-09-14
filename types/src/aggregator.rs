@@ -4,12 +4,11 @@
 
 use crate::state_store::{state_key::StateKey, table::TableHandle};
 use move_core_types::account_address::AccountAddress;
-
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AggregatorHandle(pub AccountAddress);
 
-/// Uniquely identifies each aggregator instance in storage.
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
+/// Uniquely identifies an aggregator or aggregator snapshot instance in storage.
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AggregatorID {
     // Aggregator V1 is implemented as a state item, and so can be queried by
     // the state key.
