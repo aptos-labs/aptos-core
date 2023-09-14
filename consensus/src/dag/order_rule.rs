@@ -12,7 +12,7 @@ use crate::dag::{
 };
 use aptos_consensus_types::common::Round;
 use aptos_infallible::RwLock;
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfo};
 use std::sync::Arc;
 
@@ -194,6 +194,12 @@ impl OrderRule {
             })
             .collect();
         ordered_nodes.reverse();
+        debug!(
+            "Ordered anchor {}, reached round {} with {} nodes",
+            anchor.id(),
+            lowest_round_to_reach,
+            ordered_nodes.len()
+        );
 
         self.lowest_unordered_anchor_round = anchor.round() + 1;
         if let Err(e) = self

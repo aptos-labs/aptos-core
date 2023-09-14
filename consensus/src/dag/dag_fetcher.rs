@@ -10,7 +10,7 @@ use crate::dag::{
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_time_service::TimeService;
 use aptos_types::epoch_state::EpochState;
 use async_trait::async_trait;
@@ -187,6 +187,12 @@ impl DagFetcherService {
     ) -> anyhow::Result<()> {
         let remote_request = {
             let dag_reader = self.dag.read();
+            ensure!(
+                node.round() > dag_reader.lowest_incomplete_round(),
+                "Already synced beyond requested round {}, lowest incomplete round {}",
+                node.round(),
+                dag_reader.lowest_incomplete_round()
+            );
 
             let missing_parents: Vec<NodeMetadata> = dag_reader
                 .filter_missing(node.parents_metadata())
@@ -247,6 +253,7 @@ impl TDagFetcher for DagFetcher {
         responders: Vec<Author>,
         dag: Arc<RwLock<Dag>>,
     ) -> anyhow::Result<()> {
+        debug!("Start fetch request: {:?}", remote_request);
         let mut rpc = RpcWithFallback::new(
             responders,
             remote_request.clone().into(),
