@@ -20,11 +20,10 @@ use move_core_types::vm_status::{StatusCode, VMStatus};
 /// from the state.
 pub enum AggregatorReadMode {
     /// The returned value is guaranteed to be correct.
-    Precise,
-    /// The returned value is based on speculation or an approximation. For
-    /// example, while reading and accumulating deltas only some of them can be
-    /// taken into account.
-    Speculative,
+    Aggregated,
+    /// The returned value is based on last committed value, ignoring
+    /// any pending changes.
+    LastCommitted,
 }
 
 /// Allows to query aggregator values from the state storage.
@@ -70,7 +69,7 @@ pub trait TAggregatorView {
         // When getting state value metadata for aggregator V1, we need to do a
         // precise read.
         let maybe_state_value =
-            self.get_aggregator_v1_state_value(id, AggregatorReadMode::Precise)?;
+            self.get_aggregator_v1_state_value(id, AggregatorReadMode::Aggregated)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 
@@ -139,8 +138,8 @@ pub mod test_utils {
     use move_core_types::account_address::AccountAddress;
     use std::collections::HashMap;
 
-    /// Generates a dummy identifier for aggregator V1 based on the given key.
-    pub fn aggregator_id_for_test(key: u128) -> AggregatorID {
+    /// Generates a dummy id for aggregator based on the given key. Only used for testing.
+    pub fn aggregator_v1_id_for_test(key: u128) -> AggregatorID {
         let bytes: Vec<u8> = [key.to_le_bytes(), key.to_le_bytes()]
             .iter()
             .flat_map(|b| b.to_vec())
@@ -150,19 +149,31 @@ pub mod test_utils {
     }
 
     #[derive(Default)]
-    pub struct AggregatorStore(HashMap<StateKey, StateValue>);
+    pub struct AggregatorStore {
+        v1_store: HashMap<StateKey, StateValue>,
+        v2_store: HashMap<AggregatorID, u128>,
+    }
 
     impl AggregatorStore {
         pub fn set_from_id(&mut self, id: AggregatorID, value: u128) {
-            let state_key = id
-                .into_state_key()
-                .expect("Only table-based IDs are tested.");
-            self.set_from_state_key(state_key, value);
+            match id {
+                AggregatorID::Legacy { .. } => {
+                    let state_key = id
+                        .into_state_key()
+                        .expect("Should be able to extract state key for aggregator v1");
+                    self.set_from_state_key(state_key, value);
+                },
+                AggregatorID::Ephemeral(_) => self.set_from_ephemeral_id(id, value),
+            }
         }
 
         pub fn set_from_state_key(&mut self, state_key: StateKey, value: u128) {
-            self.0
+            self.v1_store
                 .insert(state_key, StateValue::new_legacy(serialize(&value).into()));
+        }
+
+        pub fn set_from_ephemeral_id(&mut self, aggregator_id: AggregatorID, value: u128) {
+            self.v2_store.insert(aggregator_id, value);
         }
     }
 
@@ -175,7 +186,18 @@ pub mod test_utils {
             state_key: &Self::IdentifierV1,
             _mode: AggregatorReadMode,
         ) -> anyhow::Result<Option<StateValue>> {
-            Ok(self.0.get(state_key).cloned())
+            Ok(self.v1_store.get(state_key).cloned())
+        }
+
+        fn get_aggregator_v2_value(
+            &self,
+            id: &Self::IdentifierV2,
+            _mode: AggregatorReadMode,
+        ) -> anyhow::Result<u128> {
+            self.v2_store
+                .get(id)
+                .cloned()
+                .ok_or_else(|| anyhow::Error::msg(format!("Value does not exist for {:?}", id)))
         }
     }
 }
