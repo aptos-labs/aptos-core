@@ -6,7 +6,10 @@ use crate::{
     move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
     AptosVM,
 };
-use aptos_aggregator::resolver::{AggregatorReadMode, TAggregatorView};
+use aptos_aggregator::{
+    aggregator_extension::AggregatorID,
+    resolver::{AggregatorReadMode, TAggregatorView},
+};
 use aptos_gas_algebra::Fee;
 use aptos_state_view::StateViewId;
 use aptos_types::{
@@ -103,7 +106,7 @@ impl<'r> ExecutorViewWithChangeSet<'r> {
 
 impl<'r> TAggregatorView for ExecutorViewWithChangeSet<'r> {
     type IdentifierV1 = StateKey;
-    type IdentifierV2 = ();
+    type IdentifierV2 = AggregatorID;
 
     fn get_aggregator_v1_state_value(
         &self,
@@ -163,6 +166,7 @@ impl<'r> StateStorageView for ExecutorViewWithChangeSet<'r> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::storage_adapter::AsExecutorView;
     use aptos_aggregator::delta_change_set::{delta_add, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::write_set::WriteOp;
@@ -202,16 +206,16 @@ mod test {
 
     #[test]
     fn test_change_set_state_view() {
-        let mut base_view = FakeDataStore::default();
-        base_view.set_legacy(key("module_base"), serialize(&10));
-        base_view.set_legacy(key("module_both"), serialize(&20));
+        let mut state_view = FakeDataStore::default();
+        state_view.set_legacy(key("module_base"), serialize(&10));
+        state_view.set_legacy(key("module_both"), serialize(&20));
 
-        base_view.set_legacy(key("resource_base"), serialize(&30));
-        base_view.set_legacy(key("resource_both"), serialize(&40));
+        state_view.set_legacy(key("resource_base"), serialize(&30));
+        state_view.set_legacy(key("resource_both"), serialize(&40));
 
-        base_view.set_legacy(key("aggregator_base"), serialize(&50));
-        base_view.set_legacy(key("aggregator_both"), serialize(&60));
-        base_view.set_legacy(key("aggregator_delta_set"), serialize(&70));
+        state_view.set_legacy(key("aggregator_base"), serialize(&50));
+        state_view.set_legacy(key("aggregator_both"), serialize(&60));
+        state_view.set_legacy(key("aggregator_delta_set"), serialize(&70));
 
         let resource_write_set = HashMap::from([
             (key("resource_both"), write(80)),
@@ -240,7 +244,9 @@ mod test {
             &NoOpChangeSetChecker,
         )
         .unwrap();
-        let view = ExecutorViewWithChangeSet::new(&base_view, change_set);
+
+        let executor_view = state_view.as_executor_view();
+        let view = ExecutorViewWithChangeSet::new(&executor_view, change_set);
 
         assert_eq!(read_module(&view, "module_base"), 10);
         assert_eq!(read_module(&view, "module_both"), 100);

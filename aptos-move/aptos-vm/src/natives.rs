@@ -5,13 +5,12 @@
 #[cfg(feature = "testing")]
 use anyhow::Error;
 #[cfg(feature = "testing")]
-use aptos_aggregator::resolver::AggregatorReadMode;
+use aptos_aggregator::{
+    aggregator_extension::AggregatorID,
+    resolver::{AggregatorReadMode, TAggregatorView},
+};
 #[cfg(feature = "testing")]
-use aptos_aggregator::resolver::TAggregatorView;
-#[cfg(feature = "testing")]
-use aptos_framework::natives::cryptography::algebra::AlgebraContext;
-#[cfg(feature = "testing")]
-use aptos_framework::natives::event::NativeEventContext;
+use aptos_framework::natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
 #[cfg(feature = "testing")]
@@ -43,7 +42,7 @@ struct AptosBlankStorage;
 #[cfg(feature = "testing")]
 impl TAggregatorView for AptosBlankStorage {
     type IdentifierV1 = StateKey;
-    type IdentifierV2 = ();
+    type IdentifierV2 = AggregatorID;
 
     fn get_aggregator_v1_state_value(
         &self,

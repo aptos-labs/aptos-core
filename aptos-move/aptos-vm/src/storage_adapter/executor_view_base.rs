@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::resolver::{AggregatorReadMode, TAggregatorView};
+use aptos_aggregator::{
+    aggregator_extension::AggregatorID,
+    resolver::{AggregatorReadMode, TAggregatorView},
+};
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::state_store::{
     state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -30,7 +33,7 @@ impl<S: StateView> AsExecutorView<S> for S {
 
 impl<'s, S: StateView> TAggregatorView for ExecutorViewBase<'s, S> {
     type IdentifierV1 = StateKey;
-    type IdentifierV2 = ();
+    type IdentifierV2 = AggregatorID;
 
     fn get_aggregator_v1_state_value(
         &self,

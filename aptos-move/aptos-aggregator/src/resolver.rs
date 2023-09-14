@@ -118,9 +118,15 @@ pub trait TAggregatorView {
     }
 }
 
-pub trait AggregatorResolver: TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = ()> {}
+pub trait AggregatorResolver:
+    TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = AggregatorID>
+{
+}
 
-impl<T: TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = ()>> AggregatorResolver for T {}
+impl<T: TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = AggregatorID>> AggregatorResolver
+    for T
+{
+}
 
 // Utils to store aggregator values in data store. Here, we
 // only care about aggregators which are state items (V1).
@@ -160,7 +166,7 @@ pub mod test_utils {
 
     impl TAggregatorView for AggregatorStore {
         type IdentifierV1 = StateKey;
-        type IdentifierV2 = ();
+        type IdentifierV2 = AggregatorID;
 
         fn get_aggregator_v1_state_value(
             &self,

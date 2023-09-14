@@ -5,7 +5,6 @@
 use crate::task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput};
 use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
-    resolver::TAggregatorView,
     transaction::AggregatorValue,
 };
 use aptos_mvhashmap::types::TxnIndex;
@@ -20,7 +19,7 @@ use aptos_types::{
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
-use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceView};
+use aptos_vm_types::resolver::TExecutorView;
 use bytes::Bytes;
 use claims::assert_ok;
 use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout};
@@ -513,10 +512,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &(impl TResourceView<Key = K, Layout = MoveTypeLayout>
-              + TModuleView<Key = K>
-              + StateStorageView
-              + TAggregatorView<IdentifierV1 = K, IdentifierV2 = ()>),
+        view: &impl TExecutorView<K, MoveTypeLayout, ()>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,
@@ -566,10 +562,7 @@ where
 
     fn convert_resource_group_write_to_value(
         &self,
-        _view: &(impl TResourceView<Key = K, Layout = MoveTypeLayout>
-              + TModuleView<Key = K>
-              + StateStorageView
-              + TAggregatorView<IdentifierV1 = K, IdentifierV2 = ()>),
+        _view: &impl TExecutorView<K, MoveTypeLayout, ()>,
         _key: &K,
         _maybe_blob: Option<Bytes>,
         _creation: bool,

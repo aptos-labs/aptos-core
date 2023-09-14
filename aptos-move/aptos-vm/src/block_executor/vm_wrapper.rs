@@ -120,10 +120,15 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     fn convert_resource_group_write_to_value(
         &self,
         executor_view: &impl ExecutorView,
-        key: &StateKey,
+        state_key: &StateKey,
         maybe_resource_group_blob: Option<Bytes>,
         creation: bool,
     ) -> anyhow::Result<WriteOp> {
+        debug_assert!(
+            matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_resource_group()),
+            "Should only be used to convert resource group blobs to WriteOps"
+        );
+
         let resolver = self.vm.as_move_resolver(executor_view);
         let wop_converter =
             WriteOpConverter::new(&resolver, self.vm.is_storage_slot_metadata_enabled());
@@ -138,13 +143,8 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             },
             None => MoveStorageOp::Delete,
         };
-
-        debug_assert!(
-            matches!(key.inner(), StateKeyInner::AccessPath(ap) if ap.is_resource_group()),
-            ""
-        );
         wop_converter
-            .convert_resource(key, move_op, false)
-            .map_err(|_| anyhow::Error::msg("Error on converting to WriteOp"))
+            .convert_resource(state_key, move_op, false)
+            .map_err(|_| anyhow::Error::msg("Error on converting resource group blob to WriteOp"))
     }
 }

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::resolver::TAggregatorView;
+use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorView};
 use aptos_state_view::StateViewId;
 use aptos_types::state_store::{
     state_key::StateKey,
@@ -110,21 +110,25 @@ pub trait StateStorageView {
 ///  **WARNING:** There is no default implementation of `ExecutorView` for
 ///  `StateView` in order to ensure that a correct type is always used. If
 ///   conversion from state to executor view is needed, an adapter can be used.
-pub trait ExecutorView:
-    TResourceView<Key = StateKey, Layout = MoveTypeLayout>
-    + TModuleView<Key = StateKey>
-    + TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = ()>
+pub trait TExecutorView<K, L, I>:
+    TResourceView<Key = K, Layout = L>
+    + TModuleView<Key = K>
+    + TAggregatorView<IdentifierV1 = K, IdentifierV2 = I>
     + StateStorageView
 {
 }
 
-impl<T> ExecutorView for T where
-    T: TResourceView<Key = StateKey, Layout = MoveTypeLayout>
-        + TModuleView<Key = StateKey>
-        + TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = ()>
+impl<T, K, L, I> TExecutorView<K, L, I> for T where
+    T: TResourceView<Key = K, Layout = L>
+        + TModuleView<Key = K>
+        + TAggregatorView<IdentifierV1 = K, IdentifierV2 = I>
         + StateStorageView
 {
 }
+
+pub trait ExecutorView: TExecutorView<StateKey, MoveTypeLayout, AggregatorID> {}
+
+impl<T> ExecutorView for T where T: TExecutorView<StateKey, MoveTypeLayout, AggregatorID> {}
 
 /// Allows to query storage metadata in the VM session. Needed for storage refunds.
 pub trait StateValueMetadataResolver {

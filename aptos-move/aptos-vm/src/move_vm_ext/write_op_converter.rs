@@ -22,7 +22,30 @@ pub(crate) struct WriteOpConverter<'r> {
     new_slot_metadata: Option<StateValueMetadata>,
 }
 
+macro_rules! convert_impl {
+    ($convert_func_name:ident, $get_metadata_callback:ident) => {
+        pub(crate) fn $convert_func_name(
+            &self,
+            state_key: &StateKey,
+            move_storage_op: MoveStorageOp<Bytes>,
+            legacy_creation_as_modification: bool,
+        ) -> Result<WriteOp, VMStatus> {
+            self.convert(
+                self.remote.$get_metadata_callback(state_key),
+                move_storage_op,
+                legacy_creation_as_modification,
+            )
+        }
+    };
+}
+
 impl<'r> WriteOpConverter<'r> {
+    convert_impl!(convert_resource, get_resource_state_value_metadata);
+
+    convert_impl!(convert_module, get_module_state_value_metadata);
+
+    convert_impl!(convert_aggregator, get_aggregator_v1_state_value_metadata);
+
     pub(crate) fn new(
         remote: &'r dyn AptosMoveResolver,
         is_storage_slot_metadata_enabled: bool,
@@ -42,47 +65,7 @@ impl<'r> WriteOpConverter<'r> {
         }
     }
 
-    pub(crate) fn convert_resource(
-        &self,
-        state_key: &StateKey,
-        move_storage_op: MoveStorageOp<Bytes>,
-        legacy_creation_as_modification: bool,
-    ) -> Result<WriteOp, VMStatus> {
-        self.convert(
-            self.remote.get_resource_state_value_metadata(state_key),
-            move_storage_op,
-            legacy_creation_as_modification,
-        )
-    }
-
-    pub(crate) fn convert_module(
-        &self,
-        state_key: &StateKey,
-        move_storage_op: MoveStorageOp<Bytes>,
-        legacy_creation_as_modification: bool,
-    ) -> Result<WriteOp, VMStatus> {
-        self.convert(
-            self.remote.get_module_state_value_metadata(state_key),
-            move_storage_op,
-            legacy_creation_as_modification,
-        )
-    }
-
-    pub(crate) fn convert_aggregator(
-        &self,
-        state_key: &StateKey,
-        move_storage_op: MoveStorageOp<Bytes>,
-        legacy_creation_as_modification: bool,
-    ) -> Result<WriteOp, VMStatus> {
-        self.convert(
-            self.remote
-                .get_aggregator_v1_state_value_metadata(state_key),
-            move_storage_op,
-            legacy_creation_as_modification,
-        )
-    }
-
-    pub fn convert(
+    fn convert(
         &self,
         state_value_metadata_result: anyhow::Result<Option<StateValueMetadataKind>>,
         move_storage_op: MoveStorageOp<Bytes>,

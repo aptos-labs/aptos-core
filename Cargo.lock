@@ -3961,6 +3961,7 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-state-view",
  "aptos-types",
+ "aptos-vm",
  "bcs 0.1.4",
  "bytes",
  "claims",

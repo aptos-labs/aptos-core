@@ -538,9 +538,9 @@ impl FakeExecutor {
         let log_context = AdapterLogSchema::new(self.data_store.id(), 0);
 
         // TODO(Gas): revisit this.
-        let resolver = self.data_store.as_move_resolver();
-        let vm = AptosVM::new(&resolver);
+        let vm = AptosVM::new_from_state_view(&self.data_store);
 
+        let resolver = self.data_store.as_move_resolver();
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
             &txn,

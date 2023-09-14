@@ -6,8 +6,7 @@
 
 use crate::account::AccountData;
 use anyhow::Result;
-use aptos_aggregator::resolver::{AggregatorReadMode, TAggregatorView};
-use aptos_state_view::{in_memory_state_view::InMemoryStateView, StateViewId, TStateView};
+use aptos_state_view::{in_memory_state_view::InMemoryStateView, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_config::CoinInfoResource,
@@ -21,8 +20,7 @@ use aptos_vm_genesis::{
     generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
     GenesisOptions,
 };
-use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceView};
-use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
+use move_core_types::language_storage::ModuleId;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -132,51 +130,5 @@ impl TStateView for FakeDataStore {
 
     fn as_in_memory_state_view(&self) -> InMemoryStateView {
         InMemoryStateView::new(self.state_data.clone())
-    }
-}
-
-// These traits allow `FakeDataStore` act as an executor view as well.
-impl TResourceView for FakeDataStore {
-    type Key = StateKey;
-    type Layout = MoveTypeLayout;
-
-    fn get_resource_state_value(
-        &self,
-        state_key: &Self::Key,
-        _maybe_layout: Option<&Self::Layout>,
-    ) -> Result<Option<StateValue>> {
-        self.get_state_value(state_key)
-    }
-}
-
-impl TModuleView for FakeDataStore {
-    type Key = StateKey;
-
-    fn get_module_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>> {
-        self.get_state_value(state_key)
-    }
-}
-
-impl StateStorageView for FakeDataStore {
-    fn id(&self) -> StateViewId {
-        StateViewId::Miscellaneous
-    }
-
-    fn get_usage(&self) -> Result<StateStorageUsage> {
-        // Re-use implementation from the `StateView`
-        TStateView::get_usage(&self)
-    }
-}
-
-impl TAggregatorView for FakeDataStore {
-    type IdentifierV1 = StateKey;
-    type IdentifierV2 = ();
-
-    fn get_aggregator_v1_state_value(
-        &self,
-        state_key: &Self::IdentifierV1,
-        _mode: AggregatorReadMode,
-    ) -> Result<Option<StateValue>> {
-        self.get_state_value(state_key)
     }
 }

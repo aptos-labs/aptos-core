@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{delta_change_set::DeltaOp, resolver::TAggregatorView};
+use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     contract_event::ReadWriteEvent,
@@ -10,7 +10,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
-use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceView};
+use aptos_vm_types::resolver::TExecutorView;
 use bytes::Bytes;
 use move_core_types::value::MoveTypeLayout;
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
@@ -65,12 +65,11 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &(impl TResourceView<Key = <Self::Txn as Transaction>::Key, Layout = MoveTypeLayout>
-              + TModuleView<Key = <Self::Txn as Transaction>::Key>
-              + TAggregatorView<
-            IdentifierV1 = <Self::Txn as Transaction>::Key,
-            IdentifierV2 = <Self::Txn as Transaction>::Identifier,
-        > + StateStorageView),
+        view: &impl TExecutorView<
+            <Self::Txn as Transaction>::Key,
+            MoveTypeLayout,
+            <Self::Txn as Transaction>::Identifier,
+        >,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
@@ -79,12 +78,11 @@ pub trait ExecutorTask: Sync {
     /// Trait that allows converting resource group blobs to proper values.
     fn convert_resource_group_write_to_value(
         &self,
-        view: &(impl TResourceView<Key = <Self::Txn as Transaction>::Key, Layout = MoveTypeLayout>
-              + TModuleView<Key = <Self::Txn as Transaction>::Key>
-              + TAggregatorView<
-            IdentifierV1 = <Self::Txn as Transaction>::Key,
-            IdentifierV2 = <Self::Txn as Transaction>::Identifier,
-        > + StateStorageView),
+        view: &impl TExecutorView<
+            <Self::Txn as Transaction>::Key,
+            MoveTypeLayout,
+            <Self::Txn as Transaction>::Identifier,
+        >,
         key: &<Self::Txn as Transaction>::Key,
         maybe_blob: Option<Bytes>,
         creation: bool,
