@@ -241,20 +241,7 @@ pub fn snapshot(harness: &mut MoveHarness, account: &Account, index: u64) -> Sig
     )
 }
 
-pub fn snapshot_with_u64_limit(
-    harness: &mut MoveHarness,
-    account: &Account,
-    index: u64,
-) -> SignedTransaction {
-    harness.create_entry_function(
-        account,
-        str::parse("0x1::aggregator_v2_test::snapshot_with_u64_limit").unwrap(),
-        vec![],
-        vec![bcs::to_bytes(&index).unwrap()],
-    )
-}
-
-pub fn read_snapshot_u128(
+pub fn read_snapshot(
     harness: &mut MoveHarness,
     account: &Account,
     index: u64,
@@ -263,19 +250,6 @@ pub fn read_snapshot_u128(
         account,
         str::parse("0x1::aggregator_v2_test::read_snapshot").unwrap(),
         vec![TypeTag::U128],
-        vec![bcs::to_bytes(&index).unwrap()],
-    )
-}
-
-pub fn read_snapshot_u64(
-    harness: &mut MoveHarness,
-    account: &Account,
-    index: u64,
-) -> SignedTransaction {
-    harness.create_entry_function(
-        account,
-        str::parse("0x1::aggregator_v2_test::read_snapshot_with_u64_limit").unwrap(),
-        vec![TypeTag::U64],
         vec![bcs::to_bytes(&index).unwrap()],
     )
 }
