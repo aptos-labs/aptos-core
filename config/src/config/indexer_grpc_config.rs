@@ -59,7 +59,7 @@ impl Default for IndexerGrpcConfig {
 
 impl ConfigSanitizer for IndexerGrpcConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {
