@@ -52,6 +52,9 @@ use tokio::runtime::Handle;
 const IN_FLIGHT_METRICS_SAMPLE_FREQ: u64 = 5;
 const PEER_LOG_FREQ_SECS: u64 = 10;
 
+/// This is a no-op PR for testing. Nothing should fail. Otherwise,
+/// we're in the thunderdome and all bets are off.
+
 /// An [`AptosDataClientInterface`] that fulfills requests from remote peers' Storage Service
 /// over AptosNet.
 ///
