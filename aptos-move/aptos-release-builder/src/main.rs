@@ -108,18 +108,13 @@ async fn main() -> anyhow::Result<()> {
             output_dir,
         } => {
             aptos_release_builder::ReleaseConfig::load_config(release_config.as_path())
-                .with_context(|| "Failed to load release config".to_string())
-                .unwrap()
+                .with_context(|| "Failed to load release config".to_string())?
                 .generate_release_proposal_scripts(output_dir.as_path())
-                .with_context(|| "Failed to generate release proposal scripts".to_string())
-                .unwrap();
+                .with_context(|| "Failed to generate release proposal scripts".to_string())?;
             Ok(())
         },
         Commands::WriteDefault { output_path } => {
-            aptos_release_builder::ReleaseConfig::default()
-                .save_config(output_path.as_path())
-                .unwrap();
-            Ok(())
+            aptos_release_builder::ReleaseConfig::default().save_config(output_path.as_path())
         },
         Commands::ValidateProposals {
             release_config,
@@ -130,36 +125,31 @@ async fn main() -> anyhow::Result<()> {
             output_dir,
         } => {
             let config =
-                aptos_release_builder::ReleaseConfig::load_config(release_config.as_path())
-                    .unwrap();
+                aptos_release_builder::ReleaseConfig::load_config(release_config.as_path())?;
 
             let root_key_path = aptos_temppath::TempPath::new();
-            root_key_path.create_as_file().unwrap();
+            root_key_path.create_as_file()?;
 
             let mut network_config = match input_option {
                 InputOptions::FromDirectory { test_dir } => {
                     aptos_release_builder::validate::NetworkConfig::new_from_dir(
                         endpoint.clone(),
                         test_dir.as_path(),
-                    )
-                    .unwrap()
+                    )?
                 },
                 InputOptions::FromArgs {
                     root_key,
                     validator_address,
                     validator_key,
                 } => {
-                    let root_key = Ed25519PrivateKey::from_encoded_string(&root_key).unwrap();
-                    let validator_key =
-                        Ed25519PrivateKey::from_encoded_string(&validator_key).unwrap();
-                    let validator_account =
-                        AccountAddress::from_hex(validator_address.as_bytes()).unwrap();
+                    let root_key = Ed25519PrivateKey::from_encoded_string(&root_key)?;
+                    let validator_key = Ed25519PrivateKey::from_encoded_string(&validator_key)?;
+                    let validator_account = AccountAddress::from_hex(validator_address.as_bytes())?;
 
                     let mut root_key_path = root_key_path.path().to_path_buf();
                     root_key_path.set_extension("key");
 
-                    std::fs::write(root_key_path.as_path(), bcs::to_bytes(&root_key).unwrap())
-                        .unwrap();
+                    std::fs::write(root_key_path.as_path(), bcs::to_bytes(&root_key)?)?;
 
                     aptos_release_builder::validate::NetworkConfig {
                         root_key_path,
@@ -176,8 +166,7 @@ async fn main() -> anyhow::Result<()> {
             if mint_to_validator {
                 let chain_id = aptos_rest_client::Client::new(endpoint)
                     .get_ledger_information()
-                    .await
-                    .unwrap()
+                    .await?
                     .inner()
                     .chain_id;
 
@@ -185,25 +174,22 @@ async fn main() -> anyhow::Result<()> {
                     panic!("Mint to mainnet/testnet is not allowed");
                 }
 
-                network_config.mint_to_validator().await.unwrap();
+                network_config.mint_to_validator().await?;
             }
 
             network_config
                 .set_fast_resolve(FAST_RESOLUTION_TIME)
-                .await
-                .unwrap();
+                .await?;
             aptos_release_builder::validate::validate_config_and_generate_release(
                 config,
                 network_config.clone(),
                 output_dir,
             )
-            .await
-            .unwrap();
+            .await?;
             // Reset resolution time back to normal after resolution
             network_config
                 .set_fast_resolve(DEFAULT_RESOLUTION_TIME)
-                .await
-                .unwrap();
+                .await?;
             Ok(())
         },
         Commands::PrintConfigs {
@@ -218,7 +204,7 @@ async fn main() -> anyhow::Result<()> {
                 ($($type:ty), *) => {
                     $(
                         println!("{}", std::any::type_name::<$type>());
-                        println!("{}", serde_yaml::to_string(&fetch_config::<$type>(&client).unwrap()).unwrap());
+                        println!("{}", serde_yaml::to_string(&fetch_config::<$type>(&client)?)?);
                     )*
                 }
             }
@@ -230,13 +216,12 @@ async fn main() -> anyhow::Result<()> {
             }
 
             // Print Activated Features
-            let features = fetch_config::<Features>(&client).unwrap();
+            let features = fetch_config::<Features>(&client)?;
             println!(
                 "Features\n{}",
                 serde_yaml::to_string(
                     &aptos_release_builder::components::feature_flags::Features::from(&features)
-                )
-                .unwrap()
+                )?
             );
             Ok(())
         },
