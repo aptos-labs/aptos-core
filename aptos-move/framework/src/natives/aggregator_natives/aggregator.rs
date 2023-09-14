@@ -41,9 +41,7 @@ fn native_add(
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
-
-    aggregator.try_add(value)?;
-
+    aggregator.try_add(aggregator_context.resolver, value)?;
     Ok(smallvec![])
 }
 
@@ -70,7 +68,7 @@ fn native_read(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id.clone(), limit)?;
 
-    let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
+    let value = aggregator.read_most_recent_aggregator_value(aggregator_context.resolver)?;
 
     Ok(smallvec![Value::u128(value)])
 }
@@ -99,9 +97,7 @@ fn native_sub(
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
-
-    aggregator.try_sub(value)?;
-
+    aggregator.try_sub(aggregator_context.resolver, value)?;
     Ok(smallvec![])
 }
 
