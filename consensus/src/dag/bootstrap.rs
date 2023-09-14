@@ -43,7 +43,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::{select, task::JoinHandle};
 use tokio_retry::strategy::ExponentialBackoff;
 
-struct DagBootstrapper {
+pub struct DagBootstrapper {
     self_peer: Author,
     signer: Arc<ValidatorSigner>,
     epoch_state: Arc<EpochState>,
@@ -57,7 +57,7 @@ struct DagBootstrapper {
 }
 
 impl DagBootstrapper {
-    fn new(
+    pub fn new(
         self_peer: Author,
         signer: Arc<ValidatorSigner>,
         epoch_state: Arc<EpochState>,
@@ -182,11 +182,11 @@ impl DagBootstrapper {
         (dag_handler, dag_fetcher)
     }
 
-    async fn bootstrapper(
+    pub async fn bootstrapper(
         self,
         mut dag_rpc_rx: Receiver<Author, IncomingDAGRequest>,
         ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
-        mut shutdown_rx: oneshot::Receiver<()>,
+        mut shutdown_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         let sync_manager = DagStateSynchronizer::new(
             self.epoch_state.clone(),
@@ -196,6 +196,11 @@ impl DagBootstrapper {
         );
 
         loop {
+            debug!(
+                "Bootstrapping DAG instance for epoch {}",
+                self.epoch_state.epoch
+            );
+
             let ledger_info_from_storage = self
                 .storage
                 .get_latest_ledger_info()
@@ -240,9 +245,12 @@ impl DagBootstrapper {
             // poll the network handler while waiting for rebootstrap notification or shutdown notification
             select! {
                 biased;
-                _ = &mut shutdown_rx => {
+                Ok(ack_tx) = &mut shutdown_rx => {
                     df_handle.abort();
                     let _ = df_handle.await;
+                    if let Err(e) = ack_tx.send(()) {
+                        error!(error = ?e, "unable to ack to shutdown signal");
+                    }
                     return;
                 },
                 sync_status = handler.run(&mut dag_rpc_rx) => {

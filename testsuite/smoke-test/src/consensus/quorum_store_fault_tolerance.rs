@@ -132,6 +132,7 @@ async fn test_onchain_config_quorum_store_enabled_and_disabled() {
         let inner = match current_consensus_config {
             OnChainConsensusConfig::V1(inner) => inner,
             OnChainConsensusConfig::V2(_) => panic!("Unexpected V2 config"),
+            _ => unimplemented!()
         };
         // Change to V2
         let new_consensus_config = OnChainConsensusConfig::V2(ConsensusConfigV1 { ..inner });
@@ -153,6 +154,7 @@ async fn test_onchain_config_quorum_store_enabled_and_disabled() {
         let inner = match current_consensus_config {
             OnChainConsensusConfig::V1(_) => panic!("Unexpected V1 config"),
             OnChainConsensusConfig::V2(inner) => inner,
+            _ => unimplemented!()
         };
 
         // Disaster rollback to V1

@@ -1,15 +1,17 @@
 // Copyright © Aptos Foundation
 
+use std::sync::Arc;
+
 use crate::experimental::signing_phase::CommitSignerProvider;
 use aptos_crypto::bls12381;
 use aptos_types::validator_signer::ValidatorSigner;
 
 pub struct DagCommitSigner {
-    signer: ValidatorSigner,
+    signer: Arc<ValidatorSigner>,
 }
 
 impl DagCommitSigner {
-    pub fn new(signer: ValidatorSigner) -> Self {
+    pub fn new(signer: Arc<ValidatorSigner>) -> Self {
         Self { signer }
     }
 }

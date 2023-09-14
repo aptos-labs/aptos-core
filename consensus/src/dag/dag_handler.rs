@@ -60,7 +60,7 @@ impl NetworkHandler {
         // TODO(ibalajiarun): clean up Reliable Broadcast storage periodically.
         loop {
             select! {
-                Some(msg) = dag_rpc_rx.next() => {
+                msg = dag_rpc_rx.select_next_some() => {
                     match self.process_rpc(msg).await {
                         Ok(sync_status) => {
                             if matches!(sync_status, StateSyncStatus::NeedsSync(_) | StateSyncStatus::EpochEnds) {
@@ -115,6 +115,8 @@ impl NetworkHandler {
     ) -> anyhow::Result<StateSyncStatus> {
         let dag_message: DAGMessage = rpc_request.req.try_into()?;
 
+        debug!("processing rpc: {:?}", dag_message);
+
         let author = dag_message
             .author()
             .map_err(|_| anyhow::anyhow!("unexpected rpc message {:?}", dag_message))?;
@@ -150,7 +152,7 @@ impl NetworkHandler {
             }
         };
 
-        debug!("responding to rpc: {:?}", response);
+        debug!("responding to process_rpc {:?}", response);
 
         let response = response
             .and_then(|response_msg| {

@@ -198,6 +198,7 @@ async fn test_onchain_config_change() {
             let inner = match genesis_config.consensus_config.clone() {
                 OnChainConsensusConfig::V1(inner) => inner,
                 OnChainConsensusConfig::V2(inner) => inner,
+                _ => unimplemented!(),
             };
 
             let leader_reputation_type =
@@ -255,6 +256,7 @@ async fn test_onchain_config_change() {
     let inner = match current_consensus_config {
         OnChainConsensusConfig::V1(inner) => inner,
         OnChainConsensusConfig::V2(inner) => inner,
+        _ => unimplemented!()
     };
     let leader_reputation_type =
         if let ProposerElectionType::LeaderReputation(leader_reputation_type) =
