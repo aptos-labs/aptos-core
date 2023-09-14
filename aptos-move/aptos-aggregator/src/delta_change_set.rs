@@ -513,7 +513,7 @@ mod test {
 
     impl TAggregatorView for BadStorage {
         type IdentifierV1 = StateKey;
-        type IdentifierV2 = u64;
+        type IdentifierV2 = ();
 
         fn get_aggregator_v1_state_value(
             &self,

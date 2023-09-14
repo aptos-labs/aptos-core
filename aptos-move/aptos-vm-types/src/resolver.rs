@@ -91,7 +91,7 @@ pub trait StateStorageView {
 pub trait ExecutorView:
     TResourceView<Key = StateKey, Layout = MoveTypeLayout>
     + TModuleView<Key = StateKey>
-    + TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = u64>
+    + TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = ()>
     + StateStorageView
 {
 }
@@ -99,7 +99,7 @@ pub trait ExecutorView:
 impl<
         T: TResourceView<Key = StateKey, Layout = MoveTypeLayout>
             + TModuleView<Key = StateKey>
-            + TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = u64>
+            + TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = ()>
             + StateStorageView,
     > ExecutorView for T
 {

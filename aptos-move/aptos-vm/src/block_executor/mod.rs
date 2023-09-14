@@ -42,7 +42,7 @@ use std::{collections::HashMap, sync::Arc};
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
-    type Identifier = u64;
+    type Identifier = ();
     type Key = StateKey;
     type Value = WriteOp;
 }

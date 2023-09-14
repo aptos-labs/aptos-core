@@ -16,9 +16,8 @@ use aptos_types::{
 use move_binary_format::errors::Location;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
-/// Defines different ways `AggregatorView` can be used to resolve a value. The
-/// implementation of the trait can use custom logic for different reading
-/// modes.
+/// Defines different ways `AggregatorResolver` can be used to read its value
+/// from the state.
 pub enum AggregatorReadMode {
     /// The returned value is guaranteed to be correct.
     Precise,
@@ -112,9 +111,9 @@ pub trait TAggregatorView {
     }
 }
 
-pub trait AggregatorResolver: TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = u64> {}
+pub trait AggregatorResolver: TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = ()> {}
 
-impl<T: TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = u64>> AggregatorResolver for T {}
+impl<T: TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = ()>> AggregatorResolver for T {}
 
 // Utils to store aggregator values in data store. Here, we
 // only care about aggregators which are state items.
@@ -154,7 +153,7 @@ pub mod test_utils {
 
     impl TAggregatorView for AggregatorStore {
         type IdentifierV1 = StateKey;
-        type IdentifierV2 = u64;
+        type IdentifierV2 = ();
 
         fn get_aggregator_v1_state_value(
             &self,

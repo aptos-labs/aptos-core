@@ -30,7 +30,7 @@ impl<S: StateView> AsExecutorView<S> for S {
 
 impl<'s, S: StateView> TAggregatorView for ExecutorViewBase<'s, S> {
     type IdentifierV1 = StateKey;
-    type IdentifierV2 = u64;
+    type IdentifierV2 = ();
 
     fn get_aggregator_v1_state_value(
         &self,
