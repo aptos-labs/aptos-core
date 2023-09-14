@@ -6,9 +6,13 @@ use crate::{
     check_change_set::CheckChangeSet,
     output::VMOutput,
 };
-use aptos_aggregator::delta_change_set::{delta_add, serialize, DeltaOp};
+use aptos_aggregator::{
+    aggregator_change_set::AggregatorChange,
+    delta_change_set::{delta_add, serialize, DeltaOp},
+};
 use aptos_types::{
     account_address::AccountAddress,
+    aggregator::AggregatorID,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
@@ -112,15 +116,17 @@ pub(crate) fn build_change_set(
     resource_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     resource_group_write_set: impl IntoIterator<Item = (StateKey, GroupWrite)>,
     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-    aggregator_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-    aggregator_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
+    aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
+    aggregator_v2_change_set: impl IntoIterator<Item = (AggregatorID, AggregatorChange)>,
 ) -> VMChangeSet {
     VMChangeSet::new(
         BTreeMap::from_iter(resource_write_set),
         BTreeMap::from_iter(resource_group_write_set),
         BTreeMap::from_iter(module_write_set),
-        BTreeMap::from_iter(aggregator_write_set),
-        BTreeMap::from_iter(aggregator_delta_set),
+        BTreeMap::from_iter(aggregator_v1_write_set),
+        BTreeMap::from_iter(aggregator_v1_delta_set),
+        BTreeMap::from_iter(aggregator_v2_change_set),
         vec![],
         &MockChangeSetChecker,
     )
@@ -132,8 +138,9 @@ pub(crate) fn build_vm_output(
     resource_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     resource_group_write_set: impl IntoIterator<Item = (StateKey, GroupWrite)>,
     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-    aggregator_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-    aggregator_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
+    aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
+    aggregator_v2_change_set: impl IntoIterator<Item = (AggregatorID, AggregatorChange)>,
 ) -> VMOutput {
     const GAS_USED: u64 = 100;
     const STATUS: TransactionStatus = TransactionStatus::Keep(ExecutionStatus::Success);
@@ -142,8 +149,9 @@ pub(crate) fn build_vm_output(
             resource_write_set,
             resource_group_write_set,
             module_write_set,
-            aggregator_write_set,
-            aggregator_delta_set,
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set,
+            aggregator_v2_change_set,
         ),
         FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,
