@@ -79,8 +79,10 @@ pub mod test_utils {
         }
 
         pub fn set_from_ephemeral_id(&mut self, aggregator_id: AggregatorID, value: u128) {
-            self.v2_store
-                .insert(aggregator_id, StateValue::new_legacy(serialize(&value)));
+            self.v2_store.insert(
+                aggregator_id,
+                StateValue::new_legacy(serialize(&value).into()),
+            );
         }
     }
 
