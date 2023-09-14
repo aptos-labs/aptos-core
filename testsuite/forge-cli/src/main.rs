@@ -6,8 +6,8 @@
 
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::{
-    BootstrappingMode, ConsensusConfig, ContinuousSyncingMode, MempoolConfig, NodeConfig,
-    StateSyncConfig,
+    BootstrappingMode, ConsensusConfig, ContinuousSyncingMode, MempoolConfig, NetbenchConfig,
+    NodeConfig, StateSyncConfig,
 };
 use aptos_forge::{
     args::TransactionTypeArg,
@@ -525,7 +525,7 @@ fn single_test_suite(
 ) -> Result<ForgeConfig> {
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
-        "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
+        "land_blocking" => net_bench(), // TODO: remove this before landing
         "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
@@ -585,6 +585,7 @@ fn single_test_suite(
         "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true),
         "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true),
         "gather_metrics" => gather_metrics(),
+        "net_bench" => net_bench(),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -1344,6 +1345,26 @@ fn gather_metrics() -> ForgeConfig {
         .add_network_test(GatherMetrics)
         .add_network_test(Delay::new(180))
         .add_network_test(GatherMetrics)
+}
+
+fn net_bench() -> ForgeConfig {
+    ForgeConfig::default()
+        .add_network_test(Delay::new(180))
+        .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.netbench = Some(NetbenchConfig {
+                enabled: true,
+                max_network_channel_size: 1000,
+                enable_direct_send_testing: true,
+                direct_send_data_size: 100000,
+                direct_send_per_second: 1000,
+                enable_rpc_testing: false,
+                rpc_data_size: 100000,
+                rpc_per_second: 1000000,
+                rpc_in_flight: 8,
+                ..Default::default()
+            });
+        }))
 }
 
 fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
