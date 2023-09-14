@@ -196,7 +196,7 @@ To reflect cost relavent to transient storage device resources, including disk I
 
 | Parameter                       | Meaning                                                            |
 |---------------------------------|--------------------------------------------------------------------|
-| storage_io_per_state_slot_write | charged per state write op in the transaction output               |
+| storage_io_per_state_slot_write | charged per state write operation in the transaction output        |
 | storage_io_per_state_byte_write | charged per byte in all state write ops in the transaction output  |
 | storage_io_per_state_slot_read  | charged per item loaded from global state                          |
 | storage_io_per_state_byte_read  | charged per byte loaded from global state                          |
@@ -258,9 +258,11 @@ See [Payload gas](#payload-gas) for the meaning of these constants.
 
 ### Storage Fee
 
-When the network load is low,vthe gas unit price is expected to be low, as a result all of other aspects of the transaction cost are expected to be cheap. Except for the transaction fee, which is priced in terms of absolute APT value. Usually the transaction fee is the dominant aspect of the whole transaction cost, as long as the transaction allocates state slots or write to large state items, emit many or large events, or the transaction itself is large -- all of which occupy disk space on all Aptos nodes, hence charged accordingly.
+When the network load is low, the gas unit price is expected to be low, as a result all of other aspects of the transaction cost are expected to be cheap. Except for the storage fee, which is priced in terms of absolute APT value. Usually the transaction fee is the dominant aspect of the whole transaction cost, as long as the transaction allocates state slots or write to large state items, emit many or large events, or the transaction itself is large -- all of which occupy disk space on all Aptos nodes, hence charged accordingly.
 
 On the other hand, releasing state slots by deleting state items are incentivized by the storage refund. For now state slot fee is fully refunded uppon slot deallocation, and the excess state byte fee is not refundable. This is to be changed shortly by distinguishing permanent bytes (those in the global state) and reletive ephemeral bytes (those goes through the ledger history).
+
+Some cost optimization strategy with regard to storage fee:
 
 1. Minimize state item creation.
 2. Minimize event emission.
