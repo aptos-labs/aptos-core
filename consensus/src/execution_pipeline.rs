@@ -143,7 +143,7 @@ impl ExecutionPipeline {
     }
 }
 
-const PIPELINE_DEPTH: usize = 8;
+const PIPELINE_DEPTH: usize = 1024;
 
 struct ExecuteBlockCommand {
     block: ExecutableBlock,
