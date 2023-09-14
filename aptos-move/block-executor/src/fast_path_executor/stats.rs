@@ -8,6 +8,7 @@ use std::time::Duration;
 /// Statistics about a single run of `FastPathBlockExecutor`.
 #[derive(Default, Debug)]
 pub struct ExecutorStats {
+    pub batch_size: usize,
     pub total_txn_count: usize,
     pub fallback_txn_count: usize,
     pub time_stats: ExecutorTimeStats,
@@ -114,6 +115,7 @@ impl<'a> AddAssign<&'a WorkerStats> for FastPathStats {
 impl Display for ExecutorStats {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "ExecutorStats")?;
+        writeln!(f, "    batch size:         {}", self.batch_size)?;
         writeln!(f, "    Total txn count:    {}", self.total_txn_count)?;
         writeln!(f, "    Fallback txn count: {}", self.fallback_txn_count)?;
         writeln!(f, "    Time stats:")?;

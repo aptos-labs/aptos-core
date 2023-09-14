@@ -4,7 +4,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use aptos_block_executor::transaction_hints::TransactionHints;
 use crate::block_orderer::BlockOrderer;
-use crate::parallel::transaction_compressor::compress_transactions_in_parallel;
+use crate::parallel::key_compressor::compress_transactions_in_parallel;
 use crate::transaction_compressor::CompressedHintsTransaction;
 
 /// Returns a `BlockOrderer` that compresses all transactions using

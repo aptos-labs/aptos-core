@@ -13,7 +13,7 @@ use aptos_transaction_orderer::{
     },
     parallel::{
         batch_orderer::ParallelDynamicToposortOrderer,
-        transaction_compressor::compress_transactions_in_parallel,
+        key_compressor::compress_transactions_in_parallel,
     },
     quality::{amortized_inverse_dependency_cost_function, order_total_cost},
     transaction_compressor::compress_transactions,

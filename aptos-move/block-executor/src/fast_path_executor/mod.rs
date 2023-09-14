@@ -6,5 +6,7 @@ mod executor;
 mod reservation_table;
 mod view;
 mod stats;
+pub mod executor_with_compression;
+mod key_compressor;
 
 pub use executor::FastPathBlockExecutor;

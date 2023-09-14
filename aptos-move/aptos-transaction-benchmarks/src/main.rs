@@ -79,7 +79,7 @@ struct ExecuteOpt {
     #[clap(long, num_args = 1.., conflicts_with = "num_executor_shards")]
     pub remote_executor_addresses: Option<Vec<SocketAddr>>,
 
-    #[clap(long, default_value_t = true)]
+    #[clap(long, default_value_t = false)]
     pub no_conflict_txns: bool,
 
     #[clap(long)]

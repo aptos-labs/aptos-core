@@ -3,4 +3,4 @@
 pub mod batch_orderer;
 mod min_heap;
 mod reservation_table;
-pub mod transaction_compressor;
+pub mod key_compressor;

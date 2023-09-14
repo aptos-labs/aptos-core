@@ -7,6 +7,7 @@ use std::{marker::PhantomData, sync::Arc};
 use crossbeam::atomic::AtomicCell;
 use dashmap::DashMap;
 use futures::channel::oneshot;
+use futures::FutureExt;
 use itertools::Itertools;
 use rayon::{
     iter::Either::{Left, Right},
@@ -35,10 +36,11 @@ use crate::{
     transaction_hints::TransactionWithHints,
 };
 use crate::errors::Error;
+use crate::fast_path_executor::key_compressor::{CompressedKey, ParallelKeyCompressor};
 use crate::fast_path_executor::stats::{ExecutorStats, FastPathStats, WorkerStats};
 
 #[allow(dead_code)] // TODO: handle `maybe_block_gas_limit` properly
-pub struct FastPathBlockExecutor<T: Transaction, E, FB> {
+pub struct FastPathBlockExecutorWithCompression<T: Transaction, E, FB> {
     // TODO: consider getting rid of a fixed batch size.
     batch_size: usize,
 
@@ -52,7 +54,7 @@ pub struct FastPathBlockExecutor<T: Transaction, E, FB> {
     phantom: PhantomData<(T, E)>,
 }
 
-impl<T, E, FB> FastPathBlockExecutor<T, E, FB>
+impl<T, E, FB> FastPathBlockExecutorWithCompression<T, E, FB>
 where
     T: Transaction + Send + Sync,
     E: ExecutorTask<Txn = T> + Send + Sync,
@@ -81,12 +83,13 @@ where
 
     fn execute_transaction(
         worker_state: &WorkerState<E>,
+        key_compressor: &ParallelKeyCompressor<T::Key>,
         txn: T,
         txn_idx: TxnIndex,
         state_view: &impl TStateView<Key = T::Key>,
         aggregators_snapshot: &impl WritableStateView<Key = T::Key, Value = T::Value>,
-        write_reservations: &impl ReservationTable<T::Key>,
-        delta_reservations: &impl ReservationTable<T::Key>,
+        write_reservations: &impl ReservationTable<CompressedKey>,
+        delta_reservations: &impl ReservationTable<CompressedKey>,
         sequence_numbers: &DashMap<AccountAddress, Option<u64>>,
     ) -> Result<TxnExecutionInfo<E>, Error<E::Error>> {
         // NB: if we don't find the relevant sequence number in the map, there may
@@ -135,18 +138,27 @@ where
             ExecutionStatus::SkipRest(output) => (Some(output), false),
         };
 
-        let write_set = output.as_ref().map(|o| {
+        let compressed_write_set = output.as_ref().map(|o| {
             (o.resource_write_set().into_keys())
                 .chain(o.aggregator_v1_write_set().into_keys())
+                .map(|k| key_compressor.map_key(&k))
                 .collect()
         }).unwrap_or(vec![]);
+
+        let compressed_read_set = read_set_capturing_view
+            .take_read_set()
+            .iter()
+            .map(|k| key_compressor.map_key(&k))
+            .collect();
 
         let delta_set = output.as_ref().map(|o| {
             o.aggregator_v1_delta_set().into_keys().collect()
         }).unwrap_or(vec![]);
 
-        for k in &write_set {
-            write_reservations.make_reservation(k.clone(), txn_idx);
+        let compressed_delta_set = delta_set.iter().map(|k| key_compressor.map_key(&k)).collect();
+
+        for k in &compressed_write_set {
+            write_reservations.make_reservation(*k, txn_idx);
         }
 
         for k in &delta_set {
@@ -161,16 +173,18 @@ where
                     .expect("Writing to a non-existent aggregator");
                 aggregators_snapshot.write_u128(k.clone(), val);
             }
+        }
 
-            delta_reservations.make_reservation(k.clone(), txn_idx);
+        for &k in &compressed_delta_set {
+            delta_reservations.make_reservation(k, txn_idx);
         }
 
         Ok(TxnExecutionInfo {
             transaction: txn,
             output,
-            write_set,
-            read_set: read_set_capturing_view.take_read_set(),
-            delta_set,
+            write_set: compressed_write_set,
+            read_set: compressed_read_set,
+            delta_set: compressed_delta_set,
             abort,
             txn_idx,
             _phantom: PhantomData,
@@ -180,11 +194,12 @@ where
     fn execute_transactions_in_parallel(
         worker_states: &ThreadLocal<WorkerState<E>>,
         executor_arguments: &E::Argument,
+        key_compressor: &ParallelKeyCompressor<T::Key>,
         transactions: impl IntoParallelIterator<Item = (usize, T)>,
         state_view: &(impl TStateView<Key = T::Key> + Sync),
         aggregators_snapshot: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
-        write_reservations: &(impl ReservationTable<T::Key> + Sync),
-        delta_reservations: &(impl ReservationTable<T::Key> + Sync),
+        write_reservations: &(impl ReservationTable<CompressedKey> + Sync),
+        delta_reservations: &(impl ReservationTable<CompressedKey> + Sync),
         sequence_numbers: &DashMap<AccountAddress, Option<u64>>,
     ) -> Result<Vec<TxnExecutionInfo<E>>, Error<E::Error>> {
         transactions
@@ -194,6 +209,7 @@ where
                 |&mut worker_state, (txn_idx, txn)| {
                     Self::execute_transaction(
                         worker_state,
+                        key_compressor,
                         txn,
                         txn_idx as TxnIndex,
                         state_view,
@@ -210,8 +226,8 @@ where
     fn validate_transaction(
         worker_state: &WorkerState<E>,
         execution_info: &TxnExecutionInfo<E>,
-        write_reservations: &(impl ReservationTable<T::Key> + Sync),
-        delta_reservations: &(impl ReservationTable<T::Key> + Sync),
+        write_reservations: &(impl ReservationTable<CompressedKey> + Sync),
+        delta_reservations: &(impl ReservationTable<CompressedKey> + Sync),
     ) -> bool {
         if execution_info.abort {
             return false;
@@ -265,8 +281,8 @@ where
         worker_states: &ThreadLocal<WorkerState<E>>,
         executor_arguments: &E::Argument,
         execution_results: Vec<TxnExecutionInfo<E>>,
-        write_reservations: &(impl ReservationTable<T::Key> + Sync),
-        delta_reservations: &(impl ReservationTable<T::Key> + Sync),
+        write_reservations: &(impl ReservationTable<CompressedKey> + Sync),
+        delta_reservations: &(impl ReservationTable<CompressedKey> + Sync),
         sequence_numbers: &DashMap<AccountAddress, Option<u64>>,
         output_view: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
         discarded_txns: &mut Vec<TransactionWithHints<T>>,
@@ -308,9 +324,13 @@ where
 
                         Right(TransactionWithHints {
                             transaction: exec_info.transaction,
-                            read_set: exec_info.read_set,
-                            write_set: exec_info.write_set,
-                            delta_set: exec_info.delta_set,
+                            // FIXME: for now, no hints.
+                            read_set: vec![],
+                            write_set: vec![],
+                            delta_set: vec![],
+                            // read_set: exec_info.read_set,
+                            // write_set: exec_info.write_set,
+                            // delta_set: exec_info.delta_set,
                         })
                     }
                 },
@@ -353,6 +373,7 @@ where
         transactions: Txns,
         worker_states: &ThreadLocal<WorkerState<E>>,
         executor_arguments: &E::Argument,
+        key_compressor: &ParallelKeyCompressor<T::Key>,
         writable_view: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
         sequence_numbers: &DashMap<AccountAddress, Option<u64>>,
         discarded_txns: &mut Vec<TransactionWithHints<T>>,
@@ -380,6 +401,7 @@ where
         let execution_results = Self::execute_transactions_in_parallel(
             &worker_states,
             executor_arguments,
+            key_compressor,
             transactions,
             &writable_view.as_state_view(),
             &aggregators_snapshot,
@@ -480,6 +502,7 @@ where
         let mut discarded_txns = Vec::<TransactionWithHints<T>>::with_capacity(block_size);
         let sequence_numbers = DashMap::with_capacity(block_size);
         let mut worker_states = ThreadLocal::new();
+        let key_compressor = ParallelKeyCompressor::new();
 
         // Store the stage stats and reset the stage timer.
         executor_stats.time_stats.init = stage_timer.elapsed();
@@ -504,6 +527,7 @@ where
                 batch_transactions,
                 &worker_states,
                 &executor_arguments,
+                &key_compressor,
                 &state,
                 &sequence_numbers,
                 &mut discarded_txns,
@@ -593,16 +617,16 @@ impl<E: ExecutorTask> WorkerState<E> {
 struct TxnExecutionInfo<E: ExecutorTask> {
     transaction: E::Txn,
     output: Option<E::Output>,
-    write_set: Vec<<E::Txn as Transaction>::Key>,
-    read_set: Vec<<E::Txn as Transaction>::Key>,
-    delta_set: Vec<<E::Txn as Transaction>::Key>,
+    write_set: Vec<CompressedKey>,
+    read_set: Vec<CompressedKey>,
+    delta_set: Vec<CompressedKey>,
     abort: bool,
     txn_idx: TxnIndex,
 
     _phantom: PhantomData<E>,
 }
 
-impl<T, E, FB> BlockExecutorBase for FastPathBlockExecutor<T, E, FB>
+impl<T, E, FB> BlockExecutorBase for FastPathBlockExecutorWithCompression<T, E, FB>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T> + Send,
@@ -612,7 +636,7 @@ where
     type Txn = T;
 }
 
-impl<T, E, FB> BlockExecutor for FastPathBlockExecutor<T, E, FB>
+impl<T, E, FB> BlockExecutor for FastPathBlockExecutorWithCompression<T, E, FB>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T> + Send,
