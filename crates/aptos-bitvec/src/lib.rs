@@ -16,7 +16,7 @@ use std::{
     ops::{BitAnd, BitOr},
 };
 
-// Every u8 is used as a bucket of 8 bits. Total max buckets = 65536 / 8 = 8196.
+// Every u8 is used as a bucket of 8 bits. Total max buckets = 65536 / 8 = 8192.
 const BUCKET_SIZE: usize = 8;
 const MAX_BUCKETS: usize = 8192;
 
