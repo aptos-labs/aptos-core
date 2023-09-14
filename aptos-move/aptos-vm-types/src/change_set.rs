@@ -151,7 +151,7 @@ impl VMChangeSet {
     /// serialized changes.
     /// If deltas are not materialized the conversion fails.
     pub fn try_into_storage_change_set(self) -> anyhow::Result<StorageChangeSet, VMStatus> {
-        if !self.aggregator_v1_delta_set.is_empty() {
+        if !self.aggregator_v1_delta_set.is_empty() || !self.aggregator_v2_change_set.is_empty() {
             return Err(VMStatus::error(
                 StatusCode::DATA_FORMAT_ERROR,
                 err_msg(
@@ -231,8 +231,8 @@ impl VMChangeSet {
         } = self;
 
         let into_write =
-            |(state_key, aggregator_change): (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
-                let write = aggregator_change.try_into_write_op(state_view, &state_key)?;
+            |(state_key, delta_op): (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
+                let write = delta_op.try_into_write_op(state_view, &state_key)?;
                 Ok((state_key, write))
             };
 
@@ -247,47 +247,6 @@ impl VMChangeSet {
             module_write_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set: HashMap::new(),
-            aggregator_v2_change_set,
-            events,
-        })
-    }
-
-    pub fn try_materialize_aggregator_v2_changes(
-        self,
-        state_view: &impl StateView,
-    ) -> anyhow::Result<Self, VMStatus> {
-        let Self {
-            resource_write_set,
-            module_write_set,
-            aggregator_v1_write_set,
-            aggregator_v1_delta_set,
-            aggregator_v2_change_set,
-            events,
-        } = self;
-
-        let materialize_aggregator = |(aggregator_id, aggregator_change): (
-            AggregatorID,
-            AggregatorChange,
-        )|
-         -> anyhow::Result<
-            (AggregatorID, AggregatorChange),
-            VMStatus,
-        > {
-            let aggregator_change =
-                aggregator_change.materialize_aggregator(state_view, &aggregator_id)?;
-            Ok((aggregator_id, aggregator_change))
-        };
-
-        let aggregator_v2_change_set = aggregator_v2_change_set
-            .into_iter()
-            .map(materialize_aggregator)
-            .collect::<anyhow::Result<HashMap<AggregatorID, AggregatorChange>, VMStatus>>()?;
-
-        Ok(Self {
-            resource_write_set,
-            module_write_set,
-            aggregator_v1_write_set,
-            aggregator_v1_delta_set,
             aggregator_v2_change_set,
             events,
         })

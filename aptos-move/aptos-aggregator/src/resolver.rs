@@ -8,11 +8,10 @@ use crate::aggregator_extension::AggregatorID;
 ///  logic for different reading modes.
 pub enum AggregatorReadMode {
     /// The returned value is guaranteed to be correct.
-    Precise,
-    /// The returned value is based on speculation or approximation. For
-    /// example, while reading and accumulating deltas only some of them
-    /// can be taken into account.
-    Speculative,
+    Aggregated,
+    /// The returned value is based on last committed value, ignoring
+    /// any pending changes.
+    LastCommitted,
 }
 
 /// Returns a value of an aggregator from cache or global storage.
@@ -104,8 +103,8 @@ pub mod test_utils {
                     }
                 },
                 AggregatorID::Ephemeral(_) => {
-                    match self.v2_store.get(id).map(|val| val.clone().into_bytes()) {
-                        Some(bytes) => Ok(bcs::from_bytes(&bytes)?),
+                    match self.v2_store.get(id).map(|val| val.bytes()) {
+                        Some(bytes) => Ok(bcs::from_bytes(bytes)?),
                         None => {
                             anyhow::bail!("Could not find the value of the aggregator")
                         },

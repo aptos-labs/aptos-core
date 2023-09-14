@@ -211,14 +211,14 @@ fn native_snapshot(
     match ty_args[0] {
         Type::U128 => {
             let (aggregator_id, _) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
-            let id = aggregator_data.snapshot(&aggregator_id);
+            let id = aggregator_data.snapshot(&aggregator_id)?;
             Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u128(
                 id as u128
             )]))])
         },
         Type::U64 => {
             let (aggregator_id, _) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
-            let id = aggregator_data.snapshot(&aggregator_id);
+            let id = aggregator_data.snapshot(&aggregator_id)?;
             Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u64(
                 id
             )]))])

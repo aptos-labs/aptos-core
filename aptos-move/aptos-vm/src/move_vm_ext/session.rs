@@ -342,32 +342,18 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
 
         for (id, change) in aggregator_change_set.aggregator_v1_changes {
-            match id {
-                // Process Aggregator V1.
-                AggregatorID::Legacy { handle, key } => {
-                    // TODO - should we use as_state_item() ?
-                    let key_bytes = key.0.to_vec();
-                    let state_key = StateKey::table_item(handle, key_bytes);
-
-                    match change {
-                        AggregatorChangeV1::Write(value) => {
-                            let write_op = woc.convert_aggregator_mod(&state_key, value)?;
-                            aggregator_v1_write_set.insert(state_key, write_op);
-                        },
-                        AggregatorChangeV1::Merge(delta_op) => {
-                            aggregator_v1_delta_set.insert(state_key, delta_op);
-                        },
-                        AggregatorChangeV1::Delete => {
-                            let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
-                            aggregator_v1_write_set.insert(state_key, write_op);
-                        },
-                    }
+            let state_key = id.as_state_key().expect("Aggregator V1 change set should contain only Legacy AggregatorIDs");
+            match change {
+                AggregatorChangeV1::Write(value) => {
+                    let write_op = woc.convert_aggregator_mod(&state_key, value)?;
+                    aggregator_v1_write_set.insert(state_key, write_op);
                 },
-                // Process Aggregator V2.
-                AggregatorID::Ephemeral(_) => {
-                    unreachable!(
-                        "Aggregator V1 change set should contain only Legacy AggregatorIDs"
-                    )
+                AggregatorChangeV1::Merge(delta_op) => {
+                    aggregator_v1_delta_set.insert(state_key, delta_op);
+                },
+                AggregatorChangeV1::Delete => {
+                    let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
+                    aggregator_v1_write_set.insert(state_key, write_op);
                 },
             }
         }

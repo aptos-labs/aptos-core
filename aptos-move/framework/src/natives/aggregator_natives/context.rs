@@ -3,7 +3,7 @@
 
 use aptos_aggregator::{
     aggregator_change_set::AggregatorChange,
-    aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
+    aggregator_extension::{AggregatorData, AggregatorID, AggregatorState, AggregatorSnapshotState, SnapshotValue},
     delta_change_set::DeltaOp,
     resolver::AggregatorResolver,
 };
@@ -61,7 +61,7 @@ impl<'a> NativeAggregatorContext<'a> {
         let NativeAggregatorContext {
             aggregator_data, ..
         } = self;
-        let (_, destroyed_aggregators, aggregators) = aggregator_data.into_inner().into();
+        let (_, destroyed_aggregators, aggregators, snapshots) = aggregator_data.into_inner().into();
 
         let mut aggregator_v1_changes = HashMap::new();
         let mut aggregator_v2_changes = HashMap::new();
@@ -71,10 +71,10 @@ impl<'a> NativeAggregatorContext<'a> {
             let (max_value, state) = aggregator.into();
             match id {
                 AggregatorID::Ephemeral(_) => {
-                    let change = AggregatorChange {
-                        max_value,
-                        state,
-                        base_aggregator: None,
+                    let change = match state {
+                        AggregatorState::Data { value } => AggregatorChange::Data { value },
+                        // TODO - read creates a change, remove it?
+                        AggregatorState::Delta { delta, history, .. } => AggregatorChange::AggregatorDelta { delta, max_value, history },
                     };
                     aggregator_v2_changes.insert(id, change);
                 },
@@ -88,6 +88,19 @@ impl<'a> NativeAggregatorContext<'a> {
                     };
                     aggregator_v1_changes.insert(id, change);
                 },
+            }
+        }
+
+        for (id, snapshot) in snapshots {
+            let state = snapshot.into();
+            let change = match state {
+                AggregatorSnapshotState::Data { value: SnapshotValue::Integer( value ) } => Some(AggregatorChange::Data { value }),
+                AggregatorSnapshotState::Data { value: SnapshotValue::String( value ) } => Some(AggregatorChange::StringData { value }),
+                AggregatorSnapshotState::Delta { base_aggregator, delta, formula } => Some(AggregatorChange::SnapshotDelta { delta, base_aggregator, formula }),
+                AggregatorSnapshotState::Reference { .. } => None,
+            };
+            if let Some(change) = change {
+                aggregator_v2_changes.insert(id, change);
             }
         }
 
@@ -107,10 +120,10 @@ impl<'a> NativeAggregatorContext<'a> {
 mod test {
     use super::*;
     use aptos_aggregator::{
-        aggregator_extension::{DeltaHistory, SpeculativeStartValue},
+        aggregator_extension::SpeculativeStartValue,
         aggregator_v1_id_for_test,
-        bounded_math::DeltaValue,
-        AggregatorStore,
+        bounded_math::SignedU128,
+        AggregatorStore, delta_math::DeltaHistory,
     };
     use claims::{assert_matches, assert_ok};
 
@@ -138,6 +151,8 @@ mod test {
     //     |  600  |               |           | yes |         |
     //     |  700  |               |           | yes |         |
     //     |  800  |               |           |     |   yes   |
+    //     |  900  |               |           |     |         |
+    //     | 1000  |               |           |     |         |
     //     +-------+---------------+-----------+-----+---------+
     fn test_set_up_v1(context: &NativeAggregatorContext) {
         let mut aggregator_data = context.aggregator_data.borrow_mut();
@@ -202,7 +217,7 @@ mod test {
                 .unwrap(),
             AggregatorChangeV1::Delete
         );
-        let delta_100 = DeltaOp::new(DeltaValue::Positive(100), 600, DeltaHistory {
+        let delta_100 = DeltaOp::new(SignedU128::Positive(100), 600, DeltaHistory {
             max_achieved_positive_delta: 100,
             min_achieved_negative_delta: 0,
             min_overflow_positive_delta: None,
@@ -214,7 +229,7 @@ mod test {
                 .unwrap(),
             AggregatorChangeV1::Merge(delta_100)
         );
-        let delta_200 = DeltaOp::new(DeltaValue::Positive(200), 700, DeltaHistory {
+        let delta_200 = DeltaOp::new(SignedU128::Positive(200), 700, DeltaHistory {
             max_achieved_positive_delta: 200,
             min_achieved_negative_delta: 0,
             min_overflow_positive_delta: None,
@@ -291,7 +306,7 @@ mod test {
                 max_value: 900,
                 state: AggregatorState::Delta {
                     speculative_start_value: SpeculativeStartValue::LastCommittedValue(300),
-                    delta: DeltaValue::Positive(200),
+                    delta: SignedU128::Positive(200),
                     history: DeltaHistory {
                         max_achieved_positive_delta: 200,
                         min_achieved_negative_delta: 0,

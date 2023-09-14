@@ -471,7 +471,7 @@ impl VersionedAggregators {
 mod test {
     use super::*;
     use aptos_aggregator::{
-        aggregator_extension::DeltaHistory, bounded_math::DeltaValue, delta_change_set::DeltaOp,
+        bounded_math::SignedU128, delta_change_set::DeltaOp, delta_math::DeltaHistory,
     };
     use claims::{assert_err_eq, assert_ok_eq, assert_some};
     use test_case::test_case;
@@ -485,7 +485,7 @@ mod test {
 
     // For compactness, in tests where the Delta contents do not matter.
     fn test_delta() -> DeltaOp {
-        DeltaOp::new(DeltaValue::Positive(30), 1000, DeltaHistory {
+        DeltaOp::new(SignedU128::Positive(30), 1000, DeltaHistory {
             max_achieved_positive_delta: 30,
             min_achieved_negative_delta: 0,
             max_underflow_negative_delta: None,
@@ -494,7 +494,7 @@ mod test {
     }
 
     fn negative_delta() -> DeltaOp {
-        DeltaOp::new(DeltaValue::Negative(30), 1000, DeltaHistory {
+        DeltaOp::new(SignedU128::Negative(30), 1000, DeltaHistory {
             max_achieved_positive_delta: 0,
             min_achieved_negative_delta: 30,
             min_overflow_positive_delta: None,

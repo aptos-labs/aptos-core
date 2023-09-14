@@ -6,9 +6,8 @@
 //! postcondition.
 
 use crate::{
-    aggregator_extension::DeltaHistory,
-    bounded_math::{addition, addition_deltavalue, ok_underflow, subtraction, DeltaValue},
-    module::AGGREGATOR_MODULE,
+    bounded_math::SignedU128,
+    module::AGGREGATOR_MODULE, delta_math::{merge_data_and_delta, merge_two_deltas, DeltaHistory},
 };
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -19,19 +18,19 @@ use aptos_types::{
 use move_binary_format::errors::{Location, PartialVMResult};
 
 /// Represents an update from aggregator's operation.
-#[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Copy, Clonef, PartialEq, Eq)]
 pub struct DeltaOp {
     /// History computed during the transaction execution.
     history: DeltaHistory,
     /// The maximum value the aggregator can reach.
     max_value: u128,
     /// Delta which is the result of the execution.
-    update: DeltaValue,
+    update: SignedU128,
 }
 
 impl DeltaOp {
     /// Creates a new delta op.
-    pub fn new(update: DeltaValue, max_value: u128, history: DeltaHistory) -> Self {
+    pub fn new(update: SignedU128, max_value: u128, history: DeltaHistory) -> Self {
         Self {
             history,
             max_value,
@@ -40,56 +39,14 @@ impl DeltaOp {
     }
 
     /// Returns the kind of update for the delta op.
-    pub fn get_update(&self) -> DeltaValue {
+    pub fn get_update(&self) -> SignedU128 {
         self.update
     }
 
     /// Returns the result of delta application to `base` or error if
     /// postcondition is not satisfied.
     pub fn apply_to(&self, base: u128) -> PartialVMResult<u128> {
-        // First, validate if delta op can be applied to `base`. Note that
-        // this is possible if the values observed during execution didn't
-        // overflow or dropped below zero. The check can be emulated by actually
-        // doing addition and subtraction.
-        addition(
-            base,
-            self.history.max_achieved_positive_delta,
-            self.max_value,
-        )?;
-        subtraction(base, self.history.min_achieved_negative_delta)?;
-
-        // Do we need to check overflow/underflow from history as well?
-
-        // If delta has been successfully validated, apply the update.
-        Ok(addition_deltavalue(base, self.update, self.max_value)?)
-    }
-
-    /// Shifts by a `delta` the maximum positive value seen by `self`.
-    fn shifted_max_achieved_positive_delta_by(&self, delta: &DeltaOp) -> PartialVMResult<u128> {
-        // If addition overflows, we fail
-        // If addition underflows, that means `self` should have never
-        // reached any positive value. By convention, we use 0 for the latter
-        // case. Also, we can reuse `subtraction` which throws an error when M < V,
-        // simply mapping the error to 0.
-
-        Ok(ok_underflow(addition_deltavalue(
-            self.history.max_achieved_positive_delta,
-            delta.update,
-            self.max_value,
-        ))
-        .map(|result| result.unwrap_or(0))?)
-    }
-
-    /// Shifts by a `delta` the minimum negative value seen by `self`.
-    fn shifted_min_achieved_negative_delta_by(&self, delta: &DeltaOp) -> PartialVMResult<u128> {
-        // symmetric to `shifted_max_achieved_positive_delta_by`
-
-        Ok(ok_underflow(addition_deltavalue(
-            self.history.min_achieved_negative_delta,
-            delta.update.minus(),
-            self.max_value,
-        ))
-        .map(|result| result.unwrap_or(0))?)
+        merge_data_and_delta(base, &self.update, &self.history, self.max_value)
     }
 
     /// Applies self on top of previous delta, merging them together. Note
@@ -100,30 +57,10 @@ impl DeltaOp {
             self.max_value, previous_delta.max_value,
             "Cannot merge deltas with different limits",
         );
+        let (new_update, new_history) = merge_two_deltas(&previous_delta.update, &previous_delta.history, &self.update, &self.history, self.max_value)?;
 
-        // First, update the history values of this delta given that it starts from
-        // +value or -value instead of 0. We should do this check to avoid cases like this:
-        //
-        // Suppose we have deltas with limit of 100, and we have some `d2` which is +3 but it
-        // was +99 at some point. Now, if we merge some `d1` which is +2 with `d2`, we get
-        // the result is +5. However, it should not have happened because `d2` should hit
-        // +2+99 > 100 at some point in history and fail.
-        let shifted_max_achieved_positive_delta =
-            self.shifted_max_achieved_positive_delta_by(&previous_delta)?;
-        let shifted_min_achieved_negative_delta =
-            self.shifted_min_achieved_negative_delta_by(&previous_delta)?;
-
-        self.update = self.update.add(&previous_delta.update, self.max_value)?;
-
-        // Deltas have been merged successfully - update the history as well.
-        self.history.max_achieved_positive_delta = u128::max(
-            previous_delta.history.max_achieved_positive_delta,
-            shifted_max_achieved_positive_delta,
-        );
-        self.history.min_achieved_negative_delta = u128::max(
-            previous_delta.history.min_achieved_negative_delta,
-            shifted_min_achieved_negative_delta,
-        );
+        self.update = new_update;
+        self.history = new_history;
         Ok(())
     }
 
@@ -178,24 +115,22 @@ impl DeltaOp {
 impl std::fmt::Debug for DeltaOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.update {
-            DeltaValue::Positive(value) => {
+            SignedU128::Positive(value) => {
                 write!(
                     f,
-                    "+{} ensures 0 <= result <= {}, range [-{}, {}]",
+                    "+{} ensures 0 <= result <= {}, {:?}",
                     value,
                     self.max_value,
-                    self.history.min_achieved_negative_delta,
-                    self.history.max_achieved_positive_delta
+                    self.history
                 )
             },
-            DeltaValue::Negative(value) => {
+            SignedU128::Negative(value) => {
                 write!(
                     f,
-                    "-{} ensures 0 <= result <= {}, range [-{}, {}]",
+                    "-{} ensures 0 <= result <= {}, {:?}",
                     value,
                     self.max_value,
-                    self.history.min_achieved_negative_delta,
-                    self.history.max_achieved_positive_delta
+                    self.history
                 )
             },
         }
@@ -207,9 +142,9 @@ pub fn serialize(value: &u128) -> Vec<u8> {
     bcs::to_bytes(value).expect("unexpected serialization error in aggregator")
 }
 
-// Helper for tests, #[cfg(test)] doesn't work for cross-crate.
+#[cfg(any(test, feature = "testing"))]
 pub fn delta_sub(v: u128, max_value: u128) -> DeltaOp {
-    DeltaOp::new(DeltaValue::Negative(v), max_value, DeltaHistory {
+    DeltaOp::new(SignedU128::Negative(v), max_value, DeltaHistory {
         max_achieved_positive_delta: 0,
         min_achieved_negative_delta: v,
         min_overflow_positive_delta: None,
@@ -217,9 +152,9 @@ pub fn delta_sub(v: u128, max_value: u128) -> DeltaOp {
     })
 }
 
-// Helper for tests, #[cfg(test)] doesn't work for cross-crate.
+#[cfg(any(test, feature = "testing"))]
 pub fn delta_add(v: u128, max_value: u128) -> DeltaOp {
-    DeltaOp::new(DeltaValue::Positive(v), max_value, DeltaHistory {
+    DeltaOp::new(SignedU128::Positive(v), max_value, DeltaHistory {
         max_achieved_positive_delta: v,
         min_achieved_negative_delta: 0,
         min_overflow_positive_delta: None,
@@ -291,7 +226,7 @@ mod test {
 
     #[test]
     fn test_delta_merge_plus() {
-        use DeltaValue::*;
+        use SignedU128::*;
 
         // Case 1: preserving old history and updating the value.
         // Explanation: value becomes +2+1 = +3, history remains unchanged
@@ -389,7 +324,7 @@ mod test {
 
     #[test]
     fn test_delta_merge_minus() {
-        use DeltaValue::*;
+        use SignedU128::*;
 
         // Case 1: preserving old history and updating the value.
         // Explanation: value becomes -20-20 = -40, history remains unchanged

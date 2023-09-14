@@ -15,9 +15,8 @@ use crate::{
     txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_aggregator::{
-    aggregator_extension::DeltaHistory,
-    bounded_math::DeltaValue,
-    delta_change_set::{delta_add, delta_sub, DeltaOp},
+    bounded_math::SignedU128,
+    delta_change_set::{delta_add, delta_sub, DeltaOp}, delta_math::DeltaHistory,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
@@ -165,9 +164,9 @@ fn delta_chains() {
                         // Deterministic pattern for adds/subtracts.
                         DeltaOp::new(
                             if (i % 2 == 0) == (j < 5) {
-                                DeltaValue::Positive(10)
+                                SignedU128::Positive(10)
                             } else {
-                                DeltaValue::Negative(1)
+                                SignedU128::Negative(1)
                             },
                             // below params irrelevant for this test.
                             u128::MAX,
