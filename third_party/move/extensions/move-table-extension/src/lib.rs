@@ -43,7 +43,7 @@ use std::{
 /// The representation of a table handle. This is created from truncating a sha3-256 based
 /// hash over a transaction hash provided by the environment and a table creation counter
 /// local to the transaction.
-#[derive(Copy, Clone, Debug, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct TableHandle(pub AccountAddress);
 
 impl Display for TableHandle {
