@@ -10,14 +10,18 @@ use super::{
     unsync_map::UnsyncMap,
     *,
 };
-use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
+use aptos_aggregator::{
+    bounded_math::SignedU128,
+    delta_change_set::{delta_add, delta_sub, DeltaOp},
+    delta_math::DeltaHistory,
+};
 use aptos_types::executable::ExecutableTestType;
 use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
 mod proptest_types;
 
 fn match_unresolved(
     read_result: anyhow::Result<MVDataOutput<TestValue>, MVDataError>,
-    update: DeltaUpdate,
+    update: SignedU128,
 ) {
     match read_result {
         Err(MVDataError::Unresolved(delta)) => assert_eq!(delta.get_update(), update),
@@ -132,7 +136,7 @@ fn create_write_read_placeholder_struct() {
     // Reads from ap1 and ap3 go to db.
     match_unresolved(
         mvtbl.data().fetch_data(&ap1, 30),
-        DeltaUpdate::Minus((61 + 13) - 11),
+        SignedU128::Negative((61 + 13) - 11),
     );
     let r_db = mvtbl.data().fetch_data(&ap3, 30);
     assert_eq!(Err(Uninitialized), r_db);
@@ -170,10 +174,15 @@ fn materialize_delta_shortcut() {
     vd.add_delta(ap.clone(), 8, delta_add(20, limit));
     vd.add_delta(ap.clone(), 11, delta_add(30, limit));
 
-    match_unresolved(vd.fetch_data(&ap, 10), DeltaUpdate::Plus(30));
+    match_unresolved(vd.fetch_data(&ap, 10), SignedU128::Positive(30));
     assert_err_eq!(
         vd.materialize_delta(&ap, 8),
-        DeltaOp::new(DeltaUpdate::Plus(30), limit, 30, 0)
+        DeltaOp::new(SignedU128::Positive(30), limit, DeltaHistory {
+            max_achieved_positive_delta: 30,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        })
     );
     vd.provide_base_value(ap.clone(), TestValue::from_u128(5));
     // Multiple calls are idempotent.
