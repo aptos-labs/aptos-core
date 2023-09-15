@@ -1727,6 +1727,12 @@ impl VMAdapter for AptosVM {
                                     vm_status
                                 ),
                             );
+                            error!(
+                                *log_context,
+                                "execute_single_transaction txn: {:?}, status: {:?}",
+                                bcs::to_bytes::<SignedTransaction>(&**txn),
+                                vm_status,
+                            );
                         },
                         // Paranoid mode failure. We need to be alerted about this ASAP.
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
