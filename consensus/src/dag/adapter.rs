@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    consensusdb::{
-        CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema, OrderedAnchorIdSchema,
-    },
+    consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
     dag::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
@@ -69,7 +67,6 @@ impl Notifier for NotifierAdapter {
         failed_author: Vec<(Round, Author)>,
     ) -> anyhow::Result<()> {
         let anchor = ordered_nodes.last().unwrap();
-        let anchor_id = anchor.id();
         let epoch = anchor.epoch();
         let round = anchor.round();
         let timestamp = anchor.metadata().timestamp();
@@ -98,10 +95,7 @@ impl Notifier for NotifierAdapter {
                       _commit_decision: LedgerInfoWithSignatures| {
                     // TODO: this doesn't really work since not every block will trigger a callback,
                     // we need to update the buffer manager to invoke all callbacks instead of only last one
-                    if let Err(e) = storage
-                        .delete_certified_nodes(node_digests)
-                        .and_then(|_| storage.delete_ordered_anchor_ids(vec![anchor_id]))
-                    {
+                    if let Err(e) = storage.delete_certified_nodes(node_digests) {
                         error!(
                             "Failed to garbage collect committed nodes and anchor: {:?}",
                             e
@@ -244,22 +238,6 @@ impl DAGStorage for StorageAdapter {
         Ok(self.consensus_db.delete::<CertifiedNodeSchema>(digests)?)
     }
 
-    fn save_ordered_anchor_id(&self, node_id: &NodeId) -> anyhow::Result<()> {
-        Ok(self
-            .consensus_db
-            .put::<OrderedAnchorIdSchema>(node_id, &())?)
-    }
-
-    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>> {
-        Ok(self.consensus_db.get_all::<OrderedAnchorIdSchema>()?)
-    }
-
-    fn delete_ordered_anchor_ids(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()> {
-        Ok(self
-            .consensus_db
-            .delete::<OrderedAnchorIdSchema>(node_ids)?)
-    }
-
     fn get_latest_k_committed_events(&self, k: u64) -> anyhow::Result<Vec<CommitEvent>> {
         let latest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
         let mut commit_events = vec![];
@@ -278,6 +256,7 @@ impl DAGStorage for StorageAdapter {
                 commit_events.push(self.convert(new_block_event)?);
             }
         }
+        commit_events.reverse();
         Ok(commit_events)
     }
 

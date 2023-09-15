@@ -98,18 +98,6 @@ impl DAGStorage for MockStorage {
         Ok(())
     }
 
-    fn save_ordered_anchor_id(&self, _node_id: &NodeId) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>> {
-        Ok(vec![])
-    }
-
-    fn delete_ordered_anchor_ids(&self, _node_ids: Vec<NodeId>) -> anyhow::Result<()> {
-        Ok(())
-    }
-
     fn get_latest_k_committed_events(&self, _k: u64) -> anyhow::Result<Vec<CommitEvent>> {
         Ok(vec![])
     }
