@@ -29,7 +29,6 @@ use fail::fail_point;
 use futures::{SinkExt, StreamExt};
 use std::{boxed::Box, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
-use aptos_types::dkg::StartDKGEvent;
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
@@ -184,15 +183,6 @@ impl StateComputer for ExecutionProxy {
             let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().as_ref().unwrap().clone();
 
             // trigger the start of dkg
-            match StartDKGEvent::try_from(dkg_events
-                .first().unwrap()) {
-                Ok(e) => {
-                    debug!("[DKG] commit: StartDKGEvent={:?}", &e);
-                }
-                _ => {
-                    debug!("[DKG] commit: StartDKGEvent decoding failure?");
-                }
-            }
             dkg_manager_wrapper.start_dkg(dkg_events).await;
         }
 

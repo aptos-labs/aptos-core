@@ -3,8 +3,6 @@
 
 pub(crate) mod dkg_handler;
 pub mod dkg_manager;
-mod dkg_network;
-mod dkg_reliable_broadcast;
 pub mod dkg_rounding;
 mod dkg_store;
 pub mod types;

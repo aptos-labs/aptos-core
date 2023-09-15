@@ -2,21 +2,45 @@
 
 use super::{
     dkg_manager::DKGManager,
-    dkg_network::DKGRpcHandler,
-    dkg_reliable_broadcast::{DKGAggNodeHandler, DKGNodeHandler},
-    types::DKGMessage,
+    types::{DKGMessage, DKGNodeAck, DKGAggNodeAck}, DKGNode,
 };
-use crate::network::{IncomingDKGRequest, TConsensusMsg};
-use anyhow::bail;
+use crate::{network::{IncomingDKGRequest, TConsensusMsg}, network_interface::ConsensusMsg};
 use aptos_channels::aptos_channel;
-use aptos_consensus_types::common::Author;
-use aptos_logger::{error, info, warn};
+use aptos_consensus_types::{common::Author, dkg_types::DKGAggNode};
+use aptos_logger::{error, info, warn, debug};
 use aptos_network::protocols::network::RpcError;
 use aptos_types::epoch_state::EpochState;
+use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use aptos_infallible::Mutex;
+
+pub trait DKGRpcHandler {
+    type DKGRequest;
+    type DKGResponse;
+
+    fn process(&mut self, message: Self::DKGRequest) -> anyhow::Result<Self::DKGResponse>;
+}
+
+#[async_trait]
+pub trait DKGNetworkSender: Send + Sync {
+    async fn send_rpc(
+        &self,
+        receiver: Author,
+        message: ConsensusMsg,
+        timeout: Duration,
+    ) -> anyhow::Result<ConsensusMsg>;
+
+    /// Given a list of potential responders, sending rpc to get response from any of them and could
+    /// fallback to more in case of failures.
+    async fn send_rpc_with_fallbacks(
+        &self,
+        responders: Vec<Author>,
+        message: ConsensusMsg,
+        timeout: Duration,
+    ) -> anyhow::Result<ConsensusMsg>;
+}
 
 pub struct DKGNetworkHandler {
     author: Author,
@@ -63,13 +87,6 @@ impl DKGNetworkHandler {
     async fn process_rpc(&mut self, rpc_request: IncomingDKGRequest) -> anyhow::Result<()> {
         let dkg_message: DKGMessage = rpc_request.req.try_into()?;
 
-        let author = dkg_message
-            .author()
-            .map_err(|_| anyhow::anyhow!("[DKG] unexpected rpc message {:?}", dkg_message))?;
-        if author != rpc_request.sender {
-            bail!("[DKG] message author and network author mismatch");
-        }
-
         let response: anyhow::Result<DKGMessage> = match dkg_message {
             DKGMessage::DKGNodeMsg(node) => self.node_receiver.process(node).map(|r| r.into()),
             DKGMessage::DKGAggNodeMsg(agg_node) => {
@@ -94,5 +111,61 @@ impl DKGNetworkHandler {
             .response_sender
             .send(response)
             .map_err(|_| anyhow::anyhow!("[DKG] unable to respond to rpc"))
+    }
+}
+
+pub struct DKGNodeHandler {
+    dkg_manager: Arc<Mutex<DKGManager>>,
+}
+
+impl DKGNodeHandler {
+    pub fn new(dkg_manager: Arc<Mutex<DKGManager>>) -> Self {
+        Self { dkg_manager }
+    }
+}
+
+impl DKGRpcHandler for DKGNodeHandler {
+    type DKGRequest = DKGNode;
+    type DKGResponse = DKGNodeAck;
+
+    fn process(&mut self, node: Self::DKGRequest) -> anyhow::Result<Self::DKGResponse> {
+        let epoch = node.epoch();
+        debug!("[DKG] Process DKG Node from {:?}", node.author());
+        // dkg todo: persist the dkg nodes
+        match self.dkg_manager.lock().add_node(node) {
+            Ok(_) => Ok(DKGNodeAck::new(epoch)),
+            Err(e) => {
+                error!("[DKG] Error when adding DKG node: {:?}", e);
+                Err(e)
+            },
+        }
+    }
+}
+
+pub struct DKGAggNodeHandler {
+    dkg_manager: Arc<Mutex<DKGManager>>,
+}
+
+impl DKGAggNodeHandler {
+    pub fn new(dkg_manager: Arc<Mutex<DKGManager>>) -> Self {
+        Self { dkg_manager }
+    }
+}
+
+impl DKGRpcHandler for DKGAggNodeHandler {
+    type DKGRequest = DKGAggNode;
+    type DKGResponse = DKGAggNodeAck;
+
+    fn process(&mut self, agg_node: Self::DKGRequest) -> anyhow::Result<Self::DKGResponse> {
+        let epoch = agg_node.epoch();
+        debug!("[DKG] Process DKG Aggregated Node: {:?}", agg_node.metadata());
+        // dkg todo: persist the dkg nodes
+        match self.dkg_manager.lock().add_agg_node(agg_node) {
+            Ok(_) => Ok(DKGAggNodeAck::new(epoch)),
+            Err(e) => {
+                error!("[DKG] Error when adding DKG aggregated node: {:?}", e);
+                Err(e)
+            },
+        }
     }
 }

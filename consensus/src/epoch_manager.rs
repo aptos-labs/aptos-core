@@ -10,7 +10,7 @@ use crate::{
     counters,
     dkg::{
         dkg_handler::DKGNetworkHandler,
-        dkg_manager::{DKGManager, DKGManagerWrapper}, dkg_rounding::{rounding_scheme, MAX_NUM_SHARES},
+        dkg_manager::{DKGManager, DKGManagerWrapper}, build_dkg_pvss_config,
     },
     error::{error_kind, DbError},
     experimental::{
@@ -99,7 +99,7 @@ use std::{
 };
 use tokio_retry::strategy::ExponentialBackoff;
 use aptos_crypto::bls12381;
-use aptos_dkg::pvss::{Player, WeightedConfig};
+use aptos_dkg::pvss::Player;
 use aptos_dkg::pvss::traits::Transcript;
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_secure_storage::Storage;
@@ -848,6 +848,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload<P>) {
+        // dkg todo: feature guard the changes
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
@@ -856,17 +857,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             verifier: (&validator_set).into(),
         };
         let my_index = *epoch_state.verifier.address_to_validator_index().get(&self.author).unwrap();
-        debug!("[DKG] start_new_epoch: with my_index={}", my_index);
-
         debug!("[DKG] start_new_epoch: with current_epoch={:?}, target_epoch={}", self.epoch_state.as_ref().map(|a|a.epoch), epoch_state.epoch);
         let maybe_dkg_state: anyhow::Result<DKGState> = payload.get();
         match maybe_dkg_state {
             Err(_) => {
-                debug!("On-chain DKGState not initialized. Probably the DKG feature is not enabled.");
-                //dkg todo: when epoch starts with no dkg transcript, proceed epoch without randomness.
+                error!("On-chain DKGState not initialized!");
+                // dkg todo: when epoch starts with no dkg transcript, proceed epoch without randomness.
             }
             Ok(state) if state.target_epoch > 1 => {
-                debug!("[DKG] start_new_epoch with DKGState[state_id={}, target_epoch={}, countdown={}, trx_size={}]", state.state_id, state.target_epoch, state.countdown, state.serialized_transcript.len());
                 let trxs = bcs::from_bytes::<DKGTranscriptWrapper>(state.serialized_transcript.as_slice()).unwrap();
                 let st: Storage = (&self.config.safety_rules.backend).try_into().unwrap();
                 if let Err(error) = st.available() {
@@ -879,30 +877,26 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 let mut dk_bytes = private_key.to_bytes(); //in big-endian
                 dk_bytes.reverse();// now in small-endian, needed by pvss API.
                 let dk = aptos_dkg::pvss::encryption_dlog::g1::DecryptPrivKey::try_from(dk_bytes.as_slice()).unwrap();
-                let (wc_1, wc_2) = match self.dkg_manager_wrapper.get_pvss_config() {
-                    Some(config) => (config.wc_1, config.wc_2),
+                let dkg_pvss_config = match self.dkg_manager_wrapper.get_pvss_config() {
+                    Some(config) => config,
                     None => {
-                        // new validator does not have pvss config yet. create one from the stake distribution.
-                        let validator_addresses = epoch_state.verifier.get_ordered_account_addresses();
-                        let validator_stakes: Vec<_> = validator_addresses
-                            .iter()
-                            .map(|validator| epoch_state.verifier.get_voting_power(&validator).unwrap())
-                            .collect();
-
-                        let (validator_weights, weights_of_one_third_stake, weights_of_two_third_stake) =
-                        rounding_scheme(validator_stakes.clone(), MAX_NUM_SHARES);
-
-                        let weighted_config_1 =
-                            WeightedConfig::new(weights_of_one_third_stake, validator_weights.clone()).unwrap();
-                        let weighted_config_2 =
-                            WeightedConfig::new(weights_of_two_third_stake, validator_weights.clone()).unwrap();
-                        (weighted_config_1, weighted_config_2)
+                        // new validator does not have pvss config yet. create one from the validator_set.
+                        let (_, pvss_config) = build_dkg_pvss_config(state.target_epoch - 1, &validator_set);
+                        pvss_config
                     }
                 };
-                let (sk1, _pk1) = trxs.trx_one_third.decrypt_own_share(&wc_1, &Player{id: my_index}, &dk);
-                let (sk2, _pk2) = trxs.trx_two_third.decrypt_own_share(&wc_2, &Player{id: my_index}, &dk);
-                //dkg todo: start randgen with these keys.
-                debug!("[DKG] starting new epoch with sk1={:?}, sk2={:?}\n current_epoch={:?}, target_epoch={}", sk1, sk2, self.epoch_state.as_ref().map(|a|a.epoch), epoch_state.epoch);
+                match trxs.verify(&dkg_pvss_config, &epoch_state.verifier) {
+                    Ok(_) => {
+                        let (_sk1, _pk1) = trxs.trx_one_third.decrypt_own_share(&dkg_pvss_config.wc_1, &Player{id: my_index}, &dk);
+                        let (_sk2, _pk2) = trxs.trx_two_third.decrypt_own_share(&dkg_pvss_config.wc_2, &Player{id: my_index}, &dk);
+                        //dkg todo: start randgen with these keys.
+                        debug!("[DKG] Successfully decrypted randomness keys!");
+                    },
+                    Err(error) => {
+                        // dkg todo: error handling and proceed epoch without randomness
+                        panic!("[DKG] Failed to verify DKGTranscriptWrapper: {:?}", error);
+                    }
+                }
             }
             _ => {
                 debug!("No trxs in epoch 1. This is expected.");

@@ -9,7 +9,6 @@ use aptos_types::{
     dkg::{DKGPvssConfig, DKGTranscriptWrapper},
     validator_verifier::ValidatorVerifier,
 };
-use tokio::sync::OnceCell;
 
 pub struct DKGStore {
     author: Author,
@@ -21,9 +20,10 @@ pub struct DKGStore {
     // store the partially aggregated transcripts
     agg_trx: Option<DKGTranscriptWrapper>,
     // store the aggregated node containing the final aggregated transcript
-    // will be proposed as payload by proposal generator once the OnceCell is set
-    agg_node: OnceCell<DKGAggNode>,
-    agg_node_taken: bool,
+    // will be proposed as payload by proposal generator
+    agg_node: Option<DKGAggNode>,
+    // true if the aggregated node is already pulled by the proposal generator
+    agg_node_proposed: bool,
     // buffer the nodes received before the DKG locally starts
     buffered_nodes: Vec<DKGNode>,
     buffered_agg_nodes: Vec<DKGAggNode>,
@@ -37,8 +37,8 @@ impl DKGStore {
             dkg_pvss_config: None,
             nodes: HashMap::new(),
             agg_trx: None,
-            agg_node: OnceCell::new(),
-            agg_node_taken: false,
+            agg_node: None,
+            agg_node_proposed: false,
             buffered_nodes: vec![],
             buffered_agg_nodes: vec![],
         }
@@ -74,12 +74,14 @@ impl DKGStore {
             self.buffer_nodes(node);
             return Ok(None);
         }
+        
+        if self.agg_node.is_some() {
+            debug!("[DKG] Node {:?} adds DKG Node failed due to agg node already available", self.author);
+            return Ok(None);
+        }
+
         match node.verify(self.dkg_pvss_config.as_ref().unwrap(), &self.validator_verifier) {
             Ok(_) => {
-                if self.agg_node.get().is_some() || self.agg_node_taken {
-                    debug!("[DKG] Node {:?} adds DKG Node failed due to agg node already available", self.author);
-                    return Ok(None);
-                }
                 let author = node.author();
                 if self.nodes.contains_key(node.author()) {
                     return Err(anyhow::anyhow!(
@@ -100,15 +102,6 @@ impl DKGStore {
                 debug!("[DKG] Node {:?} aggregates DKG trx: {:?}", self.author, node.metadata());
 
                 let authors: Vec<Author> = self.nodes.iter().map(|(k,_)| *k).collect();
-
-                let mut aggregated_voting_power = 0;
-                for account_address in authors.clone() {
-                    match self.validator_verifier.get_voting_power(&account_address) {
-                        Some(voting_power) => aggregated_voting_power += voting_power as u128,
-                        None => (),
-                    }
-                }
-                debug!("[DKG] Node {:?} has aggregated stake {:?}, threshold stake {:?}", self.author, aggregated_voting_power, self.validator_verifier.total_voting_power() - self.validator_verifier.quorum_voting_power());
 
                 // transcripts from > one third stakes are sufficient to reconstruct the aggregated node
                 if self.validator_verifier
@@ -138,7 +131,7 @@ impl DKGStore {
     }
 
     pub fn add_agg_node(&mut self, agg_node: DKGAggNode) -> anyhow::Result<Option<DKGAggNode>> {
-        if self.agg_node.get().is_some() || self.agg_node_taken {
+        if self.agg_node.is_some() {
             return Ok(None);
         }
 
@@ -150,11 +143,9 @@ impl DKGStore {
         match agg_node.verify(self.dkg_pvss_config.as_ref().unwrap(), &self.validator_verifier)
         {
             Ok(_) => {
-                if self.agg_node.set(agg_node.clone()).is_ok() {
-                    debug!("[DKG] Adding DKG Aggregated Node for epoch {:?}", agg_node.epoch());
-                    return Ok(Some(agg_node));
-                }
-                return Ok(None);
+                self.agg_node = Some(agg_node.clone());
+                debug!("[DKG] Adding DKG Aggregated Node for epoch {:?}", agg_node.epoch());
+                return Ok(Some(agg_node));
             }
             Err(e) => {
                 anyhow::bail!("[DKG] Failed to verify DKG aggregated node: {:?}, error = {:?}", agg_node.metadata(), e);
@@ -163,14 +154,12 @@ impl DKGStore {
     }
 
     pub fn ready(&self) -> bool {
-        self.agg_node.get().is_some() && self.get_pvss_config().is_some()
+        self.agg_node.is_some() && self.get_pvss_config().is_some() && !self.agg_node_proposed
     }
 
     pub fn take_agg_node(&mut self) -> Option<DKGAggNode> {
-        if self.agg_node.initialized() {
-            self.agg_node_taken = true;
-        }
-        self.agg_node.take()
+        self.agg_node_proposed = true;
+        self.agg_node.clone()
     }
 
     pub fn buffer_nodes(&mut self, node: DKGNode) {

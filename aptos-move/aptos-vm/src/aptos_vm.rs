@@ -1324,7 +1324,6 @@ impl AptosVM {
             .0
             .get_features()
             .is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG);
-        debug!("[DKG] process_block_prologue: reconfigure_with_dkg={}", reconfigure_with_dkg_enabled);
         if reconfigure_with_dkg_enabled {
             let args = serialize_values(&block_metadata.get_prologue_v2_move_args(txn_data.sender));
             session
