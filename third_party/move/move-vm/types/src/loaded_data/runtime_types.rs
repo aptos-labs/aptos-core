@@ -115,7 +115,7 @@ pub struct StructType {
     pub phantom_ty_args_mask: Vec<bool>,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
-    pub name: Arc<StructName>,
+    pub name: Arc<StructIdentifier>,
 }
 
 impl StructType {
@@ -128,7 +128,7 @@ impl StructType {
 pub struct CachedStructIndex(pub usize);
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct StructName {
+pub struct StructIdentifier {
     pub module: ModuleId,
     pub name: Identifier,
 }
@@ -144,12 +144,12 @@ pub enum Type {
     Signer,
     Vector(Box<Type>),
     Struct {
-        name: Arc<StructName>,
+        name: Arc<StructIdentifier>,
         #[derivative(PartialEq = "ignore", Hash = "ignore")]
         ability: AbilitySet,
     },
     StructInstantiation {
-        name: Arc<StructName>,
+        name: Arc<StructIdentifier>,
         ty_args: Arc<Vec<Type>>,
         #[derivative(PartialEq = "ignore", Hash = "ignore")]
         base_ability_set: AbilitySet,

@@ -4,7 +4,7 @@
 use move_binary_format::{
     binary_views::BinaryIndexedView, errors::PartialVMResult, file_format::SignatureToken,
 };
-use move_vm_types::loaded_data::runtime_types::{StructName, Type};
+use move_vm_types::loaded_data::runtime_types::{StructIdentifier, Type};
 use std::sync::Arc;
 
 // `make_type_internal` returns a `Type` given a signature and a resolver which
@@ -12,7 +12,7 @@ use std::sync::Arc;
 pub fn make_type_internal(
     module: BinaryIndexedView,
     tok: &SignatureToken,
-    struct_name_table: &[Arc<StructName>],
+    struct_name_table: &[Arc<StructIdentifier>],
 ) -> PartialVMResult<Type> {
     let res = match tok {
         SignatureToken::Bool => Type::Bool,

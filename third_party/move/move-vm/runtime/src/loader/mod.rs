@@ -25,7 +25,7 @@ use move_core_types::{
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
-use move_vm_types::loaded_data::runtime_types::{DepthFormula, StructName, StructType, Type};
+use move_vm_types::loaded_data::runtime_types::{DepthFormula, StructIdentifier, StructType, Type};
 use parking_lot::RwLock;
 use sha3::{Digest, Sha3_256};
 use std::{
@@ -1169,7 +1169,7 @@ impl Loader {
 
     pub(crate) fn get_struct_type_by_name(
         &self,
-        name: &StructName,
+        name: &StructIdentifier,
     ) -> PartialVMResult<Arc<StructType>> {
         self.module_cache
             .read()
@@ -1558,7 +1558,7 @@ impl Script {
                         .finish(Location::Script),
                 );
             }
-            struct_names.push(Arc::new(StructName {
+            struct_names.push(Arc::new(StructIdentifier {
                 module: module_id,
                 name: struct_name.to_owned(),
             }));
@@ -1741,8 +1741,8 @@ impl StructInfo {
 
 #[derive(Clone)]
 pub(crate) struct TypeCache {
-    structs: HashMap<StructName, HashMap<Vec<Type>, StructInfo>>,
-    depth_formula: HashMap<StructName, DepthFormula>,
+    structs: HashMap<StructIdentifier, HashMap<Vec<Type>, StructInfo>>,
+    depth_formula: HashMap<StructIdentifier, DepthFormula>,
 }
 
 impl TypeCache {
@@ -1787,7 +1787,7 @@ impl PseudoGasContext {
 impl Loader {
     fn struct_name_to_type_tag(
         &self,
-        name: &StructName,
+        name: &StructIdentifier,
         ty_args: &[Type],
         gas_context: &mut PseudoGasContext,
     ) -> PartialVMResult<StructTag> {
@@ -1885,7 +1885,7 @@ impl Loader {
 
     fn struct_name_to_type_layout(
         &self,
-        name: &StructName,
+        name: &StructIdentifier,
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
@@ -2007,7 +2007,7 @@ impl Loader {
 
     fn struct_name_to_fully_annotated_layout(
         &self,
-        name: &StructName,
+        name: &StructIdentifier,
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
@@ -2109,7 +2109,7 @@ impl Loader {
 
     pub(crate) fn calculate_depth_of_struct(
         &self,
-        name: &StructName,
+        name: &StructIdentifier,
     ) -> PartialVMResult<DepthFormula> {
         if let Some(depth_formula) = self.type_cache.read().depth_formula.get(name) {
             return Ok(depth_formula.clone());

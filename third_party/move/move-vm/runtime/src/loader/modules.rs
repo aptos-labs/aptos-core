@@ -25,7 +25,7 @@ use move_core_types::{
     language_storage::ModuleId,
     vm_status::StatusCode,
 };
-use move_vm_types::loaded_data::runtime_types::{StructName, StructType, Type};
+use move_vm_types::loaded_data::runtime_types::{StructIdentifier, StructType, Type};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
@@ -83,7 +83,7 @@ impl ModuleCache {
         &self,
         module: &CompiledModule,
         struct_def: &StructDefinition,
-        struct_name_table: &[Arc<StructName>],
+        struct_name_table: &[Arc<StructIdentifier>],
     ) -> PartialVMResult<StructType> {
         let struct_handle = module.struct_handle_at(struct_def.struct_handle);
         let field_names = match &struct_def.field_information {
@@ -122,7 +122,7 @@ impl ModuleCache {
             field_names,
             abilities,
             type_parameters,
-            name: Arc::new(StructName {
+            name: Arc::new(StructIdentifier {
                 name,
                 module: module.self_id(),
             }),
@@ -297,7 +297,7 @@ impl Module {
                         .with_message("Ability definition of module mismatch".to_string()));
                     }
                 }
-                struct_names.push(Arc::new(StructName {
+                struct_names.push(Arc::new(StructIdentifier {
                     module: module_id,
                     name: struct_name.to_owned(),
                 }))
