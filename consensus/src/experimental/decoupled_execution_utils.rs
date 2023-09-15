@@ -8,7 +8,7 @@ use crate::{
         execution_phase::{ExecutionPhase, ExecutionRequest, ExecutionResponse},
         persisting_phase::{PersistingPhase, PersistingRequest},
         pipeline_phase::{CountedRequest, PipelinePhase},
-        signing_phase::{SigningPhase, SigningRequest, SigningResponse},
+        signing_phase::{CommitSignerProvider, SigningPhase, SigningRequest, SigningResponse},
     },
     network::{IncomingCommitRequest, NetworkSender},
     state_replication::StateComputer,
@@ -18,8 +18,6 @@ use aptos_consensus_types::common::Author;
 use aptos_types::{account_address::AccountAddress, validator_verifier::ValidatorVerifier};
 use futures::channel::mpsc::UnboundedReceiver;
 use std::sync::{atomic::AtomicU64, Arc};
-
-use super::signing_phase::CommitSignerProvider;
 
 /// build channels and return phases and buffer manager
 pub fn prepare_phases_and_buffer_manager(
