@@ -14,7 +14,7 @@ module aptos_framework::event {
     /// Module event feature is not supported.
     const EMODULE_EVENT_NOT_SUPPORTED: u64 = 1;
 
-    /// Emit an event with payload `msg` by using `handle_ref`'s key and counter.
+    /// Emit a module event with payload `msg`.
     public fun emit<T: store + drop>(msg: T) {
         assert!(features::module_event_enabled(), std::error::invalid_state(EMODULE_EVENT_NOT_SUPPORTED));
         write_module_event_to_store<T>(msg);
