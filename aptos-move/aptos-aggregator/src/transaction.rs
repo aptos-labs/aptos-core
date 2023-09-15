@@ -10,7 +10,7 @@ pub struct AggregatorValue(u128);
 impl AggregatorValue {
     /// Returns None if the write doesn't contain a value (i.e deletion), and panics if
     /// the value raw bytes can't be deserialized into an u128.
-    pub fn from_write(write: &dyn TransactionWrite) -> Option<Self> {
+    pub fn from_write(write: &impl TransactionWrite) -> Option<Self> {
         let v = write.extract_raw_bytes();
         v.map(|bytes| {
             Self(

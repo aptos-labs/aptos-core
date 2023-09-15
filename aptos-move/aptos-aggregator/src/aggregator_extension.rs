@@ -5,50 +5,49 @@ use crate::{
     bounded_math::{code_invariant_error, expect_ok, ok_overflow, BoundedMath, SignedU128},
     delta_math::DeltaHistory,
     resolver::{AggregatorReadMode, AggregatorResolver},
+    types::AggregatorID,
 };
 use aptos_types::{
     state_store::{state_key::StateKey, table::TableHandle},
     vm_status::StatusCode,
 };
+use claims::assert_matches;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::account_address::AccountAddress;
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct AggregatorHandle(pub AccountAddress);
-
 /// Uniquely identifies an aggregator or aggregator snapshot instance in storage.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum AggregatorID {
+pub enum VersionedID {
     // Aggregator V1 is implemented as a state item, and so can be queried by
     // the state key.
-    Legacy(StateKey),
+    V1(StateKey),
     // Aggregator V2 is embedded into resources, and uses ephemeral identifiers
     // which are unique per block.
-    Ephemeral(u64),
+    V2(AggregatorID),
 }
 
-impl AggregatorID {
-    pub fn legacy(handle: TableHandle, key: AggregatorHandle) -> Self {
-        let state_key = StateKey::table_item(handle, key.0.to_vec());
-        AggregatorID::Legacy(state_key)
+impl VersionedID {
+    pub fn v1(handle: TableHandle, key: AccountAddress) -> Self {
+        let state_key = StateKey::table_item(handle, key.to_vec());
+        VersionedID::V1(state_key)
     }
 
-    pub fn ephemeral(id: u64) -> Self {
-        AggregatorID::Ephemeral(id)
+    pub fn v2(id: AggregatorID) -> Self {
+        VersionedID::V2(id)
     }
 
     pub fn as_state_key(&self) -> Option<&StateKey> {
         match self {
-            Self::Legacy(state_key) => Some(state_key),
-            Self::Ephemeral(_) => None,
+            Self::V1(state_key) => Some(state_key),
+            Self::V2(_) => None,
         }
     }
 
     pub fn into_state_key(self) -> Option<StateKey> {
         match self {
-            Self::Legacy(state_key) => Some(state_key),
-            Self::Ephemeral(_) => None,
+            Self::V1(state_key) => Some(state_key),
+            Self::V2(_) => None,
         }
     }
 }
@@ -169,7 +168,7 @@ impl AggregatorSnapshot {
 #[derive(Debug)]
 pub struct Aggregator {
     // The identifier used to identify the aggregator.
-    id: AggregatorID,
+    id: VersionedID,
     // Describes an upper bound of an aggregator. If value of the aggregator
     // exceeds it, the aggregator overflows.
     // TODO: Currently this is a single u128 value since we use 0 as a trivial
@@ -330,10 +329,10 @@ impl Aggregator {
                 }
 
                 let maybe_value_from_storage = match &self.id {
-                    AggregatorID::Legacy(state_key) => resolver
+                    VersionedID::V1(state_key) => resolver
                         .get_aggregator_v1_value(state_key, AggregatorReadMode::LastCommitted),
                     // TODO: use integers directly, or some wrapped type.
-                    id => resolver
+                    VersionedID::V2(id) => resolver
                         .get_aggregator_v2_value(id, AggregatorReadMode::LastCommitted)
                         .map(Some),
                 };
@@ -389,11 +388,11 @@ impl Aggregator {
 
                 // Otherwise, we have to go to storage and read the value.
                 let maybe_value_from_storage = match &self.id {
-                    AggregatorID::Legacy(state_key) => {
+                    VersionedID::V1(state_key) => {
                         resolver.get_aggregator_v1_value(state_key, AggregatorReadMode::Aggregated)
                     },
                     // TODO: use integers directly, or some wrapped type.
-                    id => resolver
+                    VersionedID::V2(id) => resolver
                         .get_aggregator_v2_value(id, AggregatorReadMode::Aggregated)
                         .map(Some),
                 };
@@ -436,12 +435,12 @@ pub struct AggregatorData {
     // All aggregators that were created in the current transaction, stored as ids.
     // Used to filter out aggregators that were created and destroyed in the
     // within a single transaction.
-    new_aggregators: BTreeSet<AggregatorID>,
+    new_aggregators: BTreeSet<VersionedID>,
     // All aggregators that were destroyed in the current transaction, stored as ids.
-    destroyed_aggregators: BTreeSet<AggregatorID>,
+    destroyed_aggregators: BTreeSet<StateKey>,
     // All aggregator instances that exist in the current transaction.
-    aggregators: BTreeMap<AggregatorID, Aggregator>,
-    // All aggregatorsnapshot instances that exist in the current transaction.
+    aggregators: BTreeMap<VersionedID, Aggregator>,
+    // All aggregator snapshot instances that exist in the current transaction.
     aggregator_snapshots: BTreeMap<AggregatorID, AggregatorSnapshot>,
     // Counter for generating identifiers for Aggregators and AggregatorSnapshots.
     pub id_counter: u64,
@@ -461,7 +460,7 @@ impl AggregatorData {
     /// not to the Move aggregator.
     pub fn get_aggregator(
         &mut self,
-        id: AggregatorID,
+        id: VersionedID,
         max_value: u128,
     ) -> PartialVMResult<&mut Aggregator> {
         let aggregator = self.aggregators.entry(id.clone()).or_insert(Aggregator {
@@ -484,7 +483,7 @@ impl AggregatorData {
     /// Creates and a new Aggregator with a given `id` and a `max_value`. The value
     /// of a new aggregator is always known, therefore it is created in a data
     /// state, with a zero-initialized value.
-    pub fn create_new_aggregator(&mut self, id: AggregatorID, max_value: u128) {
+    pub fn create_new_aggregator(&mut self, id: VersionedID, max_value: u128) {
         let aggregator = Aggregator {
             id: id.clone(),
             state: AggregatorState::Data { value: 0 },
@@ -496,27 +495,26 @@ impl AggregatorData {
 
     /// If aggregator has been used in this transaction, it is removed. Otherwise,
     /// it is marked for deletion.
-    /// TODO: Should we return an error if aggregator id is v2?
-    pub fn remove_aggregator(&mut self, id: AggregatorID) {
-        // Aggregator no longer in use during this transaction: remove it.
+    pub fn remove_aggregator_v1(&mut self, id: VersionedID) {
+        // Only V1 aggregators can be removed.
+        assert_matches!(id, VersionedID::V1(_));
+
         self.aggregators.remove(&id);
 
         if self.new_aggregators.contains(&id) {
-            // Aggregator has been created in the same transaction. Therefore, no
-            // side-effects.
             self.new_aggregators.remove(&id);
         } else {
-            // Otherwise, aggregator has been created somewhere else.
-            self.destroyed_aggregators.insert(id);
+            // This avoids cloning the state key.
+            let state_key = id.into_state_key().expect("V1 identifiers are state keys");
+            self.destroyed_aggregators.insert(state_key);
         }
     }
 
-    pub fn snapshot(&mut self, id: &AggregatorID) -> PartialVMResult<u64> {
-        let new_id = self.generate_id();
-        let snapshot_id = AggregatorID::ephemeral(new_id);
+    pub fn snapshot(&mut self, id: AggregatorID) -> PartialVMResult<u64> {
+        let snapshot_id = self.generate_id();
         let aggregator = self
             .aggregators
-            .get(id)
+            .get(&VersionedID::V2(id))
             .ok_or_else(|| code_invariant_error("Aggregator ID not found"))?;
 
         let snapshot_state = match aggregator.state {
@@ -525,25 +523,25 @@ impl AggregatorData {
                 value: SnapshotValue::Integer(value),
             },
             AggregatorState::Delta { delta, .. } => AggregatorSnapshotState::Delta {
-                base_aggregator: id.clone(),
+                base_aggregator: id,
                 delta,
                 formula: DerivedFormula::Identity,
             },
         };
 
         self.aggregator_snapshots
-            .insert(snapshot_id.clone(), AggregatorSnapshot {
+            .insert(snapshot_id, AggregatorSnapshot {
                 id: snapshot_id,
                 state: snapshot_state,
             });
-        Ok(new_id)
+        Ok(snapshot_id)
     }
 
-    pub fn read_snapshot(&self, _id: AggregatorID) -> PartialVMResult<u128> {
+    pub fn read_snapshot(&self, _id: VersionedID) -> PartialVMResult<u128> {
         unimplemented!();
     }
 
-    pub fn generate_id(&mut self) -> u64 {
+    pub fn generate_id(&mut self) -> AggregatorID {
         self.id_counter += 1;
         self.id_counter
     }
@@ -552,9 +550,9 @@ impl AggregatorData {
     pub fn into(
         self,
     ) -> (
-        BTreeSet<AggregatorID>,
-        BTreeSet<AggregatorID>,
-        BTreeMap<AggregatorID, Aggregator>,
+        BTreeSet<VersionedID>,
+        BTreeSet<StateKey>,
+        BTreeMap<VersionedID, Aggregator>,
         BTreeMap<AggregatorID, AggregatorSnapshot>,
     ) {
         (

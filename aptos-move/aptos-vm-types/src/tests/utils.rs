@@ -4,8 +4,8 @@
 use crate::{change_set::VMChangeSet, check_change_set::CheckChangeSet, output::VMOutput};
 use aptos_aggregator::{
     aggregator_change_set::AggregatorChange,
-    aggregator_extension::AggregatorID,
     delta_change_set::{delta_add, serialize, DeltaOp},
+    types::AggregatorID,
 };
 use aptos_types::{
     fee_statement::FeeStatement,

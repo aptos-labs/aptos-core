@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::aggregator_natives::helpers_v1::get_aggregator_field;
-use aptos_aggregator::aggregator_extension::{extension_error, AggregatorID};
+use aptos_aggregator::{aggregator_extension::extension_error, types::AggregatorID};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
 use move_vm_types::values::{Struct, StructRef, Value};
@@ -12,26 +12,26 @@ use move_vm_types::values::{Struct, StructRef, Value};
 const VALUE_FIELD_INDEX: usize = 0;
 const LIMIT_FIELD_INDEX: usize = 1;
 
-/// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
+/// Returns ID and a maximum value of aggregator based on a reference to `Aggregator` Move struct.
 pub(crate) fn aggregator_value_as_u128(
     aggregator: &StructRef,
 ) -> PartialVMResult<(AggregatorID, u128)> {
-    let (value, limit) = get_aggregator_fields_u128(aggregator)?;
+    let (value, max_value) = get_aggregator_fields_u128(aggregator)?;
     if value > u64::MAX as u128 {
         return Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("Aggregator identifier is too small".to_string()),
         );
     }
-    Ok((AggregatorID::ephemeral(value as u64), limit))
+    Ok((value as AggregatorID, max_value))
 }
 
-/// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
+/// Returns ID and a maximum value of aggregator based on a reference to `Aggregator` Move struct.
 pub(crate) fn aggregator_value_as_u64(
     aggregator: &StructRef,
 ) -> PartialVMResult<(AggregatorID, u64)> {
-    let (value, limit) = get_aggregator_fields_u64(aggregator)?;
-    Ok((AggregatorID::ephemeral(value), limit))
+    let (value, max_value) = get_aggregator_fields_u64(aggregator)?;
+    Ok((value, max_value))
 }
 
 /// Given a reference to `Aggregator` Move struct, returns a tuple of its
