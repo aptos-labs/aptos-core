@@ -4,64 +4,6 @@ task 0 'publish'. lines 1-91:
 
 
 
-task 1 'run'. lines 93-93:
-Error: Function execution failed with VMError: {
-    message: moving container with dangling references @Unknown invariant violation generated:
-In function backtrace::backtrace::libunwind::trace::he2cc9ef73fb93386 at /Users/brm/.cargo/registry/src/index.crates.io-6f17d22bba15001f/backtrace-0.3.66/src/backtrace/libunwind.rs:93
-In function backtrace::backtrace::trace_unsynchronized::h30582e5cbb8ee637 at /Users/brm/.cargo/registry/src/index.crates.io-6f17d22bba15001f/backtrace-0.3.66/src/backtrace/mod.rs:66
-In function backtrace::backtrace::trace::h941a80e2fea3d63b at /Users/brm/.cargo/registry/src/index.crates.io-6f17d22bba15001f/backtrace-0.3.66/src/backtrace/mod.rs:53
-In function move_binary_format::errors::PartialVMError::new::h3660c3abddf23efd at /Users/brm/code/aptos-core/third_party/move/move-binary-format/src/errors.rs:401
-In function move_vm_types::values::values_impl::Locals::swap_loc::hd6709813ffd13661 at /Users/brm/code/aptos-core/third_party/move/move-vm/types/src/values/values_impl.rs:1007
-In function move_vm_types::values::values_impl::Locals::move_loc::h47fa82496304bf8e at /Users/brm/code/aptos-core/third_party/move/move-vm/types/src/values/values_impl.rs:1026
-
-CORE DUMP: >>>>>>>>>>>>
-Call stack:
- frame #0: 0x000000000000000000000000000000000000000000000000000000000000cafe::vectors::test_guess_with_inline_break [pc = 1]
-*frame #1: 0x000000000000000000000000000000000000000000000000000000000000cafe::vectors::guess_flips [pc = 27]:
-0> ImmBorrowLoc(0)
-1> StLoc(1)
-2> LdU64(0)
-3> StLoc(2)
-4> CopyLoc(2)
-5> CopyLoc(1)
-6> VecLen(4)
-7> Lt
-8> BrFalse(25)
-9> Branch(10)
-10> CopyLoc(1)
-11> CopyLoc(2)
-12> VecImmBorrow(4)
-13> ReadRef
-14> LdU8(0)
-15> Neq
-16> BrFalse(20)
-17> MoveLoc(1)
-18> Pop
-19> Branch(25)
-20> MoveLoc(2)
-21> LdU64(1)
-22> Add
-23> StLoc(2)
-24> Branch(4)
-25> CopyLoc(0)
-26> Pop
-27* MoveLoc(0)
-Locals (600003134468):
-[0] (container 600003134438: [0, 0, 0, 0])
-[1] (&container 600003134438)
-[2] U64(4)
-Operand Stack:
-
-<<<<<<<<<<<<
-,
-    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
-    sub_status: Some(2),
-    location: 0xcafe::vectors,
-    indices: [],
-    offsets: [(FunctionDefinitionIndex(0), 27)],
-    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 000000000000000000000000000000000000000000000000000000000000cafe, name: Identifier("vectors") }), FunctionDefinitionIndex(7), 1)] }),
-}
-
 >>> V1 Compiler {
 == BEGIN Bytecode ==
 // Move bytecode v6
@@ -80,7 +22,7 @@ B1:
 	5: CopyLoc[1](loc0: &vector<u8>)
 	6: VecLen(4)
 	7: Lt
-	8: BrFalse(25)
+	8: BrFalse(30)
 B2:
 	9: Branch(10)
 B3:
@@ -107,6 +49,10 @@ B6:
 	27: MoveLoc[0](Arg0: vector<u8>)
 	28: Pop
 	29: Ret
+B7:
+	30: MoveLoc[1](loc0: &vector<u8>)
+	31: Pop
+	32: Branch(25)
 }
 entry public guess_flips_directly(Arg0: vector<u8>) {
 B0:
@@ -117,7 +63,7 @@ B1:
 	3: ImmBorrowLoc[0](Arg0: vector<u8>)
 	4: VecLen(4)
 	5: Lt
-	6: BrFalse(21)
+	6: BrFalse(26)
 B2:
 	7: Branch(8)
 B3:
@@ -142,6 +88,8 @@ B6:
 	23: MoveLoc[0](Arg0: vector<u8>)
 	24: Pop
 	25: Ret
+B7:
+	26: Branch(21)
 }
 entry public guess_with_break_without_inline(Arg0: vector<u8>) {
 B0:
@@ -207,7 +155,7 @@ B1:
 	3: CopyLoc[0](Arg0: &vector<u8>)
 	4: VecLen(4)
 	5: Lt
-	6: BrFalse(23)
+	6: BrFalse(24)
 B2:
 	7: Branch(8)
 B3:
@@ -230,6 +178,10 @@ B5:
 	22: Branch(2)
 B6:
 	23: Ret
+B7:
+	24: MoveLoc[0](Arg0: &vector<u8>)
+	25: Pop
+	26: Branch(23)
 }
 test_guess_directly() {
 B0:

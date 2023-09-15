@@ -1,4 +1,4 @@
-//#publish
+//#publish --print-bytecode
 module 0xcafe::vectors {
     use std::vector;
 
@@ -43,9 +43,9 @@ module 0xcafe::vectors {
     // continue
     public entry fun guess_flips_continue(flips: vector<u8>) {
         let i = 0;
-	let flipsref2 = &flips;
-        while (i < vector::length(flipsref2)) {
-            if (*vector::borrow(flipsref1, i) != 0) {
+	let flipsref4 = &flips;
+        while (i < vector::length(flipsref4)) {
+            if (*vector::borrow(flipsref4, i) != 0) {
                 continue
             };
             i = i + 1;
