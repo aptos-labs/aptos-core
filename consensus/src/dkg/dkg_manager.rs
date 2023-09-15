@@ -226,6 +226,10 @@ impl DKGManager {
     }
 
     pub fn add_node(&mut self, node: DKGNode) -> anyhow::Result<()> {
+        if self.dkg_store.get_agg_node().is_some() {
+            // do not add node if the aggregated node is already available
+            return Ok(());
+        }
         observe_dkg(self.start_time, DKGStage::DKG_NODES_RECEIVED);
         match self.dkg_store.add_node(node) {
             Ok(agg_node) => {

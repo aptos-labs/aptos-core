@@ -74,9 +74,9 @@ impl DKGStore {
             self.buffer_nodes(node);
             return Ok(None);
         }
-        
+
         if self.agg_node.is_some() {
-            debug!("[DKG] Node {:?} adds DKG Node failed due to agg node already available", self.author);
+            // do not add node if the aggregated node is already available
             return Ok(None);
         }
 
@@ -155,6 +155,10 @@ impl DKGStore {
 
     pub fn ready(&self) -> bool {
         self.agg_node.is_some() && self.get_pvss_config().is_some() && !self.agg_node_proposed
+    }
+
+    pub fn get_agg_node(&mut self) -> &Option<DKGAggNode> {
+        &self.agg_node
     }
 
     pub fn take_agg_node(&mut self) -> Option<DKGAggNode> {
