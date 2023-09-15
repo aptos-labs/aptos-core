@@ -1668,6 +1668,16 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             // higher concurrency level
             helm_values["validator"]["config"]["execution"]["concurrency_level"] = 48.into();
 
+            // Mempool config
+            helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
+            helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
+                (3_u64 * 1024 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["mempool"]["capacity_per_user"] = 100_000.into();
+            helm_values["validator"]["config"]["mempool"]["system_transaction_timeout_secs"] =
+                (5 * 60 * 60).into();
+            helm_values["validator"]["config"]["mempool"]["system_transaction_gc_interval_ms"] =
+                (5 * 60 * 60_000).into();
+
             // Consensus and QuorumStore tweaks
             helm_values["validator"]["config"]["consensus"]
                 ["max_sending_block_txns_quorum_store_override"] = 30_000.into();
