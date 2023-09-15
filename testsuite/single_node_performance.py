@@ -50,7 +50,7 @@ class RunGroupConfig:
 TESTS = [
     RunGroupConfig(expected_tps=20500, key=RunGroupKey("no-op"), included_in=Flow.LAND_BLOCKING),
     RunGroupConfig(expected_tps=2800, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=Flow.LAND_BLOCKING),
-    RunGroupConfig(expected_tps=13000, key=RunGroupKey("coin-transfer"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=14500, key=RunGroupKey("coin-transfer"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=30300, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=Flow.LAND_BLOCKING),
     RunGroupConfig(expected_tps=12500, key=RunGroupKey("account-generation"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=26500, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
