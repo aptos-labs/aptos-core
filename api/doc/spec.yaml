@@ -9368,13 +9368,11 @@ components:
           items:
             $ref: '#/components/schemas/AccountSignature'
         fee_payer_address:
-          allOf:
-          - $ref: '#/components/schemas/Address'
-          - description: The address of the paying party
+          $ref: '#/components/schemas/Address'
+          description: The address of the paying party
         fee_payer_signer:
-          allOf:
-          - $ref: '#/components/schemas/AccountSignature'
-          - description: The signature of the fee payer
+          $ref: '#/components/schemas/AccountSignature'
+          description: The signature of the fee payer
     GasEstimation:
       type: object
       description: Struct holding the outputs of the estimate gas API
