@@ -13,7 +13,7 @@ use crate::{
     },
     AptosVM,
 };
-use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_aggregator::{aggregator_extension::AggregatorID, delta_change_set::DeltaOp};
 use aptos_block_executor::{
     errors::Error,
     executor::BlockExecutor,
@@ -42,6 +42,7 @@ use std::{collections::HashMap, sync::Arc};
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
+    type Identifier = AggregatorID;
     type Key = StateKey;
     type Value = WriteOp;
 }

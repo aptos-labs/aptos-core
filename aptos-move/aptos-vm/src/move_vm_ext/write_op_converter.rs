@@ -5,7 +5,10 @@ use crate::move_vm_ext::AptosMoveResolver;
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_types::{
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
-    state_store::{state_key::StateKey, state_value::StateValueMetadata},
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValueMetadata, StateValueMetadataKind},
+    },
     write_set::WriteOp,
 };
 use bytes::Bytes;
@@ -19,7 +22,30 @@ pub(crate) struct WriteOpConverter<'r> {
     new_slot_metadata: Option<StateValueMetadata>,
 }
 
+macro_rules! convert_impl {
+    ($convert_func_name:ident, $get_metadata_callback:ident) => {
+        pub(crate) fn $convert_func_name(
+            &self,
+            state_key: &StateKey,
+            move_storage_op: MoveStorageOp<Bytes>,
+            legacy_creation_as_modification: bool,
+        ) -> Result<WriteOp, VMStatus> {
+            self.convert(
+                self.remote.$get_metadata_callback(state_key),
+                move_storage_op,
+                legacy_creation_as_modification,
+            )
+        }
+    };
+}
+
 impl<'r> WriteOpConverter<'r> {
+    convert_impl!(convert_resource, get_resource_state_value_metadata);
+
+    convert_impl!(convert_module, get_module_state_value_metadata);
+
+    convert_impl!(convert_aggregator, get_aggregator_v1_state_value_metadata);
+
     pub(crate) fn new(
         remote: &'r dyn AptosMoveResolver,
         is_storage_slot_metadata_enabled: bool,
@@ -39,24 +65,21 @@ impl<'r> WriteOpConverter<'r> {
         }
     }
 
-    pub(crate) fn convert(
+    fn convert(
         &self,
-        state_key: &StateKey,
+        state_value_metadata_result: anyhow::Result<Option<StateValueMetadataKind>>,
         move_storage_op: MoveStorageOp<Bytes>,
         legacy_creation_as_modification: bool,
     ) -> Result<WriteOp, VMStatus> {
         use MoveStorageOp::*;
         use WriteOp::*;
 
-        let maybe_existing_metadata =
-            self.remote
-                .get_state_value_metadata(state_key)
-                .map_err(|_| {
-                    VMStatus::error(
-                        StatusCode::STORAGE_ERROR,
-                        err_msg("Storage read failed when converting change set."),
-                    )
-                })?;
+        let maybe_existing_metadata = state_value_metadata_result.map_err(|_| {
+            VMStatus::error(
+                StatusCode::STORAGE_ERROR,
+                err_msg("Storage read failed when converting change set."),
+            )
+        })?;
 
         let write_op = match (maybe_existing_metadata, move_storage_op) {
             (None, Modify(_) | Delete) => {
@@ -104,14 +127,14 @@ impl<'r> WriteOpConverter<'r> {
         Ok(write_op)
     }
 
-    pub(crate) fn convert_aggregator_mod(
+    pub(crate) fn convert_aggregator_modification(
         &self,
         state_key: &StateKey,
         value: u128,
     ) -> Result<WriteOp, VMStatus> {
         let maybe_existing_metadata = self
             .remote
-            .get_state_value_metadata(state_key)
+            .get_aggregator_v1_state_value_metadata(state_key)
             .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         let data = serialize(&value).into();
 

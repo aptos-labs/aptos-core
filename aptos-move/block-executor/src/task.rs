@@ -4,14 +4,15 @@
 
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::TStateView;
 use aptos_types::{
     contract_event::ReadWriteEvent,
     executable::ModulePath,
     fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
+use aptos_vm_types::resolver::TExecutorView;
 use bytes::Bytes;
+use move_core_types::value::MoveTypeLayout;
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -31,6 +32,7 @@ pub enum ExecutionStatus<T, E> {
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + Clone + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
+    type Identifier: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug;
     type Value: Send + Sync + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }
@@ -63,16 +65,24 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        view: &impl TExecutorView<
+            <Self::Txn as Transaction>::Key,
+            MoveTypeLayout,
+            <Self::Txn as Transaction>::Identifier,
+        >,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 
-    /// Trait that allows converting blobs to proper values.
-    fn convert_to_value(
+    /// Trait that allows converting resource group blobs to proper values.
+    fn convert_resource_group_write_to_value(
         &self,
-        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        view: &impl TExecutorView<
+            <Self::Txn as Transaction>::Key,
+            MoveTypeLayout,
+            <Self::Txn as Transaction>::Identifier,
+        >,
         key: &<Self::Txn as Transaction>::Key,
         maybe_blob: Option<Bytes>,
         creation: bool,

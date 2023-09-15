@@ -7,8 +7,10 @@ use crate::{
     task::Transaction,
     txn_last_input_output::ReadDescriptor,
 };
-use anyhow::Result;
-use aptos_aggregator::delta_change_set::serialize;
+use aptos_aggregator::{
+    delta_change_set::serialize,
+    resolver::{AggregatorReadMode, TAggregatorView},
+};
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, MVModulesError, MVModulesOutput, TxnIndex},
@@ -19,10 +21,14 @@ use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
-    vm_status::{StatusCode, VMStatus},
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceView};
+use move_core_types::{
+    value::MoveTypeLayout,
+    vm_status::{StatusCode, VMStatus},
+};
 use std::{
     cell::RefCell,
     fmt::Debug,
@@ -221,65 +227,57 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceView
     for LatestView<'a, T, S, X>
 {
     type Key = T::Key;
+    type Layout = MoveTypeLayout;
 
-    fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
+    fn get_resource_state_value(
+        &self,
+        state_key: &Self::Key,
+        _maybe_layout: Option<&Self::Layout>,
+    ) -> anyhow::Result<Option<StateValue>> {
+        debug_assert!(
+            state_key.module_path().is_none(),
+            "Reading a module {:?} using ResourceView",
+            state_key,
+        );
+
         match &self.latest_view {
-            ViewState::Sync(state) => match state_key.module_path() {
-                Some(_) => {
-                    use MVModulesError::*;
-                    use MVModulesOutput::*;
+            ViewState::Sync(state) => {
+                let mut mv_value = state.fetch_data(state_key, self.txn_idx);
 
-                    match state.fetch_module(state_key, self.txn_idx) {
-                        Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
-                        Ok(Module((v, _))) => Ok(v.as_state_value()),
-                        Err(Dependency(_)) => {
-                            // Return anything (e.g. module does not exist) to avoid waiting,
-                            // because parallel execution will fall back to sequential anyway.
-                            Ok(None)
-                        },
-                        Err(NotFound) => self.base_view.get_state_value(state_key),
-                    }
-                },
-                None => {
-                    let mut mv_value = state.fetch_data(state_key, self.txn_idx);
+                if matches!(mv_value, ReadResult::Unresolved) {
+                    let from_storage = self
+                        .base_view
+                        .get_state_value_u128(state_key)?
+                        .ok_or(VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
 
-                    if matches!(mv_value, ReadResult::Unresolved) {
-                        let from_storage = self
-                            .base_view
-                            .get_state_value_u128(state_key)?
-                            .ok_or(VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+                    // Store base value in the versioned data-structure directly, so subsequent
+                    // reads can be resolved to U128 directly without storage calls.
+                    state.set_aggregator_base_value(state_key, from_storage);
 
-                        // Store base value in the versioned data-structure directly, so subsequent
-                        // reads can be resolved to U128 directly without storage calls.
-                        state.set_aggregator_base_value(state_key, from_storage);
+                    mv_value = state.fetch_data(state_key, self.txn_idx);
+                }
 
-                        mv_value = state.fetch_data(state_key, self.txn_idx);
-                    }
-
-                    match mv_value {
-                        ReadResult::Value(v) => Ok(v.as_state_value()),
-                        ReadResult::U128(v) => {
-                            Ok(Some(StateValue::new_legacy(serialize(&v).into())))
-                        },
-                        // ExecutionHalted indicates that the parallel execution is halted.
-                        // The read should return immediately and log the error.
-                        // For now we use STORAGE_ERROR as the VM will not log the speculative eror,
-                        // so no actual error will be logged once the execution is halted and
-                        // the speculative logging is flushed.
-                        ReadResult::ExecutionHalted => Err(anyhow::Error::new(VMStatus::error(
-                            StatusCode::STORAGE_ERROR,
-                            Some("Speculative error to halt BlockSTM early.".to_string()),
-                        ))),
-                        ReadResult::None => self.get_base_value(state_key),
-                        ReadResult::Unresolved => unreachable!(
-                            "Must be resolved as base value is recorded in the MV data structure"
-                        ),
-                    }
-                },
+                match mv_value {
+                    ReadResult::Value(v) => Ok(v.as_state_value()),
+                    ReadResult::U128(v) => Ok(Some(StateValue::new_legacy(serialize(&v).into()))),
+                    // ExecutionHalted indicates that the parallel execution is halted.
+                    // The read should return immediately and log the error.
+                    // For now we use STORAGE_ERROR as the VM will not log the speculative eror,
+                    // so no actual error will be logged once the execution is halted and
+                    // the speculative logging is flushed.
+                    ReadResult::ExecutionHalted => Err(anyhow::Error::new(VMStatus::error(
+                        StatusCode::STORAGE_ERROR,
+                        Some("Speculative error to halt BlockSTM early.".to_string()),
+                    ))),
+                    ReadResult::None => self.get_base_value(state_key),
+                    ReadResult::Unresolved => unreachable!(
+                        "Must be resolved as base value is recorded in the MV data structure"
+                    ),
+                }
             },
             ViewState::Unsync(state) => state.unsync_map.fetch_data(state_key).map_or_else(
                 || self.get_base_value(state_key),
@@ -287,12 +285,68 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
             ),
         }
     }
+}
 
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
+    for LatestView<'a, T, S, X>
+{
+    type Key = T::Key;
+
+    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        debug_assert!(
+            state_key.module_path().is_some(),
+            "Reading a resource {:?} using ModuleView",
+            state_key,
+        );
+
+        match &self.latest_view {
+            ViewState::Sync(state) => {
+                use MVModulesError::*;
+                use MVModulesOutput::*;
+
+                match state.fetch_module(state_key, self.txn_idx) {
+                    Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
+                    Ok(Module((v, _))) => Ok(v.as_state_value()),
+                    Err(Dependency(_)) => {
+                        // Return anything (e.g. module does not exist) to avoid waiting,
+                        // because parallel execution will fall back to sequential anyway.
+                        Ok(None)
+                    },
+                    Err(NotFound) => self.base_view.get_state_value(state_key),
+                }
+            },
+            ViewState::Unsync(state) => state.unsync_map.fetch_data(state_key).map_or_else(
+                || self.get_base_value(state_key),
+                |v| Ok(v.as_state_value()),
+            ),
+        }
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageView
+    for LatestView<'a, T, S, X>
+{
     fn id(&self) -> StateViewId {
         self.base_view.id()
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
         self.base_view.get_usage()
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregatorView
+    for LatestView<'a, T, S, X>
+{
+    type IdentifierV1 = T::Key;
+    type IdentifierV2 = T::Identifier;
+
+    fn get_aggregator_v1_state_value(
+        &self,
+        state_key: &Self::IdentifierV1,
+        _mode: AggregatorReadMode,
+    ) -> anyhow::Result<Option<StateValue>> {
+        // TODO: Integrate aggregators.
+        self.get_resource_state_value(state_key, None)
     }
 }

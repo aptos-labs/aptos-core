@@ -19,9 +19,10 @@ use aptos_types::{
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
+use aptos_vm_types::resolver::TExecutorView;
 use bytes::Bytes;
 use claims::assert_ok;
-use move_core_types::language_storage::TypeTag;
+use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout};
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -256,6 +257,7 @@ impl<
     > Transaction for MockTransaction<K, V, E>
 {
     type Event = E;
+    type Identifier = ();
     type Key = K;
     type Value = V;
 }
@@ -510,7 +512,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = K>,
+        view: &impl TExecutorView<K, MoveTypeLayout, ()>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,
@@ -532,9 +534,16 @@ where
                 let mut read_results = vec![];
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
-                    match view.get_state_value_bytes(k) {
-                        Ok(v) => read_results.push(v.map(Into::into)),
-                        Err(_) => read_results.push(None),
+                    // TODO: test aggregator reads.
+                    match k.module_path() {
+                        Some(_) => match view.get_module_bytes(k) {
+                            Ok(v) => read_results.push(v.map(Into::into)),
+                            Err(_) => read_results.push(None),
+                        },
+                        None => match view.get_resource_bytes(k, None) {
+                            Ok(v) => read_results.push(v.map(Into::into)),
+                            Err(_) => read_results.push(None),
+                        },
                     }
                 }
                 ExecutionStatus::Success(MockOutput {
@@ -551,9 +560,9 @@ where
         }
     }
 
-    fn convert_to_value(
+    fn convert_resource_group_write_to_value(
         &self,
-        _view: &impl TStateView<Key = K>,
+        _view: &impl TExecutorView<K, MoveTypeLayout, ()>,
         _key: &K,
         _maybe_blob: Option<Bytes>,
         _creation: bool,

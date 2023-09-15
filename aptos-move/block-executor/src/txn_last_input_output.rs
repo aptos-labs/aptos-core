@@ -42,7 +42,7 @@ impl<T: TransactionOutput, E: Debug> TxnOutput<T, E> {
 }
 
 /// Information about the read which is used by validation.
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 enum ReadKind {
     /// Read returned a value from the multi-version data-structure, with index
     /// and incarnation number of the execution associated with the write of
@@ -58,14 +58,13 @@ enum ReadKind {
     Module,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ReadDescriptor<K> {
     access_path: K,
-
     kind: ReadKind,
 }
 
-impl<K: ModulePath> ReadDescriptor<K> {
+impl<K: Debug + ModulePath> ReadDescriptor<K> {
     pub fn from_version(access_path: K, txn_idx: TxnIndex, incarnation: Incarnation) -> Self {
         Self {
             access_path,
@@ -146,7 +145,9 @@ pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
     module_read_write_intersection: AtomicBool,
 }
 
-impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputOutput<K, T, E> {
+impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
+    TxnLastInputOutput<K, T, E>
+{
     pub fn new(num_txns: TxnIndex) -> Self {
         Self {
             inputs: (0..num_txns)
@@ -198,15 +199,21 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         let read_modules: Vec<AccessPath> = input
             .iter()
             .filter_map(|desc| {
-                matches!(desc.kind, ReadKind::Module)
-                    .then(|| desc.module_path().expect("Module path guaranteed to exist"))
+                matches!(desc.kind, ReadKind::Module).then(|| {
+                    desc.module_path()
+                        .unwrap_or_else(|| panic!("Module path guaranteed to exist {:?}", desc))
+                })
             })
             .collect();
         let written_modules: Vec<AccessPath> = match &output {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => output
                 .module_write_set()
                 .keys()
-                .map(|k| k.module_path().expect("Module path guaranteed to exist"))
+                .map(|k| {
+                    k.module_path().unwrap_or_else(|| {
+                        panic!("Unexpected non-module key found in putput: {:?}", k)
+                    })
+                })
                 .collect(),
             ExecutionStatus::Abort(_) => Vec::new(),
         };
