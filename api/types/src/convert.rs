@@ -333,7 +333,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         access_path: AccessPath,
         op: WriteOp,
     ) -> Result<Vec<WriteSetChange>> {
-        let ret = match op.into_bytes() {
+        let ret = match op.bytes() {
             None => match access_path.get_path() {
                 Path::Code(module_id) => vec![WriteSetChange::DeleteModule(DeleteModule {
                     address: access_path.address.into(),
@@ -355,15 +355,15 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 Path::Code(_) => vec![WriteSetChange::WriteModule(WriteModule {
                     address: access_path.address.into(),
                     state_key_hash,
-                    data: MoveModuleBytecode::new(bytes).try_parse_abi()?,
+                    data: MoveModuleBytecode::new(bytes.to_vec()).try_parse_abi()?,
                 })],
                 Path::Resource(typ) => vec![WriteSetChange::WriteResource(WriteResource {
                     address: access_path.address.into(),
                     state_key_hash,
-                    data: self.try_into_resource(&typ, &bytes)?,
+                    data: self.try_into_resource(&typ, bytes)?,
                 })],
                 Path::ResourceGroup(_) => self
-                    .try_into_resources_from_resource_group(&bytes)?
+                    .try_into_resources_from_resource_group(bytes)?
                     .into_iter()
                     .map(|data| {
                         WriteSetChange::WriteResource(WriteResource {
@@ -387,7 +387,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     ) -> Result<WriteSetChange> {
         let hex_handle = handle.0.to_vec().into();
         let key: HexEncodedBytes = key.into();
-        let ret = match op.into_bytes() {
+        let ret = match op.bytes() {
             None => {
                 let data = self.try_delete_table_item_into_deleted_table_data(handle, &key.0)?;
 
@@ -400,13 +400,13 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             },
             Some(bytes) => {
                 let data =
-                    self.try_write_table_item_into_decoded_table_data(handle, &key.0, &bytes)?;
+                    self.try_write_table_item_into_decoded_table_data(handle, &key.0, bytes)?;
 
                 WriteSetChange::WriteTableItem(WriteTableItem {
                     state_key_hash,
                     handle: hex_handle,
                     key,
-                    value: bytes.into(),
+                    value: bytes.to_vec().into(),
                     data,
                 })
             },

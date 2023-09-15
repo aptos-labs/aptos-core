@@ -1375,7 +1375,13 @@ fn exp_impl(
             };
             HE::Spec(hanchor)
         },
-        TE::Lambda(..) => panic!("ICE unexpected lambda"),
+        TE::Lambda(_lvalue_list, _boxed_exp) => {
+            context.env.add_diag(diag!(
+                Inlining::UnexpectedLambda,
+                (eloc, "unexpected lambda")
+            ));
+            HE::UnresolvedError
+        },
         TE::UnresolvedError => {
             assert!(context.env.has_errors());
             HE::UnresolvedError

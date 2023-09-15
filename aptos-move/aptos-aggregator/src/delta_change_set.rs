@@ -201,7 +201,7 @@ impl DeltaOp {
                             .finish(Location::Module(AGGREGATOR_MODULE.clone()))
                             .into_vm_status()
                     })
-                    .map(|result| WriteOp::Modification(serialize(&result)))
+                    .map(|result| WriteOp::Modification(serialize(&result).into()))
             },
             // Something is wrong, the value to which we apply delta should
             // always exist. Guard anyway.
@@ -271,12 +271,12 @@ pub fn serialize(value: &u128) -> Vec<u8> {
     bcs::to_bytes(value).expect("unexpected serialization error in aggregator")
 }
 
-// Helper for tests, #[cfg(test)] doesn't work for cross-crate.
+#[cfg(any(test, feature = "testing"))]
 pub fn delta_sub(v: u128, limit: u128) -> DeltaOp {
     DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v)
 }
 
-// Helper for tests, #[cfg(test)] doesn't work for cross-crate.
+#[cfg(any(test, feature = "testing"))]
 pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
     DeltaOp::new(DeltaUpdate::Plus(v), limit, v, 0)
 }
@@ -590,10 +590,10 @@ mod test {
         let sub_op = delta_sub(100, 200);
 
         let add_result = add_op.try_into_write_op(&state_view, &KEY);
-        assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200)));
+        assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200).into()));
 
         let sub_result = sub_op.try_into_write_op(&state_view, &KEY);
-        assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0)));
+        assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0).into()));
     }
 
     #[test]

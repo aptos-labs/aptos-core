@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::compiler::{as_module, as_script, compile_units};
+use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError};
 use move_core_types::{
     account_address::AccountAddress,
@@ -513,7 +514,7 @@ impl ModuleResolver for BogusStorage {
         vec![]
     }
 
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>, anyhow::Error> {
+    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Bytes>, anyhow::Error> {
         Ok(Err(
             PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
         )?)
@@ -526,7 +527,7 @@ impl ResourceResolver for BogusStorage {
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
+    ) -> anyhow::Result<(Option<Bytes>, usize)> {
         Ok(Err(
             PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
         )?)
@@ -604,8 +605,12 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
     m.serialize(&mut m_blob).unwrap();
     s.serialize(&mut s_blob).unwrap();
     let mut delta = ChangeSet::new();
-    delta.add_module_op(m.self_id(), Op::New(m_blob)).unwrap();
-    delta.add_module_op(s.self_id(), Op::New(s_blob)).unwrap();
+    delta
+        .add_module_op(m.self_id(), Op::New(m_blob.into()))
+        .unwrap();
+    delta
+        .add_module_op(s.self_id(), Op::New(s_blob.into()))
+        .unwrap();
 
     let m_id = m.self_id();
     let foo_name = Identifier::new("foo").unwrap();

@@ -7,6 +7,7 @@ use aptos_state_view::StateView;
 use aptos_table_natives::TableResolver;
 use aptos_types::{on_chain_config::ConfigStorage, state_store::state_key::StateKey};
 use aptos_vm_types::resolver::{ResourceGroupResolver, StateValueMetadataResolver};
+use bytes::Bytes;
 use move_core_types::{language_storage::StructTag, resolver::MoveResolver};
 use std::collections::{BTreeMap, HashMap};
 
@@ -21,7 +22,7 @@ pub trait AptosMoveResolver:
     + ConfigStorage
     + ResourceGroupResolver
 {
-    fn release_resource_group_cache(&self) -> HashMap<StateKey, BTreeMap<StructTag, Vec<u8>>>;
+    fn release_resource_group_cache(&self) -> HashMap<StateKey, BTreeMap<StructTag, Bytes>>;
 }
 
 // TODO: Remove dependency on StateView.

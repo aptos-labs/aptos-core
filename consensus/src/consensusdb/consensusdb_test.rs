@@ -113,11 +113,4 @@ fn test_dag() {
 
     let vote = Vote::new(node.metadata().clone(), Signature::dummy_signature());
     test_dag_type::<DagVoteSchema, <DagVoteSchema as Schema>::Key>(node.id(), vote, &db);
-
-    let anchor_id = node.id();
-    test_dag_type::<OrderedAnchorIdSchema, <OrderedAnchorIdSchema as Schema>::Key>(
-        anchor_id,
-        (),
-        &db,
-    );
 }

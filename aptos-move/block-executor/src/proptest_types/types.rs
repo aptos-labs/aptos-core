@@ -19,6 +19,7 @@ use aptos_types::{
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
+use bytes::Bytes;
 use claims::assert_ok;
 use move_core_types::language_storage::TypeTag;
 use once_cell::sync::OnceCell;
@@ -35,7 +36,6 @@ use std::{
         Arc,
     },
 };
-
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
 // TODO: extend to delta failures.
 pub(crate) const STORAGE_AGGREGATOR_VALUE: u128 = 100001;
@@ -54,9 +54,9 @@ where
 
     /// Gets the state value for a given state key.
     fn get_state_value(&self, _: &K) -> anyhow::Result<Option<StateValue>> {
-        Ok(Some(StateValue::new_legacy(serialize(
-            &STORAGE_AGGREGATOR_VALUE,
-        ))))
+        Ok(Some(StateValue::new_legacy(
+            serialize(&STORAGE_AGGREGATOR_VALUE).into(),
+        )))
     }
 
     fn id(&self) -> StateViewId {
@@ -140,11 +140,11 @@ pub struct ValueType<V: Into<Vec<u8>> + Debug + Clone + Eq + Arbitrary>(
 impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> TransactionWrite
     for ValueType<V>
 {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+    fn extract_raw_bytes(&self) -> Option<Bytes> {
         if self.1 {
             let mut v = self.0.clone().into();
             v.resize(16, 1);
-            Some(v)
+            Some(v.into())
         } else {
             None
         }
@@ -529,19 +529,19 @@ where
                 let behavior = &incarnation_behaviors[idx % incarnation_behaviors.len()];
 
                 // Reads
-                let mut reads_result = vec![];
+                let mut read_results = vec![];
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
                     match view.get_state_value_bytes(k) {
-                        Ok(v) => reads_result.push(v),
-                        Err(_) => reads_result.push(None),
+                        Ok(v) => read_results.push(v.map(Into::into)),
+                        Err(_) => read_results.push(None),
                     }
                 }
                 ExecutionStatus::Success(MockOutput {
                     writes: behavior.writes.clone(),
                     deltas: behavior.deltas.clone(),
                     events: behavior.events.to_vec(),
-                    read_results: reads_result,
+                    read_results,
                     materialized_delta_writes: OnceCell::new(),
                     total_gas: behavior.gas,
                 })
@@ -555,7 +555,7 @@ where
         &self,
         _view: &impl TStateView<Key = K>,
         _key: &K,
-        _maybe_blob: Option<Vec<u8>>,
+        _maybe_blob: Option<Bytes>,
         _creation: bool,
     ) -> anyhow::Result<V> {
         unimplemented!("TODO: implement for AggregatorV2 testing");

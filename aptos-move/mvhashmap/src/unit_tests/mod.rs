@@ -16,16 +16,16 @@ use aptos_types::{
     executable::{ExecutableTestType, ModulePath},
     state_store::state_value::StateValue,
 };
+use bytes::Bytes;
 use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
 use std::sync::Arc;
-
 mod proptest_types;
 
 #[derive(Debug, PartialEq, Eq)]
 struct Value(Vec<u32>);
 
 impl TransactionWrite for Value {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+    fn extract_raw_bytes(&self) -> Option<Bytes> {
         let mut v: Vec<u8> = self
             .0
             .clone()
@@ -33,7 +33,7 @@ impl TransactionWrite for Value {
             .flat_map(|element| element.to_be_bytes())
             .collect();
         v.resize(16, 0);
-        Some(v)
+        Some(v.into())
     }
 
     fn as_state_value(&self) -> Option<StateValue> {

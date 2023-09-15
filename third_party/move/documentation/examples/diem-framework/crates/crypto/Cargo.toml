@@ -9,7 +9,7 @@ license = "Apache-2.0"
 [dependencies]
 aes-gcm = "0.8.0"
 anyhow = "1.0.52"
-bytes = "1.0.1"
+bytes = "1.4.0"
 curve25519-dalek = { version = "0.1.0", package = "curve25519-dalek-fiat", default-features = false, features = ["std"] }
 diem-crypto-derive = { path = "../crypto-derive" }
 digest = "0.9.0"

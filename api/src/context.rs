@@ -259,9 +259,11 @@ impl Context {
     }
 
     pub fn get_state_value(&self, state_key: &StateKey, version: u64) -> Result<Option<Vec<u8>>> {
-        self.db
+        Ok(self
+            .db
             .state_view_at_version(Some(version))?
-            .get_state_value_bytes(state_key)
+            .get_state_value_bytes(state_key)?
+            .map(|val| val.to_vec()))
     }
 
     pub fn get_state_value_poem<E: InternalError>(
@@ -318,11 +320,11 @@ impl Context {
                     StateKeyInner::AccessPath(AccessPath { address: _, path }) => {
                         match Path::try_from(path.as_slice()) {
                             Ok(Path::Resource(struct_tag)) => {
-                                Some(Ok((struct_tag, v.into_bytes())))
+                                Some(Ok((struct_tag, v.bytes().to_vec())))
                             }
                             // TODO: Consider expanding to Path::Resource
                             Ok(Path::ResourceGroup(struct_tag)) => {
-                                Some(Ok((struct_tag, v.into_bytes())))
+                                Some(Ok((struct_tag, v.bytes().to_vec())))
                             }
                             Ok(Path::Code(_)) => None,
                             Err(e) => Some(Err(anyhow::Error::from(e))),
@@ -410,7 +412,7 @@ impl Context {
                 Ok((k, v)) => match k.inner() {
                     StateKeyInner::AccessPath(AccessPath { address: _, path }) => {
                         match Path::try_from(path.as_slice()) {
-                            Ok(Path::Code(module_id)) => Some(Ok((module_id, v.into_bytes()))),
+                            Ok(Path::Code(module_id)) => Some(Ok((module_id, v.bytes().to_vec()))),
                             Ok(Path::Resource(_)) | Ok(Path::ResourceGroup(_)) => None,
                             Err(e) => Some(Err(anyhow::Error::from(e))),
                         }

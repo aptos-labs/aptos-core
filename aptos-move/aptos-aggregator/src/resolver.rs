@@ -67,7 +67,7 @@ pub mod test_utils {
 
         pub fn set_from_state_key(&mut self, state_key: StateKey, value: u128) {
             self.0
-                .insert(state_key, StateValue::new_legacy(serialize(&value)));
+                .insert(state_key, StateValue::new_legacy(serialize(&value).into()));
         }
     }
 

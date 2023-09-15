@@ -451,7 +451,8 @@ impl MoveHarness {
     }
 
     pub fn read_state_value_bytes(&self, state_key: &StateKey) -> Option<Vec<u8>> {
-        self.read_state_value(state_key).map(StateValue::into_bytes)
+        self.read_state_value(state_key)
+            .map(|val| val.bytes().to_vec())
     }
 
     /// Reads the raw, serialized data of a resource.
