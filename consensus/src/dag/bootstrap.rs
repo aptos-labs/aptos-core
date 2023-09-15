@@ -16,7 +16,7 @@ use super::{
 };
 use crate::{
     dag::{adapter::NotifierAdapter, dag_fetcher::DagFetcher},
-    experimental::{buffer_manager::OrderedBlocks, commit_reliable_broadcast::DropGuard},
+    experimental::buffer_manager::OrderedBlocks,
     network::IncomingDAGRequest,
     state_replication::{PayloadClient, StateComputer},
 };
@@ -35,10 +35,6 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
-};
-use futures::{
-    stream::{AbortHandle, Abortable},
-    FutureExt, StreamExt,
 };
 use futures_channel::{
     mpsc::{UnboundedReceiver, UnboundedSender},
