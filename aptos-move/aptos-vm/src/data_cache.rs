@@ -358,7 +358,7 @@ impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
         state_key: &StateKey,
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
         self.executor_view
-            .get_resource_state_value_metadata(state_key)
+            .get_module_state_value_metadata(state_key)
     }
 
     fn get_resource_state_value_metadata(
@@ -366,7 +366,7 @@ impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
         state_key: &StateKey,
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
         self.executor_view
-            .get_module_state_value_metadata(state_key)
+            .get_resource_state_value_metadata(state_key)
     }
 }
 

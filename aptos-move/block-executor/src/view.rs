@@ -34,6 +34,7 @@ use std::{
     fmt::Debug,
     sync::{atomic::AtomicU32, Arc},
 };
+use aptos_types::executable::ModulePath;
 
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.
@@ -238,6 +239,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
         state_key: &Self::Key,
         _maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<StateValue>> {
+        debug_assert!(
+            state_key.module_path().is_none(),
+            "Reading a module {:?} using ResourceView",
+            state_key,
+        );
+
         match &self.latest_view {
             ViewState::Sync(state) => {
                 let mut mv_value = state.fetch_data(state_key, self.txn_idx);
@@ -287,6 +294,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
     type Key = T::Key;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        debug_assert!(
+            state_key.module_path().is_some(),
+            "Reading a resource {:?} using ModuleView",
+            state_key,
+        );
+
         match &self.latest_view {
             ViewState::Sync(state) => {
                 use MVModulesError::*;

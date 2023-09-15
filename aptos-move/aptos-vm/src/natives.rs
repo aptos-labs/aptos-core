@@ -18,10 +18,11 @@ use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{Features, TimedFeatures},
-    state_store::state_value::StateValue,
 };
 #[cfg(feature = "testing")]
-use aptos_types::{chain_id::ChainId, state_store::state_key::StateKey};
+use aptos_types::{
+    chain_id::ChainId, state_store::{state_key::StateKey, state_value::StateValue},
+};
 #[cfg(feature = "testing")]
 use bytes::Bytes;
 use move_vm_runtime::native_functions::NativeFunctionTable;
