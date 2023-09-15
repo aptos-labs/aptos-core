@@ -196,6 +196,16 @@ pub static BLOCK_COMMITTED_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static SHARDED_EXECUTION_THREAD_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_sharded_execution_thread_seconds",
+        "TBD",
+        &["thread"]
+    )
+        .unwrap()
+});
+
+
 pub(crate) fn update_parallel_block_gas_counters(
     accumulated_fee_statement: &FeeStatement,
     num_committed: usize,

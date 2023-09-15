@@ -33,6 +33,7 @@ use std::{collections::HashMap, hint, marker::PhantomData, sync::{
     mpsc::{Receiver, Sender},
     Arc,
 }};
+use crate::counters::SHARDED_EXECUTION_THREAD_SECONDS;
 use crate::txn_provider::sharded::ShardedTxnProvider;
 use crate::txn_provider::{TxnProviderTrait1, TxnProviderTrait2};
 
@@ -284,7 +285,6 @@ where
                 CommitGuard::new(post_commit_txs, *worker_idx, txn_idx);
             // Iterate round robin over workers to do commit_hook.
             *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
-            info!("block={}, shard={}, will ask worker {} to commit txn {}.", txn_provider.block_idx(), txn_provider.shard_idx(), *worker_idx, txn_idx);
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
                 // For committed txns with Success status, calculate the accumulated gas costs.
                 accumulated_fee_statement.add_fee_statement(&fee_statement);
@@ -714,10 +714,12 @@ where
                         txn_provider.run_sharding_msg_loop(&versioned_cache, &scheduler);
                     });
                     s.spawn(|_| {
+                        let _timer = SHARDED_EXECUTION_THREAD_SECONDS.with_label_values(&["commit"]).start_timer();
                         self.work_task_with_scope_v2_commit(txn_provider, &last_input_output, &versioned_cache, &scheduler, base_view);
                     });
                     for _ in 2..self.concurrency_level {
                         s.spawn(|_|{
+                            let _timer = SHARDED_EXECUTION_THREAD_SECONDS.with_label_values(&["worker"]).start_timer();
                             self.work_task_with_scope_v2_scheduler_tasks(&executor_initial_arguments, txn_provider, &last_input_output, &versioned_cache, &scheduler, base_view, &shared_counter);
                         });
                     }
