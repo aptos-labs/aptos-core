@@ -28,7 +28,7 @@ pub enum NodeBroadcastHandleError {
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,
     votes_by_round_peer: BTreeMap<Round, BTreeMap<Author, Vote>>,
-    signer: ValidatorSigner,
+    signer: Arc<ValidatorSigner>,
     epoch_state: Arc<EpochState>,
     storage: Arc<dyn DAGStorage>,
     fetch_requester: Arc<dyn TFetchRequester>,
@@ -37,7 +37,7 @@ pub(crate) struct NodeBroadcastHandler {
 impl NodeBroadcastHandler {
     pub fn new(
         dag: Arc<RwLock<Dag>>,
-        signer: ValidatorSigner,
+        signer: Arc<ValidatorSigner>,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         fetch_requester: Arc<dyn TFetchRequester>,

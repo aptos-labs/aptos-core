@@ -104,7 +104,7 @@ async fn test_certified_node_handler() {
         LedgerInfo::mock_genesis(None),
         dag.clone(),
         Box::new(RoundRobinAnchorElection::new(validators)),
-        Box::new(TestNotifier { tx }),
+        Arc::new(TestNotifier { tx }),
         storage.clone(),
     );
 

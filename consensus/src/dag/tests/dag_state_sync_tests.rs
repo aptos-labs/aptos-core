@@ -4,7 +4,7 @@ use crate::{
     dag::{
         adapter::Notifier,
         dag_fetcher::{FetchRequestHandler, TDagFetcher},
-        dag_state_sync::{StateSyncManager, DAG_WINDOW},
+        dag_state_sync::{DagStateSynchronizer, DAG_WINDOW},
         dag_store::Dag,
         storage::DAGStorage,
         tests::{dag_test::MockStorage, helpers::generate_dag_nodes},
@@ -100,7 +100,7 @@ struct MockNotifier {}
 #[async_trait]
 impl Notifier for MockNotifier {
     fn send_ordered_nodes(
-        &mut self,
+        &self,
         _ordered_nodes: Vec<Arc<CertifiedNode>>,
         _failed_author: Vec<(Round, Author)>,
     ) -> anyhow::Result<()> {
@@ -112,24 +112,17 @@ impl Notifier for MockNotifier {
     async fn send_commit_proof(&self, _ledger_info: LedgerInfoWithSignatures) {}
 }
 
-fn setup(
-    epoch_state: Arc<EpochState>,
-    dag_store: Arc<RwLock<Dag>>,
-    storage: Arc<dyn DAGStorage>,
-) -> StateSyncManager {
-    let network = Arc::new(MockDAGNetworkSender {});
+fn setup(epoch_state: Arc<EpochState>, storage: Arc<dyn DAGStorage>) -> DagStateSynchronizer {
     let time_service = TimeService::mock();
     let state_computer = Arc::new(EmptyStateComputer {});
-    let upstream_notifier = Arc::new(MockNotifier {});
+    let downstream_notifier = Arc::new(MockNotifier {});
 
-    StateSyncManager::new(
+    DagStateSynchronizer::new(
         epoch_state,
-        network,
-        upstream_notifier,
+        downstream_notifier,
         time_service,
         state_computer,
         storage,
-        dag_store,
     )
 }
 
@@ -193,24 +186,19 @@ async fn test_dag_state_sync() {
 
     let sync_node_li = CertifiedNodeMessage::new(sync_to_node, sync_to_li);
 
-    let state_sync = setup(epoch_state.clone(), slow_dag.clone(), storage.clone());
-    let dag_fetcher = Arc::new(MockDagFetcher {
+    let state_sync = setup(epoch_state.clone(), storage.clone());
+    let dag_fetcher = MockDagFetcher {
         target_dag: fast_dag.clone(),
         epoch_state: epoch_state.clone(),
-    });
+    };
 
     let sync_result = state_sync
-        .sync_to_highest_ordered_anchor(&sync_node_li, dag_fetcher)
+        .sync_dag_to(&sync_node_li, dag_fetcher, slow_dag.clone())
         .await;
     let new_dag = sync_result.unwrap().unwrap();
 
-    let dag_reader = new_dag.read();
-
-    assert_eq!(dag_reader.lowest_round(), (LI_ROUNDS - DAG_WINDOW) as Round);
-    assert_eq!(dag_reader.highest_round(), (NUM_ROUNDS - 1) as Round);
-    assert_none!(dag_reader.highest_ordered_anchor_round(),);
-    assert_eq!(
-        dag_reader.highest_committed_anchor_round(),
-        LI_ROUNDS as Round
-    );
+    assert_eq!(new_dag.lowest_round(), (LI_ROUNDS - DAG_WINDOW) as Round);
+    assert_eq!(new_dag.highest_round(), (NUM_ROUNDS - 1) as Round);
+    assert_none!(new_dag.highest_ordered_anchor_round(),);
+    assert_eq!(new_dag.highest_committed_anchor_round(), LI_ROUNDS as Round);
 }

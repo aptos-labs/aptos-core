@@ -38,6 +38,7 @@ async fn test_node_broadcast_receiver_succeed() {
         epoch: 1,
         verifier: validator_verifier.clone(),
     });
+    let signers: Vec<_> = signers.into_iter().map(Arc::new).collect();
 
     // Scenario: Start DAG from beginning
     let storage = Arc::new(MockStorage::new());
@@ -80,6 +81,7 @@ async fn test_node_broadcast_receiver_failure() {
         epoch: 1,
         verifier: validator_verifier.clone(),
     });
+    let signers: Vec<_> = signers.into_iter().map(Arc::new).collect();
 
     let mut rb_receivers: Vec<_> = signers
         .iter()
@@ -156,10 +158,12 @@ async fn test_node_broadcast_receiver_failure() {
 #[test]
 fn test_node_broadcast_receiver_storage() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
+    let signers: Vec<_> = signers.into_iter().map(Arc::new).collect();
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
         verifier: validator_verifier,
     });
+
     let storage = Arc::new(MockStorage::new());
     let dag = Arc::new(RwLock::new(Dag::new(
         epoch_state.clone(),

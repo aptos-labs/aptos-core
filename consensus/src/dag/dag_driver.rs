@@ -160,7 +160,6 @@ impl DagDriver {
             .broadcast(node.clone(), signature_builder)
             .then(move |certificate| {
                 let certified_node = CertifiedNode::new(node, certificate.signatures().to_owned());
-
                 let certified_node_msg =
                     CertifiedNodeMessage::new(certified_node, latest_ledger_info);
                 rb.broadcast(certified_node_msg, cert_ack_set)

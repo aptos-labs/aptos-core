@@ -3,7 +3,11 @@
 use super::{
     dag_driver::DagDriver,
     dag_fetcher::{FetchRequestHandler, FetchWaiter},
-    types::TDAGMessage,
+    dag_state_sync::{
+        StateSyncStatus::{self, NeedsSync, Synced},
+        StateSyncTrigger,
+    },
+    types::{CertifiedNodeMessage, TDAGMessage},
     CertifiedNode, Node,
 };
 use crate::{
@@ -23,42 +27,52 @@ use tokio::select;
 
 pub(crate) struct NetworkHandler {
     epoch_state: Arc<EpochState>,
-    dag_rpc_rx: aptos_channel::Receiver<Author, IncomingDAGRequest>,
     node_receiver: NodeBroadcastHandler,
     dag_driver: DagDriver,
     fetch_receiver: FetchRequestHandler,
     node_fetch_waiter: FetchWaiter<Node>,
     certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
+    state_sync_trigger: StateSyncTrigger,
 }
 
 impl NetworkHandler {
-    pub fn new(
+    pub(super) fn new(
         epoch_state: Arc<EpochState>,
-        dag_rpc_rx: aptos_channel::Receiver<Author, IncomingDAGRequest>,
         node_receiver: NodeBroadcastHandler,
         dag_driver: DagDriver,
         fetch_receiver: FetchRequestHandler,
         node_fetch_waiter: FetchWaiter<Node>,
         certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
+        state_sync_trigger: StateSyncTrigger,
     ) -> Self {
         Self {
             epoch_state,
-            dag_rpc_rx,
             node_receiver,
             dag_driver,
             fetch_receiver,
             node_fetch_waiter,
             certified_node_fetch_waiter,
+            state_sync_trigger,
         }
     }
 
-    pub async fn start(mut self) {
+    pub async fn run(
+        mut self,
+        dag_rpc_rx: &mut aptos_channel::Receiver<Author, IncomingDAGRequest>,
+    ) -> CertifiedNodeMessage {
         // TODO(ibalajiarun): clean up Reliable Broadcast storage periodically.
         loop {
             select! {
-                Some(msg) = self.dag_rpc_rx.next() => {
-                    if let Err(e) = self.process_rpc(msg).await {
-                        warn!(error = ?e, "error processing rpc");
+                Some(msg) = dag_rpc_rx.next() => {
+                    match self.process_rpc(msg).await {
+                        Ok(sync_status) => {
+                            if let StateSyncStatus::NeedsSync(certified_node_msg) = sync_status {
+                                return certified_node_msg;
+                            }
+                        },
+                        Err(e) =>  {
+                            warn!(error = ?e, "error processing rpc");
+                        }
                     }
                 },
                 Some(res) = self.node_fetch_waiter.next() => {
@@ -75,7 +89,10 @@ impl NetworkHandler {
         }
     }
 
-    async fn process_rpc(&mut self, rpc_request: IncomingDAGRequest) -> anyhow::Result<()> {
+    async fn process_rpc(
+        &mut self,
+        rpc_request: IncomingDAGRequest,
+    ) -> anyhow::Result<StateSyncStatus> {
         let dag_message: DAGMessage = rpc_request.req.try_into()?;
 
         let author = dag_message
@@ -90,10 +107,19 @@ impl NetworkHandler {
                 .verify(&self.epoch_state.verifier)
                 .and_then(|_| self.node_receiver.process(node))
                 .map(|r| r.into()),
-            DAGMessage::CertifiedNodeMsg(certified_node_msg) => certified_node_msg
-                .verify(&self.epoch_state.verifier)
-                .and_then(|_| self.dag_driver.process(certified_node_msg.certified_node()))
-                .map(|r| r.into()),
+            DAGMessage::CertifiedNodeMsg(certified_node_msg) => {
+                match certified_node_msg.verify(&self.epoch_state.verifier) {
+                    Ok(_) => match self.state_sync_trigger.check(certified_node_msg).await {
+                        ret @ (NeedsSync(_), None) => return Ok(ret.0),
+                        (Synced, Some(certified_node_msg)) => self
+                            .dag_driver
+                            .process(certified_node_msg.certified_node())
+                            .map(|r| r.into()),
+                        _ => unreachable!(),
+                    },
+                    Err(e) => Err(e),
+                }
+            },
             DAGMessage::FetchRequest(request) => request
                 .verify(&self.epoch_state.verifier)
                 .and_then(|_| self.fetch_receiver.process(request))
@@ -117,5 +143,6 @@ impl NetworkHandler {
             .response_sender
             .send(response)
             .map_err(|_| anyhow::anyhow!("unable to respond to rpc"))
+            .map(|_| StateSyncStatus::Synced)
     }
 }
