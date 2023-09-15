@@ -1332,7 +1332,7 @@ impl Frame {
                 let top_ty = interpreter.operand_stack.pop_ty()?;
                 top_ty.check_ref_eq(&expected_ty)?;
                 interpreter.operand_stack.push_ty(Type::Reference(Box::new(
-                    resolver.instantiate_generic_field(*idx, ty_args)?,
+                    resolver.get_field_type_generic(*idx, ty_args)?,
                 )))?;
             },
             Bytecode::MutBorrowFieldGeneric(idx) => {
@@ -1342,7 +1342,7 @@ impl Frame {
                 interpreter
                     .operand_stack
                     .push_ty(Type::MutableReference(Box::new(
-                        resolver.instantiate_generic_field(*idx, ty_args)?,
+                        resolver.get_field_type_generic(*idx, ty_args)?,
                     )))?;
             },
             Bytecode::Pack(idx) => {
@@ -1384,7 +1384,7 @@ impl Frame {
             Bytecode::PackGeneric(idx) => {
                 let field_count = resolver.field_instantiation_count(*idx);
                 let args_ty = resolver.instantiate_generic_struct_fields(*idx, ty_args)?;
-                let output_ty = resolver.instantiate_generic_type(*idx, ty_args)?;
+                let output_ty = resolver.get_struct_type_generic(*idx, ty_args)?;
                 let ability = output_ty.abilities()?;
 
                 // If the struct has a key ability, we expects all of its field to have store ability but not key ability.
@@ -1427,7 +1427,7 @@ impl Frame {
             },
             Bytecode::UnpackGeneric(idx) => {
                 let struct_ty = interpreter.operand_stack.pop_ty()?;
-                struct_ty.check_eq(&resolver.instantiate_generic_type(*idx, ty_args)?)?;
+                struct_ty.check_eq(&resolver.get_struct_type_generic(*idx, ty_args)?)?;
 
                 let struct_decl = resolver.instantiate_generic_struct_fields(*idx, ty_args)?;
                 for ty in struct_decl.into_iter() {
@@ -1567,7 +1567,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
-                let ty = resolver.instantiate_generic_type(*idx, ty_args)?;
+                let ty = resolver.get_struct_type_generic(*idx, ty_args)?;
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
@@ -1578,7 +1578,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
-                let ty = resolver.instantiate_generic_type(*idx, ty_args)?;
+                let ty = resolver.get_struct_type_generic(*idx, ty_args)?;
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
@@ -1606,7 +1606,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Reference(Box::new(Type::Signer)))?;
-                ty.check_eq(&resolver.instantiate_generic_type(*idx, ty_args)?)?;
+                ty.check_eq(&resolver.get_struct_type_generic(*idx, ty_args)?)?;
                 check_ability(ty.abilities()?.has_key())?;
             },
             Bytecode::MoveFrom(idx) => {
@@ -1623,7 +1623,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
-                let ty = resolver.instantiate_generic_type(*idx, ty_args)?;
+                let ty = resolver.get_struct_type_generic(*idx, ty_args)?;
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
@@ -1958,7 +1958,7 @@ impl Frame {
                     },
                     Bytecode::PackGeneric(si_idx) => {
                         let field_count = resolver.field_instantiation_count(*si_idx);
-                        let ty = resolver.instantiate_generic_type(*si_idx, self.ty_args())?;
+                        let ty = resolver.get_struct_type_generic(*si_idx, self.ty_args())?;
                         check_depth_of_type(resolver, &ty)?;
                         gas_meter.charge_pack(
                             true,
@@ -2163,7 +2163,7 @@ impl Frame {
                     | Bytecode::ImmBorrowGlobalGeneric(si_idx) => {
                         let is_mut = matches!(instruction, Bytecode::MutBorrowGlobalGeneric(_));
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.instantiate_generic_type(*si_idx, self.ty_args())?;
+                        let ty = resolver.get_struct_type_generic(*si_idx, self.ty_args())?;
                         interpreter.borrow_global(
                             is_mut,
                             true,
@@ -2188,7 +2188,7 @@ impl Frame {
                     },
                     Bytecode::ExistsGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.instantiate_generic_type(*si_idx, self.ty_args())?;
+                        let ty = resolver.get_struct_type_generic(*si_idx, self.ty_args())?;
                         interpreter.exists(
                             true,
                             resolver.loader(),
@@ -2212,7 +2212,7 @@ impl Frame {
                     },
                     Bytecode::MoveFromGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.instantiate_generic_type(*si_idx, self.ty_args())?;
+                        let ty = resolver.get_struct_type_generic(*si_idx, self.ty_args())?;
                         interpreter.move_from(
                             true,
                             resolver.loader(),
@@ -2250,7 +2250,7 @@ impl Frame {
                             .value_as::<Reference>()?
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
-                        let ty = resolver.instantiate_generic_type(*si_idx, self.ty_args())?;
+                        let ty = resolver.get_struct_type_generic(*si_idx, self.ty_args())?;
                         interpreter.move_to(
                             true,
                             resolver.loader(),

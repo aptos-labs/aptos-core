@@ -1167,7 +1167,7 @@ impl Loader {
         )
     }
 
-    pub(crate) fn get_struct_type_by_name(
+    pub(crate) fn get_struct_type_by_identifier(
         &self,
         name: &StructIdentifier,
     ) -> PartialVMResult<Arc<StructType>> {
@@ -1292,7 +1292,7 @@ impl<'a> Resolver<'a> {
         })
     }
 
-    pub(crate) fn instantiate_generic_type(
+    pub(crate) fn get_struct_type_generic(
         &self,
         idx: StructDefInstantiationIndex,
         ty_args: &[Type],
@@ -1340,7 +1340,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    pub(crate) fn instantiate_generic_field(
+    pub(crate) fn get_field_type_generic(
         &self,
         idx: FieldInstantiationIndex,
         ty_args: &[Type],
@@ -1717,9 +1717,8 @@ impl Script {
 //
 // Cache for data associated to a Struct, used for de/serialization and more
 //
-
 #[derive(Clone)]
-struct StructInfo {
+struct StructInfoCache {
     struct_tag: Option<(StructTag, u64)>,
     struct_layout: Option<MoveStructLayout>,
     annotated_struct_layout: Option<MoveStructLayout>,
@@ -1727,7 +1726,7 @@ struct StructInfo {
     annotated_node_count: Option<u64>,
 }
 
-impl StructInfo {
+impl StructInfoCache {
     fn new() -> Self {
         Self {
             struct_tag: None,
@@ -1741,7 +1740,7 @@ impl StructInfo {
 
 #[derive(Clone)]
 pub(crate) struct TypeCache {
-    structs: HashMap<StructIdentifier, HashMap<Vec<Type>, StructInfo>>,
+    structs: HashMap<StructIdentifier, HashMap<Vec<Type>, StructInfoCache>>,
     depth_formula: HashMap<StructIdentifier, DepthFormula>,
 }
 
@@ -1822,7 +1821,7 @@ impl Loader {
             .entry(name.clone())
             .or_insert_with(HashMap::new)
             .entry(ty_args.to_vec())
-            .or_insert_with(StructInfo::new)
+            .or_insert_with(StructInfoCache::new)
             .struct_tag = Some((struct_tag.clone(), gas_context.cost - cur_cost));
 
         Ok(struct_tag)
@@ -1902,7 +1901,7 @@ impl Loader {
         }
 
         let count_before = *count;
-        let struct_type = self.get_struct_type_by_name(name)?;
+        let struct_type = self.get_struct_type_by_identifier(name)?;
         let field_tys = struct_type
             .fields
             .iter()
@@ -1922,7 +1921,7 @@ impl Loader {
             .entry(name.clone())
             .or_insert_with(HashMap::new)
             .entry(ty_args.to_vec())
-            .or_insert_with(StructInfo::new);
+            .or_insert_with(StructInfoCache::new);
         info.struct_layout = Some(struct_layout.clone());
         info.node_count = Some(field_node_count);
 
@@ -2023,7 +2022,7 @@ impl Loader {
             }
         }
 
-        let struct_type = self.get_struct_type_by_name(name)?;
+        let struct_type = self.get_struct_type_by_identifier(name)?;
         if struct_type.fields.len() != struct_type.field_names.len() {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
@@ -2060,7 +2059,7 @@ impl Loader {
             .entry(name.clone())
             .or_insert_with(HashMap::new)
             .entry(ty_args.to_vec())
-            .or_insert_with(StructInfo::new);
+            .or_insert_with(StructInfoCache::new);
         info.annotated_struct_layout = Some(struct_layout.clone());
         info.annotated_node_count = Some(field_node_count);
 
@@ -2115,7 +2114,7 @@ impl Loader {
             return Ok(depth_formula.clone());
         }
 
-        let struct_type = self.get_struct_type_by_name(name)?;
+        let struct_type = self.get_struct_type_by_identifier(name)?;
 
         let formulas = struct_type
             .fields
