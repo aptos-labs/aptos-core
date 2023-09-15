@@ -2,14 +2,18 @@ name: "Ad-hoc Forge Run"
 on:
   workflow_dispatch:
     inputs:
+      GIT_SHA:
+        required: true
+        type: string
+        description: The git SHA1 to checkout and test
       IMAGE_TAG:
-        required: true
+        required: false
         type: string
-        description: The docker image tag to test. If not specified, falls back on GIT_SHA, and then to the latest commits on the current branch
+        description: The docker image tag to test. If not specified, falls back on GIT_SHA
       FORGE_IMAGE_TAG:
-        required: true
+        required: false
         type: string
-        description: The docker image tag to use for forge runner. If not specified, falls back on GIT_SHA, and then to the latest commits on the current branch
+        description: The docker image tag to use for forge runner. If not specified, falls back on GIT_SHA
       FORGE_RUNNER_DURATION_SECS:
         required: false
         type: string
@@ -25,9 +29,6 @@ on:
         type: string
         description: The Forge k8s cluster to be used for test
 
-env:
-  GIT_SHA: ${{ github.sha }}
-
 permissions:
   contents: read
   id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
@@ -40,14 +41,14 @@ jobs:
     steps:
       - name: collect metadata
         run: |
-          echo "GIT_SHA: ${{ env.GIT_SHA }}"
+          echo "GIT_SHA: ${{ inputs.GIT_SHA }}"
           echo "IMAGE_TAG: ${{ inputs.IMAGE_TAG }}"
           echo "FORGE_IMAGE_TAG: ${{ inputs.FORGE_IMAGE_TAG }}"
           echo "FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}"
           echo "FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}"
           echo "FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}"
     outputs:
-      gitSha: ${{ env.GIT_SHA }}
+      gitSha: ${{ inputs.GIT_SHA }}
       imageTag: ${{ inputs.IMAGE_TAG }}
       forgeImageTag: ${{ inputs.FORGE_IMAGE_TAG }}
       forgeRunnerDurationSecs: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}
