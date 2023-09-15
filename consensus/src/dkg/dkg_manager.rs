@@ -113,7 +113,7 @@ impl DKGManager {
         epoch_state: EpochState,
         reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
         backend: SecureBackend,
-        time_service: Arc<dyn TimeService>,
+        time_service: Arc<dyn TimeService>, // for metrics
     ) -> Self {
         let verifier = epoch_state.verifier.clone();
         Self {
@@ -198,7 +198,7 @@ impl DKGManager {
             error!("[DKG] Error when adding DKG node: {:?}", e);
         }
 
-        observe_dkg(self.time_service.get_current_timestamp().as_micros() as u64, DKGStage::DKG_NODE_READY);
+        observe_dkg(self.start_time, DKGStage::DKG_NODE_READY);
 
         self.broadcast_node(dkg_node);
     }
@@ -248,7 +248,7 @@ impl DKGManager {
         match self.dkg_store.add_agg_node(agg_node) {
             Ok(agg_node) => {
                 if let Some(agg_node) = agg_node {
-                    observe_dkg(self.time_service.get_current_timestamp().as_micros() as u64, DKGStage::DKG_AGG_NODE_READY);
+                    observe_dkg(self.start_time, DKGStage::DKG_AGG_NODE_READY);
 
                     // Broadcast only the first aggregated dkg node
                     self.broadcast_agg_node(agg_node);
@@ -267,13 +267,13 @@ impl DKGManager {
 
     // Will be called by the proposal generator
     pub fn take_agg_node(&mut self) -> Option<DKGAggNode> {
-        observe_dkg(self.time_service.get_current_timestamp().as_micros() as u64, DKGStage::DKG_AGG_NODE_PROPOSED);
+        observe_dkg(self.start_time, DKGStage::DKG_AGG_NODE_PROPOSED);
         self.dkg_store.take_agg_node()
     }
 
     // Will be called by the state computer
     pub fn finish_dkg(&mut self) {
-        observe_dkg(self.time_service.get_current_timestamp().as_micros() as u64, DKGStage::DKG_FINISH);
+        observe_dkg(self.start_time, DKGStage::DKG_FINISH);
         // terminate the ongoing broadcast when the DKG aggregated node is committed
         if let Some(handle) = self.rb_abort_handle.take() {
             debug!("[DKG] Node {:?} abort broadcast due to DKG finish", self.author);
