@@ -138,8 +138,12 @@ where
     }
 
     fn next_txn(&self, idx: TxnIndex) -> TxnIndex {
-        let local_rank = self.local_idxs_by_global.get(&idx).copied().unwrap();
-        self.global_idxs.get(local_rank + 1).copied().unwrap_or(self.end_txn_idx())
+        if idx == self.end_txn_idx() {
+            self.end_txn_idx()
+        } else {
+            let local_rank = self.local_idxs_by_global.get(&idx).copied().unwrap();
+            self.global_idxs.get(local_rank + 1).copied().unwrap_or(self.end_txn_idx())
+        }
     }
 
     fn txns(&self) -> Vec<TxnIndex> {
