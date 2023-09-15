@@ -46,7 +46,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 
 struct DagBootstrapper {
     self_peer: Author,
-    signer: ValidatorSigner,
+    signer: Arc<ValidatorSigner>,
     epoch_state: Arc<EpochState>,
     storage: Arc<dyn DAGStorage>,
     rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
@@ -59,7 +59,7 @@ struct DagBootstrapper {
 impl DagBootstrapper {
     fn new(
         self_peer: Author,
-        signer: ValidatorSigner,
+        signer: Arc<ValidatorSigner>,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
@@ -244,7 +244,7 @@ pub(super) fn bootstrap_dag_for_test(
 ) {
     let bootstraper = DagBootstrapper::new(
         self_peer,
-        signer,
+        signer.into(),
         epoch_state,
         storage.clone(),
         rb_network_sender,
