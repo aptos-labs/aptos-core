@@ -43,7 +43,7 @@ use aptos_types::{
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::{aptos_try, return_on_failure};
-use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
+use aptos_vm_logging::{alert, log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
     change_set::VMChangeSet,
     output::VMOutput,
@@ -1398,6 +1398,7 @@ impl AptosVM {
             txn,
             &log_context,
         );
+        info!(log_context, "simulate_signed_transaction ends: {:?}", vm_status.message());
         (
             vm_status,
             vm_output
@@ -1824,21 +1825,30 @@ impl AptosSimulationVM {
             return discard_error_vm_status(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
         }
 
+        info!(*log_context, "begin simulate_signed_transaction");
+
         // Revalidate the transaction.
         let txn_data = TransactionMetadata::new(txn);
         let mut session = self.0.new_session(resolver, SessionId::txn_meta(&txn_data));
         if let Err(err) =
             self.validate_simulated_transaction(&mut session, resolver, txn, &txn_data, log_context)
         {
+            error!(*log_context, "revalidatation failed:{:?}", err);
             return discard_error_vm_status(err);
         };
 
         let gas_params = match self.0 .0.get_gas_parameters(log_context) {
-            Err(err) => return discard_error_vm_status(err),
+            Err(err) => {
+                error!(*log_context, "get gas parameters failed:{:?}", err);
+                return discard_error_vm_status(err)
+            },
             Ok(s) => s,
         };
         let storage_gas_params = match self.0 .0.get_storage_gas_parameters(log_context) {
-            Err(err) => return discard_error_vm_status(err),
+            Err(err) => {
+                error!(*log_context, "get storage gas parameters failed:{:?}", err);
+                return discard_error_vm_status(err)
+            },
             Ok(s) => s,
         };
 
@@ -1854,7 +1864,8 @@ impl AptosSimulationVM {
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
             | payload @ TransactionPayload::EntryFunction(_) => {
-                self.0.execute_script_or_entry_function(
+                info!(*log_context, "begin executing script or entry function");
+                let result = self.0.execute_script_or_entry_function(
                     resolver,
                     session,
                     &mut gas_meter,
@@ -1863,20 +1874,25 @@ impl AptosSimulationVM {
                     log_context,
                     &mut new_published_modules_loaded,
                     &storage_gas_params.change_set_configs,
-                )
+                );
+                info!(*log_context, "result of executing script or entry function:{:?}", result);
+                return result.unwrap();
             },
             TransactionPayload::Multisig(multisig) => {
                 if let Some(payload) = multisig.transaction_payload.clone() {
                     match payload {
                         MultisigTransactionPayload::EntryFunction(entry_function) => {
                             aptos_try!({
-                                return_on_failure!(self.0.execute_multisig_entry_function(
+                                info!(*log_context, "execution of multisig entry function");
+                                let res = self.0.execute_multisig_entry_function(
                                     &mut session,
                                     &mut gas_meter,
                                     multisig.multisig_address,
                                     &entry_function,
                                     &mut new_published_modules_loaded,
-                                ));
+                                );
+                                info!(*log_context, "result of executing multisig entry function:{:?}", res);
+                                return_on_failure!(res);
                                 // TODO: Deduplicate this against execute_multisig_transaction
                                 // A bit tricky since we need to skip success/failure cleanups,
                                 // which is in the middle. Introducing a boolean would make the code
@@ -1890,17 +1906,20 @@ impl AptosSimulationVM {
                                         &txn_data,
                                     )?;
 
-                                self.0.success_transaction_cleanup(
+                                let clean_result = self.0.success_transaction_cleanup(
                                     respawned_session,
                                     &gas_meter,
                                     &txn_data,
                                     log_context,
                                     &storage_gas_params.change_set_configs,
-                                )
+                                );
+                                info!(*log_context, "result of clean result:{:?}", clean_result);
+                                return clean_result;
                             })
                         },
                     }
                 } else {
+                    info!(*log_context, "missing data");
                     Err(VMStatus::error(StatusCode::MISSING_DATA, None))
                 }
             },
