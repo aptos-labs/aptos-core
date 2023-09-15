@@ -382,9 +382,8 @@ pub struct StructDefinition {
 impl StructDefinition {
     pub fn declared_field_count(&self) -> PartialVMResult<MemberCount> {
         match &self.field_information {
-            // TODO we might want a more informative error here
             StructFieldInformation::Native => Err(PartialVMError::new(StatusCode::LINKER_ERROR)
-                .with_message("Looking for field in native structure".to_string())),
+                .with_message("Looking for field in native structure. Native structures have no accessible fields.".to_string())),
             StructFieldInformation::Declared(fields) => Ok(fields.len() as u16),
         }
     }
