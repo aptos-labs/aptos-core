@@ -145,7 +145,9 @@ pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
     module_read_write_intersection: AtomicBool,
 }
 
-impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputOutput<K, T, E> {
+impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
+    TxnLastInputOutput<K, T, E>
+{
     pub fn new(num_txns: TxnIndex) -> Self {
         Self {
             inputs: (0..num_txns)
@@ -197,15 +199,21 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLa
         let read_modules: Vec<AccessPath> = input
             .iter()
             .filter_map(|desc| {
-                matches!(desc.kind, ReadKind::Module)
-                    .then(|| desc.module_path().unwrap_or_else(|| panic!("Module path guaranteed to exist {:?}", desc)))
+                matches!(desc.kind, ReadKind::Module).then(|| {
+                    desc.module_path()
+                        .unwrap_or_else(|| panic!("Module path guaranteed to exist {:?}", desc))
+                })
             })
             .collect();
         let written_modules: Vec<AccessPath> = match &output {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => output
                 .module_write_set()
                 .keys()
-                .map(|k| k.module_path().unwrap_or_else(|| panic!("Unexpected non-module key found in putput: {:?}", k)))
+                .map(|k| {
+                    k.module_path().unwrap_or_else(|| {
+                        panic!("Unexpected non-module key found in putput: {:?}", k)
+                    })
+                })
                 .collect(),
             ExecutionStatus::Abort(_) => Vec::new(),
         };

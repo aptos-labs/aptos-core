@@ -21,7 +21,8 @@ use aptos_types::{
 };
 #[cfg(feature = "testing")]
 use aptos_types::{
-    chain_id::ChainId, state_store::{state_key::StateKey, state_value::StateValue},
+    chain_id::ChainId,
+    state_store::{state_key::StateKey, state_value::StateValue},
 };
 #[cfg(feature = "testing")]
 use bytes::Bytes;

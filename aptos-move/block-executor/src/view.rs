@@ -19,7 +19,7 @@ use aptos_mvhashmap::{
 };
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
-    executable::Executable,
+    executable::{Executable, ModulePath},
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::TransactionWrite,
 };
@@ -34,7 +34,6 @@ use std::{
     fmt::Debug,
     sync::{atomic::AtomicU32, Arc},
 };
-use aptos_types::executable::ModulePath;
 
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.
