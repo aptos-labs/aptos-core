@@ -5,7 +5,7 @@ module 0xcafe::vectors {
     // break
     public entry fun guess_flips_break(flips: vector<u8>) {
         let i = 0;
-	let flipsref1 = &flips;
+        let flipsref1 = &flips;
         while (i < vector::length(flipsref1)) {
             if (*vector::borrow(flipsref1, i) != 0) {
                 break
@@ -13,14 +13,14 @@ module 0xcafe::vectors {
             i = i + 1;
         };
         let _v = copy flips; // this is ok
-	// this will fail, a UNKNOWN_INVARIANT_VIOLATION_ERROR (code 2000)
+        // this will fail, a UNKNOWN_INVARIANT_VIOLATION_ERROR (code 2000)
         let _v2 =  flips;
     }
 
     // assert
     public entry fun guess_flips_abort(flips: vector<u8>) {
         let i = 0;
-	let flipsref2 = &flips;
+        let flipsref2 = &flips;
         while (i < vector::length(flipsref2)) {
             assert!(*vector::borrow(flipsref2, i) == 0, 3);
             i = i + 1;
@@ -32,7 +32,7 @@ module 0xcafe::vectors {
     // no check
     public entry fun guess_flips_nocheck(flips: vector<u8>) {
         let i = 0;
-	let flipsref3 = &flips;
+        let flipsref3 = &flips;
         while (i < vector::length(flipsref3)) {
             i = i + 1;
         };
@@ -43,7 +43,7 @@ module 0xcafe::vectors {
     // continue
     public entry fun guess_flips_continue(flips: vector<u8>) {
         let i = 0;
-	let flipsref4 = &flips;
+        let flipsref4 = &flips;
         while (i < vector::length(flipsref4)) {
             if (*vector::borrow(flipsref4, i) != 0) {
                 continue
@@ -52,6 +52,24 @@ module 0xcafe::vectors {
         };
         let _v = copy flips; // this is ok
         let _v2 = flips; // this is ok
+    }
+
+    // multi-break
+    public entry fun guess_flips_break2(flips: vector<u8>) {
+        let i = 0;
+        let flipsref5 = &flips;
+        while (i < vector::length(flipsref5)) {
+            if (*vector::borrow(flipsref5, i) != 0) {
+                break
+            };
+            i = i + 1;
+            if (*vector::borrow(flipsref5, i) == 5) {
+                break
+            };
+        };
+        let _v = copy flips; // this is ok
+        // this will fail, a UNKNOWN_INVARIANT_VIOLATION_ERROR (code 2000)
+        let _v2 =  flips;
     }
 
     // #[test]
@@ -78,6 +96,12 @@ module 0xcafe::vectors {
         guess_flips_continue(flips);
     }
 
+    // #[test]
+    fun test_guess_flips_break2() {
+        let flips = vector[0, 0, 0,0];
+        guess_flips_break2(flips);
+    }
+
     // direct entry versions of test cases for debugging
     public entry fun entry_test_guess_flips_break() {
         let flips = vector[0, 0, 0,0];
@@ -97,6 +121,11 @@ module 0xcafe::vectors {
     public entry fun entry_test_guess_flips_continue() {
         let flips = vector[0, 0, 0,0];
         guess_flips_continue(flips);
+    }
+
+    public entry fun entry_test_guess_flips_break2() {
+        let flips = vector[0, 0, 0,0];
+        guess_flips_break2(flips);
     }
 }
 
