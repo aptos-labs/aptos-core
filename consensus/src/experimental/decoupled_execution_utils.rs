@@ -8,15 +8,13 @@ use crate::{
         execution_phase::{ExecutionPhase, ExecutionRequest, ExecutionResponse},
         persisting_phase::{PersistingPhase, PersistingRequest},
         pipeline_phase::{CountedRequest, PipelinePhase},
-        signing_phase::{SigningPhase, SigningRequest, SigningResponse},
+        signing_phase::{CommitSignerProvider, SigningPhase, SigningRequest, SigningResponse},
     },
-    metrics_safety_rules::MetricsSafetyRules,
     network::{IncomingCommitRequest, NetworkSender},
     state_replication::StateComputer,
 };
 use aptos_channels::aptos_channel::Receiver;
 use aptos_consensus_types::common::Author;
-use aptos_infallible::Mutex;
 use aptos_types::{account_address::AccountAddress, validator_verifier::ValidatorVerifier};
 use futures::channel::mpsc::UnboundedReceiver;
 use std::sync::{atomic::AtomicU64, Arc};
@@ -25,7 +23,7 @@ use std::sync::{atomic::AtomicU64, Arc};
 pub fn prepare_phases_and_buffer_manager(
     author: Author,
     execution_proxy: Arc<dyn StateComputer>,
-    safety_rules: Arc<Mutex<MetricsSafetyRules>>,
+    safety_rules: Arc<dyn CommitSignerProvider>,
     commit_msg_tx: NetworkSender,
     commit_msg_rx: Receiver<AccountAddress, IncomingCommitRequest>,
     persisting_proxy: Arc<dyn StateComputer>,
