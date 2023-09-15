@@ -669,17 +669,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             transaction_deduper,
         );
 
-        let state_computer =
-            if onchain_consensus_config.decoupled_execution() {
-                Arc::new(self.spawn_decoupled_execution(
+        if onchain_consensus_config.decoupled_execution() {
+            Arc::new(
+                self.spawn_decoupled_execution(
                     commit_signer_provider,
                     epoch_state.verifier.clone(),
-                ))
-            } else {
-                self.commit_state_computer.clone()
-            };
-
-        state_computer
+                ),
+            )
+        } else {
+            self.commit_state_computer.clone()
+        }
     }
 
     fn set_epoch_start_metrics(&self, epoch_state: &EpochState) {
@@ -828,7 +827,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.spawn_block_retrieval_task(epoch, block_store);
     }
 
-    fn init_network_sender(&mut self, epoch_state: &EpochState) -> NetworkSender {
+    fn init_network_sender(&self, epoch_state: &EpochState) -> NetworkSender {
         NetworkSender::new(
             self.author,
             self.network_sender.clone(),
