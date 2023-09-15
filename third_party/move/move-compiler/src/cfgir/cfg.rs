@@ -192,6 +192,72 @@ impl<'a> BlockCFG<'a> {
             println!();
         }
     }
+
+    /// Adds a block on any critical edge: an edge from a node with multiple successors to
+    /// a node with multiple predecessors.  Returns true if any changes occur; in this
+    /// case, caller must call recompute().
+    pub fn remove_critical_edges<Ftype>(&mut self, mut make_label: Ftype) -> bool
+    where
+        Ftype: FnMut() -> Label,
+    {
+        let critical_edges: Vec<_> = self
+            .successor_map
+            .iter()
+            .filter(|(_, nexts)| nexts.len() > 1)
+            .flat_map(|(lbl, nexts)| {
+                nexts
+                    .iter()
+                    .filter(|lbl2| {
+                        self.predecessor_map
+                            .get(lbl2)
+                            .map_or_else(|| false, |preds| (preds.len() > 1))
+                    })
+                    .map(|lbl2| (*lbl, *lbl2))
+            })
+            .collect();
+        for (pred, succ) in &critical_edges {
+            let new_label = make_label();
+            self.add_edge(*pred, *succ, new_label);
+        }
+        !critical_edges.is_empty()
+    }
+
+    // cmd_ must be a jump or conditional jump with a from_label target.
+    // The label is replaced by to_label.
+    fn remap_target(from_label: Label, to_label: Label, sp!(_, cmd_): &mut Command) {
+        match cmd_ {
+            Command_::Jump { target, .. } if *target == from_label => {
+                *target = to_label;
+            },
+            Command_::JumpIf { if_true, .. } if *if_true == from_label => {
+                *if_true = to_label;
+            },
+            Command_::JumpIf { if_false, .. } if *if_false == from_label => {
+                *if_false = to_label;
+            },
+            _ => {
+                panic!("ICE: jump not found to remap label {}", from_label);
+            },
+        }
+    }
+
+    // Helper inserts an edge, but doesn't update maps.  Caller must should ensure that recompute()
+    // is called at some point.  new_label must be a new unique Label.
+    fn add_edge(&mut self, pred: Label, succ: Label, new_label: Label) {
+        let loc = {
+            let from_block = self.block_mut(pred);
+            let branch_cmd = from_block.back_mut().unwrap();
+            Self::remap_target(succ, new_label, branch_cmd);
+            branch_cmd.loc
+        };
+
+        let mut new_block = BasicBlock::new();
+        new_block.push_back(sp(loc, Command_::Jump {
+            target: succ,
+            from_user: false,
+        }));
+        self.blocks.insert(new_label, new_block);
+    }
 }
 
 impl<'a> CFG for BlockCFG<'a> {
