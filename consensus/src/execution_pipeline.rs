@@ -16,13 +16,13 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
 pub struct ExecutionPipeline {
-    block_tx: mpsc::Sender<ExecuteBlockCommand>,
+    block_tx: mpsc::UnboundedSender<ExecuteBlockCommand>,
 }
 
 impl ExecutionPipeline {
     pub fn spawn(executor: Arc<dyn BlockExecutorTrait>, runtime: &tokio::runtime::Handle) -> Self {
-        let (block_tx, block_rx) = mpsc::channel(PIPELINE_DEPTH);
-        let (ledger_apply_tx, ledger_apply_rx) = mpsc::channel(PIPELINE_DEPTH);
+        let (block_tx, block_rx) = mpsc::unbounded_channel();
+        let (ledger_apply_tx, ledger_apply_rx) = mpsc::unbounded_channel();
         runtime.spawn(Self::execute_stage(
             block_rx,
             ledger_apply_tx,
@@ -47,7 +47,6 @@ impl ExecutionPipeline {
                 maybe_block_gas_limit,
                 result_tx,
             })
-            .await
             .expect("Failed to send block to execution pipeline.");
 
         Box::pin(async move {
@@ -63,8 +62,8 @@ impl ExecutionPipeline {
     }
 
     async fn execute_stage(
-        mut block_rx: mpsc::Receiver<ExecuteBlockCommand>,
-        ledger_apply_tx: mpsc::Sender<LedgerApplyCommand>,
+        mut block_rx: mpsc::UnboundedReceiver<ExecuteBlockCommand>,
+        ledger_apply_tx: mpsc::UnboundedSender<LedgerApplyCommand>,
         executor: Arc<dyn BlockExecutorTrait>,
     ) {
         while let Some(ExecuteBlockCommand {
@@ -102,14 +101,13 @@ impl ExecutionPipeline {
                     state_checkpoint_output,
                     result_tx,
                 })
-                .await
                 .expect("Failed to send block to ledger_apply stage.");
         }
         debug!("execute_stage quitting.");
     }
 
     async fn ledger_apply_stage(
-        mut block_rx: mpsc::Receiver<LedgerApplyCommand>,
+        mut block_rx: mpsc::UnboundedReceiver<LedgerApplyCommand>,
         executor: Arc<dyn BlockExecutorTrait>,
     ) {
         while let Some(LedgerApplyCommand {
