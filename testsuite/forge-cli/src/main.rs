@@ -1370,13 +1370,13 @@ fn netbench_config_100_megabytes_per_s() -> NetbenchConfig {
     }
 }
 
-fn netbench_config_20_megabytes_per_s() -> NetbenchConfig {
+fn netbench_config_2_megabytes_per_s() -> NetbenchConfig {
     NetbenchConfig {
         enabled: true,
         max_network_channel_size: 1000,
         enable_direct_send_testing: true,
         direct_send_data_size: 100000,
-        direct_send_per_second: 200,
+        direct_send_per_second: 20,
         ..Default::default()
     }
 }
@@ -1396,7 +1396,7 @@ fn net_bench_two_region_env() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Not using 100 MBps here, as it will lead to throughput collapse
-            config.netbench = Some(netbench_config_20_megabytes_per_s());
+            config.netbench = Some(netbench_config_2_megabytes_per_s());
         }))
 }
 
