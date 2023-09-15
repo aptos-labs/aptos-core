@@ -71,6 +71,7 @@ pub struct PackageMetadata {
     pub upgrade_policy: UpgradePolicy,
     pub upgrade_number: u64,
     pub source_digest: String,
+    pub source_hash: Optional<String>,
     #[serde(with = "serde_bytes")]
     pub manifest: Vec<u8>,
     pub modules: Vec<ModuleMetadata>,
