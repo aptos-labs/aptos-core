@@ -56,8 +56,7 @@ pub trait TAggregatorView {
     ) -> anyhow::Result<Option<u128>> {
         let maybe_state_value = self.get_aggregator_v1_state_value(id, mode)?;
         match maybe_state_value {
-            Some(state_value) => bcs::from_bytes(state_value.bytes())
-                .map_err(|_| anyhow::Error::msg("Failed to deserialize aggregator value to u128")),
+            Some(state_value) => Ok(Some(bcs::from_bytes(state_value.bytes())?)),
             None => Ok(None),
         }
     }
