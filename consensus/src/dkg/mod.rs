@@ -8,6 +8,7 @@ mod dkg_reliable_broadcast;
 pub mod dkg_rounding;
 mod dkg_store;
 pub mod types;
+mod tracing;
 
 use crate::dkg::dkg_rounding::DKGRounding;
 use aptos_consensus_types::common::Author;

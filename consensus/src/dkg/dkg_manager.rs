@@ -6,7 +6,7 @@ use super::{
     dkg_store::DKGStore,
     types::{DKGAggNode, DKGAggNodeAckState, DKGMessage, DKGNodeAckState},
 };
-use crate::dkg::types::{DKGNode, TDKGMessage};
+use crate::{dkg::{types::{DKGNode, TDKGMessage}, tracing::{observe_dkg, DKGStage}}, util::time_service::TimeService};
 use aptos_config::config::SecureBackend;
 use aptos_consensus_types::common::Author;
 use aptos_dkg::{
@@ -29,12 +29,6 @@ use std::sync::Arc;
 use tokio_retry::strategy::ExponentialBackoff;
 use aptos_crypto::{Uniform, bls12381};
 use crate::dkg::build_dkg_pvss_config;
-
-// the transcript size is 3.25MB
-// const TRANSCRIPT_SIZE: usize = 3_250_000;
-// const TRANSCRIPT_COMPUTE_TIME_MS: u64 = 4760;
-// const TRANSCRIPT_VERIFY_TIME_MS: u64 = 555;
-// const TRANSCRIPT_AGGREGATE_TIME_MS: u64 = 21;
 
 type WT = WeightedTranscript<das::Transcript>;
 
@@ -109,6 +103,8 @@ pub struct DKGManager {
     dkg_store: DKGStore,
     dkg_rounding: Option<DKGRounding>,
     backend: SecureBackend, // for private signing keys
+    time_service: Arc<dyn TimeService>, // for metrics
+    start_time: u64,
 }
 
 impl DKGManager {
@@ -117,6 +113,7 @@ impl DKGManager {
         epoch_state: EpochState,
         reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
         backend: SecureBackend,
+        time_service: Arc<dyn TimeService>,
     ) -> Self {
         let verifier = epoch_state.verifier.clone();
         Self {
@@ -127,11 +124,14 @@ impl DKGManager {
             dkg_store: DKGStore::new(author, verifier),
             dkg_rounding: None,
             backend,
+            time_service,
+            start_time: 0,
         }
     }
 
     pub fn start_dkg(&mut self, dkg_events: Vec<ContractEvent>) {
-        // thread::sleep(Duration::from_millis(TRANSCRIPT_COMPUTE_TIME_MS));
+        self.start_time = self.time_service.get_current_timestamp().as_micros() as u64;
+
         let event = StartDKGEvent::try_from(dkg_events
             .first().unwrap()).unwrap();
         debug!("[DKG] start_dkg, target_epoch={}", event.target_epoch);
@@ -197,6 +197,9 @@ impl DKGManager {
         if let Err(e) = self.add_node(dkg_node.clone()) {
             error!("[DKG] Error when adding DKG node: {:?}", e);
         }
+
+        observe_dkg(self.time_service.get_current_timestamp().as_micros() as u64, DKGStage::DKG_NODE_READY);
+
         self.broadcast_node(dkg_node);
     }
 
@@ -245,6 +248,8 @@ impl DKGManager {
         match self.dkg_store.add_agg_node(agg_node) {
             Ok(agg_node) => {
                 if let Some(agg_node) = agg_node {
+                    observe_dkg(self.time_service.get_current_timestamp().as_micros() as u64, DKGStage::DKG_AGG_NODE_READY);
+
                     // Broadcast only the first aggregated dkg node
                     self.broadcast_agg_node(agg_node);
                 }
@@ -262,11 +267,13 @@ impl DKGManager {
 
     // Will be called by the proposal generator
     pub fn take_agg_node(&mut self) -> Option<DKGAggNode> {
+        observe_dkg(self.time_service.get_current_timestamp().as_micros() as u64, DKGStage::DKG_AGG_NODE_PROPOSED);
         self.dkg_store.take_agg_node()
     }
 
     // Will be called by the state computer
     pub fn finish_dkg(&mut self) {
+        observe_dkg(self.time_service.get_current_timestamp().as_micros() as u64, DKGStage::DKG_FINISH);
         // terminate the ongoing broadcast when the DKG aggregated node is committed
         if let Some(handle) = self.rb_abort_handle.take() {
             debug!("[DKG] Node {:?} abort broadcast due to DKG finish", self.author);

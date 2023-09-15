@@ -730,6 +730,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             epoch_state.clone(),
             dkg_reliable_broadcast,
             self.config.safety_rules.backend.clone(),
+            self.time_service.clone(),
         )));
         //dkg todo: old instance is silently dropped. Is it fine? any clean-up needed?
         self.dkg_manager_wrapper = Arc::new(DKGManagerWrapper::WithDKG(dkg_manager.clone()));
