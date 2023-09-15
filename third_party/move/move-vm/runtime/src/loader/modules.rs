@@ -5,7 +5,7 @@
 use crate::{
     loader::{
         function::{Function, FunctionHandle, FunctionInstantiation},
-        type_loader::make_type_internal,
+        type_loader::intern_type,
         BinaryCache,
     },
     native_functions::NativeFunctions,
@@ -48,20 +48,11 @@ impl ModuleCache {
         }
     }
 
-    //
-    // Common "get" operations
-    //
-
     // Retrieve a module by `ModuleId`. The module may have not been loaded yet in which
     // case `None` is returned
     pub(crate) fn module_at(&self, id: &ModuleId) -> Option<Arc<Module>> {
         self.modules.get(id).map(Arc::clone)
     }
-
-    //
-    // Insertion is under lock and it's a pretty heavy operation.
-    // The VM is pretty much stopped waiting for this to finish
-    //
 
     pub(crate) fn insert(
         &mut self,
@@ -103,7 +94,7 @@ impl ModuleCache {
 
         let mut field_tys = vec![];
         for field in fields {
-            let ty = make_type_internal(
+            let ty = intern_type(
                 BinaryIndexedView::Module(module),
                 &field.signature.0,
                 struct_name_table,
@@ -129,7 +120,6 @@ impl ModuleCache {
         })
     }
 
-    // Given a module id, returns whether the module cache has the module or not
     pub(crate) fn has_module(&self, module_id: &ModuleId) -> bool {
         self.modules.id_map.contains_key(module_id)
     }
@@ -213,7 +203,7 @@ pub(crate) struct Module {
     // function name to index into the Loader function list.
     // This allows a direct access from function name to `Function`
     pub(crate) function_map: HashMap<Identifier, usize>,
-    // struct name to index into the Loader type list
+    // struct name to index into the module's type list
     // This allows a direct access from struct name to `Struct`
     pub(crate) struct_map: HashMap<Identifier, usize>,
 
@@ -310,11 +300,7 @@ impl Module {
                         .0
                         .iter()
                         .map(|sig| {
-                            make_type_internal(
-                                BinaryIndexedView::Module(&module),
-                                sig,
-                                &struct_names,
-                            )
+                            intern_type(BinaryIndexedView::Module(&module), sig, &struct_names)
                         })
                         .collect::<PartialVMResult<Vec<_>>>()?,
                 )
@@ -345,8 +331,7 @@ impl Module {
 
             for (idx, func) in module.function_defs().iter().enumerate() {
                 let findex = FunctionDefinitionIndex(idx as TableIndex);
-                let function =
-                    Function::new(natives, findex, func, &module, signature_table.as_slice());
+                let function = Function::new(natives, findex, &module, signature_table.as_slice());
 
                 function_map.insert(function.name.to_owned(), idx);
                 function_defs.push(Arc::new(function));
@@ -378,7 +363,7 @@ impl Module {
                                     };
                                     single_signature_token_map.insert(
                                         *si,
-                                        make_type_internal(
+                                        intern_type(
                                             BinaryIndexedView::Module(&module),
                                             ty,
                                             &struct_names,
@@ -422,24 +407,24 @@ impl Module {
                 });
             }
 
-            for f_handle in module.field_handles() {
-                let def_idx = f_handle.owner;
+            for func_handle in module.field_handles() {
+                let def_idx = func_handle.owner;
                 let definition_struct_type =
                     structs[def_idx.0 as usize].definition_struct_type.clone();
-                let offset = f_handle.field as usize;
+                let offset = func_handle.field as usize;
                 field_handles.push(FieldHandle {
                     offset,
                     definition_struct_type,
                 });
             }
 
-            for f_inst in module.field_instantiations() {
-                let fh_idx = f_inst.handle;
+            for field_inst in module.field_instantiations() {
+                let fh_idx = field_inst.handle;
                 let offset = field_handles[fh_idx.0 as usize].offset;
                 let owner_struct_def = &structs[module.field_handle_at(fh_idx).owner.0 as usize];
                 field_instantiations.push(FieldInstantiation {
                     offset,
-                    instantiation: signature_table[f_inst.type_parameters.0 as usize].clone(),
+                    instantiation: signature_table[field_inst.type_parameters.0 as usize].clone(),
                     definition_struct_type: owner_struct_def.definition_struct_type.clone(),
                 });
             }

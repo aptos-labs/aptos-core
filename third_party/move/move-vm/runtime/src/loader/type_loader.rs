@@ -7,9 +7,8 @@ use move_binary_format::{
 use move_vm_types::loaded_data::runtime_types::{StructIdentifier, Type};
 use std::sync::Arc;
 
-// `make_type_internal` returns a `Type` given a signature and a resolver which
-// is resonsible to map a local struct index to a global one
-pub fn make_type_internal(
+// `intern_type` converts a signature token into the in memory type representation used by the MoveVM.
+pub fn intern_type(
     module: BinaryIndexedView,
     tok: &SignatureToken,
     struct_name_table: &[Arc<StructIdentifier>],
@@ -26,15 +25,15 @@ pub fn make_type_internal(
         SignatureToken::Signer => Type::Signer,
         SignatureToken::TypeParameter(idx) => Type::TyParam(*idx),
         SignatureToken::Vector(inner_tok) => {
-            let inner_type = make_type_internal(module, inner_tok, struct_name_table)?;
+            let inner_type = intern_type(module, inner_tok, struct_name_table)?;
             Type::Vector(Box::new(inner_type))
         },
         SignatureToken::Reference(inner_tok) => {
-            let inner_type = make_type_internal(module, inner_tok, struct_name_table)?;
+            let inner_type = intern_type(module, inner_tok, struct_name_table)?;
             Type::Reference(Box::new(inner_type))
         },
         SignatureToken::MutableReference(inner_tok) => {
-            let inner_type = make_type_internal(module, inner_tok, struct_name_table)?;
+            let inner_type = intern_type(module, inner_tok, struct_name_table)?;
             Type::MutableReference(Box::new(inner_type))
         },
         SignatureToken::Struct(sh_idx) => {
@@ -45,15 +44,15 @@ pub fn make_type_internal(
             }
         },
         SignatureToken::StructInstantiation(sh_idx, tys) => {
-            let type_parameters: Vec<_> = tys
+            let type_args: Vec<_> = tys
                 .iter()
-                .map(|tok| make_type_internal(module, tok, struct_name_table))
+                .map(|tok| intern_type(module, tok, struct_name_table))
                 .collect::<PartialVMResult<_>>()?;
             let struct_handle = module.struct_handle_at(*sh_idx);
             Type::StructInstantiation {
                 name: struct_name_table[sh_idx.0 as usize].clone(),
                 base_ability_set: struct_handle.abilities,
-                ty_args: Arc::new(type_parameters),
+                ty_args: Arc::new(type_args),
                 phantom_ty_args_mask: struct_handle
                     .type_parameters
                     .iter()

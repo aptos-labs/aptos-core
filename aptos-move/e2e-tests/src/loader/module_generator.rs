@@ -7,7 +7,8 @@
 use move_core_types::language_storage::ModuleId;
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 
-pub fn create_module(
+// TODO: Use Move source language to generate the modules.
+pub fn generate_module(
     self_addr: &ModuleId,
     deps: &[ModuleId],
     self_val: u64,

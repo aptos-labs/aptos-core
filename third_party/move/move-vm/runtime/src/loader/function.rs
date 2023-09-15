@@ -9,10 +9,7 @@ use crate::{
 use move_binary_format::{
     access::ModuleAccess,
     errors::{PartialVMError, PartialVMResult},
-    file_format::{
-        AbilitySet, Bytecode, CompiledModule, FunctionDefinition, FunctionDefinitionIndex,
-        Visibility,
-    },
+    file_format::{AbilitySet, Bytecode, CompiledModule, FunctionDefinitionIndex, Visibility},
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_types::loaded_data::runtime_types::Type;
@@ -34,6 +31,7 @@ pub(crate) struct Function {
     pub(crate) index: FunctionDefinitionIndex,
     pub(crate) code: Vec<Bytecode>,
     pub(crate) type_parameters: Vec<AbilitySet>,
+    // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
     pub(crate) def_is_native: bool,
     pub(crate) def_is_friend_or_private: bool,
@@ -64,10 +62,10 @@ impl Function {
     pub(crate) fn new(
         natives: &NativeFunctions,
         index: FunctionDefinitionIndex,
-        def: &FunctionDefinition,
         module: &CompiledModule,
         signature_table: &[Vec<Type>],
     ) -> Self {
+        let def = module.function_def_at(index);
         let handle = module.function_handle_at(def.function);
         let name = module.identifier_at(handle.name).to_owned();
         let module_id = module.self_id();

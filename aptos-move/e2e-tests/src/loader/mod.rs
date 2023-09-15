@@ -13,7 +13,7 @@ use proptest::{
     collection::{vec, SizeRange},
     prelude::*,
 };
-use std::collections::HashMap;
+use std::{cmp::Ordering, collections::HashMap};
 
 mod module_generator;
 
@@ -25,64 +25,69 @@ pub struct Node {
 }
 
 #[derive(Debug)]
-pub struct DepGraph(Graph<Node, ()>);
+pub struct DependencyGraph(Graph<Node, ()>);
 
-/// This module generates a sets of modules that could be used to test the loader.
-///
-/// To generate the module, a DAG is first generated. The node in this graph represents a module and the edge in this graph represents a dependency
-/// between modules. For example if you generate the following DAG:
-///
-///          M1
-///         /  \
-///        M2  M3
-///
-/// This will generate three modules: M1, M2 and M3. Where each module will look like following:
-///
-/// module 0x3cf3846156a51da7251ccc84b5e4be10c5ab33049b7692d1164fd2c73ef3638b.M2 {
-/// public entry foo(): u64 {
-///     let a: u64;
-/// label b0:
-///     a = 49252;                          // randomly generated integer for self node.
-///     assert(copy(a) == 49252, 42);       // assert execution result matches expected value. Expected value can be derived from traversing the DAG.
-///     return move(a);
-/// }
-/// }
-///
-/// module e57d457d2ffacab8f46dea9779f8ad8135c68fd3574eb2902b3da0cfa67cf9d1.M3 {
-/// public entry foo(): u64 {
-///     let a: u64;
-/// label b0:
-///     a = 41973;                          // randomly generated integer for self node.
-///     assert(copy(a) == 41973, 42);       // assert execution result matches expected value. Expected value can be derived from traversing the DAG.
-///     return move(a);
-/// }
-/// }
-///
-/// M2 and M3 are leaf nodes so the it should be a no-op function call. M1 will look like following:
-///
-/// module 0x61da74259dae2c25beb41d11e43c6f5c00cc72d151d8a4f382b02e4e6c420d17.M1 {
-/// import 0x3cf3846156a51da7251ccc84b5e4be10c5ab33049b7692d1164fd2c73ef3638b.M2;
-/// import e57d457d2ffacab8f46dea9779f8ad8135c68fd3574eb2902b3da0cfa67cf9d1.M3;
-/// public entry foo(): u64 {
-///     let a: u64;
-/// label b0:
-///     a = 27856 + M2.foo()+ M3.foo();  // The dependency edge will be converted invokaction into dependent module.
-///     assert(copy(a) == 119081, 42);   // The expected value is the sum of self and all its dependent modules.
-///     return move(a);
-/// }
-/// }
-///
-/// By using this strategy, we can generate a set of modules with complex depenency relationship and assert that the new loader is always
-/// linking the call to the right module.
-///
-/// The next step is to randomly generate module upgrade request to change the structure of DAG to make sure the VM will be able to handle
-/// invaldation properly.
-impl DepGraph {
+// This module generates a sets of modules that could be used to test the loader.
+//
+// To generate the module, a DAG is first generated. The node in this graph represents a module and the edge in this graph represents a dependency
+// between modules. For example if you generate the following DAG:
+//
+//          M1
+//         /  \
+//        M2  M3
+//
+// This will generate three modules: M1, M2 and M3. Where each module will look like following:
+//
+// module 0x3cf3846156a51da7251ccc84b5e4be10c5ab33049b7692d1164fd2c73ef3638b.M2 {
+// public entry foo(): u64 {
+//     let a: u64;
+// label b0:
+//     a = 49252;                          // randomly generated integer for self node.
+//     assert(copy(a) == 49252, 42);       // assert execution result matches expected value. Expected value can be derived from traversing the DAG.
+//     return move(a);
+// }
+// }
+//
+// module e57d457d2ffacab8f46dea9779f8ad8135c68fd3574eb2902b3da0cfa67cf9d1.M3 {
+// public entry foo(): u64 {
+//     let a: u64;
+// label b0:
+//     a = 41973;                          // randomly generated integer for self node.
+//     assert(copy(a) == 41973, 42);       // assert execution result matches expected value. Expected value can be derived from traversing the DAG.
+//     return move(a);
+// }
+// }
+//
+// M2 and M3 are leaf nodes so the it should be a no-op function call. M1 will look like following:
+//
+// module 0x61da74259dae2c25beb41d11e43c6f5c00cc72d151d8a4f382b02e4e6c420d17.M1 {
+// import 0x3cf3846156a51da7251ccc84b5e4be10c5ab33049b7692d1164fd2c73ef3638b.M2;
+// import e57d457d2ffacab8f46dea9779f8ad8135c68fd3574eb2902b3da0cfa67cf9d1.M3;
+// public entry foo(): u64 {
+//     let a: u64;
+// label b0:
+//     a = 27856 + M2.foo()+ M3.foo();  // The dependency edge will be converted invocation into dependent module.
+//     assert(copy(a) == 119081, 42);   // The expected value is the sum of self and all its dependent modules.
+//     return move(a);
+// }
+// }
+//
+// By using this strategy, we can generate a set of modules with complex depenency relationship and assert that the new loader is always
+// linking the call to the right module.
+//
+// TODOs:
+// - Use Move source language rather than MVIR to generate the modules.
+// - randomly generate module upgrade request to change the structure of DAG to make sure the VM will be able to handle
+// invaldation properly.
+impl DependencyGraph {
     /// Returns a [`Strategy`] that generates a universe of accounts with pre-populated initial
     /// balances.
+    ///
+    /// Note that the real number of edges might be smaller than the size input provided due to our way of generating DAG.
+    /// For example, if a (A, B) and (B, A) are both generated by the strategy, only one of them will be added to the graph.
     pub fn strategy(
         num_accounts: impl Into<SizeRange>,
-        num_edges: impl Into<SizeRange>,
+        expected_num_edges: impl Into<SizeRange>,
         balance_strategy: impl Strategy<Value = u64>,
     ) -> impl Strategy<Value = Self> {
         (
@@ -94,9 +99,9 @@ impl DepGraph {
                 ),
                 num_accounts,
             ),
-            vec(any::<(Index, Index)>(), num_edges),
+            vec(any::<(Index, Index)>(), expected_num_edges),
         )
-            .prop_map(move |(accounts, indices)| Self::create(accounts, indices))
+            .prop_map(move |(accounts, edge_indices)| Self::create(accounts, edge_indices))
     }
 
     fn create(accounts: Vec<(AccountData, u16, Identifier)>, edges: Vec<(Index, Index)>) -> Self {
@@ -115,10 +120,14 @@ impl DepGraph {
             let lhs = lhs_idx.get(&indices);
             let rhs = rhs_idx.get(&indices);
 
-            if lhs > rhs {
-                graph.add_edge(lhs.to_owned(), rhs.to_owned(), ());
-            } else if lhs < rhs {
-                graph.add_edge(rhs.to_owned(), lhs.to_owned(), ());
+            match lhs.cmp(rhs) {
+                Ordering::Greater => {
+                    graph.add_edge(lhs.to_owned(), rhs.to_owned(), ());
+                },
+                Ordering::Less => {
+                    graph.add_edge(rhs.to_owned(), lhs.to_owned(), ());
+                },
+                Ordering::Equal => (),
             }
         }
         Self(graph)
@@ -151,7 +160,7 @@ impl DepGraph {
             expected_values.insert(*account_idx, result);
 
             let module_str =
-                module_generator::create_module(&node.name, &deps, node.self_value, result);
+                module_generator::generate_module(&node.name, &deps, node.self_value, result);
             let module = Compiler {
                 deps: modules.iter().collect(),
             }

@@ -40,7 +40,7 @@ mod type_loader;
 
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
 pub(crate) use modules::{Module, ModuleCache};
-use type_loader::make_type_internal;
+use type_loader::intern_type;
 
 type ScriptHash = [u8; 32];
 
@@ -419,7 +419,7 @@ impl Loader {
             | (Type::Vector(ret_inner), Type::Vector(expected_inner)) => {
                 Self::match_return_type(ret_inner, expected_inner, map)
             },
-            // Abilities will not contribute to the equality check as they ought to cache the same value.
+            // Abilities should not contribute to the equality check as they just serve for caching computations.
             // For structs the both need to be the same struct.
             (
                 Type::Struct { name: ret_idx, .. },
@@ -1584,7 +1584,7 @@ impl Script {
             let mut instantiation = vec![];
             for ty in &script.signature_at(func_inst.type_parameters).0 {
                 instantiation.push(
-                    make_type_internal(BinaryIndexedView::Script(&script), ty, &struct_names)
+                    intern_type(BinaryIndexedView::Script(&script), ty, &struct_names)
                         .map_err(|e| e.finish(Location::Script))?,
                 );
             }
@@ -1602,7 +1602,7 @@ impl Script {
         let parameter_tys = parameters
             .0
             .iter()
-            .map(|tok| make_type_internal(BinaryIndexedView::Script(&script), tok, &struct_names))
+            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let locals = Signature(
@@ -1616,14 +1616,14 @@ impl Script {
         let local_tys = locals
             .0
             .iter()
-            .map(|tok| make_type_internal(BinaryIndexedView::Script(&script), tok, &struct_names))
+            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let return_ = Signature(vec![]);
         let return_tys = return_
             .0
             .iter()
-            .map(|tok| make_type_internal(BinaryIndexedView::Script(&script), tok, &struct_names))
+            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let type_parameters = script.type_parameters.clone();
@@ -1673,12 +1673,8 @@ impl Script {
                         };
                         single_signature_token_map.insert(
                             *si,
-                            make_type_internal(
-                                BinaryIndexedView::Script(&script),
-                                ty,
-                                &struct_names,
-                            )
-                            .map_err(|e| e.finish(Location::Script))?,
+                            intern_type(BinaryIndexedView::Script(&script), ty, &struct_names)
+                                .map_err(|e| e.finish(Location::Script))?,
                         );
                     }
                 },
