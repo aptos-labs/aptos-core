@@ -141,13 +141,13 @@ where
         let mut new_edges_weight = 0 as EdgeWeight;
 
         // Add edges to the dependency graph based on the dependencies.
-        let basic_network_latency_penalty = 1_000_000;
-        let cross_round_discount = 1_000_000;
-        let per_key_penalty = 1000;
-        let idx_round = idx as i32 / 48;
+        let basic_network_latency_penalty: EdgeWeight = 1_000_000;
+        let cross_round_discount: EdgeWeight = 1_000_000;
+        let per_key_penalty: EdgeWeight = 1000;
+        let idx_round = idx / 48;
         for (&dep, keys) in deps.iter() {
-            let dep_round = dep as i32 / 48;
-            let edge_weight = per_key_penalty * (keys.len() as i32) + min(0, basic_network_latency_penalty - cross_round_discount * (idx_round - dep_round));
+            let dep_round = dep / 48;
+            let edge_weight = per_key_penalty * (keys.len() as EdgeWeight) + min(0, basic_network_latency_penalty - cross_round_discount * ((idx_round - dep_round) as EdgeWeight));
             new_edges_weight += edge_weight;
             self.edges[idx as usize].push((dep as NodeIndex, edge_weight));
             self.edges[dep as usize].push((idx as NodeIndex, edge_weight));

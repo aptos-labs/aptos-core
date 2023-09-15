@@ -91,4 +91,4 @@ fn get_account_seq_number(txn: &Transaction) -> Option<(AccountAddress, u64)> {
 }
 
 pub type NodeWeight = i32;
-pub type EdgeWeight = i32;
+pub type EdgeWeight = i64;
