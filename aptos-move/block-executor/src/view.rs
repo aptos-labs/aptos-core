@@ -119,7 +119,6 @@ impl<'a, T: Transaction, X: Executable, P: TxnProviderTrait1> ParallelState<'a, 
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
                     match self.scheduler.wait_for_dependency(txn_idx, dep_idx) {
                         DependencyResult::Dependency(dep_condition) => {
-                            info!("txn {} is blocked by {}", txn_idx, dep_idx);
                             let _timer = counters::DEPENDENCY_WAIT_SECONDS.start_timer();
                             // Wait on a condition variable corresponding to the encountered
                             // read dependency. Once the dep_idx finishes re-execution, scheduler
@@ -140,7 +139,6 @@ impl<'a, T: Transaction, X: Executable, P: TxnProviderTrait1> ParallelState<'a, 
                             while let DependencyStatus::Unresolved = *dep_resolved {
                                 dep_resolved = cvar.wait(dep_resolved).unwrap();
                             }
-                            info!("txn {} is unblocked by {}", txn_idx, dep_idx);
                             if let DependencyStatus::ExecutionHalted = *dep_resolved {
                                 return ReadResult::ExecutionHalted;
                             }

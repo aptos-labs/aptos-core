@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use std::cmp::min;
 use crate::{PartitionedTransaction, SerializationIdx, StreamingTransactionPartitioner};
 use aptos_graphs::{
     graph::{EdgeWeight, Node, NodeWeight},
@@ -140,8 +141,13 @@ where
         let mut new_edges_weight = 0 as EdgeWeight;
 
         // Add edges to the dependency graph based on the dependencies.
-        for &dep in deps.keys() {
-            let edge_weight = (self.params.edge_weight_function)(idx, dep);
+        let basic_network_latency_penalty = 1_000_000;
+        let cross_round_discount = 1_000_000;
+        let per_key_penalty = 1000;
+        let idx_round = idx as i32 / 48;
+        for (&dep, keys) in deps.iter() {
+            let dep_round = dep as i32 / 48;
+            let edge_weight = per_key_penalty * (keys.len() as i32) + min(0, basic_network_latency_penalty - cross_round_discount * (idx_round - dep_round));
             new_edges_weight += edge_weight;
             self.edges[idx as usize].push((dep as NodeIndex, edge_weight));
             self.edges[dep as usize].push((idx as NodeIndex, edge_weight));
