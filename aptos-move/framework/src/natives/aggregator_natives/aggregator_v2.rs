@@ -52,7 +52,7 @@ fn is_string_type(context: &SafeNativeContext, type_arg: &Type) -> SafeNativeRes
 }
 
 /// Given the list of native function arguments and a type, returns a tuple of its
-/// fields: (`aggregator id`, `max_value`).
+/// fields: (`aggregator id`, `limit`).
 pub fn pop_aggregator_fields_by_type(
     ty_arg: &Type,
     args: &mut VecDeque<Value>,
@@ -60,13 +60,13 @@ pub fn pop_aggregator_fields_by_type(
     match ty_arg {
         Type::U128 => {
             // Get aggregator information and a value to add.
-            let (id, max_value) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
-            Ok((id, max_value))
+            let (id, limit) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
+            Ok((id, limit))
         },
         Type::U64 => {
             // Get aggregator information and a value to add.
-            let (id, max_value) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
-            Ok((id, max_value as u128))
+            let (id, limit) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
+            Ok((id, limit as u128))
         },
         _ => Err(SafeNativeError::Abort {
             abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,

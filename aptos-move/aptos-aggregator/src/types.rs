@@ -7,11 +7,9 @@ use move_core_types::account_address::AccountAddress;
 pub type AggregatorResult<T> = Result<T, AggregatorError>;
 
 // TODO: Use this instead of PartialVM errors.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub enum AggregatorError {
-    NotFound,
-    UnknownStorageError,
-    ExpectedV1,
+    WrongVersionID,
 }
 
 /// Ephemeral identifier type used by aggregators V2.
@@ -42,7 +40,7 @@ impl TryFrom<VersionedID> for StateKey {
     fn try_from(vid: VersionedID) -> Result<Self, Self::Error> {
         match vid {
             VersionedID::V1(state_key) => Ok(state_key),
-            VersionedID::V2(_) => Err(AggregatorError::ExpectedV1),
+            VersionedID::V2(_) => Err(AggregatorError::WrongVersionID),
         }
     }
 }

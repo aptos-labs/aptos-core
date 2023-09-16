@@ -12,26 +12,26 @@ use move_vm_types::values::{Struct, StructRef, Value};
 const VALUE_FIELD_INDEX: usize = 0;
 const LIMIT_FIELD_INDEX: usize = 1;
 
-/// Returns ID and a maximum value of aggregator based on a reference to `Aggregator` Move struct.
+/// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
 pub(crate) fn aggregator_value_as_u128(
     aggregator: &StructRef,
 ) -> PartialVMResult<(AggregatorID, u128)> {
-    let (value, max_value) = get_aggregator_fields_u128(aggregator)?;
+    let (value, limit) = get_aggregator_fields_u128(aggregator)?;
     if value > u64::MAX as u128 {
         return Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("Aggregator identifier is too small".to_string()),
         );
     }
-    Ok((value as AggregatorID, max_value))
+    Ok((value as AggregatorID, limit))
 }
 
-/// Returns ID and a maximum value of aggregator based on a reference to `Aggregator` Move struct.
+/// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
 pub(crate) fn aggregator_value_as_u64(
     aggregator: &StructRef,
 ) -> PartialVMResult<(AggregatorID, u64)> {
-    let (value, max_value) = get_aggregator_fields_u64(aggregator)?;
-    Ok((value, max_value))
+    let (value, limit) = get_aggregator_fields_u64(aggregator)?;
+    Ok((value, limit))
 }
 
 /// Given a reference to `Aggregator` Move struct, returns a tuple of its

@@ -193,3 +193,69 @@ impl SignedU128 {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_unsigned_add_delta() {
+        let math = BoundedMath::new(100);
+        assert_eq!(
+            math.unsigned_add_delta(10, &SignedU128::Positive(5)),
+            Ok(15)
+        );
+        assert_eq!(math.unsigned_add_delta(10, &SignedU128::Negative(5)), Ok(5));
+        assert_eq!(
+            math.unsigned_add_delta(10, &SignedU128::Positive(950)),
+            Err(BoundedMathError::Overflow)
+        );
+        assert_eq!(
+            math.unsigned_add_delta(10, &SignedU128::Negative(11)),
+            Err(BoundedMathError::Underflow)
+        );
+    }
+
+    #[test]
+    fn test_delta_minus() {
+        assert_eq!(SignedU128::Positive(10).minus(), SignedU128::Negative(10));
+        assert_eq!(SignedU128::Negative(10).minus(), SignedU128::Positive(10));
+    }
+
+    #[test]
+    fn test_signed_add() {
+        let math = BoundedMath::new(100);
+        assert_eq!(
+            math.signed_add(&SignedU128::Positive(10), &SignedU128::Positive(5)),
+            Ok(SignedU128::Positive(15))
+        );
+        assert_eq!(
+            math.signed_add(&SignedU128::Positive(10), &SignedU128::Negative(5)),
+            Ok(SignedU128::Positive(5))
+        );
+        assert_eq!(
+            math.signed_add(&SignedU128::Negative(10), &SignedU128::Positive(5)),
+            Ok(SignedU128::Negative(5))
+        );
+        assert_eq!(
+            math.signed_add(&SignedU128::Negative(10), &SignedU128::Negative(5)),
+            Ok(SignedU128::Negative(15))
+        );
+        assert_eq!(
+            math.signed_add(&SignedU128::Positive(10), &SignedU128::Positive(90)),
+            Ok(SignedU128::Positive(100))
+        );
+        assert_eq!(
+            math.signed_add(&SignedU128::Positive(10), &SignedU128::Positive(91)),
+            Err(BoundedMathError::Overflow)
+        );
+        assert_eq!(
+            math.signed_add(&SignedU128::Negative(10), &SignedU128::Negative(90)),
+            Ok(SignedU128::Negative(100))
+        );
+        assert_eq!(
+            math.signed_add(&SignedU128::Negative(10), &SignedU128::Negative(91)),
+            Err(BoundedMathError::Underflow)
+        );
+    }
+}
