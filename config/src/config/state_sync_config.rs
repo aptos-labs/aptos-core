@@ -247,7 +247,7 @@ impl Default for DataStreamingServiceConfig {
             max_data_stream_channel_sizes: 300,
             max_request_retry: 5,
             max_notification_id_mappings: 300,
-            max_num_consecutive_subscriptions: 100,
+            max_num_consecutive_subscriptions: 50,
             progress_check_interval_ms: 50,
         }
     }
@@ -301,7 +301,7 @@ impl Default for AptosDataClientConfig {
             max_optimistic_fetch_lag_secs: 30, // 30 seconds
             max_response_timeout_ms: 60_000,   // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_lag_secs: 60, // 60 seconds
+            max_subscription_lag_secs: 30, // 30 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             optimistic_fetch_timeout_ms: 5000, // 5 seconds
