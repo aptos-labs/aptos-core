@@ -45,6 +45,9 @@ use poem_openapi::{
     ApiRequest, OpenApi,
 };
 use std::sync::Arc;
+use aptos_logger::info;
+use aptos_state_view::TStateView;
+use aptos_vm_logging::log_schema::AdapterLogSchema;
 
 generate_success_response!(SubmitTransactionResponse, (202, Accepted));
 
@@ -414,6 +417,12 @@ impl TransactionsApi {
         estimate_prioritized_gas_unit_price: Query<Option<bool>>,
         data: SubmitTransactionPost,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
+        let ledger_info = self.context.get_latest_ledger_info()?;
+        let state_view = self.context.latest_state_view_poem(&ledger_info)?;
+        let move_resolver = state_view.as_move_resolver();
+        let log_context = AdapterLogSchema::new(move_resolver.id(), 0);
+        info!(log_context, "Node 0 simulate_transaction endpoint called");
+
         data.verify()
             .context("Simulated transaction invalid")
             .map_err(|err| {
