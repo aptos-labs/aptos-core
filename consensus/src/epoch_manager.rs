@@ -1201,10 +1201,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 }
 
-fn new_signer_from_storage(
-    author: Author,
-    backend: &SecureBackend,
-) -> aptos_types::validator_signer::ValidatorSigner {
+fn new_signer_from_storage(author: Author, backend: &SecureBackend) -> Arc<ValidatorSigner> {
     let storage: Storage = backend.try_into().expect("Unable to initialize storage");
     if let Err(error) = storage.available() {
         panic!("Storage is not available: {:?}", error);
@@ -1213,5 +1210,5 @@ fn new_signer_from_storage(
         .get(CONSENSUS_KEY)
         .map(|v| v.value)
         .expect("Unable to get private key");
-    ValidatorSigner::new(author, private_key)
+    Arc::new(ValidatorSigner::new(author, private_key))
 }

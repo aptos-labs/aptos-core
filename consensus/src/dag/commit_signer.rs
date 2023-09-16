@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::experimental::signing_phase::CommitSignerProvider;
 use aptos_crypto::bls12381;
 use aptos_types::validator_signer::ValidatorSigner;
