@@ -23,7 +23,10 @@ use aptos_config::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{debug, info, sample, sample::SampleRate, trace, warn};
-use aptos_network::{application::interface::NetworkClient, protocols::network::RpcError};
+use aptos_network::{
+    application::{interface::NetworkClient, storage::PeersAndMetadata},
+    protocols::network::RpcError,
+};
 use aptos_storage_interface::DbReader;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_types::{
@@ -259,12 +262,14 @@ impl AptosDataClient {
         }
 
         // Otherwise, we need to choose a new peer and update the subscription state
-        let peer_network_id = choose_random_peer(serviceable_peers).ok_or_else(|| {
-            Error::DataIsUnavailable(format!(
-                "No peers are advertising that they can serve the subscription! Request: {:?}",
-                request
-            ))
-        })?;
+        let peers_and_metadata = self.storage_service_client.get_peers_and_metadata();
+        let peer_network_id = choose_lowest_latency_peer(serviceable_peers, peers_and_metadata)?
+            .ok_or_else(|| {
+                Error::DataIsUnavailable(format!(
+                    "No peers are advertising that they can serve the subscription! Request: {:?}",
+                    request
+                ))
+            })?;
         let subscription_state = SubscriptionState::new(peer_network_id, request_stream_id);
         *active_subscription_state = Some(subscription_state);
 
@@ -863,6 +868,42 @@ impl SubscriptionState {
 /// Selects a peer randomly from the list of specified peers
 fn choose_random_peer(peers: Vec<PeerNetworkId>) -> Option<PeerNetworkId> {
     peers.choose(&mut rand::thread_rng()).copied()
+}
+
+/// Selects a peer from the list of specified peers that has
+/// the lowest recorded latency.
+fn choose_lowest_latency_peer(
+    peers: Vec<PeerNetworkId>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
+) -> crate::error::Result<Option<PeerNetworkId>, Error> {
+    let mut chosen_peer = None;
+    let mut chosen_latency = f64::MAX;
+
+    // Choose the peer with the lowest latency
+    for peer in peers {
+        // Get the peer's ping latency
+        let peer_metadata = peers_and_metadata
+            .get_metadata_for_peer(peer)
+            .map_err(|error| {
+                Error::UnexpectedErrorEncountered(format!(
+                    "Unable to get metadata for peer: {:?}. Error: {:?}",
+                    peer, error
+                ))
+            })?;
+        let peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata();
+        let average_ping_latency_secs = peer_monitoring_metadata.average_ping_latency_secs;
+
+        // If the peer's latency is lower than the current chosen latency,
+        // update the chosen peer and latency.
+        if let Some(average_ping_latency_secs) = average_ping_latency_secs {
+            if average_ping_latency_secs < chosen_latency {
+                chosen_peer = Some(peer);
+                chosen_latency = average_ping_latency_secs;
+            }
+        }
+    }
+
+    Ok(chosen_peer)
 }
 
 /// Updates the metrics for the number of connected peers (priority and regular)

@@ -38,6 +38,7 @@ tokio = { workspace = true }
 anyhow = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
+aptos-peer-monitoring-service-types = { workspace = true }
 aptos-storage-service-server = { workspace = true }
 aptos-time-service = { workspace = true, features = ["async", "testing"] }
 async-trait = { workspace = true }
