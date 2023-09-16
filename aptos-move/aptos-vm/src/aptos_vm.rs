@@ -1524,7 +1524,7 @@ impl VMExecutor for AptosVM {
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         info!(
             log_context,
-            "Executing block, transaction count: {}",
+            "Node 0 Executing block, transaction count: {}",
             transactions.len()
         );
 

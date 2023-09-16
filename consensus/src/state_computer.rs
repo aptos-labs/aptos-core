@@ -118,7 +118,7 @@ impl StateComputer for ExecutionProxy {
         debug!(
             block = %block,
             parent_id = parent_block_id,
-            "Executing block",
+            "Node 0 Executing block",
         );
 
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
