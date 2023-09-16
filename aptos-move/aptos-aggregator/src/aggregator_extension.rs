@@ -5,52 +5,12 @@ use crate::{
     bounded_math::{code_invariant_error, expect_ok, ok_overflow, BoundedMath, SignedU128},
     delta_math::DeltaHistory,
     resolver::{AggregatorReadMode, AggregatorResolver},
-    types::AggregatorID,
+    types::{AggregatorID, VersionedID},
 };
-use aptos_types::{
-    state_store::{state_key::StateKey, table::TableHandle},
-    vm_status::StatusCode,
-};
+use aptos_types::{state_store::state_key::StateKey, vm_status::StatusCode};
 use claims::assert_matches;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::account_address::AccountAddress;
 use std::collections::{BTreeMap, BTreeSet};
-
-/// Uniquely identifies an aggregator or aggregator snapshot instance in storage.
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum VersionedID {
-    // Aggregator V1 is implemented as a state item, and so can be queried by
-    // the state key.
-    V1(StateKey),
-    // Aggregator V2 is embedded into resources, and uses ephemeral identifiers
-    // which are unique per block.
-    V2(AggregatorID),
-}
-
-impl VersionedID {
-    pub fn v1(handle: TableHandle, key: AccountAddress) -> Self {
-        let state_key = StateKey::table_item(handle, key.to_vec());
-        VersionedID::V1(state_key)
-    }
-
-    pub fn v2(id: AggregatorID) -> Self {
-        VersionedID::V2(id)
-    }
-
-    pub fn as_state_key(&self) -> Option<&StateKey> {
-        match self {
-            Self::V1(state_key) => Some(state_key),
-            Self::V2(_) => None,
-        }
-    }
-
-    pub fn into_state_key(self) -> Option<StateKey> {
-        match self {
-            Self::V1(state_key) => Some(state_key),
-            Self::V2(_) => None,
-        }
-    }
-}
 
 /// Describes how the `speculative_start_value` in `AggregatorState` was obtained.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -505,7 +465,7 @@ impl AggregatorData {
             self.new_aggregators.remove(&id);
         } else {
             // This avoids cloning the state key.
-            let state_key = id.into_state_key().expect("V1 identifiers are state keys");
+            let state_key = id.try_into().expect("V1 identifiers are state keys");
             self.destroyed_aggregators.insert(state_key);
         }
     }

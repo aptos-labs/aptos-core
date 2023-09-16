@@ -5,7 +5,7 @@ use crate::natives::aggregator_natives::{
     helpers_v1::{aggregator_info, unpack_aggregator_struct},
     NativeAggregatorContext,
 };
-use aptos_aggregator::aggregator_extension::VersionedID;
+use aptos_aggregator::types::VersionedID;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
@@ -125,7 +125,7 @@ fn native_destroy(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
 
     // Actually remove the aggregator.
-    let id = VersionedID::v1(handle, key);
+    let id = VersionedID::legacy(handle, key);
     aggregator_data.remove_aggregator_v1(id);
 
     Ok(smallvec![])

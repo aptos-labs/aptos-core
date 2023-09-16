@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aggregator_extension::VersionedID,
     delta_change_set::serialize,
     resolver::{AggregatorReadMode, TAggregatorView},
-    types::AggregatorID,
+    types::{AggregatorID, VersionedID},
 };
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
 use std::collections::HashMap;

@@ -4,11 +4,11 @@
 use aptos_aggregator::{
     aggregator_change_set::AggregatorChange,
     aggregator_extension::{
-        AggregatorData, AggregatorSnapshotState, AggregatorState, SnapshotValue, VersionedID,
+        AggregatorData, AggregatorSnapshotState, AggregatorState, SnapshotValue,
     },
     delta_change_set::DeltaOp,
     resolver::AggregatorResolver,
-    types::AggregatorID,
+    types::{AggregatorID, VersionedID},
 };
 use aptos_types::state_store::state_key::StateKey;
 use better_any::{Tid, TidAble};
@@ -274,34 +274,34 @@ mod test {
         let mut aggregator_data = context.aggregator_data.borrow_mut();
 
         assert!(aggregator_data
-            .get_aggregator(VersionedID::v2(900), 900)
+            .get_aggregator(VersionedID::V2(900), 900)
             .unwrap()
             .try_add(context.resolver, 200)
             .unwrap());
         assert!(!aggregator_data
-            .get_aggregator(VersionedID::v2(900), 900)
+            .get_aggregator(VersionedID::V2(900), 900)
             .unwrap()
             .try_add(context.resolver, 401)
             .unwrap());
         assert!(!aggregator_data
-            .get_aggregator(VersionedID::v2(900), 900)
+            .get_aggregator(VersionedID::V2(900), 900)
             .unwrap()
             .try_sub(context.resolver, 501)
             .unwrap());
 
-        aggregator_data.create_new_aggregator(VersionedID::v2(1100), 1100);
+        aggregator_data.create_new_aggregator(VersionedID::V2(1100), 1100);
         assert!(aggregator_data
-            .get_aggregator(VersionedID::v2(1100), 1100)
+            .get_aggregator(VersionedID::V2(1100), 1100)
             .unwrap()
             .try_add(context.resolver, 200)
             .unwrap());
         assert!(!aggregator_data
-            .get_aggregator(VersionedID::v2(1100), 1100)
+            .get_aggregator(VersionedID::V2(1100), 1100)
             .unwrap()
             .try_add(context.resolver, 1000)
             .unwrap());
         assert!(!aggregator_data
-            .get_aggregator(VersionedID::v2(1100), 1100)
+            .get_aggregator(VersionedID::V2(1100), 1100)
             .unwrap()
             .try_sub(context.resolver, 201)
             .unwrap());

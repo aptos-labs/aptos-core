@@ -12,7 +12,7 @@ use crate::natives::{
     },
     AccountAddress,
 };
-use aptos_aggregator::{aggregator_extension::VersionedID, types::AggregatorID};
+use aptos_aggregator::types::{AggregatorID, VersionedID};
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
@@ -102,7 +102,7 @@ fn native_create_aggregator(
     let limit = pop_value_by_type(&ty_args[0], &mut args)?;
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let id = aggregator_data.generate_id();
-    let aggregator_id = VersionedID::v2(aggregator_data.generate_id());
+    let aggregator_id = VersionedID::V2(aggregator_data.generate_id());
     aggregator_data.create_new_aggregator(aggregator_id, limit);
 
     match ty_args[0] {
