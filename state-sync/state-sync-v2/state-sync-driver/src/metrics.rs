@@ -59,7 +59,7 @@ impl StorageSynchronizerOperations {
 /// Histogram buckets for tracking chunk sizes
 const CHUNK_SIZE_BUCKETS: &[f64] = &[
     1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 2048.0, 4096.0, 8192.0,
-    16384.0,
+    16384.0, 32768.0, 65536.0, 131072.0, 262144.0, 524288.0,
 ];
 
 /// Counter for state sync bootstrapper errors
