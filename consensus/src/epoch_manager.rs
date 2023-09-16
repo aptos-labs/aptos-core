@@ -55,17 +55,19 @@ use crate::{
 use anyhow::{bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{ConsensusConfig, NodeConfig};
+use aptos_config::config::{ConsensusConfig, NodeConfig, SecureBackend};
 use aptos_consensus_types::{
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
 };
 use aptos_event_notifications::ReconfigNotificationListener;
+use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_safety_rules::SafetyRulesManager;
+use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,
@@ -74,6 +76,7 @@ use aptos_types::{
         LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
         OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
+    validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
 use fail::fail_point;
@@ -1196,4 +1199,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .set(duration_since_epoch().as_millis() as i64);
         }
     }
+}
+
+fn new_signer_from_storage(author: Author, backend: &SecureBackend) -> Arc<ValidatorSigner> {
+    let storage: Storage = backend.try_into().expect("Unable to initialize storage");
+    if let Err(error) = storage.available() {
+        panic!("Storage is not available: {:?}", error);
+    }
+    let private_key = storage
+        .get(CONSENSUS_KEY)
+        .map(|v| v.value)
+        .expect("Unable to get private key");
+    Arc::new(ValidatorSigner::new(author, private_key))
 }
