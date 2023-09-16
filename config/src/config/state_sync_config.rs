@@ -288,7 +288,7 @@ impl Default for AptosDataClientConfig {
             max_num_in_flight_regular_polls: 10,
             max_num_output_reductions: 0,
             max_optimistic_fetch_version_lag: 1_000_000,
-            max_response_timeout_ms: 240_000,         // 240 seconds
+            max_response_timeout_ms: 240_000, // 240 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_subscription_version_lag: 1_000_000,
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,

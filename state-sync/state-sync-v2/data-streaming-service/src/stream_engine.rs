@@ -19,6 +19,7 @@ use crate::{
     },
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
+    metrics,
     streaming_client::{
         Epoch, GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, StreamRequest,
     },
@@ -273,6 +274,14 @@ impl DataStreamEngine for StateStreamEngine {
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
+        // Update the metrics for the number of received items
+        metrics::observe_value(
+            &metrics::RECEIVED_DATA_CHUNK_SIZES,
+            client_request.get_label(),
+            client_response_payload.get_label(),
+            client_response_payload.get_num_data_items(),
+        );
+
         match client_request {
             StateValuesWithProof(request) => {
                 verify_client_request_indices(
@@ -303,6 +312,7 @@ impl DataStreamEngine for StateStreamEngine {
                     None,
                     self.clone().into(),
                 )?;
+
                 return Ok(Some(data_notification));
             },
             NumberOfStates(request) => {
@@ -574,6 +584,7 @@ impl ContinuousTransactionStreamEngine {
                                 target_ledger_info.ledger_info().version()
                             )))
                     );
+
                     self.current_target_ledger_info = Some(target_ledger_info.clone());
                     Ok(())
                 },
@@ -918,6 +929,14 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             self.optimistic_fetch_requested = false;
         }
 
+        // Update the metrics for the number of received items
+        metrics::observe_value(
+            &metrics::RECEIVED_DATA_CHUNK_SIZES,
+            client_request.get_label(),
+            client_response_payload.get_label(),
+            client_response_payload.get_num_data_items(),
+        );
+
         // Handle and transform the response
         match client_request {
             EpochEndingLedgerInfos(_) => {
@@ -1115,6 +1134,14 @@ impl DataStreamEngine for EpochEndingStreamEngine {
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
+        // Update the metrics for the number of received items
+        metrics::observe_value(
+            &metrics::RECEIVED_DATA_CHUNK_SIZES,
+            client_request.get_label(),
+            client_response_payload.get_label(),
+            client_response_payload.get_num_data_items(),
+        );
+
         match client_request {
             EpochEndingLedgerInfos(request) => {
                 verify_client_request_indices(
@@ -1335,6 +1362,14 @@ impl DataStreamEngine for TransactionStreamEngine {
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
+        // Update the metrics for the number of received items
+        metrics::observe_value(
+            &metrics::RECEIVED_DATA_CHUNK_SIZES,
+            client_request.get_label(),
+            client_response_payload.get_label(),
+            client_response_payload.get_num_data_items(),
+        );
+
         match &self.request {
             StreamRequest::GetAllTransactions(stream_request) => match client_request {
                 TransactionsWithProof(request) => {

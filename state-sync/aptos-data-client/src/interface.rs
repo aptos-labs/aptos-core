@@ -226,6 +226,25 @@ impl ResponsePayload {
             Self::TransactionsWithProof(_) => "transactions_with_proof",
         }
     }
+
+    // TODO: make this less hacky!!
+    pub fn get_num_data_items(&self) -> u64 {
+        // Calculate the number of data items in the response payload
+        let num_data_items = match self {
+            Self::EpochEndingLedgerInfos(ledger_infos) => ledger_infos.len(),
+            Self::NewTransactionOutputsWithProof((outputs, _)) => {
+                outputs.transactions_and_outputs.len()
+            },
+            Self::NewTransactionsWithProof((transactions, _)) => transactions.transactions.len(),
+            Self::NumberOfStates(_) => 1,
+            Self::StateValuesWithProof(states) => states.raw_values.len(),
+            Self::TransactionOutputsWithProof(outputs) => outputs.transactions_and_outputs.len(),
+            Self::TransactionsWithProof(transactions) => transactions.transactions.len(),
+        };
+
+        // Return the number of data items
+        num_data_items as u64
+    }
 }
 
 impl From<StateValueChunkWithProof> for ResponsePayload {

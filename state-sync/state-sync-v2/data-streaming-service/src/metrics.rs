@@ -8,10 +8,28 @@ use aptos_metrics_core::{
 };
 use once_cell::sync::Lazy;
 
+/// Histogram buckets for tracking chunk sizes
+const CHUNK_SIZE_BUCKETS: &[f64] = &[
+    1.0, 2.0, 4.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0, 250.0, 500.0, 750.0, 1000.0, 2500.0, 5000.0,
+    7500.0, 10_000.0, 12_500.0, 15_000.0, 17_500.0, 20_000.0, 25_000.0, 30_000.0, 35_000.0,
+    40_000.0, 45_000.0, 50_000.0, 75_000.0, 100_000.0,
+];
+
+/// Counter for tracking sizes of data chunks received
+pub static RECEIVED_DATA_CHUNK_SIZES: Lazy<HistogramVec> = Lazy::new(|| {
+    let histogram_opts = histogram_opts!(
+        "aptos_data_streaming_service_received_data_chunk_sizes",
+        "Counter for tracking sizes of data chunks received by the data stream",
+        CHUNK_SIZE_BUCKETS.to_vec()
+    );
+    register_histogram_vec!(histogram_opts, &["request_type", "response_type"]).unwrap()
+});
+
 // Latency buckets for network latencies (i.e., the defaults only go up
 // to 10 seconds, but we usually require more).
-const NETWORK_LATENCY_BUCKETS: [f64; 14] = [
-    0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 40.0, 60.0,
+const NETWORK_LATENCY_BUCKETS: &[f64] = &[
+    0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 40.0, 60.0, 120.0, 180.0,
+    240.0, 300.0,
 ];
 
 /// Counter for the number of active data streams
@@ -146,6 +164,18 @@ pub fn increment_counter_multiple(
     counter
         .with_label_values(&[first_label, second_label])
         .inc();
+}
+
+/// Adds a new observation for the given histogram, labels and value
+pub fn observe_value(
+    histogram: &Lazy<HistogramVec>,
+    first_label: &str,
+    second_label: &str,
+    value: u64,
+) {
+    histogram
+        .with_label_values(&[first_label, second_label])
+        .observe(value as f64);
 }
 
 /// Sets the number of active data streams
