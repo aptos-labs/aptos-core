@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use std::cmp::min;
+use std::cmp::max;
 use crate::{PartitionedTransaction, SerializationIdx, StreamingTransactionPartitioner};
 use aptos_graphs::{
     graph::{EdgeWeight, Node, NodeWeight},
@@ -147,7 +147,7 @@ where
         let idx_round = idx / 48;
         for (&dep, keys) in deps.iter() {
             let dep_round = dep / 48;
-            let edge_weight = per_key_penalty * (keys.len() as EdgeWeight) + min(0, basic_network_latency_penalty - cross_round_discount * ((idx_round - dep_round) as EdgeWeight));
+            let edge_weight = per_key_penalty * (keys.len() as EdgeWeight) + max(0, basic_network_latency_penalty - cross_round_discount * ((idx_round - dep_round) as EdgeWeight));
             new_edges_weight += edge_weight;
             self.edges[idx as usize].push((dep as NodeIndex, edge_weight));
             self.edges[dep as usize].push((idx as NodeIndex, edge_weight));
