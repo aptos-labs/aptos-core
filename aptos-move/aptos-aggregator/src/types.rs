@@ -14,7 +14,7 @@ pub enum AggregatorError {
     ExpectedV1,
 }
 
-/// Ephemeral identifier types used by aggregators V2.
+/// Ephemeral identifier type used by aggregators V2.
 pub type AggregatorID = u64;
 
 /// Uniquely identifies aggregator or aggregator snapshot instances in

@@ -131,9 +131,6 @@ pub struct Aggregator {
     id: VersionedID,
     // Describes an upper bound of an aggregator. If value of the aggregator
     // exceeds it, the aggregator overflows.
-    // TODO: Currently this is a single u128 value since we use 0 as a trivial
-    // lower bound. If we want to support custom lower bounds, or have more
-    // complex postconditions, we should factor this out in its own struct.
     max_value: u128,
     // Describes a state of an aggregator.
     state: AggregatorState,
@@ -291,7 +288,6 @@ impl Aggregator {
                 let maybe_value_from_storage = match &self.id {
                     VersionedID::V1(state_key) => resolver
                         .get_aggregator_v1_value(state_key, AggregatorReadMode::LastCommitted),
-                    // TODO: use integers directly, or some wrapped type.
                     VersionedID::V2(id) => resolver
                         .get_aggregator_v2_value(id, AggregatorReadMode::LastCommitted)
                         .map(Some),
@@ -351,7 +347,6 @@ impl Aggregator {
                     VersionedID::V1(state_key) => {
                         resolver.get_aggregator_v1_value(state_key, AggregatorReadMode::Aggregated)
                     },
-                    // TODO: use integers directly, or some wrapped type.
                     VersionedID::V2(id) => resolver
                         .get_aggregator_v2_value(id, AggregatorReadMode::Aggregated)
                         .map(Some),
