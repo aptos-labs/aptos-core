@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aggregator_extension::VersionedID,
     delta_change_set::{serialize, DeltaOp},
     types::AggregatorID,
 };
@@ -117,86 +116,7 @@ pub trait AggregatorResolver:
 {
 }
 
-impl<T: TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = AggregatorID>> AggregatorResolver
-    for T
+impl<T> AggregatorResolver for T where
+    T: TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = AggregatorID>
 {
-}
-
-// Utils to store aggregator values in data store. Here, we
-// only care about aggregators which are state items (V1).
-#[cfg(any(test, feature = "testing"))]
-pub mod test_utils {
-    use super::*;
-    use crate::delta_change_set::serialize;
-    use aptos_types::state_store::{
-        state_key::StateKey, state_value::StateValue, table::TableHandle,
-    };
-    use move_core_types::account_address::AccountAddress;
-    use std::collections::HashMap;
-
-    /// Generates a dummy id for aggregator based on the given key. Only used for testing.
-    pub fn aggregator_v1_id_for_test(key: u128) -> VersionedID {
-        let bytes: Vec<u8> = [key.to_le_bytes(), key.to_le_bytes()]
-            .iter()
-            .flat_map(|b| b.to_vec())
-            .collect();
-        let key = AccountAddress::from_bytes(bytes).unwrap();
-        VersionedID::v1(TableHandle(AccountAddress::ZERO), key)
-    }
-
-    pub fn aggregator_v1_state_key_for_test(key: u128) -> StateKey {
-        let vid = aggregator_v1_id_for_test(key);
-        vid.into_state_key()
-            .expect("V1 aggregator has state key as its identifier")
-    }
-
-    #[derive(Default)]
-    pub struct AggregatorStore {
-        v1_store: HashMap<StateKey, StateValue>,
-        v2_store: HashMap<AggregatorID, u128>,
-    }
-
-    impl AggregatorStore {
-        pub fn set_from_id(&mut self, id: VersionedID, value: u128) {
-            match id {
-                VersionedID::V1(state_key) => {
-                    self.set_from_state_key(state_key, value);
-                },
-                VersionedID::V2(id) => self.set_from_aggregator_id(id, value),
-            }
-        }
-
-        pub(crate) fn set_from_state_key(&mut self, state_key: StateKey, value: u128) {
-            self.v1_store
-                .insert(state_key, StateValue::new_legacy(serialize(&value).into()));
-        }
-
-        pub(crate) fn set_from_aggregator_id(&mut self, id: AggregatorID, value: u128) {
-            self.v2_store.insert(id, value);
-        }
-    }
-
-    impl TAggregatorView for AggregatorStore {
-        type IdentifierV1 = StateKey;
-        type IdentifierV2 = AggregatorID;
-
-        fn get_aggregator_v1_state_value(
-            &self,
-            state_key: &Self::IdentifierV1,
-            _mode: AggregatorReadMode,
-        ) -> anyhow::Result<Option<StateValue>> {
-            Ok(self.v1_store.get(state_key).cloned())
-        }
-
-        fn get_aggregator_v2_value(
-            &self,
-            id: &Self::IdentifierV2,
-            _mode: AggregatorReadMode,
-        ) -> anyhow::Result<u128> {
-            self.v2_store
-                .get(id)
-                .cloned()
-                .ok_or_else(|| anyhow::Error::msg(format!("Value does not exist for {:?}", id)))
-        }
-    }
 }

@@ -574,12 +574,12 @@ pub fn extension_error(message: impl ToString) -> PartialVMError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{aggregator_v1_id_for_test, AggregatorStore};
+    use crate::{aggregator_v1_id_for_test, aggregator_v1_state_key_for_test, FakeAggregatorView};
     use claims::{assert_err, assert_ok, assert_ok_eq, assert_some_eq};
     use once_cell::sync::Lazy;
 
     #[allow(clippy::redundant_closure)]
-    static TEST_RESOLVER: Lazy<AggregatorStore> = Lazy::new(|| AggregatorStore::default());
+    static TEST_RESOLVER: Lazy<FakeAggregatorView> = Lazy::new(|| FakeAggregatorView::default());
 
     #[test]
     fn test_aggregator_not_in_storage() {
@@ -619,8 +619,8 @@ mod test {
     #[test]
     fn test_successful_operations_in_delta_mode() {
         let mut aggregator_data = AggregatorData::default();
-        let mut sample_resolver: AggregatorStore = AggregatorStore::default();
-        sample_resolver.set_from_id(aggregator_v1_id_for_test(600), 100);
+        let mut sample_resolver = FakeAggregatorView::default();
+        sample_resolver.set_from_state_key(aggregator_v1_state_key_for_test(600), 100);
 
         let aggregator = aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(600), 600)
@@ -677,8 +677,8 @@ mod test {
     #[test]
     fn test_history_updates() {
         let mut aggregator_data = AggregatorData::default();
-        let mut sample_resolver: AggregatorStore = AggregatorStore::default();
-        sample_resolver.set_from_id(aggregator_v1_id_for_test(600), 100);
+        let mut sample_resolver = FakeAggregatorView::default();
+        sample_resolver.set_from_state_key(aggregator_v1_state_key_for_test(600), 100);
 
         let aggregator = aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(600), 600)
@@ -741,8 +741,8 @@ mod test {
     #[test]
     fn test_aggregator_overflows() {
         let mut aggregator_data = AggregatorData::default();
-        let mut sample_resolver: AggregatorStore = AggregatorStore::default();
-        sample_resolver.set_from_id(aggregator_v1_id_for_test(600), 100);
+        let mut sample_resolver = FakeAggregatorView::default();
+        sample_resolver.set_from_state_key(aggregator_v1_state_key_for_test(600), 100);
 
         let aggregator = aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(600), 600)
@@ -814,8 +814,8 @@ mod test {
     #[test]
     fn test_aggregator_underflows() {
         let mut aggregator_data = AggregatorData::default();
-        let mut sample_resolver: AggregatorStore = AggregatorStore::default();
-        sample_resolver.set_from_id(aggregator_v1_id_for_test(600), 200);
+        let mut sample_resolver = FakeAggregatorView::default();
+        sample_resolver.set_from_state_key(aggregator_v1_state_key_for_test(600), 200);
 
         let aggregator = aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(600), 600)
@@ -868,8 +868,8 @@ mod test {
     #[test]
     fn test_change_in_base_value_1() {
         let mut aggregator_data = AggregatorData::default();
-        let mut sample_resolver: AggregatorStore = AggregatorStore::default();
-        sample_resolver.set_from_id(aggregator_v1_id_for_test(600), 200);
+        let mut sample_resolver = FakeAggregatorView::default();
+        sample_resolver.set_from_state_key(aggregator_v1_state_key_for_test(600), 200);
 
         let aggregator = aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(600), 600)
@@ -900,8 +900,8 @@ mod test {
     #[test]
     fn test_change_in_base_value_2() {
         let mut aggregator_data = AggregatorData::default();
-        let mut sample_resolver: AggregatorStore = AggregatorStore::default();
-        sample_resolver.set_from_id(aggregator_v1_id_for_test(600), 200);
+        let mut sample_resolver = FakeAggregatorView::default();
+        sample_resolver.set_from_state_key(aggregator_v1_state_key_for_test(600), 200);
 
         let aggregator = aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(600), 600)
@@ -931,8 +931,8 @@ mod test {
     #[test]
     fn test_change_in_base_value_3() {
         let mut aggregator_data = AggregatorData::default();
-        let mut sample_resolver: AggregatorStore = AggregatorStore::default();
-        sample_resolver.set_from_id(aggregator_v1_id_for_test(600), 200);
+        let mut sample_resolver = FakeAggregatorView::default();
+        sample_resolver.set_from_state_key(aggregator_v1_state_key_for_test(600), 200);
 
         let aggregator = aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(600), 600)

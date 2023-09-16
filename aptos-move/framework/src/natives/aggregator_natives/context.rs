@@ -144,17 +144,17 @@ mod test {
     use super::*;
     use aptos_aggregator::{
         aggregator_v1_id_for_test, aggregator_v1_state_key_for_test, bounded_math::SignedU128,
-        delta_math::DeltaHistory, AggregatorStore,
+        delta_math::DeltaHistory, FakeAggregatorView,
     };
     use claims::{assert_matches, assert_ok, assert_some_eq};
 
-    fn get_test_resolver() -> AggregatorStore {
-        let mut state_view = AggregatorStore::default();
-        state_view.set_from_id(aggregator_v1_id_for_test(500), 150);
-        state_view.set_from_id(aggregator_v1_id_for_test(600), 100);
-        state_view.set_from_id(aggregator_v1_id_for_test(700), 200);
-        state_view.set_from_id(VersionedID::v2(900), 300);
-        state_view.set_from_id(VersionedID::v2(1000), 400);
+    fn get_test_resolver() -> FakeAggregatorView {
+        let mut state_view = FakeAggregatorView::default();
+        state_view.set_from_state_key(aggregator_v1_state_key_for_test(500), 150);
+        state_view.set_from_state_key(aggregator_v1_state_key_for_test(600), 100);
+        state_view.set_from_state_key(aggregator_v1_state_key_for_test(700), 200);
+        state_view.set_from_aggregator_id(900, 300);
+        state_view.set_from_aggregator_id(1000, 400);
         state_view
     }
 
