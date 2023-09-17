@@ -410,7 +410,7 @@ where
                     scheduler,
                     &mut scheduler_task,
                     last_input_output,
-                    &txn_fee_state,
+                    txn_fee_state,
                 );
                 scheduler.coordinating_commits_mark_done();
             }
