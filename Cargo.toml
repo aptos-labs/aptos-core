@@ -74,6 +74,7 @@ members = [
     "crates/aptos-openapi",
     "crates/aptos-profiler",
     "crates/aptos-proptest-helpers",
+    "crates/aptos-protos",
     "crates/aptos-push-metrics",
     "crates/aptos-rate-limiter",
     "crates/aptos-rest-client",
@@ -228,8 +229,6 @@ members = [
     "types",
     "vm-validator",
 ]
-
-exclude = ["crates/aptos-protos"]
 
 # NOTE: default-members is the complete list of binaries that form the "production Aptos codebase". These members should
 # never include crates that require fuzzing features or test features. These are the crates we want built with no extra
@@ -545,6 +544,7 @@ ouroboros = "0.15.6"
 owo-colors = "3.5.0"
 parking_lot = "0.12.0"
 paste = "1.0.7"
+pbjson = "0.5.1"
 percent-encoding = "2.1.0"
 pin-project = "1.0.10"
 poem = { version = "=1.3.55", features = ["anyhow", "rustls"] }
@@ -559,8 +559,8 @@ prometheus-http-query = "0.5.2"
 prometheus-parse = "0.2.4"
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
-prost = "0.11.3"
-prost-types = "0.11.3"
+prost = "0.12.1"
+prost-types = "0.12.1"
 quanta = "0.10.1"
 quote = "1.0.18"
 rand = "0.7.3"
@@ -624,14 +624,14 @@ tokio-stream = "0.1.8"
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.7.4"
-tonic = { version = "0.8.3", features = [
+tonic = { version = "0.10.0", features = [
     "tls-roots",
     "transport",
     "prost",
     "gzip",
     "codegen",
 ] }
-tonic-reflection = "0.6.0"
+tonic-reflection = "0.10.0"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",

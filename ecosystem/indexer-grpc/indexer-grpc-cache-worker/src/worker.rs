@@ -135,7 +135,7 @@ async fn process_transactions_from_node_response(
 ) -> anyhow::Result<GrpcDataStatus> {
     match response.response.unwrap() {
         Response::Status(status) => {
-            match StatusType::from_i32(status.r#type).expect("[Indexer Cache] Invalid status type.")
+            match StatusType::try_from(status.r#type).expect("[Indexer Cache] Invalid status type.")
             {
                 StatusType::Init => Ok(GrpcDataStatus::StreamInit(status.start_version)),
                 StatusType::BatchEnd => {
@@ -207,7 +207,7 @@ async fn setup_cache_with_init_signal(
     let (fullnode_chain_id, starting_version) =
         match init_signal.response.expect("Response type not exists.") {
             Response::Status(status_frame) => {
-                match StatusType::from_i32(status_frame.r#type).expect("Invalid status type.") {
+                match StatusType::try_from(status_frame.r#type).expect("Invalid status type.") {
                     StatusType::Init => (init_signal.chain_id, status_frame.start_version),
                     _ => {
                         panic!("[Indexer Cache] Streaming error: first frame is not INIT signal.");
