@@ -1,3 +1,7 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
+
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
@@ -5,6 +9,7 @@
 use crate::counters::GET_NEXT_TASK_SECONDS;
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
+use concurrent_queue::{ConcurrentQueue, PopError};
 use crossbeam::utils::CachePadded;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
@@ -20,6 +25,35 @@ use std::{
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
 
 pub type Wave = u32;
+
+#[derive(Debug)]
+pub struct ArmedLock {
+    // Last bit:   1 -> unlocked; 0 -> locked
+    // Second bit: 1 -> there's work; 0 -> no work
+    locked: AtomicU64,
+}
+
+impl ArmedLock {
+    pub fn new() -> Self {
+        Self {
+            locked: AtomicU64::new(1), //
+        }
+    }
+
+    pub fn try_lock(&self) -> bool {
+        self.locked
+            .compare_exchange_weak(3, 0, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+    }
+
+    pub fn unlock(&self) {
+        self.locked.fetch_or(1, Ordering::Release);
+    }
+
+    pub fn arm(&self) {
+        self.locked.fetch_or(2, Ordering::Relaxed);
+    }
+}
 
 #[derive(Debug)]
 pub enum DependencyStatus {
@@ -238,6 +272,10 @@ pub struct Scheduler {
 
     /// Shared marker that is set when a thread detects that all txns can be committed.
     done_marker: CachePadded<AtomicBool>,
+
+    coordinating_commits_lock: CachePadded<ArmedLock>,
+
+    commit_queue: ConcurrentQueue<u32>,
 }
 
 /// Public Interfaces for the Scheduler
@@ -263,11 +301,35 @@ impl Scheduler {
             execution_idx: AtomicU32::new(0),
             validation_idx: AtomicU64::new(0),
             done_marker: CachePadded::new(AtomicBool::new(false)),
+            coordinating_commits_lock: CachePadded::new(ArmedLock::new()),
+            commit_queue: ConcurrentQueue::<u32>::bounded(num_txns as usize),
         }
     }
 
     pub fn num_txns(&self) -> TxnIndex {
         self.num_txns
+    }
+
+    pub fn add_to_commit_queue(&self, txn_idx: u32) {
+        self.commit_queue
+            .push(txn_idx)
+            .expect("Pushing to the commit_queue should never fail");
+    }
+
+    pub fn pop_from_commit_queue(&self) -> Result<u32, PopError> {
+        self.commit_queue.pop()
+    }
+
+    pub fn coordinating_commits_mark_done(&self) {
+        self.coordinating_commits_lock.unlock()
+    }
+
+    pub fn coordinating_commits_arm(&self) {
+        self.coordinating_commits_lock.arm()
+    }
+
+    pub fn should_coordinate_commits(&self) -> bool {
+        self.coordinating_commits_lock.try_lock()
     }
 
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
@@ -277,6 +339,10 @@ impl Scheduler {
         let mut commit_state_mutex = self.commit_state.lock();
         let commit_state = commit_state_mutex.deref_mut();
         let (commit_idx, commit_wave) = (&mut commit_state.0, &mut commit_state.1);
+
+        if *commit_idx == self.num_txns {
+            return None;
+        }
 
         if let Some(validation_status) = self.txn_status[*commit_idx as usize].1.try_read() {
             // Acquired the validation status read lock.
@@ -342,7 +408,7 @@ impl Scheduler {
     }
 
     /// Return the next task for the thread.
-    pub fn next_task(&self, committing: bool) -> SchedulerTask {
+    pub fn next_task(&self) -> SchedulerTask {
         let _timer = GET_NEXT_TASK_SECONDS.start_timer();
         loop {
             if self.done() {
@@ -358,20 +424,7 @@ impl Scheduler {
                 && !self.never_executed(idx_to_validate);
 
             if !prefer_validate && idx_to_execute >= self.num_txns {
-                return if self.done() {
-                    // Check again to avoid commit delay due to a race.
-                    SchedulerTask::Done
-                } else {
-                    if !committing {
-                        // Avoid pointlessly spinning, and give priority to other threads
-                        // that may be working to finish the remaining tasks.
-                        // We don't want to hint on the thread that is committing
-                        // because it may have work to do (to commit) even if there
-                        // is no more conventional (validation and execution tasks) work.
-                        hint::spin_loop();
-                    }
-                    SchedulerTask::NoTask
-                };
+                return SchedulerTask::NoTask;
             }
 
             if prefer_validate {
