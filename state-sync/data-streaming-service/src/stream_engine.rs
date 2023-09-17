@@ -284,6 +284,10 @@ impl DataStreamEngine for StateStreamEngine {
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
+        // Update the metrics for the number of received items
+        update_response_chunk_size_metrics(client_request, &client_response_payload);
+
+        // Handle and transform the response
         match client_request {
             StateValuesWithProof(request) => {
                 // Verify the client request indices
@@ -1250,6 +1254,9 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             self.optimistic_fetch_requested = false;
         }
 
+        // Update the metrics for the number of received items
+        update_response_chunk_size_metrics(client_request, &client_response_payload);
+
         // Handle and transform the response
         match client_request {
             EpochEndingLedgerInfos(_) => {
@@ -1481,6 +1488,10 @@ impl DataStreamEngine for EpochEndingStreamEngine {
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
+        // Update the metrics for the number of received items
+        update_response_chunk_size_metrics(client_request, &client_response_payload);
+
+        // Handle and transform the response
         match client_request {
             EpochEndingLedgerInfos(request) => {
                 // Verify the client request indices
@@ -1755,6 +1766,9 @@ impl DataStreamEngine for TransactionStreamEngine {
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
+        // Update the metrics for the number of received items
+        update_response_chunk_size_metrics(client_request, &client_response_payload);
+
         // Identify the version information of the stream and client requests
         let (stream_end_version, request_start_version, request_end_version) = match &self.request {
             StreamRequest::GetAllTransactions(stream_request) => match client_request {
@@ -2163,6 +2177,19 @@ fn extract_new_versions_and_target(
     }
 
     Ok((num_versions, target_ledger_info))
+}
+
+/// Updates the response chunk size metrics for the given request and response
+fn update_response_chunk_size_metrics(
+    client_request: &DataClientRequest,
+    client_response_payload: &ResponsePayload,
+) {
+    metrics::observe_value(
+        &metrics::RECEIVED_DATA_RESPONSE_CHUNK_SIZE,
+        client_request.get_label(),
+        client_response_payload.get_label(),
+        client_response_payload.get_data_chunk_size() as u64,
+    );
 }
 
 /// Updates the metrics with a terminated subscription event and reason
