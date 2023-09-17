@@ -514,7 +514,7 @@ where
                 // and write-sets of the execution. Increment incarnation counter to
                 // simulate dynamic behavior when there are multiple possible read-
                 // and write-sets (i.e. each are selected round-robin).
-                let idx = incarnation_counter.fetch_add(1, Ordering::Relaxed);
+                let idx = incarnation_counter.fetch_add(1, Ordering::SeqCst);
 
                 let behavior = &incarnation_behaviors[idx % incarnation_behaviors.len()];
 

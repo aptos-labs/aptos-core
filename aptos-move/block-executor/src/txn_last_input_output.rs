@@ -230,7 +230,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
 
     pub(crate) fn module_publishing_may_race(&self) -> bool {
         self.are_module_reads_and_writes_colliding
-            .load(Ordering::Relaxed)
+            .load(Ordering::Acquire)
     }
 
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<Vec<ReadDescriptor<K>>>> {

@@ -25,6 +25,33 @@ const TXN_IDX_MASK: u64 = (1 << 32) - 1;
 pub type Wave = u32;
 
 #[derive(Debug)]
+pub struct ArmedLock {
+    locked: AtomicU64,
+}
+
+impl ArmedLock {
+    pub fn new() -> Self {
+        Self {
+            locked: AtomicU64::new(1),
+        }
+    }
+
+    pub fn try_lock(&self) -> bool {
+        self.locked
+            .compare_exchange_weak(3, 0, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+    }
+
+    pub fn unlock(&self) {
+        self.locked.fetch_or(1, Ordering::Release);
+    }
+
+    pub fn arm(&self) {
+        self.locked.fetch_or(2, Ordering::Relaxed);
+    }
+}
+
+#[derive(Debug)]
 pub enum DependencyStatus {
     // The dependency is not resolved yet.
     Unresolved,
@@ -243,7 +270,7 @@ pub struct Scheduler {
     /// Shared marker that is set when a thread detects that all txns can be committed.
     done_marker: CachePadded<AtomicBool>,
 
-    coordinating_commits_flag: CachePadded<AtomicBool>,
+    coordinating_commits_lock: CachePadded<ArmedLock>,
 
     commit_queue: ConcurrentQueue<u32>,
 }
@@ -271,7 +298,7 @@ impl Scheduler {
             execution_idx: AtomicU32::new(0),
             validation_idx: AtomicU64::new(0),
             done_marker: CachePadded::new(AtomicBool::new(false)),
-            coordinating_commits_flag: CachePadded::new(AtomicBool::new(false)),
+            coordinating_commits_lock: CachePadded::new(ArmedLock::new()),
             commit_queue: ConcurrentQueue::<u32>::bounded(num_txns as usize),
         }
     }
@@ -291,14 +318,15 @@ impl Scheduler {
     }
 
     pub fn coordinating_commits_mark_done(&self) {
-        self.coordinating_commits_flag
-            .store(false, Ordering::SeqCst);
+        self.coordinating_commits_lock.unlock()
+    }
+
+    pub fn coordinating_commits_arm(&self) {
+        self.coordinating_commits_lock.arm()
     }
 
     pub fn should_coordinate_commits(&self) -> bool {
-        self.coordinating_commits_flag
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .is_ok()
+        self.coordinating_commits_lock.try_lock()
     }
 
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
@@ -310,7 +338,6 @@ impl Scheduler {
         let commit_state = commit_state_mutex.deref_mut();
         let (commit_idx, commit_wave) = (&mut commit_state.0, &mut commit_state.1);
 
-        //if self.done_marker.load(Ordering::Relaxed)
         if *commit_idx == self.num_txns {
             return None;
         }
@@ -382,10 +409,6 @@ impl Scheduler {
     pub fn next_task(&self) -> SchedulerTask {
         let _timer = GET_NEXT_TASK_SECONDS.start_timer();
         loop {
-            if let Ok(txn_idx) = self.commit_queue.pop() {
-                return SchedulerTask::CommitTask(txn_idx);
-            }
-
             if self.done() {
                 // No more tasks.
                 return SchedulerTask::Done;
@@ -519,7 +542,7 @@ impl Scheduler {
             // Decrease the execution index as necessary to ensure resolved dependencies
             // get a chance to be re-executed.
             self.execution_idx
-                .fetch_min(execution_target_idx, Ordering::AcqRel);
+                .fetch_min(execution_target_idx, Ordering::Release);
         }
 
         let (cur_val_idx, mut cur_wave) =
@@ -602,7 +625,7 @@ impl Scheduler {
         // The first thread that sets done_marker to be true will be reponsible for
         // resolving the conditional variables, to help other theads that may be pending
         // on the read dependency. See the comment of the function resolve_condvar().
-        if !self.done_marker.swap(true, Ordering::Release) {
+        if !self.done_marker.swap(true, Ordering::SeqCst) {
             for txn_idx in 0..self.num_txns {
                 self.resolve_condvar(txn_idx);
             }
@@ -654,7 +677,7 @@ impl Scheduler {
 
         if let Ok(prev_val_idx) =
             self.validation_idx
-                .fetch_update(Ordering::Release, Ordering::Relaxed, |val_idx| {
+                .fetch_update(Ordering::SeqCst, Ordering::Relaxed, |val_idx| {
                     let (txn_idx, wave) = Self::unpack_validation_idx(val_idx);
                     if txn_idx > target_idx {
                         let mut validation_status = self.txn_status[target_idx as usize].1.write();
@@ -768,7 +791,7 @@ impl Scheduler {
             .compare_exchange(
                 validation_idx,
                 new_validation_idx,
-                Ordering::Release,
+                Ordering::SeqCst,
                 Ordering::Relaxed,
             )
             .is_ok()
@@ -784,7 +807,7 @@ impl Scheduler {
         None
     }
 
-    fn get_bounded_execution_idx(&self, ordering: Ordering) -> u32 {
+    fn get_bounded_execution_idx(&self, ordering: Ordering) -> TxnIndex {
         min(self.execution_idx.load(ordering), self.num_txns)
     }
 
@@ -796,11 +819,8 @@ impl Scheduler {
     /// return the version to the caller for the corresponding ExecutionTask.
     /// - Otherwise, return None.
     fn try_execute_next_version(&self) -> Option<(Version, ExecutionTaskType)> {
-        if self.execution_idx.load(Ordering::Relaxed) >= self.num_txns {
-            return None;
-        }
-
-        let idx_to_execute = self.execution_idx.fetch_add(1, Ordering::Relaxed);
+        // This will never overflow - it's bounded by num_txns + num_thread
+        let idx_to_execute = self.execution_idx.fetch_add(1, Ordering::Release);
 
         if idx_to_execute >= self.num_txns {
             return None;

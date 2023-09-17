@@ -288,6 +288,12 @@ fn dynamic_read_writes_contended_with_block_gas_limit(
     .expect("creating a new value should succeed")
     .current();
 
+    println!(
+        "Gas Limit is: {}, {}",
+        num_txns,
+        maybe_block_gas_limit.unwrap()
+    );
+
     run_transactions(
         &universe,
         transaction_gen,

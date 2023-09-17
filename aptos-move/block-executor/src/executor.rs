@@ -207,6 +207,11 @@ where
             scheduler.finish_abort(idx_to_validate, incarnation)
         } else {
             scheduler.finish_validation(idx_to_validate, validation_wave);
+
+            if valid {
+                scheduler.coordinating_commits_arm();
+            }
+
             SchedulerTask::NoTask
         }
     }
@@ -377,47 +382,37 @@ where
         let executor = E::init(*executor_arguments);
         drop(init_timer);
 
-        // let committing = false; // matches!(role, CommitRole::Coordinator(_));
-
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
 
-        // let is_coordinator_in_this_iteration = scheduler.should_coordinate_commits();
+        // let mut total_iterations: i64 = 0;
 
         loop {
-            // Only one thread does next_commit_ready_txn to avoid contention.
-            // if is_coordinator_in_this_iteration {
-            //     is_coordinator_in_this_iteration = false;
-            //     scheduler.coordinating_commits_mark_done();
-            // }
+            // total_iterations += 1;
 
-            if matches!(scheduler_task, SchedulerTask::NoTask) {
-                let is_coordinator_in_this_iteration = scheduler.should_coordinate_commits();
+            let is_coordinator_in_this_iteration = scheduler.should_coordinate_commits();
 
-                if is_coordinator_in_this_iteration {
-                    self.process_commit_ready_txns(
-                        self.maybe_block_gas_limit,
-                        scheduler,
-                        &mut scheduler_task,
-                        last_input_output,
-                        txn_fee_state,
-                    );
-                    scheduler.coordinating_commits_mark_done();
-                }
+            if is_coordinator_in_this_iteration {
+                self.process_commit_ready_txns(
+                    self.maybe_block_gas_limit,
+                    scheduler,
+                    &mut scheduler_task,
+                    last_input_output,
+                    txn_fee_state,
+                );
 
-                {
-                    while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
-                        self.commit_txn(txn_idx, versioned_cache, last_input_output, base_view);
-                    }
+                scheduler.coordinating_commits_mark_done();
+            }
+
+            {
+                while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
+                    self.commit_txn(txn_idx, versioned_cache, last_input_output, base_view);
                 }
             }
-            // if is_coordinator_in_this_iteration {}
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::CommitTask(_) => {
                     unreachable!();
-                    // self.commit_txn(txn_idx, versioned_cache, last_input_output, base_view);
-                    // scheduler.next_task()
                 },
                 SchedulerTask::ValidationTask(version_to_validate, wave) => self.validate(
                     version_to_validate,
@@ -455,6 +450,8 @@ where
                 },
             }
         }
+
+        // println!("Total Iterations {}", total_iterations);
     }
 
     pub(crate) fn execute_transactions_parallel(
@@ -487,6 +484,8 @@ where
 
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
+
+        // println!("Concurrency Level {}", self.concurrency_level);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
