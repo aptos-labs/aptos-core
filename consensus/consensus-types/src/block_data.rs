@@ -218,7 +218,7 @@ impl BlockData {
         payload: Payload,
         author: Author,
         failed_authors: Vec<(Round, Author)>,
-        parent_block_info: BlockInfo
+        parent_block_info: BlockInfo,
     ) -> Self {
         Self {
             epoch,

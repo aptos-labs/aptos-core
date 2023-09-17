@@ -212,8 +212,15 @@ impl Block {
         failed_authors: Vec<(Round, Author)>,
         parent_block_info: BlockInfo,
     ) -> anyhow::Result<Self> {
-        let block_data =
-            BlockData::new_for_dag(epoch, round, timestamp, payload, author, failed_authors, parent_block_info);
+        let block_data = BlockData::new_for_dag(
+            epoch,
+            round,
+            timestamp,
+            payload,
+            author,
+            failed_authors,
+            parent_block_info,
+        );
         Self::new_proposal_from_block_data(block_data, &ValidatorSigner::from_int(0))
     }
 
