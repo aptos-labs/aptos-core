@@ -48,7 +48,7 @@ use move_core_types::language_storage::{ModuleId, StructTag};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, fmt};
+use std::{convert::TryFrom, fmt, fmt::Formatter};
 
 #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -63,6 +63,22 @@ pub enum Path {
     Code(ModuleId),
     Resource(StructTag),
     ResourceGroup(StructTag),
+}
+
+impl fmt::Display for Path {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Path::Code(module_id) => {
+                write!(f, "Code({})", module_id)
+            },
+            Path::Resource(struct_tag) => {
+                write!(f, "Resource({})", struct_tag)
+            },
+            Path::ResourceGroup(struct_tag) => {
+                write!(f, "ResourceGroup({})", struct_tag)
+            },
+        }
+    }
 }
 
 pub enum PathType {
@@ -140,18 +156,23 @@ impl AccessPath {
         matches!(self.get_path(), Path::Code(_))
     }
 
+    pub fn is_resource_group(&self) -> bool {
+        matches!(self.get_path(), Path::ResourceGroup(_))
+    }
+
     pub fn size(&self) -> usize {
         self.address.as_ref().len() + self.path.len()
     }
 }
 
 impl fmt::Debug for AccessPath {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "AccessPath {{ address: {:x}, path: {} }}",
-            self.address,
-            hex::encode(&self.path)
+            "AccessPath {{ address: 0x{}, path: {:?} }}",
+            self.address.short_str_lossless(),
+            bcs::from_bytes::<Path>(&self.path)
+                .map_or_else(|_| hex::encode(&self.path), |path| format!("{}", path)),
         )
     }
 }

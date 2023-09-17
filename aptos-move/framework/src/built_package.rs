@@ -24,7 +24,7 @@ use move_model::model::GlobalEnv;
 use move_package::{
     compilation::{compiled_package::CompiledPackage, package_layout::CompiledPackageLayout},
     source_package::manifest_parser::{parse_move_manifest_string, parse_source_manifest},
-    BuildConfig, ModelConfig,
+    BuildConfig, CompilerConfig, CompilerVersion, ModelConfig,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -68,6 +68,12 @@ pub struct BuildOptions {
     pub skip_fetch_latest_git_deps: bool,
     #[clap(long)]
     pub bytecode_version: Option<u32>,
+    #[clap(long)]
+    pub compiler_version: Option<CompilerVersion>,
+    #[clap(long)]
+    pub skip_attribute_checks: bool,
+    #[clap(skip)]
+    pub known_attributes: BTreeSet<String>,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -88,6 +94,9 @@ impl Default for BuildOptions {
             // while in a test (and cause some havoc)
             skip_fetch_latest_git_deps: false,
             bytecode_version: None,
+            compiler_version: None,
+            skip_attribute_checks: false,
+            known_attributes: extended_checks::get_all_attribute_names().clone(),
         }
     }
 }
@@ -106,6 +115,9 @@ pub fn build_model(
     additional_named_addresses: BTreeMap<String, AccountAddress>,
     target_filter: Option<String>,
     bytecode_version: Option<u32>,
+    compiler_version: Option<CompilerVersion>,
+    skip_attribute_checks: bool,
+    known_attributes: BTreeSet<String>,
 ) -> anyhow::Result<GlobalEnv> {
     let build_config = BuildConfig {
         dev_mode,
@@ -118,7 +130,12 @@ pub fn build_model(
         force_recompilation: false,
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: true,
-        bytecode_version,
+        compiler_config: CompilerConfig {
+            bytecode_version,
+            compiler_version,
+            skip_attribute_checks,
+            known_attributes,
+        },
     };
     build_config.move_model_for_package(package_path, ModelConfig {
         target_filter,
@@ -133,6 +150,8 @@ impl BuiltPackage {
     /// and is not `Ok` if there was an error among those.
     pub fn build(package_path: PathBuf, options: BuildOptions) -> anyhow::Result<Self> {
         let bytecode_version = options.bytecode_version;
+        let compiler_version = options.compiler_version;
+        let skip_attribute_checks = options.skip_attribute_checks;
         let build_config = BuildConfig {
             dev_mode: options.dev,
             additional_named_addresses: options.named_addresses.clone(),
@@ -144,8 +163,14 @@ impl BuiltPackage {
             force_recompilation: false,
             fetch_deps_only: false,
             skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
-            bytecode_version,
+            compiler_config: CompilerConfig {
+                bytecode_version,
+                compiler_version,
+                skip_attribute_checks,
+                known_attributes: options.known_attributes.clone(),
+            },
         };
+
         eprintln!("Compiling, may take a little while to download git dependencies...");
         let mut package = build_config.compile_package_no_exit(&package_path, &mut stderr())?;
 
@@ -157,6 +182,9 @@ impl BuiltPackage {
             options.named_addresses.clone(),
             None,
             bytecode_version,
+            compiler_version,
+            skip_attribute_checks,
+            options.known_attributes.clone(),
         )?;
         let runtime_metadata = extended_checks::run_extended_checks(model);
         if model.diag_count(Severity::Warning) > 0 {
@@ -166,10 +194,17 @@ impl BuiltPackage {
                 bail!("extended checks failed")
             }
         }
+
+        let compiled_pkg_path = package
+            .compiled_package_info
+            .build_flags
+            .install_dir
+            .as_ref()
+            .unwrap_or(&package_path)
+            .join(CompiledPackageLayout::Root.path())
+            .join(package.compiled_package_info.package_name.as_str());
         inject_runtime_metadata(
-            package_path
-                .join(CompiledPackageLayout::Root.path())
-                .join(package.compiled_package_info.package_name.as_str()),
+            compiled_pkg_path,
             &mut package,
             runtime_metadata,
             bytecode_version,

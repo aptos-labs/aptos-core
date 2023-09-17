@@ -10,6 +10,8 @@ blueprints:
     create_vfns: true # CANNOT BE MODIFIED AFTER DEPLOYMENT
     stake_amount: 100000000000000 # CANNOT BE MODIFIED AFTER DEPLOYMENT
     count: -1 # CANNOT BE MODIFIED AFTER DEPLOYMENT... This is count of validators. In the template, the count doesn't matter as it gets overriden by either the default (10), user's --num-of-validators, or user's custom pangue node config.
+    cpu: "" # Can leave empty for the default
+    memory: "" # Can leave empty for the default
   # nodebpexample1: 
   #   validator_config_path: ""
   #   validator_image: "" 

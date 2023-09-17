@@ -20,8 +20,6 @@ on:
         required: false
         type: string
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
-  schedule:
-    - cron: "0 12 * * *" # The main branch cadence. This runs every day at 12pm UTC.
   pull_request:
     paths:
       - ".github/workflows/forge-unstable.yaml"
@@ -42,19 +40,14 @@ jobs:
       IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
       BRANCH: ${{ steps.determine-test-branch.outputs.BRANCH }}
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
 
       - name: Determine branch based on cadence
         id: determine-test-branch
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            if [[ "${{ github.event.schedule }}" == "0 12 * * *" ]]; then
-              echo "Branch: main"
-              echo "BRANCH=main" >> $GITHUB_OUTPUT
-            else
-              echo "Unknown schedule: ${{ github.event.schedule }}"
-              exit 1
-            fi
+            echo "Unknown schedule: ${{ github.event.schedule }}"
+            exit 1
           else
             echo "Using GIT_SHA"
             # on workflow_dispatch, this will simply use the inputs.GIT_SHA given (or the default)

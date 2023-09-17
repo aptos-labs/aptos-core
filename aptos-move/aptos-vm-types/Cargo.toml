@@ -19,10 +19,13 @@ aptos-gas-algebra = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
+bcs = { workspace = true }
+bytes = { workspace = true }
 either = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 
 [dev-dependencies]
 aptos-language-e2e-tests = { workspace = true }
+aptos-vm = { workspace = true }
 claims = { workspace = true }

@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::{MoveResolverExt, SessionExt, SessionId};
+use crate::move_vm_ext::{AptosMoveResolver, SessionExt, SessionId};
 use anyhow::Result;
 use aptos_types::{
     block_metadata::BlockMetadata,
@@ -17,13 +17,13 @@ use aptos_vm_types::output::VMOutput;
 
 /// This trait describes the VM adapter's interface.
 /// TODO: bring more of the execution logic in aptos_vm into this file.
-pub(crate) trait VMAdapter {
+pub trait VMAdapter {
     /// Creates a new Session backed by the given storage.
     /// TODO: this doesn't belong in this trait. We should be able to remove
     /// this after redesigning cache ownership model.
     fn new_session<'r>(
         &self,
-        remote: &'r impl MoveResolverExt,
+        remote: &'r impl AptosMoveResolver,
         session_id: SessionId,
     ) -> SessionExt<'r, '_>;
 
@@ -38,7 +38,7 @@ pub(crate) trait VMAdapter {
     fn run_prologue(
         &self,
         session: &mut SessionExt,
-        storage: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         transaction: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus>;
@@ -50,21 +50,21 @@ pub(crate) trait VMAdapter {
     fn execute_single_transaction(
         &self,
         txn: &PreprocessedTransaction,
-        data_cache: &impl MoveResolverExt,
+        data_cache: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus>;
 
     fn validate_signature_checked_transaction(
         &self,
         session: &mut SessionExt,
-        storage: &impl MoveResolverExt,
+        resolver: &impl AptosMoveResolver,
         transaction: &SignatureCheckedTransaction,
         allow_too_new: bool,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         self.check_transaction_format(transaction)?;
 
-        let prologue_status = self.run_prologue(session, storage, transaction, log_context);
+        let prologue_status = self.run_prologue(session, resolver, transaction, log_context);
         match prologue_status {
             Err(err)
                 if !allow_too_new || err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW =>
@@ -92,7 +92,7 @@ pub enum PreprocessedTransaction {
 /// is a PreprocessedTransaction, where a user transaction is translated to a
 /// SignatureCheckedTransaction and also categorized into either a UserTransaction
 /// or a WriteSet transaction.
-pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> PreprocessedTransaction {
+pub fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> PreprocessedTransaction {
     match txn {
         Transaction::BlockMetadata(b) => PreprocessedTransaction::BlockMetadata(b),
         Transaction::GenesisTransaction(ws) => PreprocessedTransaction::WaypointWriteSet(ws),

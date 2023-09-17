@@ -1,9 +1,8 @@
 name: "CodeQL"
 
 on:
-  schedule:
-    # Every day at 10:15am UTC aka 3:15am PT
-    - cron: "15 10 * * *"
+  # Allow triggering manually
+  workflow_dispatch:
 
 jobs:
   analyze:
@@ -21,7 +20,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        uses: actions/checkout@v3
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL

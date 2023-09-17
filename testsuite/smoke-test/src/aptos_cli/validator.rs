@@ -444,7 +444,7 @@ async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
     let mut accounts = vec![];
     let mut txns = vec![];
     for _ in 0..2 {
-        let mut account = create_and_fund_account(swarm, 10000000000).await;
+        let account = create_and_fund_account(swarm, 10000000000).await;
 
         for _ in 0..5 {
             let txn = account.sign_with_transaction_builder(

@@ -6,10 +6,14 @@ use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use move_binary_format::file_format::CompiledModule;
 use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::TypeTag,
+    account_address::AccountAddress, gas_algebra::GasQuantity, identifier::IdentStr,
+    language_storage::TypeTag,
 };
 use move_vm_runtime::move_vm::MoveVM;
-use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
+use move_vm_test_utils::{
+    gas_schedule::{CostTable, GasCost, GasStatus},
+    InMemoryStorage,
+};
 
 #[derive(Arbitrary, Debug)]
 struct FuzzData {
@@ -33,7 +37,11 @@ fuzz_target!(|fuzz_data: FuzzData| {
     let vm = MoveVM::new(vec![]).unwrap();
     let storage = InMemoryStorage::new();
     let mut session = vm.new_session(&storage);
-    let mut gas = GasStatus::new_unmetered();
+
+    let cost_table = CostTable {
+        instruction_table: vec![GasCost::new(1, 1); 255],
+    };
+    let mut gas = GasStatus::new(&cost_table, GasQuantity::new(1_000));
 
     if session
         .publish_module(cm_serialized, fuzz_data.account_address, &mut gas)

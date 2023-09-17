@@ -155,7 +155,7 @@ These are read by the example and published to the Aptos blockchain:
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/your-coin.py publish
+:!: static/sdks/python/examples/your_coin.py publish
 ```
 
   </TabItem>
@@ -282,7 +282,7 @@ public fun mint<CoinType>(
 }
 ```
 
-`ManagedCoin` makes this easier by providing a entry function `managed_coin::mint`.
+`ManagedCoin` makes this easier by providing an entry function `managed_coin::mint`.
 
 ---
 

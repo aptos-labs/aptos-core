@@ -6,12 +6,13 @@ use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::network_interface::ConsensusMsg;
 use aptos_consensus_notifications::ConsensusNotifier;
-use aptos_event_notifications::ReconfigNotificationListener;
+use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
 use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
+use aptos_network_benchmark::{run_netbench_service, NetbenchMessage};
 use aptos_peer_monitoring_service_server::{
     network::PeerMonitoringServiceNetworkEvents, storage::StorageReader,
     PeerMonitoringServiceServer,
@@ -22,7 +23,7 @@ use aptos_time_service::TimeService;
 use aptos_types::chain_id::ChainId;
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, time::Instant};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
@@ -79,7 +80,7 @@ pub fn bootstrap_api_and_indexer(
 pub fn start_consensus_runtime(
     node_config: &mut NodeConfig,
     db_rw: DbReaderWriter,
-    consensus_reconfig_subscription: Option<ReconfigNotificationListener>,
+    consensus_reconfig_subscription: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
     consensus_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
@@ -103,7 +104,7 @@ pub fn start_consensus_runtime(
 pub fn start_mempool_runtime_and_get_consensus_sender(
     node_config: &mut NodeConfig,
     db_rw: &DbReaderWriter,
-    mempool_reconfig_subscription: ReconfigNotificationListener,
+    mempool_reconfig_subscription: ReconfigNotificationListener<DbBackedOnChainConfig>,
     network_interfaces: ApplicationNetworkInterfaces<MempoolSyncMsg>,
     mempool_listener: MempoolNotificationListener,
     mempool_client_receiver: Receiver<MempoolClientRequest>,
@@ -182,6 +183,20 @@ pub fn start_peer_monitoring_service(
 
     // Return the runtime
     peer_monitoring_service_runtime
+}
+
+pub fn start_netbench_service(
+    node_config: &NodeConfig,
+    network_interfaces: ApplicationNetworkInterfaces<NetbenchMessage>,
+    runtime: &Handle,
+) {
+    let network_client = network_interfaces.network_client;
+    runtime.spawn(run_netbench_service(
+        node_config.clone(),
+        network_client,
+        network_interfaces.network_service_events,
+        TimeService::real(),
+    ));
 }
 
 /// Starts the telemetry service and grabs the build information

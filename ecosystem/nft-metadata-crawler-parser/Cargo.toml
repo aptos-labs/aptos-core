@@ -15,12 +15,12 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-indexer-grpc-server-framework = { workspace = true }
+aptos-metrics-core = { workspace = true }
 async-trait = { workspace = true }
 backoff = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
-crossbeam-channel = { workspace = true }
 csv = { workspace = true }
 diesel = { workspace = true }
 diesel_migrations = { workspace = true }
@@ -29,11 +29,11 @@ futures = { workspace = true }
 google-cloud-pubsub = { workspace = true }
 google-cloud-storage = { workspace = true }
 image = { workspace = true }
+once_cell = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-time = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }

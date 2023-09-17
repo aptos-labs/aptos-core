@@ -5,6 +5,7 @@
 use crate::{bootstrap_genesis, gen_block_id, gen_ledger_info_with_sigs};
 use anyhow::{anyhow, ensure, Result};
 use aptos_cached_packages::aptos_stdlib;
+use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
 use aptos_consensus_types::block::Block;
 use aptos_db::AptosDB;
 use aptos_executor::block_executor::BlockExecutor;
@@ -31,23 +32,31 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use rand::SeedableRng;
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
+    let path = aptos_temppath::TempPath::new();
+    path.create_as_dir().unwrap();
+    test_execution_with_storage_impl_inner(false, path.path())
+}
+
+pub fn test_execution_with_storage_impl_inner(
+    force_sharding: bool,
+    db_path: &Path,
+) -> Arc<AptosDB> {
     const B: u64 = 1_000_000_000;
 
     let (genesis, validators) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
 
-    let mut core_resources_account: LocalAccount = LocalAccount::new(
+    let core_resources_account: LocalAccount = LocalAccount::new(
         aptos_test_root_address(),
         AccountKey::from_private_key(aptos_vm_genesis::GENESIS_KEYPAIR.0.clone()),
         0,
     );
 
-    let path = aptos_temppath::TempPath::new();
-    path.create_as_dir().unwrap();
-    let (aptos_db, db, executor, waypoint) = create_db_and_executor(path.path(), &genesis_txn);
+    let (aptos_db, db, executor, waypoint) =
+        create_db_and_executor(db_path, &genesis_txn, force_sharding);
 
     let parent_block_id = executor.committed_block_id();
     let signer = aptos_types::validator_signer::ValidatorSigner::new(
@@ -59,8 +68,8 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let seed = [3u8; 32];
     let mut rng = ::rand::rngs::StdRng::from_seed(seed);
 
-    let mut account1 = LocalAccount::generate(&mut rng);
-    let mut account2 = LocalAccount::generate(&mut rng);
+    let account1 = LocalAccount::generate(&mut rng);
+    let account2 = LocalAccount::generate(&mut rng);
     let account3 = LocalAccount::generate(&mut rng);
     let account4 = LocalAccount::generate(&mut rng);
 
@@ -218,7 +227,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .unwrap();
     verify_committed_txn_status(t4.as_ref(), &block1[7]).unwrap();
     // We requested the events to come back from this one, so verify that they did
-    assert_eq!(t4.unwrap().events.unwrap().len(), 2);
+    assert_eq!(t4.unwrap().events.unwrap().len(), 3);
 
     let t5 = db
         .reader
@@ -487,7 +496,11 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     assert_eq!(account3_received_events_batch1.len(), 10);
     // Account3 has one extra deposit event from being minted to.
     assert_eq!(
-        account3_received_events_batch1[0].event.sequence_number(),
+        account3_received_events_batch1[0]
+            .event
+            .v1()
+            .unwrap()
+            .sequence_number(),
         16
     );
 
@@ -503,7 +516,11 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .unwrap();
     assert_eq!(account3_received_events_batch2.len(), 7);
     assert_eq!(
-        account3_received_events_batch2[0].event.sequence_number(),
+        account3_received_events_batch2[0]
+            .event
+            .v1()
+            .unwrap()
+            .sequence_number(),
         6
     );
 
@@ -518,13 +535,21 @@ fn approx_eq(a: u64, b: u64) -> bool {
 pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
     path: P,
     genesis: &Transaction,
+    force_sharding: bool, // if true force sharding db otherwise using default db
 ) -> (
     Arc<AptosDB>,
     DbReaderWriter,
     BlockExecutor<AptosVM>,
     Waypoint,
 ) {
-    let (db, dbrw) = DbReaderWriter::wrap(AptosDB::new_for_test(&path));
+    let (db, dbrw) = force_sharding
+        .then(|| {
+            DbReaderWriter::wrap(AptosDB::new_for_test_with_sharding(
+                &path,
+                DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            ))
+        })
+        .unwrap_or_else(|| DbReaderWriter::wrap(AptosDB::new_for_test(&path)));
     let waypoint = bootstrap_genesis::<AptosVM>(&dbrw, genesis).unwrap();
     let executor = BlockExecutor::new(dbrw.clone());
 

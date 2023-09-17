@@ -117,11 +117,11 @@ impl NativeExecutor {
         let write_set = vec![
             (
                 sender_account_key,
-                WriteOp::Modification(bcs::to_bytes(&sender_account)?),
+                WriteOp::Modification(bcs::to_bytes(&sender_account)?.into()),
             ),
             (
                 sender_coin_store_key,
-                WriteOp::Modification(bcs::to_bytes(&sender_coin_store)?),
+                WriteOp::Modification(bcs::to_bytes(&sender_coin_store)?.into()),
             ),
             // (
             //     TOTAL_SUPPLY_STATE_KEY.clone(),
@@ -130,7 +130,7 @@ impl NativeExecutor {
         ];
 
         // TODO(grao): Some values are fake, because I'm lazy.
-        let events = vec![ContractEvent::new(
+        let events = vec![ContractEvent::new_v1(
             EventKey::new(0, sender_address),
             0,
             TypeTag::Struct(Box::new(WithdrawEvent::struct_tag())),
@@ -179,7 +179,7 @@ impl NativeExecutor {
 
                 write_set.push((
                     recipient_coin_store_key,
-                    WriteOp::Modification(bcs::to_bytes(&recipient_coin_store)?),
+                    WriteOp::Modification(bcs::to_bytes(&recipient_coin_store)?.into()),
                 ));
             }
         } else {
@@ -215,16 +215,16 @@ impl NativeExecutor {
 
             write_set.push((
                 recipient_account_key,
-                WriteOp::Creation(bcs::to_bytes(&recipient_account)?),
+                WriteOp::Creation(bcs::to_bytes(&recipient_account)?.into()),
             ));
             write_set.push((
                 recipient_coin_store_key,
-                WriteOp::Creation(bcs::to_bytes(&recipient_coin_store)?),
+                WriteOp::Creation(bcs::to_bytes(&recipient_coin_store)?.into()),
             ));
         }
 
         let events = vec![
-            ContractEvent::new(
+            ContractEvent::new_v1(
                 EventKey::new(0, recipient_address),
                 0,
                 TypeTag::Struct(Box::new(DepositEvent::struct_tag())),

@@ -14,7 +14,8 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
-    block_executor::partitioner::{ExecutableTransactions, SubBlocksForShard},
+    block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
+    bytes::NumToBytes,
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
@@ -24,9 +25,9 @@ use aptos_types::{
     },
     state_store::state_key::StateKey,
     transaction::{
-        analyzed_transaction::AnalyzedTransaction, ChangeSet, ExecutionStatus, RawTransaction,
-        Script, SignedTransaction, Transaction, TransactionArgument, TransactionOutput,
-        TransactionPayload, TransactionStatus, WriteSetPayload,
+        ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
+        WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -81,27 +82,6 @@ impl VMExecutor for MockVM {
         state_view: &impl StateView,
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        if state_view.is_genesis() {
-            assert_eq!(
-                transactions.len(),
-                1,
-                "Genesis block should have only one transaction."
-            );
-            let output = TransactionOutput::new(
-                gen_genesis_writeset(),
-                // mock the validator set event
-                vec![ContractEvent::new(
-                    new_epoch_event_key(),
-                    0,
-                    TypeTag::Bool,
-                    bcs::to_bytes(&0).unwrap(),
-                )],
-                0,
-                KEEP_STATUS.clone(),
-            );
-            return Ok(vec![output]);
-        }
-
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
         let mut output_cache = HashMap::new();
@@ -132,7 +112,7 @@ impl VMExecutor for MockVM {
                     // WriteSet cannot be empty so use genesis writeset only for testing.
                     gen_genesis_writeset(),
                     // mock the validator set event
-                    vec![ContractEvent::new(
+                    vec![ContractEvent::new_v1(
                         new_epoch_event_key(),
                         0,
                         TypeTag::Bool,
@@ -212,7 +192,7 @@ impl VMExecutor for MockVM {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
-        _block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
+        _transactions: PartitionedTransactions,
         _state_view: Arc<S>,
         _maybe_block_gas_limit: Option<u64>,
     ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {
@@ -266,6 +246,7 @@ fn read_state_value_from_storage(
     state_view
         .get_state_value_bytes(&StateKey::access_path(access_path.clone()))
         .expect("Failed to query storage.")
+        .map(|bytes| bytes.to_vec())
 }
 
 fn decode_bytes(bytes: &[u8]) -> u64 {
@@ -288,14 +269,18 @@ fn gen_genesis_writeset() -> WriteSet {
         access_path_for_config(ValidatorSet::CONFIG_ID).expect("access path in test");
     write_set.insert((
         StateKey::access_path(validator_set_ap),
-        WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
+        WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap().into()),
     ));
     write_set.insert((
         StateKey::access_path(AccessPath::new(
             CORE_CODE_ADDRESS,
             ConfigurationResource::resource_path(),
         )),
-        WriteOp::Modification(bcs::to_bytes(&ConfigurationResource::default()).unwrap()),
+        WriteOp::Modification(
+            bcs::to_bytes(&ConfigurationResource::default())
+                .unwrap()
+                .into(),
+        ),
     ));
     write_set
         .freeze()
@@ -306,11 +291,11 @@ fn gen_mint_writeset(sender: AccountAddress, balance: u64, seqnum: u64) -> Write
     let mut write_set = WriteSetMut::default();
     write_set.insert((
         StateKey::access_path(balance_ap(sender)),
-        WriteOp::Modification(balance.to_le_bytes().to_vec()),
+        WriteOp::Modification(balance.le_bytes()),
     ));
     write_set.insert((
         StateKey::access_path(seqnum_ap(sender)),
-        WriteOp::Modification(seqnum.to_le_bytes().to_vec()),
+        WriteOp::Modification(seqnum.le_bytes()),
     ));
     write_set.freeze().expect("mint writeset should be valid")
 }
@@ -325,15 +310,15 @@ fn gen_payment_writeset(
     let mut write_set = WriteSetMut::default();
     write_set.insert((
         StateKey::access_path(balance_ap(sender)),
-        WriteOp::Modification(sender_balance.to_le_bytes().to_vec()),
+        WriteOp::Modification(sender_balance.le_bytes()),
     ));
     write_set.insert((
         StateKey::access_path(seqnum_ap(sender)),
-        WriteOp::Modification(sender_seqnum.to_le_bytes().to_vec()),
+        WriteOp::Modification(sender_seqnum.le_bytes()),
     ));
     write_set.insert((
         StateKey::access_path(balance_ap(recipient)),
-        WriteOp::Modification(recipient_balance.to_le_bytes().to_vec()),
+        WriteOp::Modification(recipient_balance.le_bytes()),
     ));
     write_set
         .freeze()
@@ -341,7 +326,7 @@ fn gen_payment_writeset(
 }
 
 fn gen_events(sender: AccountAddress) -> Vec<ContractEvent> {
-    vec![ContractEvent::new(
+    vec![ContractEvent::new_v1(
         EventKey::new(111, sender),
         0,
         TypeTag::Vector(Box::new(TypeTag::U8)),

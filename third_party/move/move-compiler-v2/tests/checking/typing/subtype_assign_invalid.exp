@@ -6,25 +6,25 @@ error: mutability mismatch (&mut != &)
 5 │         let x: &mut u64 = &0;
   │                           ^^
 
-error: mutability mismatch (&mut != &)
+error: mutability mismatch (&mut != &) (from assignment or declaration context)
    ┌─ tests/checking/typing/subtype_assign_invalid.move:10:10
    │
 10 │         (x, y) = (&0, &0);
    │          ^
 
-error: mutability mismatch (&mut != &)
+error: mutability mismatch (&mut != &) (from assignment or declaration context)
    ┌─ tests/checking/typing/subtype_assign_invalid.move:10:13
    │
 10 │         (x, y) = (&0, &0);
    │             ^
 
-error: mutability mismatch (&mut != &)
+error: mutability mismatch (&mut != &) (from assignment or declaration context)
    ┌─ tests/checking/typing/subtype_assign_invalid.move:13:10
    │
 13 │         (x, y) = (&0, &0);
    │          ^
 
-error: mutability mismatch (&mut != &)
+error: mutability mismatch (&mut != &) (from assignment or declaration context)
    ┌─ tests/checking/typing/subtype_assign_invalid.move:16:13
    │
 16 │         (x, y)= (&0, &0);

@@ -22,13 +22,16 @@ aptos-mvhashmap = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-logging = { workspace = true }
+aptos-vm-types = { workspace = true }
 arc-swap = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 claims = { workspace = true }
 criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
 move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
@@ -39,6 +42,7 @@ concurrent-queue = "2.2.0"
 scopeguard = "1.2.0"
 
 [dev-dependencies]
+aptos-aggregator = { workspace = true, features = ["testing"] }
 criterion = { workspace = true }
 itertools = { workspace = true }
 proptest = { workspace = true }

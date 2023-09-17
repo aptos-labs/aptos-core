@@ -71,7 +71,7 @@ fn run_cmd(args: &[&str]) {
 }
 
 #[cfg(test)]
-mod compaction_tests {
+mod dbtool_tests {
     use crate::DBTool;
     use aptos_backup_cli::{
         coordinators::backup::BackupCompactor,
@@ -82,14 +82,23 @@ mod compaction_tests {
     };
     use aptos_config::config::RocksdbConfigs;
     use aptos_db::AptosDB;
-    use aptos_executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
+    use aptos_executor_test_helpers::integration_test_impl::{
+        test_execution_with_storage_impl, test_execution_with_storage_impl_inner,
+    };
     use aptos_temppath::TempPath;
     use aptos_types::{
         state_store::{state_key::StateKeyTag::AccessPath, state_key_prefix::StateKeyPrefix},
         transaction::Version,
     };
     use clap::Parser;
-    use std::{ops::Deref, path::PathBuf, sync::Arc, time::Duration};
+    use std::{
+        default::Default,
+        fs,
+        ops::Deref,
+        path::{Path, PathBuf},
+        sync::Arc,
+        time::Duration,
+    };
     use tokio::runtime::Runtime;
 
     fn assert_metadata_view_eq(view1: &MetadataView, view2: &MetadataView) {
@@ -274,13 +283,15 @@ mod compaction_tests {
         start: Version,
         end: Version,
         backup_dir: PathBuf,
+        old_db_dir: PathBuf,
         new_db_dir: PathBuf,
+        force_sharding: bool,
     ) -> (Runtime, String) {
         use aptos_db::utils::iterators::PrefixedStateValueIterator;
         use aptos_storage_interface::DbReader;
         use itertools::zip_eq;
 
-        let db = test_execution_with_storage_impl();
+        let db = test_execution_with_storage_impl_inner(force_sharding, old_db_dir.as_path());
         let (rt, port) = start_local_backup_service(Arc::clone(&db));
         let server_addr = format!(" http://localhost:{}", port);
         // Backup the local_test DB
@@ -415,41 +426,55 @@ mod compaction_tests {
             .run(),
         )
         .unwrap();
-        // boostrap a historical DB starting from version 1 to version 12
-        rt.block_on(
-            DBTool::try_parse_from([
-                "aptos-db-tool",
-                "restore",
-                "bootstrap-db",
-                "--ledger-history-start-version",
-                format!("{}", start).as_str(),
-                "--target-version",
-                format!("{}", end).as_str(),
-                "--target-db-dir",
-                new_db_dir.as_path().to_str().unwrap(),
-                "--local-fs-dir",
-                backup_dir.as_path().to_str().unwrap(),
-            ])
-            .unwrap()
-            .run(),
-        )
-        .unwrap();
+
+        let start_string = format!("{}", start);
+        let end_string = format!("{}", end);
+        let mut restore_args = vec![
+            "aptos-db-tool".to_string(),
+            "restore".to_string(),
+            "bootstrap-db".to_string(),
+            "--ledger-history-start-version".to_string(),
+            start_string, // use start_string here
+            "--target-version".to_string(),
+            end_string, // use end_string here
+            "--target-db-dir".to_string(),
+            new_db_dir.as_path().to_str().unwrap().to_string(),
+            "--local-fs-dir".to_string(),
+            backup_dir.as_path().to_str().unwrap().to_string(),
+        ];
+        if force_sharding {
+            let additional_args = vec!["--split-ledger-db", "--use-sharded-state-merkle-db"]
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>();
+            restore_args.extend(additional_args);
+        }
+        rt.block_on(DBTool::try_parse_from(restore_args).unwrap().run())
+            .unwrap();
 
         // verify the new DB has the same data as the original DB
+        let db_config = if !force_sharding {
+            RocksdbConfigs::default()
+        } else {
+            RocksdbConfigs {
+                use_sharded_state_merkle_db: true,
+                split_ledger_db: true,
+                ..Default::default()
+            }
+        };
         let (_ledger_db, tree_db, state_kv_db) =
-            AptosDB::open_dbs(new_db_dir, RocksdbConfigs::default(), true, 0).unwrap();
+            AptosDB::open_dbs(new_db_dir, db_config, false, 0).unwrap();
 
         // assert the kv are the same in db and new_db
         // current all the kv are still stored in the ledger db
         //
-        // TODO(grao): Support state kv db sharding here.
         for ver in start..=end {
             let new_iter = PrefixedStateValueIterator::new(
                 &state_kv_db,
                 StateKeyPrefix::new(AccessPath, b"".to_vec()),
                 None,
                 ver,
-                false,
+                force_sharding,
             )
             .unwrap();
             let old_iter = db
@@ -487,13 +512,24 @@ mod compaction_tests {
         let backup_dir = TempPath::new();
         backup_dir.create_as_dir().unwrap();
         let new_db_dir = TempPath::new();
+        let old_db_dir = TempPath::new();
         // Test the basic db boostrap that replays from previous snapshot to the target version
         let (rt, _) = db_restore_test_setup(
             16,
             16,
             PathBuf::from(backup_dir.path()),
+            PathBuf::from(old_db_dir.path()),
             PathBuf::from(new_db_dir.path()),
+            false,
         );
+        let backup_size = dir_size(backup_dir.path());
+        let db_size = dir_size(new_db_dir.path());
+        let old_db_size = dir_size(old_db_dir.path());
+        println!(
+            "backup size: {}, old db size: {}, new db size: {}",
+            backup_size, old_db_size, db_size
+        );
+
         rt.shutdown_timeout(Duration::from_secs(1));
     }
     #[test]
@@ -501,12 +537,15 @@ mod compaction_tests {
         let backup_dir = TempPath::new();
         backup_dir.create_as_dir().unwrap();
         let new_db_dir = TempPath::new();
+        let old_db_dir = TempPath::new();
         // Test the db boostrap in some historical range with all the kvs restored
         let (rt, _) = db_restore_test_setup(
             1,
             16,
             PathBuf::from(backup_dir.path()),
+            PathBuf::from(old_db_dir.path()),
             PathBuf::from(new_db_dir.path()),
+            false,
         );
         rt.shutdown_timeout(Duration::from_secs(1));
     }
@@ -517,12 +556,15 @@ mod compaction_tests {
         backup_dir.create_as_dir().unwrap();
         let new_db_dir = TempPath::new();
         new_db_dir.create_as_dir().unwrap();
+        let old_db_dir = TempPath::new();
         // Test the basic db boostrap that replays from previous snapshot to the target version
         let (rt, _) = db_restore_test_setup(
             1,
             16,
             PathBuf::from(backup_dir.path()),
+            PathBuf::from(old_db_dir.path()),
             PathBuf::from(new_db_dir.path()),
+            false,
         );
         // boostrap a historical DB starting from version 1 to version 18
         // This only replays the txn from txn 17 to 18
@@ -545,5 +587,54 @@ mod compaction_tests {
         )
         .unwrap();
         rt.shutdown_timeout(Duration::from_secs(1));
+    }
+
+    #[test]
+    fn test_restore_with_sharded_db() {
+        let backup_dir = TempPath::new();
+        backup_dir.create_as_dir().unwrap();
+        let new_db_dir = TempPath::new();
+        let old_db_dir = TempPath::new();
+
+        let (rt, _) = db_restore_test_setup(
+            16,
+            16,
+            PathBuf::from(backup_dir.path()),
+            PathBuf::from(old_db_dir.path()),
+            PathBuf::from(new_db_dir.path()),
+            true,
+        );
+        let backup_size = dir_size(backup_dir.path());
+        let db_size = dir_size(new_db_dir.path());
+        let old_db_size = dir_size(old_db_dir.path());
+        println!(
+            "backup size: {}, old db size: {}, new db size: {}",
+            backup_size, old_db_size, db_size
+        );
+
+        println!(
+            "backup size: {:?}, old db size: {:?}, new db size: {:?}",
+            backup_dir.path(),
+            old_db_dir.path(),
+            new_db_dir.path()
+        );
+        rt.shutdown_timeout(Duration::from_secs(1));
+    }
+
+    fn dir_size<P: AsRef<Path>>(path: P) -> u64 {
+        let mut size = 0;
+
+        for entry in fs::read_dir(path).unwrap() {
+            let entry = entry.unwrap();
+            let metadata = entry.metadata().unwrap();
+
+            if metadata.is_dir() {
+                size += dir_size(entry.path());
+            } else {
+                size += metadata.len();
+            }
+        }
+
+        size
     }
 }

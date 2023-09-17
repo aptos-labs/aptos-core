@@ -39,7 +39,7 @@ async fn test_indexer() {
 
     let client = fullnode.rest_client();
 
-    let mut account1 = swarm.aptos_public_info().random_account();
+    let account1 = swarm.aptos_public_info().random_account();
     let account2 = swarm.aptos_public_info().random_account();
 
     let mut chain_info = swarm.chain_info().into_aptos_public_info();

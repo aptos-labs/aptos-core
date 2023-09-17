@@ -87,7 +87,7 @@ where
     TestAck: TryFrom<M> + Into<M>,
     TestMessage: TryFrom<M, Error = anyhow::Error> + Into<M>,
 {
-    async fn send_rpc(
+    async fn send_rb_rpc(
         &self,
         receiver: Author,
         message: M,
@@ -121,6 +121,7 @@ async fn test_reliable_broadcast() {
         sender,
         FixedInterval::from_millis(10),
         TimeService::real(),
+        Duration::from_millis(500),
     );
     let message = TestMessage(vec![42; validators.len() - 1]);
     let aggregating = TestBroadcastStatus {
@@ -142,6 +143,7 @@ async fn test_chaining_reliable_broadcast() {
         sender,
         FixedInterval::from_millis(10),
         TimeService::real(),
+        Duration::from_millis(500),
     );
     let message = TestMessage(vec![42; validators.len()]);
     let expected = validators.iter().cloned().collect();
@@ -173,6 +175,7 @@ async fn test_abort_reliable_broadcast() {
         sender,
         FixedInterval::from_millis(10),
         TimeService::real(),
+        Duration::from_millis(500),
     );
     let message = TestMessage(vec![42; validators.len()]);
     let (tx, rx) = oneshot::channel();

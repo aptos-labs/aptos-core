@@ -66,7 +66,11 @@ test(
       await aptosToken.createCollection(alice, "Alice's simple collection", "AliceCollection", "https://aptos.dev"),
       { checkSuccess: true },
     );
-    const objectAddress = ((txn as Gen.UserTransaction).changes[0] as WriteSetChange_WriteResource).address; // should be the new object address
+
+    const objectCore = (txn as Gen.UserTransaction).changes.find(
+      (change) => (change as Gen.WriteResource).data.type === "0x1::object::ObjectCore",
+    );
+    const objectAddress = (objectCore as WriteSetChange_WriteResource).address;
 
     const object = await provider.getAccountResource(objectAddress, "0x4::aptos_token::AptosCollection");
 
@@ -353,6 +357,59 @@ test(
       expect(account2AptosCoin).toHaveLength(1);
     });
     await checkAptosCoin();
+  },
+  longTestTimeout,
+);
+
+test(
+  "it returns succeed transaction data",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = getFaucetClient();
+    const sender = new AptosAccount();
+    const receiver = new AptosAccount();
+    await faucetClient.fundAccount(sender.address(), 100_000_000);
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
+        "0x1::aptos_account",
+        "transfer",
+        [],
+        [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(receiver.address())), bcsSerializeUint64(1000)],
+      ),
+    );
+    const txn = await client.generateSignSubmitWaitForTransaction(sender, entryFunctionPayload, { checkSuccess: true });
+    expect((txn as any).success).toBeTruthy();
+    expect(txn as any).toHaveProperty("changes");
+    expect((txn as any).vm_status).toEqual("Executed successfully");
+  },
+  longTestTimeout,
+);
+
+test(
+  "it returns failed transaction reason",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = getFaucetClient();
+    const sender = new AptosAccount();
+    const receiver = new AptosAccount();
+    await faucetClient.fundAccount(sender.address(), 100_000_000);
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
+        "0x1::aptos_account",
+        "transfer",
+        [],
+        [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(receiver.address()))],
+      ),
+    );
+
+    const rawTxn = await client.generateRawTransaction(sender.address(), entryFunctionPayload);
+    const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTxn);
+    const txn = await client.submitSignedBCSTransaction(bcsTxn);
+    expect(async () => {
+      await client.waitForTransactionWithResult(txn.hash, { checkSuccess: true });
+    }).rejects.toThrow(
+      `Transaction ${txn.hash} failed with an error: Transaction Executed and Committed with Error NUMBER_OF_ARGUMENTS_MISMATCH`,
+    );
   },
   longTestTimeout,
 );

@@ -3,13 +3,13 @@ module 0x8675309::M {
     struct S {
         f: u64,
     }
-    private fun bar(s: &mut M::S) {
+    private fun bar(s: &mut M::S): &mut M::S {
         s
     }
-    private fun baz() {
+    private fun baz(): M::S {
         pack M::S(0)
     }
-    private fun foo(x: &mut u64) {
+    private fun foo(x: &mut u64): &mut u64 {
         x
     }
     private fun t0() {
@@ -31,4 +31,15 @@ module 0x8675309::M {
           Tuple()
         }
     }
+    spec fun $bar(s: M::S): M::S {
+        s
+    }
+    spec fun $baz(): M::S {
+        pack M::S(0)
+    }
+    spec fun $foo(x: u64): u64 {
+        x
+    }
+    spec fun $t0();
+    spec fun $t1();
 } // end 0x8675309::M

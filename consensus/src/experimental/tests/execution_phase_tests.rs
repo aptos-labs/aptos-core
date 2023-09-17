@@ -18,7 +18,7 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::{Error, StateComputeResult};
+use aptos_executor_types::{ExecutorError, StateComputeResult};
 use aptos_types::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
 use std::sync::Arc;
 
@@ -63,7 +63,7 @@ fn add_execution_phase_test_cases(
         ExecutionRequest {
             ordered_blocks: vec![],
         },
-        Box::new(move |resp| assert!(matches!(resp.inner, Err(Error::EmptyBlocks)))),
+        Box::new(move |resp| assert!(matches!(resp.inner, Err(ExecutorError::EmptyBlocks)))),
     );
 
     // bad parent id
@@ -80,7 +80,7 @@ fn add_execution_phase_test_cases(
                 StateComputeResult::new_dummy(),
             )],
         },
-        Box::new(move |resp| assert!(matches!(resp.inner, Err(Error::BlockNotFound(_))))),
+        Box::new(move |resp| assert!(matches!(resp.inner, Err(ExecutorError::BlockNotFound(_))))),
     );
 }
 

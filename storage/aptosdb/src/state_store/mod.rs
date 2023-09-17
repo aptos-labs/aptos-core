@@ -9,6 +9,7 @@ use crate::{
     epoch_by_version::EpochByVersionSchema,
     ledger_db::LedgerDb,
     metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
+    new_sharded_kv_schema_batch,
     schema::{state_value::StateValueSchema, state_value_index::StateValueIndexSchema},
     stale_state_value_index::StaleStateValueIndexSchema,
     state_kv_db::StateKvDb,
@@ -24,7 +25,7 @@ use crate::{
     version_data::VersionDataSchema,
     AptosDbError, LedgerStore, ShardedStateKvSchemaBatch, StaleNodeIndexCrossEpochSchema,
     StaleNodeIndexSchema, StateKvPrunerManager, StateMerklePrunerManager, TransactionStore,
-    OTHER_TIMERS_SECONDS,
+    NUM_STATE_SHARDS, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{ensure, format_err, Context, Result};
 use aptos_crypto::{
@@ -32,6 +33,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_executor_types::in_memory_state_calculator::InMemoryStateCalculator;
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
@@ -59,7 +61,6 @@ use aptos_types::{
 use arr_macro::arr;
 use claims::{assert_ge, assert_le};
 use dashmap::DashMap;
-use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::{collections::HashSet, ops::Deref, sync::Arc};
 
@@ -77,15 +78,7 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * (buffered_state::ASYNC_COMMIT_CHANNEL_BUFFER_SIZE + 2 + 1/*  Rendezvous channel */)
     * 2;
 
-const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 100000;
-
-static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(32)
-        .thread_name(|index| format!("kv_reader_{}", index))
-        .build()
-        .unwrap()
-});
+pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 100000;
 
 pub(crate) struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
@@ -312,11 +305,13 @@ impl StateStore {
         empty_buffered_state_for_restore: bool,
         skip_usage: bool,
     ) -> Self {
-        Self::sync_commit_progress(
-            Arc::clone(&ledger_db),
-            Arc::clone(&state_kv_db),
-            /*crash_if_difference_is_too_large=*/ true,
-        );
+        if !hack_for_tests {
+            Self::sync_commit_progress(
+                Arc::clone(&ledger_db),
+                Arc::clone(&state_kv_db),
+                /*crash_if_difference_is_too_large=*/ true,
+            );
+        }
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
@@ -386,29 +381,24 @@ impl StateStore {
                 .expect_version();
             assert_ge!(state_kv_commit_progress, overall_commit_progress);
 
-            if ledger_commit_progress != overall_commit_progress {
-                info!(
-                    ledger_commit_progress = ledger_commit_progress,
-                    "Start truncation...",
-                );
-                let difference = ledger_commit_progress - overall_commit_progress;
-                if crash_if_difference_is_too_large {
-                    assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
-                }
-                // TODO(grao): Support truncation for splitted ledger DBs.
-                truncate_ledger_db(
-                    ledger_db,
-                    ledger_commit_progress,
-                    overall_commit_progress,
-                    difference as usize,
-                )
-                .expect("Failed to truncate ledger db.");
+            // LedgerCommitProgress was not guaranteed to commit after all ledger changes finish,
+            // have to attempt truncating every column family.
+            info!(
+                ledger_commit_progress = ledger_commit_progress,
+                "Attempt ledger truncation...",
+            );
+            let difference = ledger_commit_progress - overall_commit_progress;
+            if crash_if_difference_is_too_large {
+                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
             }
+            // TODO(grao): Support truncation for split ledger DBs.
+            truncate_ledger_db(ledger_db, overall_commit_progress)
+                .expect("Failed to truncate ledger db.");
 
             if state_kv_commit_progress != overall_commit_progress {
                 info!(
                     state_kv_commit_progress = state_kv_commit_progress,
-                    "Start truncation..."
+                    "Start state KV truncation..."
                 );
                 let difference = state_kv_commit_progress - overall_commit_progress;
                 if crash_if_difference_is_too_large {
@@ -803,7 +793,7 @@ impl StateStore {
                     .flat_map(|sharded_states| sharded_states.iter().flatten())
                     .map(|(key, _)| key)
                     .collect::<HashSet<_>>();
-                IO_POOL.scope(|s| {
+                THREAD_MANAGER.get_io_pool().scope(|s| {
                     for key in key_set {
                         let cache = &state_cache_with_version[key.get_shard_id() as usize];
                         s.spawn(move |_| {
@@ -934,6 +924,32 @@ impl StateStore {
         Ok(())
     }
 
+    pub(crate) fn shard_state_value_batch(
+        &self,
+        metadata_batch: &SchemaBatch,
+        sharded_batch: &ShardedStateKvSchemaBatch,
+        values: &StateValueBatch,
+    ) -> Result<()> {
+        values.iter().for_each(|((key, version), value)| {
+            let shard_id = key.get_shard_id() as usize;
+            assert!(
+                shard_id < NUM_STATE_SHARDS,
+                "Invalid shard id: {}",
+                shard_id
+            );
+            sharded_batch[shard_id]
+                .put::<StateValueSchema>(&(key.clone(), *version), value)
+                .expect("Inserting into sharded schema batch should never fail");
+
+            if self.state_kv_db.enabled_sharding() {
+                metadata_batch
+                    .put::<StateValueIndexSchema>(&(key.clone(), *version), &())
+                    .expect("Inserting into state value index schema batch should never fail");
+            }
+        });
+        Ok(())
+    }
+
     /// Merklize the results generated by `value_state_sets` to `batch` and return the result root
     /// hashes for each write set.
     #[cfg(test)]
@@ -1051,7 +1067,6 @@ impl StateStore {
 
     #[cfg(test)]
     pub fn get_all_jmt_nodes(&self) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
-        // TODO(grao): Support sharding here.
         let mut iter = self
             .state_db
             .state_merkle_db
@@ -1060,8 +1075,26 @@ impl StateStore {
             Default::default(),
         )?;
         iter.seek_to_first();
+
         let all_rows = iter.collect::<Result<Vec<_>>>()?;
-        Ok(all_rows.into_iter().map(|(k, _v)| k).collect())
+
+        let mut keys: Vec<aptos_jellyfish_merkle::node_type::NodeKey> =
+            all_rows.into_iter().map(|(k, _v)| k).collect();
+        if self.state_merkle_db.sharding_enabled() {
+            for i in 0..NUM_STATE_SHARDS as u8 {
+                let mut iter = self
+                    .state_merkle_db
+                    .db_shard(i)
+                    .iter::<crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
+                    Default::default(),
+                )?;
+                iter.seek_to_first();
+
+                let all_rows = iter.collect::<Result<Vec<_>>>()?;
+                keys.extend(all_rows.into_iter().map(|(k, _v)| k).collect::<Vec<_>>());
+            }
+        }
+        Ok(keys)
     }
 
     fn prepare_version_in_cache(
@@ -1069,7 +1102,7 @@ impl StateStore {
         base_version: Version,
         sharded_state_cache: &ShardedStateCache,
     ) -> Result<()> {
-        IO_POOL.scope(|s| {
+        THREAD_MANAGER.get_io_pool().scope(|s| {
             sharded_state_cache.par_iter().for_each(|shard| {
                 shard.iter_mut().for_each(|mut entry| {
                     match entry.value() {
@@ -1113,16 +1146,17 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             .with_label_values(&["state_value_writer_write_chunk"])
             .start_timer();
         let batch = SchemaBatch::new();
-        node_batch
-            .par_iter()
-            .map(|(k, v)| batch.put::<StateValueSchema>(k, v))
-            .collect::<Result<Vec<_>>>()?;
+        let sharded_schema_batch = new_sharded_kv_schema_batch();
+
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateSnapshotRestoreProgress(version),
             &DbMetadataValue::StateSnapshotProgress(progress),
         )?;
-        // TODO(grao): Support sharding here.
-        self.state_kv_db.commit_raw_batch(batch)
+
+        self.shard_state_value_batch(&batch, &sharded_schema_batch, node_batch)?;
+
+        self.state_kv_db
+            .commit(version, batch, sharded_schema_batch)
     }
 
     fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {

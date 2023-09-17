@@ -211,6 +211,34 @@ impl BlockData {
         }
     }
 
+    pub fn new_for_dag(
+        epoch: u64,
+        round: Round,
+        timestamp_usecs: u64,
+        payload: Payload,
+        author: Author,
+        failed_authors: Vec<(Round, Author)>,
+        parent_block_info: BlockInfo,
+    ) -> Self {
+        Self {
+            epoch,
+            round,
+            timestamp_usecs,
+            quorum_cert: QuorumCert::new(
+                VoteData::new(parent_block_info, BlockInfo::empty()),
+                LedgerInfoWithSignatures::new(
+                    LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
+                    AggregateSignature::empty(),
+                ),
+            ),
+            block_type: BlockType::Proposal {
+                payload,
+                author,
+                failed_authors,
+            },
+        }
+    }
+
     pub fn new_proposal(
         payload: Payload,
         author: Author,

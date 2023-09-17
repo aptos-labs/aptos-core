@@ -10,6 +10,7 @@ use aptos_gas_meter::AptosGasMeter;
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
 };
+use aptos_vm_types::change_set::VMChangeSet;
 use move_binary_format::{
     errors::{Location, PartialVMResult, VMResult},
     file_format::CodeOffset,
@@ -479,7 +480,11 @@ where
     delegate! {
         fn algebra(&self) -> &Self::Algebra;
 
-        fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee;
+        fn storage_fee_for_state_slot(&self, op: &WriteOp) -> Fee;
+
+        fn storage_fee_refund_for_state_slot(&self, op: &WriteOp) -> Fee;
+
+        fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee;
 
         fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
 
@@ -511,42 +516,50 @@ where
         res
     }
 
-    fn charge_storage_fee_for_all<'a>(
+    fn process_storage_fee_for_all(
         &mut self,
-        write_ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
-        events: impl IntoIterator<Item = &'a ContractEvent>,
+        change_set: &mut VMChangeSet,
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
-    ) -> VMResult<()> {
+    ) -> VMResult<Fee> {
         // The new storage fee are only active since version 7.
         if self.feature_version() < 7 {
-            return Ok(());
+            return Ok(0.into());
         }
 
         // TODO(Gas): right now, some of our tests use a unit price of 0 and this is a hack
         // to avoid causing them issues. We should revisit the problem and figure out a
         // better way to handle this.
         if gas_unit_price.is_zero() {
-            return Ok(());
+            return Ok(0.into());
         }
 
         // Writes
         let mut write_fee = Fee::new(0);
         let mut write_set_storage = vec![];
-        for (key, op) in write_ops.into_iter() {
-            let fee = self.storage_fee_per_write(key, op);
+        let mut total_refund = Fee::new(0);
+        for (key, op) in change_set.write_set_iter_mut() {
+            let slot_fee = self.storage_fee_for_state_slot(op);
+            let slot_refund = self.storage_fee_refund_for_state_slot(op);
+            let bytes_fee = self.storage_fee_for_state_bytes(key, op);
+
+            Self::maybe_record_storage_deposit(op, slot_fee);
+            total_refund += slot_refund;
+
+            let fee = slot_fee + bytes_fee;
             write_set_storage.push(WriteStorage {
                 key: key.clone(),
                 op_type: write_op_type(op),
                 cost: fee,
             });
+            // TODO(gas): track storage refund in the profiler
             write_fee += fee;
         }
 
         // Events
         let mut event_fee = Fee::new(0);
         let mut event_fees = vec![];
-        for event in events {
+        for event in change_set.events().iter() {
             let fee = self.storage_fee_per_event(event);
             event_fees.push(EventStorage {
                 ty: event.type_tag().clone(),
@@ -576,7 +589,7 @@ where
         )
         .map_err(|err| err.finish(Location::Undefined))?;
 
-        Ok(())
+        Ok(total_refund)
     }
 
     fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {

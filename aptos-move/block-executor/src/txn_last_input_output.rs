@@ -15,7 +15,6 @@ use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
 use std::{
-    collections::HashSet,
     fmt::Debug,
     iter::{empty, Iterator},
     sync::{
@@ -31,7 +30,6 @@ type TxnInput<K> = Vec<ReadDescriptor<K>>;
 pub(crate) struct TxnOutput<T: TransactionOutput, E: Debug> {
     output_status: ExecutionStatus<T, Error<E>>,
 }
-type KeySet<T> = HashSet<<<T as TransactionOutput>::Txn as Transaction>::Key>;
 
 impl<T: TransactionOutput, E: Debug> TxnOutput<T, E> {
     pub fn from_output_status(output_status: ExecutionStatus<T, Error<E>>) -> Self {
@@ -44,7 +42,7 @@ impl<T: TransactionOutput, E: Debug> TxnOutput<T, E> {
 }
 
 /// Information about the read which is used by validation.
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 enum ReadKind {
     /// Read returned a value from the multi-version data-structure, with index
     /// and incarnation number of the execution associated with the write of
@@ -56,16 +54,17 @@ enum ReadKind {
     FromStorage,
     /// Read triggered a delta application failure.
     DeltaApplicationFailure,
+    /// Module read. TODO: Design a better representation once more meaningfully separated.
+    Module,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ReadDescriptor<K> {
     access_path: K,
-
     kind: ReadKind,
 }
 
-impl<K: ModulePath> ReadDescriptor<K> {
+impl<K: Debug + ModulePath> ReadDescriptor<K> {
     pub fn from_version(access_path: K, txn_idx: TxnIndex, incarnation: Incarnation) -> Self {
         Self {
             access_path,
@@ -84,6 +83,13 @@ impl<K: ModulePath> ReadDescriptor<K> {
         Self {
             access_path,
             kind: ReadKind::FromStorage,
+        }
+    }
+
+    pub fn from_module(access_path: K) -> Self {
+        Self {
+            access_path,
+            kind: ReadKind::Module,
         }
     }
 
@@ -115,7 +121,9 @@ impl<K: ModulePath> ReadDescriptor<K> {
 
     // Does the read descriptor describe a read from storage.
     pub fn validate_storage(&self) -> bool {
-        self.kind == ReadKind::FromStorage
+        self.kind == ReadKind::FromStorage //  [zi changed]
+                                           // Module reading supported from storage version only at the moment.
+                                           // self.kind == ReadKind::Storage || self.kind == ReadKind::Module
     }
 
     // Does the read descriptor describe to a read with a delta application failure.
@@ -138,7 +146,9 @@ pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
     are_module_reads_and_writes_colliding: AtomicBool,
 }
 
-impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputOutput<K, T, E> {
+impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
+    TxnLastInputOutput<K, T, E>
+{
     pub fn new(num_txns: TxnIndex) -> Self {
         Self {
             inputs: (0..num_txns)
@@ -189,13 +199,24 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         input: Vec<ReadDescriptor<K>>,
         output: ExecutionStatus<T, Error<E>>,
     ) -> anyhow::Result<()> {
-        let read_modules: Vec<AccessPath> =
-            input.iter().filter_map(|desc| desc.module_path()).collect();
+        let read_modules: Vec<AccessPath> = input
+            .iter()
+            .filter_map(|desc| {
+                matches!(desc.kind, ReadKind::Module).then(|| {
+                    desc.module_path()
+                        .unwrap_or_else(|| panic!("Module path guaranteed to exist {:?}", desc))
+                })
+            })
+            .collect();
         let written_modules: Vec<AccessPath> = match &output {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => output
-                .get_writes()
-                .into_iter()
-                .filter_map(|(k, _)| k.module_path())
+                .module_write_set()
+                .keys()
+                .map(|k| {
+                    k.module_path().unwrap_or_else(|| {
+                        panic!("Unexpected non-module key found in putput: {:?}", k)
+                    })
+                })
                 .collect(),
             ExecutionStatus::Abort(_) => Vec::new(),
         };
@@ -276,50 +297,59 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         self.outputs[txn_idx as usize].load_full()
     }
 
-    // Extracts a set of paths written or updated during execution from transaction
-    // output: (modified by writes, modified by deltas).
-    pub(crate) fn modified_keys(&self, txn_idx: TxnIndex) -> KeySet<T> {
-        match &self.outputs[txn_idx as usize].load_full() {
-            None => HashSet::new(),
-            Some(txn_output) => match &txn_output.output_status {
-                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t
-                    .get_writes()
-                    .into_iter()
-                    .map(|(k, _)| k)
-                    .chain(t.get_deltas().into_iter().map(|(k, _)| k))
-                    .collect(),
-                ExecutionStatus::Abort(_) => HashSet::new(),
-            },
-        }
+    // Extracts a set of paths (keys) written or updated during execution from transaction
+    // output, .1 for each item is false for non-module paths and true for module paths.
+    pub(crate) fn modified_keys(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<impl Iterator<Item = (<<T as TransactionOutput>::Txn as Transaction>::Key, bool)>>
+    {
+        self.outputs[txn_idx as usize]
+            .load_full()
+            .and_then(|txn_output| match &txn_output.output_status {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
+                    t.resource_write_set()
+                        .into_keys()
+                        .chain(t.aggregator_v1_write_set().into_keys())
+                        .chain(t.aggregator_v1_delta_set().into_keys())
+                        .map(|k| (k, false))
+                        .chain(t.module_write_set().into_keys().map(|k| (k, true))),
+                ),
+                ExecutionStatus::Abort(_) => None,
+            })
     }
 
     pub(crate) fn delta_keys(
         &self,
         txn_idx: TxnIndex,
-    ) -> (
-        usize,
-        Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
-    ) {
-        let ret: (
-            usize,
-            Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
-        ) = self.outputs[txn_idx as usize].load().as_ref().map_or(
-            (
-                0,
-                Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Key>()),
-            ),
+    ) -> Vec<<<T as TransactionOutput>::Txn as Transaction>::Key> {
+        self.outputs[txn_idx as usize].load().as_ref().map_or(
+            vec![],
             |txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                    let deltas = t.get_deltas();
-                    (deltas.len(), Box::new(deltas.into_iter().map(|(k, _)| k)))
+                    t.aggregator_v1_delta_set().into_keys().collect()
                 },
-                ExecutionStatus::Abort(_) => (
-                    0,
-                    Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Key>()),
-                ),
+                ExecutionStatus::Abort(_) => vec![],
             },
-        );
-        ret
+        )
+    }
+
+    pub(crate) fn events(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Event>> {
+        self.outputs[txn_idx as usize].load().as_ref().map_or(
+            Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Event>()),
+            |txn_output| match &txn_output.output_status {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    let events = t.get_events();
+                    Box::new(events.into_iter())
+                },
+                ExecutionStatus::Abort(_) => {
+                    Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Event>())
+                },
+            },
+        )
     }
 
     // Called when a transaction is committed to record WriteOps for materialized aggregator values

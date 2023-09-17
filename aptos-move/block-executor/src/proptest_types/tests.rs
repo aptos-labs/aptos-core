@@ -8,13 +8,13 @@ use crate::{
     proptest_types::{
         baseline::BaselineOutput,
         types::{
-            DeltaDataView, EmptyDataView, KeyType, MockOutput, MockTask, MockTransaction,
-            TransactionGen, TransactionGenParams, ValueType, MAX_GAS_PER_TXN,
+            DeltaDataView, EmptyDataView, KeyType, MockEvent, MockOutput, MockTask,
+            MockTransaction, TransactionGen, TransactionGenParams, ValueType, MAX_GAS_PER_TXN,
         },
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_types::executable::ExecutableTestType;
+use aptos_types::{contract_event::ReadWriteEvent, executable::ExecutableTestType};
 use claims::assert_ok;
 use num_cpus;
 use proptest::{
@@ -27,7 +27,7 @@ use proptest::{
 use rand::Rng;
 use std::{cmp::max, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
 
-fn run_transactions<K, V>(
+fn run_transactions<K, V, E>(
     key_universe: &[K],
     transaction_gens: Vec<TransactionGen<V>>,
     abort_transactions: Vec<Index>,
@@ -38,6 +38,7 @@ fn run_transactions<K, V>(
 ) where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
+    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
     Vec<u8>: From<V>,
 {
     let mut transactions: Vec<_> = transaction_gens
@@ -66,10 +67,10 @@ fn run_transactions<K, V>(
 
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
-            MockTransaction<KeyType<K>, ValueType<V>>,
-            MockTask<KeyType<K>, ValueType<V>>,
+            MockTransaction<KeyType<K>, ValueType<V>, E>,
+            MockTask<KeyType<K>, ValueType<V>, E>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<K>, ValueType<V>>, usize>,
+            NoOpTransactionCommitHook<MockOutput<KeyType<K>, ValueType<V>, E>, usize>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -97,7 +98,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 
     #[test]
@@ -107,7 +108,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 
     #[test]
@@ -117,7 +118,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 
     #[test]
@@ -127,7 +128,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 
     #[test]
@@ -137,7 +138,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 3),
         skip_rest_transactions in vec(any::<Index>(), 3),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 }
 
@@ -156,7 +157,7 @@ fn dynamic_read_writes_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
     .expect("creating a new value should succeed")
     .current();
 
-    run_transactions(
+    run_transactions::<[u8; 32], [u8; 32], MockEvent>(
         &universe,
         transaction_gen,
         vec![],
@@ -201,10 +202,13 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
 
     for _ in 0..20 {
         let output = BlockExecutor::<
-            MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, MockEvent>,
+            MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>, MockEvent>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>>, usize>,
+            NoOpTransactionCommitHook<
+                MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, MockEvent>,
+                usize,
+            >,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -252,10 +256,13 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
 
     for _ in 0..20 {
         let output = BlockExecutor::<
-            MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, MockEvent>,
+            MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>, MockEvent>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>>, usize>,
+            NoOpTransactionCommitHook<
+                MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, MockEvent>,
+                usize,
+            >,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -288,13 +295,13 @@ fn dynamic_read_writes_contended_with_block_gas_limit(
     .expect("creating a new value should succeed")
     .current();
 
-    println!(
-        "Gas Limit is: {}, {}",
-        num_txns,
-        maybe_block_gas_limit.unwrap()
-    );
+    // println!(
+    //     "Gas Limit is: {}, {}",
+    //     num_txns,
+    //     maybe_block_gas_limit.unwrap()
+    // );
 
-    run_transactions(
+    run_transactions::<[u8; 32], [u8; 32], MockEvent>(
         &universe,
         transaction_gen,
         vec![],
@@ -323,7 +330,7 @@ fn module_publishing_fallback_with_block_gas_limit(
     .expect("creating a new value should succeed")
     .current();
 
-    run_transactions(
+    run_transactions::<[u8; 32], [u8; 32], MockEvent>(
         &universe,
         transaction_gen.clone(),
         vec![],
@@ -332,16 +339,16 @@ fn module_publishing_fallback_with_block_gas_limit(
         (false, true),
         maybe_block_gas_limit,
     );
-    run_transactions(
+    run_transactions::<[u8; 32], [u8; 32], MockEvent>(
         &universe,
         transaction_gen.clone(),
         vec![],
         vec![],
         2,
-        (false, true),
+        (true, false),
         maybe_block_gas_limit,
     );
-    run_transactions(
+    run_transactions::<[u8; 32], [u8; 32], MockEvent>(
         &universe,
         transaction_gen,
         vec![],
@@ -414,10 +421,13 @@ fn publishing_fixed_params_with_block_gas_limit(
 
     // Confirm still no intersection
     let output = BlockExecutor::<
-        MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+        MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, MockEvent>,
+        MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>, MockEvent>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>>, usize>,
+        NoOpTransactionCommitHook<
+            MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, MockEvent>,
+            usize,
+        >,
         ExecutableTestType,
     >::new(
         num_cpus::get(),
@@ -457,10 +467,13 @@ fn publishing_fixed_params_with_block_gas_limit(
 
     for _ in 0..200 {
         let output = BlockExecutor::<
-            MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, MockEvent>,
+            MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>, MockEvent>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>>, usize>,
+            NoOpTransactionCommitHook<
+                MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, MockEvent>,
+                usize,
+            >,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -518,7 +531,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
     }
 
     #[test]
@@ -528,7 +541,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 10 * MAX_GAS_PER_TXN / 2)));
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 10 * MAX_GAS_PER_TXN / 2)));
     }
 
     #[test]
@@ -538,7 +551,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
     }
 
     #[test]
@@ -548,7 +561,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
     }
 
     #[test]
@@ -558,7 +571,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 3),
         skip_rest_transactions in vec(any::<Index>(), 3),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
+        run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
     }
 }
 

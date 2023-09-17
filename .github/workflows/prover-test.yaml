@@ -1,7 +1,7 @@
 name: "Prover Test"
 on:
    pull_request:
-     types: [ labeled, opened, synchronize, reopened, auto_merge_enabled ]
+     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
      paths:
        - '**.move'
        - 'Cargo.toml'
@@ -36,7 +36,7 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'CICD:run-prover-test')
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main

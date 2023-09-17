@@ -7,20 +7,20 @@
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_executor_types::{ExecutedBlock, ExecutedChunk};
+use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
 use aptos_infallible::Mutex;
-use aptos_logger::{sample, sample::SampleRate, trace, warn};
+use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
+    state_delta::StateDelta,
     ExecutedTrees,
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    block_executor::partitioner::{ExecutableTransactions, SubBlocksForShard},
-    transaction::{
-        analyzed_transaction::AnalyzedTransaction, ExecutionStatus, Transaction, TransactionOutput,
-        TransactionStatus,
-    },
+    block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
+    contract_event::ContractEvent,
+    epoch_state::EpochState,
+    transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
 use aptos_vm::{
     sharded_block_executor::{
@@ -66,11 +66,9 @@ impl ChunkOutput {
                     maybe_block_gas_limit,
                 )
             },
-            ExecutableTransactions::Sharded(block) => Self::by_transaction_execution_sharded::<V>(
-                block,
-                state_view,
-                maybe_block_gas_limit,
-            ),
+            ExecutableTransactions::Sharded(txns) => {
+                Self::by_transaction_execution_sharded::<V>(txns, state_view, maybe_block_gas_limit)
+            },
         }
     }
 
@@ -95,13 +93,13 @@ impl ChunkOutput {
     }
 
     pub fn by_transaction_execution_sharded<V: VMExecutor>(
-        block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
+        transactions: PartitionedTransactions,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
         let state_view_arc = Arc::new(state_view);
         let transaction_outputs = Self::execute_block_sharded::<V>(
-            block.clone(),
+            transactions.clone(),
             state_view_arc.clone(),
             maybe_block_gas_limit,
         )?;
@@ -113,7 +111,7 @@ impl ChunkOutput {
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
 
         Ok(Self {
-            transactions: SubBlocksForShard::flatten(block)
+            transactions: PartitionedTransactions::flatten(transactions)
                 .into_iter()
                 .map(|t| t.into_txn())
                 .collect(),
@@ -158,40 +156,31 @@ impl ChunkOutput {
         ApplyChunkOutput::apply_chunk(self, base_view, append_state_checkpoint_to_block)
     }
 
-    pub fn apply_to_ledger_for_block(
+    pub fn into_state_checkpoint_output(
         self,
-        base_view: &ExecutedTrees,
+        parent_state: &StateDelta,
         append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> Result<(ExecutedBlock, Vec<Transaction>, Vec<Transaction>)> {
-        fail_point!("executor::apply_to_ledger_for_block", |_| {
+    ) -> Result<(StateDelta, Option<EpochState>, StateCheckpointOutput)> {
+        fail_point!("executor::into_state_checkpoint_output", |_| {
             Err(anyhow::anyhow!(
-                "Injected error in apply_to_ledger_for_block."
+                "Injected error in into_state_checkpoint_output."
             ))
         });
-        ApplyChunkOutput::apply_block(self, base_view, append_state_checkpoint_to_block)
-    }
-
-    pub fn trace_log_transaction_status(&self) {
-        let status: Vec<_> = self
-            .transaction_outputs
-            .iter()
-            .map(TransactionOutput::status)
-            .cloned()
-            .collect();
-
-        if !status.is_empty() {
-            trace!("Execution status: {:?}", status);
-        }
+        ApplyChunkOutput::calculate_state_checkpoint(
+            self,
+            parent_state,
+            append_state_checkpoint_to_block,
+        )
     }
 
     fn execute_block_sharded<V: VMExecutor>(
-        block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
+        partitioned_txns: PartitionedTransactions,
         state_view: Arc<CachedStateView>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
         Ok(V::execute_block_sharded(
             SHARDED_BLOCK_EXECUTOR.lock().deref(),
-            block,
+            partitioned_txns,
             state_view,
             maybe_block_gas_limit,
         )?)
@@ -207,7 +196,7 @@ impl ChunkOutput {
     ) -> Result<Vec<TransactionOutput>> {
         Ok(V::execute_block(
             transactions,
-            &state_view,
+            state_view,
             maybe_block_gas_limit,
         )?)
     }
@@ -228,7 +217,7 @@ impl ChunkOutput {
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
             StateViewId::Miscellaneous => {
-                V::execute_block(transactions, &state_view, maybe_block_gas_limit)?
+                V::execute_block(transactions, state_view, maybe_block_gas_limit)?
             },
             _ => transactions
                 .iter()
@@ -236,7 +225,7 @@ impl ChunkOutput {
                     TransactionOutput::new(
                         WriteSet::default(),
                         Vec::new(),
-                        100,
+                        0, // Keep gas zero to match with StateCheckpoint txn output
                         TransactionStatus::Keep(ExecutionStatus::Success),
                     )
                 })
@@ -395,11 +384,16 @@ pub fn update_counters_for_processed_chunk(
         }
 
         for event in output.events() {
-            let is_core = event.key().get_creator_address() == CORE_CODE_ADDRESS;
-            let creation_number = if is_core && detailed_counters {
-                event.key().get_creation_number().to_string()
-            } else {
-                "event".to_string()
+            let (is_core, creation_number) = match event {
+                ContractEvent::V1(v1) => (
+                    v1.key().get_creator_address() == CORE_CODE_ADDRESS,
+                    if detailed_counters {
+                        v1.key().get_creation_number().to_string()
+                    } else {
+                        "event".to_string()
+                    },
+                ),
+                ContractEvent::V2(_v2) => (false, "event".to_string()),
             };
             metrics::APTOS_PROCESSED_USER_TRANSACTIONS_CORE_EVENTS
                 .with_label_values(&[

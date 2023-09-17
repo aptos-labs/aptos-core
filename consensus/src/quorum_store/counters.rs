@@ -292,6 +292,24 @@ pub static PULLED_EMPTY_TXNS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Number of txns (equals max_count) for each time the pull for batches returns full.
+pub static BATCH_PULL_FULL_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "quorum_store_batch_pull_full_txns",
+        "Number of txns (equals max_count) for each time the pull for batches returns full.",
+    )
+});
+
+/// Histogram for the number of txns excluded on pull for batches.
+pub static BATCH_PULL_EXCLUDED_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_batch_pull_excluded_txns",
+        "Histogram for the number of txns excluded on pull for batches.",
+        TRANSACTION_COUNT_BUCKETS.clone()
+    )
+    .unwrap()
+});
+
 /// Count of the created batches since last restart.
 pub static CREATED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
@@ -356,7 +374,7 @@ pub fn inc_rejected_pos_count(reason: &str) {
 }
 
 /// Count of the received batches since last restart.
-pub static RECEIVED_REMOTE_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+pub static RECEIVED_REMOTE_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_received_remote_batch_count",
         "Count of the received batches since last restart."

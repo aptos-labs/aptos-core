@@ -5,9 +5,10 @@
 use crate::{
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{ModuleId, StructTag},
 };
 use anyhow::{bail, Result};
+use bytes::Bytes;
 use std::collections::btree_map::{self, BTreeMap};
 
 /// A storage operation.
@@ -318,7 +319,5 @@ impl<Module, Resource> Changes<Module, Resource> {
 // These aliases are necessary because AccountChangeSet and ChangeSet were not
 // generic before. In order to minimise the code changes we alias new generic
 // types.
-pub type AccountChangeSet = AccountChanges<Vec<u8>, Vec<u8>>;
-pub type ChangeSet = Changes<Vec<u8>, Vec<u8>>;
-
-pub type Event = (Vec<u8>, u64, TypeTag, Vec<u8>);
+pub type AccountChangeSet = AccountChanges<Bytes, Bytes>;
+pub type ChangeSet = Changes<Bytes, Bytes>;

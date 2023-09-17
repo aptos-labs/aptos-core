@@ -30,7 +30,6 @@ use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
@@ -66,8 +65,6 @@ pub enum UnverifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
     VoteMsg(Box<VoteMsg>),
     SyncInfo(Box<SyncInfo>),
-    CommitVote(Box<CommitVote>),
-    CommitDecision(Box<CommitDecision>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
@@ -100,18 +97,6 @@ impl UnverifiedEvent {
             },
             // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
-            UnverifiedEvent::CommitVote(cv) => {
-                if !self_message {
-                    cv.verify(validator)?;
-                }
-                VerifiedEvent::CommitVote(cv)
-            },
-            UnverifiedEvent::CommitDecision(cd) => {
-                if !self_message {
-                    cd.verify(validator)?;
-                }
-                VerifiedEvent::CommitDecision(cd)
-            },
             UnverifiedEvent::BatchMsg(b) => {
                 if !self_message {
                     b.verify(peer_id, max_num_batches)?;
@@ -138,8 +123,6 @@ impl UnverifiedEvent {
             UnverifiedEvent::ProposalMsg(p) => Ok(p.epoch()),
             UnverifiedEvent::VoteMsg(v) => Ok(v.epoch()),
             UnverifiedEvent::SyncInfo(s) => Ok(s.epoch()),
-            UnverifiedEvent::CommitVote(cv) => Ok(cv.epoch()),
-            UnverifiedEvent::CommitDecision(cd) => Ok(cd.epoch()),
             UnverifiedEvent::BatchMsg(b) => b.epoch(),
             UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
@@ -153,8 +136,6 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::ProposalMsg(m) => UnverifiedEvent::ProposalMsg(m),
             ConsensusMsg::VoteMsg(m) => UnverifiedEvent::VoteMsg(m),
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
-            ConsensusMsg::CommitVoteMsg(m) => UnverifiedEvent::CommitVote(m),
-            ConsensusMsg::CommitDecisionMsg(m) => UnverifiedEvent::CommitDecision(m),
             ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
             ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
@@ -170,8 +151,6 @@ pub enum VerifiedEvent {
     VerifiedProposalMsg(Box<Block>),
     VoteMsg(Box<VoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
-    CommitVote(Box<CommitVote>),
-    CommitDecision(Box<CommitDecision>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
