@@ -58,7 +58,7 @@ impl TDAGNetworkSender for MockDAGNetworkSender {
     /// Given a list of potential responders, sending rpc to get response from any of them and could
     /// fallback to more in case of failures.
     async fn send_rpc_with_fallbacks(
-        &self,
+        self: Arc<Self>,
         _responders: Vec<Author>,
         _message: DAGMessage,
         _retry_interval: Duration,
