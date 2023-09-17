@@ -4,7 +4,7 @@ use super::dag_test;
 use crate::{
     dag::{bootstrap::bootstrap_dag_for_test, types::CertifiedNodeMessage},
     experimental::buffer_manager::OrderedBlocks,
-    network::{DAGNetworkSenderImpl, IncomingDAGRequest, NetworkSender},
+    network::{IncomingDAGRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     test_utils::{consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStorage},
@@ -68,7 +68,7 @@ impl DagBootstrapUnit {
         let ledger_info = generate_ledger_info_with_sig(&all_signers, storage.get_ledger_info());
         let dag_storage = dag_test::MockStorage::new_with_ledger_info(ledger_info);
 
-        let network = Arc::new(DAGNetworkSenderImpl::new(Arc::new(network)));
+        let network = Arc::new(network);
 
         let payload_client = Arc::new(MockPayloadManager::new(None));
 

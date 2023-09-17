@@ -488,7 +488,7 @@ impl RBNetworkSender<DAGMessage> for NetworkSender {
         self.send_rpc(receiver, message.into_network_message(), timeout)
             .await
             .map_err(|e| anyhow!("invalid rpc response: {}", e))
-            .and_then(|msg| TConsensusMsg::from_network_message(msg))
+            .and_then(TConsensusMsg::from_network_message)
     }
 }
 
