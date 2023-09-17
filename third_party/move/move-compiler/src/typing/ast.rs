@@ -720,6 +720,7 @@ impl AstDebug for ModuleCall {
                 parameter_types.ast_debug(w);
                 w.write("]");
             }
+            w.write("]");
         }
         w.write("<");
         type_arguments.ast_debug(w);
