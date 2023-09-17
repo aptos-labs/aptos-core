@@ -18,11 +18,13 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::StateComputeResult;
+use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_storage_interface::{DbReader, Order};
 use aptos_types::{
     account_config::{new_block_event_key, NewBlockEvent},
     aggregate_signature::AggregateSignature,
+    block_info::BlockInfo,
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
@@ -45,6 +47,7 @@ pub trait Notifier: Send + Sync {
 pub struct NotifierAdapter {
     executor_channel: UnboundedSender<OrderedBlocks>,
     storage: Arc<dyn DAGStorage>,
+    parent_block_info: Arc<RwLock<BlockInfo>>,
 }
 
 impl NotifierAdapter {
@@ -52,9 +55,30 @@ impl NotifierAdapter {
         executor_channel: UnboundedSender<OrderedBlocks>,
         storage: Arc<dyn DAGStorage>,
     ) -> Self {
+        let ledger_info_from_storage = storage
+            .get_latest_ledger_info()
+            .expect("latest ledger info must exist");
+
+        // We start from the block that storage's latest ledger info, if storage has end-epoch
+        // LedgerInfo, we generate the virtual genesis block
+        let parent_block_info = if ledger_info_from_storage.ledger_info().ends_epoch() {
+            let genesis =
+                Block::make_genesis_block_from_ledger_info(ledger_info_from_storage.ledger_info());
+
+            let ledger_info = ledger_info_from_storage.ledger_info();
+            genesis.gen_block_info(
+                ledger_info.transaction_accumulator_hash(),
+                ledger_info.version(),
+                ledger_info.next_epoch_state().cloned(),
+            )
+        } else {
+            ledger_info_from_storage.ledger_info().commit_info().clone()
+        };
+
         Self {
             executor_channel,
             storage,
+            parent_block_info: Arc::new(RwLock::new(parent_block_info)),
         }
     }
 }
@@ -77,13 +101,23 @@ impl Notifier for NotifierAdapter {
             payload.extend(node.payload().clone());
             node_digests.push(node.digest());
         }
+        let parent_block_info = self.parent_block_info.read().clone();
         // TODO: we may want to split payload into multiple blocks
         let block = ExecutedBlock::new(
-            Block::new_for_dag(epoch, round, timestamp, payload, author, failed_author)?,
+            Block::new_for_dag(
+                epoch,
+                round,
+                timestamp,
+                payload,
+                author,
+                failed_author,
+                parent_block_info,
+            )?,
             StateComputeResult::new_dummy(),
         );
         let block_info = block.block_info();
         let storage = self.storage.clone();
+        *self.parent_block_info.write() = block_info.clone();
         Ok(self.executor_channel.unbounded_send(OrderedBlocks {
             ordered_blocks: vec![block],
             ordered_proof: LedgerInfoWithSignatures::new(
