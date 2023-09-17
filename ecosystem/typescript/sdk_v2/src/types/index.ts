@@ -513,9 +513,72 @@ export type Event = {
 };
 
 /**
+ * Map of Move types to local TypeScript types
+ */
+export type MoveUint8Type = number;
+export type MoveUint16Type = number;
+export type MoveUint32Type = number;
+export type MoveUint64Type = string;
+export type MoveUint128Type = string;
+export type MoveUint256Type = string;
+export type MoveAddressType = `0x${string}`;
+export type MoveObjectType = `0x${string}`;
+export type MoveStructType = `0x${string}::${string}::${string}`;
+export type MoveOptionType = MoveType | null | undefined;
+/**
  * String representation of a on-chain Move struct type.
  */
 export type MoveResourceType = `${string}::${string}::${string}`;
+
+export type MoveType =
+  | boolean
+  | string
+  | MoveUint8Type
+  | MoveUint16Type
+  | MoveUint32Type
+  | MoveUint64Type
+  | MoveUint128Type
+  | MoveUint256Type
+  | MoveAddressType
+  | MoveObjectType
+  | MoveStructType
+  | Array<MoveType>;
+
+/**
+ * Possible Move values acceptable by move functions (entry, view)
+ *
+ * `Bool -> boolean`
+ *
+ * `u8, u16, u32 -> number`
+ *
+ * `u64, u128, u256 -> string`
+ *
+ * `String -> string`
+ *
+ * `Address -> 0x${string}`
+ *
+ * `Struct - 0x${string}::${string}::${string}`
+ *
+ * `Object -> 0x${string}`
+ *
+ * `Vector -> Array<MoveValue>`
+ *
+ * `Option -> MoveValue | null | undefined`
+ */
+export type MoveValue =
+  | boolean
+  | string
+  | MoveUint8Type
+  | MoveUint16Type
+  | MoveUint32Type
+  | MoveUint64Type
+  | MoveUint128Type
+  | MoveUint256Type
+  | MoveAddressType
+  | MoveObjectType
+  | MoveStructType
+  | MoveOptionType
+  | Array<MoveValue>;
 
 /**
  * Move module id is a string representation of Move module.
@@ -650,4 +713,50 @@ export type LedgerInfo = {
    * software version used by the API endpoint.
    */
   git_hash?: string;
+};
+
+/**
+ * A Block type
+ */
+export type Block = {
+  block_height: string;
+  block_hash: `0x${string}`;
+  block_timestamp: string;
+  first_version: string;
+  last_version: string;
+  /**
+   * The transactions in the block in sequential order
+   */
+  transactions?: Array<TransactionResponse>;
+};
+
+/////// REQUEST TYPES ///////
+
+/**
+ * View request for the Move view function API
+ *
+ * `type MoveResourceType = ${string}::${string}::${string}`;
+ */
+export type ViewRequest = {
+  function: MoveResourceType;
+  /**
+   * Type arguments of the function
+   */
+  type_arguments: Array<MoveResourceType>;
+  /**
+   * Arguments of the function
+   */
+  arguments: Array<MoveValue>;
+};
+
+/**
+ * Table Item request for the GetTableItem API
+ */
+export type TableItemRequest = {
+  key_type: MoveValue;
+  value_type: MoveValue;
+  /**
+   * The value of the table item's key
+   */
+  key: any;
 };

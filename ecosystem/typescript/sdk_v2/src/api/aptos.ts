@@ -58,3 +58,4 @@ function applyMixin(targetClass: any, baseClass: any, baseClassProp: string) {
 }
 
 applyMixin(Aptos, Account, "account");
+applyMixin(Aptos, General, "general");

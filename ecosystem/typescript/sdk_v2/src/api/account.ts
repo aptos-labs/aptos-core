@@ -11,6 +11,9 @@ import {
 } from "../types";
 import { getInfo, getModule, getModules, getResource, getResources, getTransactions } from "../internal/account";
 
+/**
+ * A class to query all `Account` related queries on Aptos.
+ */
 export class Account {
   readonly config: AptosConfig;
 
