@@ -3,8 +3,8 @@
 /// - Cheaper than a resource account, which allocates an Account too.
 /// - Cheaper than creating an object & immediately deleting ObjectCore.
 module aptos_framework::storage_account {
-    use aptos_framework::transaction_context;
     use aptos_framework::create_signer::create_signer;
+    use aptos_framework::transaction_context;
 
     struct SignerCapability has copy, drop, store { account: address }
 
@@ -55,7 +55,7 @@ module aptos_framework::storage_account {
     const FREE_WRITE_BYTES_QUOTA: u64 = 1024;
 
     #[test_only]
-    const DATA: vector<u8> = b"I can store so much data in a storage account because it has no overhead: no object::ObjectCore, no account::Account, just the data I need. When I need to access my state I don't need to do any expensive hashing against a table handle, rather, I simply borrow out of global storage. Then when I'm done, I simply deallocate from memory using move_from(). Neat! Wow, I sure do have a lot of extra space I can fit into here, so how about some more ASCII characters? Here you go! 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const DATA: vector<u8> = b"I can store so much data in a storage account because it has no overhead: no object::ObjectCore, no account::Account, just the data I need. When I need to access my state I don't need to do any expensive hashing against a table handle. Rather, I simply borrow out of global storage. Then when I'm done, I simply deallocate from memory using move_from(). Neat! Wow, I sure do have a lot of extra space I can fit into here, so how about some more ASCII characters? Here you go! 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
     #[test(features = @std, tree_creator = @0xace)]
     fun test_end_to_end(
