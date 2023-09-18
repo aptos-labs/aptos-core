@@ -7,8 +7,8 @@ use crate::{
     AptosVM,
 };
 use aptos_aggregator::{
-    aggregator_extension::AggregatorID,
     resolver::{AggregatorReadMode, TAggregatorView},
+    types::AggregatorID,
 };
 use aptos_gas_algebra::Fee;
 use aptos_state_view::StateViewId;

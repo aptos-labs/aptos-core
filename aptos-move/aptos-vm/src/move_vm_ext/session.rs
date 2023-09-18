@@ -7,7 +7,6 @@ use crate::{
     move_vm_ext::{write_op_converter::WriteOpConverter, AptosMoveResolver},
     transaction_metadata::TransactionMetadata,
 };
-use aptos_aggregator::aggregator_extension::AggregatorID;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
@@ -350,10 +349,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
         }
 
-        for (id, change) in aggregator_change_set.aggregator_v1_changes {
-            let state_key = id
-                .into_state_key()
-                .expect("Aggregator V1 change set should contain only Legacy AggregatorIDs");
+        for (state_key, change) in aggregator_change_set.aggregator_v1_changes {
             match change {
                 AggregatorChangeV1::Write(value) => {
                     let write_op = woc.convert_aggregator_modification(&state_key, value)?;
@@ -371,10 +367,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
 
         for (id, change) in aggregator_change_set.aggregator_v2_changes {
-            assert!(
-                matches!(id, AggregatorID::Ephemeral(_)),
-                "Aggregator V1 should not be in the V2 change set."
-            );
             aggregator_v2_change_set.insert(id, change);
         }
 

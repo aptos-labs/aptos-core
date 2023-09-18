@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::aggregator_natives::helpers_v1::get_aggregator_field;
-use aptos_aggregator::aggregator_extension::{extension_error, AggregatorID};
+use aptos_aggregator::{aggregator_extension::extension_error, types::AggregatorID};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
 use move_vm_types::values::{Struct, StructRef, Value};
@@ -23,7 +23,7 @@ pub(crate) fn aggregator_value_as_u128(
                 .with_message("Aggregator identifier is too small".to_string()),
         );
     }
-    Ok((AggregatorID::ephemeral(value as u64), limit))
+    Ok((AggregatorID::new(value as u64), limit))
 }
 
 /// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
@@ -31,7 +31,7 @@ pub(crate) fn aggregator_value_as_u64(
     aggregator: &StructRef,
 ) -> PartialVMResult<(AggregatorID, u64)> {
     let (value, limit) = get_aggregator_fields_u64(aggregator)?;
-    Ok((AggregatorID::ephemeral(value), limit))
+    Ok((AggregatorID::new(value), limit))
 }
 
 /// Given a reference to `Aggregator` Move struct, returns a tuple of its
