@@ -33,6 +33,7 @@ use std::{collections::HashMap, hint, marker::PhantomData, sync::{
     mpsc::{Receiver, Sender},
     Arc,
 }};
+use aptos_metrics_core::sharding_v3::SHARDING_V3_SPAN_SECONDS;
 use crate::counters::SHARDED_EXECUTION_THREAD_SECONDS;
 use crate::txn_provider::sharded::ShardedTxnProvider;
 use crate::txn_provider::{TxnProviderTrait1, TxnProviderTrait2};
@@ -714,12 +715,12 @@ where
                         txn_provider.run_sharding_msg_loop(&versioned_cache, &scheduler);
                     });
                     s.spawn(|_| {
-                        let _timer = SHARDED_EXECUTION_THREAD_SECONDS.with_label_values(&["commit"]).start_timer();
+                        let _timer = SHARDING_V3_SPAN_SECONDS.with_label_values(&["blockstm__commit_thread"]).start_timer();
                         self.work_task_with_scope_v2_commit(txn_provider, &last_input_output, &versioned_cache, &scheduler, base_view);
                     });
                     for _ in 2..self.concurrency_level {
                         s.spawn(|_|{
-                            let _timer = SHARDED_EXECUTION_THREAD_SECONDS.with_label_values(&["worker"]).start_timer();
+                            let _timer = SHARDING_V3_SPAN_SECONDS.with_label_values(&["blockstm__worker_thread"]).start_timer();
                             self.work_task_with_scope_v2_scheduler_tasks(&executor_initial_arguments, txn_provider, &last_input_output, &versioned_cache, &scheduler, base_view, &shared_counter);
                         });
                     }
@@ -890,6 +891,7 @@ where
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
+            let _timer = SHARDING_V3_SPAN_SECONDS.with_label_values(&["execute_transactions_parallel"]).start_timer();
             self.execute_transactions_parallel(
                 executor_arguments,
                 &txn_provider,

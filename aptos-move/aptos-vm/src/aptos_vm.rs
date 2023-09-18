@@ -80,6 +80,7 @@ use std::{
 };
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_block_executor::txn_provider::sharded::ShardedTxnProvider;
+use aptos_metrics_core::sharding_v3::SHARDING_V3_SPAN_SECONDS;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -1560,12 +1561,15 @@ impl VMExecutor for AptosVM {
         );
 
         let count = transactions.num_txns();
-        let ret = sharded_block_executor.execute_block(
-            state_view,
-            transactions,
-            AptosVM::get_concurrency_level(),
-            maybe_block_gas_limit,
-        );
+        let ret = {
+            let _timer = SHARDING_V3_SPAN_SECONDS.with_label_values(&["aptos_vm__execute_block_sharded__main"]).start_timer();
+            sharded_block_executor.execute_block(
+                state_view,
+                transactions,
+                AptosVM::get_concurrency_level(),
+                maybe_block_gas_limit,
+            )
+        };
         if ret.is_ok() {
             // Record the histogram count for transactions per block.
             BLOCK_TRANSACTION_COUNT.observe(count as f64);

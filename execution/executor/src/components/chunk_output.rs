@@ -33,6 +33,8 @@ use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
 use once_cell::sync::Lazy;
 use std::{ops::Deref, sync::Arc, time::Duration};
+use aptos_metrics_core::sharding_v3::SHARDING_V3_SPAN_SECONDS;
+use crate::metrics::APTOS_EXECUTOR_OTHER_TIMERS_SECONDS;
 
 pub static SHARDED_BLOCK_EXECUTOR: Lazy<
     Arc<Mutex<ShardedBlockExecutor<CachedStateView, LocalExecutorClient<CachedStateView>>>>,
@@ -67,6 +69,7 @@ impl ChunkOutput {
                 )
             },
             ExecutableTransactions::Sharded(txns) => {
+                let _timer = SHARDING_V3_SPAN_SECONDS.with_label_values(&["chunk_output__execution__main"]).start_timer();
                 Self::by_transaction_execution_sharded::<V>(txns, state_view, maybe_block_gas_limit)
             },
         }
@@ -98,11 +101,14 @@ impl ChunkOutput {
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
         let state_view_arc = Arc::new(state_view);
-        let transaction_outputs = Self::execute_block_sharded::<V>(
-            transactions.clone(),
-            state_view_arc.clone(),
-            maybe_block_gas_limit,
-        )?;
+        let transaction_outputs = {
+            let _timer = SHARDING_V3_SPAN_SECONDS.with_label_values(&["chunk_output__execution_sharded___main"]).start_timer();
+            Self::execute_block_sharded::<V>(
+                transactions.clone(),
+                state_view_arc.clone(),
+                maybe_block_gas_limit,
+            )?
+        };
 
         // TODO(skedia) add logic to emit counters per shard instead of doing it globally.
 

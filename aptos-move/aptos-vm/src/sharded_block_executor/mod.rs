@@ -22,6 +22,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 use aptos_block_executor::txn_provider::ShardingMsg;
+use aptos_metrics_core::sharding_v3::SHARDING_V3_SPAN_SECONDS;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::state_store::state_key::StateKey;
 use crate::block_executor::AptosTransactionOutput;
@@ -92,15 +93,18 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
         );
         let num_txns = transactions.num_txns();
         let global_idxs = transactions.global_idxs.clone();
-        let (sharded_output, global_output) = self
-            .executor_client
-            .execute_block(
-                state_view,
-                transactions,
-                concurrency_level_per_shard,
-                maybe_block_gas_limit,
-            )?
-            .into_inner();
+        let (sharded_output, global_output) = {
+            let _timer = SHARDING_V3_SPAN_SECONDS.with_label_values(&["sharded_block_executor__main"]).start_timer();
+            self
+                .executor_client
+                .execute_block(
+                    state_view,
+                    transactions,
+                    concurrency_level_per_shard,
+                    maybe_block_gas_limit,
+                )?
+                .into_inner()
+        };
         // wait for all remote executors to send the result back and append them in order by shard id
         trace!("ShardedBlockExecutor Received all results");
         let _aggregation_timer = SHARDED_EXECUTION_RESULT_AGGREGATION_SECONDS.start_timer();

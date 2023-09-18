@@ -41,6 +41,7 @@ use rayon::{prelude::*, ThreadPool};
 use std::{collections::HashMap, sync::Arc};
 use aptos_block_executor::txn_provider::sharded::ShardedTxnProvider;
 use aptos_block_executor::txn_provider::{TxnProviderTrait1, TxnProviderTrait2};
+use aptos_metrics_core::sharding_v3::SHARDING_V3_SPAN_SECONDS;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
@@ -230,7 +231,10 @@ impl BlockAptosVM {
             maybe_block_gas_limit,
             transaction_commit_listener,
         );
-        let ret = executor.execute_block(state_view, txn_provider, state_view);
+        let ret = {
+            let _timer = SHARDING_V3_SPAN_SECONDS.with_label_values(&["block_aptos_vm__invoke__executor"]).start_timer();
+            executor.execute_block(state_view, txn_provider, state_view)
+        };
         match ret {
             Ok(outputs) => {
                 let output_vec: Vec<TransactionOutput> = outputs

@@ -25,6 +25,7 @@ use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::sync::{Arc, Condvar, Mutex};
 use aptos_block_executor::txn_provider::sharded::ShardedTxnProvider;
+use aptos_metrics_core::sharding_v3::SHARDING_V3_SPAN_SECONDS;
 use aptos_types::state_store::state_key::StateKey;
 use crate::counters::BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS;
 use crate::sharded_block_executor::TxnProviderArgs;
@@ -111,14 +112,17 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             following_shard_sets,
         );
 
-        let ret = BlockAptosVM::execute_block(
-            executor_thread_pool,
-            txn_provider,
-            state_view,
-            concurrency_level,
-            maybe_block_gas_limit,
-            cross_shard_commit_sender,
-        );
+        let ret = {
+            let _timer = SHARDING_V3_SPAN_SECONDS.with_label_values(&["sharded_executor_service__block_aptos_vm"]).start_timer();
+            BlockAptosVM::execute_block(
+                executor_thread_pool,
+                txn_provider,
+                state_view,
+                concurrency_level,
+                maybe_block_gas_limit,
+                cross_shard_commit_sender,
+            )
+        };
         ret
     }
 
@@ -148,7 +152,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             self.shard_id,
             round
         );
-        let result =
+        let result = {
+            let _timer = SHARDING_V3_SPAN_SECONDS.with_label_values(&["sharded_executor_service__with_deps"]).start_timer();
             Self::execute_transactions_with_dependencies(
                 Some(self.shard_id),
                 self.executor_thread_pool.clone(),
@@ -159,7 +164,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 state_view,
                 concurrency_level,
                 maybe_block_gas_limit,
-            )?;
+            )?
+        };
         trace!(
                 "Finished executing sub block for shard {} and round {}",
                 self.shard_id,
@@ -188,12 +194,15 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         self.shard_id,
                         txn_provider_args.txns.len(),
                     );
-                    let ret = self.execute_block(
-                        txn_provider_args,
-                        state_view.as_ref(),
-                        concurrency_level_per_shard,
-                        maybe_block_gas_limit,
-                    );
+                    let ret = {
+                        let _timer = SHARDING_V3_SPAN_SECONDS.with_label_values(&["service_msg_loop__handle"]).start_timer();
+                        self.execute_block(
+                            txn_provider_args,
+                            state_view.as_ref(),
+                            concurrency_level_per_shard,
+                            maybe_block_gas_limit,
+                        )
+                    };
                     drop(state_view);
                     self.coordinator_client.send_execution_result(ret);
                 },

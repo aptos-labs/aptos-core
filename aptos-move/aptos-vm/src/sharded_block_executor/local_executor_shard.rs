@@ -16,6 +16,7 @@ use std::{sync::Arc, thread};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::{mpsc, Mutex};
 use aptos_block_executor::txn_provider::sharded::ShardedTxnProvider;
+use aptos_metrics_core::sharding_v3::SHARDING_V3_SPAN_SECONDS;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::state_store::state_key::StateKey;
 
@@ -186,6 +187,8 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
             txs.push(tx);
         }
 
+        let timer = SHARDING_V3_SPAN_SECONDS.with_label_values(&["local_executor_client__main_loop_then_wait"]).start_timer();
+        let timer_2 = SHARDING_V3_SPAN_SECONDS.with_label_values(&["local_executor_client__main_loop"]).start_timer();
         for (shard_id, ((rx, txns), global_idxs)) in rxs.into_iter().zip(sharded_txns.into_iter()).zip(global_idxs.into_iter()).enumerate() {
             let local_idxs_by_global = global_idxs.iter().enumerate().map(|(local_idx, global_idx)| (*global_idx, local_idx)).collect();
 
@@ -226,8 +229,10 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
                 ))
                 .unwrap();
         }
-
+        timer_2.stop_and_record();
         let sharded_output = self.get_output_from_shards()?;
+        timer.stop_and_record();
+
         Ok(ShardedExecutionOutput::new(sharded_output, vec![]))
     }
 }
