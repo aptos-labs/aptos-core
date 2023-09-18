@@ -18,8 +18,10 @@ use aptos_executor_types::{execution_output::ExecutionOutput, ExecutorError, Led
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
-use aptos_storage_interface::DbReader;
+use aptos_state_view::StateViewId;
+use aptos_storage_interface::{async_proof_fetcher::AsyncProofFetcher, DbReader};
 use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
+use aptos_vm::block_executor::reinitiate_warm_vm;
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::{
@@ -216,6 +218,14 @@ impl BlockTree {
         let ledger_info_with_sigs = db.get_latest_ledger_info()?;
         let ledger_info = ledger_info_with_sigs.ledger_info();
         let ledger_view = db.get_latest_executed_trees()?;
+
+        reinitiate_warm_vm(&ledger_view.verified_state_view(
+            StateViewId::BlockExecution {
+                block_id: HashValue::zero(),
+            },
+            db.clone(),
+            Arc::new(AsyncProofFetcher::new(db.clone())),
+        )?);
 
         ensure!(
             ledger_view.version() == Some(ledger_info.version()),

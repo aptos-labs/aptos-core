@@ -6,7 +6,9 @@
 
 use anyhow::{anyhow, Result};
 use aptos_executor_types::ExecutedChunk;
-use aptos_storage_interface::{DbReader, ExecutedTrees};
+use aptos_state_view::StateViewId;
+use aptos_storage_interface::{async_proof_fetcher::AsyncProofFetcher, DbReader, ExecutedTrees};
+use aptos_vm::block_executor::reinitiate_warm_vm;
 use std::{collections::VecDeque, sync::Arc};
 
 pub struct ChunkCommitQueue {
@@ -17,6 +19,11 @@ pub struct ChunkCommitQueue {
 impl ChunkCommitQueue {
     pub fn new_from_db(db: &Arc<dyn DbReader>) -> Result<Self> {
         let persisted_view = db.get_latest_executed_trees()?;
+        reinitiate_warm_vm(&persisted_view.verified_state_view(
+            StateViewId::ChunkExecution { first_version: 0 },
+            db.clone(),
+            Arc::new(AsyncProofFetcher::new(db.clone())),
+        )?);
         Ok(Self::new(persisted_view))
     }
 

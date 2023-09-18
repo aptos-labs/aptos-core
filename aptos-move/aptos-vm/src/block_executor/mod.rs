@@ -39,6 +39,7 @@ use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::{collections::HashMap, sync::Arc};
+pub use vm_wrapper::reinitiate_warm_vm;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;

@@ -1167,6 +1167,7 @@ name = "aptos-executor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-cached-packages",
  "aptos-config",
