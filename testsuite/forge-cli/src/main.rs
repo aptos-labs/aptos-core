@@ -7,7 +7,7 @@
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::{
     BootstrappingMode, ConsensusConfig, ContinuousSyncingMode, MempoolConfig, NodeConfig,
-    QuorumStoreBackPressureConfig, QuorumStoreConfig, StateSyncConfig, StateSyncDriverConfig,
+    StateSyncConfig,
 };
 use aptos_forge::{
     args::TransactionTypeArg,
@@ -598,48 +598,33 @@ fn wrap_with_realistic_env<T: NetworkTest + 'static>(test: T) -> CompositeNetwor
     )
 }
 
-fn mempool_config_practically_non_expiring() -> MempoolConfig {
-    MempoolConfig {
-        capacity: 3_000_000,
-        capacity_bytes: (3_u64 * 1024 * 1024 * 1024) as usize,
-        capacity_per_user: 100_000,
-        system_transaction_timeout_secs: 5 * 60 * 60,
-        system_transaction_gc_interval_ms: 5 * 60 * 60_000,
-        ..Default::default()
-    }
+fn mempool_config_practically_non_expiring(mempool_config: &mut MempoolConfig) {
+    mempool_config.capacity = 3_000_000;
+    mempool_config.capacity_bytes = (3_u64 * 1024 * 1024 * 1024) as usize;
+    mempool_config.capacity_per_user = 100_000;
+    mempool_config.system_transaction_timeout_secs = 5 * 60 * 60;
+    mempool_config.system_transaction_gc_interval_ms = 5 * 60 * 60_000;
 }
 
-fn state_sync_config_execute_transactions() -> StateSyncConfig {
-    StateSyncConfig {
-        state_sync_driver: StateSyncDriverConfig {
-            bootstrapping_mode: BootstrappingMode::ExecuteTransactionsFromGenesis,
-            continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactions,
-            ..Default::default()
-        },
-        ..Default::default()
-    }
+fn state_sync_config_execute_transactions(state_sync_config: &mut StateSyncConfig) {
+    state_sync_config.state_sync_driver.bootstrapping_mode =
+        BootstrappingMode::ExecuteTransactionsFromGenesis;
+    state_sync_config.state_sync_driver.continuous_syncing_mode =
+        ContinuousSyncingMode::ExecuteTransactions;
 }
 
-fn state_sync_config_apply_transaction_outputs() -> StateSyncConfig {
-    StateSyncConfig {
-        state_sync_driver: StateSyncDriverConfig {
-            bootstrapping_mode: BootstrappingMode::ApplyTransactionOutputsFromGenesis,
-            continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
-            ..Default::default()
-        },
-        ..Default::default()
-    }
+fn state_sync_config_apply_transaction_outputs(state_sync_config: &mut StateSyncConfig) {
+    state_sync_config.state_sync_driver.bootstrapping_mode =
+        BootstrappingMode::ApplyTransactionOutputsFromGenesis;
+    state_sync_config.state_sync_driver.continuous_syncing_mode =
+        ContinuousSyncingMode::ApplyTransactionOutputs;
 }
 
-fn state_sync_config_fast_sync() -> StateSyncConfig {
-    StateSyncConfig {
-        state_sync_driver: StateSyncDriverConfig {
-            bootstrapping_mode: BootstrappingMode::DownloadLatestStates,
-            continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
-            ..Default::default()
-        },
-        ..Default::default()
-    }
+fn state_sync_config_fast_sync(state_sync_config: &mut StateSyncConfig) {
+    state_sync_config.state_sync_driver.bootstrapping_mode =
+        BootstrappingMode::DownloadLatestStates;
+    state_sync_config.state_sync_driver.continuous_syncing_mode =
+        ContinuousSyncingMode::ApplyTransactionOutputs;
 }
 
 fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
@@ -661,37 +646,55 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            config.mempool = mempool_config_practically_non_expiring();
-            config.state_sync = state_sync_config_execute_transactions();
-            config.consensus = ConsensusConfig {
-                max_sending_block_txns_quorum_store_override: 30000,
-                max_receiving_block_txns_quorum_store_override: 40000,
-                max_sending_block_bytes_quorum_store_override: 10 * 1024 * 1024,
-                max_receiving_block_bytes_quorum_store_override: 12 * 1024 * 1024,
-                pipeline_backpressure: vec![],
-                chain_health_backoff: vec![],
-                quorum_store: QuorumStoreConfig {
-                    back_pressure: QuorumStoreBackPressureConfig {
-                        backlog_txn_limit_count: 200000,
-                        backlog_per_validator_batch_limit_count: 50,
-                        dynamic_min_txn_per_s: 2000,
-                        dynamic_max_txn_per_s: 8000,
-                        ..Default::default()
-                    },
-                    sender_max_batch_txns: 1000,
-                    sender_max_batch_bytes: 4 * 1024 * 1024,
-                    sender_max_num_batches: 100,
-                    sender_max_total_txns: 4000,
-                    sender_max_total_bytes: 8 * 1024 * 1024,
-                    receiver_max_batch_txns: 1000,
-                    receiver_max_batch_bytes: 4 * 1024 * 1024,
-                    receiver_max_num_batches: 100,
-                    receiver_max_total_txns: 4000,
-                    receiver_max_total_bytes: 8 * 1024 * 1024,
-                    ..Default::default()
-                },
-                ..Default::default()
-            };
+            mempool_config_practically_non_expiring(&mut config.mempool);
+            state_sync_config_execute_transactions(&mut config.state_sync);
+
+            config
+                .consensus
+                .max_sending_block_txns_quorum_store_override = 30000;
+            config
+                .consensus
+                .max_receiving_block_txns_quorum_store_override = 40000;
+            config
+                .consensus
+                .max_sending_block_bytes_quorum_store_override = 10 * 1024 * 1024;
+            config
+                .consensus
+                .max_receiving_block_bytes_quorum_store_override = 12 * 1024 * 1024;
+            config.consensus.pipeline_backpressure = vec![];
+            config.consensus.chain_health_backoff = vec![];
+
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .backlog_txn_limit_count = 200000;
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .backlog_per_validator_batch_limit_count = 50;
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .dynamic_min_txn_per_s = 2000;
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .dynamic_max_txn_per_s = 8000;
+
+            config.consensus.quorum_store.sender_max_batch_txns = 1000;
+            config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
+            config.consensus.quorum_store.sender_max_num_batches = 100;
+            config.consensus.quorum_store.sender_max_total_txns = 4000;
+            config.consensus.quorum_store.sender_max_total_bytes = 8 * 1024 * 1024;
+            config.consensus.quorum_store.receiver_max_batch_txns = 1000;
+            config.consensus.quorum_store.receiver_max_batch_bytes = 4 * 1024 * 1024;
+            config.consensus.quorum_store.receiver_max_num_batches = 100;
+            config.consensus.quorum_store.receiver_max_total_txns = 4000;
+            config.consensus.quorum_store.receiver_max_total_bytes = 8 * 1024 * 1024;
         }))
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
@@ -1362,7 +1365,7 @@ fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
             config.api.failpoints_enabled = true;
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
-            config.state_sync = state_sync_config_execute_transactions();
+            state_sync_config_execute_transactions(&mut config.state_sync);
         }))
         .with_success_criteria(
             SuccessCriteria::new(1000)
@@ -1453,7 +1456,7 @@ fn state_sync_perf_fullnodes_apply_outputs() -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
-            config.state_sync = state_sync_config_apply_transaction_outputs();
+            state_sync_config_apply_transaction_outputs(&mut config.state_sync);
         }))
         .with_success_criteria(SuccessCriteria::new(9000))
 }
@@ -1467,7 +1470,7 @@ fn state_sync_perf_fullnodes_execute_transactions() -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
-            config.state_sync = state_sync_config_execute_transactions();
+            state_sync_config_execute_transactions(&mut config.state_sync);
         }))
         .with_success_criteria(SuccessCriteria::new(5000))
 }
@@ -1488,7 +1491,7 @@ fn state_sync_perf_fullnodes_fast_sync() -> ForgeConfig {
                 .transaction_type(TransactionTypeArg::AccountGeneration.materialize_default()), // Create many state values
         )
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
-            config.state_sync = state_sync_config_fast_sync();
+            state_sync_config_fast_sync(&mut config.state_sync);
         }))
 }
 
@@ -1501,7 +1504,7 @@ fn state_sync_perf_validators() -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            config.state_sync = state_sync_config_apply_transaction_outputs();
+            state_sync_config_apply_transaction_outputs(&mut config.state_sync);
         }))
         .add_network_test(StateSyncValidatorPerformance)
         .with_success_criteria(SuccessCriteria::new(5000))
@@ -1651,23 +1654,31 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             mempool_backlog: 150000,
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            config.consensus = ConsensusConfig {
-                max_sending_block_txns_quorum_store_override: 10000,
-                pipeline_backpressure: vec![],
-                chain_health_backoff: vec![],
-                wait_for_full_blocks_above_recent_fill_threshold: 0.8,
-                wait_for_full_blocks_above_pending_blocks: 8,
-                quorum_store: QuorumStoreConfig {
-                    back_pressure: QuorumStoreBackPressureConfig {
-                        backlog_txn_limit_count: 100000,
-                        backlog_per_validator_batch_limit_count: 10,
-                        dynamic_max_txn_per_s: 6000,
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                },
-                ..Default::default()
-            };
+            config
+                .consensus
+                .max_sending_block_txns_quorum_store_override = 10000;
+            config.consensus.pipeline_backpressure = vec![];
+            config.consensus.chain_health_backoff = vec![];
+            config
+                .consensus
+                .wait_for_full_blocks_above_recent_fill_threshold = 0.8;
+            config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
+
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .backlog_txn_limit_count = 100000;
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .backlog_per_validator_batch_limit_count = 10;
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .dynamic_max_txn_per_s = 6000;
 
             // Experimental storage optimizations
             config.storage.rocksdb_configs.split_ledger_db = true;
@@ -1747,15 +1758,17 @@ fn changing_working_quorum_test_helper(
         .with_validator_override_node_config_fn(Arc::new(move |config, _| {
             config.api.failpoints_enabled = true;
             let block_size = (target_tps / 4) as u64;
-            config.consensus = ConsensusConfig {
-                max_sending_block_txns: block_size,
-                max_sending_block_txns_quorum_store_override: block_size,
-                max_receiving_block_txns_quorum_store_override: block_size,
-                round_initial_timeout_ms: 500,
-                round_timeout_backoff_exponent_base: 1.0,
-                quorum_store_poll_time_ms: 100,
-                ..Default::default()
-            };
+
+            config.consensus.max_sending_block_txns = block_size;
+            config
+                .consensus
+                .max_sending_block_txns_quorum_store_override = block_size;
+            config
+                .consensus
+                .max_receiving_block_txns_quorum_store_override = block_size;
+            config.consensus.round_initial_timeout_ms = 500;
+            config.consensus.round_timeout_backoff_exponent_base = 1.0;
+            config.consensus.quorum_store_poll_time_ms = 100;
 
             let mut min_block_txns = block_size;
             let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;
@@ -1780,14 +1793,14 @@ fn changing_working_quorum_test_helper(
             // Override the syncing mode of all nodes to use transaction output syncing.
             // TODO(joshlind): remove me once we move back to output syncing by default.
             if apply_txn_outputs {
-                config.state_sync = state_sync_config_apply_transaction_outputs();
+                state_sync_config_apply_transaction_outputs(&mut config.state_sync);
             }
         }))
         .with_fullnode_override_node_config_fn(Arc::new(move |config, _| {
             // Override the syncing mode of all nodes to use transaction output syncing.
             // TODO(joshlind): remove me once we move back to output syncing by default.
             if apply_txn_outputs {
-                config.state_sync = state_sync_config_apply_transaction_outputs();
+                state_sync_config_apply_transaction_outputs(&mut config.state_sync);
             }
         }))
         .with_emit_job(
