@@ -7,6 +7,7 @@ use move_bytecode_verifier::VerifierConfig;
 pub const DEFAULT_MAX_VALUE_NEST_DEPTH: u64 = 128;
 
 /// Dynamic config options for the Move VM.
+#[derive(Clone)]
 pub struct VMConfig {
     pub verifier: VerifierConfig,
     pub max_binary_format_version: u32,

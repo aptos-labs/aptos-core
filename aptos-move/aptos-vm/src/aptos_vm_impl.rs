@@ -51,6 +51,7 @@ use std::sync::Arc;
 pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
 
 /// A wrapper to make VMRuntime standalone
+#[derive(Clone)]
 pub struct AptosVMImpl {
     move_vm: MoveVmExt,
     gas_feature_version: u64,

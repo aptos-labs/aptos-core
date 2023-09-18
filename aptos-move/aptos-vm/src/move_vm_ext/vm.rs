@@ -25,6 +25,7 @@ use move_vm_runtime::{
 };
 use std::{ops::Deref, sync::Arc};
 
+#[derive(Clone)]
 pub struct MoveVmExt {
     inner: MoveVM,
     chain_id: u8,

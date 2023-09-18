@@ -47,6 +47,7 @@ type ScriptHash = [u8; 32];
 // A simple cache that offers both a HashMap and a Vector lookup.
 // Values are forced into a `Arc` so they can be used from multiple thread.
 // Access to this cache is always under a `RwLock`.
+#[derive(Clone)]
 struct BinaryCache<K, V> {
     id_map: HashMap<K, usize>,
     binaries: Vec<Arc<V>>,
@@ -81,6 +82,7 @@ where
 // A script cache is a map from the hash value of a script and the `Script` itself.
 // Script are added in the cache once verified and so getting a script out the cache
 // does not require further verification (except for parameters and type parameters)
+#[derive(Clone)]
 struct ScriptCache {
     scripts: BinaryCache<ScriptHash, Script>,
 }
@@ -125,6 +127,7 @@ impl ScriptCache {
 // It holds all Modules, Types and Functions loaded.
 // Types and Functions are pushed globally to the ModuleCache.
 // All accesses to the ModuleCache are under lock (exclusive).
+#[derive(Clone)]
 pub struct ModuleCache {
     modules: BinaryCache<ModuleId, Module>,
     structs: Vec<Arc<StructType>>,
@@ -608,6 +611,20 @@ pub(crate) struct Loader {
     module_cache_hits: RwLock<BTreeSet<ModuleId>>,
 
     vm_config: VMConfig,
+}
+
+impl Clone for Loader {
+    fn clone(&self) -> Self {
+        Self {
+            scripts: RwLock::new(self.scripts.read().clone()),
+            module_cache: RwLock::new(self.module_cache.read().clone()),
+            type_cache: RwLock::new(self.type_cache.read().clone()),
+            natives: self.natives.clone(),
+            invalidated: RwLock::new(*self.invalidated.read()),
+            module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
+            vm_config: self.vm_config.clone(),
+        }
+    }
 }
 
 impl Loader {
@@ -1949,7 +1966,7 @@ impl<'a> Resolver<'a> {
 // more appropriate to execution.
 // When code executes indexes in instructions are resolved against those runtime structure
 // so that any data needed for execution is immediately available
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Module {
     #[allow(dead_code)]
     id: ModuleId,
@@ -2241,6 +2258,7 @@ impl Module {
 // When code executes, indexes in instructions are resolved against runtime structures
 // (rather then "compiled") to make available data needed for execution
 // #[derive(Debug)]
+#[derive(Clone)]
 struct Script {
     // primitive pools
     script: CompiledScript,
@@ -2443,7 +2461,7 @@ impl Script {
 }
 
 // A simple wrapper for the "owner" of the function (Module or Script)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Scope {
     Module(ModuleId),
     Script(ScriptHash),
@@ -2452,6 +2470,7 @@ enum Scope {
 // A runtime function
 // #[derive(Debug)]
 // https://github.com/rust-lang/rust/issues/70263
+#[derive(Clone)]
 pub(crate) struct Function {
     #[allow(unused)]
     file_format_version: u32,
@@ -2646,14 +2665,14 @@ impl Function {
 //
 
 // A function instantiation.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FunctionInstantiation {
     // index to `ModuleCache::functions` global table
     handle: usize,
     instantiation: Vec<Type>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct StructDef {
     // struct field count
     field_count: u16,
@@ -2661,7 +2680,7 @@ struct StructDef {
     idx: CachedStructIndex,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct StructInstantiation {
     // struct field count
     field_count: u16,
@@ -2671,7 +2690,7 @@ struct StructInstantiation {
 }
 
 // A field handle. The offset is the only used information when operating on a field
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FieldHandle {
     offset: usize,
     // `ModuelCache::structs` global table index. It is the generic type.
@@ -2679,7 +2698,7 @@ struct FieldHandle {
 }
 
 // A field instantiation. The offset is the only used information when operating on a field
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FieldInstantiation {
     offset: usize,
     // `ModuelCache::structs` global table index. It is the generic type.
@@ -2692,6 +2711,7 @@ struct FieldInstantiation {
 // Cache for data associated to a Struct, used for de/serialization and more
 //
 
+#[derive(Clone)]
 struct StructInfo {
     struct_tag: Option<(StructTag, u64)>,
     struct_layout: Option<MoveStructLayout>,
@@ -2712,6 +2732,7 @@ impl StructInfo {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct TypeCache {
     structs: HashMap<CachedStructIndex, HashMap<Vec<Type>, StructInfo>>,
 }
