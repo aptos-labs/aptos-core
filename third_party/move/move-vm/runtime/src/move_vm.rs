@@ -16,6 +16,7 @@ use move_core_types::{
 };
 use std::{collections::BTreeSet, sync::Arc};
 
+#[derive(Clone)]
 pub struct MoveVM {
     pub(crate) runtime: VMRuntime,
 }
