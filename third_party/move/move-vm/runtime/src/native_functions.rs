@@ -59,6 +59,7 @@ pub fn make_table_from_iter<S: Into<Box<str>>>(
         .collect()
 }
 
+#[derive(Clone)]
 pub(crate) struct NativeFunctions(
     HashMap<AccountAddress, HashMap<String, HashMap<String, NativeFunction>>>,
 );
