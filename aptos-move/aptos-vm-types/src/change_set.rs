@@ -4,9 +4,9 @@
 use crate::check_change_set::CheckChangeSet;
 use aptos_aggregator::{
     aggregator_change_set::AggregatorChange,
-    aggregator_extension::AggregatorID,
     delta_change_set::{serialize, DeltaOp},
     resolver::{AggregatorReadMode, AggregatorResolver},
+    types::AggregatorID,
 };
 use aptos_types::{
     contract_event::ContractEvent,
