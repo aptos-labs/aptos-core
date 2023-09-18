@@ -53,7 +53,7 @@ The delegation pool owner has the following capabilities:
 
 A node operator is assigned by the pool owner to run the validator node. The operator has the following capabilities:
 
-1. Join or leave the validator set once the delegation pool reaches 1M APT
+1. Join or leave the validator set once the delegation pool reaches the minimum stake amount
 2. Perform validating functions
 3. Change the consensus key and network addresses. The consensus key is used to participate in the validator consensus process, i.e., to vote and propose a block. The operator is allowed to change ("rotate") this key in case this key is compromised.
 
@@ -87,7 +87,7 @@ See [Delegation pool operations](../nodes/validator-node/operator/delegation-poo
 3. [Operator connects to the network using pool address derived in step 2](../nodes/validator-node/operator/connect-to-aptos-network.md)
 4. [Owner initializes the delegation pool and sets operator](../nodes/validator-node/operator/delegation-pool-operations.md#initialize-a-delegation-pool)
 5. Delegators can add stake at any time
-6. When the delegation pool reaches 1M APT, the operator can call aptos node join-validator-set to join the active validator set. Changes will be effective in the next epoch.
+6. When the delegation pool reaches the minimum stake amount, the operator can call aptos node join-validator-set to join the active validator set. Changes will be effective in the next epoch.
 7. Validator validates (proposes blocks as a leader-validator) and gains rewards.  Rewards are distributed to delegators proportionally to stake amount. The stake will automatically be locked up for a fixed duration (set by governance) and automatically renewed at expiration.
 8. At any point, if the operator wants to update the consensus key or validator network addresses, they can call aptos node update-consensus-key or aptos node update-validator-network-addresses. Similar to changes to stake, the changes to consensus key or validator network addresses are only effective in the next epoch.
 9. Delegators can request to unlock their stake at any time. However, their stake will only become withdrawable when the delegation pool lockup expires. 
@@ -100,7 +100,7 @@ Participating as a delegation validator node on the Aptos network works like thi
 
 1. Operator runs a validator node and configures the on-chain validator network addresses and rotates the consensus key.
 2. Owner initializes the delegation pool.
-3. The validator node cannot sync until the delegation pool becomes active. The delegation pool becomes active when it reaches 1M APT. 
+3. The validator node cannot sync until the delegation pool becomes active. The delegation pool becomes active when it reaches the minimum stake amount. 
 4. Operator validates and gains rewards.
 5. The stake pool is automatically locked up for a fixed duration (set by the Aptos governance) and will be automatically renewed at expiration. Commissions are automatically distributed to the operator as rewards. The operator can unlock stake at any time, but cannot withdraw until the delegation pool’s lockup period expires. 
 6. Operator must wait until the new epoch starts before their validator becomes active.
