@@ -13,7 +13,7 @@ use crate::{
     },
     AptosVM,
 };
-use aptos_aggregator::{aggregator_extension::AggregatorID, delta_change_set::DeltaOp};
+use aptos_aggregator::{delta_change_set::DeltaOp, types::AggregatorID};
 use aptos_block_executor::{
     errors::Error,
     executor::BlockExecutor,
