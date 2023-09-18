@@ -5,11 +5,11 @@ use crate::natives::aggregator_natives::{
     helpers_v1::{aggregator_info, unpack_aggregator_struct},
     NativeAggregatorContext,
 };
+use aptos_aggregator::types::AggregatorVersionedID;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
-use aptos_types::aggregator::AggregatorID;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -125,8 +125,8 @@ fn native_destroy(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
 
     // Actually remove the aggregator.
-    let id = AggregatorID::legacy(handle, key);
-    aggregator_data.remove_aggregator(id);
+    let id = AggregatorVersionedID::v1(handle, key);
+    aggregator_data.remove_aggregator_v1(id);
 
     Ok(smallvec![])
 }
