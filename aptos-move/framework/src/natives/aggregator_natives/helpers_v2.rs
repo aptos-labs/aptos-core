@@ -23,7 +23,7 @@ pub(crate) fn aggregator_value_as_u128(
                 .with_message("Aggregator identifier is too small".to_string()),
         );
     }
-    Ok((value as AggregatorID, limit))
+    Ok((AggregatorID::new(value as u64), limit))
 }
 
 /// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
@@ -31,7 +31,7 @@ pub(crate) fn aggregator_value_as_u64(
     aggregator: &StructRef,
 ) -> PartialVMResult<(AggregatorID, u64)> {
     let (value, limit) = get_aggregator_fields_u64(aggregator)?;
-    Ok((value, limit))
+    Ok((AggregatorID::new(value), limit))
 }
 
 /// Given a reference to `Aggregator` Move struct, returns a tuple of its

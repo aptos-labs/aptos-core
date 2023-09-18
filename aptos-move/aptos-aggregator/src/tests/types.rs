@@ -4,13 +4,13 @@
 use crate::{
     delta_change_set::serialize,
     resolver::{AggregatorReadMode, TAggregatorView},
-    types::{AggregatorID, VersionedID},
+    types::{AggregatorID, AggregatorVersionedID},
 };
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
 use std::collections::HashMap;
 
-pub fn aggregator_v1_id_for_test(key: u128) -> VersionedID {
-    VersionedID::V1(aggregator_v1_state_key_for_test(key))
+pub fn aggregator_v1_id_for_test(key: u128) -> AggregatorVersionedID {
+    AggregatorVersionedID::V1(aggregator_v1_state_key_for_test(key))
 }
 
 pub fn aggregator_v1_state_key_for_test(key: u128) -> StateKey {
