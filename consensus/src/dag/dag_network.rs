@@ -17,11 +17,12 @@ use std::{
     time::Duration,
 };
 
+#[async_trait]
 pub trait RpcHandler {
     type Request;
     type Response;
 
-    fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response>;
+    async fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response>;
 }
 
 #[async_trait]

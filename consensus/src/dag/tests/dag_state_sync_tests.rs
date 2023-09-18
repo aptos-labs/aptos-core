@@ -83,6 +83,7 @@ impl TDagFetcher for MockDagFetcher {
     ) -> anyhow::Result<()> {
         let response = FetchRequestHandler::new(self.target_dag.clone(), self.epoch_state.clone())
             .process(remote_request)
+            .await
             .unwrap();
 
         let mut new_dag_writer = new_dag.write();
