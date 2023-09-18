@@ -32,12 +32,13 @@ fn optimize_(start: Label, blocks: &mut BasicBlocks) -> bool {
     inline_single_target_blocks(&single_target_labels, start, blocks)
 }
 
+// Return a list of labels that have just a single branch to them.
+
 fn find_single_target_labels(start: Label, blocks: &BasicBlocks) -> BTreeSet<Label> {
     use Command_ as C;
     let mut counts = BTreeMap::new();
-    // 'start' block starts as one as it is the entry point of the function. In some sense,
-    // there is an implicit "jump" to this label to begin executing the function
-    counts.insert(start, 1);
+    // 'start' block doesn't count as single entry for these purposes.  Give it 2.
+    counts.insert(start, 2);
     for block in blocks.values() {
         match &block.back().unwrap().value {
             C::JumpIf {
@@ -67,14 +68,20 @@ fn inline_single_target_blocks(
 ) -> bool {
     //cleanup of needless_collect would result in mut and non mut borrows, and compilation warning.
     let labels_vec = blocks.keys().cloned().collect::<Vec<_>>();
-    let mut labels = labels_vec.into_iter();
-    let mut next = labels.next();
+    let mut changed = false;
 
+    // all blocks
     let mut working_blocks = std::mem::take(blocks);
     let finished_blocks = blocks;
 
     let mut remapping = BTreeMap::new();
+
+    // Iterate through labels.
+    let mut labels = labels_vec.into_iter();
+    let mut next = labels.next();
     while let Some(cur) = next {
+
+        // temporarily get cur's block for mutability.
         let mut block = match working_blocks.remove(&cur) {
             None => {
                 next = labels.next();
@@ -83,26 +90,55 @@ fn inline_single_target_blocks(
             Some(b) => b,
         };
 
+        // If cur will be merged into another block, skip it for now.
+        if single_jump_targets.contains(&cur) {
+            next = labels.next();
+            finished_blocks.insert(cur, block);
+            continue;
+        }
+
         match block.back().unwrap() {
             // Do not need to worry about infinitely unwrapping loops as loop heads will always
             // be the target of at least 2 jumps: the jump to the loop and the "continue" jump
             // This is always true as long as we start the count for the start label at 1
             sp!(_, Command_::Jump { target, .. }) if single_jump_targets.contains(target) => {
+                // Note that only the last merged block will be left for cur.
                 remapping.insert(cur, *target);
-                let target_block = working_blocks.remove(target).unwrap();
-                block.pop_back();
-                block.extend(target_block);
+                match working_blocks.remove(target) {
+                    Some(target_block) => {
+                        block.pop_back();
+                        block.extend(target_block);
+                    },
+                    None => {
+                        match finished_blocks.remove(target) {
+                            Some(target_block) => {
+                                block.pop_back();
+                                block.extend(target_block);
+                            },
+                            None => {
+                                panic!(
+                                    "ICE: Target {} not found in working_blocks or finished_blocks",
+                                    target
+                                );
+                            },
+                        };
+                    },
+                };
+                changed = true;
+                // put cur's block back into working_blocks, as we will revisit it on next iter.
                 working_blocks.insert(cur, block);
+                // Note that target block is droppped.
             },
             _ => {
-                finished_blocks.insert(cur, block);
                 next = labels.next();
+                finished_blocks.insert(cur, block);
             },
         }
     }
 
-    let changed = !remapping.is_empty();
-    remap_to_last_target(remapping, start, finished_blocks);
+
+    // let changed = !remapping.is_empty();
+    remap_to_last_target(remapping, start, &mut working_blocks);
     changed
 }
 
