@@ -80,7 +80,6 @@ fn inline_single_target_blocks(
     let mut labels = labels_vec.into_iter();
     let mut next = labels.next();
     while let Some(cur) = next {
-
         // temporarily get cur's block for mutability.
         let mut block = match working_blocks.remove(&cur) {
             None => {
@@ -135,7 +134,6 @@ fn inline_single_target_blocks(
             },
         }
     }
-
 
     // let changed = !remapping.is_empty();
     remap_to_last_target(remapping, start, &mut working_blocks);
