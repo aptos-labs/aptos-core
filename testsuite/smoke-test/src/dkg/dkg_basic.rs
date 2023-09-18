@@ -1,13 +1,10 @@
 // Copyright © Aptos Foundation
 
-use crate::{
-    dkg::{get_latest_dkg_state, wait_for_epoch_fully_entered},
-    smoke_test_environment::SwarmBuilder,
-};
+use crate::{dkg::wait_for_epoch_fully_entered, smoke_test_environment::SwarmBuilder};
 use aptos_consensus::dkg::build_dkg_pvss_config;
 use aptos_forge::NodeExt;
 use aptos_types::{dkg::DKGTranscriptWrapper, validator_verifier::ValidatorVerifier};
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 #[tokio::test]
 async fn dkg_basic() {

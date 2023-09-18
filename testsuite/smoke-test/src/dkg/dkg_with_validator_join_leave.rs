@@ -2,14 +2,11 @@
 
 use crate::{dkg, smoke_test_environment::SwarmBuilder};
 use aptos::test::CliTestFramework;
-use aptos_consensus::dkg::build_dkg_pvss_config;
-use aptos_forge::{Node, NodeExt, Swarm};
-use aptos_rest_client::Client;
-use aptos_types::{dkg::DKGTranscriptWrapper, validator_verifier::ValidatorVerifier};
-use std::{collections::HashSet, sync::Arc};
+use aptos_forge::{Node, Swarm};
+use std::sync::Arc;
 
 #[tokio::test]
-async fn dkg_with_validator_set_change() {
+async fn dkg_with_validator_join_leave() {
     let epoch_duration_secs = 30;
     let estimated_dkg_latency_secs = 40;
     let time_limit_secs = epoch_duration_secs + estimated_dkg_latency_secs;
@@ -18,23 +15,26 @@ async fn dkg_with_validator_set_change() {
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {
             conf.epoch_duration_secs = epoch_duration_secs;
+            conf.allow_new_validators = true;
         }))
         .build()
         .await;
 
     println!("Wait for a moment when DKG is not running.");
-    let client: Client = swarm.validators().next().unwrap().rest_client();
+    let client_endpoint = swarm
+        .validators()
+        .skip(1)
+        .next()
+        .unwrap()
+        .rest_api_endpoint();
+    let client = aptos_rest_client::Client::new(client_endpoint.clone());
     let dkg_state_1 = dkg::wait_for_epoch_fully_entered(&client, None, time_limit_secs).await;
     println!(
         "Current epoch is {}. Number of validators: {}.",
         dkg_state_1.target_epoch,
-        dkg_state_1
-            .validator_set
-            .as_ref()
-            .unwrap()
-            .active_validators
-            .len()
+        dkg::num_validators(&dkg_state_1)
     );
+
     println!(
         "Wait until we fully entered epoch {}.",
         dkg_state_1.target_epoch + 1
@@ -45,32 +45,15 @@ async fn dkg_with_validator_set_change() {
         time_limit_secs,
     )
     .await;
-    let num_validators_in_epoch_2 = dkg_state_2
-        .validator_set
-        .as_ref()
-        .unwrap()
-        .active_validators
-        .len();
+
     println!(
         "Current epoch is {}. Number of validators: {}.",
-        dkg_state_2.target_epoch, num_validators_in_epoch_2
+        dkg_state_2.target_epoch,
+        dkg::num_validators(&dkg_state_2)
     );
-    let dkg_addr_set = dkg_state_2
-        .validator_set
-        .as_ref()
-        .unwrap()
-        .active_validators
-        .iter()
-        .map(|v| v.account_address)
-        .collect::<HashSet<_>>();
-    let swarm_addr_set = swarm
-        .validators()
-        .map(|v| v.peer_id())
-        .collect::<HashSet<_>>();
-    assert_eq!(dkg_addr_set, swarm_addr_set);
 
     println!("Letting one of the validators leave.");
-    let (victim_validator_sk, victim_validator_addr, victim_validator_endpoint) = {
+    let (victim_validator_sk, victim_validator_addr) = {
         let victim_validator = swarm.validators().next().unwrap();
         let sk = victim_validator
             .account_private_key()
@@ -78,11 +61,10 @@ async fn dkg_with_validator_set_change() {
             .unwrap()
             .private_key();
         let addr = victim_validator.peer_id();
-        let endpoint = victim_validator.rest_api_endpoint();
-        (sk, addr, endpoint)
+        (sk, addr)
     };
 
-    println!("Give the victim some money so it can at least request to leave.");
+    println!("Give the victim some money so it can first send transactions.");
     let mut public_info = swarm.chain_info().into_aptos_public_info();
     public_info
         .mint(victim_validator_addr, 1000000000000)
@@ -92,7 +74,7 @@ async fn dkg_with_validator_set_change() {
     println!("Send the txn to request leave.");
     let faucet_endpoint: reqwest::Url = "http://localhost:8081".parse().unwrap();
     let mut cli = CliTestFramework::new(
-        victim_validator_endpoint,
+        client_endpoint,
         faucet_endpoint,
         /*num_cli_accounts=*/ 0,
     )
@@ -111,27 +93,42 @@ async fn dkg_with_validator_set_change() {
         time_limit_secs,
     )
     .await;
-    let num_validators_in_epoch_3 = dkg_state_3
-        .validator_set
-        .as_ref()
-        .unwrap()
-        .active_validators
-        .len();
+
     println!(
         "Current epoch is {}. Number of validators: {}.",
-        dkg_state_3.target_epoch, num_validators_in_epoch_3
+        dkg_state_3.target_epoch,
+        dkg::num_validators(&dkg_state_3)
     );
-    assert_eq!(num_validators_in_epoch_3, num_validators_in_epoch_2 - 1);
+
+    assert!(dkg::verify_dkg_transcript(&dkg_state_2, &dkg_state_3));
+    assert_eq!(
+        dkg::num_validators(&dkg_state_3),
+        dkg::num_validators(&dkg_state_2) - 1
+    );
+
+    println!("Now re-join.");
+    let txn_result = cli.join_validator_set(idx, None).await;
+    println!("Txn result: {:?}", txn_result);
     println!(
-        "Verifying the transcript generated for epoch {} by epoch {}.",
-        dkg_state_3.target_epoch, dkg_state_2.target_epoch
+        "Wait until we fully entered epoch {}.",
+        dkg_state_3.target_epoch + 1
     );
-    let verifier = ValidatorVerifier::from(dkg_state_2.validator_set.as_ref().unwrap());
-    let (_, pvss_config) = build_dkg_pvss_config(
-        dkg_state_2.target_epoch,
-        dkg_state_3.validator_set.as_ref().unwrap(),
+    let dkg_state_4 = dkg::wait_for_epoch_fully_entered(
+        &client,
+        Some(dkg_state_3.target_epoch + 1),
+        time_limit_secs,
+    )
+    .await;
+
+    println!(
+        "Current epoch is {}. Number of validators: {}.",
+        dkg_state_4.target_epoch,
+        dkg::num_validators(&dkg_state_4)
     );
-    let trxs: DKGTranscriptWrapper =
-        bcs::from_bytes(dkg_state_3.serialized_transcript.as_slice()).unwrap();
-    assert!(trxs.verify(&pvss_config, &verifier).is_ok());
+
+    assert!(dkg::verify_dkg_transcript(&dkg_state_3, &dkg_state_4));
+    assert_eq!(
+        dkg::num_validators(&dkg_state_4),
+        dkg::num_validators(&dkg_state_3) + 1
+    );
 }

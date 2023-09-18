@@ -1174,7 +1174,7 @@ module aptos_framework::stake {
             let candidate = if (candidate_idx < num_cur_actives) {
                 vector::borrow(&cur_validator_set.active_validators, candidate_idx)
             } else {
-                vector::borrow(&cur_validator_set.pending_active, candidate_idx)
+                vector::borrow(&cur_validator_set.pending_active, candidate_idx - num_cur_actives)
             };
             let stake_pool = borrow_global<StakePool>(candidate.addr);
             let cur_active = coin::value(&stake_pool.active);
