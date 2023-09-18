@@ -248,7 +248,9 @@ pub fn encode_genesis_change_set(
         initialize_aptos_coin(&mut session);
     }
     initialize_on_chain_governance(&mut session, genesis_config);
-    create_accounts(&mut session, accounts);
+    for account in accounts {
+        create_account(&mut session, account);
+    }
     create_and_initialize_validators(&mut session, validators);
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
@@ -531,6 +533,20 @@ fn create_accounts(session: &mut SessionExt, accounts: &[AccountBalance]) {
         "create_accounts",
         vec![],
         serialized_values,
+    );
+}
+
+fn create_account(session: &mut SessionExt, account: &AccountBalance) {
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "create_account",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            MoveValue::Address(account.account_address),
+            MoveValue::U64(account.balance),
+        ]),
     );
 }
 
