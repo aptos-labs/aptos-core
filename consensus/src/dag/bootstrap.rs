@@ -4,7 +4,7 @@ use super::{
     adapter::Notifier,
     anchor_election::RoundRobinAnchorElection,
     dag_driver::DagDriver,
-    dag_fetcher::{DagFetcherService, FetchRequestHandler},
+    dag_fetcher::{DagFetcher, DagFetcherService, FetchRequestHandler},
     dag_handler::NetworkHandler,
     dag_network::TDAGNetworkSender,
     dag_state_sync::{DagStateSynchronizer, StateSyncTrigger, DAG_WINDOW},
@@ -15,7 +15,7 @@ use super::{
     types::{CertifiedNodeMessage, DAGMessage},
 };
 use crate::{
-    dag::{adapter::NotifierAdapter, dag_fetcher::DagFetcher},
+    dag::{adapter::NotifierAdapter, dag_state_sync::StateSyncStatus},
     experimental::buffer_manager::OrderedBlocks,
     network::IncomingDAGRequest,
     state_replication::{PayloadClient, StateComputer},
@@ -175,15 +175,8 @@ impl DagBootstrapper {
         ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
         mut shutdown_rx: oneshot::Receiver<()>,
     ) {
-        let adapter = Arc::new(NotifierAdapter::new(
-            ordered_nodes_tx,
-            self.storage.clone(),
-            self.epoch_state.clone(),
-        ));
-
         let sync_manager = DagStateSynchronizer::new(
             self.epoch_state.clone(),
-            adapter.clone(),
             self.time_service.clone(),
             self.state_computer.clone(),
             self.storage.clone(),
@@ -196,10 +189,15 @@ impl DagBootstrapper {
         );
 
         loop {
+            let adapter = Arc::new(NotifierAdapter::new(
+                ordered_nodes_tx.clone(),
+                self.storage.clone(),
+            ));
+
             let (dag_store, order_rule) =
                 self.bootstrap_dag_store(ledger_info.ledger_info().clone(), adapter.clone());
 
-            let state_sync_trigger = StateSyncTrigger::new(dag_store.clone(), adapter.clone());
+            let state_sync_trigger = StateSyncTrigger::new(dag_store.clone(), adapter);
 
             let (handler, fetch_service) =
                 self.bootstrap_components(dag_store.clone(), order_rule, state_sync_trigger);
@@ -214,15 +212,27 @@ impl DagBootstrapper {
                     let _ = df_handle.await;
                     return;
                 },
-                certified_node_msg = handler.run(&mut dag_rpc_rx) => {
+                sync_status = handler.run(&mut dag_rpc_rx) => {
                     df_handle.abort();
                     let _ = df_handle.await;
 
-                    let dag_fetcher = DagFetcher::new(self.epoch_state.clone(), self.dag_network_sender.clone(), self.time_service.clone());
+                    match sync_status {
+                        StateSyncStatus::NeedsSync(certified_node_msg) => {
+                            let dag_fetcher = DagFetcher::new(self.epoch_state.clone(), self.dag_network_sender.clone(), self.time_service.clone());
 
-                    if let Err(e) = sync_manager.sync_dag_to(&certified_node_msg, dag_fetcher, dag_store.clone()).await {
-                        error!(error = ?e, "unable to sync");
+                            if let Err(e) = sync_manager.sync_dag_to(&certified_node_msg, dag_fetcher, dag_store.clone()).await {
+                                error!(error = ?e, "unable to sync");
+                            }
+                        },
+                        StateSyncStatus::EpochEnds => {
+                            // Wait for epoch manager to signal shutdown
+                            _ = shutdown_rx.await;
+                            return;
+                        },
+                        _ => unreachable!()
                     }
+
+
                 }
             }
         }
@@ -241,7 +251,7 @@ pub(super) fn bootstrap_dag_for_test(
     payload_client: Arc<dyn PayloadClient>,
     state_computer: Arc<dyn StateComputer>,
 ) -> (
-    JoinHandle<CertifiedNodeMessage>,
+    JoinHandle<StateSyncStatus>,
     JoinHandle<()>,
     aptos_channel::Sender<Author, IncomingDAGRequest>,
     UnboundedReceiver<OrderedBlocks>,

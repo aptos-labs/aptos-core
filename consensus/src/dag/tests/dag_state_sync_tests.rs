@@ -116,11 +116,9 @@ impl Notifier for MockNotifier {
 fn setup(epoch_state: Arc<EpochState>, storage: Arc<dyn DAGStorage>) -> DagStateSynchronizer {
     let time_service = TimeService::mock();
     let state_computer = Arc::new(EmptyStateComputer {});
-    let downstream_notifier = Arc::new(MockNotifier {});
 
     DagStateSynchronizer::new(
         epoch_state,
-        downstream_notifier,
         time_service,
         state_computer,
         storage,

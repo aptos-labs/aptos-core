@@ -23,38 +23,47 @@ use std::sync::Arc;
 pub const DAG_WINDOW: usize = 1;
 pub const STATE_SYNC_WINDOW_MULTIPLIER: usize = 30;
 
-pub(super) enum StateSyncStatus {
+pub enum StateSyncStatus {
     NeedsSync(CertifiedNodeMessage),
-    Synced,
+    Synced(Option<CertifiedNodeMessage>),
+    EpochEnds,
 }
 
 pub(super) struct StateSyncTrigger {
     dag_store: Arc<RwLock<Dag>>,
-    downstream_notifier: Arc<dyn Notifier>,
+    proof_notifier: Arc<dyn Notifier>,
 }
 
 impl StateSyncTrigger {
-    pub(super) fn new(dag_store: Arc<RwLock<Dag>>, downstream_notifier: Arc<dyn Notifier>) -> Self {
+    pub(super) fn new(dag_store: Arc<RwLock<Dag>>, proof_notifier: Arc<dyn Notifier>) -> Self {
         Self {
             dag_store,
-            downstream_notifier,
+            proof_notifier,
         }
     }
 
     /// This method checks if a state sync is required, and if so,
     /// notifies the bootstraper, to let the bootstraper can abort this task.
-    pub(super) async fn check(
-        &self,
-        node: CertifiedNodeMessage,
-    ) -> (StateSyncStatus, Option<CertifiedNodeMessage>) {
+    pub(super) async fn check(&self, node: CertifiedNodeMessage) -> StateSyncStatus {
         let ledger_info = node.ledger_info();
 
         self.notify_commit_proof(ledger_info).await;
 
-        if self.need_sync_for_ledger_info(ledger_info) {
-            return (StateSyncStatus::NeedsSync(node), None);
+        if !self.need_sync_for_ledger_info(ledger_info) {
+            return StateSyncStatus::Synced(Some(node));
         }
-        (StateSyncStatus::Synced, Some(node))
+
+        if ledger_info.ledger_info().ends_epoch() {
+            self.proof_notifier
+                .send_epoch_change(EpochChangeProof::new(
+                    vec![ledger_info.clone()],
+                    /* more = */ false,
+                ))
+                .await;
+            return StateSyncStatus::EpochEnds;
+        }
+
+        StateSyncStatus::NeedsSync(node)
     }
 
     /// Fast forward in the decoupled-execution pipeline if the block exists there
@@ -70,7 +79,7 @@ impl StateSyncTrigger {
                 .unwrap_or_default()
                 >= ledger_info.commit_info().round()
         {
-            self.downstream_notifier
+            self.proof_notifier
                 .send_commit_proof(ledger_info.clone())
                 .await
         }
@@ -96,7 +105,6 @@ impl StateSyncTrigger {
 
 pub(super) struct DagStateSynchronizer {
     epoch_state: Arc<EpochState>,
-    notifier: Arc<dyn Notifier>,
     time_service: TimeService,
     state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn DAGStorage>,
@@ -105,14 +113,12 @@ pub(super) struct DagStateSynchronizer {
 impl DagStateSynchronizer {
     pub fn new(
         epoch_state: Arc<EpochState>,
-        notifier: Arc<dyn Notifier>,
         time_service: TimeService,
         state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn DAGStorage>,
     ) -> Self {
         Self {
             epoch_state,
-            notifier,
             time_service,
             state_computer,
             storage,
@@ -139,17 +145,6 @@ impl DagStateSynchronizer {
                         + ((STATE_SYNC_WINDOW_MULTIPLIER * DAG_WINDOW) as Round)
                         < commit_li.commit_info().round()
             );
-        }
-
-        if commit_li.ledger_info().ends_epoch() {
-            self.notifier
-                .send_epoch_change(EpochChangeProof::new(
-                    vec![commit_li.clone()],
-                    /* more = */ false,
-                ))
-                .await;
-            // TODO: make sure to terminate DAG and yield to epoch manager
-            return Ok(None);
         }
 
         // TODO: there is a case where DAG fetches missing nodes in window and a crash happens and when we restart,
@@ -192,8 +187,6 @@ impl DagStateSynchronizer {
 
         // State sync
         self.state_computer.sync_to(commit_li.clone()).await?;
-
-        // TODO: the caller should rebootstrap the order rule
 
         Ok(Arc::into_inner(sync_dag_store).map(|r| r.into_inner()))
     }

@@ -2,7 +2,10 @@
 
 use super::dag_test;
 use crate::{
-    dag::{bootstrap::bootstrap_dag_for_test, types::CertifiedNodeMessage},
+    dag::{
+        bootstrap::bootstrap_dag_for_test, dag_state_sync::StateSyncStatus,
+        types::CertifiedNodeMessage,
+    },
     experimental::buffer_manager::OrderedBlocks,
     network::{IncomingDAGRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
@@ -41,7 +44,7 @@ use std::sync::Arc;
 use tokio::task::JoinHandle;
 
 struct DagBootstrapUnit {
-    nh_task_handle: JoinHandle<CertifiedNodeMessage>,
+    nh_task_handle: JoinHandle<StateSyncStatus>,
     df_task_handle: JoinHandle<()>,
     dag_rpc_tx: aptos_channel::Sender<Author, IncomingDAGRequest>,
     network_events:
