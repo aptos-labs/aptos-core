@@ -194,8 +194,11 @@ impl<'a> BlockCFG<'a> {
     }
 
     /// Adds a block on any critical edge: an edge from a node with multiple successors to
-    /// a node with multiple predecessors.  Returns true if any changes occur; in this
-    /// case, caller must call recompute().
+    /// a node with multiple predecessors.
+    /// (See https://en.wikipedia.org/wiki/Control-flow_graph#Special_edges)
+    ///
+    /// Returns true if any changes occur; in this
+    /// case, caller must call BlockCFG::recompute() to update successor/predecessor maps.
     pub fn remove_critical_edges<Ftype>(&mut self, mut make_label: Ftype) -> bool
     where
         Ftype: FnMut() -> Label,
@@ -215,16 +218,17 @@ impl<'a> BlockCFG<'a> {
                     .map(|lbl2| (*lbl, *lbl2))
             })
             .collect();
-        for (pred, succ) in &critical_edges {
+        let had_critical_edges = !critical_edges.is_empty();
+        for (pred, succ) in critical_edges {
             let new_label = make_label();
-            self.add_edge(*pred, *succ, new_label);
+            self.split_edge(pred, succ, new_label);
         }
-        !critical_edges.is_empty()
+        had_critical_edges
     }
 
     // cmd_ must be a jump or conditional jump with a from_label target.
     // The label is replaced by to_label.
-    fn remap_target(from_label: Label, to_label: Label, sp!(_, cmd_): &mut Command) {
+    fn remap_jump_target(from_label: Label, to_label: Label, sp!(_, cmd_): &mut Command) {
         match cmd_ {
             Command_::Jump { target, .. } if *target == from_label => {
                 *target = to_label;
@@ -236,18 +240,19 @@ impl<'a> BlockCFG<'a> {
                 *if_false = to_label;
             },
             _ => {
-                panic!("ICE: jump not found to remap label {}", from_label);
+                panic!("ICE: remap_jump_target called on command {:?} which is not a branch to from_label {:?}",
+                       cmd_, from_label);
             },
         }
     }
 
-    // Helper inserts an edge, but doesn't update maps.  Caller must should ensure that recompute()
-    // is called at some point.  new_label must be a new unique Label.
-    fn add_edge(&mut self, pred: Label, succ: Label, new_label: Label) {
+    // Helper inserts a node on the edge, but doesn't update maps.  Caller must ensure that
+    // recompute() is called at some point.  new_label must be a new unique Label.
+    fn split_edge(&mut self, pred: Label, succ: Label, new_label: Label) {
         let loc = {
             let from_block = self.block_mut(pred);
             let branch_cmd = from_block.back_mut().unwrap();
-            Self::remap_target(succ, new_label, branch_cmd);
+            Self::remap_jump_target(succ, new_label, branch_cmd);
             branch_cmd.loc
         };
 

@@ -13,7 +13,7 @@ module 0xcafe::vectors {
             i = i + 1;
         };
         let _v = copy flips; // this is ok
-        // this will fail, a UNKNOWN_INVARIANT_VIOLATION_ERROR (code 2000)
+        // this used to fail with an UNKNOWN_INVARIANT_VIOLATION_ERROR (code 2000)
         let _v2 =  flips;
     }
 
@@ -68,7 +68,7 @@ module 0xcafe::vectors {
             };
         };
         let _v = copy flips; // this is ok
-        // this will fail, a UNKNOWN_INVARIANT_VIOLATION_ERROR (code 2000)
+        // this used to fail with an UNKNOWN_INVARIANT_VIOLATION_ERROR (code 2000)
         let _v2 =  flips;
     }
 
