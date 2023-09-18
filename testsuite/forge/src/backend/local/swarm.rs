@@ -213,7 +213,7 @@ impl LocalSwarm {
                         .expect("Validator should have a public network");
                     validator_config.full_node_networks.remove(i)
                 };
-
+                validator_config.set_data_dir(validator.base_dir());
                 *validator.config_mut() = validator_config.clone();
                 // Since the validator's config has changed we need to save it
                 validator_override_config.save_config(validator.config_path())?;
