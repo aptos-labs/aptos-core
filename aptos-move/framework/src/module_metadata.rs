@@ -23,7 +23,7 @@ use move_core_types::{
 };
 use move_vm_runtime::move_vm::MoveVM;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, env};
+use std::{cell::RefCell, collections::BTreeMap, env, sync::Arc};
 use thiserror::Error;
 
 /// The minimal file format version from which the V1 metadata is supported
@@ -148,31 +148,62 @@ impl KnownAttribute {
     }
 }
 
+thread_local! {
+    static V1_METADATA_CACHE: RefCell<BTreeMap<Vec<u8>, Option<Arc<RuntimeModuleMetadataV1>>>> = RefCell::new(BTreeMap::new());
+
+    static V0_METADATA_CACHE: RefCell<BTreeMap<Vec<u8>, Option<Arc<RuntimeModuleMetadataV1>>>> = RefCell::new(BTreeMap::new());
+}
+
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
-pub fn get_metadata(md: &[Metadata]) -> Option<RuntimeModuleMetadataV1> {
+pub fn get_metadata(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> {
     if let Some(data) = md.iter().find(|md| md.key == APTOS_METADATA_KEY_V1) {
-        bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value).ok()
+        V1_METADATA_CACHE.with(|cache| {
+            let mut map = cache.borrow_mut();
+            if let Some(meta) = map.get(&data.value) {
+                meta.clone()
+            } else {
+                let meta = bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value)
+                    .ok()
+                    .map(Arc::new);
+                map.insert(data.value.clone(), meta.clone());
+                meta
+            }
+        })
     } else {
         get_metadata_v0(md)
     }
 }
 
-pub fn get_metadata_v0(md: &[Metadata]) -> Option<RuntimeModuleMetadataV1> {
+pub fn get_metadata_v0(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> {
     if let Some(data) = md.iter().find(|md| md.key == APTOS_METADATA_KEY) {
-        let data_v0 = bcs::from_bytes::<RuntimeModuleMetadata>(&data.value).ok()?;
-        Some(data_v0.upgrade())
+        V0_METADATA_CACHE.with(|cache| {
+            let mut map = cache.borrow_mut();
+            if let Some(meta) = map.get(&data.value) {
+                meta.clone()
+            } else {
+                let meta = bcs::from_bytes::<RuntimeModuleMetadata>(&data.value)
+                    .ok()
+                    .map(RuntimeModuleMetadata::upgrade)
+                    .map(Arc::new);
+                map.insert(data.value.clone(), meta.clone());
+                meta
+            }
+        })
     } else {
         None
     }
 }
 
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
-pub fn get_vm_metadata(vm: &MoveVM, module_id: &ModuleId) -> Option<RuntimeModuleMetadataV1> {
+pub fn get_vm_metadata(vm: &MoveVM, module_id: &ModuleId) -> Option<Arc<RuntimeModuleMetadataV1>> {
     vm.with_module_metadata(module_id, get_metadata)
 }
 
 /// Extract metadata from the VM, legacy V0 format upgraded to V1
-pub fn get_vm_metadata_v0(vm: &MoveVM, module_id: &ModuleId) -> Option<RuntimeModuleMetadataV1> {
+pub fn get_vm_metadata_v0(
+    vm: &MoveVM,
+    module_id: &ModuleId,
+) -> Option<Arc<RuntimeModuleMetadataV1>> {
     vm.with_module_metadata(module_id, get_metadata_v0)
 }
 
