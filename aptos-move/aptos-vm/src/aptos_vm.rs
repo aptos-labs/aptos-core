@@ -104,6 +104,7 @@ pub fn allow_module_bundle_for_test() {
     MODULE_BUNDLE_DISALLOWED.store(false, Ordering::Relaxed);
 }
 
+#[derive(Clone)]
 pub struct AptosVM(pub(crate) AptosVMImpl);
 
 struct AptosSimulationVM(AptosVM);

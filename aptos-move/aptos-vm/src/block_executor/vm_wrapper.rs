@@ -10,6 +10,7 @@ use crate::{
     storage_adapter::AsExecutorView,
 };
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
+use aptos_infallible::RwLock;
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
@@ -26,6 +27,35 @@ use move_core_types::{
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::VMStatus,
 };
+use once_cell::sync::Lazy;
+use std::sync::Arc;
+
+static WARM_VM: Lazy<Arc<RwLock<Option<AptosVM>>>> = Lazy::new(|| Arc::new(RwLock::new(None)));
+
+fn initiate_vm<S: StateView>(state_view: &S) -> AptosVM {
+    // AptosVM has to be initialized using configs from storage.
+    let vm = AptosVM::new_from_state_view(&state_view);
+
+    // Loading `0x1::account` and its transitive dependency into the code cache.
+    //
+    // This should give us a warm VM to avoid the overhead of VM cold start.
+    // Result of this load could be omitted as this is a best effort approach and won't hurt if that fails.
+    //
+    // Loading up `0x1::account` should be sufficient as this is the most common module
+    // used for prologue, epilogue and transfer functionality.
+
+    let executor_view = state_view.as_executor_view();
+    let _ = vm.load_module(
+        &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
+        &vm.as_move_resolver(&executor_view),
+    );
+    vm
+}
+
+pub fn reinitiate_warm_vm<S: StateView>(state_view: &S) {
+    let vm = initiate_vm(state_view);
+    WARM_VM.write().replace(vm);
+}
 
 pub(crate) struct AptosExecutorTask<'a, S> {
     vm: AptosVM,
@@ -39,22 +69,10 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     type Txn = PreprocessedTransaction;
 
     fn init(argument: &'a S) -> Self {
-        // AptosVM has to be initialized using configs from storage.
-        let vm = AptosVM::new_from_state_view(&argument);
-
-        // Loading `0x1::account` and its transitive dependency into the code cache.
-        //
-        // This should give us a warm VM to avoid the overhead of VM cold start.
-        // Result of this load could be omitted as this is a best effort approach and won't hurt if that fails.
-        //
-        // Loading up `0x1::account` should be sufficient as this is the most common module
-        // used for prologue, epilogue and transfer functionality.
-
-        let executor_view = argument.as_executor_view();
-        let _ = vm.load_module(
-            &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            &vm.as_move_resolver(&executor_view),
-        );
+        let vm = WARM_VM
+            .read()
+            .clone()
+            .unwrap_or_else(|| initiate_vm(argument));
 
         Self {
             vm,
