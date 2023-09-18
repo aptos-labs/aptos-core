@@ -329,7 +329,6 @@ impl Drop for RocksdbPropertyReporter {
 /// access to the core Aptos data structures.
 pub struct AptosDB {
     ledger_db: Arc<LedgerDb>,
-    state_merkle_db: Arc<StateMerkleDb>,
     state_kv_db: Arc<StateKvDb>,
     pub(crate) event_store: Arc<EventStore>,
     pub(crate) ledger_store: Arc<LedgerStore>,
@@ -384,7 +383,6 @@ impl AptosDB {
 
         AptosDB {
             ledger_db: Arc::clone(&ledger_db),
-            state_merkle_db: Arc::clone(&state_merkle_db),
             state_kv_db: Arc::clone(&state_kv_db),
             event_store: Arc::new(EventStore::new(ledger_db.event_db_arc())),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&ledger_db))),
@@ -652,6 +650,11 @@ impl AptosDB {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn buffered_state(&self) -> &Mutex<BufferedState> {
         self.state_store.buffered_state()
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    fn state_merkle_db(&self) -> Arc<StateMerkleDb> {
+        self.state_store.state_db.state_merkle_db.clone()
     }
 
     /// Returns ledger infos reflecting epoch bumps starting with the given epoch. If there are no
