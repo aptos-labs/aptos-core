@@ -450,5 +450,5 @@ impl PersistentLivenessStorage for StorageWriteProxy {
 
     fn consensus_db(&self) -> Arc<ConsensusDB> {
         self.db.clone()
-    }    
+    }
 }
