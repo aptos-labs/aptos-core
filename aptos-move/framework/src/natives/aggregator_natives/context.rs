@@ -4,11 +4,13 @@
 use aptos_aggregator::{
     aggregator_change_set::AggregatorChange,
     aggregator_extension::{
-        AggregatorData, AggregatorID, AggregatorSnapshotState, AggregatorState, SnapshotValue,
+        AggregatorData, AggregatorSnapshotState, AggregatorState, SnapshotValue,
     },
     delta_change_set::DeltaOp,
     resolver::AggregatorResolver,
+    types::{AggregatorID, AggregatorVersionedID},
 };
+use aptos_types::state_store::state_key::StateKey;
 use better_any::{Tid, TidAble};
 use std::{cell::RefCell, collections::HashMap};
 
@@ -27,7 +29,7 @@ pub enum AggregatorChangeV1 {
 /// set can be converted into appropriate `WriteSet` and `DeltaChangeSet` by the
 /// user, e.g. VM session.
 pub struct AggregatorChangeSet {
-    pub aggregator_v1_changes: HashMap<AggregatorID, AggregatorChangeV1>,
+    pub aggregator_v1_changes: HashMap<StateKey, AggregatorChangeV1>,
     pub aggregator_v2_changes: HashMap<AggregatorID, AggregatorChange>,
 }
 
@@ -73,7 +75,17 @@ impl<'a> NativeAggregatorContext<'a> {
         for (id, aggregator) in aggregators {
             let (max_value, state) = aggregator.into();
             match id {
-                AggregatorID::Ephemeral(_) => {
+                AggregatorVersionedID::V1(state_key) => {
+                    let change = match state {
+                        AggregatorState::Data { value } => AggregatorChangeV1::Write(value),
+                        AggregatorState::Delta { delta, history, .. } => {
+                            let delta_op = DeltaOp::new(delta, max_value, history);
+                            AggregatorChangeV1::Merge(delta_op)
+                        },
+                    };
+                    aggregator_v1_changes.insert(state_key, change);
+                },
+                AggregatorVersionedID::V2(id) => {
                     let change = match state {
                         AggregatorState::Data { value } => AggregatorChange::Data { value },
                         // TODO - read creates a change, remove it?
@@ -86,16 +98,6 @@ impl<'a> NativeAggregatorContext<'a> {
                         },
                     };
                     aggregator_v2_changes.insert(id, change);
-                },
-                AggregatorID::Legacy { .. } => {
-                    let change = match state {
-                        AggregatorState::Data { value } => AggregatorChangeV1::Write(value),
-                        AggregatorState::Delta { delta, history, .. } => {
-                            let delta_op = DeltaOp::new(delta, max_value, history);
-                            AggregatorChangeV1::Merge(delta_op)
-                        },
-                    };
-                    aggregator_v1_changes.insert(id, change);
                 },
             }
         }
@@ -141,18 +143,18 @@ impl<'a> NativeAggregatorContext<'a> {
 mod test {
     use super::*;
     use aptos_aggregator::{
-        aggregator_v1_id_for_test, bounded_math::SignedU128, delta_math::DeltaHistory,
-        AggregatorStore,
+        aggregator_v1_id_for_test, aggregator_v1_state_key_for_test, bounded_math::SignedU128,
+        delta_math::DeltaHistory, FakeAggregatorView,
     };
     use claims::{assert_matches, assert_ok, assert_some_eq};
 
-    fn get_test_resolver() -> AggregatorStore {
-        let mut state_view = AggregatorStore::default();
-        state_view.set_from_id(aggregator_v1_id_for_test(500), 150);
-        state_view.set_from_id(aggregator_v1_id_for_test(600), 100);
-        state_view.set_from_id(aggregator_v1_id_for_test(700), 200);
-        state_view.set_from_id(AggregatorID::ephemeral(900), 300);
-        state_view.set_from_id(AggregatorID::ephemeral(1000), 400);
+    fn get_test_resolver() -> FakeAggregatorView {
+        let mut state_view = FakeAggregatorView::default();
+        state_view.set_from_state_key(aggregator_v1_state_key_for_test(500), 150);
+        state_view.set_from_state_key(aggregator_v1_state_key_for_test(600), 100);
+        state_view.set_from_state_key(aggregator_v1_state_key_for_test(700), 200);
+        state_view.set_from_aggregator_id(AggregatorID::new(900), 300);
+        state_view.set_from_aggregator_id(AggregatorID::new(1000), 400);
         state_view
     }
 
@@ -199,10 +201,10 @@ mod test {
             .try_add(context.resolver, 200)
             .unwrap());
 
-        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(100));
-        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(300));
-        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(500));
-        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(800));
+        aggregator_data.remove_aggregator_v1(aggregator_v1_id_for_test(100));
+        aggregator_data.remove_aggregator_v1(aggregator_v1_id_for_test(300));
+        aggregator_data.remove_aggregator_v1(aggregator_v1_id_for_test(500));
+        aggregator_data.remove_aggregator_v1(aggregator_v1_id_for_test(800));
     }
 
     #[test]
@@ -216,23 +218,23 @@ mod test {
             ..
         } = context.into_change_set();
 
-        assert!(!aggregator_v1_changes.contains_key(&aggregator_v1_id_for_test(100)));
+        assert!(!aggregator_v1_changes.contains_key(&aggregator_v1_state_key_for_test(100)));
         assert_matches!(
             aggregator_v1_changes
-                .get(&aggregator_v1_id_for_test(200))
+                .get(&aggregator_v1_state_key_for_test(200))
                 .unwrap(),
             AggregatorChangeV1::Write(0)
         );
-        assert!(!aggregator_v1_changes.contains_key(&aggregator_v1_id_for_test(300)));
+        assert!(!aggregator_v1_changes.contains_key(&aggregator_v1_state_key_for_test(300)));
         assert_matches!(
             aggregator_v1_changes
-                .get(&aggregator_v1_id_for_test(400))
+                .get(&aggregator_v1_state_key_for_test(400))
                 .unwrap(),
             AggregatorChangeV1::Write(0)
         );
         assert_matches!(
             aggregator_v1_changes
-                .get(&aggregator_v1_id_for_test(500))
+                .get(&aggregator_v1_state_key_for_test(500))
                 .unwrap(),
             AggregatorChangeV1::Delete
         );
@@ -244,7 +246,7 @@ mod test {
         });
         assert_eq!(
             *aggregator_v1_changes
-                .get(&aggregator_v1_id_for_test(600))
+                .get(&aggregator_v1_state_key_for_test(600))
                 .unwrap(),
             AggregatorChangeV1::Merge(delta_100)
         );
@@ -256,13 +258,13 @@ mod test {
         });
         assert_eq!(
             *aggregator_v1_changes
-                .get(&aggregator_v1_id_for_test(700))
+                .get(&aggregator_v1_state_key_for_test(700))
                 .unwrap(),
             AggregatorChangeV1::Merge(delta_200)
         );
         assert_matches!(
             aggregator_v1_changes
-                .get(&aggregator_v1_id_for_test(800))
+                .get(&aggregator_v1_state_key_for_test(800))
                 .unwrap(),
             AggregatorChangeV1::Delete
         );
@@ -272,34 +274,34 @@ mod test {
         let mut aggregator_data = context.aggregator_data.borrow_mut();
 
         assert!(aggregator_data
-            .get_aggregator(AggregatorID::ephemeral(900), 900)
+            .get_aggregator(AggregatorVersionedID::v2(900), 900)
             .unwrap()
             .try_add(context.resolver, 200)
             .unwrap());
         assert!(!aggregator_data
-            .get_aggregator(AggregatorID::ephemeral(900), 900)
+            .get_aggregator(AggregatorVersionedID::v2(900), 900)
             .unwrap()
             .try_add(context.resolver, 401)
             .unwrap());
         assert!(!aggregator_data
-            .get_aggregator(AggregatorID::ephemeral(900), 900)
+            .get_aggregator(AggregatorVersionedID::v2(900), 900)
             .unwrap()
             .try_sub(context.resolver, 501)
             .unwrap());
 
-        aggregator_data.create_new_aggregator(AggregatorID::ephemeral(1100), 1100);
+        aggregator_data.create_new_aggregator(AggregatorVersionedID::v2(1100), 1100);
         assert!(aggregator_data
-            .get_aggregator(AggregatorID::ephemeral(1100), 1100)
+            .get_aggregator(AggregatorVersionedID::v2(1100), 1100)
             .unwrap()
             .try_add(context.resolver, 200)
             .unwrap());
         assert!(!aggregator_data
-            .get_aggregator(AggregatorID::ephemeral(1100), 1100)
+            .get_aggregator(AggregatorVersionedID::v2(1100), 1100)
             .unwrap()
             .try_add(context.resolver, 1000)
             .unwrap());
         assert!(!aggregator_data
-            .get_aggregator(AggregatorID::ephemeral(1100), 1100)
+            .get_aggregator(AggregatorVersionedID::v2(1100), 1100)
             .unwrap()
             .try_sub(context.resolver, 201)
             .unwrap());
@@ -314,11 +316,11 @@ mod test {
             aggregator_v2_changes,
             ..
         } = context.into_change_set();
-        assert!(aggregator_v2_changes.contains_key(&AggregatorID::ephemeral(900)));
-        assert!(!aggregator_v2_changes.contains_key(&AggregatorID::ephemeral(1000)));
-        assert!(aggregator_v2_changes.contains_key(&AggregatorID::ephemeral(1100)));
+        assert!(aggregator_v2_changes.contains_key(&AggregatorID::new(900)));
+        assert!(!aggregator_v2_changes.contains_key(&AggregatorID::new(1000)));
+        assert!(aggregator_v2_changes.contains_key(&AggregatorID::new(1100)));
         assert_some_eq!(
-            aggregator_v2_changes.get(&AggregatorID::ephemeral(900)),
+            aggregator_v2_changes.get(&AggregatorID::new(900)),
             &AggregatorChange::AggregatorDelta {
                 max_value: 900,
                 delta: SignedU128::Positive(200),
@@ -331,7 +333,7 @@ mod test {
             }
         );
         assert_some_eq!(
-            aggregator_v2_changes.get(&AggregatorID::ephemeral(1100)),
+            aggregator_v2_changes.get(&AggregatorID::new(1100)),
             &AggregatorChange::Data { value: 200 }
         );
     }

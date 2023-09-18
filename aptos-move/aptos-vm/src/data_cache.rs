@@ -11,8 +11,8 @@ use crate::{
 #[allow(unused_imports)]
 use anyhow::{bail, Error};
 use aptos_aggregator::{
-    aggregator_extension::AggregatorID,
     resolver::{AggregatorReadMode, TAggregatorView},
+    types::AggregatorID,
 };
 use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
