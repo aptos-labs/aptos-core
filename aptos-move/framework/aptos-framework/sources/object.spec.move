@@ -427,6 +427,19 @@ spec aptos_framework::object {
         // TODO: Verify the link list loop in verify_ungated_and_descendant
         aborts_if !exists<ObjectCore>(destination);
         aborts_if !global<ObjectCore>(destination).allow_ungated_transfer;
+        aborts_if !check_owner(owner, global<ObjectCore>(destination).owner, 0);
+    }
+
+    spec fun check_owner(owner: address, current_address: address, count: u64): bool {
+        if (owner != current_address) {
+            let count = count + 1;
+            count < MAXIMUM_OBJECT_NESTING 
+                && exists<ObjectCore>(current_address) 
+                && global<ObjectCore>(current_address).allow_ungated_transfer 
+                && check_owner(owner, global<ObjectCore>(current_address).owner, count)
+        } else {
+            true
+        }
     }
 
     spec ungated_transfer_allowed<T: key>(object: Object<T>): bool {
