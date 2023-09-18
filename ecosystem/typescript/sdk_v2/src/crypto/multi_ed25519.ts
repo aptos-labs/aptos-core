@@ -11,7 +11,7 @@ export class MultiEd25519PublicKey {
 
   public readonly public_keys: Ed25519PublicKey[];
 
-  public readonly threshold: Uint8;
+  public readonly threshold: number;
 
   /**
    * Public key for a K-of-N multisig transaction. A K-of-N multisig transaction means that for such a
@@ -24,7 +24,7 @@ export class MultiEd25519PublicKey {
    * @param public_keys A list of public keys
    * @param threshold At least "threshold" signatures must be valid
    */
-  constructor(public_keys: Ed25519PublicKey[], threshold: Uint8) {
+  constructor(public_keys: Ed25519PublicKey[], threshold: number) {
     if (threshold < 0 || threshold > MultiEd25519PublicKey.MAX_SIGNATURES_SUPPORTED) {
       throw new Error(
         `"threshold" cannot be greater than 0 and larger than ${MultiEd25519PublicKey.MAX_SIGNATURES_SUPPORTED}`,
