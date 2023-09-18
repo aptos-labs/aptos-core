@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::aggregator_natives::{helpers_v1::get_handle, NativeAggregatorContext};
-use aptos_aggregator::aggregator_extension::{extension_error, AggregatorHandle, AggregatorID};
+use aptos_aggregator::{aggregator_extension::extension_error, types::AggregatorVersionedID};
 use aptos_crypto::hash::DefaultHasher;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
@@ -50,17 +50,15 @@ fn native_new_aggregator(
     hasher.update(&aggregator_context.txn_hash());
     hasher.update(&num_aggregators_len.to_be_bytes());
     let hash = hasher.finish().to_vec();
-    let key = AggregatorHandle(
-        AccountAddress::from_bytes(hash)
-            .map_err(|_| extension_error("unable to create aggregator key"))?,
-    );
+    let key = AccountAddress::from_bytes(hash)
+        .map_err(|_| extension_error("unable to create aggregator key"))?;
 
-    let id = AggregatorID::legacy(handle, key);
+    let id = AggregatorVersionedID::v1(handle, key);
     aggregator_data.create_new_aggregator(id, limit);
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
         Value::address(handle.0),
-        Value::address(key.0),
+        Value::address(key),
         Value::u128(limit),
     ]))])
 }
