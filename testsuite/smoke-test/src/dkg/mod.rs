@@ -1,13 +1,13 @@
 // Copyright © Aptos Foundation
 
+use aptos_consensus::dkg::build_dkg_pvss_config;
 use aptos_rest_client::Client;
-use aptos_types::on_chain_config::DKGState;
+use aptos_types::{
+    dkg::DKGTranscriptWrapper, on_chain_config::DKGState, validator_verifier::ValidatorVerifier,
+};
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use std::time::Duration;
 use tokio::time::Instant;
-use aptos_consensus::dkg::build_dkg_pvss_config;
-use aptos_types::dkg::DKGTranscriptWrapper;
-use aptos_types::validator_verifier::ValidatorVerifier;
 
 async fn get_latest_dkg_state(rest_client: &Client) -> DKGState {
     let maybe_response = rest_client
@@ -67,4 +67,5 @@ fn num_validators(dkg_state: &DKGState) -> usize {
 }
 
 mod dkg_basic;
+mod dkg_with_validator_down;
 mod dkg_with_validator_join_leave;
