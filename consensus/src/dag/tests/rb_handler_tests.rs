@@ -70,7 +70,10 @@ async fn test_node_broadcast_receiver_succeed() {
     // expect an ack for a valid message
     assert_ok_eq!(rb_receiver.process(wellformed_node).await, expected_result);
     // expect the original ack for any future message from same author
-    assert_ok_eq!(rb_receiver.process(equivocating_node).await, expected_result);
+    assert_ok_eq!(
+        rb_receiver.process(equivocating_node).await,
+        expected_result
+    );
 }
 
 // TODO: Unit test node broad receiver with a pruned DAG store. Possibly need a validator verifier trait.

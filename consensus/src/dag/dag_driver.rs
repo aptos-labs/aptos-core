@@ -25,8 +25,9 @@ use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{block_info::Round, epoch_state::EpochState};
 use async_trait::async_trait;
 use futures::{
+    executor::block_on,
     future::{AbortHandle, Abortable},
-    FutureExt, executor::block_on,
+    FutureExt,
 };
 use std::{sync::Arc, time::Duration};
 use thiserror::Error as ThisError;
@@ -73,7 +74,10 @@ impl DagDriver {
             .get_strong_links_for_round(highest_round, &epoch_state.verifier)
             .map_or_else(|| highest_round.saturating_sub(1), |_| highest_round);
 
-        debug!("highest_round: {}, current_round: {}", highest_round, current_round);
+        debug!(
+            "highest_round: {}, current_round: {}",
+            highest_round, current_round
+        );
 
         let mut driver = Self {
             author,
