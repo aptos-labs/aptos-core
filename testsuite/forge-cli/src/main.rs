@@ -1641,7 +1641,7 @@ fn realistic_env_max_load_test(
 
 fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(12).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(8).unwrap())
         // if we have full nodes for subset of validators, TPS drops.
         // Validators without VFN are not creating batches,
         // as no useful transaction reach their mempool.
