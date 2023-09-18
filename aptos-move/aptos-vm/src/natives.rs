@@ -6,8 +6,8 @@
 use anyhow::Error;
 #[cfg(feature = "testing")]
 use aptos_aggregator::{
-    aggregator_extension::AggregatorID,
     resolver::{AggregatorReadMode, TAggregatorView},
+    types::AggregatorID,
 };
 #[cfg(feature = "testing")]
 use aptos_framework::natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};

@@ -129,7 +129,7 @@ mod test {
     use crate::{
         bounded_math::{EBOUND_OVERFLOW, EBOUND_UNDERFLOW},
         resolver::{AggregatorReadMode, TAggregatorView},
-        AggregatorStore,
+        FakeAggregatorView,
     };
     use aptos_types::{
         state_store::{state_key::StateKey, state_value::StateValue},
@@ -384,7 +384,7 @@ mod test {
 
     #[test]
     fn test_failed_write_op_conversion_because_of_empty_storage() {
-        let state_view = AggregatorStore::default();
+        let state_view = FakeAggregatorView::default();
         let delta_op = delta_add(10, 1000);
         assert_matches!(
             state_view.try_convert_aggregator_v1_delta_into_write_op(
@@ -438,7 +438,7 @@ mod test {
 
     #[test]
     fn test_successful_write_op_conversion() {
-        let mut state_view = AggregatorStore::default();
+        let mut state_view = FakeAggregatorView::default();
         state_view.set_from_state_key(KEY.clone(), 100);
 
         // Both addition and subtraction should succeed!
@@ -462,7 +462,7 @@ mod test {
 
     #[test]
     fn test_unsuccessful_write_op_conversion() {
-        let mut state_view = AggregatorStore::default();
+        let mut state_view = FakeAggregatorView::default();
         state_view.set_from_state_key(KEY.clone(), 100);
 
         // Both addition and subtraction should fail!
