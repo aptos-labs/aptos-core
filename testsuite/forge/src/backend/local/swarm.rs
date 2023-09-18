@@ -14,7 +14,9 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_framework::ReleaseBundle;
-use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
+use aptos_genesis::builder::{
+    FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn, InitGenesisStakeFn,
+};
 use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};
 use aptos_sdk::{
@@ -111,6 +113,7 @@ impl LocalSwarm {
         versions: Arc<HashMap<Version, LocalVersion>>,
         initial_version: Option<Version>,
         init_config: Option<InitConfigFn>,
+        init_genesis_stake: Option<InitGenesisStakeFn>,
         init_genesis_config: Option<InitGenesisConfigFn>,
         dir: Option<PathBuf>,
         genesis_framework: Option<ReleaseBundle>,
@@ -137,31 +140,30 @@ impl LocalSwarm {
                     .unwrap_or_else(|| aptos_cached_packages::head_release_bundle().clone()),
             )?
             .with_num_validators(number_of_validators)
-            .with_init_config(Some(Arc::new(
-                move |index, config, genesis_stake_amount| {
-                    // for local tests, turn off parallel execution:
-                    config.execution.concurrency_level = 1;
+            .with_init_config(Some(Arc::new(move |index, config| {
+                // for local tests, turn off parallel execution:
+                config.execution.concurrency_level = 1;
 
-                    // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
-                    // which cause flakiness in tests.
-                    if number_of_validators.get() == 1 {
-                        // this delays empty block by (30-1) * 30ms
-                        config.consensus.quorum_store_poll_time_ms = 900;
-                        config
-                            .state_sync
-                            .state_sync_driver
-                            .enable_auto_bootstrapping = true;
-                        config
-                            .state_sync
-                            .state_sync_driver
-                            .max_connection_deadline_secs = 1;
-                    }
+                // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
+                // which cause flakiness in tests.
+                if number_of_validators.get() == 1 {
+                    // this delays empty block by (30-1) * 30ms
+                    config.consensus.quorum_store_poll_time_ms = 900;
+                    config
+                        .state_sync
+                        .state_sync_driver
+                        .enable_auto_bootstrapping = true;
+                    config
+                        .state_sync
+                        .state_sync_driver
+                        .max_connection_deadline_secs = 1;
+                }
 
-                    if let Some(init_config) = &init_config {
-                        (init_config)(index, config, genesis_stake_amount);
-                    }
-                },
-            )))
+                if let Some(init_config) = &init_config {
+                    (init_config)(index, config);
+                }
+            })))
+            .with_init_genesis_stake(init_genesis_stake)
             .with_init_genesis_config(init_genesis_config)
             .build(rng)?;
 

@@ -20,7 +20,7 @@ use std::{
 async fn test_aptos_node_after_get_bin() {
     let mut swarm = SwarmBuilder::new_local(1)
         .with_aptos()
-        .with_init_config(Arc::new(|_, conf, _| {
+        .with_init_config(Arc::new(|_, conf| {
             conf.api.failpoints_enabled = true;
         }))
         .build()

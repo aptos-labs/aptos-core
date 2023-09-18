@@ -6,7 +6,7 @@ use crate::{Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm
 use anyhow::{bail, Context};
 use aptos_config::config::NodeConfig;
 use aptos_framework::ReleaseBundle;
-use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
+use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn, InitGenesisStakeFn};
 use aptos_infallible::Mutex;
 use rand::rngs::StdRng;
 use std::{
@@ -122,6 +122,7 @@ impl LocalFactory {
         genesis_framework: Option<ReleaseBundle>,
         init_config: Option<InitConfigFn>,
         vfn_config: Option<NodeConfig>,
+        init_genesis_stake: Option<InitGenesisStakeFn>,
         init_genesis_config: Option<InitGenesisConfigFn>,
         guard: ActiveNodesGuard,
     ) -> Result<LocalSwarm>
@@ -136,6 +137,7 @@ impl LocalFactory {
             self.versions.clone(),
             Some(version.clone()),
             init_config,
+            init_genesis_stake,
             init_genesis_config,
             swarmdir,
             genesis_framework,
@@ -206,6 +208,7 @@ impl Factory for LocalFactory {
                 num_fullnodes,
                 version,
                 framework,
+                None,
                 None,
                 None,
                 None,

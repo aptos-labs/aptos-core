@@ -414,7 +414,8 @@ pub struct GenesisConfiguration {
     pub gas_schedule: GasScheduleV2,
 }
 
-pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig, &mut u64) + Send + Sync>;
+pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig) + Send + Sync>;
+pub type InitGenesisStakeFn = Arc<dyn Fn(usize, &mut u64) + Send + Sync>;
 pub type InitGenesisConfigFn = Arc<dyn Fn(&mut GenesisConfiguration) + Send + Sync>;
 
 /// Builder that builds a network of validator nodes that can run locally
@@ -425,6 +426,7 @@ pub struct Builder {
     num_validators: NonZeroUsize,
     randomize_first_validator_ports: bool,
     init_config: Option<InitConfigFn>,
+    init_genesis_stake: Option<InitGenesisStakeFn>,
     init_genesis_config: Option<InitGenesisConfigFn>,
 }
 
@@ -439,6 +441,7 @@ impl Builder {
             num_validators: NonZeroUsize::new(1).unwrap(),
             randomize_first_validator_ports: true,
             init_config: None,
+            init_genesis_stake: None,
             init_genesis_config: None,
         })
     }
@@ -455,6 +458,14 @@ impl Builder {
 
     pub fn with_init_config(mut self, init_config: Option<InitConfigFn>) -> Self {
         self.init_config = init_config;
+        self
+    }
+
+    pub fn with_init_genesis_stake(
+        mut self,
+        init_genesis_stake: Option<InitGenesisStakeFn>,
+    ) -> Self {
+        self.init_genesis_stake = init_genesis_stake;
         self
     }
 
@@ -520,9 +531,8 @@ impl Builder {
         let name = index.to_string();
 
         let mut config = template.clone();
-        let mut genesis_stake_amount = 10;
         if let Some(init_config) = &self.init_config {
-            (init_config)(index, &mut config, &mut genesis_stake_amount);
+            (init_config)(index, &mut config);
         }
 
         let mut validator = ValidatorNodeConfig::new(
@@ -530,7 +540,8 @@ impl Builder {
             index,
             self.config_dir.as_path(),
             config,
-            genesis_stake_amount,
+            // Default value. Can be overriden by init_genesis_stake
+            10,
             // Default to 0% commission for local node building.
             0,
         )?;
@@ -591,6 +602,11 @@ impl Builder {
     ) -> anyhow::Result<(Transaction, Waypoint)> {
         let mut configs: Vec<ValidatorConfiguration> = Vec::new();
 
+        if let Some(init_genesis_stake) = &self.init_genesis_stake {
+            for validator in validators.iter_mut() {
+                (init_genesis_stake)(validator.index, &mut validator.genesis_stake_amount);
+            }
+        }
         for validator in validators.iter() {
             configs.push(validator.try_into()?);
         }
