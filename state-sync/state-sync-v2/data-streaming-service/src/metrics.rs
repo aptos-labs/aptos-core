@@ -42,6 +42,15 @@ pub static CREATE_DATA_STREAM: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for the creation of new subscription streams
+pub static CREATE_SUBSCRIPTION_STREAM: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_data_streaming_service_create_subscription_stream",
+        "Counters related to the creation of new subscription streams",
+    )
+    .unwrap()
+});
+
 /// Counter for the termination of existing data streams
 pub static TERMINATE_DATA_STREAM: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(

@@ -7,7 +7,7 @@ use crate::{
     metrics,
     metrics::{
         increment_counter, start_timer, LRU_CACHE_HIT, LRU_CACHE_PROBE, OPTIMISTIC_FETCH_ADD,
-        SUBSCRIPTION_ADD, SUBSCRIPTION_FAILURE,
+        SUBSCRIPTION_ADD, SUBSCRIPTION_FAILURE, SUBSCRIPTION_NEW_STREAM,
     },
     moderator::RequestModerator,
     network::ResponseSender,
@@ -312,6 +312,13 @@ impl<T: StorageReaderInterface> Handler<T> {
             let subscription_stream_requests =
                 SubscriptionStreamRequests::new(subscription_request, self.time_service.clone());
             subscriptions.insert(peer_network_id, subscription_stream_requests);
+
+            // Update the subscription metrics
+            increment_counter(
+                &metrics::SUBSCRIPTION_EVENTS,
+                peer_network_id.network_id(),
+                SUBSCRIPTION_NEW_STREAM.into(),
+            );
         }
 
         // Update the subscription metrics

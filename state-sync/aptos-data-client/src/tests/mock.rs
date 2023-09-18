@@ -5,7 +5,7 @@ use crate::{
     client::AptosDataClient,
     error::Result,
     global_summary::GlobalDataSummary,
-    interface::{AptosDataClientInterface, Response},
+    interface::{AptosDataClientInterface, Response, SubscriptionRequestMetadata},
     poller::DataSummaryPoller,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -270,6 +270,26 @@ mock! {
             include_events: bool,
             request_timeout_ms: u64,
         ) -> Result<Response<TransactionOrOutputListWithProof>>;
+
+        async fn subscribe_to_transaction_outputs_with_proof(
+            &self,
+            subscription_request_metadata: SubscriptionRequestMetadata,
+            request_timeout_ms: u64,
+        ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+
+        async fn subscribe_to_transactions_with_proof(
+            &self,
+            subscription_request_metadata: SubscriptionRequestMetadata,
+            include_events: bool,
+            request_timeout_ms: u64,
+        ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+
+        async fn subscribe_to_transactions_or_outputs_with_proof(
+            &self,
+            subscription_request_metadata: SubscriptionRequestMetadata,
+            include_events: bool,
+            request_timeout_ms: u64,
+        ) -> Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
     }
 }
 

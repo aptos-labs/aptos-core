@@ -256,7 +256,7 @@ pub(super) fn bootstrap_dag_for_test(
 
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
     let adapter = Arc::new(NotifierAdapter::new(ordered_nodes_tx, storage.clone()));
-    let (dag_rpc_tx, mut dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
+    let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
 
     let (dag_store, order_rule) =
         bootstraper.bootstrap_dag_store(latest_ledger_info, adapter.clone());
@@ -266,7 +266,10 @@ pub(super) fn bootstrap_dag_for_test(
     let (handler, fetch_service) =
         bootstraper.bootstrap_components(dag_store.clone(), order_rule, state_sync_trigger);
 
-    let dh_handle = tokio::spawn(async move { handler.run(&mut dag_rpc_rx).await });
+    let dh_handle = tokio::spawn(async move {
+        let mut dag_rpc_rx = dag_rpc_rx;
+        handler.run(&mut dag_rpc_rx).await
+    });
     let df_handle = tokio::spawn(fetch_service.start());
 
     (dh_handle, df_handle, dag_rpc_tx, ordered_nodes_rx)

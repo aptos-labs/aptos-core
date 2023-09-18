@@ -218,13 +218,14 @@ impl BlockData {
         payload: Payload,
         author: Author,
         failed_authors: Vec<(Round, Author)>,
+        parent_block_info: BlockInfo,
     ) -> Self {
         Self {
             epoch,
             round,
             timestamp_usecs,
             quorum_cert: QuorumCert::new(
-                VoteData::new(BlockInfo::empty(), BlockInfo::empty()),
+                VoteData::new(parent_block_info, BlockInfo::empty()),
                 LedgerInfoWithSignatures::new(
                     LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
                     AggregateSignature::empty(),
