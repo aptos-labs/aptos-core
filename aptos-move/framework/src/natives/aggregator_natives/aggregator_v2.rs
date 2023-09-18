@@ -12,7 +12,7 @@ use crate::natives::{
     },
     AccountAddress,
 };
-use aptos_aggregator::aggregator_extension::AggregatorID;
+use aptos_aggregator::types::{AggregatorID, AggregatorVersionedID};
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
@@ -102,16 +102,16 @@ fn native_create_aggregator(
     let limit = pop_value_by_type(&ty_args[0], &mut args)?;
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let id = aggregator_data.generate_id();
-    let aggregator_id = AggregatorID::ephemeral(aggregator_data.generate_id());
+    let aggregator_id = AggregatorVersionedID::V2(aggregator_data.generate_id());
     aggregator_data.create_new_aggregator(aggregator_id, limit);
 
     match ty_args[0] {
         Type::U128 => Ok(smallvec![Value::struct_(Struct::pack(vec![
-            Value::u128(id as u128),
+            Value::u128(id.id() as u128),
             Value::u128(limit),
         ]))]),
         Type::U64 => Ok(smallvec![Value::struct_(Struct::pack(vec![
-            Value::u64(id),
+            Value::u64(id.id()),
             Value::u64(limit as u64),
         ]))]),
         _ => Err(SafeNativeError::Abort {
@@ -135,7 +135,7 @@ fn native_try_add(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let value = pop_value_by_type(&ty_args[0], &mut args)?;
     let (id, limit) = pop_aggregator_fields_by_type(&ty_args[0], &mut args)?;
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    let aggregator = aggregator_data.get_aggregator(AggregatorVersionedID::V2(id), limit)?;
     Ok(smallvec![Value::bool(
         aggregator.try_add(aggregator_context.resolver, value)?
     )])
@@ -156,7 +156,7 @@ fn native_try_sub(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let value = pop_value_by_type(&ty_args[0], &mut args)?;
     let (id, limit) = pop_aggregator_fields_by_type(&ty_args[0], &mut args)?;
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    let aggregator = aggregator_data.get_aggregator(AggregatorVersionedID::V2(id), limit)?;
     Ok(smallvec![Value::bool(
         aggregator.try_sub(aggregator_context.resolver, value)?
     )])
@@ -177,7 +177,7 @@ fn native_read(
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let (id, limit) = pop_aggregator_fields_by_type(&ty_args[0], &mut args)?;
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    let aggregator = aggregator_data.get_aggregator(AggregatorVersionedID::V2(id), limit)?;
     let value = aggregator.read_most_recent_aggregator_value(aggregator_context.resolver)?;
     if value > limit {
         return Err(SafeNativeError::InvariantViolation(PartialVMError::new(
@@ -211,16 +211,16 @@ fn native_snapshot(
     match ty_args[0] {
         Type::U128 => {
             let (aggregator_id, _) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
-            let id = aggregator_data.snapshot(&aggregator_id)?;
+            let id = aggregator_data.snapshot(aggregator_id)?;
             Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u128(
-                id as u128
+                id.id() as u128
             )]))])
         },
         Type::U64 => {
             let (aggregator_id, _) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
-            let id = aggregator_data.snapshot(&aggregator_id)?;
+            let id = aggregator_data.snapshot(aggregator_id)?;
             Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u64(
-                id
+                id.id()
             )]))])
         },
         _ => Err(SafeNativeError::Abort {

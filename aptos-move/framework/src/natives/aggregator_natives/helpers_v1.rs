@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::aggregator_extension::{extension_error, AggregatorHandle, AggregatorID};
+use aptos_aggregator::{aggregator_extension::extension_error, types::AggregatorVersionedID};
 use aptos_types::{account_address::AccountAddress, state_store::table::TableHandle};
 use move_binary_format::errors::PartialVMResult;
 use move_vm_types::values::{Reference, Struct, StructRef, Value};
@@ -40,27 +40,20 @@ pub(crate) fn get_aggregator_field(aggregator: &StructRef, index: usize) -> Part
 }
 
 /// Returns ID and a limit of aggregator based on a reference to `Aggregator` Move struct.
-pub(crate) fn aggregator_info(aggregator: &StructRef) -> PartialVMResult<(AggregatorID, u128)> {
-    let (handle, key, limit) = get_aggregator_fields(aggregator)?;
-    Ok((AggregatorID::legacy(handle, key), limit))
-}
-
-/// Given a reference to `Aggregator` Move struct, returns a tuple of its
-/// fields: (`handle`, `key`, `limit`).
-pub fn get_aggregator_fields(
+pub(crate) fn aggregator_info(
     aggregator: &StructRef,
-) -> PartialVMResult<(TableHandle, AggregatorHandle, u128)> {
+) -> PartialVMResult<(AggregatorVersionedID, u128)> {
     let handle =
         get_aggregator_field(aggregator, HANDLE_FIELD_INDEX)?.value_as::<AccountAddress>()?;
     let key = get_aggregator_field(aggregator, KEY_FIELD_INDEX)?.value_as::<AccountAddress>()?;
     let limit = get_aggregator_field(aggregator, LIMIT_FIELD_INDEX)?.value_as::<u128>()?;
-    Ok((TableHandle(handle), AggregatorHandle(key), limit))
+    Ok((AggregatorVersionedID::v1(TableHandle(handle), key), limit))
 }
 
 /// Given an `Aggregator` Move struct, unpacks it into fields: (`handle`, `key`, `limit`).
 pub(crate) fn unpack_aggregator_struct(
     aggregator_struct: Struct,
-) -> PartialVMResult<(TableHandle, AggregatorHandle, u128)> {
+) -> PartialVMResult<(TableHandle, AccountAddress, u128)> {
     let mut fields: Vec<Value> = aggregator_struct.unpack()?.collect();
     assert!(fields.len() == 3);
 
@@ -80,5 +73,5 @@ pub(crate) fn unpack_aggregator_struct(
         .map_or(Err(extension_error("unable to pop `handle` field")), |v| {
             v.value_as::<AccountAddress>()
         })?;
-    Ok((TableHandle(handle), AggregatorHandle(key), limit))
+    Ok((TableHandle(handle), key, limit))
 }

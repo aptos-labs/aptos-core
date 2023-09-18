@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
-    aggregator_extension::AggregatorID,
     resolver::{AggregatorReadMode, TAggregatorView},
+    types::AggregatorID,
 };
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::state_store::{
