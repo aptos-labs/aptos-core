@@ -6,12 +6,13 @@ import { Deserializer, Serializer } from "../bcs";
 import { Uint8 } from "../types";
 import { Ed25519PublicKey, Ed25519Signature } from "./ed25519";
 
-/**
- * MultiEd25519 currently supports at most 32 signatures.
- */
-const MAX_SIGNATURES_SUPPORTED = 32;
-
 export class MultiEd25519PublicKey {
+  static readonly MAX_SIGNATURES_SUPPORTED = 32;
+
+  public readonly public_keys: Ed25519PublicKey[];
+
+  public readonly threshold: Uint8;
+
   /**
    * Public key for a K-of-N multisig transaction. A K-of-N multisig transaction means that for such a
    * transaction to be executed, at least K out of the N authorized signers have signed the transaction
@@ -23,10 +24,15 @@ export class MultiEd25519PublicKey {
    * @param public_keys A list of public keys
    * @param threshold At least "threshold" signatures must be valid
    */
-  constructor(public readonly public_keys: Ed25519PublicKey[], public readonly threshold: Uint8) {
-    if (threshold > MAX_SIGNATURES_SUPPORTED) {
-      throw new Error(`"threshold" cannot be larger than ${MAX_SIGNATURES_SUPPORTED}`);
+  constructor(public_keys: Ed25519PublicKey[], threshold: Uint8) {
+    if (threshold < 0 || threshold > MultiEd25519PublicKey.MAX_SIGNATURES_SUPPORTED) {
+      throw new Error(
+        `"threshold" cannot be greater than 0 and larger than ${MultiEd25519PublicKey.MAX_SIGNATURES_SUPPORTED}`,
+      );
     }
+
+    this.public_keys = public_keys;
+    this.threshold = threshold;
   }
 
   /**
@@ -62,7 +68,12 @@ export class MultiEd25519PublicKey {
 }
 
 export class MultiEd25519Signature {
+  static MAX_SIGNATURES_SUPPORTED = 32;
   static BITMAP_LEN: Uint8 = 4;
+
+  public readonly signatures: Ed25519Signature[];
+
+  public readonly bitmap: Uint8Array;
 
   /**
    * Signature for a K-of-N multisig transaction.
@@ -74,10 +85,13 @@ export class MultiEd25519Signature {
    * @param bitmap 4 bytes, at most 32 signatures are supported. If Nth bit value is `1`, the Nth
    * signature should be provided in `signatures`. Bits are read from left to right
    */
-  constructor(public readonly signatures: Ed25519Signature[], public readonly bitmap: Uint8Array) {
+  constructor(signatures: Ed25519Signature[], bitmap: Uint8Array) {
     if (bitmap.length !== MultiEd25519Signature.BITMAP_LEN) {
       throw new Error(`"bitmap" length should be ${MultiEd25519Signature.BITMAP_LEN}`);
     }
+
+    this.signatures = signatures;
+    this.bitmap = bitmap;
   }
 
   /**
@@ -118,7 +132,7 @@ export class MultiEd25519Signature {
     const dupCheckSet = new Set();
 
     bits.forEach((bit: number) => {
-      if (bit >= MAX_SIGNATURES_SUPPORTED) {
+      if (bit >= MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED) {
         throw new Error(`Invalid bit value ${bit}.`);
       }
 

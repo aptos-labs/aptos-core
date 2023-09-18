@@ -35,10 +35,13 @@ export class Ed25519PublicKey {
 export class Ed25519Signature {
   static readonly LENGTH = 64;
 
-  constructor(public readonly value: Uint8Array) {
+  public readonly value: Uint8Array;
+
+  constructor(value: Uint8Array) {
     if (value.length !== Ed25519Signature.LENGTH) {
       throw new Error(`Ed25519Signature length should be ${Ed25519Signature.LENGTH}`);
     }
+    this.value = value;
   }
 
   serialize(serializer: Serializer): void {

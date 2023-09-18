@@ -15,22 +15,31 @@ import { Ed25519PublicKey } from "./ed25519";
  * Account addresses can be derived from AuthenticationKey
  */
 export class AuthenticationKey {
+  // Length of AuthenticationKey in bytes(UInt8Array)
   static readonly LENGTH: number = 32;
 
+  // Scheme identifier for MultiEd25519 signatures used to derive authentication keys for MultiEd25519 public keys
   static readonly MULTI_ED25519_SCHEME: number = 1;
 
+  // Scheme identifier for Ed25519 signatures used to derive authentication key for MultiEd25519 public key
   static readonly ED25519_SCHEME: number = 0;
 
+  // Scheme identifier used when hashing an account's address together with a seed to derive the address (not the
+  // authentication key) of a resource account.
   static readonly DERIVE_RESOURCE_ACCOUNT_SCHEME: number = 255;
 
-  readonly data: Hex;
+  private readonly _data: Hex;
 
   constructor(hexInput: HexInput) {
     const hex = Hex.fromHexInput({ hexInput });
     if (hex.toUint8Array().length !== AuthenticationKey.LENGTH) {
-      throw new Error("Expected a hexinput of length 32");
+      throw new Error(`Authentication Key length should be ${AuthenticationKey.LENGTH}`);
     }
-    this.data = hex;
+    this._data = hex;
+  }
+
+  get data(): Hex {
+    return this._data;
   }
 
   /**

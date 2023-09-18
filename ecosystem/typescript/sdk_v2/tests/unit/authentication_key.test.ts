@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+import { Hex } from "../../src/core/hex";
 import { AuthenticationKey } from "../../src/crypto/authentication_key";
 import { Ed25519PublicKey } from "../../src/crypto/ed25519";
 import { MultiEd25519PublicKey } from "../../src/crypto/multi_ed25519";
@@ -10,15 +11,16 @@ const auth_key_hexInput = "0x6324287105756b0338e0f84025bd0ac80e58154eb94257b0d4f
 const public_key = "0x719ab6a6d406931ca80efa922e3377390a8d2803e42ecdbf394e979f9a5e57bc";
 
 describe("AuthenticationKey", () => {
-  it("should create an instance with save the hexinput correctly", () => {
+  it("should create an instance with provided hexinput correctly", () => {
     const authKey = new AuthenticationKey(auth_key_hexInput);
     expect(authKey).toBeInstanceOf(AuthenticationKey);
     expect(authKey.data.toString()).toEqual(auth_key_hexInput);
+    expect(authKey.data).toBeInstanceOf(Hex);
   });
 
   it("should throw an error with invalid hex input length", () => {
     const invalidHexInput = "0123456789abcdef"; // Invalid length
-    expect(() => new AuthenticationKey(invalidHexInput)).toThrowError("Expected a hexinput of length 32");
+    expect(() => new AuthenticationKey(invalidHexInput)).toThrowError(`Authentication Key length should be ${AuthenticationKey.LENGTH}`);
   });
 
   it("should create AuthenticationKey from Ed25519PublicKey", () => {
