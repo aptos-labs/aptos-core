@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::resolver::TAggregatorView;
+use aptos_aggregator::{resolver::TAggregatorView, types::AggregatorID};
 use aptos_state_view::StateViewId;
 use aptos_types::{
-    aggregator::AggregatorID,
     state_store::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
