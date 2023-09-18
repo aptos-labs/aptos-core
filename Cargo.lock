@@ -1597,6 +1597,7 @@ dependencies = [
  "itertools",
  "libsecp256k1",
  "log",
+ "lru 0.7.8",
  "merlin",
  "move-binary-format",
  "move-cli",
