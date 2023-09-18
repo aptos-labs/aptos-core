@@ -226,6 +226,28 @@ impl ResponsePayload {
             Self::TransactionsWithProof(_) => "transactions_with_proof",
         }
     }
+
+    /// Returns the chunk size of the response payload (i.e., the
+    /// number of data items held in the response).
+    pub fn get_data_chunk_size(&self) -> usize {
+        match self {
+            Self::EpochEndingLedgerInfos(epoch_ending_ledger_infos) => {
+                epoch_ending_ledger_infos.len()
+            },
+            Self::NewTransactionOutputsWithProof((transaction_outputs, _)) => {
+                transaction_outputs.transactions_and_outputs.len()
+            },
+            Self::NewTransactionsWithProof((transactions, _)) => transactions.transactions.len(),
+            Self::NumberOfStates(_) => {
+                1 // The number of states is a single u64
+            },
+            Self::StateValuesWithProof(state_values) => state_values.raw_values.len(),
+            Self::TransactionOutputsWithProof(transaction_outputs) => {
+                transaction_outputs.transactions_and_outputs.len()
+            },
+            Self::TransactionsWithProof(transactions) => transactions.transactions.len(),
+        }
+    }
 }
 
 impl From<StateValueChunkWithProof> for ResponsePayload {

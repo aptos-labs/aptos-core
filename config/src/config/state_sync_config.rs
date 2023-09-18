@@ -16,12 +16,12 @@ const MAX_MESSAGE_SIZE: usize = 60 * 1024 * 1024; /* 60 MiB */
 // The maximum chunk sizes for data client requests and response
 const MAX_EPOCH_CHUNK_SIZE: u64 = 200;
 const MAX_STATE_CHUNK_SIZE: u64 = 4000;
-const MAX_TRANSACTION_CHUNK_SIZE: u64 = 5000;
-const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 5000;
+const MAX_TRANSACTION_CHUNK_SIZE: u64 = 20_000;
+const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 20_000;
 
 // The maximum number of concurrent requests to send
-const MAX_CONCURRENT_REQUESTS: u64 = 12;
-const MAX_CONCURRENT_STATE_REQUESTS: u64 = 12;
+const MAX_CONCURRENT_REQUESTS: u64 = 20;
+const MAX_CONCURRENT_STATE_REQUESTS: u64 = 20;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -189,7 +189,7 @@ impl Default for StorageServiceConfig {
             max_network_channel_size: 4000,
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
             max_num_active_subscriptions: 30,
-            max_optimistic_fetch_period_ms: 5000, // 5 seconds
+            max_optimistic_fetch_period_ms: 10_000,
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_subscription_period_ms: 30_000, // 30 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
@@ -287,14 +287,14 @@ impl Default for AptosDataClientConfig {
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
             max_num_output_reductions: 0,
-            max_optimistic_fetch_version_lag: 50_000, // Assumes 5K TPS for 10 seconds, which should be plenty
-            max_response_timeout_ms: 180_000,         // 180 seconds
+            max_optimistic_fetch_version_lag: 500_000,
+            max_response_timeout_ms: 240_000,
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_version_lag: 100_000, // Assumes 5K TPS for 20 seconds, which should be plenty
+            max_subscription_version_lag: 500_000,
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
-            optimistic_fetch_timeout_ms: 5000, // 5 seconds
-            response_timeout_ms: 30_000,       // 30 seconds
+            optimistic_fetch_timeout_ms: 10_000,
+            response_timeout_ms: 120_000,
             summary_poll_loop_interval_ms: 200,
             use_compression: true,
         }

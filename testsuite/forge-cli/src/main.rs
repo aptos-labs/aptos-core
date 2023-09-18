@@ -1647,7 +1647,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         // as no useful transaction reach their mempool.
         // something to potentially improve upon.
         // So having VFNs for all validators
-        //////// .with_initial_fullnode_count(12)
+        .with_initial_fullnode_count(12)
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
             mempool_backlog: 500_000,
@@ -1656,17 +1656,18 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             const MB: usize = 1024 * 1024;
 
             // ask for more resources than normal
-            helm_values["validator"]["resources"]["limits"]["cpu"] = 58.into();
-            helm_values["validator"]["resources"]["requests"]["cpu"] = 58.into();
+            helm_values["validator"]["resources"]["limits"]["cpu"] = 54.into();
+            helm_values["validator"]["resources"]["requests"]["cpu"] = 54.into();
             helm_values["validator"]["resources"]["limits"]["memory"] = "200Gi".into();
             helm_values["validator"]["resources"]["requests"]["memory"] = "200Gi".into();
-            helm_values["fullnode"]["resources"]["limits"]["cpu"] = 58.into();
-            helm_values["fullnode"]["resources"]["requests"]["cpu"] = 58.into();
+            helm_values["fullnode"]["resources"]["limits"]["cpu"] = 54.into();
+            helm_values["fullnode"]["resources"]["requests"]["cpu"] = 54.into();
             helm_values["fullnode"]["resources"]["limits"]["memory"] = "200Gi".into();
             helm_values["fullnode"]["resources"]["requests"]["memory"] = "200Gi".into();
 
             // higher concurrency level
             helm_values["validator"]["config"]["execution"]["concurrency_level"] = 48.into();
+            helm_values["fullnode"]["config"]["execution"]["concurrency_level"] = 48.into();
 
             // Consensus and QuorumStore tweaks
             helm_values["validator"]["config"]["consensus"]
@@ -1728,7 +1729,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             helm_values["validator"]["config"]["storage"]["rocksdb_configs"]
                 ["use_sharded_state_merkle_db"] = true.into();
             helm_values["validator"]["config"]["storage"]["rocksdb_configs"]
-                ["skip_index_and_usage"] = true.into();
+                ["skip_index_and_usage"] = false.into(); // TODO: joshlind: can we get state sync to use this, too??
         }))
         .with_success_criteria(
             SuccessCriteria::new(8000)

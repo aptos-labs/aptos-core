@@ -19,6 +19,7 @@ use crate::{
     },
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
+    metrics,
     streaming_client::{
         Epoch, GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, StreamRequest,
     },
@@ -273,6 +274,9 @@ impl DataStreamEngine for StateStreamEngine {
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
+        // Update the metrics for the number of received items
+        update_response_chunk_size_metrics(client_request, &client_response_payload);
+
         match client_request {
             StateValuesWithProof(request) => {
                 verify_client_request_indices(
@@ -911,6 +915,9 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
+        // Update the metrics for the number of received items
+        update_response_chunk_size_metrics(client_request, &client_response_payload);
+
         // We reset the pending requests to prevent malicious responses from blocking the streams
         if self.end_of_epoch_requested {
             self.end_of_epoch_requested = false;
@@ -1115,6 +1122,9 @@ impl DataStreamEngine for EpochEndingStreamEngine {
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
+        // Update the metrics for the number of received items
+        update_response_chunk_size_metrics(client_request, &client_response_payload);
+
         match client_request {
             EpochEndingLedgerInfos(request) => {
                 verify_client_request_indices(
@@ -1335,6 +1345,9 @@ impl DataStreamEngine for TransactionStreamEngine {
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
+        // Update the metrics for the number of received items
+        update_response_chunk_size_metrics(client_request, &client_response_payload);
+
         match &self.request {
             StreamRequest::GetAllTransactions(stream_request) => match client_request {
                 TransactionsWithProof(request) => {
@@ -1623,4 +1636,17 @@ fn create_data_notification(
         notification_id,
         data_payload,
     })
+}
+
+/// Updates the response chunk size metrics for the given request and response
+fn update_response_chunk_size_metrics(
+    client_request: &DataClientRequest,
+    client_response_payload: &ResponsePayload,
+) {
+    metrics::observe_value(
+        &metrics::RECEIVED_DATA_RESPONSE_CHUNK_SIZE,
+        client_request.get_label(),
+        client_response_payload.get_label(),
+        client_response_payload.get_data_chunk_size() as u64,
+    );
 }
