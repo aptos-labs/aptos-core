@@ -15,7 +15,7 @@ describe("MultiEd25519", () => {
       edPksArray.push(new Ed25519PublicKey(multiEd25519PkTestObject.public_keys[i]));
     }
 
-    const pubKeyMultiSig = new MultiEd25519PublicKey(edPksArray, multiEd25519PkTestObject.threshold);
+    const pubKeyMultiSig = new MultiEd25519PublicKey({ publieKeys: edPksArray, threshold: multiEd25519PkTestObject.threshold });
 
     expect(Hex.fromHexInput({ hexInput: pubKeyMultiSig.toUint8Array() }).toStringWithoutPrefix()).toEqual(
       multiEd25519PkTestObject.bytesInStringWithoutPrefix,
@@ -28,7 +28,7 @@ describe("MultiEd25519", () => {
       edPksArray.push(new Ed25519PublicKey(multiEd25519PkTestObject.public_keys[i]));
     }
 
-    const pubKeyMultiSig = new MultiEd25519PublicKey(edPksArray, multiEd25519PkTestObject.threshold);
+    const pubKeyMultiSig = new MultiEd25519PublicKey({ publieKeys: edPksArray, threshold: multiEd25519PkTestObject.threshold });
 
     const serializer = new Serializer();
     serializer.serialize(pubKeyMultiSig);

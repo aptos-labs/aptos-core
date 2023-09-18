@@ -7,10 +7,13 @@ import { Uint8 } from "../types";
 import { Ed25519PublicKey, Ed25519Signature } from "./ed25519";
 
 export class MultiEd25519PublicKey {
+  // Maximum number of signatures shreshold supported
   static readonly MAX_SIGNATURES_SUPPORTED = 32;
 
-  public readonly public_keys: Ed25519PublicKey[];
+  // List of Ed25519 public keys for this MultiEd25519PublicKey
+  public readonly publicKeys: Ed25519PublicKey[];
 
+  // At least "threshold" signatures must be valid for the number of public keys specified
   public readonly threshold: number;
 
   /**
@@ -19,19 +22,26 @@ export class MultiEd25519PublicKey {
    * and passed the check conducted by the chain.
    *
    * @see {@link
-   * https://aptos.dev/guides/creating-a-signed-transaction#multisignature-transactions | Creating a Signed Transaction}
+   * https://aptos.dev/integration/creating-a-signed-transaction/ | Creating a Signed Transaction}
    *
    * @param public_keys A list of public keys
    * @param threshold At least "threshold" signatures must be valid
    */
-  constructor(public_keys: Ed25519PublicKey[], threshold: number) {
-    if (threshold < 0 || threshold > MultiEd25519PublicKey.MAX_SIGNATURES_SUPPORTED) {
+  constructor(args: { publieKeys: Ed25519PublicKey[], threshold: number }) {
+    const { publieKeys, threshold } = args;
+    if (threshold > MultiEd25519PublicKey.MAX_SIGNATURES_SUPPORTED) {
       throw new Error(
-        `"threshold" cannot be greater than 0 and larger than ${MultiEd25519PublicKey.MAX_SIGNATURES_SUPPORTED}`,
+        `"threshold" cannot be larger than ${MultiEd25519PublicKey.MAX_SIGNATURES_SUPPORTED}`,
       );
     }
 
-    this.public_keys = public_keys;
+    if (threshold < 0) {
+      throw new Error(
+        '"threshold" cannot be less than 0',
+      );
+    }
+
+    this.publicKeys = publieKeys;
     this.threshold = threshold;
   }
 
@@ -39,12 +49,12 @@ export class MultiEd25519PublicKey {
    * Converts a MultiEd25519PublicKey into Uint8Array (bytes) with: bytes = p1_bytes | ... | pn_bytes | threshold
    */
   toUint8Array(): Uint8Array {
-    const bytes = new Uint8Array(this.public_keys.length * Ed25519PublicKey.LENGTH + 1);
-    this.public_keys.forEach((k: Ed25519PublicKey, i: number) => {
-      bytes.set(k.value.toUint8Array(), i * Ed25519PublicKey.LENGTH);
+    const bytes = new Uint8Array(this.publicKeys.length * Ed25519PublicKey.LENGTH + 1);
+    this.publicKeys.forEach((k: Ed25519PublicKey, i: number) => {
+      bytes.set(k.data.toUint8Array(), i * Ed25519PublicKey.LENGTH);
     });
 
-    bytes[this.public_keys.length * Ed25519PublicKey.LENGTH] = this.threshold;
+    bytes[this.publicKeys.length * Ed25519PublicKey.LENGTH] = this.threshold;
 
     return bytes;
   }
@@ -63,7 +73,7 @@ export class MultiEd25519PublicKey {
       const begin = i;
       keys.push(new Ed25519PublicKey(bytes.subarray(begin, begin + Ed25519PublicKey.LENGTH)));
     }
-    return new MultiEd25519PublicKey(keys, threshold);
+    return new MultiEd25519PublicKey({ publieKeys: keys, threshold });
   }
 }
 
@@ -100,7 +110,7 @@ export class MultiEd25519Signature {
   toUint8Array(): Uint8Array {
     const bytes = new Uint8Array(this.signatures.length * Ed25519Signature.LENGTH + MultiEd25519Signature.BITMAP_LEN);
     this.signatures.forEach((k: Ed25519Signature, i: number) => {
-      bytes.set(k.value, i * Ed25519Signature.LENGTH);
+      bytes.set(k.data, i * Ed25519Signature.LENGTH);
     });
 
     bytes.set(this.bitmap, this.signatures.length * Ed25519Signature.LENGTH);

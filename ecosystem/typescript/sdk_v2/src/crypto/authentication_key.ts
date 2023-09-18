@@ -15,7 +15,7 @@ import { Ed25519PublicKey } from "./ed25519";
  * Account addresses can be derived from AuthenticationKey
  */
 export class AuthenticationKey {
-  // Length of AuthenticationKey in bytes(UInt8Array)
+  // Length of AuthenticationKey in bytes(Uint8Array)
   static readonly LENGTH: number = 32;
 
   // Scheme identifier for MultiEd25519 signatures used to derive authentication keys for MultiEd25519 public keys
@@ -28,18 +28,23 @@ export class AuthenticationKey {
   // authentication key) of a resource account.
   static readonly DERIVE_RESOURCE_ACCOUNT_SCHEME: number = 255;
 
-  private readonly _data: Hex;
+  public readonly data: Hex;
 
-  constructor(hexInput: HexInput) {
-    const hex = Hex.fromHexInput({ hexInput });
+  constructor(args: { data: HexInput }) {
+    const { data } = args;
+    const hex = Hex.fromHexInput({ hexInput: data });
     if (hex.toUint8Array().length !== AuthenticationKey.LENGTH) {
       throw new Error(`Authentication Key length should be ${AuthenticationKey.LENGTH}`);
     }
-    this._data = hex;
+    this.data = hex;
   }
 
-  get data(): Hex {
-    return this._data;
+  toString(): string {
+    return this.data.toString();
+  }
+
+  toUint8Array(): Uint8Array {
+    return this.data.toUint8Array();
   }
 
   /**
@@ -57,7 +62,7 @@ export class AuthenticationKey {
     const hash = sha3Hash.create();
     hash.update(bytes);
 
-    return new AuthenticationKey(hash.digest());
+    return new AuthenticationKey({ data: hash.digest() });
   }
 
   static fromEd25519PublicKey(publicKey: Ed25519PublicKey): AuthenticationKey {
@@ -70,7 +75,7 @@ export class AuthenticationKey {
     const hash = sha3Hash.create();
     hash.update(bytes);
 
-    return new AuthenticationKey(hash.digest());
+    return new AuthenticationKey({ data: hash.digest() });
   }
 
   /**
