@@ -85,6 +85,10 @@ impl LocalNode {
         })
     }
 
+    pub fn base_dir(&self) -> PathBuf {
+        self.directory.clone()
+    }
+
     pub fn config_path(&self) -> PathBuf {
         self.directory.join("node.yaml")
     }

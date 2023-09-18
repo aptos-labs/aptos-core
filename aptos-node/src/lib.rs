@@ -266,7 +266,7 @@ where
 
         // Build genesis and the validator node
         let builder = aptos_genesis::builder::Builder::new(&test_dir, framework.clone())?
-            .with_init_config(Some(Arc::new(move |_, config| {
+            .with_init_config(Some(Arc::new(move |_, config, _| {
                 *config = node_config.clone();
             })))
             .with_init_genesis_config(Some(Arc::new(|genesis_config| {
@@ -289,10 +289,10 @@ where
             genesis_waypoint.to_string().as_bytes(),
         )?;
 
-        aptos_config::config::sanitize_node_config(&mut validators[0].config)?;
+        aptos_config::config::sanitize_node_config(validators[0].config.override_config_mut())?;
 
         // Return the validator config
-        validators[0].config.clone()
+        validators[0].config.override_config().clone()
     };
 
     // Prepare log file since we cannot automatically route logs to stderr

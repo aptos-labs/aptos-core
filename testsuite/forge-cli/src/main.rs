@@ -2,8 +2,13 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::field_reassign_with_default)]
+
 use anyhow::{format_err, Context, Result};
-use aptos_config::config::{ChainHealthBackoffValues, ConsensusConfig, PipelineBackpressureValues};
+use aptos_config::config::{
+    BootstrappingMode, ConsensusConfig, ContinuousSyncingMode, MempoolConfig, NodeConfig,
+    StateSyncConfig,
+};
 use aptos_forge::{
     args::TransactionTypeArg,
     prometheus_metrics::LatencyBreakdownSlice,
@@ -593,6 +598,35 @@ fn wrap_with_realistic_env<T: NetworkTest + 'static>(test: T) -> CompositeNetwor
     )
 }
 
+fn mempool_config_practically_non_expiring(mempool_config: &mut MempoolConfig) {
+    mempool_config.capacity = 3_000_000;
+    mempool_config.capacity_bytes = (3_u64 * 1024 * 1024 * 1024) as usize;
+    mempool_config.capacity_per_user = 100_000;
+    mempool_config.system_transaction_timeout_secs = 5 * 60 * 60;
+    mempool_config.system_transaction_gc_interval_ms = 5 * 60 * 60_000;
+}
+
+fn state_sync_config_execute_transactions(state_sync_config: &mut StateSyncConfig) {
+    state_sync_config.state_sync_driver.bootstrapping_mode =
+        BootstrappingMode::ExecuteTransactionsFromGenesis;
+    state_sync_config.state_sync_driver.continuous_syncing_mode =
+        ContinuousSyncingMode::ExecuteTransactions;
+}
+
+fn state_sync_config_apply_transaction_outputs(state_sync_config: &mut StateSyncConfig) {
+    state_sync_config.state_sync_driver.bootstrapping_mode =
+        BootstrappingMode::ApplyTransactionOutputsFromGenesis;
+    state_sync_config.state_sync_driver.continuous_syncing_mode =
+        ContinuousSyncingMode::ApplyTransactionOutputs;
+}
+
+fn state_sync_config_fast_sync(state_sync_config: &mut StateSyncConfig) {
+    state_sync_config.state_sync_driver.bootstrapping_mode =
+        BootstrappingMode::DownloadLatestStates;
+    state_sync_config.state_sync_driver.continuous_syncing_mode =
+        ContinuousSyncingMode::ApplyTransactionOutputs;
+}
+
 fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
@@ -611,70 +645,56 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
             // no epoch change.
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
         }))
-        .with_node_helm_config_fn(Arc::new(|helm_values| {
-            // Mempool config
-            helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
-            helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
-                (3_u64 * 1024 * 1024 * 1024).into();
-            helm_values["validator"]["config"]["mempool"]["capacity_per_user"] = 100_000.into();
-            helm_values["validator"]["config"]["mempool"]["system_transaction_timeout_secs"] =
-                (5 * 60 * 60).into();
-            helm_values["validator"]["config"]["mempool"]["system_transaction_gc_interval_ms"] =
-                (5 * 60 * 60_000).into();
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            mempool_config_practically_non_expiring(&mut config.mempool);
+            state_sync_config_execute_transactions(&mut config.state_sync);
 
-            // State sync config
-            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
-                ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
-            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
-                ["continuous_syncing_mode"] = "ExecuteTransactions".into();
+            config
+                .consensus
+                .max_sending_block_txns_quorum_store_override = 30000;
+            config
+                .consensus
+                .max_receiving_block_txns_quorum_store_override = 40000;
+            config
+                .consensus
+                .max_sending_block_bytes_quorum_store_override = 10 * 1024 * 1024;
+            config
+                .consensus
+                .max_receiving_block_bytes_quorum_store_override = 12 * 1024 * 1024;
+            config.consensus.pipeline_backpressure = vec![];
+            config.consensus.chain_health_backoff = vec![];
 
-            // consensus configs
-            helm_values["validator"]["config"]["consensus"]
-                ["max_sending_block_txns_quorum_store_override"] = 30000.into();
-            helm_values["validator"]["config"]["consensus"]
-                ["max_receiving_block_txns_quorum_store_override"] = 40000.into();
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .backlog_txn_limit_count = 200000;
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .backlog_per_validator_batch_limit_count = 50;
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .dynamic_min_txn_per_s = 2000;
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .dynamic_max_txn_per_s = 8000;
 
-            helm_values["validator"]["config"]["consensus"]
-                ["max_sending_block_bytes_quorum_store_override"] = (10 * 1024 * 1024).into();
-            helm_values["validator"]["config"]["consensus"]
-                ["max_receiving_block_bytes_quorum_store_override"] = (12 * 1024 * 1024).into();
-
-            helm_values["validator"]["config"]["consensus"]["pipeline_backpressure"] =
-                serde_yaml::to_value(Vec::<PipelineBackpressureValues>::new()).unwrap();
-            helm_values["validator"]["config"]["consensus"]["chain_health_backoff"] =
-                serde_yaml::to_value(Vec::<ChainHealthBackoffValues>::new()).unwrap();
-
-            // quorum store configs
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
-                ["backlog_txn_limit_count"] = 200000.into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
-                ["backlog_per_validator_batch_limit_count"] = 50.into();
-
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
-                ["dynamic_min_txn_per_s"] = 2000.into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
-                ["dynamic_max_txn_per_s"] = 8000.into();
-
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["sender_max_batch_txns"] = 1000.into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["sender_max_batch_bytes"] = (4 * 1024 * 1024).into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["sender_max_num_batches"] = 100.into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["sender_max_total_txns"] = 4000.into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["sender_max_total_bytes"] = (8 * 1024 * 1024).into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["receiver_max_batch_txns"] = 1000.into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["receiver_max_batch_bytes"] = (4 * 1024 * 1024).into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["receiver_max_num_batches"] = 100.into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["receiver_max_total_txns"] = 4000.into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["receiver_max_total_bytes"] = (8 * 1024 * 1024).into();
+            config.consensus.quorum_store.sender_max_batch_txns = 1000;
+            config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
+            config.consensus.quorum_store.sender_max_num_batches = 100;
+            config.consensus.quorum_store.sender_max_total_txns = 4000;
+            config.consensus.quorum_store.sender_max_total_bytes = 8 * 1024 * 1024;
+            config.consensus.quorum_store.receiver_max_batch_txns = 1000;
+            config.consensus.quorum_store.receiver_max_batch_bytes = 4 * 1024 * 1024;
+            config.consensus.quorum_store.receiver_max_num_batches = 100;
+            config.consensus.quorum_store.receiver_max_total_txns = 4000;
+            config.consensus.quorum_store.receiver_max_total_bytes = 8 * 1024 * 1024;
         }))
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
@@ -809,9 +829,8 @@ fn realistic_env_sweep_wrap(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
-        .with_node_helm_config_fn(Arc::new(move |helm_values| {
-            helm_values["validator"]["config"]["execution"]
-                ["processed_transactions_detailed_counters"] = true.into();
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.execution.processed_transactions_detailed_counters = true;
         }))
         .add_network_test(wrap_with_realistic_env(test))
         // Test inherits the main EmitJobRequest, so update here for more precise latency measurements
@@ -955,9 +974,8 @@ fn workload_vs_perf_benchmark() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .with_node_helm_config_fn(Arc::new(move |helm_values| {
-            helm_values["validator"]["config"]["execution"]
-                ["processed_transactions_detailed_counters"] = true.into();
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.execution.processed_transactions_detailed_counters = true;
         }))
         .add_network_test(LoadVsPerfBenchmark {
             test: Box::new(PerformanceBenchmark),
@@ -1100,9 +1118,8 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
                 .mode(EmitJobMode::ConstTps { tps: 1000 })
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
         )
-        .with_node_helm_config_fn(Arc::new(move |helm_values| {
-            helm_values["validator"]["config"]["execution"]
-                ["processed_transactions_detailed_counters"] = true.into();
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.execution.processed_transactions_detailed_counters = true;
         }))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
@@ -1132,9 +1149,8 @@ fn workload_mix_test() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
         .with_initial_fullnode_count(3)
         .add_network_test(PerformanceBenchmark)
-        .with_node_helm_config_fn(Arc::new(move |helm_values| {
-            helm_values["validator"]["config"]["execution"]
-                ["processed_transactions_detailed_counters"] = true.into();
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.execution.processed_transactions_detailed_counters = true;
         }))
         .with_emit_job(
             EmitJobRequest::default()
@@ -1210,9 +1226,8 @@ fn individual_workload_tests(test_name: String) -> ForgeConfig {
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
-        .with_node_helm_config_fn(Arc::new(move |helm_values| {
-            helm_values["validator"]["config"]["execution"]
-                ["processed_transactions_detailed_counters"] = true.into();
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.execution.processed_transactions_detailed_counters = true;
         }))
         .with_emit_job(
             if test_name == "write_new_resource" {
@@ -1288,9 +1303,12 @@ fn validator_reboot_stress_test() -> ForgeConfig {
         }))
 }
 
-fn apply_quorum_store_configs_for_single_node(helm_values: &mut serde_yaml::Value) {
-    helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
-        ["dynamic_max_txn_per_s"] = 5500.into();
+fn apply_config_for_quorum_store_single_node(config: &mut NodeConfig) {
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .dynamic_max_txn_per_s = 5500;
 }
 
 fn single_vfn_perf() -> ForgeConfig {
@@ -1303,8 +1321,8 @@ fn single_vfn_perf() -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )
-        .with_node_helm_config_fn(Arc::new(|helm_values| {
-            apply_quorum_store_configs_for_single_node(helm_values);
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            apply_config_for_quorum_store_single_node(config);
         }))
 }
 
@@ -1343,16 +1361,11 @@ fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
             },
             ThreeRegionSameCloudSimulationTest,
         ))
-        .with_node_helm_config_fn(Arc::new(move |helm_values| {
-            helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
-            // helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
-            //     4000.into();
-            // helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
-            //     1000000.into();
-            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
-                ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
-            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
-                ["continuous_syncing_mode"] = "ExecuteTransactions".into();
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.api.failpoints_enabled = true;
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            state_sync_config_execute_transactions(&mut config.state_sync);
         }))
         .with_success_criteria(
             SuccessCriteria::new(1000)
@@ -1392,8 +1405,8 @@ fn network_partition() -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )
-        .with_node_helm_config_fn(Arc::new(|helm_values| {
-            apply_quorum_store_configs_for_single_node(helm_values);
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            apply_config_for_quorum_store_single_node(config);
         }))
 }
 
@@ -1442,11 +1455,8 @@ fn state_sync_perf_fullnodes_apply_outputs() -> ForgeConfig {
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
-        .with_node_helm_config_fn(Arc::new(|helm_values| {
-            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
-                ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
-            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
-                ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            state_sync_config_apply_transaction_outputs(&mut config.state_sync);
         }))
         .with_success_criteria(SuccessCriteria::new(9000))
 }
@@ -1459,11 +1469,8 @@ fn state_sync_perf_fullnodes_execute_transactions() -> ForgeConfig {
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
-        .with_node_helm_config_fn(Arc::new(|helm_values| {
-            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
-                ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
-            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
-                ["continuous_syncing_mode"] = "ExecuteTransactions".into();
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            state_sync_config_execute_transactions(&mut config.state_sync);
         }))
         .with_success_criteria(SuccessCriteria::new(5000))
 }
@@ -1483,11 +1490,8 @@ fn state_sync_perf_fullnodes_fast_sync() -> ForgeConfig {
                 })
                 .transaction_type(TransactionTypeArg::AccountGeneration.materialize_default()), // Create many state values
         )
-        .with_node_helm_config_fn(Arc::new(|helm_values| {
-            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
-                ["bootstrapping_mode"] = "DownloadLatestStates".into();
-            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
-                ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            state_sync_config_fast_sync(&mut config.state_sync);
         }))
 }
 
@@ -1499,11 +1503,8 @@ fn state_sync_perf_validators() -> ForgeConfig {
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
-        .with_node_helm_config_fn(Arc::new(|helm_values| {
-            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
-                ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
-            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
-                ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            state_sync_config_apply_transaction_outputs(&mut config.state_sync);
         }))
         .add_network_test(StateSyncValidatorPerformance)
         .with_success_criteria(SuccessCriteria::new(5000))
@@ -1652,32 +1653,36 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
             mempool_backlog: 150000,
         }))
-        .with_node_helm_config_fn(Arc::new(move |helm_values| {
-            helm_values["validator"]["config"]["consensus"]
-                ["max_sending_block_txns_quorum_store_override"] = 10000.into();
-            helm_values["validator"]["config"]["consensus"]["pipeline_backpressure"] =
-                serde_yaml::to_value(Vec::<PipelineBackpressureValues>::new()).unwrap();
-            helm_values["validator"]["config"]["consensus"]["chain_health_backoff"] =
-                serde_yaml::to_value(Vec::<ChainHealthBackoffValues>::new()).unwrap();
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config
+                .consensus
+                .max_sending_block_txns_quorum_store_override = 10000;
+            config.consensus.pipeline_backpressure = vec![];
+            config.consensus.chain_health_backoff = vec![];
+            config
+                .consensus
+                .wait_for_full_blocks_above_recent_fill_threshold = 0.8;
+            config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
 
-            helm_values["validator"]["config"]["consensus"]
-                ["wait_for_full_blocks_above_recent_fill_threshold"] = (0.8).into();
-            helm_values["validator"]["config"]["consensus"]
-                ["wait_for_full_blocks_above_pending_blocks"] = 8.into();
-
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
-                ["backlog_txn_limit_count"] = 100000.into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
-                ["backlog_per_validator_batch_limit_count"] = 10.into();
-
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
-                ["dynamic_max_txn_per_s"] = 6000.into();
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .backlog_txn_limit_count = 100000;
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .backlog_per_validator_batch_limit_count = 10;
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .dynamic_max_txn_per_s = 6000;
 
             // Experimental storage optimizations
-            helm_values["validator"]["config"]["storage"]["rocksdb_configs"]["split_ledger_db"] =
-                true.into();
-            helm_values["validator"]["config"]["storage"]["rocksdb_configs"]
-                ["use_sharded_state_merkle_db"] = true.into();
+            config.storage.rocksdb_configs.split_ledger_db = true;
+            config.storage.rocksdb_configs.use_sharded_state_merkle_db = true;
         }))
         .with_success_criteria(
             SuccessCriteria::new(8000)
@@ -1750,21 +1755,20 @@ fn changing_working_quorum_test_helper(
             helm_values["genesis"]["validator"]["num_validators_with_larger_stake"] =
                 num_large_validators.into();
         }))
-        .with_node_helm_config_fn(Arc::new(move |helm_values| {
-            helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
+        .with_validator_override_node_config_fn(Arc::new(move |config, _| {
+            config.api.failpoints_enabled = true;
             let block_size = (target_tps / 4) as u64;
-            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
-                block_size.into();
-            helm_values["validator"]["config"]["consensus"]
-                ["max_sending_block_txns_quorum_store_override"] = block_size.into();
-            helm_values["validator"]["config"]["consensus"]
-                ["max_receiving_block_txns_quorum_store_override"] = block_size.into();
-            helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
-                500.into();
-            helm_values["validator"]["config"]["consensus"]
-                ["round_timeout_backoff_exponent_base"] = 1.0.into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store_poll_time_ms"] =
-                100.into();
+
+            config.consensus.max_sending_block_txns = block_size;
+            config
+                .consensus
+                .max_sending_block_txns_quorum_store_override = block_size;
+            config
+                .consensus
+                .max_receiving_block_txns_quorum_store_override = block_size;
+            config.consensus.round_initial_timeout_ms = 500;
+            config.consensus.round_timeout_backoff_exponent_base = 1.0;
+            config.consensus.quorum_store_poll_time_ms = 100;
 
             let mut min_block_txns = block_size;
             let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;
@@ -1781,26 +1785,22 @@ fn changing_working_quorum_test_helper(
                     item.backoff_if_below_participating_voting_power_percentage = 90 - i * 5;
                 }
             }
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["sender_max_batch_txns"] = min_block_txns.into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["receiver_max_batch_txns"] = min_block_txns.into();
+            config.consensus.quorum_store.sender_max_batch_txns = min_block_txns as usize;
+            config.consensus.quorum_store.receiver_max_batch_txns = min_block_txns as usize;
 
-            helm_values["validator"]["config"]["consensus"]["chain_health_backoff"] =
-                serde_yaml::to_value(chain_health_backoff).unwrap();
+            config.consensus.chain_health_backoff = chain_health_backoff;
 
             // Override the syncing mode of all nodes to use transaction output syncing.
             // TODO(joshlind): remove me once we move back to output syncing by default.
             if apply_txn_outputs {
-                helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
-                    ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
-                helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
-                    ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
-
-                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
-                    ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
-                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
-                    ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+                state_sync_config_apply_transaction_outputs(&mut config.state_sync);
+            }
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(move |config, _| {
+            // Override the syncing mode of all nodes to use transaction output syncing.
+            // TODO(joshlind): remove me once we move back to output syncing by default.
+            if apply_txn_outputs {
+                state_sync_config_apply_transaction_outputs(&mut config.state_sync);
             }
         }))
         .with_emit_job(
@@ -1849,13 +1849,11 @@ fn large_db_test(
         .with_initial_fullnode_count(std::cmp::max(2, target_tps / 1000))
         .add_network_test(PerformanceBenchmark)
         .with_existing_db(existing_db_tag.clone())
-        .with_node_helm_config_fn(Arc::new(move |helm_values| {
-            helm_values["validator"]["storage"]["labels"]["tag"] = existing_db_tag.clone().into();
-            helm_values["fullnode"]["storage"]["labels"]["tag"] = existing_db_tag.clone().into();
-            helm_values["validator"]["config"]["base"]["working_dir"] =
-                "/opt/aptos/data/checkpoint".into();
-            helm_values["fullnode"]["config"]["base"]["working_dir"] =
-                "/opt/aptos/data/checkpoint".into();
+        .with_validator_override_node_config_fn(Arc::new(move |config, _| {
+            config.base.working_dir = Some(PathBuf::from("/opt/aptos/data/checkpoint"));
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(move |config, _| {
+            config.base.working_dir = Some(PathBuf::from("/opt/aptos/data/checkpoint"));
         }))
         .with_emit_job(
             EmitJobRequest::default()
@@ -1944,15 +1942,7 @@ fn multiregion_benchmark_test() -> ForgeConfig {
 
             helm_values["genesis"]["multicluster"]["enabled"] = true.into();
         }))
-        .with_node_helm_config_fn(Arc::new(|helm_values| {
-            helm_values["multicluster"]["enabled"] = true.into();
-            // Create headless services for validators and fullnodes.
-            // Note: chaos-mesh will not work with clusterIP services.
-            helm_values["service"]["validator"]["internal"]["type"] = "ClusterIP".into();
-            helm_values["service"]["validator"]["internal"]["headless"] = true.into();
-            helm_values["service"]["fullnode"]["internal"]["type"] = "ClusterIP".into();
-            helm_values["service"]["fullnode"]["internal"]["headless"] = true.into();
-        }))
+        .with_multi_region_config()
         .with_success_criteria(
             SuccessCriteria::new(4500)
                 .add_no_restarts()

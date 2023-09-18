@@ -174,7 +174,7 @@ async fn test_gas_estimation_inner(swarm: &mut LocalSwarm) {
 #[tokio::test]
 async fn test_gas_estimation_txns_limit() {
     let mut swarm = SwarmBuilder::new_local(1)
-        .with_init_config(Arc::new(|_, conf| {
+        .with_init_config(Arc::new(|_, conf, _| {
             let max_block_txns = 3;
             conf.api.gas_estimation.enabled = true;
             // Use a small full block threshold to make gas estimates update sooner.
@@ -213,7 +213,7 @@ async fn test_gas_estimation_gas_used_limit() {
                 block_gas_limit: Some(1),
             });
         }))
-        .with_init_config(Arc::new(|_, conf| {
+        .with_init_config(Arc::new(|_, conf, _| {
             let max_block_txns = 3;
             conf.api.gas_estimation.enabled = true;
             // The full block threshold will never be hit
