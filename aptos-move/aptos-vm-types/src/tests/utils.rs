@@ -9,6 +9,7 @@ use crate::{
 use aptos_aggregator::{
     aggregator_change_set::AggregatorChange,
     delta_change_set::{delta_add, serialize, DeltaOp},
+    types::AggregatorID,
 };
 use aptos_types::{
     account_address::AccountAddress,

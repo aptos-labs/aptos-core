@@ -199,7 +199,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_addition_deltavalue() {
+    fn test_unsigned_add_delta() {
         let math = BoundedMath::new(100);
         assert_eq!(
             math.unsigned_add_delta(10, &SignedU128::Positive(5)),
@@ -223,7 +223,7 @@ mod test {
     }
 
     #[test]
-    fn delta_add() {
+    fn test_signed_add() {
         let math = BoundedMath::new(100);
         assert_eq!(
             math.signed_add(&SignedU128::Positive(10), &SignedU128::Positive(5)),

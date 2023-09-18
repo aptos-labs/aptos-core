@@ -8,7 +8,7 @@ use crate::{
     block_executor::vm_wrapper::AptosExecutorTask,
     counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS},
 };
-use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_aggregator::{delta_change_set::DeltaOp, types::AggregatorID};
 use aptos_block_executor::{
     errors::Error, executor::BlockExecutor,
     task::TransactionOutput as BlockExecutorTransactionOutput,
