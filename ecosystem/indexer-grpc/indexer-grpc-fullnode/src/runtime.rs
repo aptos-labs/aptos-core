@@ -13,6 +13,9 @@ use aptos_protos::internal::fullnode::v1::{
     transactions_from_node_response, GetTransactionsFromNodeRequest, StreamStatus,
     TransactionsFromNodeResponse,
 };
+use aptos_protos::indexer::v1::{
+    GetTransactionsRequest, TransactionsResponse,
+    raw_data_server::{RawDataServer, RawData}};
 use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
 use futures::Stream;
@@ -27,11 +30,20 @@ pub const RETRY_TIME_MILLIS: u64 = 100;
 const TRANSACTION_CHANNEL_SIZE: usize = 35;
 const DEFAULT_EMIT_SIZE: usize = 1000;
 
-type ResponseStream =
+type FullnodeResponseStream =
     Pin<Box<dyn Stream<Item = Result<TransactionsFromNodeResponse, Status>> + Send>>;
+type TransactionResponseStream = Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
 
 // The GRPC server
 pub struct FullnodeDataService {
+    pub context: Arc<Context>,
+    pub processor_task_count: u16,
+    pub processor_batch_size: u16,
+    pub output_batch_size: u16,
+}
+
+// TODO: move it to data service.
+pub struct RawDataService {
     pub context: Arc<Context>,
     pub processor_task_count: u16,
     pub processor_batch_size: u16,
@@ -63,6 +75,12 @@ pub fn bootstrap(
     runtime.spawn(async move {
         let context = Arc::new(Context::new(chain_id, db, mp_sender, node_config));
         let server = FullnodeDataService {
+            context: context.clone(),
+            processor_task_count,
+            processor_batch_size,
+            output_batch_size,
+        };
+        let indexer_server = RawDataService {
             context,
             processor_task_count,
             processor_batch_size,
@@ -73,6 +91,7 @@ pub fn bootstrap(
             .http2_keepalive_interval(Some(std::time::Duration::from_secs(60)))
             .http2_keepalive_timeout(Some(std::time::Duration::from_secs(5)))
             .add_service(FullnodeDataServer::new(server))
+            .add_service(RawDataServer::new(indexer_server))
             // Make port into a config
             .serve(address.to_socket_addrs().unwrap().next().unwrap())
             .await
@@ -84,7 +103,7 @@ pub fn bootstrap(
 
 #[tonic::async_trait]
 impl FullnodeData for FullnodeDataService {
-    type GetTransactionsFromNodeStream = ResponseStream;
+    type GetTransactionsFromNodeStream = FullnodeResponseStream;
 
     /// This function is required by the GRPC tonic server. It basically handles the request.
     /// Given we want to persist the stream for better performance, our approach is that when
@@ -203,5 +222,93 @@ pub fn get_status(
             },
         )),
         chain_id: ledger_chain_id as u32,
+    }
+}
+
+#[tonic::async_trait]
+impl RawData for RawDataService {
+    type GetTransactionsStream = TransactionResponseStream;
+
+    async fn get_transactions(
+        &self,
+        req: Request<GetTransactionsRequest>,
+    ) -> Result<Response<Self::GetTransactionsStream>, Status> {
+        // Some node metadata
+        let context = self.context.clone();
+        let r = req.into_inner();
+        let starting_version = r.starting_version.expect("Starting version must be set");
+        let processor_batch_size = self.processor_batch_size;
+        let output_batch_size = self.output_batch_size;
+        let ledger_chain_id = context.chain_id().id();
+        let transactions_count = r.transactions_count;
+        // Creates a channel to send the stream to the client
+        let (tx, mut rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
+        let (external_service_tx, external_service_rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
+
+        tokio::spawn(async move {
+            // Initialize the coordinator that tracks starting version and processes transactions
+            let mut coordinator = IndexerStreamCoordinator::new(
+                context,
+                starting_version,
+                // Performance is not important for raw data, and to make sure data is in order,
+                // single thread is used.
+                1,
+                processor_batch_size,
+                output_batch_size,
+                tx.clone(),
+            );
+            loop {
+                // Processes and sends batch of transactions to client
+                let results = coordinator.process_next_batch().await;
+                let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
+                    Ok(max_version) => max_version,
+                    Err(e) => {
+                        error!("[indexer-grpc] Error sending to stream: {}", e);
+                        break;
+                    },
+                };
+                coordinator.current_version = max_version + 1;
+            }
+        });
+        tokio::spawn(async move {
+            let mut response_transactions_count = transactions_count;
+            while let Some(response) = rx.recv().await {
+                if let Some(count) = response_transactions_count.as_ref() {
+                    if *count == 0 {
+                        break;
+                    }
+                }
+
+                let response = response.map(|t| {
+                    TransactionsResponse {
+                        chain_id: Some(ledger_chain_id as u64),
+                        transactions: match t.response.unwrap() {
+                            transactions_from_node_response::Response::Data(transaction_output) => {
+                                let mut transactions = transaction_output.transactions;
+                                let current_transactions_count = transactions.len() as u64;
+                                if let Some(count) = response_transactions_count.as_mut() {
+                                    transactions = transactions.into_iter().take(*count as usize).collect();
+                                    *count = count.saturating_sub(current_transactions_count);
+                                }
+                                transactions
+                            },
+                            _ => vec![],
+                        }
+                    }
+                });
+                match external_service_tx.send(response).await {
+                    Ok(_) => {},
+                    Err(e) => {
+                        aptos_logger::warn!("[indexer-grpc] Unable to send end batch status: {:?}", e);
+                        break;
+                    },
+                }
+            }
+        });
+
+        let output_stream = ReceiverStream::new(external_service_rx);
+        Ok(Response::new(
+            Box::pin(output_stream) as Self::GetTransactionsStream
+        ))
     }
 }
