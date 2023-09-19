@@ -289,10 +289,10 @@ where
             genesis_waypoint.to_string().as_bytes(),
         )?;
 
-        aptos_config::config::sanitize_node_config(&mut validators[0].config)?;
+        aptos_config::config::sanitize_node_config(validators[0].config.override_config_mut())?;
 
         // Return the validator config
-        validators[0].config.clone()
+        validators[0].config.override_config().clone()
     };
 
     // Prepare log file since we cannot automatically route logs to stderr

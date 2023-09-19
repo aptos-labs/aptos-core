@@ -42,8 +42,7 @@ impl StateSyncTrigger {
     }
 
     /// This method checks if a state sync is required, and if so,
-    /// notifies the bootstraper and yields the current task infinitely,
-    /// to let the bootstraper can abort this task.
+    /// notifies the bootstraper, to let the bootstraper can abort this task.
     pub(super) async fn check(
         &self,
         node: CertifiedNodeMessage,

@@ -91,8 +91,6 @@ SUBCOMMANDS:
             Run a Move script
     test
             Runs Move unit tests for a package
-    transactional-test
-            Run Move transactional tests
     verify-package
             Downloads a package and verifies the bytecode
     view

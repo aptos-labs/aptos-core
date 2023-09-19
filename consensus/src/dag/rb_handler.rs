@@ -12,6 +12,7 @@ use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
+use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
 use thiserror::Error as ThisError;
 
@@ -140,11 +141,12 @@ fn read_votes_from_storage(
     votes_by_round_peer
 }
 
+#[async_trait]
 impl RpcHandler for NodeBroadcastHandler {
     type Request = Node;
     type Response = Vote;
 
-    fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
+    async fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
         let node = self.validate(node)?;
 
         let votes_by_peer = self

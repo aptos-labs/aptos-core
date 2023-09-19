@@ -16,14 +16,16 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::{ExecutorError, ExecutorResult, StateComputeResult};
+use aptos_executor_types::{ExecutorResult, StateComputeResult};
 use aptos_logger::prelude::*;
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
+use async_trait::async_trait;
 use fail::fail_point;
 use futures::{
     channel::{mpsc::UnboundedSender, oneshot},
     SinkExt,
 };
+use futures_channel::mpsc::unbounded;
 use std::sync::Arc;
 
 /// Ordering-only execution proxy
@@ -74,7 +76,7 @@ impl StateComputer for OrderingStateComputer {
         blocks: &[Arc<ExecutedBlock>],
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
-    ) -> Result<(), ExecutorError> {
+    ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
 
         if self
@@ -132,4 +134,74 @@ impl StateComputer for OrderingStateComputer {
     }
 
     fn end_epoch(&self) {}
+}
+
+// TODO: stop using state computer for DAG state sync
+pub struct DagStateSyncComputer {
+    ordering_state_computer: OrderingStateComputer,
+}
+
+impl DagStateSyncComputer {
+    pub fn new(
+        state_computer_for_sync: Arc<dyn StateComputer>,
+        reset_event_channel_tx: UnboundedSender<ResetRequest>,
+    ) -> Self {
+        // note: this channel is unused
+        let (sender_tx, _) = unbounded();
+        Self {
+            ordering_state_computer: OrderingStateComputer {
+                executor_channel: sender_tx,
+                state_computer_for_sync,
+                reset_event_channel_tx,
+            },
+        }
+    }
+}
+
+#[async_trait]
+impl StateComputer for DagStateSyncComputer {
+    async fn compute(
+        &self,
+        // The block that will be computed.
+        _block: &Block,
+        // The parent block root hash.
+        _parent_block_id: HashValue,
+    ) -> ExecutorResult<StateComputeResult> {
+        unimplemented!("method not supported")
+    }
+
+    /// Send a successful commit. A future is fulfilled when the state is finalized.
+    async fn commit(
+        &self,
+        _blocks: &[Arc<ExecutedBlock>],
+        _finality_proof: LedgerInfoWithSignatures,
+        _callback: StateComputerCommitCallBackType,
+    ) -> ExecutorResult<()> {
+        unimplemented!("method not supported")
+    }
+
+    /// Best effort state synchronization to the given target LedgerInfo.
+    /// In case of success (`Result::Ok`) the LI of storage is at the given target.
+    /// In case of failure (`Result::Error`) the LI of storage remains unchanged, and the validator
+    /// can assume there were no modifications to the storage made.
+    async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+        self.ordering_state_computer.sync_to(target).await
+    }
+
+    // Reconfigure to execute transactions for a new epoch.
+    fn new_epoch(
+        &self,
+        _epoch_state: &EpochState,
+        _payload_manager: Arc<PayloadManager>,
+        _transaction_shuffler: Arc<dyn TransactionShuffler>,
+        _block_gas_limit: Option<u64>,
+        _transaction_deduper: Arc<dyn TransactionDeduper>,
+    ) {
+        unimplemented!("method not supported");
+    }
+
+    // Reconfigure to clear epoch state at end of epoch.
+    fn end_epoch(&self) {
+        unimplemented!("method not supported")
+    }
 }

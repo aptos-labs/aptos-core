@@ -17,13 +17,13 @@ use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use lru::LruCache;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 /// Gets the epoch ending ledger info at the given epoch
 pub fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
-    subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
+    subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
     epoch: u64,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
@@ -85,7 +85,7 @@ pub fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
 pub fn notify_peer_of_new_data<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
-    subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
+    subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,

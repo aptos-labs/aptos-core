@@ -553,7 +553,9 @@ impl ContinuousTransactionStreamEngine {
             if subscription_stream_index
                 >= active_subscription_stream.get_max_subscription_stream_index()
             {
+                // Terminate the stream and update the termination metrics
                 self.active_subscription_stream = None;
+                update_terminated_subscription_metrics(metrics::MAX_CONSECUTIVE_REQUESTS_LABEL);
             }
         }
 
@@ -816,8 +818,9 @@ impl ContinuousTransactionStreamEngine {
             )));
         }
 
-        // Reset the active subscription stream
+        // Reset the active subscription stream and update the metrics
         self.active_subscription_stream = None;
+        update_terminated_subscription_metrics(request_error.get_label());
 
         // Log the error based on the request type
         if matches!(
@@ -2052,4 +2055,9 @@ fn extract_new_versions_and_target(
     }
 
     Ok((num_versions, target_ledger_info))
+}
+
+/// Updates the metrics with a terminated subscription event and reason
+fn update_terminated_subscription_metrics(termination_reason: &str) {
+    metrics::increment_counter(&metrics::TERMINATE_SUBSCRIPTION_STREAM, termination_reason);
 }

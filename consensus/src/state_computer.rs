@@ -6,6 +6,7 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
     error::StateSyncError,
+    execution_pipeline::ExecutionPipeline,
     monitor,
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
@@ -25,9 +26,11 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
 use fail::fail_point;
-use futures::{SinkExt, StreamExt};
+use futures::{future::BoxFuture, SinkExt, StreamExt};
 use std::{boxed::Box, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
+
+pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<StateComputeResult>>;
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
@@ -60,6 +63,7 @@ pub struct ExecutionProxy {
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
     maybe_block_gas_limit: Mutex<Option<u64>>,
     transaction_deduper: Mutex<Option<Arc<dyn TransactionDeduper>>>,
+    execution_pipeline: ExecutionPipeline,
 }
 
 impl ExecutionProxy {
@@ -84,6 +88,7 @@ impl ExecutionProxy {
                 callback();
             }
         });
+        let execution_pipeline = ExecutionPipeline::spawn(executor.clone(), handle);
         Self {
             executor,
             txn_notifier,
@@ -95,6 +100,7 @@ impl ExecutionProxy {
             transaction_shuffler: Mutex::new(None),
             maybe_block_gas_limit: Mutex::new(None),
             transaction_deduper: Mutex::new(None),
+            execution_pipeline,
         }
     }
 }
@@ -102,18 +108,13 @@ impl ExecutionProxy {
 // TODO: filter duplicated transaction before executing
 #[async_trait::async_trait]
 impl StateComputer for ExecutionProxy {
-    async fn compute(
+    async fn schedule_compute(
         &self,
         // The block to be executed.
         block: &Block,
         // The parent block id.
         parent_block_id: HashValue,
-    ) -> ExecutorResult<StateComputeResult> {
-        fail_point!("consensus::compute", |_| {
-            Err(aptos_executor_types::ExecutorError::InternalError {
-                error: "Injected error in compute".into(),
-            })
-        });
+    ) -> StateComputeResultFut {
         let block_id = block.id();
         debug!(
             block = %block,
@@ -124,48 +125,54 @@ impl StateComputer for ExecutionProxy {
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
         let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
-        let txns = payload_manager.get_transactions(block).await?;
+        let txn_notifier = self.txn_notifier.clone();
+        let txns = match payload_manager.get_transactions(block).await {
+            Ok(txns) => txns,
+            Err(err) => return Box::pin(async move { Err(err) }),
+        };
 
         let deduped_txns = txn_deduper.dedup(txns);
         let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
-        let block_gas_limit = *self.maybe_block_gas_limit.lock();
+        let maybe_block_gas_limit = *self.maybe_block_gas_limit.lock();
 
         // TODO: figure out error handling for the prologue txn
-        let executor = self.executor.clone();
-
+        let timestamp = block.timestamp_usecs();
         let transactions_to_execute = block.transactions_to_execute(
             &self.validators.lock(),
             shuffled_txns.clone(),
-            block_gas_limit,
+            maybe_block_gas_limit,
         );
 
-        let compute_result = monitor!(
-            "execute_block",
-            tokio::task::spawn_blocking(move || {
-                executor.execute_block(
-                    (block_id, transactions_to_execute).into(),
-                    parent_block_id,
-                    block_gas_limit,
-                )
-            })
-            .await
-        )
-        .expect("spawn_blocking failed")?;
+        let fut = self
+            .execution_pipeline
+            .queue(
+                (block_id, transactions_to_execute).into(),
+                parent_block_id,
+                maybe_block_gas_limit,
+            )
+            .await;
 
-        observe_block(block.timestamp_usecs(), BlockStage::EXECUTED);
-
-        // notify mempool about failed transaction
-        if let Err(e) = self
-            .txn_notifier
-            .notify_failed_txn(shuffled_txns, &compute_result)
-            .await
-        {
-            error!(
-                error = ?e, "Failed to notify mempool of rejected txns",
+        Box::pin(async move {
+            debug!(
+                block_id = block_id,
+                "Got state compute result, post processing."
             );
-        }
-        Ok(compute_result)
+            let compute_result = fut.await?;
+            observe_block(timestamp, BlockStage::EXECUTED);
+
+            // notify mempool about failed transaction
+            if let Err(e) = txn_notifier
+                .notify_failed_txn(shuffled_txns, &compute_result)
+                .await
+            {
+                error!(
+                    error = ?e, "Failed to notify mempool of rejected txns",
+                );
+            }
+
+            Ok(compute_result)
+        })
     }
 
     /// Send a successful commit. A future is fulfilled when the state is finalized.

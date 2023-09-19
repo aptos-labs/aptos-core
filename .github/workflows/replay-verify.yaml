@@ -69,7 +69,7 @@ jobs:
     if: |
       github.event_name == 'schedule' ||
       github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all' )
+      github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'mainnet' || inputs.CHAIN_NAME == 'all' )
     needs: determine-test-metadata
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-replay-verify.yaml@main
     secrets: inherit
@@ -83,7 +83,7 @@ jobs:
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
       # workflow config
       RUNS_ON: "high-perf-docker-with-local-ssd"
-      TIMEOUT_MINUTES: 240
+      TIMEOUT_MINUTES: 300
 
   test-replay:
     if: ${{ github.event_name == 'pull_request' }}

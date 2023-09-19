@@ -9,7 +9,9 @@ use crate::{
         MAX_CATCH_UP_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
     },
 };
-use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
+use aptos_config::config::{
+    BootstrappingMode, ContinuousSyncingMode, NodeConfig, OverrideNodeConfig,
+};
 use aptos_forge::{LocalSwarm, Node, NodeExt, Swarm, SwarmExt};
 use aptos_inspection_service::inspection_client::InspectionClient;
 use aptos_rest_client::Client as RestClient;
@@ -228,7 +230,7 @@ async fn create_full_node(full_node_config: NodeConfig, swarm: &mut LocalSwarm) 
     let vfn_peer_id = swarm
         .add_validator_fullnode(
             &swarm.versions().max().unwrap(),
-            full_node_config,
+            OverrideNodeConfig::new_with_default_base(full_node_config),
             validator_peer_id,
         )
         .unwrap();

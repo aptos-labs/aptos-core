@@ -303,11 +303,12 @@ impl FetchRequestHandler {
     }
 }
 
+#[async_trait]
 impl RpcHandler for FetchRequestHandler {
     type Request = RemoteFetchRequest;
     type Response = FetchResponse;
 
-    fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response> {
+    async fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response> {
         let dag_reader = self.dag.read();
 
         // `Certified Node`: In the good case, there should exist at least one honest validator that

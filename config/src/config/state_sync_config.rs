@@ -301,7 +301,7 @@ impl Default for AptosDataClientConfig {
             max_optimistic_fetch_lag_secs: 30, // 30 seconds
             max_response_timeout_ms: 60_000,   // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_lag_secs: 60, // 60 seconds
+            max_subscription_lag_secs: 30, // 30 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             optimistic_fetch_timeout_ms: 5000, // 5 seconds
