@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::helpers_v1::set_aggregator_field;
 use crate::natives::aggregator_natives::helpers_v1::get_aggregator_field;
 use aptos_aggregator::{aggregator_extension::extension_error, types::AggregatorID};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -12,26 +13,14 @@ use move_vm_types::values::{Struct, StructRef, Value};
 const VALUE_FIELD_INDEX: usize = 0;
 const LIMIT_FIELD_INDEX: usize = 1;
 
-/// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
-pub(crate) fn aggregator_value_as_u128(
-    aggregator: &StructRef,
-) -> PartialVMResult<(AggregatorID, u128)> {
-    let (value, limit) = get_aggregator_fields_u128(aggregator)?;
+pub(crate) fn aggregator_value_field_as_id(value: u128) -> PartialVMResult<AggregatorID> {
     if value > u64::MAX as u128 {
         return Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("Aggregator identifier is too small".to_string()),
         );
     }
-    Ok((AggregatorID::new(value as u64), limit))
-}
-
-/// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
-pub(crate) fn aggregator_value_as_u64(
-    aggregator: &StructRef,
-) -> PartialVMResult<(AggregatorID, u64)> {
-    let (value, limit) = get_aggregator_fields_u64(aggregator)?;
-    Ok((AggregatorID::new(value), limit))
+    Ok(AggregatorID::new(value as u64))
 }
 
 /// Given a reference to `Aggregator` Move struct, returns a tuple of its
@@ -40,6 +29,10 @@ pub fn get_aggregator_fields_u128(aggregator: &StructRef) -> PartialVMResult<(u1
     let value = get_aggregator_field(aggregator, VALUE_FIELD_INDEX)?.value_as::<u128>()?;
     let limit = get_aggregator_field(aggregator, LIMIT_FIELD_INDEX)?.value_as::<u128>()?;
     Ok((value, limit))
+}
+
+pub fn set_aggregator_value_field(aggregator: &StructRef, value: Value) -> PartialVMResult<()> {
+    set_aggregator_field(aggregator, VALUE_FIELD_INDEX, value)
 }
 
 /// Given a reference to `Aggregator` Move struct, returns a tuple of its

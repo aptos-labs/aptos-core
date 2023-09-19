@@ -1,18 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::helpers_v2::get_aggregator_fields_u64;
 use crate::natives::{
     aggregator_natives::{
         helpers_v2::{
             aggregator_snapshot_value_as_bytes, aggregator_snapshot_value_as_u128,
-            aggregator_snapshot_value_as_u64, aggregator_value_as_u128, aggregator_value_as_u64,
-            string_to_bytes,
+            aggregator_snapshot_value_as_u64, aggregator_value_field_as_id,
+            get_aggregator_fields_u128, set_aggregator_value_field, string_to_bytes,
         },
         NativeAggregatorContext,
     },
     AccountAddress,
 };
-use aptos_aggregator::types::{AggregatorID, AggregatorVersionedID};
+use aptos_aggregator::{bounded_math::BoundedMath, types::AggregatorVersionedID};
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
@@ -34,8 +35,8 @@ use std::{collections::VecDeque, ops::Deref};
 /// The generic type supplied to aggregator snapshots is not supported.
 pub const EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE: u64 = 0x03_0005;
 
-/// The aggregator snapshots feature is not enabled.
-pub const EAGGREGATOR_SNAPSHOTS_NOT_ENABLED: u64 = 0x03_0006;
+/// The aggregator api feature is not enabled.
+pub const EAGGREGATOR_API_NOT_ENABLED: u64 = 0x03_0006;
 
 /// The generic type supplied to the aggregators is not supported.
 pub const EUNSUPPORTED_AGGREGATOR_TYPE: u64 = 0x03_0007;
@@ -53,20 +54,20 @@ fn is_string_type(context: &SafeNativeContext, type_arg: &Type) -> SafeNativeRes
 
 /// Given the list of native function arguments and a type, returns a tuple of its
 /// fields: (`aggregator id`, `limit`).
-pub fn pop_aggregator_fields_by_type(
+pub fn get_aggregator_fields_by_type(
     ty_arg: &Type,
-    args: &mut VecDeque<Value>,
-) -> SafeNativeResult<(AggregatorID, u128)> {
+    agg: &StructRef,
+) -> SafeNativeResult<(u128, u128)> {
     match ty_arg {
         Type::U128 => {
             // Get aggregator information and a value to add.
-            let (id, limit) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
+            let (id, limit) = get_aggregator_fields_u128(agg)?;
             Ok((id, limit))
         },
         Type::U64 => {
             // Get aggregator information and a value to add.
-            let (id, limit) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
-            Ok((id, limit as u128))
+            let (id, limit) = get_aggregator_fields_u64(agg)?;
+            Ok((id as u128, limit as u128))
         },
         _ => Err(SafeNativeError::Abort {
             abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
@@ -74,7 +75,7 @@ pub fn pop_aggregator_fields_by_type(
     }
 }
 
-/// Given the list of native function arguments and a type, pop the next argument if it is of given type
+/// Given the list of native function arguments and a type, pop the next argument if it is of given type.
 pub fn pop_value_by_type(ty_arg: &Type, args: &mut VecDeque<Value>) -> SafeNativeResult<u128> {
     match ty_arg {
         Type::U128 => Ok(safely_pop_arg!(args, u128)),
@@ -85,8 +86,26 @@ pub fn pop_value_by_type(ty_arg: &Type, args: &mut VecDeque<Value>) -> SafeNativ
     }
 }
 
+pub fn create_value_by_type(ty_arg: &Type, value: u128) -> SafeNativeResult<Value> {
+    match ty_arg {
+        Type::U128 => Ok(Value::u128(value)),
+        Type::U64 => {
+            if let Ok(cast_value) = u64::try_from(value) {
+                Ok(Value::u64(cast_value))
+            } else {
+                Err(SafeNativeError::InvariantViolation(PartialVMError::new(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                )))
+            }
+        },
+        _ => Err(SafeNativeError::Abort {
+            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
+        }),
+    }
+}
+
 /***************************************************************************************************
- * native fun create_aggregator<Element>(limit: Element): Aggregator<Element>;
+ * native fun create_aggregator<Element>(max_value: Element): Aggregator<Element>;
  **************************************************************************************************/
 
 fn native_create_aggregator(
@@ -94,30 +113,33 @@ fn native_create_aggregator(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    if !context.aggregator_v2_api_enabled() {
+        return Err(SafeNativeError::Abort {
+            abort_code: EAGGREGATOR_API_NOT_ENABLED,
+        });
+    }
+
     debug_assert_eq!(args.len(), 1);
 
     context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
-    // Get the current aggregator data.
-    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let limit = pop_value_by_type(&ty_args[0], &mut args)?;
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let id = aggregator_data.generate_id();
-    let aggregator_id = AggregatorVersionedID::V2(aggregator_data.generate_id());
-    aggregator_data.create_new_aggregator(aggregator_id, limit);
+    let max_value = pop_value_by_type(&ty_args[0], &mut args)?;
 
-    match ty_args[0] {
-        Type::U128 => Ok(smallvec![Value::struct_(Struct::pack(vec![
-            Value::u128(id.id() as u128),
-            Value::u128(limit),
-        ]))]),
-        Type::U64 => Ok(smallvec![Value::struct_(Struct::pack(vec![
-            Value::u64(id.id()),
-            Value::u64(limit as u64),
-        ]))]),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
-        }),
-    }
+    let value_field_value = if context.aggregator_execution_enabled() {
+        // Get the current aggregator data.
+        let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+        let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+        let id = aggregator_data.generate_id();
+        let aggregator_id = AggregatorVersionedID::V2(id);
+        aggregator_data.create_new_aggregator(aggregator_id, max_value);
+        id.id() as u128
+    } else {
+        0
+    };
+
+    Ok(smallvec![Value::struct_(Struct::pack(vec![
+        create_value_by_type(&ty_args[0], value_field_value)?,
+        create_value_by_type(&ty_args[0], max_value)?,
+    ]))])
 }
 
 /***************************************************************************************************
@@ -129,16 +151,30 @@ fn native_try_add(
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);
-
     context.charge(AGGREGATOR_V2_TRY_ADD_BASE)?;
-    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let value = pop_value_by_type(&ty_args[0], &mut args)?;
-    let (id, limit) = pop_aggregator_fields_by_type(&ty_args[0], &mut args)?;
-    let aggregator = aggregator_data.get_aggregator(AggregatorVersionedID::V2(id), limit)?;
-    Ok(smallvec![Value::bool(
-        aggregator.try_add(aggregator_context.resolver, value)?
-    )])
+
+    let input = pop_value_by_type(&ty_args[0], &mut args)?;
+    let agg_struct = safely_pop_arg!(args, StructRef);
+    let (agg_value, agg_max_value) = get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?;
+
+    let result_value = if context.aggregator_execution_enabled() {
+        let id = AggregatorVersionedID::V2(aggregator_value_field_as_id(agg_value)?);
+        let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+        let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+        let aggregator = aggregator_data.get_aggregator(id, agg_max_value)?;
+        aggregator.try_add(aggregator_context.resolver, input)?
+    } else {
+        let math = BoundedMath::new(agg_max_value);
+        match math.unsigned_add(agg_value, input) {
+            Ok(sum) => {
+                set_aggregator_value_field(&agg_struct, create_value_by_type(&ty_args[0], sum)?)?;
+                true
+            },
+            Err(_) => false,
+        }
+    };
+
+    Ok(smallvec![Value::bool(result_value)])
 }
 
 /***************************************************************************************************
@@ -150,16 +186,31 @@ fn native_try_sub(
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);
-
     context.charge(AGGREGATOR_V2_TRY_SUB_BASE)?;
-    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let value = pop_value_by_type(&ty_args[0], &mut args)?;
-    let (id, limit) = pop_aggregator_fields_by_type(&ty_args[0], &mut args)?;
-    let aggregator = aggregator_data.get_aggregator(AggregatorVersionedID::V2(id), limit)?;
-    Ok(smallvec![Value::bool(
-        aggregator.try_sub(aggregator_context.resolver, value)?
-    )])
+
+    let input = pop_value_by_type(&ty_args[0], &mut args)?;
+    let agg_struct = safely_pop_arg!(args, StructRef);
+    let (agg_value, agg_max_value) = get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?;
+
+    let result_value = if context.aggregator_execution_enabled() {
+        let id = AggregatorVersionedID::V2(aggregator_value_field_as_id(agg_value)?);
+
+        let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+        let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+        let aggregator = aggregator_data.get_aggregator(id, agg_max_value)?;
+
+        aggregator.try_sub(aggregator_context.resolver, input)?
+    } else {
+        let math = BoundedMath::new(agg_max_value);
+        match math.unsigned_subtract(agg_value, input) {
+            Ok(sum) => {
+                set_aggregator_value_field(&agg_struct, create_value_by_type(&ty_args[0], sum)?)?;
+                true
+            },
+            Err(_) => false,
+        }
+    };
+    Ok(smallvec![Value::bool(result_value)])
 }
 
 /***************************************************************************************************
@@ -172,25 +223,28 @@ fn native_read(
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 1);
-
     context.charge(AGGREGATOR_V2_READ_BASE)?;
-    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let (id, limit) = pop_aggregator_fields_by_type(&ty_args[0], &mut args)?;
-    let aggregator = aggregator_data.get_aggregator(AggregatorVersionedID::V2(id), limit)?;
-    let value = aggregator.read_most_recent_aggregator_value(aggregator_context.resolver)?;
-    if value > limit {
+
+    let (agg_value, agg_max_value) =
+        get_aggregator_fields_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
+
+    let result_value = if context.aggregator_execution_enabled() {
+        let id = AggregatorVersionedID::V2(aggregator_value_field_as_id(agg_value)?);
+
+        let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+        let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+        let aggregator = aggregator_data.get_aggregator(id, agg_max_value)?;
+        aggregator.read_most_recent_aggregator_value(aggregator_context.resolver)?
+    } else {
+        agg_value
+    };
+
+    if result_value > agg_max_value {
         return Err(SafeNativeError::InvariantViolation(PartialVMError::new(
             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
         )));
     };
-    match ty_args[0] {
-        Type::U128 => Ok(smallvec![Value::u128(value)]),
-        Type::U64 => Ok(smallvec![Value::u64(value as u64)]),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
-        }),
-    }
+    Ok(smallvec![create_value_by_type(&ty_args[0], result_value)?])
 }
 
 /***************************************************************************************************
@@ -203,30 +257,23 @@ fn native_snapshot(
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 1);
-
     context.charge(AGGREGATOR_V2_SNAPSHOT_BASE)?;
-    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
 
-    match ty_args[0] {
-        Type::U128 => {
-            let (aggregator_id, _) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
-            let id = aggregator_data.snapshot(aggregator_id)?;
-            Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u128(
-                id.id() as u128
-            )]))])
-        },
-        Type::U64 => {
-            let (aggregator_id, _) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
-            let id = aggregator_data.snapshot(aggregator_id)?;
-            Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u64(
-                id.id()
-            )]))])
-        },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
-        }),
-    }
+    let (agg_value, _agg_max_value) =
+        get_aggregator_fields_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
+
+    let result_value = if context.aggregator_execution_enabled() {
+        let aggregator_id = aggregator_value_field_as_id(agg_value)?;
+        let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+        let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+        aggregator_data.snapshot(aggregator_id)?.id() as u128
+    } else {
+        agg_value
+    };
+
+    Ok(smallvec![Value::struct_(Struct::pack(vec![
+        create_value_by_type(&ty_args[0], result_value)?
+    ]))])
 }
 
 /***************************************************************************************************
@@ -240,7 +287,7 @@ fn native_create_snapshot(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     if !context.aggregator_v2_api_enabled() {
         return Err(SafeNativeError::Abort {
-            abort_code: EAGGREGATOR_SNAPSHOTS_NOT_ENABLED,
+            abort_code: EAGGREGATOR_API_NOT_ENABLED,
         });
     }
 
@@ -248,33 +295,30 @@ fn native_create_snapshot(
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_BASE)?;
 
-    match ty_args[0] {
-        Type::U128 => {
-            let input = safely_pop_arg!(args, u128);
-            Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u128(
-                input
-            )]))])
-        },
-        Type::U64 => {
-            let input = safely_pop_arg!(args, u64);
-            Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u64(
-                input
-            )]))])
-        },
-        _ => {
-            // Check if the type is a string
-            if is_string_type(context, &ty_args[0])? {
-                let input = string_to_bytes(safely_pop_arg!(args, Struct))?;
-                let move_string_value = Value::struct_(Struct::pack(vec![Value::vector_u8(input)]));
-                let move_snapshot_value = Value::struct_(Struct::pack(vec![move_string_value]));
-                return Ok(smallvec![move_snapshot_value]);
-            }
-            // If not a string, return an error
-            Err(SafeNativeError::Abort {
-                abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
-            })
-        },
-    }
+    let move_field_value = if context.aggregator_execution_enabled() {
+        unreachable!("not yet implemented")
+    } else {
+        match ty_args[0] {
+            Type::U128 => Value::u128(safely_pop_arg!(args, u128)),
+            Type::U64 => Value::u64(safely_pop_arg!(args, u64)),
+            _ => {
+                // Check if the type is a string
+                if is_string_type(context, &ty_args[0])? {
+                    let input = string_to_bytes(safely_pop_arg!(args, Struct))?;
+                    Value::struct_(Struct::pack(vec![Value::vector_u8(input)]))
+                } else {
+                    // If not a string, return an error
+                    return Err(SafeNativeError::Abort {
+                        abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
+                    });
+                }
+            },
+        }
+    };
+
+    Ok(smallvec![Value::struct_(Struct::pack(vec![
+        move_field_value
+    ]))])
 }
 
 /***************************************************************************************************

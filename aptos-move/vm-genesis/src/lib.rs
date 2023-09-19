@@ -432,6 +432,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
         FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION,
         FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
+        FeatureFlag::AGGREGATOR_EXECUTION,
     ]
 }
 
