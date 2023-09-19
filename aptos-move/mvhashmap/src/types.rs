@@ -18,7 +18,6 @@ pub struct StorageVersion;
 
 // TODO: Find better representations for this, a similar one for TxnIndex.
 pub type Version = Result<(TxnIndex, Incarnation), StorageVersion>;
-pub type AggregatorID = u64;
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum Flag {

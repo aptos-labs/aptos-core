@@ -21,7 +21,7 @@ impl AggregatorID {
         Self(value)
     }
 
-    pub fn into(self) -> u64 {
+    pub fn id(&self) -> u64 {
         self.0
     }
 }

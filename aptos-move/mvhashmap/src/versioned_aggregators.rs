@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{AggregatorID, AtomicTxnIndex, MVAggregatorsError, TxnIndex};
-use aptos_aggregator::delta_change_set::DeltaOp;
+use crate::types::{AtomicTxnIndex, MVAggregatorsError, TxnIndex};
+use aptos_aggregator::{delta_change_set::DeltaOp, types::AggregatorID};
 use claims::{assert_matches, assert_none};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
@@ -507,7 +507,10 @@ mod test {
             NO_ENTRY => None,
             VALUE => Some(AggregatorEntry::Value(10, None)),
             DELTA => Some(AggregatorEntry::Delta(test_delta())),
-            SNAPSHOT => Some(AggregatorEntry::Snapshot(2, test_delta())),
+            SNAPSHOT => Some(AggregatorEntry::Snapshot(
+                AggregatorID::new(2),
+                test_delta(),
+            )),
             ESTIMATE => Some(AggregatorEntry::Estimate(EstimatedEntry::NoBypass)),
             _ => unreachable!("Wrong type index in test"),
         }
@@ -604,7 +607,10 @@ mod test {
             &**snapshot_bypass.unwrap(),
             AggregatorEntry::Estimate(EstimatedEntry::SnapshotBypass(_, _))
         );
-        assert_ok_eq!(v.read(8), VersionedRead::Snapshot(2, 6, test_delta()));
+        assert_ok_eq!(
+            v.read(8),
+            VersionedRead::Snapshot(AggregatorID::new(2), 6, test_delta())
+        );
 
         // Next, ensure read_estimate_deltas remains true if entries are overwritten
         // with matching deltas. Check at each point to not rely on the invariant that
@@ -735,7 +741,7 @@ mod test {
 
         let mut v = VersionedValue::new(None);
         let delta_bypass = DeltaBypass(test_delta());
-        let snapshot_bypass = SnapshotBypass(5, negative_delta());
+        let snapshot_bypass = SnapshotBypass(AggregatorID::new(5), negative_delta());
 
         assert_eq!(v.applicable_bypass(&NoBypass), NoBypass);
         assert_eq!(v.applicable_bypass(&delta_bypass), delta_bypass);
