@@ -8,7 +8,11 @@ use aptos_types::PeerId;
 use itertools::{self, EitherOrBoth, Itertools};
 use std::collections::BTreeMap;
 
+/// The link stats are obtained from https://github.com/doitintl/intercloud-throughput/blob/master/results_202202/results.csv
+/// The four regions were hand-picked from the dataset to simulate a multi-region setup
+/// with high latencies and low bandwidth.
 const FOUR_REGION_LINK_STATS: &[u8] = include_bytes!("data/four_region_link_stats.csv");
+/// The two regions were chosen as the most distant regions among the four regions set.
 const TWO_REGION_LINK_STATS: &[u8] = include_bytes!("data/two_region_link_stats.csv");
 
 fn get_link_stats_table(csv: &[u8]) -> BTreeMap<String, BTreeMap<String, (u64, f64)>> {

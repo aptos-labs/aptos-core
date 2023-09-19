@@ -527,8 +527,8 @@ fn single_test_suite(
 ) -> Result<ForgeConfig> {
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
-        "land_blocking" => net_bench_two_region_env(), // TODO: remove this before landing
-        "realistic_env_max_load" => net_bench_two_region_env(), // TODO: remove this before landing
+        "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
+        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         // Rest of the tests:
@@ -1359,26 +1359,20 @@ fn gather_metrics() -> ForgeConfig {
         .add_network_test(GatherMetrics)
 }
 
-fn netbench_config_100_megabytes_per_s() -> NetbenchConfig {
-    NetbenchConfig {
-        enabled: true,
-        max_network_channel_size: 1000,
-        enable_direct_send_testing: true,
-        direct_send_data_size: 100000,
-        direct_send_per_second: 1000,
-        ..Default::default()
-    }
+fn netbench_config_100_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
+    netbench_config.enabled = true;
+    netbench_config.max_network_channel_size = 1000;
+    netbench_config.enable_direct_send_testing = true;
+    netbench_config.direct_send_data_size = 100000;
+    netbench_config.direct_send_per_second = 1000;
 }
 
-fn netbench_config_2_megabytes_per_s() -> NetbenchConfig {
-    NetbenchConfig {
-        enabled: true,
-        max_network_channel_size: 1000,
-        enable_direct_send_testing: true,
-        direct_send_data_size: 100000,
-        direct_send_per_second: 20,
-        ..Default::default()
-    }
+fn netbench_config_2_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
+    netbench_config.enabled = true;
+    netbench_config.max_network_channel_size = 1000;
+    netbench_config.enable_direct_send_testing = true;
+    netbench_config.direct_send_data_size = 100000;
+    netbench_config.direct_send_per_second = 20;
 }
 
 fn net_bench() -> ForgeConfig {
@@ -1386,7 +1380,9 @@ fn net_bench() -> ForgeConfig {
         .add_network_test(Delay::new(180))
         .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            config.netbench = Some(netbench_config_100_megabytes_per_s());
+            let mut netbench_config = NetbenchConfig::default();
+            netbench_config_100_megabytes_per_sec(&mut netbench_config);
+            config.netbench = Some(netbench_config);
         }))
 }
 
@@ -1396,7 +1392,9 @@ fn net_bench_two_region_env() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Not using 100 MBps here, as it will lead to throughput collapse
-            config.netbench = Some(netbench_config_2_megabytes_per_s());
+            let mut netbench_config = NetbenchConfig::default();
+            netbench_config_2_megabytes_per_sec(&mut netbench_config);
+            config.netbench = Some(netbench_config);
         }))
 }
 
