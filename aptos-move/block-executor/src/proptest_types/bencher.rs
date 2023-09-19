@@ -34,13 +34,10 @@ pub struct Bencher<K, V, E> {
 
 pub(crate) struct BencherState<
     K: Hash + Clone + Debug + Eq + PartialOrd + Ord,
-    V: Clone + Eq + Arbitrary,
     E: Send + Sync + Debug + Clone + ReadWriteEvent,
-> where
-    Vec<u8>: From<V>,
-{
-    transactions: Vec<MockTransaction<KeyType<K>, ValueType<V>, E>>,
-    baseline_output: BaselineOutput<KeyType<K>, ValueType<V>>,
+> {
+    transactions: Vec<MockTransaction<KeyType<K>, ValueType, E>>,
+    baseline_output: BaselineOutput<KeyType<K>, ValueType>,
 }
 
 impl<K, V, E> Bencher<K, V, E>
@@ -62,7 +59,7 @@ where
     pub fn bench(&self, key_strategy: &impl Strategy<Value = K>, bencher: &mut CBencher) {
         bencher.iter_batched(
             || {
-                BencherState::<K, V, E>::with_universe(
+                BencherState::<K, E>::with_universe::<V>(
                     vec(key_strategy, self.universe_size),
                     self.transaction_size,
                     self.transaction_gen_param,
@@ -75,16 +72,16 @@ where
     }
 }
 
-impl<K, V, E> BencherState<K, V, E>
+impl<K, E> BencherState<K, E>
 where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
-    V: Clone + Eq + Send + Sync + Arbitrary + 'static,
     E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
-    Vec<u8>: From<V>,
 {
     /// Creates a new benchmark state with the given account universe strategy and number of
     /// transactions.
-    pub(crate) fn with_universe(
+    pub(crate) fn with_universe<
+        V: Into<Vec<u8>> + Clone + Eq + Send + Sync + Arbitrary + 'static,
+    >(
         universe_strategy: impl Strategy<Value = Vec<K>>,
         num_transactions: usize,
         transaction_params: TransactionGenParams,
@@ -117,7 +114,7 @@ where
     }
 
     pub(crate) fn run(self) {
-        let data_view = EmptyDataView::<KeyType<K>, ValueType<V>> {
+        let data_view = EmptyDataView::<KeyType<K>, ValueType> {
             phantom: PhantomData,
         };
 
@@ -129,10 +126,10 @@ where
         );
 
         let output = BlockExecutor::<
-            MockTransaction<KeyType<K>, ValueType<V>, E>,
-            MockTask<KeyType<K>, ValueType<V>, E>,
-            EmptyDataView<KeyType<K>, ValueType<V>>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<K>, ValueType<V>, E>, usize>,
+            MockTransaction<KeyType<K>, ValueType, E>,
+            MockTask<KeyType<K>, ValueType, E>,
+            EmptyDataView<KeyType<K>, ValueType>,
+            NoOpTransactionCommitHook<MockOutput<KeyType<K>, ValueType, E>, usize>,
             ExecutableTestType,
         >::new(num_cpus::get(), executor_thread_pool, None, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);

@@ -271,10 +271,6 @@ impl AptosVM {
         )
     }
 
-    pub(crate) fn is_storage_slot_metadata_enabled(&self) -> bool {
-        self.0.get_features().is_storage_slot_metadata_enabled()
-    }
-
     fn fee_statement_from_gas_meter(
         txn_data: &TransactionMetadata,
         gas_meter: &impl AptosGasMeter,
