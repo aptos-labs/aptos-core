@@ -376,7 +376,7 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
 
     fn check_resource_usage(&mut self, loc: Loc, ty: &mut Type, needs_key: bool) {
         match &mut ty.value {
-            Type_::Apply(abilties, n, _) => {
+            Type_::Apply(abilities, n, _) => {
                 if let TypeName_::ModuleType(m, s) = &n.value {
                     if Some(m.value) != self.inliner.current_module {
                         self.inliner.env.add_diag(diag!(Inlining::AfterExpansion,
@@ -384,7 +384,7 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
                         ));
                     }
                     if needs_key
-                        && !abilties
+                        && !abilities
                             .as_ref()
                             .map(|a| a.has_ability_(Ability_::Key))
                             .unwrap_or_default()
@@ -392,21 +392,30 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
                         self.inliner.env.add_diag(diag!(Inlining::AfterExpansion,
                             (loc, format!("After inlining: invalid storage operation since type `{}::{}` has no `key`", m, s))
                         ));
-                    }
+                    };
+                }
+            },
+            Type_::Param(TParam {
+                user_specified_name,
+                abilities,
+                ..
+            }) => {
+                if needs_key && !abilities.iter().any(|a| a.value == Ability_::Key) {
+                    self.inliner.env.add_diag(diag!(Inlining::AfterExpansion,
+                                                    (loc, format!("After inlining: invalid storage operation since type `{}` has no `key`", user_specified_name))
+                    ));
                 }
             },
             Type_::Ref(_, bt) => self.check_resource_usage(loc, bt.as_mut(), needs_key),
-            Type_::Unit
-            | Type_::Param(_)
-            | Type_::Var(_)
-            | Type_::Anything
-            | Type_::UnresolvedError => {
+            Type_::Unit | Type_::Var(_) | Type_::Anything | Type_::UnresolvedError => {
                 self.inliner.env.add_diag(diag!(
                     Inlining::AfterExpansion,
                     (
                         loc,
-                        "After inlining: invalid storage operation as type is not a struct"
-                            .to_owned()
+                        format!(
+                            "After inlining: invalid storage operation as type {} is not a struct",
+                            ast_debug::display_verbose(ty),
+                        )
                     )
                 ));
             },
