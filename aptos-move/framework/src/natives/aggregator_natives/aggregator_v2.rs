@@ -107,11 +107,11 @@ fn native_create_aggregator(
 
     match ty_args[0] {
         Type::U128 => Ok(smallvec![Value::struct_(Struct::pack(vec![
-            Value::u128(id.into() as u128),
+            Value::u128(id.id() as u128),
             Value::u128(limit),
         ]))]),
         Type::U64 => Ok(smallvec![Value::struct_(Struct::pack(vec![
-            Value::u64(id.into()),
+            Value::u64(id.id()),
             Value::u64(limit as u64),
         ]))]),
         _ => Err(SafeNativeError::Abort {
@@ -213,14 +213,14 @@ fn native_snapshot(
             let (aggregator_id, _) = aggregator_value_as_u128(&safely_pop_arg!(args, StructRef))?;
             let id = aggregator_data.snapshot(aggregator_id)?;
             Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u128(
-                id.into() as u128
+                id.id() as u128
             )]))])
         },
         Type::U64 => {
             let (aggregator_id, _) = aggregator_value_as_u64(&safely_pop_arg!(args, StructRef))?;
             let id = aggregator_data.snapshot(aggregator_id)?;
             Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u64(
-                id.into()
+                id.id()
             )]))])
         },
         _ => Err(SafeNativeError::Abort {
