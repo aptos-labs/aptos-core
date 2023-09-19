@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::dag::{
-    adapter::Notifier,
+    adapter::OrderedNotifier,
     anchor_election::AnchorElection,
     dag_state_sync::DAG_WINDOW,
     dag_store::{Dag, NodeStatus},
@@ -21,7 +21,7 @@ pub struct OrderRule {
     lowest_unordered_anchor_round: Round,
     dag: Arc<RwLock<Dag>>,
     anchor_election: Box<dyn AnchorElection>,
-    notifier: Arc<dyn Notifier>,
+    notifier: Arc<dyn OrderedNotifier>,
     storage: Arc<dyn DAGStorage>,
 }
 
@@ -31,7 +31,7 @@ impl OrderRule {
         latest_ledger_info: LedgerInfo,
         dag: Arc<RwLock<Dag>>,
         mut anchor_election: Box<dyn AnchorElection>,
-        notifier: Arc<dyn Notifier>,
+        notifier: Arc<dyn OrderedNotifier>,
         storage: Arc<dyn DAGStorage>,
     ) -> Self {
         let committed_round = if latest_ledger_info.ends_epoch() {

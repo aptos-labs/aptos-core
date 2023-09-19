@@ -3,7 +3,7 @@
 
 use crate::{
     dag::{
-        adapter::Notifier,
+        adapter::OrderedNotifier,
         anchor_election::RoundRobinAnchorElection,
         dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
@@ -85,21 +85,13 @@ pub struct TestNotifier {
 }
 
 #[async_trait]
-impl Notifier for TestNotifier {
+impl OrderedNotifier for TestNotifier {
     fn send_ordered_nodes(
         &self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         _failed_authors: Vec<(Round, Author)>,
     ) -> anyhow::Result<()> {
         Ok(self.tx.unbounded_send(ordered_nodes)?)
-    }
-
-    async fn send_epoch_change(&self, _proof: EpochChangeProof) {
-        unimplemented!()
-    }
-
-    async fn send_commit_proof(&self, _ledger_info: LedgerInfoWithSignatures) {
-        unimplemented!()
     }
 }
 

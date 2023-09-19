@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 
 use super::{
-    adapter::Notifier,
     dag_fetcher::TDagFetcher,
     dag_store::Dag,
     storage::DAGStorage,
     types::{CertifiedNodeMessage, RemoteFetchRequest},
+    ProofNotifier,
 };
 use crate::state_replication::StateComputer;
 use aptos_consensus_types::common::Round;
@@ -31,11 +31,11 @@ pub enum StateSyncStatus {
 
 pub(super) struct StateSyncTrigger {
     dag_store: Arc<RwLock<Dag>>,
-    proof_notifier: Arc<dyn Notifier>,
+    proof_notifier: Arc<dyn ProofNotifier>,
 }
 
 impl StateSyncTrigger {
-    pub(super) fn new(dag_store: Arc<RwLock<Dag>>, proof_notifier: Arc<dyn Notifier>) -> Self {
+    pub(super) fn new(dag_store: Arc<RwLock<Dag>>, proof_notifier: Arc<dyn ProofNotifier>) -> Self {
         Self {
             dag_store,
             proof_notifier,

@@ -86,6 +86,7 @@ impl DagBootstrapUnit {
                 Arc::new(dag_storage),
                 network.clone(),
                 network.clone(),
+                network.clone(),
                 time_service,
                 payload_client,
                 state_computer,

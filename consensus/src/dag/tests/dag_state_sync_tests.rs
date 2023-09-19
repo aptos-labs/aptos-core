@@ -2,7 +2,7 @@
 
 use crate::{
     dag::{
-        adapter::Notifier,
+        adapter::OrderedNotifier,
         dag_fetcher::{FetchRequestHandler, TDagFetcher},
         dag_state_sync::{DagStateSynchronizer, DAG_WINDOW},
         dag_store::Dag,
@@ -99,7 +99,7 @@ impl TDagFetcher for MockDagFetcher {
 struct MockNotifier {}
 
 #[async_trait]
-impl Notifier for MockNotifier {
+impl OrderedNotifier for MockNotifier {
     fn send_ordered_nodes(
         &self,
         _ordered_nodes: Vec<Arc<CertifiedNode>>,
@@ -107,10 +107,6 @@ impl Notifier for MockNotifier {
     ) -> anyhow::Result<()> {
         Ok(())
     }
-
-    async fn send_epoch_change(&self, _proof: EpochChangeProof) {}
-
-    async fn send_commit_proof(&self, _ledger_info: LedgerInfoWithSignatures) {}
 }
 
 fn setup(epoch_state: Arc<EpochState>, storage: Arc<dyn DAGStorage>) -> DagStateSynchronizer {
