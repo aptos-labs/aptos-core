@@ -3,8 +3,9 @@
 
 use crate::AptosDB;
 use anyhow::{anyhow, Result};
-use aptos_config::config::{BootstrappingMode, NodeConfig};
+use aptos_config::config::NodeConfig;
 use aptos_crypto::HashValue;
+use aptos_infallible::RwLock;
 use aptos_storage_interface::{
     cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter,
     StateSnapshotReceiver,
@@ -16,7 +17,7 @@ use aptos_types::{
     transaction::{TransactionOutputListWithProof, TransactionToCommit, Version},
 };
 use either::Either;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 pub const SECONDARY_DB_DIR: &str = "fast_sync_secondary";
 
@@ -41,7 +42,6 @@ impl FastSyncStorageWrapper {
     /// If the db is empty and configured to do fast sync, we return a FastSyncStorageWrapper
     /// Otherwise, we returns AptosDB directly and the FastSyncStorageWrapper is None
     pub fn initialize_dbs(config: &NodeConfig) -> Result<Either<AptosDB, Self>> {
-        // ) -> Result<(Option<AptosDB>, Option<FastSyncStorageWrapper>)> {
         let mut db_dir = config.storage.dir();
         let db_main = AptosDB::open(
             db_dir.as_path(),
@@ -55,8 +55,11 @@ impl FastSyncStorageWrapper {
         .map_err(|err| anyhow!("fast sync DB failed to open {}", err))?;
 
         // when the db is empty and configured to do fast sync, we will create a second DB
-        if config.state_sync.state_sync_driver.bootstrapping_mode
-            == BootstrappingMode::DownloadLatestStates
+        if config
+            .state_sync
+            .state_sync_driver
+            .bootstrapping_mode
+            .is_fast_sync()
             && (db_main.ledger_store.get_latest_version().map_or(0, |v| v) == 0)
         {
             db_dir.push(SECONDARY_DB_DIR);
@@ -89,22 +92,19 @@ impl FastSyncStorageWrapper {
         self.temporary_db_with_genesis.clone()
     }
 
-    pub fn get_fast_sync_status(&self) -> Result<FastSyncStatus> {
-        self.fast_sync_status
-            .read()
-            .map_err(|err| anyhow!("failed to read fast sync status: {}", err))
-            .map(|status| *status)
+    pub fn get_fast_sync_status(&self) -> FastSyncStatus {
+        *self.fast_sync_status.read()
     }
 
     /// Check if the fast sync finished already
     fn is_fast_sync_bootstrap_finished(&self) -> bool {
-        let status = self.get_fast_sync_status().unwrap();
+        let status = self.get_fast_sync_status();
         status == FastSyncStatus::FINISHED
     }
 
     /// Check if the fast sync started already
     fn is_fast_sync_bootstrap_started(&self) -> bool {
-        let status = self.get_fast_sync_status().unwrap();
+        let status = self.get_fast_sync_status();
         status == FastSyncStatus::STARTED
     }
 
@@ -131,10 +131,7 @@ impl DbWriter for FastSyncStorageWrapper {
         version: Version,
         expected_root_hash: HashValue,
     ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
-        *self
-            .fast_sync_status
-            .write()
-            .expect("Failed to get write lock of fast sync status") = FastSyncStatus::STARTED;
+        *self.fast_sync_status.write() = FastSyncStatus::STARTED;
         self.get_aptos_db_write_ref()
             .get_state_snapshot_receiver(version, expected_root_hash)
     }
@@ -145,17 +142,14 @@ impl DbWriter for FastSyncStorageWrapper {
         output_with_proof: TransactionOutputListWithProof,
         ledger_infos: &[LedgerInfoWithSignatures],
     ) -> Result<()> {
-        let status = self.get_fast_sync_status()?;
+        let status = self.get_fast_sync_status();
         assert_eq!(status, FastSyncStatus::STARTED);
         self.get_aptos_db_write_ref().finalize_state_snapshot(
             version,
             output_with_proof,
             ledger_infos,
         )?;
-        let mut status = self
-            .fast_sync_status
-            .write()
-            .expect("Failed to get write lock of fast sync status");
+        let mut status = self.fast_sync_status.write();
         *status = FastSyncStatus::FINISHED;
         Ok(())
     }

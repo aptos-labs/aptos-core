@@ -5,7 +5,7 @@
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
-use aptos_db::{fast_sync_aptos_db::SECONDARY_DB_DIR, LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
+use aptos_db::{fast_sync_storage_wrapper::SECONDARY_DB_DIR, LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use aptos_logger::{debug, info};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
