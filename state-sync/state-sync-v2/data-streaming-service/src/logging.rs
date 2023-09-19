@@ -30,15 +30,16 @@ impl<'a> LogSchema<'a> {
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LogEntry {
-    CheckStreamProgress,
     AptosDataClient,
+    CheckStreamProgress,
+    CreatedSubscriptionStream,
     EndOfStreamNotification,
-    HandleTerminateRequest,
     HandleStreamRequest,
+    HandleTerminateRequest,
     InitializeStream,
     ReceivedDataResponse,
     RefreshGlobalData,
-    RequestTimeout,
+    RequestError,
     RespondToStreamRequest,
     RetryDataRequest,
     SendDataRequests,

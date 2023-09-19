@@ -45,7 +45,6 @@ use move_ir_types::location::Spanned;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::session::SerializedReturnValues;
 use once_cell::sync::Lazy;
-use rayon::iter::Either;
 use regex::Regex;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -175,6 +174,132 @@ pub trait MoveTestAdapter<'a>: Sized {
         subcommand: TaskInput<Self::Subcommand>,
     ) -> Result<Option<String>>;
 
+    fn compile_module(
+        &mut self,
+        syntax: SyntaxChoice,
+        data: Option<NamedTempFile>,
+        start_line: usize,
+        command_lines_stop: usize,
+    ) -> Result<(
+        NamedTempFile,
+        Option<Symbol>,
+        CompiledModule,
+        Option<String>,
+    )> {
+        let data = match data {
+            Some(f) => f,
+            None => panic!(
+                "Expected a module text block following 'publish' starting on lines {}-{}",
+                start_line, command_lines_stop
+            ),
+        };
+        let data_path = data.path().to_str().unwrap();
+        let run_config = self.run_config();
+        let state = self.compiled_state();
+        let (named_addr_opt, module, warnings_opt) = match syntax {
+            // Run the V2 compiler if requested
+            SyntaxChoice::Source if run_config == TestRunConfig::CompilerV2 => {
+                let ((module, _), warning_opt) = compile_source_unit_v2(
+                    state.pre_compiled_deps,
+                    state.named_address_mapping.clone(),
+                    &state.source_files().cloned().collect::<Vec<_>>(),
+                    data_path.to_owned(),
+                    self.known_attributes(),
+                )?;
+                if let Some(module) = module {
+                    (None, module, warning_opt)
+                } else {
+                    anyhow::bail!("expected a module but found a script")
+                }
+            },
+            // In all other cases, run V1
+            SyntaxChoice::Source => {
+                let (unit, warnings_opt) = compile_source_unit(
+                    state.pre_compiled_deps,
+                    state.named_address_mapping.clone(),
+                    &state.source_files().cloned().collect::<Vec<_>>(),
+                    data_path.to_owned(),
+                    self.known_attributes(),
+                )?;
+                let (named_addr_opt, module) = match unit {
+                    AnnotatedCompiledUnit::Module(annot_module) => {
+                        let (named_addr_opt, _id) = annot_module.module_id();
+                        (
+                            named_addr_opt.map(|n| n.value),
+                            annot_module.named_module.module,
+                        )
+                    },
+                    AnnotatedCompiledUnit::Script(_) => panic!(
+                        "Expected a module text block, not a script, following 'publish' \
+                         starting on lines {}-{}",
+                        start_line, command_lines_stop
+                    ),
+                };
+                (named_addr_opt, module, warnings_opt)
+            },
+            SyntaxChoice::IR => {
+                let module = compile_ir_module(state.dep_modules(), data_path)?;
+                (None, module, None)
+            },
+        };
+        Ok((data, named_addr_opt, module, warnings_opt))
+    }
+
+    fn compile_script(
+        &mut self,
+        syntax: SyntaxChoice,
+        data: Option<NamedTempFile>,
+        start_line: usize,
+        command_lines_stop: usize,
+    ) -> Result<(CompiledScript, Option<String>)> {
+        let data = match data {
+            Some(f) => f,
+            None => panic!(
+                "Expected a script text block following 'run' starting on lines {}-{}",
+                start_line, command_lines_stop
+            ),
+        };
+        let data_path = data.path().to_str().unwrap();
+        let run_config = self.run_config();
+        let state = self.compiled_state();
+        let (script, warning_opt) = match syntax {
+            // Run the V2 compiler if requested.
+            SyntaxChoice::Source if run_config == TestRunConfig::CompilerV2 => {
+                let ((_, script), warning_opt) = compile_source_unit_v2(
+                    state.pre_compiled_deps,
+                    state.named_address_mapping.clone(),
+                    &state.source_files().cloned().collect::<Vec<_>>(),
+                    data_path.to_owned(),
+                    self.known_attributes(),
+                )?;
+                if let Some(script) = script {
+                    (script, warning_opt)
+                } else {
+                    anyhow::bail!("expected a script but found a module")
+                }
+            },
+            // In all other Source cases, run the V1 compiler
+            SyntaxChoice::Source => {
+                let (unit, warning_opt) = compile_source_unit(
+                    state.pre_compiled_deps,
+                    state.named_address_mapping.clone(),
+                    &state.source_files().cloned().collect::<Vec<_>>(),
+                    data_path.to_owned(),
+                    self.known_attributes(),
+                )?;
+                match unit {
+                    AnnotatedCompiledUnit::Script(annot_script) => (annot_script.named_script.script, warning_opt),
+                    AnnotatedCompiledUnit::Module(_) => panic!(
+                        "Expected a script text block, not a module, following 'run' starting on lines {}-{}",
+                        start_line, command_lines_stop
+                    ),
+                }
+            },
+            SyntaxChoice::IR => (compile_ir_script(state.dep_modules(), data_path)?, None),
+        };
+        Ok((script, warning_opt))
+    }
+
     fn handle_command(
         &mut self,
         task: TaskInput<
@@ -200,30 +325,21 @@ pub trait MoveTestAdapter<'a>: Sized {
             TaskCommand::Init { .. } => {
                 panic!("The 'init' command is optional. But if used, it must be the first command")
             },
-            TaskCommand::PrintBytecode(PrintBytecodeCommand { input }) => {
-                let state = self.compiled_state();
-                let data = match data {
-                    Some(f) => f,
-                    None => panic!(
-                        "Expected a Move IR module text block following 'print-bytecode' starting on lines {}-{}",
-                        start_line, command_lines_stop
-                    ),
-                };
-                let data_path = data.path().to_str().unwrap();
-                let compiled = match input {
+            TaskCommand::PrintBytecode(PrintBytecodeCommand { input, syntax }) => {
+                let syntax = syntax.unwrap_or_else(|| self.default_syntax());
+                let result = match input {
                     PrintBytecodeInputChoice::Script => {
-                        Either::Left(compile_ir_script(state.dep_modules(), data_path)?)
+                        let (script, _warning_opt) =
+                            self.compile_script(syntax, data, start_line, command_lines_stop)?;
+                        disassembler_for_view(BinaryIndexedView::Script(&script)).disassemble()?
                     },
                     PrintBytecodeInputChoice::Module => {
-                        Either::Right(compile_ir_module(state.dep_modules(), data_path)?)
+                        let (_data, _named_addr_opt, module, _warnings_opt) =
+                            self.compile_module(syntax, data, start_line, command_lines_stop)?;
+                        disassembler_for_view(BinaryIndexedView::Module(&module)).disassemble()?
                     },
                 };
-                let view = match &compiled {
-                    Either::Left(script) => BinaryIndexedView::Script(script),
-                    Either::Right(module) => BinaryIndexedView::Module(module),
-                };
-                let disassembler = disassembler_for_view(view);
-                Ok(Some(disassembler.disassemble()?))
+                Ok(Some(result))
             },
             TaskCommand::Publish(
                 PublishCommand {
@@ -234,61 +350,8 @@ pub trait MoveTestAdapter<'a>: Sized {
                 extra_args,
             ) => {
                 let syntax = syntax.unwrap_or_else(|| self.default_syntax());
-                let data = match data {
-                    Some(f) => f,
-                    None => panic!(
-                        "Expected a module text block following 'publish' starting on lines {}-{}",
-                        start_line, command_lines_stop
-                    ),
-                };
-                let data_path = data.path().to_str().unwrap();
-                let run_config = self.run_config();
-                let state = self.compiled_state();
-                let (named_addr_opt, module, warnings_opt) = match syntax {
-                    // Run the V2 compiler if requested
-                    SyntaxChoice::Source if run_config == TestRunConfig::CompilerV2 => {
-                        let ((module, _), warning_opt) = compile_source_unit_v2(
-                            state.pre_compiled_deps,
-                            state.named_address_mapping.clone(),
-                            &state.source_files().cloned().collect::<Vec<_>>(),
-                            data_path.to_owned(),
-                        )?;
-                        if let Some(module) = module {
-                            (None, module, warning_opt)
-                        } else {
-                            anyhow::bail!("expected a module but found a script")
-                        }
-                    },
-                    // In all other cases, run V1
-                    SyntaxChoice::Source => {
-                        let (unit, warnings_opt) = compile_source_unit(
-                            state.pre_compiled_deps,
-                            state.named_address_mapping.clone(),
-                            &state.source_files().cloned().collect::<Vec<_>>(),
-                            data_path.to_owned(),
-                            self.known_attributes(),
-                        )?;
-                        let (named_addr_opt, module) = match unit {
-                            AnnotatedCompiledUnit::Module(annot_module) => {
-                                let (named_addr_opt, _id) = annot_module.module_id();
-                                (
-                                    named_addr_opt.map(|n| n.value),
-                                    annot_module.named_module.module,
-                                )
-                            },
-                            AnnotatedCompiledUnit::Script(_) => panic!(
-                                "Expected a module text block, not a script, following 'publish' \
-                                starting on lines {}-{}",
-                                start_line, command_lines_stop
-                            ),
-                        };
-                        (named_addr_opt, module, warnings_opt)
-                    },
-                    SyntaxChoice::IR => {
-                        let module = compile_ir_module(state.dep_modules(), data_path)?;
-                        (None, module, None)
-                    },
-                };
+                let (data, named_addr_opt, module, warnings_opt) =
+                    self.compile_module(syntax, data, start_line, command_lines_stop)?;
                 let printed = if print_bytecode {
                     let disassembler = disassembler_for_view(BinaryIndexedView::Module(&module));
                     Some(format!(
@@ -307,6 +370,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 if print_bytecode {
                     output = merge_output(output, printed);
                 }
+                let data_path = data.path().to_str().unwrap();
                 match syntax {
                     SyntaxChoice::Source => self.compiled_state().add_with_source_file(
                         named_addr_opt,
@@ -333,50 +397,8 @@ pub trait MoveTestAdapter<'a>: Sized {
                 extra_args,
             ) => {
                 let syntax = syntax.unwrap_or_else(|| self.default_syntax());
-                let data = match data {
-                    Some(f) => f,
-                    None => panic!(
-                        "Expected a script text block following 'run' starting on lines {}-{}",
-                        start_line, command_lines_stop
-                    ),
-                };
-                let data_path = data.path().to_str().unwrap();
-                let run_config = self.run_config();
-                let state = self.compiled_state();
-                let (script, warning_opt) = match syntax {
-                    // Run the V2 compiler if requested.
-                    SyntaxChoice::Source if run_config == TestRunConfig::CompilerV2 => {
-                        let ((_, script), warning_opt) = compile_source_unit_v2(
-                            state.pre_compiled_deps,
-                            state.named_address_mapping.clone(),
-                            &state.source_files().cloned().collect::<Vec<_>>(),
-                            data_path.to_owned(),
-                        )?;
-                        if let Some(script) = script {
-                            (script, warning_opt)
-                        } else {
-                            anyhow::bail!("expected a script but found a module")
-                        }
-                    },
-                    // In all other Source cases, run the V1 compiler
-                    SyntaxChoice::Source => {
-                        let (unit, warning_opt) = compile_source_unit(
-                            state.pre_compiled_deps,
-                            state.named_address_mapping.clone(),
-                            &state.source_files().cloned().collect::<Vec<_>>(),
-                            data_path.to_owned(),
-                            self.known_attributes(),
-                        )?;
-                        match unit {
-                            AnnotatedCompiledUnit::Script(annot_script) => (annot_script.named_script.script, warning_opt),
-                            AnnotatedCompiledUnit::Module(_) => panic!(
-                            "Expected a script text block, not a module, following 'run' starting on lines {}-{}",
-                            start_line, command_lines_stop
-                            ),
-                        }
-                    },
-                    SyntaxChoice::IR => (compile_ir_script(state.dep_modules(), data_path)?, None),
-                };
+                let (script, warning_opt) =
+                    self.compile_script(syntax, data, start_line, command_lines_stop)?;
                 let printed = if print_bytecode {
                     let disassembler = disassembler_for_view(BinaryIndexedView::Script(&script));
                     Some(format!(
@@ -647,6 +669,7 @@ fn compile_source_unit_v2(
     named_address_mapping: BTreeMap<String, NumericalAddress>,
     deps: &[String],
     path: String,
+    known_attributes: &BTreeSet<String>,
 ) -> Result<(
     (Option<CompiledModule>, Option<CompiledScript>),
     Option<String>,
@@ -675,6 +698,7 @@ fn compile_source_unit_v2(
             .into_iter()
             .map(|(alias, addr)| format!("{}={}", alias, addr))
             .collect(),
+        known_attributes: known_attributes.clone(),
         ..move_compiler_v2::Options::default()
     };
     let mut error_writer = termcolor::Buffer::no_color();
@@ -911,14 +935,20 @@ fn handle_known_task<'a, Adapter: MoveTestAdapter<'a>>(
     let task_name = task.name.to_owned();
     let start_line = task.start_line;
     let stop_line = task.stop_line;
+    let data_path = match &task.data {
+        Some(f) => f.path().to_str().unwrap().to_string(),
+        None => "".to_string(),
+    };
     let result = adapter.handle_command(task);
-    let result_string = match result {
+    let mut result_string = match result {
         Ok(None) => return,
         Ok(Some(s)) => s,
         Err(e) => format!("Error: {}", e),
     };
+    if !data_path.is_empty() {
+        result_string = result_string.replace(&data_path, "TEMPFILE");
+    }
     assert!(!result_string.is_empty());
-
     writeln!(
         output,
         "\ntask {} '{}'. lines {}-{}:\n{}",

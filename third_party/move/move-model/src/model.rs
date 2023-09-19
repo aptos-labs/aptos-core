@@ -1202,6 +1202,7 @@ impl GlobalEnv {
             .collect();
 
         let id = ModuleId(self.module_data.len() as RawIndex);
+        let used_modules = use_decls.iter().filter_map(|ud| ud.module_id).collect();
         self.module_data.push(ModuleData {
             name,
             id,
@@ -1219,9 +1220,9 @@ impl GlobalEnv {
             attributes,
             use_decls,
             spec_block_infos,
-            used_modules: Default::default(),
+            used_modules,
             used_modules_including_specs: Default::default(),
-            friend_modules: Default::default(),
+            friend_modules: Default::default(), // TODO: friend declarations
         });
         id
     }

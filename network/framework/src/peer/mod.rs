@@ -18,7 +18,7 @@
 use crate::{
     counters::{
         self, network_application_inbound_traffic, network_application_outbound_traffic,
-        RECEIVED_LABEL, SENT_LABEL,
+        FAILED_LABEL, RECEIVED_LABEL, SENT_LABEL,
     },
     logging::NetworkSchema,
     peer_manager::{PeerManagerError, TransportNotification},
@@ -523,10 +523,7 @@ where
             peer_id.short_str(),
             protocol_id
         );
-        let data_len = data.len() as u64;
-        counters::direct_send_messages(&self.network_context, RECEIVED_LABEL).inc();
-        counters::direct_send_bytes(&self.network_context, RECEIVED_LABEL).inc_by(data_len);
-        network_application_inbound_traffic(self.network_context, message.protocol_id, data_len);
+        self.update_inbound_direct_send_metrics(message.protocol_id, data.len() as u64);
 
         let notif = PeerNotification::RecvMessage(Message {
             protocol_id,
@@ -544,6 +541,16 @@ where
         }
     }
 
+    /// Updates the inbound direct send metrics (e.g., messages and bytes received)
+    fn update_inbound_direct_send_metrics(&self, protocol_id: ProtocolId, data_len: u64) {
+        // Update the metrics for the received direct send message
+        counters::direct_send_messages(&self.network_context, RECEIVED_LABEL).inc();
+        counters::direct_send_bytes(&self.network_context, RECEIVED_LABEL).inc_by(data_len);
+
+        // Update the general network traffic metrics
+        network_application_inbound_traffic(self.network_context, protocol_id, data_len);
+    }
+
     async fn handle_outbound_request(
         &mut self,
         request: PeerRequest,
@@ -558,13 +565,9 @@ where
             // To send an outbound DirectSendMsg, we just bump some counters and
             // push it onto our outbound writer queue.
             PeerRequest::SendDirectSend(message) => {
+                // Create the direct send message
                 let message_len = message.mdata.len();
                 let protocol_id = message.protocol_id;
-                network_application_outbound_traffic(
-                    self.network_context,
-                    protocol_id,
-                    message_len as u64,
-                );
                 let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
                     protocol_id,
                     priority: Priority::default(),
@@ -573,11 +576,10 @@ where
 
                 match write_reqs_tx.send(message).await {
                     Ok(_) => {
-                        counters::direct_send_messages(&self.network_context, SENT_LABEL).inc();
-                        counters::direct_send_bytes(&self.network_context, SENT_LABEL)
-                            .inc_by(message_len as u64);
+                        self.update_outbound_direct_send_metrics(protocol_id, message_len as u64);
                     },
                     Err(e) => {
+                        counters::direct_send_messages(&self.network_context, FAILED_LABEL).inc();
                         warn!(
                             NetworkSchema::new(&self.network_context)
                                 .connection_metadata(&self.connection_metadata),
@@ -592,11 +594,6 @@ where
             },
             PeerRequest::SendRpc(request) => {
                 let protocol_id = request.protocol_id;
-                network_application_outbound_traffic(
-                    self.network_context,
-                    protocol_id,
-                    request.data.len() as u64,
-                );
                 if let Err(e) = self
                     .outbound_rpcs
                     .handle_outbound_request(request, write_reqs_tx)
@@ -614,6 +611,16 @@ where
                 }
             },
         }
+    }
+
+    /// Updates the outbound direct send metrics (e.g., messages and bytes sent)
+    fn update_outbound_direct_send_metrics(&mut self, protocol_id: ProtocolId, data_len: u64) {
+        // Update the metrics for the sent direct send message
+        counters::direct_send_messages(&self.network_context, SENT_LABEL).inc();
+        counters::direct_send_bytes(&self.network_context, SENT_LABEL).inc_by(data_len);
+
+        // Update the general network traffic metrics
+        network_application_outbound_traffic(self.network_context, protocol_id, data_len);
     }
 
     fn shutdown(&mut self, reason: DisconnectReason) {

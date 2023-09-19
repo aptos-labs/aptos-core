@@ -19,6 +19,12 @@ from test_framework.shell import LocalShell, RunResult, Shell
 GRPCURL_PATH = os.environ.get("GRPCURL_PATH", "grpcurl")
 
 INDEXER_GRPC_DOCKER_COMPOSE_FILE = "docker/compose/indexer-grpc/docker-compose.yaml"
+INDEXER_GRPC_DATA_SERVICE_CERT_FILE = (
+    "docker/compose/indexer-grpc/data-service-grpc-server.crt"
+)
+INDEXER_GRPC_DATA_SERVICE_KEY_FILE = (
+    "docker/compose/indexer-grpc/data-service-grpc-server.key"
+)
 VALIDATOR_TESTNET_DOCKER_COMPOSE_FILE = (
     "docker/compose/validator-testnet/docker-compose.yaml"
 )
@@ -26,7 +32,25 @@ VALIDATOR_TESTNET_DOCKER_COMPOSE_FILE = (
 INDEXER_FULLNODE_REST_API_URL = "http://localhost:8080"
 INDEXER_DATA_SERVICE_READINESS_URL = "http://localhost:18084/readiness"
 GRPC_INDEXER_FULLNODE_URL = "localhost:50051"
-GRPC_DATA_SERVICE_URL = "localhost:50052"
+GRPC_DATA_SERVICE_NON_TLS_URL = "localhost:50052"
+GRPC_DATA_SERVICE_TLS_URL = "localhost:50053"
+
+GRPC_IS_READY_MESSAGE = f"""
+    ======================================
+    Transaction Stream Service(indexer grpc) is ready to serve!
+    
+    You can use grpcurl to test it out:
+    
+    - For non-TLS:
+        grpcurl -plaintext -d '{{ "starting_version": 0 }}' \\
+            -H "x-aptos-data-authorization:dummy_token" \\
+            {GRPC_DATA_SERVICE_NON_TLS_URL} aptos.indexer.v1.RawData/GetTransactions
+    - For TLS:
+        grpcurl -insecure -d '{{ "starting_version": 0 }}' \\
+            -H "x-aptos-data-authorization:dummy_token" \\
+            {GRPC_DATA_SERVICE_TLS_URL} aptos.indexer.v1.RawData/GetTransactions
+    ======================================
+"""
 
 SHARED_DOCKER_VOLUME_NAMES = ["aptos-shared", "indexer-grpc-file-store"]
 
@@ -50,6 +74,32 @@ class SystemContext:
         base = ["sudo"] if self.run_docker_as_root else []
         command = (list(pre_args) if pre_args else []) + base + ["docker"] + list(args)
         return self.shell.run(command, stream_output=stream_output)
+
+    def create_grpc_testing_certificates_if_absent(self) -> None:
+        # Check if the certificates are already present
+        if os.path.isfile(INDEXER_GRPC_DATA_SERVICE_CERT_FILE) and os.path.isfile(
+            INDEXER_GRPC_DATA_SERVICE_KEY_FILE
+        ):
+            return
+        # If not, create them
+        log.info("Creating grpc testing certificates")
+        command = [
+            "openssl",
+            "req",
+            "-x509",
+            "-newkey",
+            "rsa:4096",
+            "-subj",
+            "/C=US/ST=CA/L=SF/O=Testing/CN=www.testing.com",
+            "-keyout",
+            INDEXER_GRPC_DATA_SERVICE_KEY_FILE,
+            "-out",
+            INDEXER_GRPC_DATA_SERVICE_CERT_FILE,
+            "-days",
+            "365",
+            "-nodes",
+        ]
+        self.shell.run(command)
 
 
 class DockerComposeAction(Enum):
@@ -102,6 +152,7 @@ def start_single_validator_testnet(context: SystemContext) -> None:
 
 
 def start_indexer_grpc(context: SystemContext, redis_only: bool = False) -> None:
+    context.create_grpc_testing_certificates_if_absent()
     extra_indexer_grpc_docker_args = []
     if redis_only:
         extra_indexer_grpc_docker_args = [
@@ -197,7 +248,7 @@ def wait_for_indexer_grpc_progress(context: SystemContext) -> None:
                     "-proto",
                     "aptos/indexer/v1/raw_data.proto",
                     "-plaintext",
-                    GRPC_DATA_SERVICE_URL,
+                    GRPC_DATA_SERVICE_NON_TLS_URL,
                     "aptos.indexer.v1.RawData/GetTransactions",
                 ],
                 timeout_secs=GRPC_PROGRESS_THRESHOLD_SECS,
@@ -230,6 +281,7 @@ def start(context: SystemContext, no_indexer_grpc: bool = False) -> None:
 
     if not no_indexer_grpc:
         wait_for_indexer_grpc_progress(context)
+        log.info(GRPC_IS_READY_MESSAGE)
 
 
 def stop(context: SystemContext) -> None:
@@ -307,6 +359,10 @@ def check_system(context: SystemContext) -> None:
     # Check that grpcurl is installed.
     if not shutil.which(GRPCURL_PATH):
         raise RuntimeError(f"{GRPCURL_PATH} is not installed or not in PATH")
+
+    # Check that openssl is installed.
+    if not shutil.which("openssl"):
+        raise RuntimeError("openssl is not installed or not in PATH")
 
 
 def main() -> None:

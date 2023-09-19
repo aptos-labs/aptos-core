@@ -462,6 +462,16 @@ impl EventStore {
         Ok(())
     }
 
+    pub fn latest_version(&self) -> Result<Option<Version>> {
+        let mut iter = self.event_db.iter::<EventSchema>(ReadOptions::default())?;
+        iter.seek_to_last();
+        if let Some(((version, _), _)) = iter.next().transpose()? {
+            Ok(Some(version))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Prune a set of candidate events in the range of version in [begin, end) and all related indices
     pub fn prune_events(
         &self,

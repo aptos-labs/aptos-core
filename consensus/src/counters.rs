@@ -792,3 +792,17 @@ pub static BATCH_WAIT_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
         .unwrap(),
     )
 });
+
+/// Histogram of timers for each of the buffer manager phase processors.
+pub static BUFFER_MANAGER_PHASE_PROCESS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        // metric name
+        "aptos_consensus_buffer_manager_phase_process_seconds",
+        // metric description
+        "Timer for buffer manager PipelinePhase::process()",
+        // metric labels (dimensions)
+        &["name"],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
+    )
+    .unwrap()
+});

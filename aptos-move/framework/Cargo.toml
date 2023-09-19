@@ -14,8 +14,8 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-aggregator = { workspace = true, features = ["testing"] }
-aptos-crypto = { workspace = true, features = ["fuzzing"] }
+aptos-aggregator = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-move-stdlib = { workspace = true }
@@ -24,6 +24,7 @@ aptos-sdk-builder = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
+aptos-vm-types = { workspace = true }
 ark-bls12-381 = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
@@ -85,6 +86,8 @@ thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
 
 [dev-dependencies]
+aptos-aggregator = { workspace = true, features = ["testing"] }
+aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-gas-meter = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 claims = { workspace = true }

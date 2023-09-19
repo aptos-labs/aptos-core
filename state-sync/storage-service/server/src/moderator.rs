@@ -151,7 +151,11 @@ impl RequestModerator {
         let storage_server_summary = self.cached_storage_server_summary.load();
 
         // Verify the request is serviceable using the current storage server summary
-        if !storage_server_summary.can_service(&self.aptos_data_client_config, request) {
+        if !storage_server_summary.can_service(
+            &self.aptos_data_client_config,
+            self.time_service.clone(),
+            request,
+        ) {
             // Increment the invalid request count for the peer
             let mut unhealthy_peer_states = self.unhealthy_peer_states.write();
             let unhealthy_peer_state = unhealthy_peer_states

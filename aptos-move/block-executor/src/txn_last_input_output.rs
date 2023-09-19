@@ -6,7 +6,7 @@ use crate::{
     task::{ExecutionStatus, Transaction, TransactionOutput},
 };
 use anyhow::anyhow;
-use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
+use aptos_mvhashmap::types::{TxnIndex, Version};
 use aptos_types::{
     access_path::AccessPath, executable::ModulePath, fee_statement::FeeStatement,
     write_set::WriteOp,
@@ -42,34 +42,31 @@ impl<T: TransactionOutput, E: Debug> TxnOutput<T, E> {
 }
 
 /// Information about the read which is used by validation.
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 enum ReadKind {
     /// Read returned a value from the multi-version data-structure, with index
     /// and incarnation number of the execution associated with the write of
     /// that entry.
-    Version(TxnIndex, Incarnation),
+    Versioned(Version),
     /// Read resolved a delta.
     Resolved(u128),
-    /// Read occurred from storage.
-    Storage,
-    /// Read triggered a delta application failure.
-    DeltaApplicationFailure,
+    /// Speculative inconsistency failure.
+    SpeculativeFailure,
     /// Module read. TODO: Design a better representation once more meaningfully separated.
     Module,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ReadDescriptor<K> {
     access_path: K,
-
     kind: ReadKind,
 }
 
-impl<K: ModulePath> ReadDescriptor<K> {
-    pub fn from_version(access_path: K, txn_idx: TxnIndex, incarnation: Incarnation) -> Self {
+impl<K: Debug + ModulePath> ReadDescriptor<K> {
+    pub fn from_versioned(access_path: K, version: Version) -> Self {
         Self {
             access_path,
-            kind: ReadKind::Version(txn_idx, incarnation),
+            kind: ReadKind::Versioned(version),
         }
     }
 
@@ -80,13 +77,6 @@ impl<K: ModulePath> ReadDescriptor<K> {
         }
     }
 
-    pub fn from_storage(access_path: K) -> Self {
-        Self {
-            access_path,
-            kind: ReadKind::Storage,
-        }
-    }
-
     pub fn from_module(access_path: K) -> Self {
         Self {
             access_path,
@@ -94,10 +84,10 @@ impl<K: ModulePath> ReadDescriptor<K> {
         }
     }
 
-    pub fn from_delta_application_failure(access_path: K) -> Self {
+    pub fn from_speculative_failure(access_path: K) -> Self {
         Self {
             access_path,
-            kind: ReadKind::DeltaApplicationFailure,
+            kind: ReadKind::SpeculativeFailure,
         }
     }
 
@@ -110,9 +100,8 @@ impl<K: ModulePath> ReadDescriptor<K> {
     }
 
     // Does the read descriptor describe a read from MVHashMap w. a specified version.
-    pub fn validate_version(&self, version: Version) -> bool {
-        let (txn_idx, incarnation) = version;
-        self.kind == ReadKind::Version(txn_idx, incarnation)
+    pub fn validate_versioned(&self, version: Version) -> bool {
+        self.kind == ReadKind::Versioned(version)
     }
 
     // Does the read descriptor describe a read from MVHashMap w. a resolved delta.
@@ -120,15 +109,14 @@ impl<K: ModulePath> ReadDescriptor<K> {
         self.kind == ReadKind::Resolved(value)
     }
 
-    // Does the read descriptor describe a read from storage.
-    pub fn validate_storage(&self) -> bool {
-        // Module reading supported from storage version only at the moment.
-        self.kind == ReadKind::Storage || self.kind == ReadKind::Module
+    // Does the read descriptor describe a read from MVHashMap w. a resolved delta.
+    pub fn validate_module(&self) -> bool {
+        self.kind == ReadKind::Module
     }
 
     // Does the read descriptor describe to a read with a delta application failure.
-    pub fn validate_delta_application_failure(&self) -> bool {
-        self.kind == ReadKind::DeltaApplicationFailure
+    pub fn is_speculative_failure(&self) -> bool {
+        self.kind == ReadKind::SpeculativeFailure
     }
 }
 
@@ -146,7 +134,9 @@ pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
     module_read_write_intersection: AtomicBool,
 }
 
-impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputOutput<K, T, E> {
+impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
+    TxnLastInputOutput<K, T, E>
+{
     pub fn new(num_txns: TxnIndex) -> Self {
         Self {
             inputs: (0..num_txns)
@@ -198,15 +188,21 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         let read_modules: Vec<AccessPath> = input
             .iter()
             .filter_map(|desc| {
-                matches!(desc.kind, ReadKind::Module)
-                    .then(|| desc.module_path().expect("Module path guaranteed to exist"))
+                matches!(desc.kind, ReadKind::Module).then(|| {
+                    desc.module_path()
+                        .unwrap_or_else(|| panic!("Module path guaranteed to exist {:?}", desc))
+                })
             })
             .collect();
         let written_modules: Vec<AccessPath> = match &output {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => output
                 .module_write_set()
                 .keys()
-                .map(|k| k.module_path().expect("Module path guaranteed to exist"))
+                .map(|k| {
+                    k.module_path().unwrap_or_else(|| {
+                        panic!("Unexpected non-module key found in putput: {:?}", k)
+                    })
+                })
                 .collect(),
             ExecutionStatus::Abort(_) => Vec::new(),
         };

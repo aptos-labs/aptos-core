@@ -3,6 +3,7 @@
 
 use crate::generate_traffic;
 use anyhow::Context;
+use aptos_config::config::OverrideNodeConfig;
 use aptos_forge::{NetworkContext, NetworkTest, Result, Test};
 use aptos_logger::info;
 use rand::{
@@ -64,7 +65,8 @@ impl NetworkTest for ForgeSetupTest {
         let num_pfns = 5;
         for _ in 0..num_pfns {
             let pfn_version = swarm.versions().max().unwrap();
-            let pfn_node_config = swarm.get_default_pfn_node_config();
+            let pfn_node_config =
+                OverrideNodeConfig::new_with_default_base(swarm.get_default_pfn_node_config());
             let pfn_peer_id =
                 runtime.block_on(swarm.add_full_node(&pfn_version, pfn_node_config))?;
 
