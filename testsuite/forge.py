@@ -10,6 +10,8 @@ import re
 import resource
 import sys
 import textwrap
+import yaml
+
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
@@ -29,7 +31,9 @@ from typing import (
     TypedDict,
     Union,
 )
+
 from urllib.parse import ParseResult, urlunparse, urlencode
+
 from test_framework.logging import init_logging, log
 from test_framework.filesystem import Filesystem, LocalFilesystem
 from test_framework.git import Git
@@ -52,9 +56,7 @@ VALIDATOR_TESTING_IMAGE_NAME = "validator-testing"
 FORGE_IMAGE_NAME = "forge"
 ECR_REPO_PREFIX = "aptos"
 
-DEFAULT_CONFIG = "forge-wrapper-config"
-DEFAULT_CONFIG_KEY = "forge-wrapper-config.json"
-
+DEFAULT_CONFIG = "gs://forge-config/forge-config.yaml"
 FORGE_TEST_RUNNER_TEMPLATE_PATH = "forge-test-runner-template.yaml"
 
 MULTIREGION_KUBECONFIG_DIR = "/etc/multiregion-kubeconfig"
@@ -276,8 +278,7 @@ class ForgeContext:
     gcp_project: Optional[str] = None
     gcp_zone: Optional[str] = None
 
-    # the default cloud is AWS
-    cloud: Cloud = Cloud.AWS
+    cloud: Cloud = Cloud.GCP
 
     def report(self, result: ForgeResult, outputs: List[ForgeFormatter]) -> None:
         for formatter in outputs:
@@ -877,7 +878,8 @@ def ensure_provided_image_tags_has_profile_or_features(
             curr_tag = tag
         ret.append(curr_tag)
 
-    return tuple(ret)
+    assert len(ret) == 2
+    return (ret[0], ret[1])
 
 
 def find_recent_images_by_profile_or_features(
@@ -903,7 +905,9 @@ def find_recent_images_by_profile_or_features(
         shell,
         git,
         num_images,
-        image_name=VALIDATOR_TESTING_IMAGE_NAME,
+        # We actually wanna look for images we can run forge against!
+        # Not only images that have the validator image
+        image_name=FORGE_IMAGE_NAME,
         image_tag_prefixes=[image_tag_prefix],
         cloud=cloud,
     )
@@ -961,15 +965,21 @@ def image_exists(
 ) -> bool:
     """Check if an image exists in a given repository"""
     if cloud == Cloud.GCP:
-        full_image = f"{GAR_REPO_NAME}/{image_name}:{image_tag}"
-        return shell.run(
+        full_image = f"{GAR_REPO_NAME}/{image_name}"
+        tags_output = shell.run(
             [
-                "crane",
-                "manifest",
+                "gcloud",
+                "container",
+                "images",
+                "list-tags",
+                f"--filter={image_tag}",
+                "--format=json",
                 full_image,
             ],
             stream_output=True,
-        ).succeeded()
+        ).unwrap()
+        tags = json.loads(tags_output.decode("utf-8"))
+        return len(tags) > 0
     elif cloud == Cloud.AWS:
         full_image = f"{ECR_REPO_PREFIX}/{image_name}:{image_tag}"
         log.info(f"Checking if image exists in GCP: {full_image}")
@@ -1185,6 +1195,36 @@ async def run_multiple(
             )
 
 
+def get_config_backend(context: SystemContext, config_path: str) -> ForgeConfigBackend:
+    if config_path.startswith("gs://"):
+        return GSForgeConfigBackend(context, config_path)
+    else:
+        return FilesystemConfigBackend(context, config_path)
+
+
+@dataclass
+class GCloud:
+    shell: Shell
+
+    def get_project(self) -> str:
+        return (
+            self.shell.run(["gcloud", "config", "get", "project"])
+            .unwrap()
+            .decode("utf-8")
+            .strip()
+        )
+
+    def set_project(self, project: str) -> None:
+        self.shell.run(["gcloud", "config", "set", "project", project]).unwrap()
+
+
+def ensure_gcp_project(shell: Shell, project: str) -> None:
+    gcloud = GCloud(shell)
+    if gcloud.get_project() != project:
+        log.warn("Setting gcloud project to %s", project)
+        gcloud.set_project(project)
+
+
 @main.command()
 # output files
 @envoption("FORGE_OUTPUT")
@@ -1197,6 +1237,7 @@ async def run_multiple(
 @envoption("CLOUD")
 @envoption("AWS_REGION", "us-west-2")
 @envoption("GCP_ZONE", "us-central1-c")
+@envoption("GCP_PROJECT", "aptos-forge-gcp-0")
 # forge test runner customization
 @envoption("FORGE_RUNNER_MODE", "k8s")
 @envoption("FORGE_CLUSTER_NAME")
@@ -1214,7 +1255,7 @@ async def run_multiple(
 @envoption("IMAGE_TAG")
 @envoption("UPGRADE_IMAGE_TAG")
 @envoption("FORGE_NAMESPACE")
-@envoption("VERBOSE")
+@click.option("--verbose", is_flag=True, default=False)
 @envoption("GITHUB_ACTIONS", "false")
 @click.option("--balance-clusters", is_flag=True)
 @envoption("FORGE_BLOCKING", "true")
@@ -1241,6 +1282,7 @@ def test(
     cloud: str,
     aws_region: str,
     gcp_zone: str,
+    gcp_project: str,
     forge_runner_mode: str,
     forge_cluster_name: Optional[str],
     forge_num_validators: Optional[str],
@@ -1256,7 +1298,7 @@ def test(
     image_tag: Optional[str],
     upgrade_image_tag: Optional[str],
     forge_namespace: Optional[str],
-    verbose: Optional[str],
+    verbose: bool,
     github_actions: str,
     balance_clusters: bool,
     forge_blocking: Optional[str],
@@ -1282,12 +1324,15 @@ def test(
 
     # Initialize all configs
     shell = LocalShell()
+
+    ensure_gcp_project(shell, gcp_project)
+
     git = Git(shell)
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
     config.init()
 
     log.debug("Finished sourcing configs")
@@ -1382,7 +1427,10 @@ def test(
             f"Looking for cluster {forge_cluster_name} in cloud {cloud_enum.value}"
         )
         forge_cluster = find_forge_cluster(
-            context.shell, cloud_enum, forge_cluster_name, context.filesystem.mkstemp()
+            context.shell,
+            cloud_enum,
+            forge_cluster_name,
+            context.filesystem.mkstemp(),
         )
         log.info(f"Found cluster: {forge_cluster}")
 
@@ -1492,6 +1540,7 @@ def test(
         aws_account_num=aws_account_num,
         aws_region=aws_region,
         gcp_zone=gcp_zone,
+        gcp_project=gcp_project,
         forge_image_tag=forge_image_tag,
         image_tag=image_tag,
         upgrade_image_tag=upgrade_image_tag,
@@ -1609,7 +1658,7 @@ def list_jobs(
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
     config.init()
 
     # Default to show running jobs
@@ -1647,7 +1696,7 @@ def tail(
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
     config.init()
 
     job_name = sanitize_forge_resource_name(job_name)
@@ -1764,9 +1813,6 @@ def get_forge_config_diff(
 
 
 class ForgeConfigBackend:
-    def create(self) -> None:
-        raise NotImplementedError()
-
     def write(self, config: object) -> None:
         raise NotImplementedError()
 
@@ -1775,65 +1821,41 @@ class ForgeConfigBackend:
 
 
 @dataclass
-class S3ForgeConfigBackend(ForgeConfigBackend):
+class GSForgeConfigBackend(ForgeConfigBackend):
     system: SystemContext
-    name: str
-    key: str = DEFAULT_CONFIG_KEY
-
-    def create(self) -> None:
-        self.system.shell.run(["aws", "s3", "mb", f"s3://{self.name}"]).unwrap()
+    path: str
 
     def write(self, config: object) -> None:
         temp = self.system.filesystem.mkstemp()
-        self.system.filesystem.write(temp, json.dumps(config).encode())
+        self.system.filesystem.write(temp, yaml.dump(config).encode())
         self.system.shell.run(
             [
-                "aws",
-                "s3api",
-                "put-object",
-                "--bucket",
-                self.name,
-                "--key",
-                self.key,
-                "--body",
+                "gsutil",
+                "cp",
                 temp,
+                self.path,
             ]
         ).unwrap()
 
     def read(self) -> object:
         temp = self.system.filesystem.mkstemp()
-        self.system.shell.run(
-            [
-                "aws",
-                "s3api",
-                "get-object",
-                "--bucket",
-                self.name,
-                "--key",
-                self.key,
-                temp,
-            ]
-        ).unwrap()
-        return json.loads(self.system.filesystem.read(temp))
+        output = self.system.shell.run(["gsutil", "cat", self.path]).unwrap()
+        return yaml.safe_load(output.decode("utf-8"))
 
 
 @dataclass
 class FilesystemConfigBackend(ForgeConfigBackend):
-    filename: str
     system: SystemContext
-
-    def create(self) -> None:
-        # We dont need to do anything special
-        pass
+    filename: str
 
     def write(self, config: object) -> None:
         self.system.filesystem.write(
             self.filename,
-            json.dumps(config).encode(),
+            yaml.dump(config).encode(),
         )
 
     def read(self) -> object:
-        return json.loads(self.system.filesystem.read(self.filename))
+        return yaml.safe_load(self.system.filesystem.read(self.filename))
 
 
 class ForgeConfig:
@@ -1844,7 +1866,8 @@ class ForgeConfig:
         self.config: ForgeConfigValue = default_forge_config()
 
     def create(self) -> None:
-        self.backend.create()
+        # TODO write the default usable config structure
+        pass
 
     def init(self) -> None:
         self.config = ensure_forge_config(self.backend.read())
@@ -1883,7 +1906,7 @@ def create_config() -> None:
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
     config.create()
 
 
@@ -1896,7 +1919,7 @@ def get_config(key: Optional[str]) -> None:
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
     config.init()
 
     try:
@@ -1907,7 +1930,7 @@ def get_config(key: Optional[str]) -> None:
         raise click.ClickException(str(e))
 
     # print the config as JSON so it looks nicer
-    config_string = json.dumps(val, indent=2)
+    config_string = yaml.dump(val, indent=2)
     log.info(config_string)
 
 
@@ -1937,12 +1960,12 @@ def set_config(
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
 
     old_config = deepcopy(config.dump())
 
     if config_path:
-        local_config = ForgeConfig(FilesystemConfigBackend(config_path, context))
+        local_config = ForgeConfig(FilesystemConfigBackend(context, config_path))
         local_config.init()
         for k, v in local_config.dump().items():
             config.set(k, v, validate=not force)
@@ -1969,7 +1992,7 @@ def config_edit(ctx: click.Context) -> None:
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
     context = SystemContext(shell, filesystem, processes, SystemTime())
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
     config.init()
 
     temp = filesystem.mkstemp()
@@ -1998,7 +2021,7 @@ def helm_config_get(chart: str) -> None:
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
 
     assert_helm_chart_valid(chart)
 
@@ -2028,7 +2051,7 @@ def helm_config_set(
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
 
     assert_helm_chart_valid(chart)
 
@@ -2036,7 +2059,7 @@ def helm_config_set(
     config.init()
 
     # read new helm config and set it as a corresponding key
-    local_config = FilesystemConfigBackend(config_path, context)
+    local_config = FilesystemConfigBackend(context, config_path)
     local_config_values = local_config.read()
     old_config = deepcopy(config.dump())
 
@@ -2081,7 +2104,7 @@ def cluster_config_delete(
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
     context = SystemContext(shell, filesystem, processes, SystemTime())
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
 
     config.init()
     old_config = deepcopy(config.dump())
@@ -2115,7 +2138,7 @@ def cluster_config_add(cluster: str, y: bool) -> None:
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
 
     config.init()
     old_config = deepcopy(config.dump())
@@ -2143,7 +2166,7 @@ def cluster_config_enable(cluster: str, y: bool) -> None:
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
 
     config.init()
     old_config = deepcopy(config.dump())
@@ -2174,7 +2197,7 @@ def cluster_config_disable(
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
 
     config.init()
     old_config = deepcopy(config.dump())
@@ -2198,7 +2221,7 @@ def cluster_config_list() -> None:
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
 
     config.init()
 
@@ -2236,7 +2259,7 @@ def test_config_add(
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
 
     config.init()
     old_config = deepcopy(config.dump())
@@ -2283,7 +2306,7 @@ def test_config_show(
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
 
     config.init()
 
@@ -2311,7 +2334,7 @@ def test_config_list() -> None:
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
 
     config.init()
 
@@ -2335,7 +2358,7 @@ def test_config_delete(
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
 
     config.init()
     old_config = deepcopy(config.dump())
@@ -2375,7 +2398,7 @@ def test_config_enable(
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
 
     config.init()
     old_config = deepcopy(config.dump())
@@ -2417,7 +2440,7 @@ def test_config_disable(
     processes = SystemProcesses()
     time = SystemTime()
     context = SystemContext(shell, filesystem, processes, time)
-    config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
+    config = ForgeConfig(get_config_backend(context, DEFAULT_CONFIG))
 
     config.init()
     old_config = deepcopy(config.dump())

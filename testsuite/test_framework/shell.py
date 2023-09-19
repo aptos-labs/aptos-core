@@ -69,6 +69,7 @@ class LocalShell(Shell):
         for line in iter(process.stdout.readline, b""):
             if stream_output:
                 sys.stdout.buffer.write(line)
+                sys.stdout.buffer.flush()
             output += line
             if timeout_secs and time.time() - start_time > timeout_secs:
                 process.kill()

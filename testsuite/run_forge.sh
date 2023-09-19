@@ -7,4 +7,5 @@
 
 echo "Warning: run_forge.sh is deprecated. Please use forge.py instead."
 echo "Executing python testsuite/forge.py test $@"
+poetry --directory testsuite install 
 exec python3 testsuite/forge.py test "$@"
