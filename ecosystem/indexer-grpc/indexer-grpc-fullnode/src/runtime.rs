@@ -225,6 +225,8 @@ pub fn get_status(
     }
 }
 
+/// External service on the fullnode is for testing/local development only.
+/// Performance is not optimized, e.g., single-threaded.
 #[tonic::async_trait]
 impl RawData for RawDataService {
     type GetTransactionsStream = TransactionResponseStream;
@@ -282,7 +284,7 @@ impl RawData for RawDataService {
                 let response = response.map(|t| {
                     TransactionsResponse {
                         chain_id: Some(ledger_chain_id as u64),
-                        transactions: match t.response.unwrap() {
+                        transactions: match t.response.expect("Response must be set") {
                             transactions_from_node_response::Response::Data(transaction_output) => {
                                 let mut transactions = transaction_output.transactions;
                                 let current_transactions_count = transactions.len() as u64;
@@ -292,7 +294,7 @@ impl RawData for RawDataService {
                                 }
                                 transactions
                             },
-                            _ => vec![],
+                            _ => panic!("Unexpected response type."),
                         }
                     }
                 });
