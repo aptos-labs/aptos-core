@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use super::{
-    adapter::{OrderedNotifier, OrderedNotifierAdapter},
+    adapter::{OrderedNotifier, OrderedNotifierAdapter, TLedgerInfoProvider},
     anchor_election::RoundRobinAnchorElection,
     dag_driver::DagDriver,
     dag_fetcher::{DagFetcher, DagFetcherService, FetchRequestHandler},
@@ -16,7 +16,10 @@ use super::{
     ProofNotifier,
 };
 use crate::{
-    dag::dag_state_sync::StateSyncStatus,
+    dag::{
+        adapter::{compute_initial_block_and_ledger_info, LedgerInfoProvider},
+        dag_state_sync::StateSyncStatus,
+    },
     experimental::buffer_manager::OrderedBlocks,
     network::IncomingDAGRequest,
     state_replication::{PayloadClient, StateComputer},
@@ -25,17 +28,12 @@ use aptos_channels::{
     aptos_channel::{self, Receiver},
     message_queues::QueueStyle,
 };
-use aptos_consensus_types::common::Author;
-use aptos_crypto::HashValue;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
-    aggregate_signature::AggregateSignature,
-    block_info::BlockInfo,
-    epoch_state::EpochState,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    validator_signer::ValidatorSigner,
+    epoch_state::EpochState, ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
 };
 use futures_channel::{
     mpsc::{UnboundedReceiver, UnboundedSender},
@@ -87,14 +85,23 @@ impl DagBootstrapper {
 
     fn bootstrap_dag_store(
         &self,
-        latest_ledger_info: LedgerInfo,
+        initial_ledger_info: LedgerInfo,
         notifier: Arc<dyn OrderedNotifier>,
+        dag_window_size_config: usize,
     ) -> (Arc<RwLock<Dag>>, OrderRule) {
+        let initial_round = if initial_ledger_info.round() <= dag_window_size_config as Round {
+            1
+        } else {
+            initial_ledger_info
+                .round()
+                .saturating_sub(dag_window_size_config as Round)
+        };
+
         let dag = Arc::new(RwLock::new(Dag::new(
             self.epoch_state.clone(),
             self.storage.clone(),
-            latest_ledger_info.round(),
-            DAG_WINDOW,
+            initial_round,
+            dag_window_size_config,
         )));
 
         let validators = self.epoch_state.verifier.get_ordered_account_addresses();
@@ -102,7 +109,7 @@ impl DagBootstrapper {
 
         let order_rule = OrderRule::new(
             self.epoch_state.clone(),
-            latest_ledger_info,
+            initial_ledger_info,
             dag.clone(),
             anchor_election,
             notifier,
@@ -117,6 +124,7 @@ impl DagBootstrapper {
         dag: Arc<RwLock<Dag>>,
         order_rule: OrderRule,
         state_sync_trigger: StateSyncTrigger,
+        ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     ) -> (NetworkHandler, DagFetcherService) {
         let validators = self.epoch_state.verifier.get_ordered_account_addresses();
 
@@ -150,6 +158,7 @@ impl DagBootstrapper {
             self.storage.clone(),
             order_rule,
             fetch_requester.clone(),
+            ledger_info_provider,
         );
         let rb_handler = NodeBroadcastHandler::new(
             dag.clone(),
@@ -186,30 +195,45 @@ impl DagBootstrapper {
             self.storage.clone(),
         );
 
-        // TODO: fetch the correct block info
-        let ledger_info = LedgerInfoWithSignatures::new(
-            LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
-            AggregateSignature::empty(),
-        );
-
         loop {
+            let ledger_info_from_storage = self
+                .storage
+                .get_latest_ledger_info()
+                .expect("latest ledger info must exist");
+            let (parent_block_info, ledger_info) =
+                compute_initial_block_and_ledger_info(ledger_info_from_storage);
+            let ledger_info_provider = Arc::new(RwLock::new(LedgerInfoProvider::new(ledger_info)));
+
             let adapter = Arc::new(OrderedNotifierAdapter::new(
                 ordered_nodes_tx.clone(),
                 self.storage.clone(),
                 self.epoch_state.clone(),
+                parent_block_info,
+                ledger_info_provider.clone(),
             ));
 
-            let (dag_store, order_rule) =
-                self.bootstrap_dag_store(ledger_info.ledger_info().clone(), adapter.clone());
+            let (dag_store, order_rule) = self.bootstrap_dag_store(
+                ledger_info_provider
+                    .get_latest_ledger_info()
+                    .ledger_info()
+                    .clone(),
+                adapter.clone(),
+                DAG_WINDOW,
+            );
 
             let state_sync_trigger = StateSyncTrigger::new(
                 self.epoch_state.clone(),
+                ledger_info_provider.clone(),
                 dag_store.clone(),
                 self.proof_notifier.clone(),
             );
 
-            let (handler, fetch_service) =
-                self.bootstrap_components(dag_store.clone(), order_rule, state_sync_trigger);
+            let (handler, fetch_service) = self.bootstrap_components(
+                dag_store.clone(),
+                order_rule,
+                state_sync_trigger,
+                ledger_info_provider.clone(),
+            );
 
             let df_handle = tokio::spawn(fetch_service.start());
 
@@ -222,6 +246,7 @@ impl DagBootstrapper {
                     return;
                 },
                 sync_status = handler.run(&mut dag_rpc_rx) => {
+                    debug!("state sync notification received. {:?}", sync_status);
                     df_handle.abort();
                     let _ = df_handle.await;
 
@@ -229,9 +254,19 @@ impl DagBootstrapper {
                         StateSyncStatus::NeedsSync(certified_node_msg) => {
                             let dag_fetcher = DagFetcher::new(self.epoch_state.clone(), self.dag_network_sender.clone(), self.time_service.clone());
 
-                            if let Err(e) = sync_manager.sync_dag_to(&certified_node_msg, dag_fetcher, dag_store.clone()).await {
-                                error!(error = ?e, "unable to sync");
+                            let highest_committed_anchor_round = ledger_info_provider.get_highest_committed_anchor_round();
+                            let sync_future = sync_manager.sync_dag_to(&certified_node_msg, dag_fetcher, dag_store.clone(), highest_committed_anchor_round);
+
+                            select! {
+                                Err(e) = sync_future => {
+                                    error!(error = ?e, "unable to sync");
+                                },
+                                Ok(_) = &mut shutdown_rx => {
+                                    return;
+                                }
                             }
+
+                            debug!("going to rebootstrap.");
                         },
                         StateSyncStatus::EpochEnds => {
                             // Wait for epoch manager to signal shutdown
@@ -240,8 +275,6 @@ impl DagBootstrapper {
                         },
                         _ => unreachable!()
                     }
-
-
                 }
             }
         }
@@ -279,22 +312,39 @@ pub(super) fn bootstrap_dag_for_test(
         state_computer,
     );
 
+    let ledger_info_from_storage = storage
+        .get_latest_ledger_info()
+        .expect("latest ledger info must exist");
+    let (parent_block_info, ledger_info) =
+        compute_initial_block_and_ledger_info(ledger_info_from_storage);
+    let ledger_info_provider = Arc::new(RwLock::new(LedgerInfoProvider::new(ledger_info)));
+
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
     let adapter = Arc::new(OrderedNotifierAdapter::new(
         ordered_nodes_tx,
         storage.clone(),
         epoch_state.clone(),
+        parent_block_info,
+        ledger_info_provider.clone(),
     ));
     let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
 
     let (dag_store, order_rule) =
-        bootstraper.bootstrap_dag_store(latest_ledger_info, adapter.clone());
+        bootstraper.bootstrap_dag_store(latest_ledger_info, adapter.clone(), DAG_WINDOW);
 
-    let state_sync_trigger =
-        StateSyncTrigger::new(epoch_state, dag_store.clone(), proof_notifier.clone());
+    let state_sync_trigger = StateSyncTrigger::new(
+        epoch_state,
+        ledger_info_provider.clone(),
+        dag_store.clone(),
+        proof_notifier.clone(),
+    );
 
-    let (handler, fetch_service) =
-        bootstraper.bootstrap_components(dag_store.clone(), order_rule, state_sync_trigger);
+    let (handler, fetch_service) = bootstraper.bootstrap_components(
+        dag_store.clone(),
+        order_rule,
+        state_sync_trigger,
+        ledger_info_provider,
+    );
 
     let dh_handle = tokio::spawn(async move {
         let mut dag_rpc_rx = dag_rpc_rx;

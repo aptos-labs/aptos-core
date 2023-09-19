@@ -150,6 +150,8 @@ impl NetworkHandler {
             }
         };
 
+        debug!("responding to rpc: {:?}", response);
+
         let response = response
             .and_then(|response_msg| {
                 rpc_request
