@@ -680,6 +680,7 @@ where
         let scheduler = Scheduler::new(txn_provider);
         println!("[TTT] scheduler_lastio_news={:?}", tt.elapsed());
 
+        let tt = Instant::now();
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
             match txn_provider.commit_strategy() {
@@ -736,6 +737,8 @@ where
             };
         });
         drop(timer);
+        println!("[TTT] blockstm_threads={:?}", tt.elapsed());
+
 
         // TODO: for large block sizes and many cores, extract outputs in parallel.
         let mut final_results = Vec::with_capacity(num_txns);
