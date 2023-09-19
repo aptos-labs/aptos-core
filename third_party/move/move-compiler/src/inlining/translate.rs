@@ -266,7 +266,6 @@ impl<'l, 'r> Visitor for SubstitutionVisitor<'l, 'r> {
                     | BuiltinFunction_::Freeze(ty) => ty,
                     BuiltinFunction_::Assert(_) => return VisitorContinuation::Descend,
                 };
-                self.type_(ty);
                 self.check_resource_usage(ex.exp.loc, ty, true);
                 VisitorContinuation::Descend
             },
