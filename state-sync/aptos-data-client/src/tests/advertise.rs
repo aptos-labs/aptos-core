@@ -36,7 +36,7 @@ async fn request_works_only_when_data_available() {
     let expected_peer = mock_network.add_peer(true);
 
     // Requesting some txns now will still fail since no peers are advertising
-    // availability for the desired range.
+    // availability for the desired range
     let error = client
         .get_transactions_with_proof(100, 50, 100, false, request_timeout)
         .await
