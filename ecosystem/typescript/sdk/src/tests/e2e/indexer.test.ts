@@ -129,6 +129,18 @@ describe("Indexer", () => {
       expect(ledgerInfo.ledger_infos[0].chain_id).toBeGreaterThan(1);
     });
 
+    // OBJECTS //
+
+    it(
+      "gets account owned objects data",
+      async () => {
+        const ownerAddress = "0x5ba9fa393e4840013932ecceb243ae2e6c38a558444fe777ebe8e0550c4c4e18";
+        const accountObjects = await indexerClient.getOwnedObjects(ownerAddress);
+        expect(accountObjects.current_objects[0].owner_address).toEqual(ownerAddress);
+      },
+      longTestTimeout,
+    );
+
     // TOKENS //
 
     it(

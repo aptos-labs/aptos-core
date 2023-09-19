@@ -881,11 +881,12 @@ export class IndexerClient {
    * @returns GetCurrentObjectsQuery response type
    */
   async getOwnedObjects(
-      ownerAddress: MaybeHexString,
-      extraArgs?: {
-        options?: IndexerPaginationArgs;
-        orderBy?: IndexerSortBy<Account_Transactions_Order_By>[];
-      },): Promise<GetCurrentObjectsQuery> {
+    ownerAddress: MaybeHexString,
+    extraArgs?: {
+      options?: IndexerPaginationArgs;
+      orderBy?: IndexerSortBy<Account_Transactions_Order_By>[];
+    },
+  ): Promise<GetCurrentObjectsQuery> {
     const address = HexString.ensure(ownerAddress).hex();
     IndexerClient.validateAddress(address);
 
