@@ -22,6 +22,7 @@ import {
   GetTokenCurrentOwnerDataQuery,
   GetOwnedTokensByTokenDataQuery,
   GetAccountCoinsDataCountQuery,
+  GetCurrentObjectsQuery,
 } from "../indexer/generated/operations";
 import {
   GetAccountTokensCount,
@@ -45,6 +46,7 @@ import {
   GetTokenCurrentOwnerData,
   GetOwnedTokensByTokenData,
   GetAccountCoinsDataCount,
+  GetCurrentObjects,
 } from "../indexer/generated/queries";
 import { ClientConfig, post } from "../client";
 import { ApiError } from "./aptos_client";
@@ -869,6 +871,37 @@ export class IndexerClient {
       },
     };
 
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries an account owned objects
+   *
+   * @param ownerAddress Owner address
+   * @returns GetCurrentObjectsQuery response type
+   */
+  async getOwnedObjects(
+      ownerAddress: MaybeHexString,
+      extraArgs?: {
+        options?: IndexerPaginationArgs;
+        orderBy?: IndexerSortBy<Account_Transactions_Order_By>[];
+      },): Promise<GetCurrentObjectsQuery> {
+    const address = HexString.ensure(ownerAddress).hex();
+    IndexerClient.validateAddress(address);
+
+    const whereCondition: any = {
+      owner_address: { _eq: address },
+    };
+
+    const graphqlQuery = {
+      query: GetAccountTransactionsData,
+      variables: {
+        where_condition: whereCondition,
+        offset: extraArgs?.options?.offset,
+        limit: extraArgs?.options?.limit,
+        order_by: extraArgs?.orderBy,
+      },
+    };
     return this.queryIndexer(graphqlQuery);
   }
 }
