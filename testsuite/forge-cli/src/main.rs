@@ -6,8 +6,8 @@
 
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::{
-    BootstrappingMode, ConsensusConfig, ContinuousSyncingMode, MempoolConfig, NodeConfig,
-    StateSyncConfig,
+    BootstrappingMode, ConsensusConfig, ContinuousSyncingMode, MempoolConfig, NetbenchConfig,
+    NodeConfig, StateSyncConfig,
 };
 use aptos_forge::{
     args::TransactionTypeArg,
@@ -30,7 +30,9 @@ use aptos_testcases::{
     generate_traffic,
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
     modifiers::{CpuChaosTest, ExecutionDelayConfig, ExecutionDelayTest},
-    multi_region_network_test::MultiRegionNetworkEmulationTest,
+    multi_region_network_test::{
+        MultiRegionNetworkEmulationConfig, MultiRegionNetworkEmulationTest,
+    },
     network_bandwidth_test::NetworkBandwidthTest,
     network_loss_test::NetworkLossTest,
     network_partition_test::NetworkPartitionTest,
@@ -585,6 +587,8 @@ fn single_test_suite(
         "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true),
         "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true),
         "gather_metrics" => gather_metrics(),
+        "net_bench" => net_bench(),
+        "net_bench_two_region_env" => net_bench_two_region_env(),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -625,6 +629,15 @@ fn state_sync_config_fast_sync(state_sync_config: &mut StateSyncConfig) {
         BootstrappingMode::DownloadLatestStates;
     state_sync_config.state_sync_driver.continuous_syncing_mode =
         ContinuousSyncingMode::ApplyTransactionOutputs;
+}
+
+fn wrap_with_two_region_env<T: NetworkTest + 'static>(test: T) -> CompositeNetworkTest {
+    CompositeNetworkTest::new(
+        MultiRegionNetworkEmulationTest::new_with_config(
+            MultiRegionNetworkEmulationConfig::two_region(),
+        ),
+        test,
+    )
 }
 
 fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
@@ -1344,6 +1357,45 @@ fn gather_metrics() -> ForgeConfig {
         .add_network_test(GatherMetrics)
         .add_network_test(Delay::new(180))
         .add_network_test(GatherMetrics)
+}
+
+fn netbench_config_100_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
+    netbench_config.enabled = true;
+    netbench_config.max_network_channel_size = 1000;
+    netbench_config.enable_direct_send_testing = true;
+    netbench_config.direct_send_data_size = 100000;
+    netbench_config.direct_send_per_second = 1000;
+}
+
+fn netbench_config_2_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
+    netbench_config.enabled = true;
+    netbench_config.max_network_channel_size = 1000;
+    netbench_config.enable_direct_send_testing = true;
+    netbench_config.direct_send_data_size = 100000;
+    netbench_config.direct_send_per_second = 20;
+}
+
+fn net_bench() -> ForgeConfig {
+    ForgeConfig::default()
+        .add_network_test(Delay::new(180))
+        .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            let mut netbench_config = NetbenchConfig::default();
+            netbench_config_100_megabytes_per_sec(&mut netbench_config);
+            config.netbench = Some(netbench_config);
+        }))
+}
+
+fn net_bench_two_region_env() -> ForgeConfig {
+    ForgeConfig::default()
+        .add_network_test(wrap_with_two_region_env(Delay::new(180)))
+        .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // Not using 100 MBps here, as it will lead to throughput collapse
+            let mut netbench_config = NetbenchConfig::default();
+            netbench_config_2_megabytes_per_sec(&mut netbench_config);
+            config.netbench = Some(netbench_config);
+        }))
 }
 
 fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
