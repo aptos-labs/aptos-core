@@ -59,7 +59,7 @@ pub fn bootstrap(
         let server = FullnodeDataService {
             service_context: service_context.clone(),
         };
-        let indexer_server = LocalnetDataService { service_context };
+        let localnet_data_server = LocalnetDataService { service_context };
 
         let mut tonic_server = Server::builder()
             .http2_keepalive_interval(Some(std::time::Duration::from_secs(60)))
@@ -67,7 +67,7 @@ pub fn bootstrap(
 
         let router = match dev_mode_enabled {
             false => tonic_server.add_service(FullnodeDataServer::new(server)),
-            true => tonic_server.add_service(RawDataServer::new(indexer_server)),
+            true => tonic_server.add_service(RawDataServer::new(localnet_data_server)),
         };
         // Make port into a config
         router

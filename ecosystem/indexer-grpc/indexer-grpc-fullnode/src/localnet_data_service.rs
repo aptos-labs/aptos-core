@@ -27,6 +27,7 @@ pub struct LocalnetDataService {
 
 /// External service on the fullnode is for testing/local development only.
 /// Performance is not optimized, e.g., single-threaded.
+/// NOTE: code is duplicated from fullnode_data_service.rs with some minor changes.
 #[tonic::async_trait]
 impl RawData for LocalnetDataService {
     type GetTransactionsStream = TransactionResponseStream;
