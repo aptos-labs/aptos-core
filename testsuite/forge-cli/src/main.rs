@@ -527,8 +527,8 @@ fn single_test_suite(
 ) -> Result<ForgeConfig> {
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
-        "land_blocking" => net_bench_two_region_env(), // TODO
-        "realistic_env_max_load" => net_bench_two_region_env(), // TODO
+        "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
+        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         // Rest of the tests:
