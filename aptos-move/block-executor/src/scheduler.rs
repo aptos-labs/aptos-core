@@ -1,7 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
-#![allow(unused_imports)]
-
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
@@ -36,7 +32,7 @@ pub struct ArmedLock {
 impl ArmedLock {
     pub fn new() -> Self {
         Self {
-            locked: AtomicU64::new(1), //
+            locked: AtomicU64::new(1),
         }
     }
 
@@ -273,7 +269,7 @@ pub struct Scheduler {
     /// Shared marker that is set when a thread detects that all txns can be committed.
     done_marker: CachePadded<AtomicBool>,
 
-    coordinating_commits_lock: CachePadded<ArmedLock>,
+    queueing_commits_lock: CachePadded<ArmedLock>,
 
     commit_queue: ConcurrentQueue<u32>,
 }
@@ -301,7 +297,7 @@ impl Scheduler {
             execution_idx: AtomicU32::new(0),
             validation_idx: AtomicU64::new(0),
             done_marker: CachePadded::new(AtomicBool::new(false)),
-            coordinating_commits_lock: CachePadded::new(ArmedLock::new()),
+            queueing_commits_lock: CachePadded::new(ArmedLock::new()),
             commit_queue: ConcurrentQueue::<u32>::bounded(num_txns as usize),
         }
     }
@@ -320,16 +316,16 @@ impl Scheduler {
         self.commit_queue.pop()
     }
 
-    pub fn coordinating_commits_mark_done(&self) {
-        self.coordinating_commits_lock.unlock()
+    pub fn queueing_commits_mark_done(&self) {
+        self.queueing_commits_lock.unlock()
     }
 
-    pub fn coordinating_commits_arm(&self) {
-        self.coordinating_commits_lock.arm()
+    pub fn queueing_commits_arm(&self) {
+        self.queueing_commits_lock.arm()
     }
 
     pub fn should_coordinate_commits(&self) -> bool {
-        self.coordinating_commits_lock.try_lock()
+        self.queueing_commits_lock.try_lock()
     }
 
     /// If successful, returns Some(TxnIndex), the index of committed transaction.

@@ -239,14 +239,14 @@ where
             scheduler.finish_validation(idx_to_validate, validation_wave);
 
             if valid {
-                scheduler.coordinating_commits_arm();
+                scheduler.queueing_commits_arm();
             }
 
             SchedulerTask::NoTask
         }
     }
 
-    fn coordinator_commit_hook(
+    fn queue_ready_commits(
         &self,
         maybe_block_gas_limit: Option<u64>,
         scheduler: &Scheduler,
@@ -260,7 +260,6 @@ where
             let (accumulated_fee_statement, txn_fee_statements) =
                 (&mut txn_state_pair.0, &mut txn_state_pair.1);
 
-            // Coordinator sends the committed txn index to Worker at the end of the scope.
             defer! {
                 scheduler.add_to_commit_queue(txn_idx);
             }
@@ -336,7 +335,7 @@ where
         }
     }
 
-    fn commit_txn(
+    fn commit_epilogue(
         &self,
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
@@ -397,7 +396,7 @@ where
         }
     }
 
-    fn work_task_with_scope(
+    fn worker_loop(
         &self,
         executor_arguments: &E::Argument,
         block: &[T],
@@ -418,20 +417,20 @@ where
         let mut scheduler_task = SchedulerTask::NoTask;
 
         loop {
-            if scheduler.should_coordinate_commits() {
-                self.coordinator_commit_hook(
+            while scheduler.should_coordinate_commits() {
+                self.queue_ready_commits(
                     self.maybe_block_gas_limit,
                     scheduler,
                     &mut scheduler_task,
                     last_input_output,
                     txn_fee_state,
                 );
-                scheduler.coordinating_commits_mark_done();
+                scheduler.queueing_commits_mark_done();
             }
 
             {
                 while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
-                    self.commit_txn(txn_idx, versioned_cache, last_input_output, base_view);
+                    self.commit_epilogue(txn_idx, versioned_cache, last_input_output, base_view);
                 }
             }
 
@@ -471,7 +470,12 @@ where
                 SchedulerTask::NoTask => scheduler.next_task(),
                 SchedulerTask::Done => {
                     while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
-                        self.commit_txn(txn_idx, versioned_cache, last_input_output, base_view);
+                        self.commit_epilogue(
+                            txn_idx,
+                            versioned_cache,
+                            last_input_output,
+                            base_view,
+                        );
                     }
                     break;
                 },
@@ -515,7 +519,7 @@ where
         self.executor_thread_pool.scope(|s| {
             for _ in 0..self.concurrency_level {
                 s.spawn(|_| {
-                    self.work_task_with_scope(
+                    self.worker_loop(
                         &executor_initial_arguments,
                         signature_verified_block,
                         &last_input_output,
