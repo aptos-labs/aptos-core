@@ -10,9 +10,12 @@ spec aptos_framework::stake {
         invariant [suspendable] chain_status::is_operating() ==> exists<AptosCoinCapabilities>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==> exists<ValidatorPerformance>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==> exists<ValidatorSet>(@aptos_framework);
-        // property 1: The validator set resource stores consensus information for each validator. The consensus scheme remains consistent across all validators within the set.
-        // This property is timeout (haven't proved)
+
+        // property 1: the validator set resource stores consensus information for each validator.
+        // the consensus scheme remains consistent across all validators within the set.
+        // this property cause timeout and haven't proved yet
         // apply ConsensusInv to * except on_new_epoch;
+
         // property 2: The owner of a validator remains immutable.
         apply ValidatorOwnerNoChange to *;
         // property 3: The total staked value in the stake pool should be constant (excluding adding and withdrawing operations).
@@ -237,12 +240,14 @@ spec aptos_framework::stake {
         let post post_fees_table = global<ValidatorFees>(@aptos_framework).fees_table;
         let post post_inactive_value = post_stake_pool.inactive.value;
         ensures post_stake_pool.pending_active.value == 0;
+        // the amount stored in the stake pool should not changed after the update
         ensures if (features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES) && table::spec_contains(fees_table, pool_address)) {
             !table::spec_contains(post_fees_table, pool_address) &&
             post_active_value == stake_pool.active.value + rewards_amount_1 + stake_pool.pending_active.value + table::spec_get(fees_table, pool_address).value
         } else {
             post_active_value == stake_pool.active.value + rewards_amount_1 + stake_pool.pending_active.value
         };
+        // when current lockup cycle has expired, pending inactive should be fully unlocked and moved into inactive
         ensures if (timestamp::spec_now_seconds() >= stake_pool.locked_until_secs) {
             post_pending_inactive_value == 0 &&
             post_inactive_value == stake_pool.inactive.value + stake_pool.pending_inactive.value + rewards_amount_2
