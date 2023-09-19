@@ -6,6 +6,7 @@ use crate::{
     error::StateSyncError,
     experimental::buffer_manager::OrderedBlocks,
     payload_manager::PayloadManager,
+    state_computer::StateComputeResultFut,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
     transaction_deduper::TransactionDeduper,
@@ -206,19 +207,20 @@ impl RandomComputeResultStateComputer {
 
 #[async_trait::async_trait]
 impl StateComputer for RandomComputeResultStateComputer {
-    async fn compute(
+    async fn schedule_compute(
         &self,
         _block: &Block,
         parent_block_id: HashValue,
-    ) -> ExecutorResult<StateComputeResult> {
+    ) -> StateComputeResultFut {
         // trapdoor for Execution Error
-        if parent_block_id == self.random_compute_result_root_hash {
+        let res = if parent_block_id == self.random_compute_result_root_hash {
             Err(ExecutorError::BlockNotFound(parent_block_id))
         } else {
             Ok(StateComputeResult::new_dummy_with_root_hash(
                 self.random_compute_result_root_hash,
             ))
-        }
+        };
+        Box::pin(async move { res })
     }
 
     async fn commit(

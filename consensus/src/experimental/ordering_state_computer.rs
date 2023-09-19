@@ -16,7 +16,7 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::{ExecutorError, ExecutorResult, StateComputeResult};
+use aptos_executor_types::{ExecutorResult, StateComputeResult};
 use aptos_logger::prelude::*;
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
 use async_trait::async_trait;
@@ -76,7 +76,7 @@ impl StateComputer for OrderingStateComputer {
         blocks: &[Arc<ExecutedBlock>],
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
-    ) -> Result<(), ExecutorError> {
+    ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
 
         if self
