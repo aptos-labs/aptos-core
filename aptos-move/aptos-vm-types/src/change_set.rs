@@ -255,7 +255,7 @@ impl VMChangeSet {
         })
     }
 
-    fn squash_additional_aggregator_changes(
+    fn squash_additional_aggregator_v1_changes(
         aggregator_v1_write_set: &mut HashMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: &mut HashMap<StateKey, DeltaOp>,
         additional_aggregator_v1_write_set: HashMap<StateKey, WriteOp>,
@@ -341,6 +341,35 @@ impl VMChangeSet {
         Ok(())
     }
 
+    fn squash_additional_aggregator_v2_changes(
+        change_set: &mut HashMap<AggregatorID, AggregatorChange>,
+        additional_change_set: HashMap<AggregatorID, AggregatorChange>,
+    ) -> anyhow::Result<(), VMStatus> {
+        let merged_changes = additional_change_set
+            .into_iter()
+            .map(|(id, additional_change)| {
+                (
+                    id,
+                    AggregatorChange::merge_two_changes(
+                        change_set.get(&id),
+                        additional_change
+                            .get_merge_dependent_id()
+                            .and_then(|id| change_set.get(&id)),
+                        &additional_change,
+                    ),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        for (id, merged_change) in merged_changes.into_iter() {
+            change_set.insert(
+                id,
+                merged_change.map_err(|e| e.finish(Location::Undefined).into_vm_status())?,
+            );
+        }
+        Ok(())
+    }
+
     fn squash_additional_writes(
         write_set: &mut HashMap<StateKey, WriteOp>,
         additional_write_set: HashMap<StateKey, WriteOp>,
@@ -372,15 +401,16 @@ impl VMChangeSet {
             events: additional_events,
         } = additional_change_set;
 
-        Self::squash_additional_aggregator_changes(
+        Self::squash_additional_aggregator_v1_changes(
             &mut self.aggregator_v1_write_set,
             &mut self.aggregator_v1_delta_set,
             additional_aggregator_write_set,
             additional_aggregator_delta_set,
         )?;
-        if !additional_aggregator_v2_change_set.is_empty() {
-            unimplemented!("Aggregator v2 change sets are not supported yet.");
-        }
+        Self::squash_additional_aggregator_v2_changes(
+            &mut self.aggregator_v2_change_set,
+            additional_aggregator_v2_change_set,
+        )?;
         Self::squash_additional_writes(
             &mut self.resource_write_set,
             additional_resource_write_set,

@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
-    aggregator_change_set::AggregatorChange,
-    aggregator_extension::{AggregatorData, AggregatorState},
+    aggregator_change_set::{AggregatorApplyChange, AggregatorChange},
+    aggregator_extension::{AggregatorData, AggregatorSnapshotState, AggregatorState},
     delta_change_set::DeltaOp,
+    delta_math::DeltaHistory,
     resolver::AggregatorResolver,
-    types::{AggregatorID, AggregatorVersionedID},
+    types::{AggregatorID, AggregatorValue, AggregatorVersionedID, SnapshotValue},
 };
 use aptos_types::state_store::state_key::StateKey;
 use better_any::{Tid, TidAble};
@@ -63,13 +64,58 @@ impl<'a> NativeAggregatorContext<'a> {
         let NativeAggregatorContext {
             aggregator_data, ..
         } = self;
-        let (_, destroyed_aggregators, aggregators, _snapshots) =
+        let (_, destroyed_aggregators, aggregators, snapshots) =
             aggregator_data.into_inner().into();
 
         let mut aggregator_v1_changes = HashMap::new();
         let mut aggregator_v2_changes = HashMap::new();
 
-        // First, process all writes and deltas.
+        // First process all snapshots (they need access to aggregators)
+        for (id, snapshot) in snapshots {
+            let state = snapshot.into();
+            let change = match state {
+                AggregatorSnapshotState::Create {
+                    value: SnapshotValue::Integer(value),
+                } => Some(AggregatorChange::Create(AggregatorValue::Snapshot(value))),
+                AggregatorSnapshotState::Create {
+                    value: SnapshotValue::String(value),
+                } => Some(AggregatorChange::Create(AggregatorValue::Derived(value))),
+                AggregatorSnapshotState::Delta {
+                    base_aggregator,
+                    delta,
+                } => {
+                    let delta_op = aggregators.get(&AggregatorVersionedID::V2(base_aggregator)).map_or_else(
+                        || DeltaOp::new(delta, u128::MAX, DeltaHistory::new()),
+                        |v| match v.state {
+                            AggregatorState::Create { .. } => unreachable!("Aggregator that snapshot in Delta state depends on cannot be in Create state"),
+                            AggregatorState::Delta { history, .. } => DeltaOp::new(delta, v.max_value, history),
+                        }
+                    );
+                    Some(AggregatorChange::Apply(
+                        AggregatorApplyChange::SnapshotDelta {
+                            base_aggregator,
+                            delta: delta_op,
+                        },
+                    ))
+                },
+                AggregatorSnapshotState::Derived {
+                    base_snapshot,
+                    formula,
+                } => Some(AggregatorChange::Apply(
+                    AggregatorApplyChange::SnapshotDerived {
+                        base_snapshot,
+                        formula,
+                    },
+                )),
+                // Not a write
+                AggregatorSnapshotState::Reference { .. } => None,
+            };
+            if let Some(change) = change {
+                aggregator_v2_changes.insert(id, change);
+            }
+        }
+
+        // Second, process all aggregators.
         for (id, aggregator) in aggregators {
             let (max_value, state) = aggregator.into();
             match id {
@@ -85,17 +131,25 @@ impl<'a> NativeAggregatorContext<'a> {
                 },
                 AggregatorVersionedID::V2(id) => {
                     let change = match state {
-                        AggregatorState::Create { value } => AggregatorChange::Data { value },
-                        // TODO - read creates a change, remove it?
+                        AggregatorState::Create { value } => {
+                            Some(AggregatorChange::Create(AggregatorValue::Aggregator(value)))
+                        },
                         AggregatorState::Delta { delta, history, .. } => {
-                            AggregatorChange::AggregatorDelta {
-                                delta,
-                                max_value,
-                                history,
+                            if delta.is_zero() && history.is_empty() {
+                                // not a write
+                                None
+                            } else {
+                                Some(AggregatorChange::Apply(
+                                    AggregatorApplyChange::AggregatorDelta {
+                                        delta: DeltaOp::new(delta, max_value, history),
+                                    },
+                                ))
                             }
                         },
                     };
-                    aggregator_v2_changes.insert(id, change);
+                    if let Some(change) = change {
+                        aggregator_v2_changes.insert(id, change);
+                    }
                 },
             }
         }
@@ -294,20 +348,18 @@ mod test {
         assert!(aggregator_v2_changes.contains_key(&AggregatorID::new(1100)));
         assert_some_eq!(
             aggregator_v2_changes.get(&AggregatorID::new(900)),
-            &AggregatorChange::AggregatorDelta {
-                max_value: 900,
-                delta: SignedU128::Positive(200),
-                history: DeltaHistory {
+            &AggregatorChange::Apply(AggregatorApplyChange::AggregatorDelta {
+                delta: DeltaOp::new(SignedU128::Positive(200), 900, DeltaHistory {
                     max_achieved_positive_delta: 200,
                     min_achieved_negative_delta: 0,
                     min_overflow_positive_delta: Some(601),
                     max_underflow_negative_delta: Some(301),
-                },
-            }
+                },),
+            }),
         );
         assert_some_eq!(
             aggregator_v2_changes.get(&AggregatorID::new(1100)),
-            &AggregatorChange::Data { value: 200 }
+            &AggregatorChange::Create(AggregatorValue::Aggregator(200)),
         );
     }
 }
