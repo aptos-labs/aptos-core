@@ -47,7 +47,7 @@ impl ArmedLock {
     }
 
     pub fn arm(&self) {
-        self.locked.fetch_or(2, Ordering::Relaxed);
+        self.locked.fetch_or(2, Ordering::Release);
     }
 }
 
