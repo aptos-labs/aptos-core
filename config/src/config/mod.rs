@@ -44,6 +44,7 @@ pub use indexer_grpc_config::*;
 pub use inspection_service_config::*;
 pub use logger_config::*;
 pub use mempool_config::*;
+pub use netbench::*;
 pub use network_config::*;
 pub use node_config::*;
 pub use node_config_loader::sanitize_node_config;

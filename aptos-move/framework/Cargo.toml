@@ -50,6 +50,7 @@ include_dir = { workspace = true }
 itertools = { workspace = true }
 libsecp256k1 = { workspace = true }
 log = { workspace = true }
+lru = { workspace = true }
 merlin = { workspace = true }
 move-binary-format = { workspace = true }
 move-command-line-common = { workspace = true }
