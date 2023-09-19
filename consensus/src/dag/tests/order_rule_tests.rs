@@ -87,7 +87,7 @@ pub struct TestNotifier {
 #[async_trait]
 impl Notifier for TestNotifier {
     fn send_ordered_nodes(
-        &mut self,
+        &self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         _failed_authors: Vec<(Round, Author)>,
     ) -> anyhow::Result<()> {
@@ -118,7 +118,7 @@ fn create_order_rule(
             ledger_info,
             dag,
             anchor_election,
-            Box::new(TestNotifier { tx }),
+            Arc::new(TestNotifier { tx }),
             Arc::new(MockStorage::new()),
         ),
         rx,

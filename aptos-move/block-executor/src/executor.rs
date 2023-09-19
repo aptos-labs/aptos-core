@@ -18,12 +18,16 @@ use crate::{
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
-    types::{MVDataError, MVDataOutput, TxnIndex, Version},
+    types::{Incarnation, MVDataError, MVDataOutput, TxnIndex},
     unsync_map::UnsyncMap,
     MVHashMap,
 };
 use aptos_state_view::TStateView;
-use aptos_types::{executable::Executable, fee_statement::FeeStatement, write_set::WriteOp};
+use aptos_types::{
+    executable::Executable,
+    fee_statement::FeeStatement,
+    write_set::{TransactionWrite, WriteOp},
+};
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use rayon::ThreadPool;
@@ -111,17 +115,17 @@ where
     }
 
     fn execute(
-        version: Version,
+        idx_to_execute: TxnIndex,
+        incarnation: Incarnation,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
         scheduler: &Scheduler,
         executor: &E,
         base_view: &S,
         latest_view: ParallelState<T, X>,
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
-        let (idx_to_execute, incarnation) = version;
         let txn = &signature_verified_block[idx_to_execute as usize];
 
         // VM execution.
@@ -136,7 +140,6 @@ where
         let mut updates_outside = false;
         let mut apply_updates = |output: &E::Output| {
             // First, apply writes.
-            let write_version = (idx_to_execute, incarnation);
             for (k, v) in output
                 .resource_write_set()
                 .into_iter()
@@ -145,7 +148,9 @@ where
                 if prev_modified_keys.remove(&k).is_none() {
                     updates_outside = true;
                 }
-                versioned_cache.data().write(k, write_version, v);
+                versioned_cache
+                    .data()
+                    .write(k, idx_to_execute, incarnation, v);
             }
 
             for (k, v) in output.module_write_set().into_iter() {
@@ -160,7 +165,7 @@ where
                 if prev_modified_keys.remove(&k).is_none() {
                     updates_outside = true;
                 }
-                versioned_cache.add_delta(k, idx_to_execute, d);
+                versioned_cache.data().add_delta(k, idx_to_execute, d);
             }
         };
 
@@ -207,37 +212,40 @@ where
     }
 
     fn validate(
-        version_to_validate: Version,
+        idx_to_validate: TxnIndex,
+        incarnation: Incarnation,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
         scheduler: &Scheduler,
     ) -> SchedulerTask {
         use MVDataError::*;
         use MVDataOutput::*;
 
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
-        let (idx_to_validate, incarnation) = version_to_validate;
         let read_set = last_input_output
             .read_set(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
 
         let valid = read_set.iter().all(|r| {
-            match versioned_cache.fetch_data(r.path(), idx_to_validate) {
-                Ok(Versioned(version, _)) => r.validate_version(version),
+            if r.is_speculative_failure() {
+                return false;
+            }
+
+            match versioned_cache.data().fetch_data(r.path(), idx_to_validate) {
+                Ok(Versioned(version, _)) => r.validate_versioned(version),
                 Ok(Resolved(value)) => r.validate_resolved(value),
+                Err(Uninitialized) => {
+                    // Can match the current behavior for modules: the path would be considered
+                    // 'Uninitialized' for data() hashmap, as the output is stored in the modules
+                    // MVHashMap. We validate all module reads successfully, as reading any
+                    // module that is also published triggeres ModulePathReadWrite fallback.
+                    r.validate_module()
+                },
                 // Dependency implies a validation failure, and if the original read were to
                 // observe an unresolved delta, it would set the aggregator base value in the
                 // multi-versioned data-structure, resolve, and record the resolved value.
-                Err(Dependency(_)) | Err(Unresolved(_)) => false,
-                Err(NotFound) => r.validate_storage(),
-                // We successfully validate when read (again) results in a delta application
-                // failure. If the failure is speculative, a later validation will fail due to
-                // a read without this error. However, if the failure is real, passing
-                // validation here allows to avoid infinitely looping and instead panic when
-                // materializing deltas as writes in the final output preparation state. Panic
-                // is also preferable as it allows testing for this scenario.
-                Err(DeltaApplicationFailure) => r.validate_delta_application_failure(),
+                Err(Dependency(_)) | Err(Unresolved(_)) | Err(DeltaApplicationFailure) => false,
             }
         });
 
@@ -319,7 +327,7 @@ where
             {
                 if txn_idx + 1 == scheduler.num_txns() {
                     assert!(
-                        !matches!(scheduler_task, SchedulerTask::ExecutionTask(_, _)),
+                        !matches!(scheduler_task, SchedulerTask::ExecutionTask(_, _, _)),
                         "All transactions can be committed, can't have execution task"
                     );
 
@@ -362,7 +370,7 @@ where
     fn worker_commit_hook(
         &self,
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         base_view: &S,
     ) {
@@ -381,22 +389,28 @@ where
             // single materialized aggregator. If needed, the contention may be further
             // mitigated by batching consecutive commit_hooks.
             let committed_delta = versioned_cache
+                .data()
                 .materialize_delta(&k, txn_idx)
                 .unwrap_or_else(|op| {
                     // TODO: this logic should improve with the new AGGR data structure
                     // TODO: and the ugly base_view parameter will also disappear.
                     let storage_value = base_view
-                        .get_state_value_u128(&k)
-                        .expect("Error reading the base value for committed delta in storage")
-                        .expect("No base value for committed delta in storage");
+                        .get_state_value(&k)
+                        .expect("Error reading the base value for committed delta in storage");
 
-                    versioned_cache.set_aggregator_base_value(&k, storage_value);
-                    op.apply_to(storage_value)
+                    let w: T::Value = TransactionWrite::from_state_value(storage_value);
+                    let value_u128 = w
+                        .as_u128()
+                        .expect("Aggregator base value deserialization error")
+                        .expect("Aggregator base value must exist");
+
+                    versioned_cache.data().provide_base_value(k.clone(), w);
+                    op.apply_to(value_u128)
                         .expect("Materializing delta w. base value set must succeed")
                 });
 
             // Must contain committed value as we set the base value above.
-            delta_writes.push((k, WriteOp::Modification(serialize(&committed_delta))));
+            delta_writes.push((k, WriteOp::Modification(serialize(&committed_delta).into())));
         }
         last_input_output.record_delta_writes(txn_idx, delta_writes);
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
@@ -419,7 +433,7 @@ where
         executor_arguments: &E::Argument,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
         base_view: &S,
@@ -467,26 +481,30 @@ where
             }
 
             scheduler_task = match scheduler_task {
-                SchedulerTask::ValidationTask(version_to_validate, wave) => Self::validate(
-                    version_to_validate,
+                SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => Self::validate(
+                    txn_idx,
+                    incarnation,
                     wave,
                     last_input_output,
                     versioned_cache,
                     scheduler,
                 ),
-                SchedulerTask::ExecutionTask(version_to_execute, ExecutionTaskType::Execution) => {
-                    Self::execute(
-                        version_to_execute,
-                        block,
-                        last_input_output,
-                        versioned_cache,
-                        scheduler,
-                        &executor,
-                        base_view,
-                        ParallelState::new(versioned_cache, scheduler, shared_counter),
-                    )
-                },
-                SchedulerTask::ExecutionTask(_, ExecutionTaskType::Wakeup(condvar)) => {
+                SchedulerTask::ExecutionTask(
+                    txn_idx,
+                    incarnation,
+                    ExecutionTaskType::Execution,
+                ) => Self::execute(
+                    txn_idx,
+                    incarnation,
+                    block,
+                    last_input_output,
+                    versioned_cache,
+                    scheduler,
+                    &executor,
+                    base_view,
+                    ParallelState::new(versioned_cache, scheduler, shared_counter),
+                ),
+                SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*condvar;
                     // Mark dependency resolved.
                     *lock.lock() = DependencyStatus::Resolved;

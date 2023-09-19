@@ -5,6 +5,7 @@
 use crate::{bootstrap_genesis, gen_block_id, gen_ledger_info_with_sigs};
 use anyhow::{anyhow, ensure, Result};
 use aptos_cached_packages::aptos_stdlib;
+use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
 use aptos_consensus_types::block::Block;
 use aptos_db::AptosDB;
 use aptos_executor::block_executor::BlockExecutor;
@@ -542,7 +543,12 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
     Waypoint,
 ) {
     let (db, dbrw) = force_sharding
-        .then(|| DbReaderWriter::wrap(AptosDB::new_for_test_with_sharding(&path)))
+        .then(|| {
+            DbReaderWriter::wrap(AptosDB::new_for_test_with_sharding(
+                &path,
+                DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            ))
+        })
         .unwrap_or_else(|| DbReaderWriter::wrap(AptosDB::new_for_test(&path)));
     let waypoint = bootstrap_genesis::<AptosVM>(&dbrw, genesis).unwrap();
     let executor = BlockExecutor::new(dbrw.clone());

@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    consensusdb::{
-        CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema, OrderedAnchorIdSchema,
-    },
+    consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
     dag::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
@@ -20,11 +18,13 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::StateComputeResult;
+use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_storage_interface::{DbReader, Order};
 use aptos_types::{
     account_config::{new_block_event_key, NewBlockEvent},
     aggregate_signature::AggregateSignature,
+    block_info::BlockInfo,
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
@@ -33,9 +33,9 @@ use futures_channel::mpsc::UnboundedSender;
 use std::{collections::HashMap, sync::Arc};
 
 #[async_trait]
-pub trait Notifier: Send {
+pub trait Notifier: Send + Sync {
     fn send_ordered_nodes(
-        &mut self,
+        &self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
     ) -> anyhow::Result<()>;
@@ -47,6 +47,7 @@ pub trait Notifier: Send {
 pub struct NotifierAdapter {
     executor_channel: UnboundedSender<OrderedBlocks>,
     storage: Arc<dyn DAGStorage>,
+    parent_block_info: Arc<RwLock<BlockInfo>>,
 }
 
 impl NotifierAdapter {
@@ -54,9 +55,30 @@ impl NotifierAdapter {
         executor_channel: UnboundedSender<OrderedBlocks>,
         storage: Arc<dyn DAGStorage>,
     ) -> Self {
+        let ledger_info_from_storage = storage
+            .get_latest_ledger_info()
+            .expect("latest ledger info must exist");
+
+        // We start from the block that storage's latest ledger info, if storage has end-epoch
+        // LedgerInfo, we generate the virtual genesis block
+        let parent_block_info = if ledger_info_from_storage.ledger_info().ends_epoch() {
+            let genesis =
+                Block::make_genesis_block_from_ledger_info(ledger_info_from_storage.ledger_info());
+
+            let ledger_info = ledger_info_from_storage.ledger_info();
+            genesis.gen_block_info(
+                ledger_info.transaction_accumulator_hash(),
+                ledger_info.version(),
+                ledger_info.next_epoch_state().cloned(),
+            )
+        } else {
+            ledger_info_from_storage.ledger_info().commit_info().clone()
+        };
+
         Self {
             executor_channel,
             storage,
+            parent_block_info: Arc::new(RwLock::new(parent_block_info)),
         }
     }
 }
@@ -64,12 +86,11 @@ impl NotifierAdapter {
 #[async_trait]
 impl Notifier for NotifierAdapter {
     fn send_ordered_nodes(
-        &mut self,
+        &self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
     ) -> anyhow::Result<()> {
         let anchor = ordered_nodes.last().unwrap();
-        let anchor_id = anchor.id();
         let epoch = anchor.epoch();
         let round = anchor.round();
         let timestamp = anchor.metadata().timestamp();
@@ -80,13 +101,23 @@ impl Notifier for NotifierAdapter {
             payload.extend(node.payload().clone());
             node_digests.push(node.digest());
         }
+        let parent_block_info = self.parent_block_info.read().clone();
         // TODO: we may want to split payload into multiple blocks
         let block = ExecutedBlock::new(
-            Block::new_for_dag(epoch, round, timestamp, payload, author, failed_author)?,
+            Block::new_for_dag(
+                epoch,
+                round,
+                timestamp,
+                payload,
+                author,
+                failed_author,
+                parent_block_info,
+            )?,
             StateComputeResult::new_dummy(),
         );
         let block_info = block.block_info();
         let storage = self.storage.clone();
+        *self.parent_block_info.write() = block_info.clone();
         Ok(self.executor_channel.unbounded_send(OrderedBlocks {
             ordered_blocks: vec![block],
             ordered_proof: LedgerInfoWithSignatures::new(
@@ -98,10 +129,7 @@ impl Notifier for NotifierAdapter {
                       _commit_decision: LedgerInfoWithSignatures| {
                     // TODO: this doesn't really work since not every block will trigger a callback,
                     // we need to update the buffer manager to invoke all callbacks instead of only last one
-                    if let Err(e) = storage
-                        .delete_certified_nodes(node_digests)
-                        .and_then(|_| storage.delete_ordered_anchor_ids(vec![anchor_id]))
-                    {
+                    if let Err(e) = storage.delete_certified_nodes(node_digests) {
                         error!(
                             "Failed to garbage collect committed nodes and anchor: {:?}",
                             e
@@ -244,22 +272,6 @@ impl DAGStorage for StorageAdapter {
         Ok(self.consensus_db.delete::<CertifiedNodeSchema>(digests)?)
     }
 
-    fn save_ordered_anchor_id(&self, node_id: &NodeId) -> anyhow::Result<()> {
-        Ok(self
-            .consensus_db
-            .put::<OrderedAnchorIdSchema>(node_id, &())?)
-    }
-
-    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>> {
-        Ok(self.consensus_db.get_all::<OrderedAnchorIdSchema>()?)
-    }
-
-    fn delete_ordered_anchor_ids(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()> {
-        Ok(self
-            .consensus_db
-            .delete::<OrderedAnchorIdSchema>(node_ids)?)
-    }
-
     fn get_latest_k_committed_events(&self, k: u64) -> anyhow::Result<Vec<CommitEvent>> {
         let latest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
         let mut commit_events = vec![];
@@ -278,6 +290,7 @@ impl DAGStorage for StorageAdapter {
                 commit_events.push(self.convert(new_block_event)?);
             }
         }
+        commit_events.reverse();
         Ok(commit_events)
     }
 

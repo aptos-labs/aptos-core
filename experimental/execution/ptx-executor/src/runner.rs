@@ -22,7 +22,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     adapter_common::{preprocess_transaction, VMAdapter},
-    data_cache::AsMoveResolver,
+    storage_adapter::AsExecutorView,
     AptosVM,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -240,7 +240,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
         // TODO(ptx): maybe warm up vm like done in AptosExecutorTask
         let vm = {
             let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "vm_init"]);
-            AptosVM::new(&self.base_view.as_move_resolver())
+            AptosVM::new_from_state_view(&self.base_view)
         };
 
         loop {
@@ -270,11 +270,13 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                         preprocess_transaction::<AptosVM>(transaction)
                     };
                     drop(_pre);
+
+                    let executor_view = state_view.as_executor_view();
                     let vm_output = {
                         let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_vm"]);
                         vm.execute_single_transaction(
                             &preprocessed_txn,
-                            &vm.as_move_resolver(&state_view),
+                            &vm.as_move_resolver(&executor_view),
                             &log_context,
                         )
                     };

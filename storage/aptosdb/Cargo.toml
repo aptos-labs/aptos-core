@@ -40,6 +40,7 @@ byteorder = { workspace = true }
 claims = { workspace = true }
 clap = { workspace = true, optional = true }
 dashmap = { workspace = true }
+either = { workspace = true }
 itertools = { workspace = true }
 lru = { workspace = true }
 move-core-types = { workspace = true }

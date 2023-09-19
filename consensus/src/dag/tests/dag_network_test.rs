@@ -70,7 +70,7 @@ impl TDAGNetworkSender for MockDAGNetworkSender {
     }
 
     async fn send_rpc_with_fallbacks(
-        &self,
+        self: Arc<Self>,
         responders: Vec<Author>,
         message: DAGMessage,
         retry_interval: Duration,
@@ -81,7 +81,7 @@ impl TDAGNetworkSender for MockDAGNetworkSender {
             message,
             retry_interval,
             rpc_timeout,
-            Arc::new(self.clone()),
+            self.clone(),
             self.time_service.clone(),
         )
     }
@@ -111,7 +111,7 @@ async fn test_send_rpc_with_fallback() {
     };
 
     let message = TestMessage(vec![42; validators.len() - 1]);
-    let mut rpc = sender
+    let mut rpc = Arc::new(sender)
         .send_rpc_with_fallbacks(
             validators,
             message.into(),

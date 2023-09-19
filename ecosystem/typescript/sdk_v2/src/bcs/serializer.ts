@@ -10,7 +10,7 @@ import {
   MAX_U8_NUMBER,
   MAX_U256_BIG_INT,
 } from "./consts";
-import { AnyNumber, Uint16, Uint32, Uint8 } from "./types";
+import { AnyNumber, Uint16, Uint32, Uint8 } from "../types";
 
 export interface Serializable {
   serialize(serializer: Serializer): void;
@@ -226,6 +226,47 @@ export class Serializer {
    */
   toUint8Array(): Uint8Array {
     return new Uint8Array(this.buffer).slice(0, this.offset);
+  }
+
+  /**
+   * Serializes a `Serializable` value, facilitating composable serialization.
+   *
+   * @param value The Serializable value to serialize
+   *
+   * @example
+   * // Define the MoveStruct class that implements the Serializable interface
+   * class MoveStruct implements Serializable {
+   *     constructor(
+   *         public creatorAddress: AccountAddress, // where AccountAddress implements Serializable
+   *         public collectionName: string,
+   *         public tokenName: string
+   *     ) {}
+   *
+   *     serialize(serializer: Serializer): void {
+   *         serializer.serialize(this.creatorAddress);  // Composable serialization of another Serializable object
+   *         serializer.serializeStr(this.collectionName);
+   *         serializer.serializeStr(this.tokenName);
+   *     }
+   * }
+   *
+   * // Construct a MoveStruct
+   * const moveStruct = new MoveStruct(new AccountAddress(...), "MyCollection", "TokenA");
+   *
+   * // Serialize a string, a u64 number, and a MoveStruct instance.
+   * const serializer = new Serializer();
+   * serializer.serializeStr("ExampleString");
+   * serializer.serializeU64(12345678);
+   * serializer.serialize(moveStruct);
+   *
+   * // Get the bytes from the Serializer instance
+   * const serializedBytes = serializer.toUint8Array();
+   *
+   * @returns the serializer instance
+   */
+  serialize<T extends Serializable>(value: T) {
+    // NOTE: The `serialize` method called by `value` is defined in `value`'s
+    // Serializable interface, not the one defined in this class.
+    value.serialize(this);
   }
 }
 

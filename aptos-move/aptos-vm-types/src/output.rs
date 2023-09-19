@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::change_set::VMChangeSet;
-use aptos_state_view::StateView;
+use aptos_aggregator::resolver::AggregatorResolver;
 use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
@@ -70,7 +70,10 @@ impl VMOutput {
     /// Materializes delta sets.
     /// Guarantees that if deltas are materialized successfully, the output
     /// has an empty delta set.
-    pub fn try_materialize(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
+    pub fn try_materialize(
+        self,
+        resolver: &impl AggregatorResolver,
+    ) -> anyhow::Result<Self, VMStatus> {
         // First, check if output of transaction should be discarded or delta
         // change set is empty. In both cases, we do not need to apply any
         // deltas and can return immediately.
@@ -79,7 +82,7 @@ impl VMOutput {
         }
 
         let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
-        let materialized_change_set = change_set.try_materialize(state_view)?;
+        let materialized_change_set = change_set.try_materialize(resolver)?;
         Ok(VMOutput::new(
             materialized_change_set,
             fee_statement,
@@ -90,9 +93,9 @@ impl VMOutput {
     /// Same as `try_materialize` but also constructs `TransactionOutput`.
     pub fn try_into_transaction_output(
         self,
-        state_view: &impl StateView,
+        resolver: &impl AggregatorResolver,
     ) -> anyhow::Result<TransactionOutput, VMStatus> {
-        let materialized_output = self.try_materialize(state_view)?;
+        let materialized_output = self.try_materialize(resolver)?;
         debug_assert!(
             materialized_output
                 .change_set()
@@ -111,10 +114,10 @@ impl VMOutput {
         mut self,
         materialized_deltas: Vec<(StateKey, WriteOp)>,
     ) -> TransactionOutput {
-        // We should have a materialized delta for every delta in the output.
         assert_eq!(
             materialized_deltas.len(),
-            self.change_set().aggregator_v1_delta_set().len()
+            self.change_set().aggregator_v1_delta_set().len(),
+            "Different number of materialized deltas and deltas in the output."
         );
         debug_assert!(
             materialized_deltas

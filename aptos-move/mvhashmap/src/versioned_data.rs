@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{Flag, Incarnation, MVDataError, MVDataOutput, TxnIndex, Version};
+use crate::types::{Flag, Incarnation, MVDataError, MVDataOutput, ShiftedTxnIndex, TxnIndex};
 use anyhow::Result;
-use aptos_aggregator::{delta_change_set::DeltaOp, transaction::AggregatorValue};
+use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_types::write_set::TransactionWrite;
+use claims::assert_some;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{collections::btree_map::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
@@ -33,18 +35,13 @@ enum EntryCell<V> {
     Delta(DeltaOp, Option<u128>),
 }
 
-/// A VersionedValue internally contains a BTreeMap from indices of transactions
-/// that update the given access path alongside the corresponding entries. It may
-/// also contain a base value (value from storage) as u128 if the key corresponds
-/// to an aggregator.
+/// A versioned value internally is represented as a BTreeMap from indices of
+/// transactions that update the given access path & the corresponding entries.
 struct VersionedValue<V> {
-    versioned_map: BTreeMap<TxnIndex, CachePadded<Entry<V>>>,
-
-    // An aggregator value from storage can be here to avoid redundant storage calls.
-    aggregator_base_value: Option<u128>,
+    versioned_map: BTreeMap<ShiftedTxnIndex, CachePadded<Entry<V>>>,
 }
 
-/// Maps each key (access path) to an internal VersionedValue.
+/// Maps each key (access path) to an internal versioned value representation.
 pub struct VersionedData<K, V> {
     values: DashMap<K, VersionedValue<V>>,
 }
@@ -90,19 +87,22 @@ impl<V> Entry<V> {
     }
 }
 
-impl<V: TransactionWrite> VersionedValue<V> {
-    fn new() -> Self {
+impl<V: TransactionWrite> Default for VersionedValue<V> {
+    fn default() -> Self {
         Self {
             versioned_map: BTreeMap::new(),
-            aggregator_base_value: None,
         }
     }
+}
 
+impl<V: TransactionWrite> VersionedValue<V> {
     fn read(&self, txn_idx: TxnIndex) -> anyhow::Result<MVDataOutput<V>, MVDataError> {
         use MVDataError::*;
         use MVDataOutput::*;
 
-        let mut iter = self.versioned_map.range(0..txn_idx);
+        let mut iter = self
+            .versioned_map
+            .range(ShiftedTxnIndex::zero()..ShiftedTxnIndex::new(txn_idx));
 
         // If read encounters a delta, it must traverse the block of transactions
         // (top-down) until it encounters a write or reaches the end of the block.
@@ -111,25 +111,34 @@ impl<V: TransactionWrite> VersionedValue<V> {
         while let Some((idx, entry)) = iter.next_back() {
             if entry.flag() == Flag::Estimate {
                 // Found a dependency.
-                return Err(Dependency(*idx));
+                return Err(Dependency(
+                    idx.idx().expect("May not depend on storage version"),
+                ));
             }
 
             match (&entry.cell, accumulator.as_mut()) {
                 (EntryCell::Write(incarnation, data), None) => {
                     // Resolve to the write if no deltas were applied in between.
-                    let write_version = (*idx, *incarnation);
-                    return Ok(Versioned(write_version, data.clone()));
+                    return Ok(Versioned(
+                        idx.idx().map(|idx| (idx, *incarnation)),
+                        data.clone(),
+                    ));
                 },
                 (EntryCell::Write(incarnation, data), Some(accumulator)) => {
                     // Deltas were applied. We must deserialize the value
                     // of the write and apply the aggregated delta accumulator.
-                    return match AggregatorValue::from_write(data.as_ref()) {
+                    return match data
+                        .as_u128()
+                        .expect("Aggregator value must deserialize to u128")
+                    {
                         None => {
                             // Resolve to the write if the WriteOp was deletion
                             // (MoveVM will observe 'deletion'). This takes precedence
                             // over any speculative delta accumulation errors on top.
-                            let write_version = (*idx, *incarnation);
-                            Ok(Versioned(write_version, data.clone()))
+                            Ok(Versioned(
+                                idx.idx().map(|idx| (idx, *incarnation)),
+                                data.clone(),
+                            ))
                         },
                         Some(value) => {
                             // Panics if the data can't be resolved to an aggregator value.
@@ -137,7 +146,7 @@ impl<V: TransactionWrite> VersionedValue<V> {
                                 .map_err(|_| DeltaApplicationFailure)
                                 .and_then(|a| {
                                     // Apply accumulated delta to resolve the aggregator value.
-                                    a.apply_to(value.into())
+                                    a.apply_to(value)
                                         .map(|result| Resolved(result))
                                         .map_err(|_| DeltaApplicationFailure)
                                 })
@@ -184,22 +193,10 @@ impl<V: TransactionWrite> VersionedValue<V> {
         // deltas the actual written value has not been seen yet (i.e.
         // it is not added as an entry to the data-structure).
         match accumulator {
-            Some(Ok(accumulator)) => match self.aggregator_base_value {
-                Some(base_value) => accumulator
-                    .apply_to(base_value)
-                    .map(|result| Resolved(result))
-                    .map_err(|_| DeltaApplicationFailure),
-                None => Err(Unresolved(accumulator)),
-            },
+            Some(Ok(accumulator)) => Err(Unresolved(accumulator)),
             Some(Err(_)) => Err(DeltaApplicationFailure),
-            None => Err(NotFound),
+            None => Err(Uninitialized),
         }
-    }
-}
-
-impl<V: TransactionWrite> Default for VersionedValue<V> {
-    fn default() -> Self {
-        VersionedValue::new()
     }
 }
 
@@ -210,17 +207,12 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         }
     }
 
-    pub(crate) fn set_aggregator_base_value(&self, key: &K, value: u128) {
-        let mut v = self.values.get_mut(key).expect("Path must exist");
-
-        // Record base value. If a value was added by another thread, assert they're equal.
-        assert_eq!(*v.aggregator_base_value.get_or_insert(value), value);
-    }
-
-    pub(crate) fn add_delta(&self, key: K, txn_idx: TxnIndex, delta: DeltaOp) {
+    pub fn add_delta(&self, key: K, txn_idx: TxnIndex, delta: DeltaOp) {
         let mut v = self.values.entry(key).or_default();
-        v.versioned_map
-            .insert(txn_idx, CachePadded::new(Entry::new_delta_from(delta)));
+        v.versioned_map.insert(
+            ShiftedTxnIndex::new(txn_idx),
+            CachePadded::new(Entry::new_delta_from(delta)),
+        );
     }
 
     /// Mark an entry from transaction 'txn_idx' at access path 'key' as an estimated write
@@ -228,7 +220,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
     pub fn mark_estimate(&self, key: &K, txn_idx: TxnIndex) {
         let mut v = self.values.get_mut(key).expect("Path must exist");
         v.versioned_map
-            .get_mut(&txn_idx)
+            .get_mut(&ShiftedTxnIndex::new(txn_idx))
             .expect("Entry by the txn must exist to mark estimate")
             .mark_estimate();
     }
@@ -238,13 +230,13 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
     pub fn delete(&self, key: &K, txn_idx: TxnIndex) {
         // TODO: investigate logical deletion.
         let mut v = self.values.get_mut(key).expect("Path must exist");
-        assert!(
-            v.versioned_map.remove(&txn_idx).is_some(),
-            "Entry must exist to be deleted"
+        assert_some!(
+            v.versioned_map.remove(&ShiftedTxnIndex::new(txn_idx)),
+            "Entry for key / idx must exist to be deleted"
         );
     }
 
-    pub(crate) fn fetch_data(
+    pub fn fetch_data(
         &self,
         key: &K,
         txn_idx: TxnIndex,
@@ -252,16 +244,35 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         self.values
             .get(key)
             .map(|v| v.read(txn_idx))
-            .unwrap_or(Err(MVDataError::NotFound))
+            .unwrap_or(Err(MVDataError::Uninitialized))
+    }
+
+    pub fn provide_base_value(&self, key: K, data: V) {
+        let mut v = self.values.entry(key).or_default();
+        let bytes_len = data.bytes_len();
+        // For base value, incarnation is irrelevant, set to 0.
+        let prev_entry = v.versioned_map.insert(
+            ShiftedTxnIndex::zero(),
+            CachePadded::new(Entry::new_write_from(0, data)),
+        );
+
+        assert!(prev_entry.map_or(true, |entry| -> bool {
+            if let EntryCell::Write(i, v) = &entry.cell {
+                // base value may have already been provided due to a concurrency race,
+                // but it has to be the same as being set.
+                // Assert the length of bytes for efficiency (instead of full equality)
+                *i == 0 && v.bytes_len() == bytes_len
+            } else {
+                true
+            }
+        }));
     }
 
     /// Versioned write of data at a given key (and version).
-    pub fn write(&self, key: K, version: Version, data: V) {
-        let (txn_idx, incarnation) = version;
-
+    pub fn write(&self, key: K, txn_idx: TxnIndex, incarnation: Incarnation, data: V) {
         let mut v = self.values.entry(key).or_default();
         let prev_entry = v.versioned_map.insert(
-            txn_idx,
+            ShiftedTxnIndex::new(txn_idx),
             CachePadded::new(Entry::new_write_from(incarnation, data)),
         );
 
@@ -282,14 +293,14 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
     /// transaction has indeed produced a delta recorded at the given key.
     ///
     /// If the result is Err(op), it means the base value to apply DeltaOp op hadn't been set.
-    pub(crate) fn materialize_delta(&self, key: &K, txn_idx: TxnIndex) -> Result<u128, DeltaOp> {
+    pub fn materialize_delta(&self, key: &K, txn_idx: TxnIndex) -> Result<u128, DeltaOp> {
         let mut v = self.values.get_mut(key).expect("Path must exist");
 
         // +1 makes sure we include the delta from txn_idx.
         match v.read(txn_idx + 1) {
             Ok(MVDataOutput::Resolved(value)) => {
                 v.versioned_map
-                    .get_mut(&txn_idx)
+                    .get_mut(&ShiftedTxnIndex::new(txn_idx))
                     .expect("Entry by the txn must exist to commit delta")
                     .record_delta_shortcut(value);
 

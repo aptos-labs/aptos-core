@@ -15,7 +15,7 @@ use crate::{
     errors::{Error as BlockExecutorError, Result as BlockExecutorResult},
     proptest_types::types::{MockOutput, MockTransaction, STORAGE_AGGREGATOR_VALUE},
 };
-use aptos_aggregator::{delta_change_set::serialize, transaction::AggregatorValue};
+use aptos_aggregator::delta_change_set::serialize;
 use aptos_types::{contract_event::ReadWriteEvent, write_set::TransactionWrite};
 use claims::{assert_matches, assert_none, assert_some_eq};
 use itertools::izip;
@@ -93,7 +93,7 @@ impl<K: Debug + Hash + Clone + Eq, V: Debug + Clone + PartialEq + Eq + Transacti
         txns: &[MockTransaction<K, V, E>],
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {
-        let mut current_world = HashMap::<K, BaselineValue<_>>::new();
+        let mut current_world = HashMap::<K, BaselineValue<V>>::new();
         let mut accumulated_gas = 0;
 
         let mut status = BaselineStatus::Success;
@@ -133,11 +133,10 @@ impl<K: Debug + Hash + Clone + Eq, V: Debug + Clone + PartialEq + Eq + Transacti
                                 .or_insert(BaselineValue::Empty)
                             {
                                 // Get base value from the latest write.
-                                BaselineValue::GenericWrite(w_value) => {
-                                    AggregatorValue::from_write(w_value)
-                                        .expect("Delta to a non-existent aggregator")
-                                        .into()
-                                },
+                                BaselineValue::GenericWrite(w_value) => w_value
+                                    .as_u128()
+                                    .expect("Delta to a non-existent aggregator")
+                                    .expect("Must deserialize the aggregator base value"),
                                 // Get base value from latest resolved aggregator value.
                                 BaselineValue::Aggregator(value) => *value,
                                 // Storage always gets resolved to a default constant.
@@ -245,9 +244,10 @@ impl<K: Debug + Hash + Clone + Eq, V: Debug + Clone + PartialEq + Eq + Transacti
                         .for_each(|(k, result_delta_write)| {
                             assert_eq!(
                                 *baseline_deltas.get(k).expect("Baseline must contain delta"),
-                                AggregatorValue::from_write(result_delta_write)
-                                    .expect("Delta to a non-existent aggregator")
-                                    .into()
+                                result_delta_write
+                                    .as_u128()
+                                    .expect("Baseline must contain delta")
+                                    .expect("Must deserialize aggregator write value")
                             );
                         });
                 });

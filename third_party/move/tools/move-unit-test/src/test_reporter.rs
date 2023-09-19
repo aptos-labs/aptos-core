@@ -9,7 +9,7 @@ use move_binary_format::{
     access::ModuleAccess,
     errors::{ExecutionState, Location, VMError, VMResult},
 };
-use move_command_line_common::files::FileHash;
+use move_command_line_common::{env::read_bool_env_var, files::FileHash};
 pub use move_compiler::unit_test::ExpectedMoveError as MoveError;
 use move_compiler::{
     diagnostics::{self, Diagnostic, Diagnostics},
@@ -18,6 +18,7 @@ use move_compiler::{
 use move_core_types::{effects::ChangeSet, language_storage::ModuleId, vm_status::StatusType};
 use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;
+use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     io::{Result, Write},
@@ -344,7 +345,7 @@ impl TestFailure {
             Some(vm_error) => vm_error,
         };
 
-        let diags = match vm_error.location() {
+        let mut diags = match vm_error.location() {
             Location::Module(module_id) => {
                 let diag_opt = vm_error.offsets().first().and_then(|(fdef_idx, offset)| {
                     let function_source_map = test_plan
@@ -374,6 +375,12 @@ impl TestFailure {
             },
             _ => base_message,
         };
+
+        static MOVE_TEST_DEBUG: Lazy<bool> = Lazy::new(|| read_bool_env_var("MOVE_TEST_DEBUG"));
+        if *MOVE_TEST_DEBUG {
+            let full_vm_error_description = vm_error.format_test_output(*MOVE_TEST_DEBUG, false);
+            diags = diags + &full_vm_error_description;
+        }
 
         match vm_error.exec_state() {
             None => diags,

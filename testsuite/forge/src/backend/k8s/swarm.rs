@@ -13,7 +13,7 @@ use crate::{
 };
 use ::aptos_logger::*;
 use anyhow::{anyhow, bail, format_err};
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, OverrideNodeConfig};
 use aptos_retrier::fixed_retry_strategy;
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
@@ -150,7 +150,7 @@ impl K8sSwarm {
     async fn install_public_fullnode_resources<'a>(
         &mut self,
         version: &'a Version,
-        node_config: &'a NodeConfig,
+        node_config: &'a OverrideNodeConfig,
     ) -> Result<(PeerId, K8sNode)> {
         // create APIs
         let stateful_set_api: Arc<K8sApi<_>> = Arc::new(K8sApi::<StatefulSet>::from_client(
@@ -302,14 +302,18 @@ impl Swarm for K8sSwarm {
     fn add_validator_full_node(
         &mut self,
         _version: &Version,
-        _template: NodeConfig,
+        _config: OverrideNodeConfig,
         _id: PeerId,
     ) -> Result<PeerId> {
         todo!()
     }
 
-    async fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
-        self.install_public_fullnode_resources(version, &template)
+    async fn add_full_node(
+        &mut self,
+        version: &Version,
+        config: OverrideNodeConfig,
+    ) -> Result<PeerId> {
+        self.install_public_fullnode_resources(version, &config)
             .await
             .map(|(peer_id, node)| {
                 self.fullnodes.insert(peer_id, node);

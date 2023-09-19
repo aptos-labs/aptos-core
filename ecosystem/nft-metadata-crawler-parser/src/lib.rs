@@ -16,7 +16,7 @@ pub async fn get_uri_metadata(url: String) -> anyhow::Result<(String, u32)> {
         .timeout(Duration::from_secs(MAX_HEAD_REQUEST_RETRY_SECONDS))
         .build()
         .context("Failed to build reqwest client")?;
-    let request = client.head(&url);
+    let request = client.head(url.trim());
     let response = request.send().await?;
     let headers = response.headers();
 

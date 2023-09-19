@@ -7,7 +7,6 @@ use crate::{
     move_vm_ext::{write_op_converter::WriteOpConverter, AptosMoveResolver},
     transaction_metadata::TransactionMetadata,
 };
-use aptos_aggregator::aggregator_extension::AggregatorID;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
@@ -21,6 +20,7 @@ use aptos_types::{
     state_store::state_key::StateKey, transaction::SignatureCheckedTransaction,
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
+use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -210,7 +210,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         remote: &dyn AptosMoveResolver,
         change_set: MoveChangeSet,
         ap_cache: &mut C,
-    ) -> VMResult<(MoveChangeSet, HashMap<StateKey, MoveStorageOp<Vec<u8>>>)> {
+    ) -> VMResult<(MoveChangeSet, HashMap<StateKey, MoveStorageOp<Bytes>>)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
         let common_error = || {
@@ -280,9 +280,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let op = if source_data.is_empty() {
                     MoveStorageOp::Delete
                 } else if create {
-                    MoveStorageOp::New(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
+                    MoveStorageOp::New(
+                        bcs::to_bytes(&source_data)
+                            .map_err(|_| common_error())?
+                            .into(),
+                    )
                 } else {
-                    MoveStorageOp::Modify(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
+                    MoveStorageOp::Modify(
+                        bcs::to_bytes(&source_data)
+                            .map_err(|_| common_error())?
+                            .into(),
+                    )
                 };
                 resource_group_change_set.insert(state_key, op);
             }
@@ -294,7 +302,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     pub(crate) fn convert_change_set<C: AccessPathCache>(
         woc: &WriteOpConverter,
         change_set: MoveChangeSet,
-        resource_group_change_set: HashMap<StateKey, MoveStorageOp<Vec<u8>>>,
+        resource_group_change_set: HashMap<StateKey, MoveStorageOp<Bytes>>,
         events: Vec<ContractEvent>,
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
@@ -310,7 +318,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             let (modules, resources) = account_changeset.into_inner();
             for (struct_tag, blob_op) in resources {
                 let state_key = StateKey::access_path(ap_cache.get_resource_path(addr, struct_tag));
-                let op = woc.convert(
+                let op = woc.convert_resource(
                     &state_key,
                     blob_op,
                     configs.legacy_resource_creation_as_modification(),
@@ -322,39 +330,37 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             for (name, blob_op) in modules {
                 let state_key =
                     StateKey::access_path(ap_cache.get_module_path(ModuleId::new(addr, name)));
-                let op = woc.convert(&state_key, blob_op, false)?;
+                let op = woc.convert_module(&state_key, blob_op, false)?;
                 module_write_set.insert(state_key, op);
             }
         }
 
         for (state_key, blob_op) in resource_group_change_set {
-            let op = woc.convert(&state_key, blob_op, false)?;
+            let op = woc.convert_resource(&state_key, blob_op, false)?;
             resource_write_set.insert(state_key, op);
         }
 
         for (handle, change) in table_change_set.changes {
             for (key, value_op) in change.entries {
                 let state_key = StateKey::table_item(handle.into(), key);
-                let op = woc.convert(&state_key, value_op, false)?;
+                let op = woc.convert_resource(&state_key, value_op, false)?;
                 resource_write_set.insert(state_key, op);
             }
         }
 
         for (id, change) in aggregator_change_set.changes {
-            let AggregatorID { handle, key } = id;
-            let key_bytes = key.0.to_vec();
-            let state_key = StateKey::table_item(handle, key_bytes);
-
+            let state_key = id.into_state_key();
             match change {
                 AggregatorChange::Write(value) => {
-                    let write_op = woc.convert_aggregator_mod(&state_key, value)?;
+                    let write_op = woc.convert_aggregator_modification(&state_key, value)?;
                     aggregator_write_set.insert(state_key, write_op);
                 },
                 AggregatorChange::Merge(delta_op) => {
                     aggregator_delta_set.insert(state_key, delta_op);
                 },
                 AggregatorChange::Delete => {
-                    let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
+                    let write_op =
+                        woc.convert_aggregator(&state_key, MoveStorageOp::Delete, false)?;
                     aggregator_write_set.insert(state_key, write_op);
                 },
             }

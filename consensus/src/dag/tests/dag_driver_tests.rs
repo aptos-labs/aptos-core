@@ -60,7 +60,7 @@ impl TDAGNetworkSender for MockNetworkSender {
     /// Given a list of potential responders, sending rpc to get response from any of them and could
     /// fallback to more in case of failures.
     async fn send_rpc_with_fallbacks(
-        &self,
+        self: Arc<Self>,
         _responders: Vec<Author>,
         _message: DAGMessage,
         _retry_interval: Duration,
@@ -104,7 +104,7 @@ async fn test_certified_node_handler() {
         LedgerInfo::mock_genesis(None),
         dag.clone(),
         Box::new(RoundRobinAnchorElection::new(validators)),
-        Box::new(TestNotifier { tx }),
+        Arc::new(TestNotifier { tx }),
         storage.clone(),
     );
 
@@ -130,14 +130,14 @@ async fn test_certified_node_handler() {
 
     let first_round_node = new_certified_node(1, signers[0].author(), vec![]);
     // expect an ack for a valid message
-    assert_ok!(driver.process(first_round_node.clone()));
+    assert_ok!(driver.process(first_round_node.clone()).await);
     // expect an ack if the same message is sent again
-    assert_ok_eq!(driver.process(first_round_node), CertifiedAck::new(1));
+    assert_ok_eq!(driver.process(first_round_node).await, CertifiedAck::new(1));
 
     let parent_node = new_certified_node(1, signers[1].author(), vec![]);
     let invalid_node = new_certified_node(2, signers[0].author(), vec![parent_node.certificate()]);
     assert_eq!(
-        driver.process(invalid_node).unwrap_err().to_string(),
+        driver.process(invalid_node).await.unwrap_err().to_string(),
         DagDriverError::MissingParents.to_string()
     );
 }

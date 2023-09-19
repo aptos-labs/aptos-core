@@ -356,10 +356,10 @@ impl LedgerDb {
             .write_schemas(schemas.transaction_info_db_batches)?;
         self.transaction_db
             .write_schemas(schemas.transaction_db_batches)?;
-        self.ledger_metadata_db
-            .write_schemas(schemas.ledger_metadata_db_batches)?;
         self.event_db.write_schemas(schemas.event_db_batches)?;
         self.transaction_accumulator_db
-            .write_schemas(schemas.transaction_accumulator_db_batches)
+            .write_schemas(schemas.transaction_accumulator_db_batches)?;
+        self.ledger_metadata_db
+            .write_schemas(schemas.ledger_metadata_db_batches)
     }
 }

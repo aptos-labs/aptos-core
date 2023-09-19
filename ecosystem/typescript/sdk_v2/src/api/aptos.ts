@@ -28,3 +28,28 @@ export class Aptos {
     this.account = new Account(this.config);
   }
 }
+
+export interface Aptos extends Account {}
+
+/**
+In TypeScript, we can’t inherit or extend from more than one class,
+Mixins helps us to get around that by creating a partial classes 
+that we can combine to form a single class that contains all the methods and properties from the partial classes.
+{@link https://www.typescriptlang.org/docs/handbook/mixins.html#alternative-pattern}
+
+Here, we combine any sub-class and the Aptos class.
+*/
+function applyMixin(targetClass: any, baseClass: any, baseClassProp: string) {
+  // Mixin instance methods
+  Object.getOwnPropertyNames(baseClass.prototype).forEach((propertyName) => {
+    const propertyDescriptor = Object.getOwnPropertyDescriptor(baseClass.prototype, propertyName);
+    if (!propertyDescriptor) return;
+    // eslint-disable-next-line func-names
+    propertyDescriptor.value = function (...args: any) {
+      return (this as any)[baseClassProp][propertyName](...args);
+    };
+    Object.defineProperty(targetClass.prototype, propertyName, propertyDescriptor);
+  });
+}
+
+applyMixin(Aptos, Account, "account");

@@ -194,10 +194,17 @@ impl BuiltPackage {
                 bail!("extended checks failed")
             }
         }
+
+        let compiled_pkg_path = package
+            .compiled_package_info
+            .build_flags
+            .install_dir
+            .as_ref()
+            .unwrap_or(&package_path)
+            .join(CompiledPackageLayout::Root.path())
+            .join(package.compiled_package_info.package_name.as_str());
         inject_runtime_metadata(
-            package_path
-                .join(CompiledPackageLayout::Root.path())
-                .join(package.compiled_package_info.package_name.as_str()),
+            compiled_pkg_path,
             &mut package,
             runtime_metadata,
             bytecode_version,

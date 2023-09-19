@@ -2,12 +2,12 @@
 
 use super::dag_test;
 use crate::{
-    dag::bootstrap::bootstrap_dag,
+    dag::{bootstrap::bootstrap_dag_for_test, types::CertifiedNodeMessage},
     experimental::buffer_manager::OrderedBlocks,
-    network::{DAGNetworkSenderImpl, IncomingDAGRequest, NetworkSender},
+    network::{IncomingDAGRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
-    test_utils::{consensus_runtime, MockPayloadManager, MockStorage},
+    test_utils::{consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStorage},
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
@@ -32,16 +32,17 @@ use aptos_types::{
 };
 use claims::assert_gt;
 use futures::{
-    stream::{select, AbortHandle, Select},
+    stream::{select, Select},
     StreamExt,
 };
 use futures_channel::mpsc::UnboundedReceiver;
 use maplit::hashmap;
 use std::sync::Arc;
+use tokio::task::JoinHandle;
 
 struct DagBootstrapUnit {
-    nh_abort_handle: AbortHandle,
-    df_abort_handle: AbortHandle,
+    nh_task_handle: JoinHandle<CertifiedNodeMessage>,
+    df_task_handle: JoinHandle<()>,
     dag_rpc_tx: aptos_channel::Sender<Author, IncomingDAGRequest>,
     network_events:
         Box<Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>>,
@@ -67,26 +68,30 @@ impl DagBootstrapUnit {
         let ledger_info = generate_ledger_info_with_sig(&all_signers, storage.get_ledger_info());
         let dag_storage = dag_test::MockStorage::new_with_ledger_info(ledger_info);
 
-        let network = Arc::new(DAGNetworkSenderImpl::new(Arc::new(network)));
+        let network = Arc::new(network);
 
         let payload_client = Arc::new(MockPayloadManager::new(None));
 
-        let (nh_abort_handle, df_abort_handle, dag_rpc_tx, ordered_nodes_rx) = bootstrap_dag(
-            self_peer,
-            signer,
-            Arc::new(epoch_state),
-            storage.get_ledger_info(),
-            Arc::new(dag_storage),
-            network.clone(),
-            network.clone(),
-            time_service,
-            payload_client,
-        );
+        let state_computer = Arc::new(EmptyStateComputer {});
+
+        let (nh_abort_handle, df_abort_handle, dag_rpc_tx, ordered_nodes_rx) =
+            bootstrap_dag_for_test(
+                self_peer,
+                signer,
+                Arc::new(epoch_state),
+                storage.get_ledger_info(),
+                Arc::new(dag_storage),
+                network.clone(),
+                network.clone(),
+                time_service,
+                payload_client,
+                state_computer,
+            );
 
         (
             Self {
-                nh_abort_handle,
-                df_abort_handle,
+                nh_task_handle: nh_abort_handle,
+                df_task_handle: df_abort_handle,
                 dag_rpc_tx,
                 network_events,
             },

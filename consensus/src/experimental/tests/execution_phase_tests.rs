@@ -5,10 +5,12 @@
 use crate::{
     experimental::{
         buffer_manager::create_channel,
-        execution_phase::{ExecutionPhase, ExecutionRequest, ExecutionResponse},
-        pipeline_phase::{CountedRequest, PipelinePhase},
+        execution_schedule_phase::{ExecutionRequest, ExecutionSchedulePhase},
+        execution_wait_phase::{ExecutionResponse, ExecutionWaitPhase},
+        pipeline_phase::{CountedRequest, PipelinePhase, StatelessPipeline},
         tests::phase_tester::PhaseTester,
     },
+    state_replication::StateComputer,
     test_utils::{consensus_runtime, RandomComputeResultStateComputer},
 };
 use aptos_consensus_types::{
@@ -18,19 +20,52 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::{Error, StateComputeResult};
+use aptos_executor_types::{ExecutorError, StateComputeResult};
 use aptos_types::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
+use async_trait::async_trait;
 use std::sync::Arc;
 
-pub fn prepare_execution_phase() -> (HashValue, ExecutionPhase) {
+// ExecutionSchedulePhase and ExecutionWaitPhase chained together.
+// In BufferManager they are chained through the main loop.
+pub struct ExecutionPhaseForTest {
+    schedule_phase: ExecutionSchedulePhase,
+    wait_phase: ExecutionWaitPhase,
+}
+
+impl ExecutionPhaseForTest {
+    pub fn new(execution_proxy: Arc<dyn StateComputer>) -> Self {
+        let schedule_phase = ExecutionSchedulePhase::new(execution_proxy);
+        let wait_phase = ExecutionWaitPhase;
+        Self {
+            schedule_phase,
+            wait_phase,
+        }
+    }
+}
+
+#[async_trait]
+impl StatelessPipeline for ExecutionPhaseForTest {
+    type Request = ExecutionRequest;
+    type Response = ExecutionResponse;
+
+    const NAME: &'static str = "execution";
+
+    async fn process(&self, req: ExecutionRequest) -> ExecutionResponse {
+        let wait_req = self.schedule_phase.process(req).await;
+        self.wait_phase.process(wait_req).await
+    }
+}
+
+pub fn prepare_execution_phase() -> (HashValue, ExecutionPhaseForTest) {
     let execution_proxy = Arc::new(RandomComputeResultStateComputer::new());
     let random_hash_value = execution_proxy.get_root_hash();
-    let execution_phase = ExecutionPhase::new(execution_proxy);
+    let execution_phase = ExecutionPhaseForTest::new(execution_proxy);
+
     (random_hash_value, execution_phase)
 }
 
 fn add_execution_phase_test_cases(
-    phase_tester: &mut PhaseTester<ExecutionPhase>,
+    phase_tester: &mut PhaseTester<ExecutionPhaseForTest>,
     random_hash_value: HashValue,
 ) {
     let genesis_qc = certificate_for_genesis();
@@ -63,7 +98,7 @@ fn add_execution_phase_test_cases(
         ExecutionRequest {
             ordered_blocks: vec![],
         },
-        Box::new(move |resp| assert!(matches!(resp.inner, Err(Error::EmptyBlocks)))),
+        Box::new(move |resp| assert!(matches!(resp.inner, Err(ExecutorError::EmptyBlocks)))),
     );
 
     // bad parent id
@@ -80,7 +115,7 @@ fn add_execution_phase_test_cases(
                 StateComputeResult::new_dummy(),
             )],
         },
-        Box::new(move |resp| assert!(matches!(resp.inner, Err(Error::BlockNotFound(_))))),
+        Box::new(move |resp| assert!(matches!(resp.inner, Err(ExecutorError::BlockNotFound(_))))),
     );
 }
 
@@ -90,7 +125,7 @@ fn execution_phase_tests() {
 
     // unit tests
     let (random_hash_value, execution_phase) = prepare_execution_phase();
-    let mut unit_phase_tester = PhaseTester::<ExecutionPhase>::new();
+    let mut unit_phase_tester = PhaseTester::<ExecutionPhaseForTest>::new();
     add_execution_phase_test_cases(&mut unit_phase_tester, random_hash_value);
     unit_phase_tester.unit_test(&execution_phase);
 
@@ -106,7 +141,7 @@ fn execution_phase_tests() {
 
     runtime.spawn(execution_phase_pipeline.start());
 
-    let mut e2e_phase_tester = PhaseTester::<ExecutionPhase>::new();
+    let mut e2e_phase_tester = PhaseTester::<ExecutionPhaseForTest>::new();
     add_execution_phase_test_cases(&mut e2e_phase_tester, random_hash_value);
     e2e_phase_tester.e2e_test(in_channel_tx, out_channel_rx);
 }

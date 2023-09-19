@@ -30,6 +30,7 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 dashmap = { workspace = true }
 fail = { workspace = true }
 itertools = { workspace = true }

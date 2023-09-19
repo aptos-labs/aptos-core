@@ -192,6 +192,11 @@ pub fn start(
     // Instantiate the global logger
     let (remote_log_receiver, logger_filter_update) = logger::create_logger(&config, log_file);
 
+    assert!(
+        !cfg!(feature = "testing") && !cfg!(feature = "fuzzing"),
+        "Testing features shouldn't be compiled"
+    );
+
     // Ensure failpoints are configured correctly
     if fail::has_failpoints() {
         warn!("Failpoints are enabled!");
@@ -284,10 +289,10 @@ where
             genesis_waypoint.to_string().as_bytes(),
         )?;
 
-        aptos_config::config::sanitize_node_config(&mut validators[0].config)?;
+        aptos_config::config::sanitize_node_config(validators[0].config.override_config_mut())?;
 
         // Return the validator config
-        validators[0].config.clone()
+        validators[0].config.override_config().clone()
     };
 
     // Prepare log file since we cannot automatically route logs to stderr

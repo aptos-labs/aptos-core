@@ -47,8 +47,8 @@
 use crate::{
     counters::{
         self, network_application_inbound_traffic, network_application_outbound_traffic,
-        CANCELED_LABEL, DECLINED_LABEL, FAILED_LABEL, RECEIVED_LABEL, REQUEST_LABEL,
-        RESPONSE_LABEL, SENT_LABEL,
+        CANCELED_LABEL, DECLINED_LABEL, FAILED_LABEL, INBOUND_LABEL, OUTBOUND_LABEL,
+        RECEIVED_LABEL, REQUEST_LABEL, RESPONSE_LABEL, SENT_LABEL,
     },
     logging::NetworkSchema,
     peer::PeerNotification,
@@ -175,7 +175,8 @@ pub struct InboundRpcs {
     remote_peer_id: PeerId,
     /// The core async queue of pending inbound rpc tasks. The tasks are driven
     /// to completion by the `InboundRpcs::next_completed_response()` method.
-    inbound_rpc_tasks: FuturesUnordered<BoxFuture<'static, Result<RpcResponse, RpcError>>>,
+    inbound_rpc_tasks:
+        FuturesUnordered<BoxFuture<'static, Result<(RpcResponse, ProtocolId), RpcError>>>,
     /// A blanket timeout on all inbound rpc requests. If the application handler
     /// doesn't respond to the request before this timeout, the request will be
     /// dropped.
@@ -213,15 +214,20 @@ impl InboundRpcs {
 
         // Drop new inbound requests if our completion queue is at capacity.
         if self.inbound_rpc_tasks.len() as u32 == self.max_concurrent_inbound_rpcs {
-            // Increase counter of declined responses and log warning.
-            counters::rpc_messages(network_context, RESPONSE_LABEL, DECLINED_LABEL).inc();
+            // Increase counter of declined requests
+            counters::rpc_messages(
+                network_context,
+                REQUEST_LABEL,
+                INBOUND_LABEL,
+                DECLINED_LABEL,
+            )
+            .inc();
             return Err(RpcError::TooManyPending(self.max_concurrent_inbound_rpcs));
         }
 
         let protocol_id = request.protocol_id;
         let request_id = request.request_id;
         let priority = request.priority;
-        let req_len = request.raw_request.len() as u64;
 
         trace!(
             NetworkSchema::new(network_context).remote_peer(&self.remote_peer_id),
@@ -231,15 +237,12 @@ impl InboundRpcs {
             request_id,
             protocol_id,
         );
+        self.update_inbound_rpc_request_metrics(protocol_id, request.raw_request.len() as u64);
 
-        // Collect counters for received request.
-        counters::rpc_messages(network_context, REQUEST_LABEL, RECEIVED_LABEL).inc();
-        counters::rpc_bytes(network_context, REQUEST_LABEL, RECEIVED_LABEL).inc_by(req_len);
-        network_application_inbound_traffic(self.network_context, protocol_id, req_len);
         let timer =
             counters::inbound_rpc_handler_latency(network_context, protocol_id).start_timer();
 
-        // Foward request to PeerManager for handling.
+        // Forward request to PeerManager for handling.
         let (response_tx, response_rx) = oneshot::channel();
         let notif = PeerNotification::RecvRpc(InboundRpcRequest {
             protocol_id,
@@ -247,7 +250,8 @@ impl InboundRpcs {
             res_tx: response_tx,
         });
         if let Err(err) = peer_notifs_tx.push(protocol_id, notif) {
-            counters::rpc_messages(network_context, RESPONSE_LABEL, FAILED_LABEL).inc();
+            counters::rpc_messages(network_context, REQUEST_LABEL, INBOUND_LABEL, FAILED_LABEL)
+                .inc();
             return Err(err.into());
         }
 
@@ -258,11 +262,14 @@ impl InboundRpcs {
             .map(move |result| {
                 // Flatten the errors
                 let maybe_response = match result {
-                    Ok(Ok(Ok(response_bytes))) => Ok(RpcResponse {
-                        request_id,
-                        priority,
-                        raw_response: Vec::from(response_bytes.as_ref()),
-                    }),
+                    Ok(Ok(Ok(response_bytes))) => {
+                        let rpc_response = RpcResponse {
+                            request_id,
+                            priority,
+                            raw_response: Vec::from(response_bytes.as_ref()),
+                        };
+                        Ok((rpc_response, protocol_id))
+                    },
                     Ok(Ok(Err(err))) => Err(err),
                     Ok(Err(oneshot::Canceled)) => Err(RpcError::UnexpectedResponseChannelCancel),
                     Err(timeout::Elapsed) => Err(RpcError::TimedOut),
@@ -283,12 +290,34 @@ impl InboundRpcs {
         Ok(())
     }
 
+    /// Updates the inbound RPC request metrics (e.g., messages and bytes received)
+    fn update_inbound_rpc_request_metrics(&self, protocol_id: ProtocolId, data_len: u64) {
+        // Update the metrics for the new RPC request
+        counters::rpc_messages(
+            &self.network_context,
+            REQUEST_LABEL,
+            INBOUND_LABEL,
+            RECEIVED_LABEL,
+        )
+        .inc();
+        counters::rpc_bytes(
+            &self.network_context,
+            REQUEST_LABEL,
+            INBOUND_LABEL,
+            RECEIVED_LABEL,
+        )
+        .inc_by(data_len);
+
+        // Update the general network traffic metrics
+        network_application_inbound_traffic(self.network_context, protocol_id, data_len);
+    }
+
     /// Method for `Peer` actor to drive the pending inbound rpc tasks forward.
     /// The returned `Future` is a `FusedFuture` so it works correctly in a
     /// `futures::select!`.
     pub fn next_completed_response(
         &mut self,
-    ) -> impl Future<Output = Result<RpcResponse, RpcError>> + FusedFuture + '_ {
+    ) -> impl Future<Output = Result<(RpcResponse, ProtocolId), RpcError>> + FusedFuture + '_ {
         self.inbound_rpc_tasks.select_next_some()
     }
 
@@ -298,13 +327,19 @@ impl InboundRpcs {
     pub async fn send_outbound_response(
         &mut self,
         write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
-        maybe_response: Result<RpcResponse, RpcError>,
+        maybe_response: Result<(RpcResponse, ProtocolId), RpcError>,
     ) -> Result<(), RpcError> {
         let network_context = &self.network_context;
-        let response = match maybe_response {
+        let (response, protocol_id) = match maybe_response {
             Ok(response) => response,
             Err(err) => {
-                counters::rpc_messages(network_context, RESPONSE_LABEL, FAILED_LABEL).inc();
+                counters::rpc_messages(
+                    network_context,
+                    RESPONSE_LABEL,
+                    OUTBOUND_LABEL,
+                    FAILED_LABEL,
+                )
+                .inc();
                 return Err(err);
             },
         };
@@ -321,10 +356,31 @@ impl InboundRpcs {
         let message = NetworkMessage::RpcResponse(response);
         write_reqs_tx.send(message).await?;
 
-        // Collect counters for sent response.
-        counters::rpc_messages(network_context, RESPONSE_LABEL, SENT_LABEL).inc();
-        counters::rpc_bytes(network_context, RESPONSE_LABEL, SENT_LABEL).inc_by(res_len);
+        // Update the outbound RPC response metrics
+        self.update_outbound_rpc_response_metrics(protocol_id, res_len);
+
         Ok(())
+    }
+
+    fn update_outbound_rpc_response_metrics(&self, protocol_id: ProtocolId, data_len: u64) {
+        // Update the metrics for the new RPC response
+        counters::rpc_messages(
+            &self.network_context,
+            RESPONSE_LABEL,
+            OUTBOUND_LABEL,
+            SENT_LABEL,
+        )
+        .inc();
+        counters::rpc_bytes(
+            &self.network_context,
+            RESPONSE_LABEL,
+            OUTBOUND_LABEL,
+            SENT_LABEL,
+        )
+        .inc_by(data_len);
+
+        // Update the general network traffic metrics
+        network_application_outbound_traffic(self.network_context, protocol_id, data_len);
     }
 }
 
@@ -396,13 +452,25 @@ impl OutboundRpcs {
 
         // Drop the outbound request if the application layer has already canceled.
         if application_response_tx.is_canceled() {
-            counters::rpc_messages(network_context, REQUEST_LABEL, CANCELED_LABEL).inc();
+            counters::rpc_messages(
+                network_context,
+                REQUEST_LABEL,
+                OUTBOUND_LABEL,
+                CANCELED_LABEL,
+            )
+            .inc();
             return Err(RpcError::UnexpectedResponseChannelCancel);
         }
 
         // Drop new outbound requests if our completion queue is at capacity.
         if self.outbound_rpc_tasks.len() == self.max_concurrent_outbound_rpcs as usize {
-            counters::rpc_messages(network_context, REQUEST_LABEL, DECLINED_LABEL).inc();
+            counters::rpc_messages(
+                network_context,
+                REQUEST_LABEL,
+                OUTBOUND_LABEL,
+                DECLINED_LABEL,
+            )
+            .inc();
             // Notify application that their request was dropped due to capacity.
             let err = Err(RpcError::TooManyPending(self.max_concurrent_outbound_rpcs));
             let _ = application_response_tx.send(err);
@@ -433,10 +501,8 @@ impl OutboundRpcs {
         });
         write_reqs_tx.send(message).await?;
 
-        // Collect counters for requests sent.
-        counters::rpc_messages(network_context, REQUEST_LABEL, SENT_LABEL).inc();
-        counters::rpc_bytes(network_context, REQUEST_LABEL, SENT_LABEL).inc_by(req_len);
-        network_application_outbound_traffic(self.network_context, protocol_id, req_len);
+        // Update the outbound RPC request metrics
+        self.update_outbound_rpc_request_metrics(protocol_id, req_len);
 
         // Create channel over which response is delivered to outbound_rpc_task.
         let (response_tx, response_rx) = oneshot::channel::<RpcResponse>();
@@ -505,6 +571,28 @@ impl OutboundRpcs {
         Ok(())
     }
 
+    /// Updates the outbound RPC request metrics (e.g., messages and bytes sent)
+    fn update_outbound_rpc_request_metrics(&mut self, protocol_id: ProtocolId, data_len: u64) {
+        // Update the metrics for the new RPC request
+        counters::rpc_messages(
+            &self.network_context,
+            REQUEST_LABEL,
+            OUTBOUND_LABEL,
+            SENT_LABEL,
+        )
+        .inc();
+        counters::rpc_bytes(
+            &self.network_context,
+            REQUEST_LABEL,
+            OUTBOUND_LABEL,
+            SENT_LABEL,
+        )
+        .inc_by(data_len);
+
+        // Update the general network traffic metrics
+        network_application_outbound_traffic(self.network_context, protocol_id, data_len);
+    }
+
     /// Method for `Peer` actor to drive the pending outbound rpc tasks forward.
     /// The returned `Future` is a `FusedFuture` so it works correctly in a
     /// `futures::select!`.
@@ -535,9 +623,20 @@ impl OutboundRpcs {
 
         match result {
             Ok((latency, request_len)) => {
-                counters::rpc_messages(network_context, RESPONSE_LABEL, RECEIVED_LABEL).inc();
-                counters::rpc_bytes(network_context, RESPONSE_LABEL, RECEIVED_LABEL)
-                    .inc_by(request_len);
+                counters::rpc_messages(
+                    network_context,
+                    RESPONSE_LABEL,
+                    INBOUND_LABEL,
+                    RECEIVED_LABEL,
+                )
+                .inc();
+                counters::rpc_bytes(
+                    network_context,
+                    RESPONSE_LABEL,
+                    INBOUND_LABEL,
+                    RECEIVED_LABEL,
+                )
+                .inc_by(request_len);
 
                 trace!(
                     NetworkSchema::new(network_context).remote_peer(peer_id),
@@ -554,9 +653,21 @@ impl OutboundRpcs {
                     // We don't log when the application has dropped the RPC
                     // response channel because this is often expected (e.g.,
                     // on state sync subscription requests that timeout).
-                    counters::rpc_messages(network_context, REQUEST_LABEL, CANCELED_LABEL).inc();
+                    counters::rpc_messages(
+                        network_context,
+                        REQUEST_LABEL,
+                        OUTBOUND_LABEL,
+                        CANCELED_LABEL,
+                    )
+                    .inc();
                 } else {
-                    counters::rpc_messages(network_context, REQUEST_LABEL, FAILED_LABEL).inc();
+                    counters::rpc_messages(
+                        network_context,
+                        REQUEST_LABEL,
+                        OUTBOUND_LABEL,
+                        FAILED_LABEL,
+                    )
+                    .inc();
                     warn!(
                         NetworkSchema::new(network_context).remote_peer(peer_id),
                         "{} Error making outbound RPC request to {} (request_id {}). Error: {}",
@@ -582,8 +693,7 @@ impl OutboundRpcs {
         let is_canceled = if let Some((protocol_id, response_tx)) =
             self.pending_outbound_rpcs.remove(&request_id)
         {
-            network_application_inbound_traffic(
-                self.network_context,
+            self.update_inbound_rpc_response_metrics(
                 protocol_id,
                 response.raw_response.len() as u64,
             );
@@ -611,5 +721,27 @@ impl OutboundRpcs {
                 peer_id.short_str(),
             );
         }
+    }
+
+    /// Updates the inbound RPC response metrics (e.g., messages and bytes received)
+    fn update_inbound_rpc_response_metrics(&self, protocol_id: ProtocolId, data_len: u64) {
+        // Update the metrics for the new RPC response
+        counters::rpc_messages(
+            &self.network_context,
+            RESPONSE_LABEL,
+            INBOUND_LABEL,
+            RECEIVED_LABEL,
+        )
+        .inc();
+        counters::rpc_bytes(
+            &self.network_context,
+            RESPONSE_LABEL,
+            INBOUND_LABEL,
+            RECEIVED_LABEL,
+        )
+        .inc_by(data_len);
+
+        // Update the general network traffic metrics
+        network_application_inbound_traffic(self.network_context, protocol_id, data_len);
     }
 }
