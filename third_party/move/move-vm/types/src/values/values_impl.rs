@@ -3055,7 +3055,7 @@ impl<'t, 'l, 'v> serde::Serialize for AnnotatedValue<'t, 'l, 'v, MoveTypeLayout,
                     let value_to_transform =
                         Value(value_impl.copy_value().map_err(serde::ser::Error::custom)?);
                     let transformed_value = transformation
-                        .try_revert(value_to_transform)
+                        .pre_serialization_transform(tag, layout.as_ref(), value_to_transform)
                         .map_err(serde::ser::Error::custom)?;
 
                     AnnotatedValue {
@@ -3170,7 +3170,7 @@ impl<'d, 't> serde::de::DeserializeSeed<'d> for SeedWrapper<'t, &MoveTypeLayout>
 
                 Ok(match self.transformation {
                     Some(transformation) if transformation.matches(tag) => transformation
-                        .try_apply(layout.as_ref(), value)
+                        .post_deserialization_transform(tag, layout.as_ref(), value)
                         .map_err(serde::de::Error::custom)?,
                     _ => value,
                 })
@@ -3651,7 +3651,7 @@ pub mod prop {
                 .boxed(),
 
             L::Tagged(tag, layout) => match tag {
-                LayoutTag::AggregatorLifting => value_strategy_with_layout(layout.as_ref()),
+                LayoutTag::IdentifierMapping(_) => value_strategy_with_layout(layout.as_ref()),
             },
         }
     }
@@ -3674,7 +3674,6 @@ pub mod prop {
         leaf.prop_recursive(8, 32, 2, |inner| {
             prop_oneof![
                 1 => inner.clone().prop_map(|layout| L::Vector(Box::new(layout))),
-                1 => inner.clone().prop_map(|layout| L::Tagged(LayoutTag::AggregatorLifting, Box::new(layout))),
                 1 => vec(inner, 0..1).prop_map(|f_layouts| {
                      L::Struct(MoveStructLayout::new(f_layouts))}),
             ]
@@ -3696,7 +3695,7 @@ impl ValueImpl {
         use MoveTypeLayout as L;
 
         // Make sure to strip all marks from the type layout.
-        if let L::Tagged(LayoutTag::AggregatorLifting, layout) = layout {
+        if let L::Tagged(LayoutTag::IdentifierMapping(_), layout) = layout {
             return self.as_move_value(layout.as_ref());
         }
 

@@ -12,7 +12,7 @@ pub(crate) fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
         L::Bool | L::U8 | L::U16 | L::U32 | L::U64 | L::U128 | L::U256 | L::Address | L::Signer => {
             true
         },
-        L::Vector(layout) | L::Tagged(LayoutTag::AggregatorLifting, layout) => {
+        L::Vector(layout) | L::Tagged(LayoutTag::IdentifierMapping(_), layout) => {
             is_valid_layout(layout)
         },
         L::Struct(struct_layout) => {

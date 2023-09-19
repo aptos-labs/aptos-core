@@ -390,18 +390,9 @@ pub struct AggregatorData {
     aggregators: BTreeMap<AggregatorVersionedID, Aggregator>,
     // All aggregator snapshot instances that exist in the current transaction.
     aggregator_snapshots: BTreeMap<AggregatorID, AggregatorSnapshot>,
-    // Counter for generating identifiers for Aggregators and AggregatorSnapshots.
-    pub id_counter: u64,
 }
 
 impl AggregatorData {
-    pub fn new(id_counter: u64) -> Self {
-        Self {
-            id_counter,
-            ..Default::default()
-        }
-    }
-
     /// Returns a mutable reference to an aggregator with `id` and a `max_value`.
     /// If transaction that is currently executing did not initialize it,
     /// a new aggregator instance is created.
@@ -472,6 +463,7 @@ impl AggregatorData {
         &mut self,
         aggregator_id: AggregatorID,
         aggregator_max_value: u128,
+        resolver: &dyn AggregatorResolver,
     ) -> PartialVMResult<AggregatorID> {
         let aggregator = self.get_aggregator(
             AggregatorVersionedID::V2(aggregator_id),
@@ -489,7 +481,7 @@ impl AggregatorData {
             },
         };
 
-        let snapshot_id = self.generate_id();
+        let snapshot_id = resolver.generate_aggregator_v2_id();
         self.aggregator_snapshots
             .insert(snapshot_id, AggregatorSnapshot {
                 id: snapshot_id,
@@ -498,9 +490,13 @@ impl AggregatorData {
         Ok(snapshot_id)
     }
 
-    pub fn create_new_snapshot(&mut self, value: SnapshotValue) -> AggregatorID {
+    pub fn create_new_snapshot(
+        &mut self,
+        value: SnapshotValue,
+        resolver: &dyn AggregatorResolver,
+    ) -> AggregatorID {
         let snapshot_state = AggregatorSnapshotState::Create { value };
-        let snapshot_id = self.generate_id();
+        let snapshot_id = resolver.generate_aggregator_v2_id();
 
         self.aggregator_snapshots
             .insert(snapshot_id, AggregatorSnapshot {
@@ -577,10 +573,11 @@ impl AggregatorData {
     pub fn string_concat(
         &mut self,
         id: AggregatorID,
+        resolver: &dyn AggregatorResolver,
         prefix: Vec<u8>,
         suffix: Vec<u8>,
     ) -> AggregatorID {
-        let new_id = self.generate_id();
+        let new_id = resolver.generate_aggregator_v2_id();
 
         let snapshot_state = AggregatorSnapshotState::Derived {
             base_snapshot: id,
@@ -593,11 +590,6 @@ impl AggregatorData {
                 state: snapshot_state,
             });
         new_id
-    }
-
-    pub fn generate_id(&mut self) -> AggregatorID {
-        self.id_counter += 1;
-        AggregatorID::new(self.id_counter)
     }
 
     /// Unpacks aggregator data.
@@ -630,25 +622,23 @@ mod test {
     use super::*;
     use crate::{aggregator_v1_id_for_test, aggregator_v1_state_key_for_test, FakeAggregatorView};
     use claims::{assert_err, assert_ok, assert_ok_eq, assert_some_eq};
-    use once_cell::sync::Lazy;
-
-    #[allow(clippy::redundant_closure)]
-    static TEST_RESOLVER: Lazy<FakeAggregatorView> = Lazy::new(|| FakeAggregatorView::default());
 
     #[test]
     fn test_aggregator_not_in_storage() {
+        let resolver = FakeAggregatorView::default();
         let mut aggregator_data = AggregatorData::default();
         let aggregator = aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(300), 700)
             .unwrap();
-        assert_err!(aggregator.read_last_committed_aggregator_value(&*TEST_RESOLVER));
-        assert_err!(aggregator.read_aggregated_aggregator_value(&*TEST_RESOLVER));
-        assert_err!(aggregator.try_add(&*TEST_RESOLVER, 100));
-        assert_err!(aggregator.try_sub(&*TEST_RESOLVER, 1));
+        assert_err!(aggregator.read_last_committed_aggregator_value(&resolver));
+        assert_err!(aggregator.read_aggregated_aggregator_value(&resolver));
+        assert_err!(aggregator.try_add(&resolver, 100));
+        assert_err!(aggregator.try_sub(&resolver, 1));
     }
 
     #[test]
     fn test_operations_on_new_aggregator() {
+        let resolver = FakeAggregatorView::default();
         let mut aggregator_data = AggregatorData::default();
         aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(200), 200);
 
@@ -657,18 +647,15 @@ mod test {
             .expect("Get aggregator failed");
 
         assert_eq!(aggregator.state, AggregatorState::Create { value: 0 });
-        assert_ok!(aggregator.try_add(&*TEST_RESOLVER, 100));
+        assert_ok!(aggregator.try_add(&resolver, 100));
         assert_eq!(aggregator.state, AggregatorState::Create { value: 100 });
-        assert!(aggregator.try_sub(&*TEST_RESOLVER, 50).unwrap());
+        assert!(aggregator.try_sub(&resolver, 50).unwrap());
         assert_eq!(aggregator.state, AggregatorState::Create { value: 50 });
-        assert!(!aggregator.try_sub(&*TEST_RESOLVER, 70).unwrap());
+        assert!(!aggregator.try_sub(&resolver, 70).unwrap());
         assert_eq!(aggregator.state, AggregatorState::Create { value: 50 });
-        assert!(!aggregator.try_add(&*TEST_RESOLVER, 170).unwrap());
+        assert!(!aggregator.try_add(&resolver, 170).unwrap());
         assert_eq!(aggregator.state, AggregatorState::Create { value: 50 });
-        assert_ok_eq!(
-            aggregator.read_aggregated_aggregator_value(&*TEST_RESOLVER),
-            50
-        );
+        assert_ok_eq!(aggregator.read_aggregated_aggregator_value(&resolver), 50);
     }
     #[test]
     fn test_successful_operations_in_delta_mode() {

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_aggregator::types::{AggregatorID, TryFromMoveValue, TryIntoMoveValue};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use bytes::Bytes;
@@ -10,13 +11,12 @@ use move_core_types::{
     language_storage::StructTag,
     metadata::Metadata,
     resolver::{resource_size, ResourceResolver},
-    value::MoveTypeLayout,
+    value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::StatusCode,
 };
 use move_vm_types::{
     value_transformation::{
-        deserialize_and_exchange, AsIdentifier, IdentifierBuilder, TransformationError,
-        TransformationResult, ValueExchange,
+        deserialize_and_replace_values_with_ids, TransformationResult, ValueToIdentifierMapping,
     },
     values::Value,
 };
@@ -39,12 +39,12 @@ impl MockDB {
 }
 
 /// Models a state view which has:
-///   1. A lifting map of extracted aggregator values.
+///   1. A map of extracted aggregator / snapshot values.
 ///   2. A cache layer which models per-block data.
 /// . 3. Actual storage backend.
 #[derive(Debug, Default)]
 pub(crate) struct MockStateView {
-    liftings: RefCell<BTreeMap<u64, Value>>,
+    mapping: RefCell<BTreeMap<u64, Value>>,
     in_memory_cache: BTreeMap<StateKey, Bytes>,
     db: MockDB,
 }
@@ -58,9 +58,9 @@ impl MockStateView {
         self.db.store_bytes(state_key, blob.into());
     }
 
-    pub(crate) fn add_lifting(&self, identifier: u64, v: Value) {
-        let mut liftings = self.liftings.borrow_mut();
-        liftings.insert(identifier, v);
+    pub(crate) fn add_mapping(&self, identifier: u64, v: Value) {
+        let mut mapping = self.mapping.borrow_mut();
+        mapping.insert(identifier, v);
     }
 
     pub(crate) fn add_to_in_memory_cache(
@@ -70,66 +70,63 @@ impl MockStateView {
         layout: MoveTypeLayout,
     ) {
         // INVARIANT: All data in cache must be lifted.
-        // As a result, one should call `add_lifting` before this method.
+        // As a result, one should call `add_mapping` before this method.
         let blob = value
             .simple_serialize(&layout)
             .expect("Deserialization when caching a value always succeeds");
         self.in_memory_cache.insert(state_key, blob.into());
     }
 
-    pub(crate) fn assert_lifted_equal_at(&self, identifier: u64, expected_value: Value) {
+    pub(crate) fn assert_mapping_equal_at(&self, identifier: u64, expected_value: Value) {
         assert!(self
-            .liftings
+            .mapping
             .borrow()
             .get(&identifier)
             .is_some_and(|actual_value| { actual_value.equals(&expected_value).unwrap() }));
     }
 }
 
-impl ValueExchange for MockStateView {
-    fn try_exchange(
+impl ValueToIdentifierMapping for MockStateView {
+    fn value_to_identifier(
         &self,
+        _kind: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
-        value_to_exchange: Value,
+        value: Value,
     ) -> TransformationResult<Value> {
-        let mut liftings = self.liftings.borrow_mut();
-        let identifier = liftings.len() as u64;
+        let mut mapping = self.mapping.borrow_mut();
+        let identifier = mapping.len() as u64;
+        let identifier_value = AggregatorID::new(identifier).try_into_move_value(layout)?;
 
-        let identifier_value = Value::embed_identifier(layout, identifier).ok_or_else(|| {
-            TransformationError::new(&format!("Cannot embed identifier for {}", layout))
-        })?;
-
-        liftings.insert(identifier, value_to_exchange);
+        mapping.insert(identifier, value);
         Ok(identifier_value)
     }
 
-    fn try_claim_back(&self, value_to_exchange: Value) -> TransformationResult<Value> {
-        let liftings = self.liftings.borrow();
-        let identifier = value_to_exchange.as_identifier().ok_or_else(|| {
-            TransformationError::new(&format!(
-                "Value {} cannot be an identifier",
-                value_to_exchange
-            ))
-        })?;
+    fn identifier_to_value(
+        &self,
+        layout: &MoveTypeLayout,
+        identifier: Value,
+    ) -> TransformationResult<Value> {
+        let mapping = self.mapping.borrow();
+        let identifier = AggregatorID::try_from_move_value(layout, identifier, &())?.as_u64();
 
-        Ok(liftings
+        Ok(mapping
             .get(&identifier)
-            .expect("Identifiers must always exist in the lifting map")
+            .expect("Identifiers must always exist in the mapping")
             .copy_value()
-            .expect("Copying lifted values should never fail"))
+            .expect("Copying mapped values should never fail"))
     }
 }
 
 // Performs a serialization round-trip, exchanging values which are supposed
-// to be lifted.
+// to be mapped to identifiers.
 macro_rules! patch_blob_from_db {
     ($blob:ident, $layout:ident, $exchange:ident) => {
-        deserialize_and_exchange(&$blob, $layout, $exchange)
+        deserialize_and_replace_values_with_ids(&$blob, $layout, $exchange)
             .map(|value| value.simple_serialize($layout))
             .flatten()
             .ok_or_else(|| {
                 PartialVMError::new(StatusCode::VALUE_DESERIALIZATION_ERROR)
-                    .with_message("Failed to deserialize and exchange lifted values".to_string())
+                    .with_message("Failed to deserialize and replace with identifiers".to_string())
                     .finish(Location::Undefined)
             })
     };
