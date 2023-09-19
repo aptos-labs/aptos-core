@@ -28,7 +28,7 @@ pub(crate) fn bootstrap_db(
 /// do not run the backup service.
 #[cfg(feature = "consensus-only-perf-test")]
 pub(crate) fn bootstrap_db(
-    aptos_db: AptosDB,
+    db: AptosDB,
     _backup_service_address: SocketAddr,
 ) -> (
     Arc<aptos_db::fake_aptosdb::FakeAptosDB>,
@@ -37,7 +37,7 @@ pub(crate) fn bootstrap_db(
 ) {
     use aptos_db::fake_aptosdb::FakeAptosDB;
 
-    let (aptos_db, db_rw) = DbReaderWriter::wrap(FakeAptosDB::new(aptos_db));
+    let (aptos_db, db_rw) = DbReaderWriter::wrap(FakeAptosDB::new(db));
     (aptos_db, db_rw, None)
 }
 
