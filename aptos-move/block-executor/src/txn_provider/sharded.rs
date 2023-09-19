@@ -17,7 +17,7 @@ use crate::txn_provider::{RemoteCommit, ShardingMsg, TxnProviderTrait1, TxnProvi
 
 /// A BlockSTM plug-in that allows distributed execution with multiple BlockSTM instances.
 pub struct ShardedTxnProvider<T: Transaction, TO: TransactionOutput, TE: Debug> {
-    pub block_id: u8,
+    pub block_id: [u8; 32],
     pub num_shards: usize,
     pub shard_id: usize,
 
@@ -48,7 +48,7 @@ where
     TE: Debug + Send + Clone,
 {
     pub fn new(
-        block_id: u8,
+        block_id: [u8; 32],
         num_shards: usize,
         shard_id: usize,
         rx: Arc<Mutex<Receiver<ShardingMsg<TO, TE>>>>,
@@ -168,8 +168,8 @@ where
         self.remote_committed_txns.contains(&txn_idx)
     }
 
-    fn block_idx(&self) -> u8 {
-        self.block_id
+    fn block_idx(&self) -> &[u8] {
+        self.block_id.as_slice()
     }
 
     fn shard_idx(&self) -> usize {

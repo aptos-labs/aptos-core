@@ -12,6 +12,7 @@ use rayon::{
     prelude::{IntoParallelIterator, IntoParallelRefIterator},
 };
 use std::sync::Mutex;
+use aptos_crypto::HashValue;
 
 impl PartitionerV2 {
     pub(crate) fn add_edges(state: &mut PartitionState) -> PartitionedTransactions {
@@ -72,7 +73,7 @@ impl PartitionerV2 {
         let final_num_rounds = state.sub_block_matrix.len();
 
         PartitionedTransactions {
-            block_id: 0,
+            block_id: [0; 32],
             sharded_txns: vec![],
             global_idxs: vec![],
             shard_idxs_by_txn: vec![],

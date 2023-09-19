@@ -43,7 +43,6 @@ impl BlockPartitioningStage {
             block_size
         );
         let block_id = HashValue::random();
-        let block_id_short = block_id.as_ref()[0];
         let block = match &self.partitioner {
             None => {
                 ExecutableBlock::new(block_id, ExecutableTransactions::Unsharded(txns))
@@ -55,7 +54,7 @@ impl BlockPartitioningStage {
                 //     println!("[BeforePartitioner] block={}, rank={}, txn={:?}", block_id_short, rank, get_account_seq_number(txn.transaction()));
                 // }
                 let timer = TIMER.with_label_values(&["partition"]).start_timer();
-                let partitioned_txns = partitioner.partition(block_id_short, analyzed_txns, self.num_executor_shards);
+                let partitioned_txns = partitioner.partition(block_id.as_ref().clone(), analyzed_txns, self.num_executor_shards);
                 timer.stop_and_record();
                 //debugging stuff
                 // println!("block={}, global_idxs={:?}", block_id_short, partitioned_txns.global_idxs);

@@ -53,7 +53,7 @@ pub struct PartitionerV3 {
 }
 
 impl BlockPartitioner for PartitionerV3 {
-    fn partition(&self, block_id: u8, transactions: Vec<AnalyzedTransaction>, num_shards: usize) -> PartitionedTransactions {
+    fn partition(&self, block_id: [u8; 32], transactions: Vec<AnalyzedTransaction>, num_shards: usize) -> PartitionedTransactions {
         let block_size = transactions.len();
         let mut fennel = FennelGraphPartitioner::new(num_shards);
         fennel.balance_constraint_mode = BalanceConstraintMode::Batched;

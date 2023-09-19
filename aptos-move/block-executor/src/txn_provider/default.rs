@@ -7,6 +7,7 @@ use std::sync::Arc;
 use aptos_mvhashmap::MVHashMap;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::executable::Executable;
+use move_core_types::account_address::AccountAddress;
 use crate::scheduler::Scheduler;
 use crate::task::{Transaction, TransactionOutput};
 use crate::txn_last_input_output::TxnOutput;
@@ -14,12 +15,14 @@ use crate::txn_provider::{TxnProviderTrait1, TxnProviderTrait2};
 
 /// Some logic of vanilla BlockSTM.
 pub struct DefaultTxnProvider<T> {
+    block_id: [u8; 32],
     txns: Vec<T>,
 }
 
 impl<T> DefaultTxnProvider<T> {
     pub fn new(txns: Vec<T>) -> Self {
         Self {
+            block_id: AccountAddress::random().into_bytes(),
             txns
         }
     }
@@ -62,8 +65,8 @@ impl<T> TxnProviderTrait1 for DefaultTxnProvider<T> {
         unreachable!()
     }
 
-    fn block_idx(&self) -> u8 {
-        0
+    fn block_idx(&self) -> &[u8] {
+        self.block_id.as_slice()
     }
 
     fn shard_idx(&self) -> usize {

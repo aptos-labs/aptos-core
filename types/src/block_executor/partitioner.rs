@@ -453,7 +453,7 @@ impl From<(HashValue, Vec<Transaction>)> for ExecutableBlock {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PartitionedTransactions {
-    pub block_id: u8,
+    pub block_id: [u8; 32],
     /// global_idxs[s] = [a,b,c] <=> Shard `s` needs to execute txns a,b,c.
     pub sharded_txns: Vec<Vec<AnalyzedTransaction>>,
     /// global_idxs[s] = [a,b,c] <=> Shard `s` needs to execute txns of global idx a,b,c.

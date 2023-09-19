@@ -737,7 +737,7 @@ where
             };
         });
         drop(timer);
-        println!("[TTT] blockstm_threads={:?}", tt.elapsed());
+        println!("[TTTT] block_id={}, blockstm_threads={}ms", hex::encode(txn_provider.block_idx()), tt.elapsed().as_millis());
 
 
         // TODO: for large block sizes and many cores, extract outputs in parallel.

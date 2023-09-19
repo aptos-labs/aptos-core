@@ -140,7 +140,7 @@ impl PartitionerV2 {
 impl BlockPartitioner for PartitionerV2 {
     fn partition(
         &self,
-        block_id: u8,
+        block_id: [u8; 32],
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> PartitionedTransactions {

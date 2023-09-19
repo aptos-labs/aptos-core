@@ -41,7 +41,7 @@ pub trait TxnProviderTrait1 {
     fn local_rank(&self, idx: TxnIndex) -> usize;
     fn is_local(&self, idx: TxnIndex) -> bool;
     fn txn_output_has_arrived(&self, txn_idx: TxnIndex) -> bool;
-    fn block_idx(&self) -> u8; //debug only
+    fn block_idx(&self) -> &[u8]; //debug only
     fn shard_idx(&self) -> usize;
 }
 
