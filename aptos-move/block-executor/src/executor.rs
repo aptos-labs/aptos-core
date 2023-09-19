@@ -740,6 +740,7 @@ where
         // TODO: for large block sizes and many cores, extract outputs in parallel.
         let mut final_results = Vec::with_capacity(num_txns);
 
+        let tt = Instant::now();
         let maybe_err = if last_input_output.module_publishing_may_race() {
             counters::MODULE_PUBLISHING_FALLBACK_COUNT.inc();
             Some(Error::ModulePathReadWrite)
@@ -760,6 +761,7 @@ where
             }
             ret
         };
+        println!("[TTT] output_taking={:?}", tt.elapsed());
 
         let tt = Instant::now();
         drop(scheduler);
