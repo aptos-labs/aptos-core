@@ -660,55 +660,7 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            mempool_config_practically_non_expiring(&mut config.mempool);
-            state_sync_config_execute_transactions(&mut config.state_sync);
-
-            config
-                .consensus
-                .max_sending_block_txns_quorum_store_override = 30000;
-            config
-                .consensus
-                .max_receiving_block_txns_quorum_store_override = 40000;
-            config
-                .consensus
-                .max_sending_block_bytes_quorum_store_override = 10 * 1024 * 1024;
-            config
-                .consensus
-                .max_receiving_block_bytes_quorum_store_override = 12 * 1024 * 1024;
-            config.consensus.pipeline_backpressure = vec![];
-            config.consensus.chain_health_backoff = vec![];
-
-            config
-                .consensus
-                .quorum_store
-                .back_pressure
-                .backlog_txn_limit_count = 200000;
-            config
-                .consensus
-                .quorum_store
-                .back_pressure
-                .backlog_per_validator_batch_limit_count = 50;
-            config
-                .consensus
-                .quorum_store
-                .back_pressure
-                .dynamic_min_txn_per_s = 2000;
-            config
-                .consensus
-                .quorum_store
-                .back_pressure
-                .dynamic_max_txn_per_s = 8000;
-
-            config.consensus.quorum_store.sender_max_batch_txns = 1000;
-            config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
-            config.consensus.quorum_store.sender_max_num_batches = 100;
-            config.consensus.quorum_store.sender_max_total_txns = 4000;
-            config.consensus.quorum_store.sender_max_total_bytes = 8 * 1024 * 1024;
-            config.consensus.quorum_store.receiver_max_batch_txns = 1000;
-            config.consensus.quorum_store.receiver_max_batch_bytes = 4 * 1024 * 1024;
-            config.consensus.quorum_store.receiver_max_num_batches = 100;
-            config.consensus.quorum_store.receiver_max_total_txns = 4000;
-            config.consensus.quorum_store.receiver_max_total_bytes = 8 * 1024 * 1024;
+            optimize_for_maximum_throughput(config);
         }))
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
@@ -720,6 +672,58 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
                     max_round_gap: 6,
                 }),
         )
+}
+
+fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
+    mempool_config_practically_non_expiring(&mut config.mempool);
+    state_sync_config_execute_transactions(&mut config.state_sync);
+
+    config
+        .consensus
+        .max_sending_block_txns_quorum_store_override = 30000;
+    config
+        .consensus
+        .max_receiving_block_txns_quorum_store_override = 40000;
+    config
+        .consensus
+        .max_sending_block_bytes_quorum_store_override = 10 * 1024 * 1024;
+    config
+        .consensus
+        .max_receiving_block_bytes_quorum_store_override = 12 * 1024 * 1024;
+    config.consensus.pipeline_backpressure = vec![];
+    config.consensus.chain_health_backoff = vec![];
+
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .backlog_txn_limit_count = 200000;
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .backlog_per_validator_batch_limit_count = 50;
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .dynamic_min_txn_per_s = 2000;
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .dynamic_max_txn_per_s = 8000;
+
+    config.consensus.quorum_store.sender_max_batch_txns = 1000;
+    config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
+    config.consensus.quorum_store.sender_max_num_batches = 100;
+    config.consensus.quorum_store.sender_max_total_txns = 4000;
+    config.consensus.quorum_store.sender_max_total_bytes = 8 * 1024 * 1024;
+    config.consensus.quorum_store.receiver_max_batch_txns = 1000;
+    config.consensus.quorum_store.receiver_max_batch_bytes = 4 * 1024 * 1024;
+    config.consensus.quorum_store.receiver_max_num_batches = 100;
+    config.consensus.quorum_store.receiver_max_total_txns = 4000;
+    config.consensus.quorum_store.receiver_max_total_bytes = 8 * 1024 * 1024;
 }
 
 fn large_db_simple_test() -> ForgeConfig {
@@ -1716,50 +1720,71 @@ fn realistic_env_max_load_test(
 }
 
 fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
-    ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(12).unwrap())
+    // TO ACHIEVE MAXIMUM THROUGHPUT, OVERRIDE THESE ON-CHAIN CONFIGS:
+    //     block_gas_limit: None
+    //     conflict_window_size: 256
+
+    // ALSO THESE ARE THE MOST COMMONLY USED TUNE-ABLES:
+    const USE_CRAZY_MACHINES: bool = false;
+    const ENABLE_VFNS: bool = true;
+    const VALIDATOR_COUNT: usize = 12;
+
+    let mut forge_config = ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
+        .add_network_test(MultiRegionNetworkEmulationTest::default())
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+            mempool_backlog: 500_000,
+        }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // consensus and quorum store configs copied from the consensus-only suite
+            optimize_for_maximum_throughput(config);
+
+            // Other consensus / Quroum store configs
+            config
+                .consensus
+                .wait_for_full_blocks_above_recent_fill_threshold = 0.2;
+            config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
+            config.consensus.quorum_store_pull_timeout_ms = 200;
+
+            // Experimental storage optimizations
+            config.storage.rocksdb_configs.enable_storage_sharding = true;
+
+            if USE_CRAZY_MACHINES {
+                config.execution.concurrency_level = 48;
+            }
+        }));
+
+    if ENABLE_VFNS {
         // if we have full nodes for subset of validators, TPS drops.
         // Validators without VFN are not creating batches,
         // as no useful transaction reach their mempool.
         // something to potentially improve upon.
         // So having VFNs for all validators
-        .with_initial_fullnode_count(12)
-        .add_network_test(MultiRegionNetworkEmulationTest::default())
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 150000,
-        }))
-        .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            config
-                .consensus
-                .max_sending_block_txns_quorum_store_override = 10000;
-            config.consensus.pipeline_backpressure = vec![];
-            config.consensus.chain_health_backoff = vec![];
-            config
-                .consensus
-                .wait_for_full_blocks_above_recent_fill_threshold = 0.8;
-            config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
+        forge_config = forge_config.with_initial_fullnode_count(VALIDATOR_COUNT);
+    }
 
-            config
-                .consensus
-                .quorum_store
-                .back_pressure
-                .backlog_txn_limit_count = 100000;
-            config
-                .consensus
-                .quorum_store
-                .back_pressure
-                .backlog_per_validator_batch_limit_count = 10;
-            config
-                .consensus
-                .quorum_store
-                .back_pressure
-                .dynamic_max_txn_per_s = 6000;
-
-            // Experimental storage optimizations
-            config.storage.rocksdb_configs.enable_storage_sharding = true;
-        }))
-        .with_success_criteria(
-            SuccessCriteria::new(8000)
+    if USE_CRAZY_MACHINES {
+        forge_config = forge_config
+            .with_validator_resource_override(NodeResourceOverride {
+                cpu_cores: Some(58),
+                memory_gib: Some(200),
+            })
+            .with_fullnode_resource_override(NodeResourceOverride {
+                cpu_cores: Some(58),
+                memory_gib: Some(200),
+            })
+            .with_success_criteria(
+                SuccessCriteria::new(25000)
+                    .add_no_restarts()
+                    .add_wait_for_catchup_s(60)
+                    .add_chain_progress(StateProgressThreshold {
+                        max_no_progress_secs: 10.0,
+                        max_round_gap: 4,
+                    }),
+            );
+    } else {
+        forge_config = forge_config.with_success_criteria(
+            SuccessCriteria::new(8800)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
@@ -1774,7 +1799,10 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
                 }),
-        )
+        );
+    }
+
+    forge_config
 }
 
 fn pre_release_suite() -> ForgeConfig {
