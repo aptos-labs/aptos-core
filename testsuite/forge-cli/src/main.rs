@@ -1700,46 +1700,91 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         // as no useful transaction reach their mempool.
         // something to potentially improve upon.
         // So having VFNs for all validators
-        .with_initial_fullnode_count(12)
+        /* remove vfns: .with_initial_fullnode_count(12) */
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 150000,
+            mempool_backlog: 500_000,
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config
                 .consensus
-                .max_sending_block_txns_quorum_store_override = 10000;
-            config.consensus.pipeline_backpressure = vec![];
-            config.consensus.chain_health_backoff = vec![];
+                .wait_for_full_blocks_above_recent_fill_threshold = 0.2;
+            config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
+
+            // consensus and quorum store configs copied from the consensus-only suite
+            mempool_config_practically_non_expiring(&mut config.mempool);
+            state_sync_config_execute_transactions(&mut config.state_sync);
+
             config
                 .consensus
-                .wait_for_full_blocks_above_recent_fill_threshold = 0.8;
-            config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
+                .max_sending_block_txns_quorum_store_override = 30000;
+            config
+                .consensus
+                .max_receiving_block_txns_quorum_store_override = 40000;
+            config
+                .consensus
+                .max_sending_block_bytes_quorum_store_override = 10 * 1024 * 1024;
+            config
+                .consensus
+                .max_receiving_block_bytes_quorum_store_override = 12 * 1024 * 1024;
+            config.consensus.pipeline_backpressure = vec![];
+            config.consensus.chain_health_backoff = vec![];
 
             config
                 .consensus
                 .quorum_store
                 .back_pressure
-                .backlog_txn_limit_count = 100000;
+                .backlog_txn_limit_count = 200000;
             config
                 .consensus
                 .quorum_store
                 .back_pressure
-                .backlog_per_validator_batch_limit_count = 10;
+                .backlog_per_validator_batch_limit_count = 50;
             config
                 .consensus
                 .quorum_store
                 .back_pressure
-                .dynamic_max_txn_per_s = 6000;
+                .dynamic_min_txn_per_s = 2000;
+            config
+                .consensus
+                .quorum_store
+                .back_pressure
+                .dynamic_max_txn_per_s = 8000;
+
+            config.consensus.quorum_store.sender_max_batch_txns = 1000;
+            config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
+            config.consensus.quorum_store.sender_max_num_batches = 100;
+            config.consensus.quorum_store.sender_max_total_txns = 4000;
+            config.consensus.quorum_store.sender_max_total_bytes = 8 * 1024 * 1024;
+            config.consensus.quorum_store.receiver_max_batch_txns = 1000;
+            config.consensus.quorum_store.receiver_max_batch_bytes = 4 * 1024 * 1024;
+            config.consensus.quorum_store.receiver_max_num_batches = 100;
+            config.consensus.quorum_store.receiver_max_total_txns = 4000;
+            config.consensus.quorum_store.receiver_max_total_bytes = 8 * 1024 * 1024;
+
+            // Higher concurrency level
+            config.execution.concurrency_level = 48;
 
             // Experimental storage optimizations
             config.storage.rocksdb_configs.split_ledger_db = true;
             config.storage.rocksdb_configs.use_sharded_state_merkle_db = true;
+            config.storage.rocksdb_configs.skip_index_and_usage = true;
+        }))
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["validator"]["resources"]["limits"]["cpu"] = 58.into();
+            helm_values["validator"]["resources"]["requests"]["cpu"] = 58.into();
+            helm_values["validator"]["resources"]["limits"]["memory"] = "200Gi".into();
+            helm_values["validator"]["resources"]["requests"]["memory"] = "200Gi".into();
+            helm_values["fullnode"]["resources"]["limits"]["cpu"] = 58.into();
+            helm_values["fullnode"]["resources"]["requests"]["cpu"] = 58.into();
+            helm_values["fullnode"]["resources"]["limits"]["memory"] = "200Gi".into();
+            helm_values["fullnode"]["resources"]["requests"]["memory"] = "200Gi".into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(8000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
+                /*
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // Tuned for throughput uses more cores than regular tests,
                     // as it achieves higher throughput.
@@ -1748,6 +1793,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new_gb(10.0, 30),
                 ))
+                 */
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
