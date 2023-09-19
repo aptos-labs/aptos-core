@@ -7,7 +7,7 @@ use super::{
     dag_fetcher::{DagFetcher, DagFetcherService, FetchRequestHandler},
     dag_handler::NetworkHandler,
     dag_network::TDAGNetworkSender,
-    dag_state_sync::{DagStateSynchronizer, StateSyncTrigger, DAG_WINDOW},
+    dag_state_sync::{DagStateSynchronizer, StateSyncStatus, StateSyncTrigger, DAG_WINDOW},
     dag_store::Dag,
     order_rule::OrderRule,
     rb_handler::NodeBroadcastHandler,
@@ -16,7 +16,7 @@ use super::{
     ProofNotifier,
 };
 use crate::{
-    dag::dag_state_sync::StateSyncStatus,
+    dag::adapter::compute_initial_block_and_ledger_info,
     experimental::buffer_manager::OrderedBlocks,
     network::IncomingDAGRequest,
     state_replication::{PayloadClient, StateComputer},
@@ -186,24 +186,29 @@ impl DagBootstrapper {
             self.storage.clone(),
         );
 
-        // TODO: fetch the correct block info
-        let ledger_info = LedgerInfoWithSignatures::new(
-            LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
-            AggregateSignature::empty(),
-        );
+        loop {            
+            let ledger_info_from_storage = self
+                .storage
+                .get_latest_ledger_info()
+                .expect("latest ledger info must exist");
+            let (parent_block_info, ledger_info) =
+                compute_initial_block_and_ledger_info(ledger_info_from_storage);
+            let highest_committed_anchor_round =
+                Arc::new(RwLock::new(ledger_info.commit_info().round()));
 
-        loop {
             let adapter = Arc::new(OrderedNotifierAdapter::new(
                 ordered_nodes_tx.clone(),
                 self.storage.clone(),
                 self.epoch_state.clone(),
+                parent_block_info,
+                highest_committed_anchor_round.clone(),
             ));
 
             let (dag_store, order_rule) =
                 self.bootstrap_dag_store(ledger_info.ledger_info().clone(), adapter.clone());
 
             let state_sync_trigger = StateSyncTrigger::new(
-                self.epoch_state.clone(),
+                highest_committed_anchor_round.clone(),
                 dag_store.clone(),
                 self.proof_notifier.clone(),
             );
@@ -229,7 +234,8 @@ impl DagBootstrapper {
                         StateSyncStatus::NeedsSync(certified_node_msg) => {
                             let dag_fetcher = DagFetcher::new(self.epoch_state.clone(), self.dag_network_sender.clone(), self.time_service.clone());
 
-                            if let Err(e) = sync_manager.sync_dag_to(&certified_node_msg, dag_fetcher, dag_store.clone()).await {
+                            let highest_committed_anchor_round = { *highest_committed_anchor_round.clone().read() };
+                            if let Err(e) = sync_manager.sync_dag_to(&certified_node_msg, dag_fetcher, dag_store.clone(), highest_committed_anchor_round).await {
                                 error!(error = ?e, "unable to sync");
                             }
                         },
@@ -279,19 +285,31 @@ pub(super) fn bootstrap_dag_for_test(
         state_computer,
     );
 
+    let ledger_info_from_storage = storage
+        .get_latest_ledger_info()
+        .expect("latest ledger info must exist");
+    let (parent_block_info, ledger_info) =
+        compute_initial_block_and_ledger_info(ledger_info_from_storage);
+    let highest_committed_anchor_round = Arc::new(RwLock::new(ledger_info.commit_info().round()));
+
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
     let adapter = Arc::new(OrderedNotifierAdapter::new(
         ordered_nodes_tx,
         storage.clone(),
         epoch_state.clone(),
+        parent_block_info,
+        highest_committed_anchor_round.clone(),
     ));
     let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
 
     let (dag_store, order_rule) =
         bootstraper.bootstrap_dag_store(latest_ledger_info, adapter.clone());
 
-    let state_sync_trigger =
-        StateSyncTrigger::new(epoch_state, dag_store.clone(), proof_notifier.clone());
+    let state_sync_trigger = StateSyncTrigger::new(
+        highest_committed_anchor_round,
+        dag_store.clone(),
+        proof_notifier.clone(),
+    );
 
     let (handler, fetch_service) =
         bootstraper.bootstrap_components(dag_store.clone(), order_rule, state_sync_trigger);

@@ -32,6 +32,7 @@ pub enum StateSyncStatus {
 
 pub(super) struct StateSyncTrigger {
     epoch_state: Arc<EpochState>,
+    highest_committed_anchor_round: Arc<RwLock<Round>>,
     dag_store: Arc<RwLock<Dag>>,
     proof_notifier: Arc<dyn ProofNotifier>,
 }
@@ -39,11 +40,13 @@ pub(super) struct StateSyncTrigger {
 impl StateSyncTrigger {
     pub(super) fn new(
         epoch_state: Arc<EpochState>,
+        highest_committed_anchor_round: Arc<RwLock<Round>>,
         dag_store: Arc<RwLock<Dag>>,
         proof_notifier: Arc<dyn ProofNotifier>,
     ) -> Self {
         Self {
             epoch_state,
+            highest_committed_anchor_round,
             dag_store,
             proof_notifier,
         }
@@ -95,8 +98,7 @@ impl StateSyncTrigger {
     async fn notify_commit_proof(&self, ledger_info: &LedgerInfoWithSignatures) {
         // if the anchor exists between ledger info round and highest ordered round
         // Note: ledger info round <= highest ordered round
-        if self.dag_store.read().highest_committed_anchor_round()
-            < ledger_info.commit_info().round()
+        if *self.highest_committed_anchor_round.read() < ledger_info.commit_info().round()
             && self
                 .dag_store
                 .read()
@@ -122,11 +124,10 @@ impl StateSyncTrigger {
         // (meaning consensus is behind) or
         // the highest committed anchor round is 2*DAG_WINDOW behind the given ledger info round
         // (meaning execution is behind the DAG window)
-        (dag_reader
+        dag_reader
             .highest_ordered_anchor_round()
-            .unwrap_or_default()
-            < li.commit_info().round())
-            || dag_reader.highest_committed_anchor_round()
+            .is_some_and(|r| r < li.commit_info().round())
+            || *self.highest_committed_anchor_round.read()
                 + ((STATE_SYNC_WINDOW_MULTIPLIER * DAG_WINDOW) as Round)
                 < li.commit_info().round()
     }
@@ -160,6 +161,7 @@ impl DagStateSynchronizer {
         node: &CertifiedNodeMessage,
         dag_fetcher: impl TDagFetcher,
         current_dag_store: Arc<RwLock<Dag>>,
+        highest_committed_anchor_round: Round,
     ) -> anyhow::Result<Option<Dag>> {
         let commit_li = node.ledger_info();
 
@@ -170,7 +172,7 @@ impl DagStateSynchronizer {
                     .highest_ordered_anchor_round()
                     .unwrap_or_default()
                     < commit_li.commit_info().round()
-                    || dag_reader.highest_committed_anchor_round()
+                    || highest_committed_anchor_round
                         + ((STATE_SYNC_WINDOW_MULTIPLIER * DAG_WINDOW) as Round)
                         < commit_li.commit_info().round()
             );

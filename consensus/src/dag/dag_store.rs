@@ -364,8 +364,4 @@ impl Dag {
         }
         None
     }
-
-    pub(super) fn highest_committed_anchor_round(&self) -> Round {
-        self.highest_committed_anchor_round
-    }
 }
