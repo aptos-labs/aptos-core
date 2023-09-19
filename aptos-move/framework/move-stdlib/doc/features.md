@@ -74,6 +74,8 @@ return true.
 -  [Function `aggregator_snapshots_enabled`](#0x1_features_aggregator_snapshots_enabled)
 -  [Function `get_sponsored_automatic_account_creation`](#0x1_features_get_sponsored_automatic_account_creation)
 -  [Function `sponsored_automatic_account_creation_enabled`](#0x1_features_sponsored_automatic_account_creation_enabled)
+-  [Function `get_aggregator_api_feature`](#0x1_features_get_aggregator_api_feature)
+-  [Function `aggregator_api_enabled`](#0x1_features_aggregator_api_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -128,13 +130,29 @@ The enabled features, represented by a bitset stored on chain.
 ## Constants
 
 
-<a name="0x1_features_AGGREGATOR_SNAPSHOTS"></a>
+<a name="0x1_features_AGGREGATOR_API"></a>
 
-Whether the aggregator snapshots feature is enabled.
+Whether the aggregator API feature is enabled - i.e. whether
+Aggregator and AggregatorSnapshot structs can be created
+(and consequently interacted with).
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_SNAPSHOTS">AGGREGATOR_SNAPSHOTS</a>: u64 = 30;
+<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_API">AGGREGATOR_API</a>: u64 = 30;
+</code></pre>
+
+
+
+<a name="0x1_features_AGGREGATOR_EXECUTION"></a>
+
+Whether the efficient and concurrent execution of aggregators is enabled.
+Without this flag, aggregators are executed sequentially, creating
+read/write conflicts.
+After this flag is enabled, aggregators modifications stop creating conflicts,
+when possible to optimize out.
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_EXECUTION">AGGREGATOR_EXECUTION</a>: u64 = 33;
 </code></pre>
 
 
@@ -361,6 +379,24 @@ This is needed because of new attributes for structs and a change in storage rep
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_RESOURCE_GROUPS">RESOURCE_GROUPS</a>: u64 = 9;
+</code></pre>
+
+
+
+<a name="0x1_features_SAFER_METADATA"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SAFER_METADATA">SAFER_METADATA</a>: u64 = 32;
+</code></pre>
+
+
+
+<a name="0x1_features_SAFER_RESOURCE_GROUPS"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SAFER_RESOURCE_GROUPS">SAFER_RESOURCE_GROUPS</a>: u64 = 31;
 </code></pre>
 
 
@@ -1345,13 +1381,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_aggregator_snapshots_feature"></a>
+<a name="0x1_features_get_aggregator_api_feature"></a>
 
-## Function `get_aggregator_snapshots_feature`
+## Function `get_aggregator_api_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_api_feature">get_aggregator_api_feature</a>(): u64
 </code></pre>
 
 
@@ -1360,20 +1396,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64 { <a href="features.md#0x1_features_AGGREGATOR_SNAPSHOTS">AGGREGATOR_SNAPSHOTS</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_api_feature">get_aggregator_api_feature</a>(): u64 { <a href="features.md#0x1_features_AGGREGATOR_API">AGGREGATOR_API</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_aggregator_snapshots_enabled"></a>
+<a name="0x1_features_aggregator_api_enabled"></a>
 
-## Function `aggregator_snapshots_enabled`
+## Function `aggregator_api_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_enabled">aggregator_snapshots_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_api_enabled">aggregator_api_enabled</a>(): bool
 </code></pre>
 
 
@@ -1382,8 +1418,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_enabled">aggregator_snapshots_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_AGGREGATOR_SNAPSHOTS">AGGREGATOR_SNAPSHOTS</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_api_enabled">aggregator_api_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_AGGREGATOR_API">AGGREGATOR_API</a>)
 }
 </code></pre>
 
