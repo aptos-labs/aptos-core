@@ -33,6 +33,7 @@ use std::{collections::HashMap, hint, marker::PhantomData, sync::{
     mpsc::{Receiver, Sender},
     Arc,
 }};
+use std::time::Instant;
 use aptos_metrics_core::sharding_v3::SHARDING_V3_SPAN_SECONDS;
 use crate::counters::SHARDED_EXECUTION_THREAD_SECONDS;
 use crate::txn_provider::sharded::ShardedTxnProvider;
@@ -661,20 +662,23 @@ where
         // w. concurrency_level = 1 for some reason.
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
+        let tt = Instant::now();
         let versioned_cache = MVHashMap::new();
         for (global_txn_idx, key) in txn_provider.remote_dependencies() {
             versioned_cache.data().force_mark_estimate(key, global_txn_idx);
             //sharding todo: what about `versioned_cache.modules()`?
         }
-
+        println!("[TTT] insert_estimate={:?}", tt.elapsed());
         let shared_counter = AtomicU32::new(0);
         let num_txns = txn_provider.num_txns();
         if num_txns == 0 {
             return Ok(vec![]);
         }
 
+        let tt = Instant::now();
         let last_input_output = TxnLastInputOutput::new(txn_provider);
         let scheduler = Scheduler::new(txn_provider);
+        println!("[TTT] scheduler_lastio_news={:?}", tt.elapsed());
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
@@ -757,7 +761,9 @@ where
             ret
         };
 
+        let tt = Instant::now();
         drop(scheduler);
+        println!("[TTT] scheduler_drop={:?}", tt.elapsed());
         self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
             drop(last_input_output);
