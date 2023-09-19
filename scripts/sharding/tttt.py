@@ -149,7 +149,59 @@ block_gens = [
 approaches = [
     {
         "_type": "unsharded",
+        "concurrency": 60,
+    },
+    {
+        "_type": "unsharded",
+        "concurrency": 56,
+    },
+    {
+        "_type": "unsharded",
+        "concurrency": 52,
+    },
+    {
+        "_type": "unsharded",
         "concurrency": 48,
+    },
+    {
+        "_type": "unsharded",
+        "concurrency": 44,
+    },
+    {
+        "_type": "unsharded",
+        "concurrency": 40,
+    },
+    {
+        "_type": "unsharded",
+        "concurrency": 36,
+    },
+    {
+        "_type": "unsharded",
+        "concurrency": 32,
+    },
+    {
+        "_type": "unsharded",
+        "concurrency": 28,
+    },
+    {
+        "_type": "unsharded",
+        "concurrency": 24,
+    },
+    {
+        "_type": "unsharded",
+        "concurrency": 20,
+    },
+    {
+        "_type": "unsharded",
+        "concurrency": 16,
+    },
+    {
+        "_type": "unsharded",
+        "concurrency": 12,
+    },
+    {
+        "_type": "unsharded",
+        "concurrency": 8,
     },
     # {
     #     "_type": "sharded_v1",
@@ -183,46 +235,41 @@ approaches = [
     #     "_type": "ptx",
     #     "concurrency": 54,
     # },
-    {
-        "_type": "graph",
-        "shards": 2,
-        "shard_concurrency": 24,
-    },
-    {
-        "_type": "graph",
-        "shards": 3,
-        "shard_concurrency": 16,
-    },
-    {
-        "_type": "graph",
-        "shards": 4,
-        "shard_concurrency": 12,
-    },
-    {
-        "_type": "graph",
-        "shards": 6,
-        "shard_concurrency": 8,
-    },
-    {
-        "_type": "graph",
-        "shards": 8,
-        "shard_concurrency": 6,
-    },
-    {
-        "_type": "graph",
-        "shards": 12,
-        "shard_concurrency": 4,
-    },
-    {
-        "_type": "graph",
-        "shards": 16,
-        "shard_concurrency": 3,
-    },
-    {
-        "_type": "graph",
-        "shards": 24,
-        "shard_concurrency": 2,
-    },
+    # {
+    #     "_type": "graph",
+    #     "shards": 2,
+    #     "shard_concurrency": 24,
+    # },
+    # {
+    #     "_type": "graph",
+    #     "shards": 3,
+    #     "shard_concurrency": 16,
+    # },
+    # {
+    #     "_type": "graph",
+    #     "shards": 4,
+    #     "shard_concurrency": 12,
+    # },
+    # {
+    #     "_type": "graph",
+    #     "shards": 6,
+    #     "shard_concurrency": 8,
+    # },
+    # {
+    #     "_type": "graph",
+    #     "shards": 8,
+    #     "shard_concurrency": 6,
+    # },
+    # {
+    #     "_type": "graph",
+    #     "shards": 12,
+    #     "shard_concurrency": 4,
+    # },
+    # {
+    #     "_type": "graph",
+    #     "shards": 16,
+    #     "shard_concurrency": 3,
+    # },
 ]
 
 
