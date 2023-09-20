@@ -264,7 +264,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     }
 
     pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
-        if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
+        if let ExecutionStatus::Success(output) = self.try_take_output(txn_idx).unwrap() {
             self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
                 output_status: ExecutionStatus::SkipRest(output),
             })));
@@ -353,13 +353,14 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
 
     // Must be executed after parallel execution is done, grabs outputs. Will panic if
     // other outstanding references to the recorded outputs exist.
-    pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<T, Error<E>> {
-        let owning_ptr = self.outputs[txn_idx as usize]
-            .swap(None)
-            .expect("[BlockSTM]: Output must be recorded after execution");
-
-        Arc::try_unwrap(owning_ptr)
-            .map(|output| output.output_status)
-            .expect("[BlockSTM]: Output should be uniquely owned after execution")
+    pub(crate) fn try_take_output(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<ExecutionStatus<T, Error<E>>> {
+        self.outputs[txn_idx as usize].swap(None).map(|owning_ptr| {
+            Arc::try_unwrap(owning_ptr)
+                .map(|output| output.output_status)
+                .expect("[BlockSTM]: Output should be uniquely owned after execution")
+        })
     }
 }

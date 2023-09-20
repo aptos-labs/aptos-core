@@ -5,8 +5,9 @@
 use crate::{
     counters,
     counters::{
-        PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
-        TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
+        PARALLEL_EXECUTION_SECONDS, PARALLEL_EXECUTOR_FINAL_RESULT_SECONDS,
+        RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS,
+        WORK_WITH_TASK_SECONDS,
     },
     errors::*,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
@@ -26,7 +27,10 @@ use aptos_state_view::TStateView;
 use aptos_types::{executable::Executable, fee_statement::FeeStatement, write_set::WriteOp};
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
-use rayon::ThreadPool;
+use rayon::{
+    iter::{IntoParallelIterator, ParallelIterator},
+    ThreadPool,
+};
 use std::{
     collections::HashMap,
     marker::PhantomData,
@@ -34,7 +38,7 @@ use std::{
         atomic::AtomicU32,
         mpsc,
         mpsc::{Receiver, Sender},
-        Arc,
+        Arc, Mutex,
     },
 };
 
@@ -574,29 +578,8 @@ where
         drop(timer);
 
         let num_txns = num_txns as usize;
-        // TODO: for large block sizes and many cores, extract outputs in parallel.
-        let mut final_results = Vec::with_capacity(num_txns);
 
-        let maybe_err = if last_input_output.module_publishing_may_race() {
-            counters::MODULE_PUBLISHING_FALLBACK_COUNT.inc();
-            Some(Error::ModulePathReadWrite)
-        } else {
-            let mut ret = None;
-            for idx in 0..num_txns {
-                match last_input_output.take_output(idx as TxnIndex) {
-                    ExecutionStatus::Success(t) => final_results.push(t),
-                    ExecutionStatus::SkipRest(t) => {
-                        final_results.push(t);
-                        break;
-                    },
-                    ExecutionStatus::Abort(err) => {
-                        ret = Some(err);
-                        break;
-                    },
-                };
-            }
-            ret
-        };
+        let ret = self.make_final_result_in_parallel(&last_input_output, num_txns);
 
         self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
@@ -605,11 +588,60 @@ where
             // TODO: re-use the code cache.
             drop(versioned_cache);
         });
+        ret
+    }
 
+    fn make_final_result_in_parallel(
+        &self,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        num_txns: usize,
+    ) -> Result<Vec<E::Output>, E::Error> {
+        let _timer = PARALLEL_EXECUTOR_FINAL_RESULT_SECONDS.start_timer();
+        let skip_rest_index = Arc::new(Mutex::new(None));
+        let maybe_err = Arc::new(Mutex::new(None));
+        let mut final_results = if last_input_output.module_publishing_may_race() {
+            counters::MODULE_PUBLISHING_FALLBACK_COUNT.inc();
+            *maybe_err.lock().unwrap() = Some(Error::ModulePathReadWrite);
+            vec![]
+        } else {
+            self.executor_thread_pool.scope(|_| {
+                (0..num_txns)
+                    .into_par_iter()
+                    .map(
+                        |idx| match last_input_output.try_take_output(idx as TxnIndex) {
+                            Some(ExecutionStatus::Success(output)) => output,
+                            Some(ExecutionStatus::SkipRest(output)) => {
+                                let mut skip_index = skip_rest_index.lock().unwrap();
+                                if let Some(existing_index) = *skip_index {
+                                    *skip_index = Some(std::cmp::min(existing_index, idx));
+                                } else {
+                                    *skip_index = Some(idx);
+                                }
+                                output
+                            }
+                            Some(ExecutionStatus::Abort(err)) => {
+                                *maybe_err.lock().unwrap() = Some(err);
+                                E::Output::skip_output()
+                            },
+                            None => {
+                                // This is the case when there is an error or txn is skipped by the scheduler.
+                                E::Output::skip_output()
+                            },
+                        },
+                    )
+                    .collect()
+            })
+        };
+
+        let maybe_err = maybe_err.lock().unwrap().take();
         match maybe_err {
             Some(err) => Err(err),
             None => {
-                final_results.resize_with(num_txns, E::Output::skip_output);
+                if let Some(skip_index) = *skip_rest_index.lock().unwrap() {
+                    final_results[skip_index..].iter_mut().for_each(|t| {
+                        *t = E::Output::skip_output();
+                    });
+                }
                 Ok(final_results)
             },
         }
