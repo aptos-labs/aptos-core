@@ -16,12 +16,7 @@ use aptos_state_view::StateView;
 use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use bytes::Bytes;
-use move_core_types::{
-    effects::Op as MoveStorageOp,
-    ident_str,
-    language_storage::{ModuleId, CORE_CODE_ADDRESS},
-    vm_status::VMStatus,
-};
+use move_core_types::{effects::Op as MoveStorageOp, vm_status::VMStatus};
 
 pub(crate) struct AptosExecutorTask<'a, S> {
     vm: AptosVM,
@@ -41,19 +36,6 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         // creating `StorageAdapter` here.
         let config_storage = StorageAdapter::new(argument);
         let vm = AptosVM::new(&config_storage);
-
-        // Loading `0x1::account` and its transitive dependency into the code cache.
-        //
-        // This should give us a warm VM to avoid the overhead of VM cold start.
-        // Result of this load could be omitted as this is a best effort approach and won't hurt if that fails.
-        //
-        // Loading up `0x1::account` should be sufficient as this is the most common module
-        // used for prologue, epilogue and transfer functionality.
-
-        let _ = vm.load_module(
-            &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            &vm.as_move_resolver(argument),
-        );
 
         Self {
             vm,
