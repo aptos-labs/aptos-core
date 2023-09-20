@@ -37,15 +37,23 @@ use move_core_types::{
     value::MoveValue,
 };
 use move_package::package_hooks::register_package_hooks;
+use once_cell::sync::Lazy;
 use project_root::get_project_root;
 use rand::{
     rngs::{OsRng, StdRng},
     Rng, SeedableRng,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
 
 const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
+
+static CACHED_BUILT_PACKAGES: Lazy<Mutex<HashMap<PathBuf, Arc<anyhow::Result<BuiltPackage>>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// A simple test harness for defining Move e2e tests.
 ///
@@ -330,19 +338,16 @@ impl MoveHarness {
         output.gas_used()
     }
 
-    /// Creates a transaction which publishes the Move Package found at the given path on behalf
+    /// Creates a transaction which publishes the passed already-built Move Package on behalf
     /// of the given account.
     ///
     /// The passed function allows to manipulate the generated metadata for testing purposes.
-    pub fn create_publish_package(
+    pub fn create_publish_built_package(
         &mut self,
         account: &Account,
-        path: &Path,
-        options: Option<BuildOptions>,
+        package: &BuiltPackage,
         mut patch_metadata: impl FnMut(&mut PackageMetadata),
     ) -> SignedTransaction {
-        let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
-            .expect("building package must succeed");
         let code = package.extract_code();
         let mut metadata = package
             .extract_metadata()
@@ -355,6 +360,55 @@ impl MoveHarness {
                 code,
             ),
         )
+    }
+
+    /// Creates a transaction which publishes the Move Package found at the given path on behalf
+    /// of the given account.
+    ///
+    /// The passed function allows to manipulate the generated metadata for testing purposes.
+    pub fn create_publish_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: Option<BuildOptions>,
+        patch_metadata: impl FnMut(&mut PackageMetadata),
+    ) -> SignedTransaction {
+        let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
+            .expect("building package must succeed");
+        self.create_publish_built_package(account, &package, patch_metadata)
+    }
+
+    pub fn create_publish_package_cache_building(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        patch_metadata: impl FnMut(&mut PackageMetadata),
+    ) -> SignedTransaction {
+        let package_arc = {
+            let mut cache = CACHED_BUILT_PACKAGES.lock().unwrap();
+
+            Arc::clone(cache.entry(path.to_owned()).or_insert_with(|| {
+                Arc::new(BuiltPackage::build(
+                    path.to_owned(),
+                    BuildOptions::default(),
+                ))
+            }))
+        };
+        let package_ref = package_arc
+            .as_ref()
+            .as_ref()
+            .expect("building package must succeed");
+        self.create_publish_built_package(account, package_ref, patch_metadata)
+    }
+
+    /// Runs transaction which publishes the Move Package.
+    pub fn publish_package_cache_building(
+        &mut self,
+        account: &Account,
+        path: &Path,
+    ) -> TransactionStatus {
+        let txn = self.create_publish_package_cache_building(account, path, |_| {});
+        self.run(txn)
     }
 
     /// Runs transaction which publishes the Move Package.
