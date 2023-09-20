@@ -716,6 +716,9 @@ impl FakeExecutor {
         // FIXME: should probably read the timestamp from storage.
         let timed_features =
             TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+
+        let resolver = self.data_store.as_move_resolver();
+
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
@@ -724,9 +727,9 @@ impl FakeExecutor {
             self.chain_id,
             self.features.clone(),
             timed_features,
+            &resolver,
         )
         .unwrap();
-        let resolver = self.data_store.as_move_resolver();
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
@@ -787,6 +790,8 @@ impl FakeExecutor {
             let timed_features =
                 TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
 
+            let resolver = self.data_store.as_move_resolver();
+
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new_with_gas_hook(
                 NativeGasParameters::zeros(),
@@ -798,9 +803,9 @@ impl FakeExecutor {
                 Some(move |expression| {
                     a2.lock().unwrap().push(expression);
                 }),
+                &resolver,
             )
             .unwrap();
-            let resolver = self.data_store.as_move_resolver();
             let mut session = vm.new_session(&resolver, SessionId::void());
 
             let fun_name = Self::name(function_name);
@@ -861,6 +866,9 @@ impl FakeExecutor {
             // FIXME: should probably read the timestamp from storage.
             let timed_features =
                 TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+
+            let resolver = self.data_store.as_move_resolver();
+
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
@@ -869,9 +877,9 @@ impl FakeExecutor {
                 self.chain_id,
                 self.features.clone(),
                 timed_features,
+                &resolver,
             )
             .unwrap();
-            let resolver = self.data_store.as_move_resolver();
             let mut session = vm.new_session(&resolver, SessionId::void());
             session
                 .execute_function_bypass_visibility(
@@ -911,6 +919,8 @@ impl FakeExecutor {
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
+        let resolver = self.data_store.as_move_resolver();
+
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
@@ -920,9 +930,9 @@ impl FakeExecutor {
             self.features.clone(),
             // FIXME: should probably read the timestamp from storage.
             TimedFeatures::enable_all(),
+            &resolver,
         )
         .unwrap();
-        let resolver = self.data_store.as_move_resolver();
         let mut session = vm.new_session(&resolver, SessionId::void());
         session
             .execute_function_bypass_visibility(

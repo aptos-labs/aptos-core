@@ -20,8 +20,10 @@ use aptos_table_natives::NativeTableContext;
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
+use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    native_functions::NativeFunction,
 };
 use std::{ops::Deref, sync::Arc};
 
@@ -48,6 +50,7 @@ impl MoveVmExt {
         features: Features,
         timed_features: TimedFeatures,
         gas_hook: Option<F>,
+        resolver: &impl AptosMoveResolver,
     ) -> VMResult<Self>
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
@@ -87,20 +90,32 @@ impl MoveVmExt {
         }
 
         Ok(Self {
-            inner: MoveVM::new_with_config(aptos_natives_with_builder(&mut builder), VMConfig {
-                verifier: verifier_config,
-                max_binary_format_version,
-                paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
-                enable_invariant_violation_check_in_swap_loc,
-                type_size_limit,
-                max_value_nest_depth: Some(128),
-                type_max_cost,
-                type_base_cost,
-                type_byte_cost,
-            })?,
+            inner: Self::new_move_vm(
+                aptos_natives_with_builder(&mut builder),
+                VMConfig {
+                    verifier: verifier_config,
+                    max_binary_format_version,
+                    paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
+                    enable_invariant_violation_check_in_swap_loc,
+                    type_size_limit,
+                    max_value_nest_depth: Some(128),
+                    type_max_cost,
+                    type_base_cost,
+                    type_byte_cost,
+                },
+                resolver,
+            )?,
             chain_id,
             features: Arc::new(features),
         })
+    }
+
+    fn new_move_vm(
+        natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
+        vm_config: VMConfig,
+        _resolver: &impl AptosMoveResolver,
+    ) -> VMResult<MoveVM> {
+        MoveVM::new_with_config(natives, vm_config)
     }
 
     pub fn new(
@@ -110,6 +125,7 @@ impl MoveVmExt {
         chain_id: u8,
         features: Features,
         timed_features: TimedFeatures,
+        resolver: &impl AptosMoveResolver,
     ) -> VMResult<Self> {
         Self::new_impl::<fn(DynamicExpression)>(
             native_gas_params,
@@ -119,6 +135,7 @@ impl MoveVmExt {
             features,
             timed_features,
             None,
+            resolver,
         )
     }
 
@@ -130,6 +147,7 @@ impl MoveVmExt {
         features: Features,
         timed_features: TimedFeatures,
         gas_hook: Option<F>,
+        resolver: &impl AptosMoveResolver,
     ) -> VMResult<Self>
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
@@ -142,6 +160,7 @@ impl MoveVmExt {
             features,
             timed_features,
             gas_hook,
+            resolver,
         )
     }
 
