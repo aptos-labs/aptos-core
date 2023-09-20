@@ -1371,8 +1371,8 @@ fn netbench_config_2_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
     netbench_config.enabled = true;
     netbench_config.max_network_channel_size = 1000;
     netbench_config.enable_direct_send_testing = true;
-    netbench_config.direct_send_data_size = 2000000;
-    netbench_config.direct_send_per_second = 1;
+    netbench_config.direct_send_data_size = 100000;
+    netbench_config.direct_send_per_second = 20;
 }
 
 fn net_bench() -> ForgeConfig {
