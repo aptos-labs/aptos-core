@@ -63,6 +63,8 @@ pub enum Commands {
         print_gas_schedule: bool,
     },
     /// Print out package metadata.
+    /// Usage: --endpoint '<URL>'
+    /// --package-address <ADDRESS> --package-name <PACKAGE_NAME> [--print-json]
     PrintPackageMetadata {
         /// Url endpoint for the desired network. e.g: https://fullnode.mainnet.aptoslabs.com/v1.
         #[clap(short, long)]
@@ -73,6 +75,9 @@ pub enum Commands {
         /// The name of the package
         #[clap(long)]
         package_name: String,
+        /// Whether to print the original data in json
+        #[clap(long)]
+        print_json: bool,
     },
 }
 
@@ -229,6 +234,7 @@ async fn main() -> anyhow::Result<()> {
             endpoint,
             package_address,
             package_name,
+            print_json,
         } => {
             let client = aptos_rest_client::Client::new(endpoint);
             let address = AccountAddress::from_str_strict(&package_address)?;
@@ -237,7 +243,12 @@ async fn main() -> anyhow::Result<()> {
                 .await?;
             for package in packages.into_inner().packages {
                 if package.name == package_name {
-                    println!("PackageMetadata:\n{}", package);
+                    if print_json {
+                        println!("{}", serde_json::to_string(&package).unwrap());
+                    } else {
+                        println!("{}", package);
+                    }
+                    break;
                 }
             }
             Ok(())
