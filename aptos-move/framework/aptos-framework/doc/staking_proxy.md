@@ -316,6 +316,31 @@ Aborts if conditions of SetStackingContractVoter and SetStackPoolVoterAbortsIf a
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+<b>let</b> vesting_contracts = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_AdminStore">vesting::AdminStore</a>&gt;(owner_address).vesting_contracts;
+<b>let</b> <b>post</b> post_vesting_contracts = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_AdminStore">vesting::AdminStore</a>&gt;(owner_address).vesting_contracts;
+<b>ensures</b> <b>exists</b> i in 0..len(vesting_contracts): (<b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">vesting::VestingContract</a>&gt;(vesting_contracts[i])).staking.operator == old_operator
+    ==&gt;
+    {
+        <b>let</b> operator_addr = <a href="staking_proxy.md#0x1_staking_proxy_find_vesting_contract">find_vesting_contract</a>(post_vesting_contracts, old_operator, 0);
+        <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">vesting::VestingContract</a>&gt;(operator_addr).staking.operator == new_operator
+    };
+</code></pre>
+
+
+
+
+<a name="0x1_staking_proxy_find_vesting_contract"></a>
+
+
+<pre><code><b>fun</b> <a href="staking_proxy.md#0x1_staking_proxy_find_vesting_contract">find_vesting_contract</a>(vesting_contracts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, old_operator: <b>address</b>, count: num): <b>address</b> {
+   <b>let</b> operator = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">vesting::VestingContract</a>&gt;(vesting_contracts[count]).staking.operator;
+   <b>if</b> (operator == old_operator) {
+       vesting_contracts[count]
+   } <b>else</b> {
+       <a href="staking_proxy.md#0x1_staking_proxy_find_vesting_contract">find_vesting_contract</a>(vesting_contracts, old_operator, count + 1)
+   }
+}
 </code></pre>
 
 

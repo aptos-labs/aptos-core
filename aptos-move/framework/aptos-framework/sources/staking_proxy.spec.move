@@ -43,10 +43,6 @@ spec aptos_framework::staking_proxy {
         }
     }
 
-    // spec fun find_count(vesting_contracts: vector<address>, old_operator: address, count: num): count {
-    //     let counts = 
-    // }
-
     spec set_staking_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
         use aptos_std::simple_map;
         use aptos_framework::staking_contract::{Store};
@@ -93,15 +89,10 @@ spec aptos_framework::staking_proxy {
         operator: address;
         new_voter: address;
 
-
         let owner_address = signer::address_of(owner);
         let staker = owner_address;
         let store = global<Store>(staker);
-
-        // in staking_contract_exists
         let staking_contract_exists = exists<Store>(staker) && simple_map::spec_contains_key(store.staking_contracts, operator);
-
-        // in update_voter
         let staker_address = owner_address;
         let staking_contract = simple_map::spec_get(store.staking_contracts, operator);
         let pool_address = staking_contract.pool_address;
