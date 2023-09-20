@@ -109,6 +109,7 @@ pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F, chain_id: 
 where
     F: FnOnce(&mut GenesisSession),
 {
+    let state_view_storage = StorageAdapter::new(state_view);
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
@@ -116,9 +117,9 @@ where
         chain_id,
         Features::default(),
         TimedFeatures::enable_all(),
+        &state_view_storage,
     )
     .unwrap();
-    let state_view_storage = StorageAdapter::new(state_view);
     let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
