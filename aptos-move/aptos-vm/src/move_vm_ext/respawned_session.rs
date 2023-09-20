@@ -75,6 +75,19 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         let additional_change_set = self.with_session_mut(|session| {
             session.take().unwrap().finish(&mut (), change_set_configs)
         })?;
+        if additional_change_set.has_creation() {
+            // After respawning, for example, in the epilogue, there shouldn't be new slots
+            // created, otherwise there's a potential vulnerability like this:
+            // 1. slot created by the user
+            // 2. another user transaction deletes the slot and claims the refund
+            // 3. in the epilogue the same slot gets recreated, and the final write set will have
+            //    a ModifyWithMetadata carrying the original metadata
+            // 4. user keeps doing the same and repeatedly claim refund out of the slot.
+            return Err(VMStatus::error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                err_msg("Unexpected storage allocation after respawning session."),
+            ));
+        }
         let mut change_set = self.into_heads().executor_view.change_set;
         change_set
             .squash_additional_change_set(additional_change_set, change_set_configs)
