@@ -1712,8 +1712,8 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
 
             // consensus and quorum store configs copied from the consensus-only suite
-            mempool_config_practically_non_expiring(&mut config.mempool);
-            state_sync_config_execute_transactions(&mut config.state_sync);
+            // mempool_config_practically_non_expiring(&mut config.mempool);
+            // state_sync_config_execute_transactions(&mut config.state_sync);
 
             config
                 .consensus
