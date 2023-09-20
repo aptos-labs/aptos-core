@@ -450,11 +450,7 @@ impl Deref for CertifiedNodeMessage {
 
 impl TDAGMessage for CertifiedNodeMessage {
     fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        self.inner.verify(verifier)?;
-
-        self.ledger_info
-            .verify_signatures(verifier)
-            .map_err(|e| anyhow::anyhow!("unable to verify ledger info: {}", e))
+        self.inner.verify(verifier)
     }
 }
 

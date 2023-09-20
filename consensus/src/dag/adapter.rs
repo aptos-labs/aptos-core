@@ -79,28 +79,28 @@ pub(crate) fn compute_initial_block_and_ledger_info(
     }
 }
 
-pub struct OrderedNotifierAdapter {
+pub(super) struct OrderedNotifierAdapter {
     executor_channel: UnboundedSender<OrderedBlocks>,
     storage: Arc<dyn DAGStorage>,
     parent_block_id: Arc<RwLock<HashValue>>,
     epoch_state: Arc<EpochState>,
-    highest_committed_anchor_round: Arc<RwLock<Round>>,
+    ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
 }
 
 impl OrderedNotifierAdapter {
-    pub fn new(
+    pub(super) fn new(
         executor_channel: UnboundedSender<OrderedBlocks>,
         storage: Arc<dyn DAGStorage>,
         epoch_state: Arc<EpochState>,
         parent_block_info: BlockInfo,
-        highest_committed_anchor_round: Arc<RwLock<Round>>,
+        ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
     ) -> Self {
         Self {
             executor_channel,
             storage,
             parent_block_id: Arc::new(RwLock::new(parent_block_info.id())),
             epoch_state,
-            highest_committed_anchor_round,
+            ledger_info_provider,
         }
     }
 }
@@ -153,7 +153,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let block_info = block.block_info();
         let storage = self.storage.clone();
         *self.parent_block_id.write() = block.id();
-        let highest_committed_anchor_round = self.highest_committed_anchor_round.clone();
+        let ledger_info_provider = self.ledger_info_provider.clone();
         Ok(self.executor_channel.unbounded_send(OrderedBlocks {
             ordered_blocks: vec![block],
             ordered_proof: LedgerInfoWithSignatures::new(
@@ -163,7 +163,9 @@ impl OrderedNotifier for OrderedNotifierAdapter {
             callback: Box::new(
                 move |committed_blocks: &[Arc<ExecutedBlock>],
                       commit_decision: LedgerInfoWithSignatures| {
-                    *highest_committed_anchor_round.write() = commit_decision.commit_info().round();
+                    ledger_info_provider
+                        .write()
+                        .notify_commit_proof(commit_decision);
                     
                     for executed_block in committed_blocks {
                         if let Some(node_digests) = executed_block.block().block_data().dag_nodes()
@@ -331,5 +333,35 @@ impl DAGStorage for StorageAdapter {
     fn get_latest_ledger_info(&self) -> anyhow::Result<LedgerInfoWithSignatures> {
         // TODO: use callback from notifier to cache the latest ledger info
         self.aptos_db.get_latest_ledger_info()
+    }
+}
+
+pub(crate) trait TLedgerInfoProvider: Send + Sync {
+    fn get_latest_ledger_info(&self) -> LedgerInfoWithSignatures;
+
+    fn get_highest_committed_anchor_round(&self) -> Round;
+}
+
+pub(super) struct LedgerInfoProvider {
+    latest_ledger_info: LedgerInfoWithSignatures,
+}
+
+impl LedgerInfoProvider {
+    pub(super) fn new(latest_ledger_info: LedgerInfoWithSignatures) -> Self {
+        Self { latest_ledger_info }
+    }
+
+    pub(super) fn notify_commit_proof(&mut self, ledger_info: LedgerInfoWithSignatures) {
+        self.latest_ledger_info = ledger_info;
+    }
+}
+
+impl TLedgerInfoProvider for RwLock<LedgerInfoProvider> {
+    fn get_latest_ledger_info(&self) -> LedgerInfoWithSignatures {
+        self.read().latest_ledger_info.clone()
+    }
+
+    fn get_highest_committed_anchor_round(&self) -> Round {
+        self.read().latest_ledger_info.ledger_info().round()
     }
 }
