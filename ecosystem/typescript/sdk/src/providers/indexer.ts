@@ -60,6 +60,7 @@ import {
   InputMaybe,
   Token_Activities_V2_Order_By,
   User_Transactions_Order_By,
+  Current_Objects_Order_By,
 } from "../indexer/generated/types";
 
 /**
@@ -884,7 +885,7 @@ export class IndexerClient {
     ownerAddress: MaybeHexString,
     extraArgs?: {
       options?: IndexerPaginationArgs;
-      orderBy?: IndexerSortBy<Account_Transactions_Order_By>[];
+      orderBy?: IndexerSortBy<Current_Objects_Order_By>[];
     },
   ): Promise<GetCurrentObjectsQuery> {
     const address = HexString.ensure(ownerAddress).hex();
@@ -895,7 +896,7 @@ export class IndexerClient {
     };
 
     const graphqlQuery = {
-      query: GetAccountTransactionsData,
+      query: GetCurrentObjects,
       variables: {
         where_condition: whereCondition,
         offset: extraArgs?.options?.offset,
