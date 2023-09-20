@@ -154,14 +154,25 @@ impl OrderRule {
 
     /// Finalize the ordering with the given anchor node, update anchor election and construct blocks for execution.
     fn finalize_order(&mut self, anchor: Arc<CertifiedNode>) {
-        let failed_authors: Vec<_> = (self.lowest_unordered_anchor_round..anchor.round())
-            .step_by(2)
-            .map(|failed_round| (failed_round, self.anchor_election.get_anchor(failed_round)))
-            .collect();
+        // Check we're in the expected instance
         assert!(Self::check_parity(
             self.lowest_unordered_anchor_round,
             anchor.round(),
         ));
+        let lowest_round_to_reach = anchor.round().saturating_sub(DAG_WINDOW as u64);
+
+        // Ceil it to the closest unordered anchor round
+        let lowest_anchor_round = std::cmp::max(
+            self.lowest_unordered_anchor_round,
+            lowest_round_to_reach
+                + !Self::check_parity(lowest_round_to_reach, anchor.round()) as u64,
+        );
+        assert!(Self::check_parity(lowest_anchor_round, anchor.round()));
+
+        let failed_authors: Vec<_> = (lowest_anchor_round..anchor.round())
+            .step_by(2)
+            .map(|failed_round| (failed_round, self.anchor_election.get_anchor(failed_round)))
+            .collect();
         let parents = anchor
             .parents()
             .iter()
@@ -173,17 +184,18 @@ impl OrderRule {
             parents,
             failed_authors.iter().map(|(_, author)| *author).collect(),
         );
-        self.lowest_unordered_anchor_round = anchor.round() + 1;
 
         let mut dag_writer = self.dag.write();
         let mut ordered_nodes: Vec<_> = dag_writer
-            .reachable_mut(&anchor, None)
+            .reachable_mut(&anchor, Some(lowest_round_to_reach))
             .map(|node_status| {
                 node_status.mark_as_ordered();
                 node_status.as_node().clone()
             })
             .collect();
         ordered_nodes.reverse();
+
+        self.lowest_unordered_anchor_round = anchor.round() + 1;
         if let Err(e) = self
             .notifier
             .send_ordered_nodes(ordered_nodes, failed_authors)
