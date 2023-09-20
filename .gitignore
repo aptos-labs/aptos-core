@@ -90,8 +90,9 @@ target-out-docker
 .*\#
 \#*\#
 
-# Aptos CLI files
+# Aptos CLI / local testnet files
 .aptos
+**/*.rdb
 
 # VSCode settings
 .vscode/
