@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_aggregator::{aggregator_change_set::AggregatorChange, delta_change_set::DeltaOp};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     contract_event::ReadWriteEvent,
@@ -47,7 +47,7 @@ pub trait Transaction: Sync + Send + Clone + 'static {
         + DeserializeOwned
         + Serialize;
     /// AggregatorV2 identifier type.
-    type Identifier: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug;
+    type Identifier: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + Copy;
     type Value: Send + Sync + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }
@@ -110,8 +110,16 @@ pub trait TransactionOutput: Send + Sync + Debug {
         &self,
     ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
 
-    /// Get the aggregator deltas of a transaction from its output.
+    /// Get the aggregator V1 deltas of a transaction from its output.
     fn aggregator_v1_delta_set(&self) -> HashMap<<Self::Txn as Transaction>::Key, DeltaOp>;
+
+    /// Get the aggregator V2 changes of a transaction from its output.
+    fn aggregator_v2_change_set(
+        &self,
+    ) -> HashMap<
+        <Self::Txn as Transaction>::Identifier,
+        AggregatorChange<<Self::Txn as Transaction>::Identifier>,
+    >;
 
     /// Get the events of a transaction from its output.
     fn get_events(&self) -> Vec<<Self::Txn as Transaction>::Event>;

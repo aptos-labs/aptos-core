@@ -4,42 +4,42 @@
 use crate::{
     bounded_math::code_invariant_error,
     delta_change_set::DeltaOp,
-    types::{AggregatorID, AggregatorValue, SnapshotToStringFormula},
+    types::{AggregatorValue, SnapshotToStringFormula},
 };
 use move_binary_format::errors::PartialVMResult;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum AggregatorApplyChange {
+pub enum AggregatorApplyChange<I: Clone> {
     AggregatorDelta {
         delta: DeltaOp,
     },
     /// Value is:
-    /// (value of base_aggregator at the beginning of the transaction + delta)
+    /// (value of base_aggregator at the BEGINNING of the transaction + delta)
     SnapshotDelta {
-        base_aggregator: AggregatorID,
+        base_aggregator: I,
         delta: DeltaOp,
     },
     /// Value is:
-    /// formula(value of base_snapshot at the end of the transaction)
+    /// formula(value of base_snapshot at the END of the transaction)
     SnapshotDerived {
-        base_snapshot: AggregatorID,
+        base_snapshot: I,
         formula: SnapshotToStringFormula,
     },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum AggregatorChange {
+pub enum AggregatorChange<I: Clone> {
     Create(AggregatorValue),
-    Apply(AggregatorApplyChange),
+    Apply(AggregatorApplyChange<I>),
 }
 
-pub enum ApplyBase {
-    Previous(AggregatorID),
-    Current(AggregatorID),
+pub enum ApplyBase<I: Clone> {
+    Previous(I),
+    Current(I),
 }
 
-impl AggregatorApplyChange {
-    pub fn get_apply_base_id_option(&self) -> Option<ApplyBase> {
+impl<I: Copy + Clone> AggregatorApplyChange<I> {
+    pub fn get_apply_base_id_option(&self) -> Option<ApplyBase<I>> {
         use AggregatorApplyChange::*;
 
         match self {
@@ -51,7 +51,7 @@ impl AggregatorApplyChange {
         }
     }
 
-    pub fn get_apply_base_id(&self, self_id: &AggregatorID) -> ApplyBase {
+    pub fn get_apply_base_id(&self, self_id: &I) -> ApplyBase<I> {
         self.get_apply_base_id_option()
             .unwrap_or(ApplyBase::Previous(*self_id))
     }
@@ -73,8 +73,8 @@ impl AggregatorApplyChange {
     }
 }
 
-impl AggregatorChange {
-    pub fn get_merge_dependent_id(&self) -> Option<AggregatorID> {
+impl<I: Copy + Clone> AggregatorChange<I> {
+    pub fn get_merge_dependent_id(&self) -> Option<I> {
         use AggregatorApplyChange::*;
         use AggregatorChange::*;
 
@@ -89,10 +89,10 @@ impl AggregatorChange {
 
     /// Applies next aggregator change on top of self, merging two changes together.
     pub fn merge_two_changes(
-        prev_change: Option<&AggregatorChange>,
-        prev_dependent_change: Option<&AggregatorChange>,
-        next_change: &AggregatorChange,
-    ) -> PartialVMResult<AggregatorChange> {
+        prev_change: Option<&AggregatorChange<I>>,
+        prev_dependent_change: Option<&AggregatorChange<I>>,
+        next_change: &AggregatorChange<I>,
+    ) -> PartialVMResult<AggregatorChange<I>> {
         use AggregatorApplyChange::*;
         use AggregatorChange::*;
         use AggregatorValue::*;
@@ -147,7 +147,7 @@ impl AggregatorChange {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{bounded_math::SignedU128, delta_math::DeltaHistory};
+    use crate::{bounded_math::SignedU128, delta_math::DeltaHistory, types::AggregatorID};
     use claims::{assert_err, assert_ok};
     use AggregatorApplyChange::*;
     use AggregatorChange::*;
@@ -155,7 +155,7 @@ mod test {
 
     #[test]
     fn test_merge_aggregator_data_into_delta() {
-        let aggregator_change1 = Create(Aggregator(20));
+        let aggregator_change1: AggregatorChange<AggregatorID> = Create(Aggregator(20));
 
         let aggregator_change2 = Apply(AggregatorDelta {
             delta: DeltaOp::new(SignedU128::Positive(10), 100, DeltaHistory {
@@ -192,7 +192,7 @@ mod test {
 
     #[test]
     fn test_merge_data_into_data() {
-        let aggregator_change1 = Create(Aggregator(20));
+        let aggregator_change1: AggregatorChange<AggregatorID> = Create(Aggregator(20));
         let aggregator_change2 = Create(Aggregator(50));
         let aggregator_change3 = Create(Aggregator(70));
 
@@ -210,7 +210,7 @@ mod test {
 
     #[test]
     fn test_merge_delta_into_delta() {
-        let aggregator_change1 = Apply(AggregatorDelta {
+        let aggregator_change1: AggregatorChange<AggregatorID> = Apply(AggregatorDelta {
             delta: DeltaOp::new(SignedU128::Positive(10), 100, DeltaHistory {
                 max_achieved_positive_delta: 30,
                 min_achieved_negative_delta: 15,
@@ -249,7 +249,7 @@ mod test {
 
     #[test]
     fn test_merge_delta_into_delta2() {
-        let aggregator_change1 = Apply(AggregatorDelta {
+        let aggregator_change1: AggregatorChange<AggregatorID> = Apply(AggregatorDelta {
             delta: DeltaOp::new(SignedU128::Negative(40), 100, DeltaHistory {
                 max_achieved_positive_delta: 20,
                 min_achieved_negative_delta: 59,
@@ -313,7 +313,7 @@ mod test {
 
     #[test]
     fn test_merge_delta_into_delta3() {
-        let aggregator_change1 = Apply(AggregatorDelta {
+        let aggregator_change1: AggregatorChange<AggregatorID> = Apply(AggregatorDelta {
             delta: DeltaOp::new(SignedU128::Positive(20), 100, DeltaHistory {
                 max_achieved_positive_delta: 20,
                 min_achieved_negative_delta: 60,
@@ -351,7 +351,7 @@ mod test {
 
     #[test]
     fn test_merge_delta_into_delta4() {
-        let aggregator_change1 = Apply(AggregatorDelta {
+        let aggregator_change1: AggregatorChange<AggregatorID> = Apply(AggregatorDelta {
             delta: DeltaOp::new(SignedU128::Negative(20), 100, DeltaHistory {
                 max_achieved_positive_delta: 20,
                 min_achieved_negative_delta: 60,

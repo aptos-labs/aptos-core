@@ -211,7 +211,7 @@ where
 
     let baseline = Baseline::new(transactions.as_slice(), test_group);
     // Only testing data, provide executable type ().
-    let map = MVHashMap::<KeyType<K>, usize, Value<V>, ExecutableTestType>::new();
+    let map = MVHashMap::<KeyType<K>, usize, Value<V>, ExecutableTestType, ()>::new();
 
     // make ESTIMATE placeholders for all versions to be updated.
     // allows to test that correct values appear at the end of concurrent execution.

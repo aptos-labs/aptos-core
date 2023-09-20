@@ -59,7 +59,7 @@ pub(crate) fn build_change_set(
     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
-    aggregator_v2_change_set: impl IntoIterator<Item = (AggregatorID, AggregatorChange)>,
+    aggregator_v2_change_set: impl IntoIterator<Item = (AggregatorID, AggregatorChange<AggregatorID>)>,
 ) -> VMChangeSet {
     VMChangeSet::new(
         HashMap::from_iter(resource_write_set),
@@ -79,7 +79,7 @@ pub(crate) fn build_vm_output(
     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
-    aggregator_v2_change_set: impl IntoIterator<Item = (AggregatorID, AggregatorChange)>,
+    aggregator_v2_change_set: impl IntoIterator<Item = (AggregatorID, AggregatorChange<AggregatorID>)>,
 ) -> VMOutput {
     const GAS_USED: u64 = 100;
     const STATUS: TransactionStatus = TransactionStatus::Keep(ExecutionStatus::Success);

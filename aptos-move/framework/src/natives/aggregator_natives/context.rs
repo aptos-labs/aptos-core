@@ -29,7 +29,7 @@ pub enum AggregatorChangeV1 {
 /// user, e.g. VM session.
 pub struct AggregatorChangeSet {
     pub aggregator_v1_changes: HashMap<StateKey, AggregatorChangeV1>,
-    pub aggregator_v2_changes: HashMap<AggregatorID, AggregatorChange>,
+    pub aggregator_v2_changes: HashMap<AggregatorID, AggregatorChange<AggregatorID>>,
 }
 
 /// Native context that can be attached to VM `NativeContextExtensions`.

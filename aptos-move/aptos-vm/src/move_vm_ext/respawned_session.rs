@@ -7,8 +7,9 @@ use crate::{
     AptosVM,
 };
 use aptos_aggregator::{
+    aggregator_change_set::{AggregatorChange, ApplyBase},
     resolver::{AggregatorReadMode, TAggregatorView},
-    types::AggregatorID,
+    types::{AggregatorID, AggregatorValue},
 };
 use aptos_gas_algebra::Fee;
 use aptos_state_view::StateViewId;
@@ -135,6 +136,29 @@ impl<'r> TAggregatorView for ExecutorViewWithChangeSet<'r> {
                 Some(write_op) => Ok(write_op.as_state_value()),
                 None => self.base.get_aggregator_v1_state_value(id, mode),
             },
+        }
+    }
+
+    fn get_aggregator_v2_value(
+        &self,
+        id: &Self::IdentifierV2,
+        mode: AggregatorReadMode,
+    ) -> anyhow::Result<AggregatorValue> {
+        use AggregatorChange::*;
+
+        match self.change_set.aggregator_v2_change_set().get(id) {
+            Some(Create(value)) => Ok(value.clone()),
+            Some(Apply(apply)) => {
+                let base_value = match apply.get_apply_base_id(id) {
+                    ApplyBase::Previous(base_id) => {
+                        self.base.get_aggregator_v2_value(&base_id, mode)?
+                    },
+                    // For Current, call on self to include current change!
+                    ApplyBase::Current(base_id) => self.get_aggregator_v2_value(&base_id, mode)?,
+                };
+                Ok(apply.apply_to_base(base_value)?)
+            },
+            None => self.base.get_aggregator_v2_value(id, mode),
         }
     }
 }

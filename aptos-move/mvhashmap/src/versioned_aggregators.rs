@@ -5,53 +5,60 @@ use crate::types::{AtomicTxnIndex, MVAggregatorsError, TxnIndex};
 use aptos_aggregator::{
     aggregator_change_set::{AggregatorApplyChange, ApplyBase},
     delta_change_set::DeltaOp,
-    types::{AggregatorID, AggregatorValue},
+    types::AggregatorValue,
 };
 use claims::{assert_matches, assert_none};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
     collections::btree_map::{BTreeMap, Entry},
+    fmt::Debug,
+    hash::Hash,
     iter::DoubleEndedIterator,
     sync::atomic::Ordering,
 };
+
+pub enum CommitError {
+    CodeInvariantError(String),
+    ReExecutionNeeded(String),
+}
 
 // When an AggregatorEntry (see below) is transformed to an Estimate, internally we store
 // a potential bypass (based on the previously stored entry), which may allow a read
 // operation to not wait for the corresponding dependency.
 #[derive(Clone, Debug, PartialEq)]
-enum EstimatedEntry {
+enum EstimatedEntry<K: Clone> {
     NoBypass,
     // If applicable, can bypass the Estimate by considering a apply change instead.
-    Bypass(AggregatorApplyChange),
+    Bypass(AggregatorApplyChange<K>),
 }
 
 // There is no explicit deletion as it will be impossible to resolve the ID of a deleted
 // aggregator (as the ID will not be contained in a resource anymore). The write on the
 // previously holding resource and Block-STM read validation ensures correctness.
 #[derive(Debug)]
-enum AggregatorEntry {
+enum AggregatorEntry<K: Clone> {
     // If the value is determined by a delta applied to a value read during the execution
     // of the same transaction, the delta may also be kept in the entry. This is useful
     // if speculative execution aborts and the entry is marked as estimate, as the delta
     // may be used to avoid waiting on the Estimate entry. More in comments below.
-    Value(AggregatorValue, Option<AggregatorApplyChange>),
+    Value(AggregatorValue, Option<AggregatorApplyChange<K>>),
     // Applies the change on top of the previous entry - either for the same ID corresponding
     // to this change, or for the apply_base_id given by the change, at a specific point defined
     // by the it's ApplyBase.
-    Apply(AggregatorApplyChange),
+    Apply(AggregatorApplyChange<K>),
     // Marks the entry as an estimate, indicating that the next incarnation of the
     // transaction is estimated to populate the entry. May contain a bypass internally
     // (allowing a read operation to avoid waiting for the corresponding dependency),
     // encapulated by the EstimatedEntry.
-    Estimate(EstimatedEntry),
+    Estimate(EstimatedEntry<K>),
 }
 
 // A VersionedValue internally contains a BTreeMap from indices of transactions
 // that update a given aggregator, alongside the corresponding entries.
 #[derive(Debug)]
-struct VersionedValue {
-    versioned_map: BTreeMap<TxnIndex, CachePadded<AggregatorEntry>>,
+struct VersionedValue<K: Clone> {
+    versioned_map: BTreeMap<TxnIndex, CachePadded<AggregatorEntry<K>>>,
 
     // The value of the given aggregator prior to the block execution. None implies that
     // the aggregator did not exist prior to the block.
@@ -64,15 +71,15 @@ struct VersionedValue {
 }
 
 #[derive(Debug, PartialEq)]
-enum VersionedRead {
+enum VersionedRead<K: Clone> {
     Value(AggregatorValue),
     // The transaction index records the index at which the Snapshot was encountered.
     // This is required for the caller to resolve the value of the aggregator (with the
     // recorded id) from which the snapshot was created at the correct version (index).
-    DependentApply(AggregatorID, TxnIndex, AggregatorApplyChange),
+    DependentApply(K, TxnIndex, AggregatorApplyChange<K>),
 }
 
-impl VersionedValue {
+impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
     // VersionedValue should only be created when base value of the corresponding aggregator
     // is known & provided to the constructor.
     fn new(base_value: Option<AggregatorValue>) -> Self {
@@ -115,7 +122,7 @@ impl VersionedValue {
         self.read_estimate_deltas = false;
     }
 
-    fn insert(&mut self, txn_idx: TxnIndex, entry: AggregatorEntry) {
+    fn insert(&mut self, txn_idx: TxnIndex, entry: AggregatorEntry<K>) {
         use AggregatorApplyChange::*;
         use AggregatorEntry::*;
         use EstimatedEntry::*;
@@ -200,7 +207,7 @@ impl VersionedValue {
     // precedence over a DeltaApplicationError.
     fn apply_delta_suffix(
         &self,
-        iter: &mut dyn DoubleEndedIterator<Item = (&TxnIndex, &CachePadded<AggregatorEntry>)>,
+        iter: &mut dyn DoubleEndedIterator<Item = (&TxnIndex, &CachePadded<AggregatorEntry<K>>)>,
         delta: DeltaOp,
     ) -> Result<u128, MVAggregatorsError> {
         use AggregatorApplyChange::*;
@@ -253,7 +260,7 @@ impl VersionedValue {
     // Reads a given aggregator value at a given version (transaction index) and produces
     // a ReadResult if successful, which is either a u128 value, or a snapshot specifying
     // a different aggregator (with ID) at a given version and a delta to apply on top.
-    fn read(&self, txn_idx: TxnIndex) -> Result<VersionedRead, MVAggregatorsError> {
+    fn read(&self, txn_idx: TxnIndex) -> Result<VersionedRead<K>, MVAggregatorsError> {
         use AggregatorApplyChange::*;
         use AggregatorEntry::*;
         use EstimatedEntry::*;
@@ -275,6 +282,8 @@ impl VersionedValue {
                 (Apply(apply), _) | (Estimate(Bypass(apply)), true) => {
                     match apply.get_apply_base_id_option() {
                         None => {
+                            // If read encounters a delta, it must traverse the block of transactions
+                            // (top-down) until it encounters a value or use the base value.
                             if let AggregatorDelta { delta } = apply {
                                 self.apply_delta_suffix(&mut iter, *delta)
                                     .map(AggregatorValue::Aggregator)
@@ -322,15 +331,15 @@ impl VersionedValue {
 /// between Aggregator and AggregatorSnapshot. It is easy to provide this property from the
 /// caller side, even if IDs are re-used (say among incarnations) by e.g. assigning odd and
 /// even ids to Aggregators and AggregatorSnapshots, and it allows asserting the uses strictly.
-pub struct VersionedAggregators {
-    values: DashMap<AggregatorID, VersionedValue>,
+pub struct VersionedAggregators<K: Clone> {
+    values: DashMap<K, VersionedValue<K>>,
 
     /// No deltas are allowed below next_idx_to_commit version, as all deltas (and snapshots)
     /// must be materialized and converted to Values during commit.
     next_idx_to_commit: AtomicTxnIndex,
 }
 
-impl VersionedAggregators {
+impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
     // TODO: integrate into the rest of the system.
     #[allow(dead_code)]
     /// Part of the big multi-versioned data-structure, which creates different types of
@@ -349,7 +358,7 @@ impl VersionedAggregators {
     ///
     /// Setting base value multiple times, even concurrently, is okay for the same ID,
     /// because the corresponding value prior to the block is fixed.
-    pub fn set_base_value(&self, id: AggregatorID, base_value: AggregatorValue) {
+    pub fn set_base_value(&self, id: K, base_value: AggregatorValue) {
         self.values
             .entry(id)
             .or_insert(VersionedValue::new(Some(base_value)));
@@ -357,12 +366,9 @@ impl VersionedAggregators {
 
     /// Must be called when an aggregator creation with a given ID and initial value is observed
     /// in the outputs of txn_idx.
-    pub fn create_aggregator(&self, id: AggregatorID, txn_idx: TxnIndex, value: u128) {
+    pub fn create_aggregator(&self, id: K, txn_idx: TxnIndex, value: AggregatorValue) {
         let mut created = VersionedValue::new(None);
-        created.insert(
-            txn_idx,
-            AggregatorEntry::Value(AggregatorValue::Aggregator(value), None),
-        );
+        created.insert(txn_idx, AggregatorEntry::Value(value, None));
 
         assert_none!(
             self.values.insert(id, created),
@@ -374,11 +380,7 @@ impl VersionedAggregators {
     /// a particular aggregator ID, an invocation of either create_aggregator (for newly created
     /// aggregators), or set_base_value (for existing aggregators) must have been completed.
 
-    pub fn read(
-        &self,
-        id: AggregatorID,
-        txn_idx: TxnIndex,
-    ) -> Result<AggregatorValue, MVAggregatorsError> {
+    pub fn read(&self, id: K, txn_idx: TxnIndex) -> Result<AggregatorValue, MVAggregatorsError> {
         let read_res = self
             .values
             .get(&id)
@@ -404,7 +406,7 @@ impl VersionedAggregators {
     /// transaction may not be committed yet, and there is no reason to provide txn_idx.
     pub fn read_latest_committed_value(
         &self,
-        id: AggregatorID,
+        id: K,
     ) -> Result<AggregatorValue, MVAggregatorsError> {
         self.values
             .get_mut(&id)
@@ -423,10 +425,10 @@ impl VersionedAggregators {
     /// Upon commit Snapshot and Delta entries are all required to be replaced with Values.
     pub fn record_value(
         &self,
-        id: AggregatorID,
+        id: K,
         txn_idx: TxnIndex,
         value: AggregatorValue,
-        maybe_apply: Option<AggregatorApplyChange>,
+        maybe_apply: Option<AggregatorApplyChange<K>>,
     ) {
         self.values
             .get_mut(&id)
@@ -434,30 +436,175 @@ impl VersionedAggregators {
             .insert(txn_idx, AggregatorEntry::Value(value, maybe_apply));
     }
 
-    pub fn record_apply(&self, id: AggregatorID, txn_idx: TxnIndex, apply: AggregatorApplyChange) {
+    pub fn record_apply(&self, id: K, txn_idx: TxnIndex, apply: AggregatorApplyChange<K>) {
         self.values
             .get_mut(&id)
             .expect("VersionedValue for an (resolved) ID must already exist")
             .insert(txn_idx, AggregatorEntry::Apply(apply));
     }
 
-    pub fn mark_estimate(&self, id: AggregatorID, txn_idx: TxnIndex) {
+    pub fn mark_estimate(&self, id: K, txn_idx: TxnIndex) {
         self.values
             .get_mut(&id)
             .expect("VersionedValue for an (resolved) ID must already exist")
             .mark_estimate(txn_idx);
     }
 
-    pub fn remove(&self, id: AggregatorID, txn_idx: TxnIndex) {
+    pub fn remove(&self, id: K, txn_idx: TxnIndex) {
         self.values
             .get_mut(&id)
             .expect("VersionedValue for an (resolved) ID must already exist")
             .remove(txn_idx);
     }
 
-    pub fn update_committed_idx(&self, committed_idx: TxnIndex) {
+    pub fn try_commit(&self, idx_to_commit: TxnIndex, ids: Vec<K>) -> Result<(), CommitError> {
+        // we may not need to return values here, we can just read them.
+        use AggregatorApplyChange::*;
+
+        if idx_to_commit != self.next_idx_to_commit.load(Ordering::SeqCst) {
+            return Err(CommitError::CodeInvariantError(
+                "idx_to_commit must be next_idx_to_commit".to_string(),
+            ));
+        }
+
+        let mut derived_ids = Vec::new();
+
+        for id in ids {
+            let mut versioned_value = self
+                .values
+                .get_mut(&id)
+                .expect("Value in commit needs to be in the HashMap");
+            let entry_to_commit = versioned_value
+                .versioned_map
+                .get(&idx_to_commit)
+                .expect("Value in commit at that transaction version needs to be in the HashMap");
+
+            let new_entry = match &**entry_to_commit {
+                AggregatorEntry::Value(_, _) => None,
+                AggregatorEntry::Apply(AggregatorDelta { delta }) => {
+                    let prev_value = versioned_value.read_latest_committed_value(idx_to_commit)
+                        .map_err(|e| CommitError::CodeInvariantError(format!("Cannot read latest committed value for Apply(AggregatorDelta) during commit: {:?}", e)))?;
+                    if let AggregatorValue::Aggregator(base) = prev_value {
+                        let new_value = delta.apply_to(base).map_err(|e| {
+                            CommitError::ReExecutionNeeded(format!(
+                                "Failed to apply delta to base: {:?}",
+                                e
+                            ))
+                        })?;
+                        Some(AggregatorEntry::Value(
+                            AggregatorValue::Aggregator(new_value),
+                            Some(AggregatorDelta { delta: *delta }),
+                        ))
+                    } else {
+                        return Err(CommitError::CodeInvariantError(
+                            "Cannot apply delta to non-AggregatorValue::Aggregator".to_string(),
+                        ));
+                    }
+                },
+                AggregatorEntry::Apply(SnapshotDelta {
+                    base_aggregator,
+                    delta,
+                }) => {
+                    let prev_value = self.values
+                        .get_mut(base_aggregator)
+                        .ok_or_else(|| CommitError::CodeInvariantError("Cannot find base_aggregator for Apply(SnapshotDelta) during commit".to_string()))?
+                        .read_latest_committed_value(idx_to_commit)
+                        .map_err(|e| CommitError::CodeInvariantError(format!("Cannot read latest committed value for base aggregator for ApplySnapshotDelta) during commit: {:?}", e)))?;
+
+                    if let AggregatorValue::Aggregator(base) = prev_value {
+                        let new_value = delta.apply_to(base).map_err(|e| {
+                            CommitError::ReExecutionNeeded(format!(
+                                "Failed to apply delta to base: {:?}",
+                                e
+                            ))
+                        })?;
+                        Some(AggregatorEntry::Value(
+                            AggregatorValue::Snapshot(new_value),
+                            Some(SnapshotDelta {
+                                base_aggregator: *base_aggregator,
+                                delta: *delta,
+                            }),
+                        ))
+                    } else {
+                        return Err(CommitError::CodeInvariantError(
+                            "Cannot apply delta to non-AggregatorValue::Aggregator".to_string(),
+                        ));
+                    }
+                },
+                AggregatorEntry::Apply(SnapshotDerived { .. }) => {
+                    // Because Derived values can depend on the current value, we need to compute other values before it.
+                    derived_ids.push(id);
+                    None
+                },
+                AggregatorEntry::Estimate(_) => {
+                    return Err(CommitError::CodeInvariantError(
+                        "Cannot commit an estimate".to_string(),
+                    ))
+                },
+            };
+
+            if let Some(new_entry) = new_entry {
+                versioned_value.insert(idx_to_commit, new_entry);
+            }
+        }
+
+        for id in derived_ids {
+            let mut versioned_value = self
+                .values
+                .get_mut(&id)
+                .expect("Value in commit needs to be in the HashMap");
+            let entry_to_commit = versioned_value
+                .versioned_map
+                .get(&idx_to_commit)
+                .expect("Value in commit at that transaction version needs to be in the HashMap");
+            let new_entry = match &**entry_to_commit {
+                AggregatorEntry::Apply(SnapshotDerived {
+                    base_snapshot,
+                    formula,
+                }) => {
+                    let prev_value = self.values
+                        .get_mut(base_snapshot)
+                        .ok_or_else(|| CommitError::CodeInvariantError("Cannot find base_aggregator for Apply(SnapshotDelta) during commit".to_string()))?
+                        // Read values committed in this commit
+                        .read_latest_committed_value(idx_to_commit + 1)
+                        .map_err(|e| CommitError::CodeInvariantError(format!("Cannot read latest committed value for base aggregator for ApplySnapshotDelta) during commit: {:?}", e)))?;
+
+                    if let AggregatorValue::Snapshot(base) = prev_value {
+                        let new_value = formula.apply(base);
+                        AggregatorEntry::Value(
+                            AggregatorValue::Derived(new_value),
+                            Some(SnapshotDerived {
+                                base_snapshot: *base_snapshot,
+                                formula: formula.clone(),
+                            }),
+                        )
+                    } else {
+                        return Err(CommitError::CodeInvariantError(
+                            "Cannot apply delta to non-AggregatorValue::Aggregator".to_string(),
+                        ));
+                    }
+                },
+                _ => unreachable!("We've only added derived values into derived_ids"),
+            };
+
+            versioned_value.insert(idx_to_commit, new_entry);
+        }
+
         self.next_idx_to_commit
-            .fetch_max(committed_idx + 1, Ordering::SeqCst);
+            .compare_exchange(
+                idx_to_commit,
+                idx_to_commit + 1,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
+            .map_err(|v| {
+                CommitError::CodeInvariantError(format!(
+                    "Cannot update next_idx_to_commit, it must be idx_to_commit ({}), but is {}",
+                    idx_to_commit, v
+                ))
+            })?;
+
+        Ok(())
     }
 }
 
@@ -465,8 +612,10 @@ impl VersionedAggregators {
 mod test {
     use super::*;
     use aptos_aggregator::{
-        bounded_math::SignedU128, delta_change_set::DeltaOp, delta_math::DeltaHistory,
-        types::SnapshotToStringFormula,
+        bounded_math::SignedU128,
+        delta_change_set::DeltaOp,
+        delta_math::DeltaHistory,
+        types::{AggregatorID, SnapshotToStringFormula},
     };
     use claims::{assert_err_eq, assert_ok_eq, assert_some};
     use test_case::test_case;
@@ -507,7 +656,7 @@ mod test {
         }
     }
 
-    fn aggregator_entry(type_index: usize) -> Option<AggregatorEntry> {
+    fn aggregator_entry(type_index: usize) -> Option<AggregatorEntry<AggregatorID>> {
         match type_index {
             NO_ENTRY => None,
             VALUE_AGGREGATOR => Some(AggregatorEntry::Value(
@@ -541,7 +690,10 @@ mod test {
         }
     }
 
-    fn aggregator_entry_aggregator_value_and_delta(value: u128, delta: DeltaOp) -> AggregatorEntry {
+    fn aggregator_entry_aggregator_value_and_delta(
+        value: u128,
+        delta: DeltaOp,
+    ) -> AggregatorEntry<AggregatorID> {
         AggregatorEntry::Value(
             AggregatorValue::Aggregator(value),
             Some(AggregatorApplyChange::AggregatorDelta { delta }),
@@ -552,7 +704,7 @@ mod test {
         value: u128,
         delta: DeltaOp,
         base_aggregator: AggregatorID,
-    ) -> AggregatorEntry {
+    ) -> AggregatorEntry<AggregatorID> {
         AggregatorEntry::Value(
             AggregatorValue::Snapshot(value),
             Some(AggregatorApplyChange::SnapshotDelta {
@@ -566,7 +718,7 @@ mod test {
         value: Vec<u8>,
         formula: SnapshotToStringFormula,
         base_snapshot: AggregatorID,
-    ) -> AggregatorEntry {
+    ) -> AggregatorEntry<AggregatorID> {
         AggregatorEntry::Value(
             AggregatorValue::Derived(value),
             Some(AggregatorApplyChange::SnapshotDerived {
