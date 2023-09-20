@@ -680,16 +680,37 @@ impl MoveHarness {
 /// Helper to assert transaction is successful
 #[macro_export]
 macro_rules! assert_success {
-    ($s:expr) => {{
-        use aptos_types::transaction::*;
-        assert_eq!($s, TransactionStatus::Keep(ExecutionStatus::Success))
+    ($s:expr $(,)?) => {{
+        assert_eq!($s, aptos_types::transaction::TransactionStatus::Keep(
+            aptos_types::transaction::ExecutionStatus::Success))
+    }};
+    ($s:expr, $($arg:tt)+) => {{
+        assert_eq!(
+            $s,
+            aptos_types::transaction::TransactionStatus::Keep(
+                aptos_types::transaction::ExecutionStatus::Success),
+            $($arg)+
+        )
     }};
 }
 
 /// Helper to assert transaction aborts.
 #[macro_export]
 macro_rules! assert_abort {
-    ($s:expr, $c:pat) => {{
+    // identity needs to be before pattern (both with and without message),
+    // as if we pass variable - it matches the pattern arm, but value is not used, but overriden.
+    // Opposite order and test_asserts_variable_used / test_asserts_variable_used_with_message tests
+    // would fail
+    ($s:expr, $c:ident $(,)?) => {{
+        assert!(matches!(
+            $s,
+            aptos_types::transaction::TransactionStatus::Keep(
+                aptos_types::transaction::ExecutionStatus::MoveAbort { code, .. }
+            )
+            if code == $c,
+        ));
+    }};
+    ($s:expr, $c:pat $(,)?) => {{
         assert!(matches!(
             $s,
             aptos_types::transaction::TransactionStatus::Keep(
@@ -697,23 +718,54 @@ macro_rules! assert_abort {
             ),
         ));
     }};
+    ($s:expr, $c:ident, $($arg:tt)+) => {{
+        assert!(
+            matches!(
+                $s,
+                aptos_types::transaction::TransactionStatus::Keep(
+                    aptos_types::transaction::ExecutionStatus::MoveAbort { code, .. }
+                )
+                if code == $c,
+            ),
+            $($arg)+
+        );
+    }};
+    ($s:expr, $c:pat, $($arg:tt)+) => {{
+        assert!(
+            matches!(
+                $s,
+                aptos_types::transaction::TransactionStatus::Keep(
+                    aptos_types::transaction::ExecutionStatus::MoveAbort { code: $c, .. }
+                ),
+            ),
+            $($arg)+
+        );
+    }};
 }
 
 /// Helper to assert vm status code.
 #[macro_export]
 macro_rules! assert_vm_status {
-    ($s:expr, $c:expr) => {{
+    ($s:expr, $c:expr $(,)?) => {{
         use aptos_types::transaction::*;
         assert_eq!(
             $s,
             TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some($c)))
         );
     }};
+    ($s:expr, $c:expr, $($arg:tt)+) => {{
+        use aptos_types::transaction::*;
+        assert_eq!(
+            $s,
+            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some($c))),
+            $($arg)+,
+        );
+    }};
 }
 
 #[macro_export]
 macro_rules! assert_move_abort {
-    ($s:expr, $c:ident) => {{
+    ($s:expr, $c:ident $(,)?) => {{
         use aptos_types::transaction::*;
         assert!(match $s {
             TransactionStatus::Keep(ExecutionStatus::MoveAbort {
@@ -724,4 +776,81 @@ macro_rules! assert_move_abort {
             _ => false,
         });
     }};
+    ($s:expr, $c:ident, $($arg:tt)+) => {{
+        use aptos_types::transaction::*;
+        assert!(
+            match $s {
+                TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                    location: _,
+                    code: _,
+                    info,
+                }) => info == $c,
+                _ => false,
+            },
+            $($arg)+
+        );
+    }};
+}
+
+#[cfg(test)]
+mod tests {
+    use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
+    use move_core_types::vm_status::AbortLocation;
+
+    #[test]
+    fn test_asserts() {
+        let success = TransactionStatus::Keep(ExecutionStatus::Success);
+
+        let abort_13 = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+            code: 13,
+            location: AbortLocation::Script,
+            info: None,
+        });
+
+        assert_success!(success);
+        assert_success!(success,);
+        assert_success!(success, "success");
+        assert_success!(success, "message {}", 0);
+        assert_success!(success, "message {}", 0,);
+
+        let x = 13;
+        assert_abort!(abort_13, 13);
+        assert_abort!(abort_13, 13,);
+        assert_abort!(abort_13, x);
+        assert_abort!(abort_13, _);
+        assert_abort!(abort_13, 13 | 14);
+        assert_abort!(abort_13, 13, "abort");
+        assert_abort!(abort_13, 13, "abort {}", 0);
+        assert_abort!(abort_13, x, "abort");
+        assert_abort!(abort_13, x, "abort {}", 0);
+        assert_abort!(abort_13, _, "abort");
+        assert_abort!(abort_13, 13 | 14, "abort");
+        assert_abort!(abort_13, 13 | 14, "abort",);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_asserts_variable_used() {
+        let abort_13 = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+            code: 13,
+            location: AbortLocation::Script,
+            info: None,
+        });
+
+        let x = 14;
+        assert_abort!(abort_13, x);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_asserts_variable_used_with_message() {
+        let abort_13 = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+            code: 13,
+            location: AbortLocation::Script,
+            info: None,
+        });
+
+        let x = 14;
+        assert_abort!(abort_13, x, "abort");
+    }
 }
