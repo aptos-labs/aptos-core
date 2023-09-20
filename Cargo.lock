@@ -590,6 +590,7 @@ dependencies = [
  "criterion",
  "crossbeam",
  "dashmap",
+ "derivative",
  "itertools",
  "move-binary-format",
  "move-core-types",
@@ -601,6 +602,7 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "serde",
+ "test-case",
 ]
 
 [[package]]
