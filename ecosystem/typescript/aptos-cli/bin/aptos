@@ -1,0 +1,69 @@
+#!/usr/bin/env node
+
+const { spawn } = require("child_process");
+const fs = require("fs");
+const os = require("os");
+
+const PNAME = "aptos-cli";
+const VERSION = "2.0.2";
+
+// Get all arguments passed to the script
+const getOS = () => {
+  const platform = os.platform();
+  switch (platform) {
+    case "darwin":
+      return "MacOSX";
+    case "linux":
+      return "Ubuntu";
+    case "win32":
+      return "Windows";
+    default:
+      throw new Error(`Unsupported OS ${platform}`);
+  }
+};
+
+const main = async () => {
+  const os = getOS();
+  const binaryName = `${PNAME}-${VERSION}-${os}`;
+
+  // If binary does not exist, download it
+  if (!fs.existsSync(`${__dirname}/${binaryName}`)) {
+    await new Promise((resolve, reject) => {
+      const url = `https://github.com/aptos-labs/aptos-core/releases/download/${PNAME}-v${VERSION}/${PNAME}-${VERSION}-${os}-x86_64.zip`;
+      console.log("Downloading aptos CLI...");
+      let downloadProcess;
+      if (os === "Windows") {
+        downloadProcess = spawnAsync(
+          `curl -L -o C:/tmp/aptos.zip ${url} & powershell Expand-Archive -Path C:/tmp/aptos.zip -DestinationPath C:/tmp -Force & move C:\\tmp\\aptos.exe ${__dirname}/${binaryName}`,
+          {
+            stdio: "inherit",
+            shell: true,
+          }
+        );
+      } else {
+        downloadProcess = spawn(
+          `curl -L -o /tmp/aptos.zip ${url}; unzip -o -q /tmp/aptos.zip -d /tmp; mv /tmp/aptos ${__dirname}/${binaryName};`,
+          {
+            stdio: "inherit",
+            shell: true,
+          }
+        );
+      }
+
+      downloadProcess.on("close", (code) => {
+        if (code !== 0) {
+          reject("Error occurred while downloading aptos CLI");
+        }
+        console.log("Download complete");
+        resolve();
+      });
+    });
+  }
+
+  // Spawn a child process to execute the binary with the provided arguments
+  spawn(`${__dirname}/${binaryName}`, process.argv.slice(2), {
+    stdio: "inherit",
+  });
+};
+
+main().catch(console.error);
