@@ -296,6 +296,22 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
             })
     }
 
+    pub(crate) fn aggregator_v2_keys(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<impl Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Identifier>>
+    {
+        self.outputs[txn_idx as usize]
+            .load()
+            .as_ref()
+            .and_then(|txn_output| match &txn_output.output_status {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    Some(t.aggregator_v2_change_set().into_keys())
+                },
+                ExecutionStatus::Abort(_) => None,
+            })
+    }
+
     pub(crate) fn delta_keys(
         &self,
         txn_idx: TxnIndex,

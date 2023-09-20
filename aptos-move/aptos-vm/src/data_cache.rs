@@ -12,7 +12,7 @@ use crate::{
 use anyhow::{bail, Error};
 use aptos_aggregator::{
     resolver::{AggregatorReadMode, TAggregatorView},
-    types::AggregatorID,
+    types::{AggregatorID, AggregatorValue},
 };
 use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
@@ -335,6 +335,14 @@ impl<'e, E: ExecutorView> TAggregatorView for StorageAdapter<'e, E> {
         mode: AggregatorReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         self.executor_view.get_aggregator_v1_state_value(id, mode)
+    }
+
+    fn get_aggregator_v2_value(
+        &self,
+        id: &Self::IdentifierV2,
+        mode: AggregatorReadMode,
+    ) -> anyhow::Result<AggregatorValue> {
+        self.executor_view.get_aggregator_v2_value(id, mode)
     }
 }
 

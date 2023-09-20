@@ -12,6 +12,7 @@ use aptos_types::{
 };
 use serde::Serialize;
 use std::{fmt::Debug, hash::Hash};
+use versioned_aggregators::VersionedAggregators;
 
 pub mod types;
 pub mod unsync_map;
@@ -33,10 +34,11 @@ mod unit_tests;
 ///
 /// TODO: separate V into different generic types for data and code modules with specialized
 /// traits (currently both WriteOp for executor).
-pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable> {
+pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     data: VersionedData<K, V>,
     group_data: VersionedGroupData<K, T, V>,
     modules: VersionedModules<K, V, X>,
+    aggregators: VersionedAggregators<I>,
 }
 
 impl<
@@ -44,16 +46,18 @@ impl<
         T: Hash + Clone + Eq + Debug + Serialize,
         V: TransactionWrite,
         X: Executable,
-    > MVHashMap<K, T, V, X>
+        I: Copy + Clone + Eq + Hash + Debug,
+    > MVHashMap<K, T, V, X, I>
 {
     // -----------------------------------
     // Functions shared for data and modules.
 
-    pub fn new() -> MVHashMap<K, T, V, X> {
+    pub fn new() -> MVHashMap<K, T, V, X, I> {
         MVHashMap {
             data: VersionedData::new(),
             group_data: VersionedGroupData::new(),
             modules: VersionedModules::new(),
+            aggregators: VersionedAggregators::new(),
         }
     }
 
@@ -71,6 +75,10 @@ impl<
     pub fn modules(&self) -> &VersionedModules<K, V, X> {
         &self.modules
     }
+
+    pub fn aggregators(&self) -> &VersionedAggregators<I> {
+        &self.aggregators
+    }
 }
 
 impl<
@@ -78,7 +86,8 @@ impl<
         T: Hash + Clone + Debug + Eq + Serialize,
         V: TransactionWrite,
         X: Executable,
-    > Default for MVHashMap<K, T, V, X>
+        I: Copy + Clone + Eq + Hash + Debug,
+    > Default for MVHashMap<K, T, V, X, I>
 {
     fn default() -> Self {
         Self::new()
