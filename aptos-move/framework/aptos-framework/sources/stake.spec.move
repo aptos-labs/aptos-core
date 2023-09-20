@@ -208,7 +208,7 @@ spec aptos_framework::stake {
                 validator_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals + 1);
     }
 
- spec update_stake_pool {
+    spec update_stake_pool {
         // Takes 30s to verify
         include ResourceRequirement;
         include staking_config::StakingRewardsConfigRequirement;
@@ -364,7 +364,7 @@ spec aptos_framework::stake {
         include AddStakeAbortsIfAndEnsures;
     }
 
-   spec initialize_stake_owner {
+    spec initialize_stake_owner {
         include ResourceRequirement;
     }
 
