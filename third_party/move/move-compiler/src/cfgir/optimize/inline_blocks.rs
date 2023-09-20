@@ -68,7 +68,6 @@ fn inline_single_target_blocks(
 ) -> bool {
     //cleanup of needless_collect would result in mut and non mut borrows, and compilation warning.
     let labels_vec = blocks.keys().cloned().collect::<Vec<_>>();
-    let mut changed = false;
 
     // all blocks
     let mut working_blocks = std::mem::take(blocks);
@@ -88,13 +87,6 @@ fn inline_single_target_blocks(
             },
             Some(b) => b,
         };
-
-        // If cur will be merged into another block, skip it for now.
-        if single_jump_targets.contains(&cur) {
-            next = labels.next();
-            finished_blocks.insert(cur, block);
-            continue;
-        }
 
         match block.back().unwrap() {
             // Do not need to worry about infinitely unwrapping loops as loop heads will always
@@ -123,7 +115,6 @@ fn inline_single_target_blocks(
                         };
                     },
                 };
-                changed = true;
                 // put cur's block back into working_blocks, as we will revisit it on next iter.
                 working_blocks.insert(cur, block);
                 // Note that target block is droppped.
@@ -135,8 +126,9 @@ fn inline_single_target_blocks(
         }
     }
 
-    // let changed = !remapping.is_empty();
-    remap_to_last_target(remapping, start, &mut working_blocks);
+
+    let changed = !remapping.is_empty();
+    remap_to_last_target(remapping, start, finished_blocks);
     changed
 }
 
@@ -165,9 +157,18 @@ fn remap_to_last_target(
     if remapping.is_empty() {
         return;
     }
-    // populate remapping for non changed blocks
+    // populate remapping for non changed blocks, and also
+    // close transitive chains (lab1 -> lab2 -> lab3 becomes lab1 -> lab3).
     for label in blocks.keys() {
-        remapping.entry(*label).or_insert(*label);
+        let mut label2 = *label;
+        while let Some(target) = remapping.get(&label2) {
+            // proceed until label2 has no mapping, or is self-mapping.
+            if label2 == *target {
+                break;
+            }
+            label2 = *target;
+        }
+        remapping.entry(*label).or_insert(label2);
     }
     let owned_blocks = std::mem::take(blocks);
     let (_start, remapped_blocks) = remap_labels(&remapping, start, owned_blocks);
