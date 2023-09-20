@@ -17,9 +17,10 @@ use move_binary_format::{
     file_format::{CompiledModule, CompiledScript},
 };
 use move_core_types::{state::VMState, vm_status::StatusCode};
+use serde::Serialize;
 use std::time::Instant;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct VerifierConfig {
     pub max_loop_depth: Option<usize>,
     pub max_function_parameters: Option<usize>,

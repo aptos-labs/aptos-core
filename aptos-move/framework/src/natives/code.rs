@@ -8,7 +8,9 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
-use aptos_types::{transaction::ModuleBundle, vm_status::StatusCode};
+use aptos_types::{
+    on_chain_config::OnChainConfig, transaction::ModuleBundle, vm_status::StatusCode,
+};
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{account_address::AccountAddress, gas_algebra::NumBytes};
@@ -61,6 +63,11 @@ impl<T> MoveOption<T> {
 pub struct PackageRegistry {
     /// Packages installed at this address.
     pub packages: Vec<PackageMetadata>,
+}
+
+impl OnChainConfig for PackageRegistry {
+    const MODULE_IDENTIFIER: &'static str = "code";
+    const TYPE_IDENTIFIER: &'static str = "PackageRegistry";
 }
 
 /// The PackageMetadata type. This must be kept in sync with `code.move`. Documentation is
