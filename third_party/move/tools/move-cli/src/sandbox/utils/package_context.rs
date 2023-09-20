@@ -58,7 +58,7 @@ impl PackageContext {
             let self_id = module.self_id();
             let mut module_bytes = vec![];
             module.serialize_for_version(bytecode_version, &mut module_bytes)?;
-            serialized_modules.push((self_id, module_bytes));
+            serialized_modules.push((self_id, module_bytes.into()));
         }
         state.save_modules(&serialized_modules)?;
 

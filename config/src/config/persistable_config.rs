@@ -25,13 +25,7 @@ pub trait PersistableConfig: Serialize + DeserializeOwned {
         let serialized_config = serde_yaml::to_vec(&self)
             .map_err(|e| Error::Yaml(output_file.as_ref().to_str().unwrap().to_string(), e))?;
 
-        // Create the file and write the serialized config to the file
-        let mut file = File::create(output_file.as_ref())
-            .map_err(|e| Error::IO(output_file.as_ref().to_str().unwrap().to_string(), e))?;
-        file.write_all(&serialized_config)
-            .map_err(|e| Error::IO(output_file.as_ref().to_str().unwrap().to_string(), e))?;
-
-        Ok(())
+        Self::write_file(serialized_config, output_file)
     }
 
     /// Read the config at the given path and return the contents as a string
@@ -43,6 +37,16 @@ pub trait PersistableConfig: Serialize + DeserializeOwned {
                 config_path_string, error
             ))
         })
+    }
+
+    /// Create the file and write the serialized config to the file
+    fn write_file<P: AsRef<Path>>(serialized_config: Vec<u8>, output_file: P) -> Result<(), Error> {
+        let mut file = File::create(output_file.as_ref())
+            .map_err(|e| Error::IO(output_file.as_ref().to_str().unwrap().to_string(), e))?;
+        file.write_all(&serialized_config)
+            .map_err(|e| Error::IO(output_file.as_ref().to_str().unwrap().to_string(), e))?;
+
+        Ok(())
     }
 
     /// Parse the config from the serialized string

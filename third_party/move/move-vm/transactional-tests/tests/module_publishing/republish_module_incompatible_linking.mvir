@@ -4,7 +4,7 @@ module 0x42.Duplicate {
   public g() { label b0: return; }
 }
 
-//# publish
+//# publish --verbose
 module 0x42.Duplicate {
   public f() { label b0: return; }
   // cannot drop public functions

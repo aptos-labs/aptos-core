@@ -10,8 +10,8 @@ use crate::{
 use anyhow::Context;
 use aptos_config::{
     config::{
-        merge_node_config, ApiConfig, BaseConfig, DiscoveryMethod, ExecutionConfig, NetworkConfig,
-        NodeConfig, RoleType, WaypointConfig,
+        ApiConfig, BaseConfig, DiscoveryMethod, ExecutionConfig, NetworkConfig, NodeConfig,
+        OverrideNodeConfig, RoleType, WaypointConfig,
     },
     network_id::NetworkId,
 };
@@ -73,12 +73,12 @@ fn get_fullnode_image_from_validator_image(
 /// Create a ConfigMap with the given NodeConfig, with a constant key
 async fn create_node_config_configmap(
     node_config_config_map_name: String,
-    node_config: &NodeConfig,
+    node_config: &OverrideNodeConfig,
 ) -> Result<ConfigMap> {
     let mut data: BTreeMap<String, String> = BTreeMap::new();
     data.insert(
         FULLNODE_CONFIG_MAP_KEY.to_string(),
-        serde_yaml::to_string(&node_config)?,
+        serde_yaml::to_string(&node_config.get_yaml()?)?,
     );
     let node_config_config_map = ConfigMap {
         binary_data: None,
@@ -337,27 +337,23 @@ pub async fn install_public_fullnode<'a>(
     persistent_volume_claim_api: Arc<dyn ReadWrite<PersistentVolumeClaim>>,
     service_api: Arc<dyn ReadWrite<Service>>,
     version: &'a Version,
-    node_config: &'a NodeConfig,
+    node_config: &'a OverrideNodeConfig,
     era: String,
     namespace: String,
     use_port_forward: bool,
     index: usize,
 ) -> Result<(PeerId, K8sNode)> {
-    let default_node_config = get_default_pfn_node_config();
-
-    let merged_node_config =
-        merge_node_config(default_node_config, serde_yaml::to_value(node_config)?)?;
-
-    let node_peer_id = node_config.get_peer_id().unwrap_or_else(PeerId::random);
+    let node_peer_id = node_config
+        .override_config()
+        .get_peer_id()
+        .unwrap_or_else(PeerId::random);
     let fullnode_name = format!("public-fullnode-{}-{}", index, node_peer_id.short_str());
 
     // create the NodeConfig configmap
     let fullnode_node_config_config_map_name = format!("{}-config", fullnode_name.clone());
-    let fullnode_node_config_config_map = create_node_config_configmap(
-        fullnode_node_config_config_map_name.clone(),
-        &merged_node_config,
-    )
-    .await?;
+    let fullnode_node_config_config_map =
+        create_node_config_configmap(fullnode_node_config_config_map_name.clone(), node_config)
+            .await?;
     configmap_api
         .create(&PostParams::default(), &fullnode_node_config_config_map)
         .await?;
@@ -621,10 +617,11 @@ mod tests {
     async fn test_create_node_config_map() {
         let config_map_name = "aptos-node-0-validator-0-config".to_string();
         let node_config = NodeConfig::default();
+        let override_config = OverrideNodeConfig::new_with_default_base(node_config.clone());
 
         // expect that the one we get is the same as the one we created
         let created_config_map =
-            create_node_config_configmap(config_map_name.clone(), &node_config)
+            create_node_config_configmap(config_map_name.clone(), &override_config)
                 .await
                 .unwrap();
 
@@ -739,6 +736,7 @@ mod tests {
         let mut node_config = get_default_pfn_node_config();
         node_config.full_node_networks[0].identity =
             Identity::from_config(PrivateKey::generate_for_testing(), peer_id);
+        let override_config = OverrideNodeConfig::new_with_default_base(node_config);
 
         let era = "42069".to_string();
         let namespace = "forge42069".to_string();
@@ -749,7 +747,7 @@ mod tests {
             persistent_volume_claim_api,
             service_api,
             &version,
-            &node_config,
+            &override_config,
             era,
             namespace,
             false,

@@ -15,7 +15,7 @@ use aptos_consensus_types::{
     proof_of_store::ProofOfStore,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::{Error::DataNotFound, *};
+use aptos_executor_types::{ExecutorError::DataNotFound, *};
 use aptos_logger::prelude::*;
 use aptos_types::transaction::SignedTransaction;
 use futures::{channel::mpsc::Sender, SinkExt};
@@ -36,7 +36,7 @@ impl PayloadManager {
         batch_store: &BatchStore<NetworkSender>,
     ) -> Vec<(
         HashValue,
-        oneshot::Receiver<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
+        oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
     )> {
         let mut receivers = Vec::new();
         for pos in proofs {
@@ -135,10 +135,7 @@ impl PayloadManager {
 
     /// Extract transaction and DKG Aggregated Node from a given block
     /// Assumes it is never called for the same block concurrently. Otherwise status can be None.
-    pub async fn get_transactions(
-        &self,
-        block: &Block,
-    ) -> Result<(Vec<SignedTransaction>, Option<DKGPayload>), Error> {
+    pub async fn get_transactions(&self, block: &Block) -> ExecutorResult<(Vec<SignedTransaction>, Option<DKGPayload>)> {
         let payload = match block.payload() {
             Some(p) => p,
             None => return Ok((Vec::new(), None)),

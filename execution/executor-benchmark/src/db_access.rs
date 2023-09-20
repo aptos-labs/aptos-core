@@ -2,32 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_state_view::TStateView;
-use aptos_storage_interface::{cached_state_view::CachedStateView, state_view::DbStateView};
+use aptos_state_view::StateView;
+use aptos_storage_interface::state_view::DbStateView;
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKey,
+    write_set::TOTAL_SUPPLY_STATE_KEY,
 };
 use move_core_types::{
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
 };
-use once_cell::sync::Lazy;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::str::FromStr;
-
-// Note: in case this changes in the future, it doesn't have to be a constant, and can be read from
-// genesis directly if necessary.
-pub static TOTAL_SUPPLY_STATE_KEY: Lazy<StateKey> = Lazy::new(|| {
-    StateKey::table_item(
-        "1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca"
-            .parse()
-            .unwrap(),
-        vec![
-            6, 25, 220, 41, 160, 170, 200, 250, 20, 103, 20, 5, 142, 141, 214, 210, 208, 243, 189,
-            245, 246, 51, 25, 7, 191, 145, 243, 172, 216, 30, 105, 53,
-        ],
-    )
-});
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct CoinStore {
@@ -120,25 +106,25 @@ impl DbAccessUtil {
 
     pub fn get_account(
         account_key: &StateKey,
-        state_view: &CachedStateView,
+        state_view: &impl StateView,
     ) -> Result<Option<Account>> {
         Self::get_value(account_key, state_view)
     }
 
     pub fn get_coin_store(
         coin_store_key: &StateKey,
-        state_view: &CachedStateView,
+        state_view: &impl StateView,
     ) -> Result<Option<CoinStore>> {
         Self::get_value(coin_store_key, state_view)
     }
 
     pub fn get_value<T: DeserializeOwned>(
         state_key: &StateKey,
-        state_view: &CachedStateView,
+        state_view: &impl StateView,
     ) -> Result<Option<T>> {
         let value = state_view
             .get_state_value_bytes(state_key)?
-            .map(move |value| bcs::from_bytes(value.as_slice()));
+            .map(move |value| bcs::from_bytes(&value));
         value.transpose().map_err(anyhow::Error::msg)
     }
 
@@ -146,9 +132,10 @@ impl DbAccessUtil {
         state_key: &StateKey,
         state_view: &DbStateView,
     ) -> Result<Option<T>> {
-        let value = state_view
-            .get_state_value(state_key)?
-            .map(move |value| bcs::from_bytes(value.into_bytes().as_slice()));
-        value.transpose().map_err(anyhow::Error::msg)
+        Self::get_value(state_key, state_view)
+    }
+
+    pub fn get_total_supply(state_view: &impl StateView) -> Result<Option<u128>> {
+        Self::get_value(&TOTAL_SUPPLY_STATE_KEY, state_view)
     }
 }

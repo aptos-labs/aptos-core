@@ -131,7 +131,6 @@ fullnode:
     full_node_networks:
       # The first item in the array `full_node_networks` must always refer to the public fullnode network
       - network_id: "public"
-        seeds: {}
 
 service:
   # -- If set, the base domain name to use for External DNS

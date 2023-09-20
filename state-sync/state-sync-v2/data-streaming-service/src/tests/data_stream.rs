@@ -6,8 +6,11 @@ use crate::{
     data_notification::{
         DataClientRequest, DataPayload, EpochEndingLedgerInfosRequest,
         NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
-        NewTransactionsWithProofRequest, PendingClientResponse, TransactionOutputsWithProofRequest,
-        TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
+        NewTransactionsWithProofRequest, PendingClientResponse,
+        SubscribeTransactionOutputsWithProofRequest,
+        SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
+        TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
+        TransactionsWithProofRequest,
     },
     data_stream::{DataStream, DataStreamListener},
     streaming_client::{
@@ -401,7 +404,7 @@ async fn test_continuous_stream_epoch_change_retry() {
         ..Default::default()
     };
 
-    // Test both types of continuous data streams
+    // Test all types of continuous data streams
     let (data_stream_1, _stream_listener_1) = create_continuous_transaction_stream(
         AptosDataClientConfig::default(),
         streaming_service_config,
@@ -462,80 +465,43 @@ async fn test_continuous_stream_epoch_change_retry() {
 
 #[tokio::test]
 async fn test_continuous_stream_optimistic_fetch_retry() {
-    // Create a test streaming service config
+    // Create a test streaming service config with subscriptions disabled
     let max_request_retry = 3;
     let max_concurrent_requests = 3;
     let streaming_service_config = DataStreamingServiceConfig {
+        enable_subscription_streaming: false,
         max_concurrent_requests,
         max_request_retry,
         ..Default::default()
     };
 
-    // Test both types of continuous data streams
-    let (data_stream_1, stream_listener_1) = create_continuous_transaction_stream(
+    // Test all types of continuous data streams
+    let continuous_data_streams = enumerate_continuous_data_streams(
         AptosDataClientConfig::default(),
         streaming_service_config,
-        MAX_ADVERTISED_TRANSACTION,
-        MAX_ADVERTISED_EPOCH_END,
     );
-    let (data_stream_2, stream_listener_2) = create_continuous_transaction_output_stream(
-        AptosDataClientConfig::default(),
-        streaming_service_config,
-        MAX_ADVERTISED_TRANSACTION_OUTPUT,
-        MAX_ADVERTISED_EPOCH_END,
-    );
-    let (data_stream_3, stream_listener_3) = create_continuous_transaction_or_output_stream(
-        AptosDataClientConfig::default(),
-        streaming_service_config,
-        MAX_ADVERTISED_TRANSACTION_OUTPUT,
-        MAX_ADVERTISED_EPOCH_END,
-    );
-    for (mut data_stream, mut stream_listener, transactions_only, allow_transactions_or_outputs) in [
-        (data_stream_1, stream_listener_1, true, false),
-        (data_stream_2, stream_listener_2, false, false),
-        (data_stream_3, stream_listener_3, false, true),
-    ] {
+    for (mut data_stream, mut stream_listener, transactions_only, allow_transactions_or_outputs) in
+        continuous_data_streams
+    {
         // Initialize the data stream
         let global_data_summary = create_global_data_summary(1);
         initialize_data_requests(&mut data_stream, &global_data_summary);
 
-        // Verify a single request is made
-        let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
-        assert_eq!(sent_requests.as_ref().unwrap().len(), 1);
-
-        // Verify the request is for the correct data
-        let client_request = get_pending_client_request(&mut data_stream, 0);
-        let expected_request = if allow_transactions_or_outputs {
-            DataClientRequest::NewTransactionsOrOutputsWithProof(
-                NewTransactionsOrOutputsWithProofRequest {
-                    known_version: MAX_ADVERTISED_TRANSACTION_OUTPUT,
-                    known_epoch: MAX_ADVERTISED_EPOCH_END,
-                    include_events: false,
-                },
-            )
-        } else if transactions_only {
-            DataClientRequest::NewTransactionsWithProof(NewTransactionsWithProofRequest {
-                known_version: MAX_ADVERTISED_TRANSACTION,
-                known_epoch: MAX_ADVERTISED_EPOCH_END,
-                include_events: false,
-            })
-        } else {
-            DataClientRequest::NewTransactionOutputsWithProof(
-                NewTransactionOutputsWithProofRequest {
-                    known_version: MAX_ADVERTISED_TRANSACTION_OUTPUT,
-                    known_epoch: MAX_ADVERTISED_EPOCH_END,
-                },
-            )
-        };
-        assert_eq!(client_request, expected_request);
+        // Verify a single request is made and that it contains the correct data
+        verify_pending_optimistic_fetch(
+            &mut data_stream,
+            transactions_only,
+            allow_transactions_or_outputs,
+            0,
+        );
 
         // Set a timeout response for the optimistic fetch request and process it
         set_timeout_response_in_queue(&mut data_stream, 0);
         process_data_responses(&mut data_stream, &global_data_summary).await;
         assert_none!(stream_listener.select_next_some().now_or_never());
 
-        // Handle multiple timeouts and retries because no new data is known
-        // about, so the best we can do is send optimistic fetches
+        // Handle multiple timeouts and retries (because no new data is known)
+        let client_request = get_pending_client_request(&mut data_stream, 0);
         for _ in 0..max_request_retry * 3 {
             // Set a timeout response for the request and process it
             set_timeout_response_in_queue(&mut data_stream, 0);
@@ -547,7 +513,7 @@ async fn test_continuous_stream_optimistic_fetch_retry() {
         }
 
         // Set an optimistic fetch response in the queue and process it
-        set_optimistic_fetch_response_in_queue(
+        set_new_data_response_in_queue(
             &mut data_stream,
             0,
             MAX_ADVERTISED_TRANSACTION + 1,
@@ -555,161 +521,286 @@ async fn test_continuous_stream_optimistic_fetch_retry() {
         );
         process_data_responses(&mut data_stream, &global_data_summary).await;
 
-        // Verify another optimistic fetch request is now sent (for data beyond the previous target)
-        let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
-        assert_eq!(sent_requests.as_ref().unwrap().len(), 1);
-        let client_request = get_pending_client_request(&mut data_stream, 0);
-        let expected_request = if allow_transactions_or_outputs {
-            DataClientRequest::NewTransactionsOrOutputsWithProof(
-                NewTransactionsOrOutputsWithProofRequest {
-                    known_version: MAX_ADVERTISED_TRANSACTION_OUTPUT + 1,
-                    known_epoch: MAX_ADVERTISED_EPOCH_END,
-                    include_events: false,
-                },
-            )
-        } else if transactions_only {
-            DataClientRequest::NewTransactionsWithProof(NewTransactionsWithProofRequest {
-                known_version: MAX_ADVERTISED_TRANSACTION + 1,
-                known_epoch: MAX_ADVERTISED_EPOCH_END,
-                include_events: false,
-            })
-        } else {
-            DataClientRequest::NewTransactionOutputsWithProof(
-                NewTransactionOutputsWithProofRequest {
-                    known_version: MAX_ADVERTISED_TRANSACTION_OUTPUT + 1,
-                    known_epoch: MAX_ADVERTISED_EPOCH_END,
-                },
-            )
-        };
-        assert_eq!(client_request, expected_request);
+        // Verify another optimistic fetch request is now sent
+        verify_pending_optimistic_fetch(
+            &mut data_stream,
+            transactions_only,
+            allow_transactions_or_outputs,
+            1, // Offset by 1 (for data beyond the previous target)
+        );
 
-        // Set a timeout response for the optimistic fetch request and process it.
+        // Set an error response for the optimistic fetch request and process it.
         // This will cause the same request to be re-sent.
-        set_timeout_response_in_queue(&mut data_stream, 0);
+        set_failure_response_in_queue(&mut data_stream, 0);
         process_data_responses(&mut data_stream, &global_data_summary).await;
 
-        // Set a timeout response for the optimistic fetch request and process it,
-        // but this time the node knows about new data to fetch.
-        set_timeout_response_in_queue(&mut data_stream, 0);
-        let mut new_global_data_summary = global_data_summary.clone();
-        let new_highest_synced_version = MAX_ADVERTISED_TRANSACTION + 1000;
-        new_global_data_summary.advertised_data.synced_ledger_infos = vec![create_ledger_info(
-            new_highest_synced_version,
-            MAX_ADVERTISED_EPOCH_END,
-            false,
-        )];
-        process_data_responses(&mut data_stream, &new_global_data_summary).await;
-
-        // Verify multiple data requests have now been sent to fetch the missing data
-        let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
-        assert_eq!(sent_requests.as_ref().unwrap().len(), 3);
-        for i in 0..3 {
-            let client_request = get_pending_client_request(&mut data_stream, i);
-            let expected_version = MAX_ADVERTISED_TRANSACTION + 2 + i as u64;
-            let expected_request = if allow_transactions_or_outputs {
-                DataClientRequest::TransactionsOrOutputsWithProof(
-                    TransactionsOrOutputsWithProofRequest {
-                        start_version: expected_version,
-                        end_version: expected_version,
-                        proof_version: new_highest_synced_version,
-                        include_events: false,
-                    },
-                )
-            } else if transactions_only {
-                DataClientRequest::TransactionsWithProof(TransactionsWithProofRequest {
-                    start_version: expected_version,
-                    end_version: expected_version,
-                    proof_version: new_highest_synced_version,
-                    include_events: false,
-                })
-            } else {
-                DataClientRequest::TransactionOutputsWithProof(TransactionOutputsWithProofRequest {
-                    start_version: expected_version,
-                    end_version: expected_version,
-                    proof_version: new_highest_synced_version,
-                })
-            };
-            assert_eq!(client_request, expected_request);
-        }
+        // Advertise new data and verify the data is requested
+        advertise_new_data_and_verify_requests(
+            &mut data_stream,
+            global_data_summary,
+            transactions_only,
+            allow_transactions_or_outputs,
+            max_concurrent_requests,
+        )
+        .await;
     }
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_continuous_stream_optimistic_fetch_timeout() {
     // Create a test data client config
-    let optimistic_fetch_timeout_ms = 2022;
     let data_client_config = AptosDataClientConfig {
-        optimistic_fetch_timeout_ms,
+        optimistic_fetch_timeout_ms: 1005,
         ..Default::default()
     };
 
-    // Test both types of continuous data streams
-    let (data_stream_1, stream_listener_1) = create_continuous_transaction_stream(
+    // Create a test streaming service config with subscriptions disabled
+    let streaming_service_config = DataStreamingServiceConfig {
+        enable_subscription_streaming: false,
+        ..Default::default()
+    };
+
+    // Verify the timeouts of all continuous data streams
+    verify_continuous_stream_request_timeouts(
         data_client_config,
-        DataStreamingServiceConfig::default(),
-        MAX_ADVERTISED_TRANSACTION,
-        MAX_ADVERTISED_EPOCH_END,
+        streaming_service_config,
+        1, // Optimistic fetch requests are only sent one at a time
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn test_continuous_stream_subscription_failures() {
+    // Create a test streaming service config with subscriptions enabled
+    let max_request_retry = 3;
+    let max_concurrent_requests = 3;
+    let streaming_service_config = DataStreamingServiceConfig {
+        enable_subscription_streaming: true,
+        max_concurrent_requests,
+        max_request_retry,
+        ..Default::default()
+    };
+
+    // Test all types of continuous data streams
+    let continuous_data_streams = enumerate_continuous_data_streams(
+        AptosDataClientConfig::default(),
+        streaming_service_config,
     );
-    let (data_stream_2, stream_listener_2) = create_continuous_transaction_output_stream(
-        data_client_config,
-        DataStreamingServiceConfig::default(),
-        MAX_ADVERTISED_TRANSACTION_OUTPUT,
-        MAX_ADVERTISED_EPOCH_END,
-    );
-    let (data_stream_3, stream_listener_3) = create_continuous_transaction_or_output_stream(
-        data_client_config,
-        DataStreamingServiceConfig::default(),
-        MAX_ADVERTISED_TRANSACTION_OUTPUT,
-        MAX_ADVERTISED_EPOCH_END,
-    );
-    for (mut data_stream, mut stream_listener, transactions_only, allow_transactions_or_outputs) in [
-        (data_stream_1, stream_listener_1, true, false),
-        (data_stream_2, stream_listener_2, false, false),
-        (data_stream_3, stream_listener_3, false, true),
-    ] {
+    for (mut data_stream, mut stream_listener, transactions_only, allow_transactions_or_outputs) in
+        continuous_data_streams
+    {
         // Initialize the data stream
         let global_data_summary = create_global_data_summary(1);
         initialize_data_requests(&mut data_stream, &global_data_summary);
 
-        // Verify a single request is made
-        let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
-        assert_eq!(sent_requests.as_ref().unwrap().len(), 1);
+        // Fetch the subscription stream ID from the first pending request
+        let mut subscription_stream_id = get_subscription_stream_id(&mut data_stream, 0);
 
-        // Wait until a notification is sent. The mock data client
-        // will verify the timeout.
-        wait_for_notification_and_verify(
+        // Verify the pending requests are for the correct data and correctly formed
+        verify_pending_subscription_requests(
             &mut data_stream,
-            &mut stream_listener,
-            transactions_only,
+            max_concurrent_requests,
             allow_transactions_or_outputs,
-            true,
-            &global_data_summary,
-        )
-        .await;
+            transactions_only,
+            0,
+            subscription_stream_id,
+            0,
+        );
 
-        // Handle multiple timeouts and retries because no new data is known
-        // about, so the best we can do is send optimistic fetch requests.
-        for _ in 0..3 {
+        // Set a failure response for the first subscription request and process it
+        set_failure_response_in_queue(&mut data_stream, 0);
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_none!(stream_listener.select_next_some().now_or_never());
+
+        // Handle multiple timeouts and retries
+        for _ in 0..max_request_retry * 3 {
+            // Set a timeout response for the first request and process it
             set_timeout_response_in_queue(&mut data_stream, 0);
             process_data_responses(&mut data_stream, &global_data_summary).await;
+
+            // Fetch the subscription stream ID from the first pending request
+            let next_subscription_stream_id = get_subscription_stream_id(&mut data_stream, 0);
+
+            // Verify the next stream ID is different from the previous one
+            assert_ne!(subscription_stream_id, next_subscription_stream_id);
+            subscription_stream_id = next_subscription_stream_id;
+
+            // Verify the pending requests are for the correct data and correctly formed
+            verify_pending_subscription_requests(
+                &mut data_stream,
+                max_concurrent_requests,
+                allow_transactions_or_outputs,
+                transactions_only,
+                0,
+                subscription_stream_id,
+                0,
+            );
         }
 
-        // Wait until a notification is sent. The mock data client
-        // will verify the timeout.
-        wait_for_notification_and_verify(
+        // Set a failure response for the first request and process it
+        set_failure_response_in_queue(&mut data_stream, 0);
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+
+        // Fetch the next subscription stream ID from the first pending request
+        let next_subscription_stream_id = get_subscription_stream_id(&mut data_stream, 0);
+
+        // Verify the next stream ID is different from the previous one
+        assert_ne!(subscription_stream_id, next_subscription_stream_id);
+        subscription_stream_id = next_subscription_stream_id;
+
+        // Verify the pending requests are for the correct data and correctly formed
+        verify_pending_subscription_requests(
             &mut data_stream,
-            &mut stream_listener,
+            max_concurrent_requests,
+            allow_transactions_or_outputs,
+            transactions_only,
+            0,
+            subscription_stream_id,
+            0,
+        );
+
+        // Set a subscription response in the queue and process it
+        set_new_data_response_in_queue(
+            &mut data_stream,
+            0,
+            MAX_ADVERTISED_TRANSACTION + 1,
+            transactions_only,
+        );
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+
+        // Verify the pending requests are for the correct data and correctly formed
+        verify_pending_subscription_requests(
+            &mut data_stream,
+            max_concurrent_requests,
+            allow_transactions_or_outputs,
+            transactions_only,
+            1,
+            subscription_stream_id, // The subscription stream ID should be the same
+            0,
+        );
+
+        // Set a timeout response for the subscription request and process it.
+        // This will cause the same request to be re-sent.
+        set_timeout_response_in_queue(&mut data_stream, 0);
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+
+        // Advertise new data and verify the data is requested
+        advertise_new_data_and_verify_requests(
+            &mut data_stream,
+            global_data_summary,
             transactions_only,
             allow_transactions_or_outputs,
-            true,
-            &global_data_summary,
+            max_concurrent_requests,
         )
         .await;
     }
 }
 
+#[tokio::test]
+async fn test_continuous_stream_subscription_max() {
+    // Create a test streaming service config with subscriptions enabled
+    let max_concurrent_requests = 3;
+    let max_num_consecutive_subscriptions = 5;
+    let streaming_service_config = DataStreamingServiceConfig {
+        enable_subscription_streaming: true,
+        max_concurrent_requests,
+        max_num_consecutive_subscriptions,
+        ..Default::default()
+    };
+
+    // Test all types of continuous data streams
+    let continuous_data_streams = enumerate_continuous_data_streams(
+        AptosDataClientConfig::default(),
+        streaming_service_config,
+    );
+    for (mut data_stream, _stream_listener, transactions_only, allow_transactions_or_outputs) in
+        continuous_data_streams
+    {
+        // Initialize the data stream
+        let global_data_summary = create_global_data_summary(1);
+        initialize_data_requests(&mut data_stream, &global_data_summary);
+
+        // Iterate through several changes in subscription streams
+        let num_subscription_stream_changes = 5;
+        for stream_number in 0..num_subscription_stream_changes {
+            // Fetch the subscription stream ID from the first pending request
+            let subscription_stream_id = get_subscription_stream_id(&mut data_stream, 0);
+
+            // Verify the pending requests are for the correct data and correctly formed
+            verify_pending_subscription_requests(
+                &mut data_stream,
+                max_concurrent_requests,
+                allow_transactions_or_outputs,
+                transactions_only,
+                0,
+                subscription_stream_id,
+                stream_number * max_num_consecutive_subscriptions,
+            );
+
+            // Set valid responses for all pending requests and process the responses
+            for request_index in 0..max_concurrent_requests {
+                set_new_data_response_in_queue(
+                    &mut data_stream,
+                    request_index as usize,
+                    MAX_ADVERTISED_TRANSACTION + request_index,
+                    transactions_only,
+                );
+            }
+            process_data_responses(&mut data_stream, &global_data_summary).await;
+
+            // Verify the number of pending requests
+            let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+            assert_eq!(
+                sent_requests.as_ref().unwrap().len(),
+                (max_num_consecutive_subscriptions - max_concurrent_requests) as usize
+            );
+
+            // Set valid responses for all pending requests and process the responses
+            for request_index in 0..(max_num_consecutive_subscriptions - max_concurrent_requests) {
+                set_new_data_response_in_queue(
+                    &mut data_stream,
+                    request_index as usize,
+                    MAX_ADVERTISED_TRANSACTION + request_index + max_concurrent_requests,
+                    transactions_only,
+                );
+            }
+            process_data_responses(&mut data_stream, &global_data_summary).await;
+
+            // Fetch the next subscription stream ID from the first pending request
+            let next_subscription_stream_id = get_subscription_stream_id(&mut data_stream, 0);
+
+            // Verify the subscription stream ID has changed (because we hit the max number of requests)
+            assert_ne!(subscription_stream_id, next_subscription_stream_id);
+        }
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
-async fn test_transactions_and_output_stream_timeout() {
+async fn test_continuous_stream_subscription_timeout() {
+    // Create a test data client config
+    let data_client_config = AptosDataClientConfig {
+        subscription_response_timeout_ms: 2022,
+        ..Default::default()
+    };
+
+    // Create a test streaming service config with subscriptions enabled
+    let streaming_service_config = DataStreamingServiceConfig {
+        enable_subscription_streaming: true,
+        max_concurrent_requests: 7,
+        ..Default::default()
+    };
+
+    // Verify the timeouts of all continuous data streams
+    verify_continuous_stream_request_timeouts(
+        data_client_config,
+        streaming_service_config,
+        streaming_service_config.max_concurrent_requests,
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_stream_timeouts() {
     // Create a test data client config
     let max_response_timeout_ms = 85;
     let response_timeout_ms = 7;
@@ -764,8 +855,8 @@ async fn test_transactions_and_output_stream_timeout() {
         );
 
         // Wait for the data client to satisfy all requests
-        for i in 0..max_concurrent_requests as usize {
-            wait_for_data_client_to_respond(&mut data_stream, i).await;
+        for request_index in 0..max_concurrent_requests as usize {
+            wait_for_data_client_to_respond(&mut data_stream, request_index).await;
         }
 
         // Handle multiple timeouts and retries on the first request
@@ -787,8 +878,8 @@ async fn test_transactions_and_output_stream_timeout() {
         .await;
 
         // Wait for the data client to satisfy all requests
-        for i in 0..max_concurrent_requests as usize {
-            wait_for_data_client_to_respond(&mut data_stream, i).await;
+        for request_index in 0..max_concurrent_requests as usize {
+            wait_for_data_client_to_respond(&mut data_stream, request_index).await;
         }
 
         // Set a timeout on the second request
@@ -878,6 +969,66 @@ async fn test_stream_listener_dropped() {
     process_data_responses(&mut data_stream, &global_data_summary).await;
     let (_, sent_notifications) = data_stream.get_sent_requests_and_notifications();
     assert_eq!(sent_notifications.len(), 2);
+}
+
+/// Advertises new data (beyond the highest advertised data) and verifies
+/// that data client requests are sent to fetch the missing data.
+async fn advertise_new_data_and_verify_requests(
+    data_stream: &mut DataStream<MockAptosDataClient>,
+    global_data_summary: GlobalDataSummary,
+    transactions_only: bool,
+    allow_transactions_or_outputs: bool,
+    max_concurrent_requests: u64,
+) {
+    // Advertise new data beyond the currently advertised data
+    let mut new_global_data_summary = global_data_summary.clone();
+    let new_highest_synced_version = MAX_ADVERTISED_TRANSACTION + 1000;
+    new_global_data_summary.advertised_data.synced_ledger_infos = vec![create_ledger_info(
+        new_highest_synced_version,
+        MAX_ADVERTISED_EPOCH_END,
+        false,
+    )];
+
+    // Set a timeout response at the head of the queue and process the response
+    set_timeout_response_in_queue(data_stream, 0);
+    process_data_responses(data_stream, &new_global_data_summary).await;
+
+    // Verify multiple data requests have now been sent to fetch the missing data
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len(),
+        max_concurrent_requests as usize,
+    );
+
+    // Verify the pending requests are for the correct data and correctly formed
+    for request_index in 0..max_concurrent_requests {
+        let client_request = get_pending_client_request(data_stream, request_index as usize);
+        let expected_version = MAX_ADVERTISED_TRANSACTION + 2 + request_index;
+        let expected_request = if allow_transactions_or_outputs {
+            DataClientRequest::TransactionsOrOutputsWithProof(
+                TransactionsOrOutputsWithProofRequest {
+                    start_version: expected_version,
+                    end_version: expected_version,
+                    proof_version: new_highest_synced_version,
+                    include_events: false,
+                },
+            )
+        } else if transactions_only {
+            DataClientRequest::TransactionsWithProof(TransactionsWithProofRequest {
+                start_version: expected_version,
+                end_version: expected_version,
+                proof_version: new_highest_synced_version,
+                include_events: false,
+            })
+        } else {
+            DataClientRequest::TransactionOutputsWithProof(TransactionOutputsWithProofRequest {
+                start_version: expected_version,
+                end_version: expected_version,
+                proof_version: new_highest_synced_version,
+            })
+        };
+        assert_eq!(client_request, expected_request);
+    }
 }
 
 /// Creates a state value stream for the given `version`.
@@ -1083,6 +1234,71 @@ fn create_optimal_chunk_sizes(chunk_sizes: u64) -> OptimalChunkSizes {
     }
 }
 
+/// A utility function that creates and returns all types of
+/// continuous data streams. This is useful for tests that verify
+/// all stream types.
+fn enumerate_continuous_data_streams(
+    data_client_config: AptosDataClientConfig,
+    streaming_service_config: DataStreamingServiceConfig,
+) -> Vec<(
+    DataStream<MockAptosDataClient>,
+    DataStreamListener,
+    bool,
+    bool,
+)> {
+    let mut continuous_data_streams = vec![];
+
+    // Create a continuous transaction stream
+    let transactions_only = true;
+    let allow_transactions_or_outputs = false;
+    let (data_stream, stream_listener) = create_continuous_transaction_stream(
+        data_client_config,
+        streaming_service_config,
+        MAX_ADVERTISED_TRANSACTION,
+        MAX_ADVERTISED_EPOCH_END,
+    );
+    continuous_data_streams.push((
+        data_stream,
+        stream_listener,
+        transactions_only,
+        allow_transactions_or_outputs,
+    ));
+
+    // Create a continuous transaction output stream
+    let transactions_only = false;
+    let allow_transactions_or_outputs = false;
+    let (data_stream, stream_listener) = create_continuous_transaction_output_stream(
+        data_client_config,
+        streaming_service_config,
+        MAX_ADVERTISED_TRANSACTION_OUTPUT,
+        MAX_ADVERTISED_EPOCH_END,
+    );
+    continuous_data_streams.push((
+        data_stream,
+        stream_listener,
+        transactions_only,
+        allow_transactions_or_outputs,
+    ));
+
+    // Create a continuous transaction or output stream
+    let transactions_only = false;
+    let allow_transactions_or_outputs = true;
+    let (data_stream, stream_listener) = create_continuous_transaction_or_output_stream(
+        data_client_config,
+        streaming_service_config,
+        MAX_ADVERTISED_TRANSACTION_OUTPUT,
+        MAX_ADVERTISED_EPOCH_END,
+    );
+    continuous_data_streams.push((
+        data_stream,
+        stream_listener,
+        transactions_only,
+        allow_transactions_or_outputs,
+    ));
+
+    continuous_data_streams
+}
+
 /// Sets the client response at the index in the pending queue to contain an
 /// epoch ending data response.
 fn set_epoch_ending_response_in_queue(
@@ -1138,9 +1354,9 @@ fn set_state_value_response_in_queue(
     pending_response.lock().client_response = client_response;
 }
 
-/// Sets the client response at the index in the pending queue to contain
-/// an optimistic fetch response.
-fn set_optimistic_fetch_response_in_queue(
+/// Sets the client response at the index in the pending
+/// queue to contain new data.
+fn set_new_data_response_in_queue(
     data_stream: &mut DataStream<MockAptosDataClient>,
     index: usize,
     single_data_version: u64,
@@ -1166,15 +1382,37 @@ fn set_optimistic_fetch_response_in_queue(
     pending_response.lock().client_response = client_response;
 }
 
+/// Sets the client response at the index in the pending queue to contain a failure
+fn set_failure_response_in_queue(data_stream: &mut DataStream<MockAptosDataClient>, index: usize) {
+    set_response_in_queue(
+        data_stream,
+        index,
+        aptos_data_client::error::Error::UnexpectedErrorEncountered("Oops!".into()),
+    );
+}
+
 /// Sets the client response at the index in the pending queue to contain a
 /// timeout response.
 fn set_timeout_response_in_queue(data_stream: &mut DataStream<MockAptosDataClient>, index: usize) {
+    set_response_in_queue(
+        data_stream,
+        index,
+        aptos_data_client::error::Error::TimeoutWaitingForResponse("Timed out!".into()),
+    );
+}
+
+/// Sets the given error response at the index in the pending queue
+fn set_response_in_queue(
+    data_stream: &mut DataStream<MockAptosDataClient>,
+    index: usize,
+    error_response: aptos_data_client::error::Error,
+) {
+    // Get the pending response at the specified index
     let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
     let pending_response = sent_requests.as_mut().unwrap().get_mut(index).unwrap();
-    let client_response = Some(Err(
-        aptos_data_client::error::Error::TimeoutWaitingForResponse("Timed out!".into()),
-    ));
-    pending_response.lock().client_response = client_response;
+
+    // Set the response
+    pending_response.lock().client_response = Some(Err(error_response));
 }
 
 /// Waits for the data client to set the response at the index in the
@@ -1221,10 +1459,10 @@ fn insert_response_into_pending_queue(
     pending_response: PendingClientResponse,
 ) {
     // Clear the queue
-    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
-    sent_requests.as_mut().unwrap().clear();
+    data_stream.clear_sent_data_requests_queue();
 
     // Insert the pending response
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
     let pending_response = Arc::new(Mutex::new(Box::new(pending_response)));
     sent_requests.as_mut().unwrap().push_front(pending_response);
 }
@@ -1239,6 +1477,71 @@ fn verify_client_request_resubmitted(
     let pending_response = sent_requests.as_mut().unwrap().pop_front().unwrap();
     assert_eq!(pending_response.lock().client_request, client_request);
     assert_none!(pending_response.lock().client_response.as_ref());
+}
+
+/// Verifies the timeouts of all continuous data stream requests
+/// in the presence of RPC timeouts and failures.
+async fn verify_continuous_stream_request_timeouts(
+    data_client_config: AptosDataClientConfig,
+    streaming_service_config: DataStreamingServiceConfig,
+    num_expected_requests: u64,
+) {
+    // Test all types of continuous data streams
+    let continuous_data_streams =
+        enumerate_continuous_data_streams(data_client_config, streaming_service_config);
+    for (mut data_stream, mut stream_listener, transactions_only, allow_transactions_or_outputs) in
+        continuous_data_streams
+    {
+        // Initialize the data stream
+        let global_data_summary = create_global_data_summary(1);
+        initialize_data_requests(&mut data_stream, &global_data_summary);
+
+        // Verify that the expected number of requests are made
+        let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+        assert_eq!(
+            sent_requests.as_ref().unwrap().len(),
+            num_expected_requests as usize
+        );
+
+        // Wait until a notification is sent. The mock data client
+        // will verify the timeout.
+        wait_for_notification_and_verify(
+            &mut data_stream,
+            &mut stream_listener,
+            transactions_only,
+            allow_transactions_or_outputs,
+            true,
+            &global_data_summary,
+        )
+        .await;
+
+        // Handle multiple timeouts and retries because no new data is known,
+        // so the best we can do is resend the same requests.
+        for _ in 0..3 {
+            // Set a timeout response for the subscription request and process it
+            set_timeout_response_in_queue(&mut data_stream, 0);
+            process_data_responses(&mut data_stream, &global_data_summary).await;
+
+            // Verify more requests are made
+            let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+            assert_eq!(
+                sent_requests.as_ref().unwrap().len(),
+                num_expected_requests as usize
+            );
+        }
+
+        // Wait until a notification is sent. The mock data client
+        // will verify the timeout.
+        wait_for_notification_and_verify(
+            &mut data_stream,
+            &mut stream_listener,
+            transactions_only,
+            allow_transactions_or_outputs,
+            true,
+            &global_data_summary,
+        )
+        .await;
+    }
 }
 
 /// Verifies that a single epoch ending notification is received by the
@@ -1291,23 +1594,137 @@ fn get_pending_client_request(
     client_request
 }
 
-/// Waits for an optimistic fetch notification along the given
-/// listener and continues to drive progress until one is received.
-/// Verifies the notification when it is received.
+/// Returns the subscription stream ID from the pending client request at the given index
+fn get_subscription_stream_id(
+    data_stream: &mut DataStream<MockAptosDataClient>,
+    index: usize,
+) -> u64 {
+    // Get the pending client request
+    let client_request = get_pending_client_request(data_stream, index);
+
+    // Extract the subscription stream ID from the request
+    match client_request {
+        DataClientRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
+            request.subscription_stream_id
+        },
+        DataClientRequest::SubscribeTransactionsWithProof(request) => {
+            request.subscription_stream_id
+        },
+        DataClientRequest::SubscribeTransactionOutputsWithProof(request) => {
+            request.subscription_stream_id
+        },
+        _ => panic!("Unexpected client request type found! {:?}", client_request),
+    }
+}
+
+/// Verifies that a single pending optimistic fetch exists and
+/// that it is for the correct data.
+fn verify_pending_optimistic_fetch(
+    data_stream: &mut DataStream<MockAptosDataClient>,
+    transactions_only: bool,
+    allow_transactions_or_outputs: bool,
+    known_version_offset: u64,
+) {
+    // Verify a single request is pending
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(sent_requests.as_ref().unwrap().len(), 1);
+
+    // Verify the request is for the correct data
+    let client_request = get_pending_client_request(data_stream, 0);
+    let expected_request = if allow_transactions_or_outputs {
+        DataClientRequest::NewTransactionsOrOutputsWithProof(
+            NewTransactionsOrOutputsWithProofRequest {
+                known_version: MAX_ADVERTISED_TRANSACTION_OUTPUT + known_version_offset,
+                known_epoch: MAX_ADVERTISED_EPOCH_END,
+                include_events: false,
+            },
+        )
+    } else if transactions_only {
+        DataClientRequest::NewTransactionsWithProof(NewTransactionsWithProofRequest {
+            known_version: MAX_ADVERTISED_TRANSACTION + known_version_offset,
+            known_epoch: MAX_ADVERTISED_EPOCH_END,
+            include_events: false,
+        })
+    } else {
+        DataClientRequest::NewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
+            known_version: MAX_ADVERTISED_TRANSACTION_OUTPUT + known_version_offset,
+            known_epoch: MAX_ADVERTISED_EPOCH_END,
+        })
+    };
+    assert_eq!(client_request, expected_request);
+}
+
+/// Verifies that the pending subscription requests are well formed
+/// and for the correct data.
+fn verify_pending_subscription_requests(
+    data_stream: &mut DataStream<MockAptosDataClient>,
+    max_concurrent_requests: u64,
+    allow_transactions_or_outputs: bool,
+    transactions_only: bool,
+    starting_stream_index: u64,
+    subscription_stream_id: u64,
+    known_version_offset: u64,
+) {
+    // Verify the correct number of pending requests
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len(),
+        max_concurrent_requests as usize
+    );
+
+    // Verify the pending requests are for the correct data and correctly formed
+    for request_index in 0..max_concurrent_requests {
+        let client_request = get_pending_client_request(data_stream, request_index as usize);
+        let expected_request = if allow_transactions_or_outputs {
+            DataClientRequest::SubscribeTransactionsOrOutputsWithProof(
+                SubscribeTransactionsOrOutputsWithProofRequest {
+                    known_version: MAX_ADVERTISED_TRANSACTION_OUTPUT + known_version_offset,
+                    known_epoch: MAX_ADVERTISED_EPOCH_END,
+                    subscription_stream_index: starting_stream_index + request_index,
+                    include_events: false,
+                    subscription_stream_id,
+                },
+            )
+        } else if transactions_only {
+            DataClientRequest::SubscribeTransactionsWithProof(
+                SubscribeTransactionsWithProofRequest {
+                    known_version: MAX_ADVERTISED_TRANSACTION + known_version_offset,
+                    known_epoch: MAX_ADVERTISED_EPOCH_END,
+                    subscription_stream_index: starting_stream_index + request_index,
+                    include_events: false,
+                    subscription_stream_id,
+                },
+            )
+        } else {
+            DataClientRequest::SubscribeTransactionOutputsWithProof(
+                SubscribeTransactionOutputsWithProofRequest {
+                    known_version: MAX_ADVERTISED_TRANSACTION_OUTPUT + known_version_offset,
+                    known_epoch: MAX_ADVERTISED_EPOCH_END,
+                    subscription_stream_index: starting_stream_index + request_index,
+                    subscription_stream_id,
+                },
+            )
+        };
+        assert_eq!(client_request, expected_request);
+    }
+}
+
+/// Verifies a notification along the given listener and
+/// continues to drive progress until one is received.
 async fn wait_for_notification_and_verify(
     data_stream: &mut DataStream<MockAptosDataClient>,
     stream_listener: &mut DataStreamListener,
     transaction_syncing: bool,
     allow_transactions_or_outputs: bool,
-    optimistic_fetch_notification: bool,
+    new_data_notification: bool,
     global_data_summary: &GlobalDataSummary,
 ) {
     loop {
         if let Ok(data_notification) =
             timeout(Duration::from_secs(1), stream_listener.select_next_some()).await
         {
-            if optimistic_fetch_notification {
-                // Verify we got the correct optimistic fetch data
+            if new_data_notification {
+                // Verify we got the correct new data
                 match data_notification.data_payload {
                     DataPayload::ContinuousTransactionsWithProof(..) => {
                         assert!(allow_transactions_or_outputs || transaction_syncing);

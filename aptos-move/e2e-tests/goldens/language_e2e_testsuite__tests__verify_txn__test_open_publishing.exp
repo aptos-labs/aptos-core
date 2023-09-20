@@ -6,70 +6,28 @@ Ok(
                     WriteSetMut {
                         write_set: {
                             StateKey {
-                                inner: AccessPath(
-                                    AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 00f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1014d },
-                                ),
+                                inner: AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Code(f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1::M)" },
                                 hash: OnceCell(Uninit),
                             }: CreationWithMetadata(a11ceb0b060000000601000203020a050c0607120a081c200c3c23000000010001000002000100020303010300014d036d61780373756df5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10001000002080a000a012403060a01020a00020101000001060a000a01160c020a020200, metadata:V0 { deposit: 50000, creation_time_usecs: 0 }),
                             StateKey {
-                                inner: AccessPath(
-                                    AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 01000000000000000000000000000000000000000000000000000000000000000104636f696e09436f696e53746f7265010700000000000000000000000000000000000000000000000000000000000000010a6170746f735f636f696e094170746f73436f696e00 },
-                                ),
+                                inner: AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
                                 hash: OnceCell(Uninit),
                             }: Modification(e8059a3b000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1),
                             StateKey {
-                                inner: AccessPath(
-                                    AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 010000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e7400 },
-                                ),
+                                inner: AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" },
                                 hash: OnceCell(Uninit),
                             }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10b00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
                             StateKey {
-                                inner: TableItem {
-                                    handle: TableHandle(
-                                        1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca,
-                                    ),
-                                    key: [
-                                        6,
-                                        25,
-                                        220,
-                                        41,
-                                        160,
-                                        170,
-                                        200,
-                                        250,
-                                        20,
-                                        103,
-                                        20,
-                                        5,
-                                        142,
-                                        141,
-                                        214,
-                                        210,
-                                        208,
-                                        243,
-                                        189,
-                                        245,
-                                        246,
-                                        51,
-                                        25,
-                                        7,
-                                        191,
-                                        145,
-                                        243,
-                                        172,
-                                        216,
-                                        30,
-                                        105,
-                                        53,
-                                    ],
-                                },
+                                inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
                                 hash: OnceCell(Uninit),
                             }: Modification(e71cf505000000000100000000000000),
                         },
                     },
                 ),
             ),
-            events: [],
+            events: [
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "f6010000000000000200000000000000010000000000000050c30000000000000000000000000000" },
+            ],
             gas_used: 502,
             status: Keep(
                 Success,

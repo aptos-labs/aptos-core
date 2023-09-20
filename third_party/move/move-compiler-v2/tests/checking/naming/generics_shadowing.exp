@@ -3,11 +3,20 @@ module 0x2::M {
     struct S {
         dummy_field: bool,
     }
-    private fun foo<S>(s: S) {
+    private fun foo<S>(s: #0): #0 {
         {
           let s: S = s;
           {
             let s: S = s;
+            s
+          }
+        }
+    }
+    spec fun $foo<S>(s: #0): #0 {
+        {
+          let s: #0 = s;
+          {
+            let s: #0 = s;
             s
           }
         }

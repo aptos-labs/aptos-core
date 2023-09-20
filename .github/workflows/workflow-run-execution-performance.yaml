@@ -56,7 +56,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
         if: ${{ needs.file_change_determinator.outputs.only_docs_changed != 'true' && !inputs.RUN_ONLY_SINGLE_NODE_PERF }}
@@ -80,7 +80,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
         if: ${{ needs.file_change_determinator.outputs.only_docs_changed != 'true' && !inputs.RUN_ONLY_SINGLE_NODE_PERF }}
@@ -104,7 +104,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'

@@ -156,13 +156,9 @@ impl AptosNodeArgs {
     }
 }
 
-pub fn load_seed(input: &str) -> Result<Option<[u8; 32]>, FromHexError> {
+pub fn load_seed(input: &str) -> Result<[u8; 32], FromHexError> {
     let trimmed_input = input.trim();
-    if !trimmed_input.is_empty() {
-        FromHex::from_hex(trimmed_input).map(Some)
-    } else {
-        Ok(None)
-    }
+    FromHex::from_hex(trimmed_input)
 }
 
 /// Runtime handle to ensure that all inner runtimes stay in scope
@@ -196,6 +192,11 @@ pub fn start(
 
     // Instantiate the global logger
     let (remote_log_receiver, logger_filter_update) = logger::create_logger(&config, log_file);
+
+    assert!(
+        !cfg!(feature = "testing") && !cfg!(feature = "fuzzing"),
+        "Testing features shouldn't be compiled"
+    );
 
     // Ensure failpoints are configured correctly
     if fail::has_failpoints() {
@@ -275,7 +276,7 @@ where
                 genesis_config.recurring_lockup_duration_secs = 7200;
             })))
             .with_randomize_first_validator_ports(random_ports);
-        let (root_key, _genesis, genesis_waypoint, validators) = builder.build(rng)?;
+        let (root_key, _genesis, genesis_waypoint, mut validators) = builder.build(rng)?;
 
         // Write the mint key to disk
         let serialized_keys = bcs::to_bytes(&root_key)?;
@@ -289,8 +290,10 @@ where
             genesis_waypoint.to_string().as_bytes(),
         )?;
 
+        aptos_config::config::sanitize_node_config(validators[0].config.override_config_mut())?;
+
         // Return the validator config
-        validators[0].config.clone()
+        validators[0].config.override_config().clone()
     };
 
     // Prepare log file since we cannot automatically route logs to stderr

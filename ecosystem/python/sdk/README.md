@@ -22,7 +22,14 @@ poetry install
 make test
 ```
 
-## E2E testing
+## E2E testing and Using the Aptos CLI
+
+* Download the [Aptos CLI](https://aptos.dev/tools/aptos-cli/install-cli/).
+* Set the environment variable `APTOS_CLI_PATH` to the full path the the CLI.
+* `make examples_cli`
+
+We of course allow you to do this a bit more manually by:
+
 First, run a local testnet (run this from the root of aptos-core):
 
 ```bash
@@ -48,6 +55,12 @@ Note: These end-to-end tests are tested against a node built from the same commi
 ```bash
 make fmt
 ```
+
+## Package Publishing
+
+* Download the [Aptos CLI](https://aptos.dev/tools/aptos-cli/install-cli/).
+* Set the environment variable `APTOS_CLI_PATH` to the full path the the CLI.
+* `poetry run python -m aptos_sdk.cli` and set the appropriate command-line parameters
 
 ## Generating types
 The Python `openapi-python-client` tool cannot parse references. Therefore there are three options:

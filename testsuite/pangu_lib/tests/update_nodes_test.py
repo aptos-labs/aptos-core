@@ -13,8 +13,8 @@ from pangu_lib.testnet_commands.update_nodes import *
 class testnet_update_nodes_test(unittest.TestCase):
     def setUp(self) -> None:
         self.maxDiff = None
-        self.pangu_config_no_vfn = b"blueprints:\n \n nodebp:\n    nodes_persistent_volume_claim_size: size\n    validator_storage_class_name: standard\n    vfn_storage_class_name: standard\n    validator_config_path: /path/to/config.yaml\n    validator_image:  none\n    vfn_config_path:  /path/to/config2.yaml\n    vfn_image:  none\n    create_vfns: false\n    stake_amount: 1000\n    count: 10\n"
-        self.pangu_config_with_vfn = b"blueprints:\n \n nodebp:\n    nodes_persistent_volume_claim_size: size\n    validator_storage_class_name: standard\n    vfn_storage_class_name: standard\n    validator_config_path: /path/to/config.yaml\n    validator_image:  none\n    vfn_config_path:  /path/to/config2.yaml\n    vfn_image:  none\n    create_vfns: true\n    stake_amount: 1000\n    count: 10\n"
+        self.pangu_config_no_vfn = b"blueprints:\n \n nodebp:\n    nodes_persistent_volume_claim_size: size\n    validator_storage_class_name: standard\n    vfn_storage_class_name: standard\n    validator_config_path: /path/to/config.yaml\n    validator_image:  none\n    vfn_config_path:  /path/to/config2.yaml\n    vfn_image:  none\n    create_vfns: false\n    stake_amount: 1000\n    count: 10\n    cpu: '1'\n    memory: 1Gi\n"
+        self.pangu_config_with_vfn = b"blueprints:\n \n nodebp:\n    nodes_persistent_volume_claim_size: size\n    validator_storage_class_name: standard\n    vfn_storage_class_name: standard\n    validator_config_path: /path/to/config.yaml\n    validator_image:  none\n    vfn_config_path:  /path/to/config2.yaml\n    vfn_image:  none\n    create_vfns: true\n    stake_amount: 1000\n    count: 10\n    cpu: '1'\n    memory: 1Gi\n"
 
     def test_update_nodes_no_nodes(self) -> None:
         """Tests updating nodes"""

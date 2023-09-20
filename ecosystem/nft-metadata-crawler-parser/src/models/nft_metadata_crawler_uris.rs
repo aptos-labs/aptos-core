@@ -1,16 +1,16 @@
 // Copyright © Aptos Foundation
 
-use crate::schema::nft_metadata_crawler::parsed_token_uris;
+use crate::schema::nft_metadata_crawler::parsed_asset_uris;
 use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(token_uri))]
-#[diesel(table_name = parsed_token_uris)]
+#[diesel(primary_key(asset_uri))]
+#[diesel(table_name = parsed_asset_uris)]
 pub struct NFTMetadataCrawlerURIs {
-    token_uri: String,
+    asset_uri: String,
     raw_image_uri: Option<String>,
     raw_animation_uri: Option<String>,
     cdn_json_uri: Option<String>,
@@ -22,9 +22,9 @@ pub struct NFTMetadataCrawlerURIs {
 }
 
 impl NFTMetadataCrawlerURIs {
-    pub fn new(token_uri: String) -> Self {
+    pub fn new(asset_uri: String) -> Self {
         Self {
-            token_uri,
+            asset_uri,
             raw_image_uri: None,
             raw_animation_uri: None,
             cdn_json_uri: None,
@@ -36,19 +36,19 @@ impl NFTMetadataCrawlerURIs {
         }
     }
 
-    pub fn get_token_uri(&self) -> String {
-        self.token_uri.clone()
+    pub fn get_asset_uri(&self) -> String {
+        self.asset_uri.clone()
     }
 
-    pub fn set_token_uri(&mut self, token_uri: String) {
-        self.token_uri = token_uri;
+    pub fn set_asset_uri(&mut self, asset_uri: String) {
+        self.asset_uri = asset_uri;
     }
 
     pub fn get_raw_image_uri(&self) -> Option<String> {
         let uri = self.raw_image_uri.clone();
         if uri.is_none() {
             warn!(
-                token_uri = self.token_uri,
+                asset_uri = self.asset_uri,
                 "[NFT Metadata Crawler] raw_image_uri is None"
             );
         }
@@ -63,7 +63,7 @@ impl NFTMetadataCrawlerURIs {
         let uri = self.raw_animation_uri.clone();
         if uri.is_none() {
             warn!(
-                token_uri = self.token_uri,
+                asset_uri = self.asset_uri,
                 "[NFT Metadata Crawler] raw_animation_uri is None"
             );
         }
@@ -78,7 +78,7 @@ impl NFTMetadataCrawlerURIs {
         let uri = self.cdn_json_uri.clone();
         if uri.is_none() {
             warn!(
-                token_uri = self.token_uri,
+                asset_uri = self.asset_uri,
                 "[NFT Metadata Crawler] cdn_json_uri is None"
             );
         }
@@ -93,7 +93,7 @@ impl NFTMetadataCrawlerURIs {
         let uri = self.cdn_image_uri.clone();
         if uri.is_none() {
             warn!(
-                token_uri = self.token_uri,
+                asset_uri = self.asset_uri,
                 "[NFT Metadata Crawler] cdn_image_uri is None"
             );
         }
@@ -108,7 +108,7 @@ impl NFTMetadataCrawlerURIs {
         let uri = self.cdn_animation_uri.clone();
         if uri.is_none() {
             warn!(
-                token_uri = self.token_uri,
+                asset_uri = self.asset_uri,
                 "[NFT Metadata Crawler] cdn_animation_uri is None"
             );
         }

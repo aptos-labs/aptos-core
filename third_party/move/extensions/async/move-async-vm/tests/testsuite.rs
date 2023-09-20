@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Error};
+use bytes::Bytes;
 use itertools::Itertools;
 use move_async_vm::{
     actor_metadata,
@@ -46,7 +47,7 @@ struct Harness {
     vm: AsyncVM,
     actor_instances: Vec<(ModuleId, AccountAddress)>,
     baseline: RefCell<String>,
-    resource_store: RefCell<BTreeMap<(AccountAddress, StructTag), Vec<u8>>>,
+    resource_store: RefCell<BTreeMap<(AccountAddress, StructTag), Bytes>>,
 }
 
 fn test_account() -> AccountAddress {
@@ -385,12 +386,12 @@ impl<'a> ModuleResolver for HarnessProxy<'a> {
         vec![]
     }
 
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
+    fn get_module(&self, id: &ModuleId) -> Result<Option<Bytes>, Error> {
         Ok(self
             .harness
             .module_cache
             .get(id.name())
-            .map(|c| c.serialize(None)))
+            .map(|c| c.serialize(None).into()))
     }
 }
 
@@ -400,7 +401,7 @@ impl<'a> ResourceResolver for HarnessProxy<'a> {
         address: &AccountAddress,
         typ: &StructTag,
         _metadata: &[Metadata],
-    ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
+    ) -> anyhow::Result<(Option<Bytes>, usize)> {
         let res = self
             .harness
             .resource_store

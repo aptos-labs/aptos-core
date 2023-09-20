@@ -32,7 +32,6 @@ fullnode:
     full_node_networks:
       # The first item in the array `full_node_networks` must always refer to the public fullnode network
       - network_id: "public"
-        seeds: {}
         identity: {}
         inbound_rate_limit_config:
         outbound_rate_limit_config:

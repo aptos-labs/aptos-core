@@ -56,6 +56,9 @@ FULLNODE_HOST_PORT: int = 6182
 API_PORT: int = 8080
 METRICS_PORT: int = 9101
 BACKUP_PORT: int = 6186
+# Resource requests
+CPU_REQUEST: str = "4"
+MEMORY_REQUEST: str = "8Gi"
 
 PLACEHOLDER_VFN_SEED: str = (
     "00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237"
@@ -89,7 +92,7 @@ def generate_labels(
         dict[str, str]: the labels
     """
     label = {
-        "app.kubernetes.io/name": f"{name}",
+        "app.kubernetes.io/name": type.value,  # this is used by the role
         "app.kubernetes.io/instance": f"{type_specific_name(name, type, custom_suffix)}",
         "managed-by": "pangu",
         "type": type.value,

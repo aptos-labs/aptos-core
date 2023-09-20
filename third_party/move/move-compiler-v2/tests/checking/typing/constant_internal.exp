@@ -2,9 +2,11 @@
 module 0x2::X {
 } // end 0x2::X
 module 0x2::M {
+    use 0x2::X::{Self, C}; // resolved as: 0x2::X
     private fun foo() {
         0;
         0;
         Tuple()
     }
+    spec fun $foo();
 } // end 0x2::M

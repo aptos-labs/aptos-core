@@ -21,6 +21,7 @@ use aptos_types::{
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
 };
+use once_cell::sync::Lazy;
 use poem_openapi::{Object, Union};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -30,6 +31,12 @@ use std::{
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+static DUMMY_GUID: Lazy<EventGuid> = Lazy::new(|| EventGuid {
+    creation_number: U64::from(0u64),
+    account_address: Address::from(AccountAddress::ZERO),
+});
+static DUMMY_SEQUENCE_NUMBER: Lazy<U64> = Lazy::new(|| U64::from(0));
 
 // Warning: Do not add a docstring to a field that uses a type in `derives.rs`,
 // it will result in a change to the type representation. Read more about this
@@ -529,10 +536,16 @@ pub struct Event {
 impl From<(&ContractEvent, serde_json::Value)> for Event {
     fn from((event, data): (&ContractEvent, serde_json::Value)) -> Self {
         match event {
-            ContractEvent::V0(v0) => Self {
-                guid: (*v0.key()).into(),
-                sequence_number: v0.sequence_number().into(),
-                typ: v0.type_tag().clone().into(),
+            ContractEvent::V1(v1) => Self {
+                guid: (*v1.key()).into(),
+                sequence_number: v1.sequence_number().into(),
+                typ: v1.type_tag().clone().into(),
+                data,
+            },
+            ContractEvent::V2(v2) => Self {
+                guid: *DUMMY_GUID,
+                sequence_number: *DUMMY_SEQUENCE_NUMBER,
+                typ: v2.type_tag().clone().into(),
                 data,
             },
         }
@@ -557,11 +570,18 @@ pub struct VersionedEvent {
 impl From<(&EventWithVersion, serde_json::Value)> for VersionedEvent {
     fn from((event, data): (&EventWithVersion, serde_json::Value)) -> Self {
         match &event.event {
-            ContractEvent::V0(v0) => Self {
+            ContractEvent::V1(v1) => Self {
                 version: event.transaction_version.into(),
-                guid: (*v0.key()).into(),
-                sequence_number: v0.sequence_number().into(),
-                typ: v0.type_tag().clone().into(),
+                guid: (*v1.key()).into(),
+                sequence_number: v1.sequence_number().into(),
+                typ: v1.type_tag().clone().into(),
+                data,
+            },
+            ContractEvent::V2(v2) => Self {
+                version: event.transaction_version.into(),
+                guid: *DUMMY_GUID,
+                sequence_number: *DUMMY_SEQUENCE_NUMBER,
+                typ: v2.type_tag().clone().into(),
                 data,
             },
         }

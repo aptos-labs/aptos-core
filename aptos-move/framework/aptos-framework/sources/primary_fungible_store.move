@@ -126,6 +126,8 @@ module aptos_framework::primary_fungible_store {
     /// Withdraw `amount` of fungible asset from the given account's primary store.
     public fun withdraw<T: key>(owner: &signer, metadata: Object<T>, amount: u64): FungibleAsset {
         let store = primary_store(signer::address_of(owner), metadata);
+        // Check if the store object has been burnt or not. If so, unburn it first.
+        may_be_unburn(owner, store);
         fungible_asset::withdraw(owner, store, amount)
     }
 
@@ -144,6 +146,8 @@ module aptos_framework::primary_fungible_store {
         amount: u64,
     ) acquires DeriveRefPod {
         let sender_store = ensure_primary_store_exists(signer::address_of(sender), metadata);
+        // Check if the sender store object has been burnt or not. If so, unburn it first.
+        may_be_unburn(sender, sender_store);
         let recipient_store = ensure_primary_store_exists(recipient, metadata);
         fungible_asset::transfer(sender, sender_store, recipient_store, amount);
     }
@@ -191,6 +195,12 @@ module aptos_framework::primary_fungible_store {
         let from_primary_store = primary_store(from, fungible_asset::transfer_ref_metadata(transfer_ref));
         let to_primary_store = ensure_primary_store_exists(to, fungible_asset::transfer_ref_metadata(transfer_ref));
         fungible_asset::transfer_with_ref(transfer_ref, from_primary_store, to_primary_store, amount);
+    }
+
+    fun may_be_unburn(owner: &signer, store: Object<FungibleStore>) {
+        if (object::is_burnt(store)) {
+            object::unburn(owner, store);
+        };
     }
 
     #[test_only]
@@ -263,5 +273,50 @@ module aptos_framework::primary_fungible_store {
         assert!(!is_frozen(aaron_address, metadata), 6);
         burn(&burn_ref, aaron_address, 50);
         assert!(balance(aaron_address, metadata) == 0, 7);
+    }
+
+    #[test(user_1 = @0xcafe, user_2 = @0xface)]
+    fun test_transfer_to_burnt_store(
+        user_1: &signer,
+        user_2: &signer,
+    ) acquires DeriveRefPod {
+        let (creator_ref, metadata) = create_test_token(user_1);
+        let (mint_ref, _, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
+        let user_1_address = signer::address_of(user_1);
+        let user_2_address = signer::address_of(user_2);
+        mint(&mint_ref, user_1_address, 100);
+        transfer(user_1, metadata, user_2_address, 80);
+
+        // User 2 burns their primary store but should still be able to transfer afterward.
+        let user_2_primary_store = primary_store(user_2_address, metadata);
+        object::burn(user_2, user_2_primary_store);
+        assert!(object::is_burnt(user_2_primary_store), 0);
+        // Balance still works
+        assert!(balance(user_2_address, metadata) == 80, 0);
+        // Deposit still works
+        transfer(user_1, metadata, user_2_address, 20);
+        transfer(user_2, metadata, user_1_address, 90);
+        assert!(balance(user_2_address, metadata) == 10, 0);
+    }
+
+    #[test(user_1 = @0xcafe, user_2 = @0xface)]
+    fun test_withdraw_from_burnt_store(
+        user_1: &signer,
+        user_2: &signer,
+    ) acquires DeriveRefPod {
+        let (creator_ref, metadata) = create_test_token(user_1);
+        let (mint_ref, _, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
+        let user_1_address = signer::address_of(user_1);
+        let user_2_address = signer::address_of(user_2);
+        mint(&mint_ref, user_1_address, 100);
+        transfer(user_1, metadata, user_2_address, 80);
+
+        // User 2 burns their primary store but should still be able to withdraw afterward.
+        let user_2_primary_store = primary_store(user_2_address, metadata);
+        object::burn(user_2, user_2_primary_store);
+        assert!(object::is_burnt(user_2_primary_store), 0);
+        let coins = withdraw(user_2, metadata, 70);
+        assert!(balance(user_2_address, metadata) == 10, 0);
+        deposit(user_2_address, coins);
     }
 }

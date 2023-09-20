@@ -1,17 +1,31 @@
 // Copyright © Aptos Foundation
 
+use crate::utils::{
+    constants::MAX_RETRY_TIME_SECONDS,
+    counters::{
+        FAILED_TO_UPLOAD_TO_GCS_COUNT, GCS_UPLOAD_INVOCATION_COUNT,
+        SUCCESSFULLY_UPLOADED_TO_GCS_COUNT,
+    },
+};
 use anyhow::Context;
+use backoff::{future::retry, ExponentialBackoff};
+use futures::FutureExt;
 use google_cloud_storage::{
-    client::{Client, ClientConfig},
+    client::Client,
     http::objects::upload::{Media, UploadObjectRequest, UploadType},
 };
 use image::ImageFormat;
 use serde_json::Value;
+use std::time::Duration;
 
 /// Writes JSON Value to GCS
-pub async fn write_json_to_gcs(bucket: String, id: String, json: Value) -> anyhow::Result<String> {
-    let client = init_client().await?;
-
+pub async fn write_json_to_gcs(
+    bucket: String,
+    id: String,
+    json: Value,
+    client: &Client,
+) -> anyhow::Result<String> {
+    GCS_UPLOAD_INVOCATION_COUNT.inc();
     let filename = format!("cdn/{}.json", id);
     let json_string = json.to_string();
     let json_bytes = json_string.into_bytes();
@@ -22,19 +36,38 @@ pub async fn write_json_to_gcs(bucket: String, id: String, json: Value) -> anyho
         content_length: Some(json_bytes.len() as u64),
     });
 
-    client
-        .upload_object(
-            &UploadObjectRequest {
-                bucket,
-                ..Default::default()
-            },
-            json_bytes,
-            &upload_type,
-        )
-        .await
-        .context("Error uploading JSON to GCS")?;
+    let op = || {
+        async {
+            Ok(client
+                .upload_object(
+                    &UploadObjectRequest {
+                        bucket: bucket.clone(),
+                        ..Default::default()
+                    },
+                    json_bytes.clone(),
+                    &upload_type,
+                )
+                .await
+                .context("Error uploading JSON to GCS")?)
+        }
+        .boxed()
+    };
 
-    Ok(filename)
+    let backoff = ExponentialBackoff {
+        max_elapsed_time: Some(Duration::from_secs(MAX_RETRY_TIME_SECONDS)),
+        ..Default::default()
+    };
+
+    match retry(backoff, op).await {
+        Ok(_) => {
+            SUCCESSFULLY_UPLOADED_TO_GCS_COUNT.inc();
+            Ok(filename)
+        },
+        Err(e) => {
+            FAILED_TO_UPLOAD_TO_GCS_COUNT.inc();
+            Err(e)
+        },
+    }
 }
 
 /// Infers file type and writes image to GCS
@@ -43,9 +76,9 @@ pub async fn write_image_to_gcs(
     bucket: String,
     id: String,
     buffer: Vec<u8>,
+    client: &Client,
 ) -> anyhow::Result<String> {
-    let client = init_client().await?;
-
+    GCS_UPLOAD_INVOCATION_COUNT.inc();
     let extension = match img_format {
         ImageFormat::Gif | ImageFormat::Avif => img_format
             .extensions_str()
@@ -56,29 +89,42 @@ pub async fn write_image_to_gcs(
     };
 
     let filename = format!("cdn/{}.{}", id, extension);
-
     let upload_type = UploadType::Simple(Media {
         name: filename.clone().into(),
         content_type: format!("image/{}", extension).into(),
         content_length: Some(buffer.len() as u64),
     });
 
-    client
-        .upload_object(
-            &UploadObjectRequest {
-                bucket,
-                ..Default::default()
-            },
-            buffer,
-            &upload_type,
-        )
-        .await?;
+    let op = || {
+        async {
+            Ok(client
+                .upload_object(
+                    &UploadObjectRequest {
+                        bucket: bucket.clone(),
+                        ..Default::default()
+                    },
+                    buffer.clone(),
+                    &upload_type,
+                )
+                .await
+                .context("Error uploading image to GCS")?)
+        }
+        .boxed()
+    };
 
-    Ok(filename)
-}
+    let backoff = ExponentialBackoff {
+        max_elapsed_time: Some(Duration::from_secs(MAX_RETRY_TIME_SECONDS)),
+        ..Default::default()
+    };
 
-/// Creates a GCS client using auth from env variable
-async fn init_client() -> anyhow::Result<Client> {
-    let config = ClientConfig::default().with_auth().await?;
-    Ok(Client::new(config))
+    match retry(backoff, op).await {
+        Ok(_) => {
+            SUCCESSFULLY_UPLOADED_TO_GCS_COUNT.inc();
+            Ok(filename)
+        },
+        Err(e) => {
+            FAILED_TO_UPLOAD_TO_GCS_COUNT.inc();
+            Err(e)
+        },
+    }
 }

@@ -236,13 +236,13 @@ module aptos_framework::transaction_validation {
     /// Called by the Adapter
     fun epilogue(
         account: signer,
-        txn_sequence_number: u64,
+        storage_fee_refunded: u64,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         gas_units_remaining: u64
     ) {
         let addr = signer::address_of(&account);
-        epilogue_gas_payer(account, addr, txn_sequence_number, txn_gas_price, txn_max_gas_units, gas_units_remaining);
+        epilogue_gas_payer(account, addr, storage_fee_refunded, txn_gas_price, txn_max_gas_units, gas_units_remaining);
     }
 
     /// Epilogue function with explicit gas payer specified, is run after a transaction is successfully executed.
@@ -250,7 +250,7 @@ module aptos_framework::transaction_validation {
     fun epilogue_gas_payer(
         account: signer,
         gas_payer: address,
-        _txn_sequence_number: u64,
+        storage_fee_refunded: u64,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         gas_units_remaining: u64
@@ -270,15 +270,27 @@ module aptos_framework::transaction_validation {
             error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
         );
 
-        if (features::collect_and_distribute_gas_fees()) {
+        let amount_to_burn = if (features::collect_and_distribute_gas_fees()) {
+            // TODO(gas): We might want to distinguish the refundable part of the charge and burn it or track
+            // it separately, so that we don't increase the total supply by refunding.
+
             // If transaction fees are redistributed to validators, collect them here for
             // later redistribution.
             transaction_fee::collect_fee(gas_payer, transaction_fee_amount);
+            0
         } else {
             // Otherwise, just burn the fee.
             // TODO: this branch should be removed completely when transaction fee collection
             // is tested and is fully proven to work well.
-            transaction_fee::burn_fee(gas_payer, transaction_fee_amount);
+            transaction_fee_amount
+        };
+
+        if (amount_to_burn > storage_fee_refunded) {
+            let burn_amount = amount_to_burn - storage_fee_refunded;
+            transaction_fee::burn_fee(gas_payer, burn_amount);
+        } else if (amount_to_burn < storage_fee_refunded) {
+            let mint_amount = storage_fee_refunded - amount_to_burn;
+            transaction_fee::mint_and_refund(gas_payer, mint_amount)
         };
 
         // Increment sequence number

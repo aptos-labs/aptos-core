@@ -8,8 +8,10 @@ use crate::{
     naming::ast::ModuleDefinition,
 };
 use clap::*;
+use move_command_line_common::env::read_bool_env_var;
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
+use once_cell::sync::Lazy;
 use petgraph::{algo::astar as petgraph_astar, graphmap::DiGraphMap};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -283,6 +285,20 @@ pub fn format_comma<T: fmt::Display, I: IntoIterator<Item = T>>(items: I) -> Str
 // Flags
 //**************************************************************************************************
 
+pub fn debug_compiler_env_var() -> bool {
+    static DEBUG_COMPILER: Lazy<bool> =
+        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_DEBUG_ENV_VAR));
+    *DEBUG_COMPILER
+}
+
+pub fn debug_compiler_env_var_str() -> &'static str {
+    if debug_compiler_env_var() {
+        "true"
+    } else {
+        "false"
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Parser)]
 pub struct Flags {
     /// Compile in test mode
@@ -329,7 +345,11 @@ pub struct Flags {
     #[clap(
 	long = cli::SKIP_ATTRIBUTE_CHECKS,
     )]
-    pub skip_attribute_checks: bool,
+    skip_attribute_checks: bool,
+
+    /// Debug compiler by printing out internal information
+    #[clap(long = cli::DEBUG_FLAG, default_value=debug_compiler_env_var_str())]
+    debug: bool,
 }
 
 impl Flags {
@@ -342,6 +362,7 @@ impl Flags {
             bytecode_version: None,
             keep_testing_functions: false,
             skip_attribute_checks: false,
+            debug: debug_compiler_env_var(),
         }
     }
 
@@ -354,6 +375,7 @@ impl Flags {
             bytecode_version: None,
             keep_testing_functions: false,
             skip_attribute_checks: false,
+            debug: debug_compiler_env_var(),
         }
     }
 
@@ -366,6 +388,7 @@ impl Flags {
             bytecode_version: None,
             keep_testing_functions: false,
             skip_attribute_checks: false,
+            debug: debug_compiler_env_var(),
         }
     }
 
@@ -378,6 +401,7 @@ impl Flags {
             bytecode_version: None,
             keep_testing_functions: true,
             skip_attribute_checks: false,
+            debug: false,
         }
     }
 
@@ -439,6 +463,10 @@ impl Flags {
             skip_attribute_checks: new_value,
             ..self
         }
+    }
+
+    pub fn debug(&self) -> bool {
+        self.debug
     }
 }
 

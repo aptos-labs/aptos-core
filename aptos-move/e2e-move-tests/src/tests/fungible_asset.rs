@@ -43,7 +43,7 @@ fn test_basic_fungible_token() {
         .execute_view_function(
             str::parse(&format!(
                 "0x{}::managed_fungible_token::get_metadata",
-                *alice.address()
+                (*alice.address()).to_hex()
             ))
             .unwrap(),
             vec![],
@@ -58,7 +58,7 @@ fn test_basic_fungible_token() {
         &alice,
         str::parse(&format!(
             "0x{}::managed_fungible_asset::mint_to_primary_stores",
-            *alice.address()
+            (*alice.address()).to_hex()
         ))
         .unwrap(),
         vec![],
@@ -74,7 +74,7 @@ fn test_basic_fungible_token() {
         &alice,
         str::parse(&format!(
             "0x{}::managed_fungible_asset::transfer_between_primary_stores",
-            *alice.address()
+            (*alice.address()).to_hex()
         ))
         .unwrap(),
         vec![],
@@ -91,7 +91,7 @@ fn test_basic_fungible_token() {
         &alice,
         str::parse(&format!(
             "0x{}::managed_fungible_asset::burn_from_primary_stores",
-            *alice.address()
+            (*alice.address()).to_hex()
         ))
         .unwrap(),
         vec![],

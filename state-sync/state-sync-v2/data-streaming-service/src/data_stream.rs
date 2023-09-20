@@ -8,8 +8,10 @@ use crate::{
         DataClientRequest, DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
         NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
         NewTransactionsWithProofRequest, NotificationId, NumberOfStatesRequest,
-        StateValuesWithProofRequest, TransactionOutputsWithProofRequest,
-        TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
+        StateValuesWithProofRequest, SubscribeTransactionOutputsWithProofRequest,
+        SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
+        TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
+        TransactionsWithProofRequest,
     },
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
@@ -23,6 +25,7 @@ use aptos_data_client::{
     global_summary::{AdvertisedData, GlobalDataSummary},
     interface::{
         AptosDataClientInterface, Response, ResponseContext, ResponseError, ResponsePayload,
+        SubscriptionRequestMetadata,
     },
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
@@ -121,7 +124,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         let data_stream_listener = DataStreamListener::new(data_stream_id, notification_receiver);
 
         // Create a new stream engine
-        let stream_engine = StreamEngine::new(stream_request, advertised_data)?;
+        let stream_engine = StreamEngine::new(data_stream_config, stream_request, advertised_data)?;
 
         // Create a new data stream
         let data_stream = Self {
@@ -141,6 +144,17 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         };
 
         Ok((data_stream, data_stream_listener))
+    }
+
+    /// Clears the sent data requests queue and drops all tasks
+    pub fn clear_sent_data_requests_queue(&mut self) {
+        // Clear all pending data requests
+        if let Some(sent_data_requests) = self.sent_data_requests.as_mut() {
+            sent_data_requests.clear();
+        }
+
+        // Abort all spawned tasks
+        self.abort_spawned_tasks();
     }
 
     /// Returns true iff the first batch of data client requests has been sent
@@ -232,9 +246,11 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
 
         // Send the client requests
         if max_num_requests_to_send > 0 {
-            let client_requests = self
-                .stream_engine
-                .create_data_client_requests(max_num_requests_to_send, global_data_summary)?;
+            let client_requests = self.stream_engine.create_data_client_requests(
+                max_num_requests_to_send,
+                global_data_summary,
+                self.notification_id_generator.clone(),
+            )?;
             for client_request in &client_requests {
                 // Send the client request
                 let pending_client_response =
@@ -285,6 +301,8 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         // request type and the number of previous failures.
         let request_timeout_ms = if is_optimistic_fetch_request(&data_client_request) {
             self.data_client_config.optimistic_fetch_timeout_ms
+        } else if is_subscription_request(&data_client_request) {
+            self.data_client_config.subscription_response_timeout_ms
         } else if !request_retry {
             self.data_client_config.response_timeout_ms
         } else {
@@ -414,18 +432,19 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                         }
                     },
                     Err(error) => {
-                        // If the error was a timeout and the request was an optimistic fetch
-                        // we need to notify the stream engine and not retry the request.
-                        if matches!(
-                            error,
-                            aptos_data_client::error::Error::TimeoutWaitingForResponse(_)
-                        ) && is_optimistic_fetch_request(client_request)
+                        // Handle the error depending on the request type
+                        if is_subscription_request(client_request)
+                            || is_optimistic_fetch_request(client_request)
                         {
+                            // The request was for new data. We should notify the
+                            // stream engine and clear the requests queue.
                             self.stream_engine
-                                .notify_optimistic_fetch_timeout(client_request)?;
+                                .notify_new_data_request_error(client_request, error)?;
+                            self.clear_sent_data_requests_queue();
                         } else {
+                            // Otherwise, we should handle the error and simply retry
                             self.handle_data_client_error(client_request, &error)?;
-                        };
+                        }
                         break;
                     },
                 }
@@ -668,6 +687,14 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
 impl<T> Drop for DataStream<T> {
     /// Terminates the stream by aborting all spawned tasks
     fn drop(&mut self) {
+        self.abort_spawned_tasks();
+    }
+}
+
+impl<T> DataStream<T> {
+    /// Aborts all currently spawned tasks. This is useful if the stream is
+    /// terminated prematurely, or if the sent data requests are cleared.
+    fn abort_spawned_tasks(&mut self) {
         for spawned_task in &self.spawned_tasks {
             spawned_task.abort();
         }
@@ -755,6 +782,27 @@ fn sanity_check_client_response(
             matches!(
                 data_client_response.payload,
                 ResponsePayload::StateValuesWithProof(_)
+            )
+        },
+        DataClientRequest::SubscribeTransactionsWithProof(_) => {
+            matches!(
+                data_client_response.payload,
+                ResponsePayload::NewTransactionsWithProof(_)
+            )
+        },
+        DataClientRequest::SubscribeTransactionOutputsWithProof(_) => {
+            matches!(
+                data_client_response.payload,
+                ResponsePayload::NewTransactionOutputsWithProof(_)
+            )
+        },
+        DataClientRequest::SubscribeTransactionsOrOutputsWithProof(_) => {
+            matches!(
+                data_client_response.payload,
+                ResponsePayload::NewTransactionsWithProof(_)
+            ) || matches!(
+                data_client_response.payload,
+                ResponsePayload::NewTransactionOutputsWithProof(_)
             )
         },
         DataClientRequest::TransactionsWithProof(_) => {
@@ -847,6 +895,26 @@ fn spawn_request_task<T: AptosDataClientInterface + Send + Clone + 'static>(
             },
             DataClientRequest::StateValuesWithProof(request) => {
                 get_states_values_with_proof(aptos_data_client, request, request_timeout_ms).await
+            },
+            DataClientRequest::SubscribeTransactionsWithProof(request) => {
+                subscribe_to_transactions_with_proof(aptos_data_client, request, request_timeout_ms)
+                    .await
+            },
+            DataClientRequest::SubscribeTransactionOutputsWithProof(request) => {
+                subscribe_to_transaction_outputs_with_proof(
+                    aptos_data_client,
+                    request,
+                    request_timeout_ms,
+                )
+                .await
+            },
+            DataClientRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
+                subscribe_to_transactions_or_outputs_with_proof(
+                    aptos_data_client,
+                    request,
+                    request_timeout_ms,
+                )
+                .await
             },
             DataClientRequest::TransactionOutputsWithProof(request) => {
                 get_transaction_outputs_with_proof(aptos_data_client, request, request_timeout_ms)
@@ -1029,6 +1097,73 @@ async fn get_transactions_or_outputs_with_proof<
     Ok(Response::new(context, ResponsePayload::try_from(payload)?))
 }
 
+async fn subscribe_to_transactions_with_proof<
+    T: AptosDataClientInterface + Send + Clone + 'static,
+>(
+    aptos_data_client: T,
+    request: SubscribeTransactionsWithProofRequest,
+    request_timeout_ms: u64,
+) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
+    let subscription_request_metadata = SubscriptionRequestMetadata {
+        known_version_at_stream_start: request.known_version,
+        known_epoch_at_stream_start: request.known_epoch,
+        subscription_stream_id: request.subscription_stream_id,
+        subscription_stream_index: request.subscription_stream_index,
+    };
+    let client_response = aptos_data_client.subscribe_to_transactions_with_proof(
+        subscription_request_metadata,
+        request.include_events,
+        request_timeout_ms,
+    );
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
+}
+
+async fn subscribe_to_transaction_outputs_with_proof<
+    T: AptosDataClientInterface + Send + Clone + 'static,
+>(
+    aptos_data_client: T,
+    request: SubscribeTransactionOutputsWithProofRequest,
+    request_timeout_ms: u64,
+) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
+    let subscription_request_metadata = SubscriptionRequestMetadata {
+        known_version_at_stream_start: request.known_version,
+        known_epoch_at_stream_start: request.known_epoch,
+        subscription_stream_id: request.subscription_stream_id,
+        subscription_stream_index: request.subscription_stream_index,
+    };
+    let client_response = aptos_data_client.subscribe_to_transaction_outputs_with_proof(
+        subscription_request_metadata,
+        request_timeout_ms,
+    );
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
+}
+
+async fn subscribe_to_transactions_or_outputs_with_proof<
+    T: AptosDataClientInterface + Send + Clone + 'static,
+>(
+    aptos_data_client: T,
+    request: SubscribeTransactionsOrOutputsWithProofRequest,
+    request_timeout_ms: u64,
+) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
+    let subscription_request_metadata = SubscriptionRequestMetadata {
+        known_version_at_stream_start: request.known_version,
+        known_epoch_at_stream_start: request.known_epoch,
+        subscription_stream_id: request.subscription_stream_id,
+        subscription_stream_index: request.subscription_stream_index,
+    };
+    let client_response = aptos_data_client.subscribe_to_transactions_or_outputs_with_proof(
+        subscription_request_metadata,
+        request.include_events,
+        request_timeout_ms,
+    );
+    let (context, payload) = client_response.await?.into_parts();
+    Ok(Response::new(context, ResponsePayload::try_from(payload)?))
+}
+
 /// Returns true iff the given request is an optimistic fetch request
 fn is_optimistic_fetch_request(request: &DataClientRequest) -> bool {
     matches!(request, DataClientRequest::NewTransactionsWithProof(_))
@@ -1040,4 +1175,18 @@ fn is_optimistic_fetch_request(request: &DataClientRequest) -> bool {
             request,
             DataClientRequest::NewTransactionsOrOutputsWithProof(_)
         )
+}
+
+/// Returns true iff the given request is a subscription request
+fn is_subscription_request(request: &DataClientRequest) -> bool {
+    matches!(
+        request,
+        DataClientRequest::SubscribeTransactionsWithProof(_)
+    ) || matches!(
+        request,
+        DataClientRequest::SubscribeTransactionOutputsWithProof(_)
+    ) || matches!(
+        request,
+        DataClientRequest::SubscribeTransactionsOrOutputsWithProof(_)
+    )
 }

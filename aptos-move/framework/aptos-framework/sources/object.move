@@ -45,6 +45,8 @@ module aptos_framework::object {
     const EMAXIMUM_NESTING: u64 = 6;
     /// The resource is not stored at the specified address.
     const ERESOURCE_DOES_NOT_EXIST: u64 = 7;
+    /// Cannot reclaim objects that weren't burnt.
+    const EOBJECT_NOT_BURNT: u64 = 8;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const INIT_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -84,6 +86,9 @@ module aptos_framework::object {
     /// derivation to produce an object address.
     const OBJECT_FROM_SEED_ADDRESS_SCHEME: u8 = 0xFE;
 
+    /// Address where unwanted objects can be forcefully transferred to.
+    const BURN_ADDRESS: address = @0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The core of the object model that defines ownership, transferability, and events.
     struct ObjectCore has key {
@@ -96,6 +101,13 @@ module aptos_framework::object {
         allow_ungated_transfer: bool,
         /// Emitted events upon transferring of ownership.
         transfer_events: event::EventHandle<TransferEvent>,
+    }
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    /// This is added to objects that are burnt (ownership transferred to BURN_ADDRESS).
+    struct TombStone has key {
+        /// Track the previous owner before the object is burnt so they can reclaim later if so desired.
+        original_owner: address,
     }
 
     #[resource_group(scope = global)]
@@ -149,6 +161,11 @@ module aptos_framework::object {
         object: address,
         from: address,
         to: address,
+    }
+
+    #[view]
+    public fun is_burnt<T: key>(object: Object<T>): bool {
+        exists<TombStone>(object.inner)
     }
 
     /// Produces an ObjectId from the given address. This is not verified.
@@ -515,6 +532,52 @@ module aptos_framework::object {
         };
     }
 
+    /// Forcefully transfer an unwanted object to BURN_ADDRESS, ignoring whether ungated_transfer is allowed.
+    /// This only works for objects directly owned and for simplicity does not apply to indirectly owned objects.
+    /// Original owners can reclaim burnt objects any time in the future by calling unburn.
+    public entry fun burn<T: key>(owner: &signer, object: Object<T>) acquires ObjectCore {
+        let original_owner = signer::address_of(owner);
+        assert!(owner(object) == original_owner, error::permission_denied(ENOT_OBJECT_OWNER));
+        let object_addr = object.inner;
+        move_to(&create_signer(object_addr), TombStone { original_owner });
+        let object = borrow_global_mut<ObjectCore>(object_addr);
+        object.owner = BURN_ADDRESS;
+
+        // Burn should still emit event to make sure ownership is upgrade correctly in indexing.
+        event::emit_event(
+            &mut object.transfer_events,
+            TransferEvent {
+                object: object_addr,
+                from: original_owner,
+                to: BURN_ADDRESS,
+            },
+        );
+    }
+
+    /// Allow origin owners to reclaim any objects they previous burnt.
+    public entry fun unburn<T: key>(
+        original_owner: &signer,
+        object: Object<T>,
+    ) acquires ObjectCore, TombStone {
+        let object_addr = object.inner;
+        assert!(exists<TombStone>(object_addr), error::invalid_argument(EOBJECT_NOT_BURNT));
+
+        let TombStone { original_owner: original_owner_addr } = move_from<TombStone>(object_addr);
+        assert!(original_owner_addr == signer::address_of(original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
+        let object = borrow_global_mut<ObjectCore>(object_addr);
+        object.owner = original_owner_addr;
+
+        // Unburn reclaims should still emit event to make sure ownership is upgrade correctly in indexing.
+        event::emit_event(
+            &mut object.transfer_events,
+            TransferEvent {
+                object: object_addr,
+                from: BURN_ADDRESS,
+                to: original_owner_addr,
+            },
+        );
+    }
+
     /// Accessors
     /// Return true if ungated transfer is allowed.
     public fun ungated_transfer_allowed<T: key>(object: Object<T>): bool acquires ObjectCore {
@@ -701,5 +764,44 @@ module aptos_framework::object {
         std::vector::push_back(&mut bytes, DERIVE_AUID_ADDRESS_SCHEME);
         let auid2 = aptos_framework::from_bcs::to_address(std::hash::sha3_256(bytes));
         assert!(auid1 == auid2, 0);
+    }
+
+    #[test(creator = @0x123)]
+    fun test_burn_and_unburn(creator: &signer) acquires ObjectCore, TombStone {
+        let (hero_constructor, hero) = create_hero(creator);
+        // Freeze the object.
+        let transfer_ref = generate_transfer_ref(&hero_constructor);
+        disable_ungated_transfer(&transfer_ref);
+
+        // Owner should be able to burn, despite ungated transfer disallowed.
+        burn(creator, hero);
+        assert!(owner(hero) == BURN_ADDRESS, 0);
+        assert!(!ungated_transfer_allowed(hero), 0);
+
+        // Owner should be able to reclaim.
+        unburn(creator, hero);
+        assert!(owner(hero) == signer::address_of(creator), 0);
+        // Object still frozen.
+        assert!(!ungated_transfer_allowed(hero), 0);
+    }
+
+    #[test(creator = @0x123)]
+    #[expected_failure(abort_code = 0x50004, location = Self)]
+    fun test_burn_indirectly_owned_should_fail(creator: &signer) acquires ObjectCore {
+        let (_, hero) = create_hero(creator);
+        let (_, weapon) = create_weapon(creator);
+        transfer_to_object(creator, weapon, hero);
+
+        // Owner should be not be able to burn weapon directly.
+        assert!(owner(weapon) == object_address(&hero), 0);
+        assert!(owns(weapon, signer::address_of(creator)), 0);
+        burn(creator, weapon);
+    }
+
+    #[test(creator = @0x123)]
+    #[expected_failure(abort_code = 0x10008, location = Self)]
+    fun test_unburn_object_not_burnt_should_fail(creator: &signer) acquires ObjectCore, TombStone {
+        let (_, hero) = create_hero(creator);
+        unburn(creator, hero);
     }
 }

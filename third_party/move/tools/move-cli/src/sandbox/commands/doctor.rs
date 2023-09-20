@@ -76,17 +76,5 @@ pub fn doctor(state: &OnDiskStateView) -> Result<()> {
             )
         }
     }
-    // deserialize each event
-    for event_path in state.event_paths() {
-        let event = state.view_events(&event_path);
-        if event.is_err() {
-            bail!(
-                "Failed to deserialize event {:?} stored under address {:?}",
-                event_path.file_name().unwrap(),
-                parent_addr(&event_path)
-            )
-        }
-    }
-
     Ok(())
 }

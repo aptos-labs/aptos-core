@@ -35,7 +35,7 @@ type WT = WeightedTranscript<das::Transcript>;
 pub enum DKGManagerWrapper {
     #[allow(dead_code)]
     NoDKG,
-    WithDKG(Arc<Mutex<DKGManager>>),
+    WithDKG(Arc<Mutex<DKGManager>>),    // dkg todo: remove mutex, use concurrent data structure and channels instead
 }
 
 impl DKGManagerWrapper {

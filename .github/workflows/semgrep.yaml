@@ -14,6 +14,7 @@ jobs:
 
     container:
       image: returntocorp/semgrep
+      options: --user root
 
     # Skip any PR created by dependabot to avoid permission issues:
     if: (github.actor != 'dependabot[bot]')

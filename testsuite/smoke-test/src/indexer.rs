@@ -33,7 +33,7 @@ pub fn setup_indexer() -> anyhow::Result<PgDbPool> {
 }
 
 pub async fn execute_nft_txns<'t>(
-    mut creator: LocalAccount,
+    creator: LocalAccount,
     info: &mut AptosPublicInfo<'t>,
 ) -> Result<()> {
     let collection_name = "collection name".to_owned().into_bytes();

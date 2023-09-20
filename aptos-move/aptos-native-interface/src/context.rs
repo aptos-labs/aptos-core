@@ -118,4 +118,9 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
     pub fn set_incremental_gas_charging(&mut self, enable: bool) {
         self.enable_incremental_gas_charging = enable;
     }
+
+    /// Returns true if the aggregator snapshots feature is enabled.
+    pub fn aggregator_snapshots_enabled(&self) -> bool {
+        self.get_feature_flags().is_aggregator_snapshots_enabled()
+    }
 }

@@ -5,19 +5,17 @@
 use crate::{
     experimental::{
         buffer_manager::{create_channel, BufferManager, OrderedBlocks, ResetRequest},
-        execution_phase::{ExecutionPhase, ExecutionRequest, ExecutionResponse},
+        execution_schedule_phase::{ExecutionRequest, ExecutionSchedulePhase},
+        execution_wait_phase::{ExecutionResponse, ExecutionWaitPhase, ExecutionWaitRequest},
         persisting_phase::{PersistingPhase, PersistingRequest},
         pipeline_phase::{CountedRequest, PipelinePhase},
-        signing_phase::{SigningPhase, SigningRequest, SigningResponse},
+        signing_phase::{CommitSignerProvider, SigningPhase, SigningRequest, SigningResponse},
     },
-    metrics_safety_rules::MetricsSafetyRules,
-    network::NetworkSender,
-    round_manager::VerifiedEvent,
+    network::{IncomingCommitRequest, NetworkSender},
     state_replication::StateComputer,
 };
 use aptos_channels::aptos_channel::Receiver;
 use aptos_consensus_types::common::Author;
-use aptos_infallible::Mutex;
 use aptos_types::{account_address::AccountAddress, validator_verifier::ValidatorVerifier};
 use futures::channel::mpsc::UnboundedReceiver;
 use std::sync::{atomic::AtomicU64, Arc};
@@ -26,32 +24,43 @@ use std::sync::{atomic::AtomicU64, Arc};
 pub fn prepare_phases_and_buffer_manager(
     author: Author,
     execution_proxy: Arc<dyn StateComputer>,
-    safety_rules: Arc<Mutex<MetricsSafetyRules>>,
+    safety_rules: Arc<dyn CommitSignerProvider>,
     commit_msg_tx: NetworkSender,
-    commit_msg_rx: Receiver<AccountAddress, VerifiedEvent>,
+    commit_msg_rx: Receiver<AccountAddress, IncomingCommitRequest>,
     persisting_proxy: Arc<dyn StateComputer>,
     block_rx: UnboundedReceiver<OrderedBlocks>,
     sync_rx: UnboundedReceiver<ResetRequest>,
     verifier: ValidatorVerifier,
 ) -> (
-    PipelinePhase<ExecutionPhase>,
+    PipelinePhase<ExecutionSchedulePhase>,
+    PipelinePhase<ExecutionWaitPhase>,
     PipelinePhase<SigningPhase>,
     PipelinePhase<PersistingPhase>,
     BufferManager,
 ) {
-    // Execution Phase
-    let (execution_phase_request_tx, execution_phase_request_rx) =
-        create_channel::<CountedRequest<ExecutionRequest>>();
-    let (execution_phase_response_tx, execution_phase_response_rx) =
-        create_channel::<ExecutionResponse>();
-
     let ongoing_tasks = Arc::new(AtomicU64::new(0));
 
-    let execution_phase_processor = ExecutionPhase::new(execution_proxy);
-    let execution_phase = PipelinePhase::new(
-        execution_phase_request_rx,
-        Some(execution_phase_response_tx),
-        Box::new(execution_phase_processor),
+    // Execution Phase
+    let (execution_schedule_phase_request_tx, execution_schedule_phase_request_rx) =
+        create_channel::<CountedRequest<ExecutionRequest>>();
+    let (execution_schedule_phase_response_tx, execution_schedule_phase_response_rx) =
+        create_channel::<ExecutionWaitRequest>();
+    let execution_schedule_phase_processor = ExecutionSchedulePhase::new(execution_proxy);
+    let execution_schedule_phase = PipelinePhase::new(
+        execution_schedule_phase_request_rx,
+        Some(execution_schedule_phase_response_tx),
+        Box::new(execution_schedule_phase_processor),
+    );
+
+    let (execution_wait_phase_request_tx, execution_wait_phase_request_rx) =
+        create_channel::<CountedRequest<ExecutionWaitRequest>>();
+    let (execution_wait_phase_response_tx, execution_wait_phase_response_rx) =
+        create_channel::<ExecutionResponse>();
+    let execution_wait_phase_processor = ExecutionWaitPhase;
+    let execution_wait_phase = PipelinePhase::new(
+        execution_wait_phase_request_rx,
+        Some(execution_wait_phase_response_tx),
+        Box::new(execution_wait_phase_processor),
     );
 
     // Signing Phase
@@ -79,16 +88,19 @@ pub fn prepare_phases_and_buffer_manager(
     );
 
     (
-        execution_phase,
+        execution_schedule_phase,
+        execution_wait_phase,
         signing_phase,
         persisting_phase,
         BufferManager::new(
             author,
-            execution_phase_request_tx,
-            execution_phase_response_rx,
+            execution_schedule_phase_request_tx,
+            execution_schedule_phase_response_rx,
+            execution_wait_phase_request_tx,
+            execution_wait_phase_response_rx,
             signing_phase_request_tx,
             signing_phase_response_rx,
-            commit_msg_tx,
+            Arc::new(commit_msg_tx),
             commit_msg_rx,
             persisting_phase_request_tx,
             block_rx,

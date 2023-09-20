@@ -28,7 +28,7 @@ module 0x1.Token {
 
 }
 
-//# run
+//# run --verbose
 import 0x1.Token;
 
 main() {

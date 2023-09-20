@@ -14,7 +14,9 @@ use move_binary_format::{
     file_format::{FunctionHandle, ModuleHandle, TableIndex},
     file_format_common,
 };
+use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_ir_types::ast as IR_AST;
 use move_model::{
     ast::Address,
     model::{
@@ -27,6 +29,7 @@ use move_model::{
 use move_stackless_bytecode::{
     function_target_pipeline::FunctionTargetsHolder, stackless_bytecode::Constant,
 };
+use move_symbol_pool::symbol as IR_SYMBOL;
 use std::collections::BTreeMap;
 
 /// Internal state of the module code generator
@@ -67,14 +70,18 @@ pub struct ModuleGenerator {
     /// A mapping from constants sequences to pool indices.
     cons_to_idx: BTreeMap<Constant, FF::ConstantPoolIndex>,
     /// The file-format module we are building.
-    pub module: move_binary_format::CompiledModule,
+    pub module: FF::CompiledModule,
+    /// The source map for the module.
+    pub source_map: SourceMap,
 }
 
 /// Immutable context for a module code generation, seperated from the mutable generator
 /// state to reduce borrow conflicts.
 #[derive(Debug, Clone)]
 pub struct ModuleContext<'env> {
+    /// The global model.
     pub env: &'env GlobalEnv,
+    /// A holder for function target data, containing stackless bytecode.
     pub targets: &'env FunctionTargetsHolder,
 }
 
@@ -83,11 +90,25 @@ impl ModuleGenerator {
     pub fn run(
         ctx: &ModuleContext,
         module_env: &ModuleEnv,
-    ) -> (FF::CompiledModule, Option<FF::FunctionHandle>) {
+    ) -> (FF::CompiledModule, SourceMap, Option<FF::FunctionHandle>) {
         let module = move_binary_format::CompiledModule {
-            version: file_format_common::VERSION_6,
+            version: file_format_common::VERSION_EXPERIMENTAL,
             self_module_handle_idx: FF::ModuleHandleIndex(0),
             ..Default::default()
+        };
+        let source_map = {
+            let module_name_opt = if module_env.is_script_module() {
+                None
+            } else {
+                let name = IR_AST::ModuleName(IR_SYMBOL::Symbol::from(
+                    ctx.symbol_to_str(module_env.get_name().name()),
+                ));
+                Some(IR_AST::ModuleIdent::new(
+                    name,
+                    module_env.get_name().addr().expect_numerical(),
+                ))
+            };
+            SourceMap::new(ctx.env.to_ir_loc(&module_env.get_loc()), module_name_opt)
         };
         let mut gen = Self {
             module_idx: FF::ModuleHandleIndex(0),
@@ -105,9 +126,10 @@ impl ModuleGenerator {
             main_handle: None,
             script_handle: None,
             module,
+            source_map,
         };
         gen.gen_module(ctx, module_env);
-        (gen.module, gen.main_handle)
+        (gen.module, gen.source_map, gen.main_handle)
     }
 
     /// Generates a module, visiting all of its members.
@@ -660,5 +682,10 @@ impl<'env> ModuleContext<'env> {
         } else {
             None
         }
+    }
+
+    /// Convert the symbol into a string.
+    pub fn symbol_to_str(&self, s: Symbol) -> String {
+        s.display(self.env.symbol_pool()).to_string()
     }
 }

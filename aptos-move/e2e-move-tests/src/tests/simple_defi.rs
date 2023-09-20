@@ -59,8 +59,11 @@ fn exchange_e2e_test() {
     assert_success!(result);
 
     // verify that we store the signer cap within the module
-    let module_data =
-        parse_struct_tag(&format!("0x{}::simple_defi::ModuleData", resource_address)).unwrap();
+    let module_data = parse_struct_tag(&format!(
+        "0x{}::simple_defi::ModuleData",
+        resource_address.to_hex()
+    ))
+    .unwrap();
 
     assert_eq!(
         h.read_resource::<ModuleData>(&resource_address, module_data)

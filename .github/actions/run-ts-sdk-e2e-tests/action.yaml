@@ -13,11 +13,11 @@ runs:
   using: composite
   steps:
     # Install node and pnpm.
-    - uses: actions/setup-node@969bd2663942d722d85b6a8626225850c2f7be4b # pin@v3
+    - uses: actions/setup-node@v3
       with:
         node-version-file: .node-version
         registry-url: "https://registry.npmjs.org"
-    - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
+    - uses: pnpm/action-setup@v2
 
     # Find a docker image to use for the testnet.
     - uses: ./.github/actions/get-latest-docker-image-tag

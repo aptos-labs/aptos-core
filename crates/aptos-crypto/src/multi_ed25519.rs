@@ -558,7 +558,8 @@ impl From<Ed25519Signature> for MultiEd25519Signature {
 // Helper functions //
 //////////////////////
 
-// Helper function required to MultiEd25519 keys to_bytes to add the threshold.
+/// Helper function used to convert a slice of MultiEd25519 keys to a sequence of bytes by
+/// concatenating the serialized `keys` and the `threshold`.
 fn to_bytes<T: ValidCryptoMaterial>(keys: &[T], threshold: u8) -> Vec<u8> {
     let mut bytes: Vec<u8> = keys
         .iter()

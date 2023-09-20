@@ -11,25 +11,39 @@ use crate::state_store::{
 };
 use anyhow::{bail, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use bytes::Bytes;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{btree_map, BTreeMap},
-    ops::Deref,
+    ops::{Deref, DerefMut},
 };
+
+// Note: in case this changes in the future, it doesn't have to be a constant, and can be read from
+// genesis directly if necessary.
+pub static TOTAL_SUPPLY_STATE_KEY: Lazy<StateKey> = Lazy::new(|| {
+    StateKey::table_item(
+        "1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca"
+            .parse()
+            .unwrap(),
+        vec![
+            6, 25, 220, 41, 160, 170, 200, 250, 20, 103, 20, 5, 142, 141, 214, 210, 208, 243, 189,
+            245, 246, 51, 25, 7, 191, 145, 243, 172, 216, 30, 105, 53,
+        ],
+    )
+});
 
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
-    Creation(#[serde(with = "serde_bytes")] Vec<u8>),
-    Modification(#[serde(with = "serde_bytes")] Vec<u8>),
+    Creation(Bytes),
+    Modification(Bytes),
     Deletion,
     CreationWithMetadata {
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
+        data: Bytes,
         metadata: StateValueMetadata,
     },
     ModificationWithMetadata {
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
+        data: Bytes,
         metadata: StateValueMetadata,
     },
     DeletionWithMetadata {
@@ -129,19 +143,7 @@ impl WriteOp {
         Ok(true)
     }
 
-    pub fn into_bytes(self) -> Option<Vec<u8>> {
-        use WriteOp::*;
-
-        match self {
-            Creation(data)
-            | CreationWithMetadata { data, .. }
-            | Modification(data)
-            | ModificationWithMetadata { data, .. } => Some(data),
-            Deletion | DeletionWithMetadata { .. } => None,
-        }
-    }
-
-    pub fn bytes(&self) -> Option<&[u8]> {
+    pub fn bytes(&self) -> Option<&Bytes> {
         use WriteOp::*;
 
         match self {
@@ -166,21 +168,59 @@ impl WriteOp {
 }
 
 pub trait TransactionWrite {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>>;
+    fn bytes(&self) -> Option<&Bytes>;
 
     fn as_state_value(&self) -> Option<StateValue>;
+
+    // Often, the contents of W:TransactionWrite are converted to Option<StateValue>, e.g.
+    // to emulate reading from storage after W has been applied. However, in some contexts,
+    // it is also helpful to convert a StateValue to a potential instance of W that would
+    // have the desired effect. This allows e.g. to store certain sentinel elements of
+    // type W in data-structures (happens in MVHashMap). If there are several instances of
+    // W that correspond to maybe_state_value, an arbitrary one may be provided.
+    fn from_state_value(maybe_state_value: Option<StateValue>) -> Self;
+
+    fn extract_raw_bytes(&self) -> Option<Bytes> {
+        self.bytes().cloned()
+    }
+
+    fn bytes_len(&self) -> usize {
+        self.bytes().map(|bytes| bytes.len()).unwrap_or(0)
+    }
+
+    fn as_u128(&self) -> anyhow::Result<Option<u128>> {
+        match self.bytes() {
+            Some(bytes) => Ok(Some(bcs::from_bytes(bytes)?)),
+            None => Ok(None),
+        }
+    }
+
+    fn is_deletion(&self) -> bool {
+        self.bytes().is_none()
+    }
 }
 
 impl TransactionWrite for WriteOp {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
-        self.clone().into_bytes()
+    fn bytes(&self) -> Option<&Bytes> {
+        self.bytes()
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
         self.bytes().map(|bytes| match self.metadata() {
-            None => StateValue::new_legacy(bytes.to_vec()),
-            Some(metadata) => StateValue::new_with_metadata(bytes.to_vec(), metadata.clone()),
+            None => StateValue::new_legacy(bytes.clone()),
+            Some(metadata) => StateValue::new_with_metadata(bytes.clone(), metadata.clone()),
         })
+    }
+
+    fn from_state_value(maybe_state_value: Option<StateValue>) -> Self {
+        match maybe_state_value.map(|state_value| state_value.into()) {
+            None => WriteOp::Deletion,
+            Some((None, bytes)) => WriteOp::Creation(bytes),
+            Some((Some(metadata), bytes)) => WriteOp::CreationWithMetadata {
+                data: bytes,
+                metadata,
+            },
+        }
     }
 }
 
@@ -258,6 +298,14 @@ impl Deref for WriteSet {
     }
 }
 
+impl DerefMut for WriteSet {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            Self::V0(write_set) => write_set,
+        }
+    }
+}
+
 /// `WriteSet` contains all access paths that one transaction modifies. Each of them is a `WriteOp`
 /// where `Value(val)` means that serialized representation should be updated to `val`, and
 /// `Deletion` means that we are going to delete this access path.
@@ -280,6 +328,30 @@ impl WriteSetV0 {
     pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {
         self.0.get(key)
     }
+
+    pub fn get_total_supply(&self) -> Option<u128> {
+        let value = self
+            .0
+            .get(&TOTAL_SUPPLY_STATE_KEY)
+            .and_then(|op| op.bytes())
+            .map(|bytes| bcs::from_bytes::<u128>(bytes));
+        value.transpose().map_err(anyhow::Error::msg).unwrap()
+    }
+
+    // This is a temporary method to update the total supply in the write set.
+    // TODO: get rid of this func() and use WriteSetMut instead; for that we need to change
+    //       VM execution such that to 'TransactionOutput' is materialized after updating
+    //       total_supply.
+    pub fn update_total_supply(&mut self, value: u128) {
+        assert!(self
+            .0
+            .write_set
+            .insert(
+                TOTAL_SUPPLY_STATE_KEY.clone(),
+                WriteOp::Modification(bcs::to_bytes(&value).unwrap().into())
+            )
+            .is_some());
+    }
 }
 
 /// A mutable version of `WriteSet`.
@@ -287,6 +359,7 @@ impl WriteSetV0 {
 /// This is separate because it goes through validation before becoming an immutable `WriteSet`.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct WriteSetMut {
+    // TODO: Change to HashMap with a stable iterator for serialization.
     write_set: BTreeMap<StateKey, WriteOp>,
 }
 

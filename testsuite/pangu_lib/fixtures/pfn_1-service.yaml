@@ -21,6 +21,6 @@ spec:
     protocol: TCP
   selector:
     app.kubernetes.io/instance: pfn-name-pfn
-    app.kubernetes.io/name: pfn-name
+    app.kubernetes.io/name: pfn
     managed-by: pangu
     type: pfn

@@ -7,7 +7,7 @@ use crate::{
     proof_of_store::{BatchInfo, ProofOfStore},
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::Error;
+use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_types::{
     account_address::AccountAddress, transaction::SignedTransaction,
@@ -66,9 +66,22 @@ pub enum DataStatus {
     Requested(
         Vec<(
             HashValue,
-            oneshot::Receiver<Result<Vec<SignedTransaction>, Error>>,
+            oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
         )>,
     ),
+}
+
+impl DataStatus {
+    pub fn extend(&mut self, other: DataStatus) {
+        match (self, other) {
+            (DataStatus::Requested(v1), DataStatus::Requested(v2)) => v1.extend(v2.into_iter()),
+            (_, _) => unreachable!(),
+        }
+    }
+
+    pub fn take(&mut self) -> DataStatus {
+        std::mem::replace(self, DataStatus::Requested(vec![]))
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -91,6 +104,17 @@ impl ProofWithData {
         Self {
             proofs,
             status: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    pub fn extend(&mut self, other: ProofWithData) {
+        let other_data_status = other.status.lock().as_mut().unwrap().take();
+        self.proofs.extend(other.proofs);
+        let mut status = self.status.lock();
+        if status.is_none() {
+            *status = Some(other_data_status);
+        } else {
+            status.as_mut().unwrap().extend(other_data_status);
         }
     }
 }
@@ -165,6 +189,14 @@ impl Payload {
             Payload::DirectMempool(txns) => txns.is_empty(),
             Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs.is_empty(),
             Payload::DKG(_) => false,
+        }
+    }
+
+    pub fn extend(&mut self, other: Payload) {
+        match (self, other) {
+            (Payload::DirectMempool(v1), Payload::DirectMempool(v2)) => v1.extend(v2),
+            (Payload::InQuorumStore(p1), Payload::InQuorumStore(p2)) => p1.extend(p2),
+            (_, _) => unreachable!(),
         }
     }
 

@@ -69,7 +69,7 @@ impl PackageHandler {
     // Return a `Package` to be published. Packages are tracked by publisher so if
     // the same `LocalAccount` is used, the package will be an upgrade of the existing one
     // otherwise a "new" package will be generated (new suffix)
-    pub fn pick_package(&mut self, rng: &mut StdRng, publisher: &mut LocalAccount) -> Package {
+    pub fn pick_package(&mut self, rng: &mut StdRng, publisher: &LocalAccount) -> Package {
         let idx = rng.gen_range(0usize, self.packages.len());
         let tracker = self
             .packages
@@ -161,7 +161,7 @@ impl Package {
     // Return a transaction to publish the current package
     pub fn publish_transaction(
         &self,
-        publisher: &mut LocalAccount,
+        publisher: &LocalAccount,
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction {
         match self {
@@ -175,7 +175,7 @@ impl Package {
     pub fn use_random_transaction(
         &self,
         rng: &mut StdRng,
-        account: &mut LocalAccount,
+        account: &LocalAccount,
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction {
         // let payload = module_simple::rand_gen_function(rng, module_id);
@@ -259,7 +259,7 @@ fn update(
 
 fn publish_transaction(
     txn_factory: &TransactionFactory,
-    publisher: &mut LocalAccount,
+    publisher: &LocalAccount,
     modules: &[(String, CompiledModule)],
     metadata: &PackageMetadata,
 ) -> SignedTransaction {

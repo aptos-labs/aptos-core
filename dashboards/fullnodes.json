@@ -54,77 +54,69 @@
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 7,
-      "isNew": false,
       "panels": [],
       "span": 0,
       "title": "State Sync",
       "type": "row"
     },
     {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "description": "Ledger timestamp's lag compared to the nodes current time.",
-      "editable": false,
-      "error": false,
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
-      "hiddenSeries": false,
-      "id": 29,
-      "isNew": false,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisShow": false,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
       },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "options": { "alertThreshold": true },
-      "percentage": false,
-      "pluginVersion": "9.1.1",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "span": 0,
-      "stack": false,
-      "steppedLine": false,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "id": 29,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "10.2.0-60139",
       "targets": [
         {
-          "expr": "(aptos_state_sync_timestamp{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", type=\"real\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} - on(kubernetes_pod_name, kubernetes_pod_name) aptos_state_sync_timestamp{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", type=\"synced\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "aptos_state_sync_version{type=\"synced\", kubernetes_pod_name=~\"$kubernetes_pod_name\", kubernetes_pod_name=~\".*fullnode.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}",
           "legendFormat": "{{kubernetes_pod_name}}-{{kubernetes_pod_name}}",
+          "range": true,
           "refId": "A"
-        },
-        {
-          "expr": "(aptos_state_sync_timestamp{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", type=\"real\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} - on(kubernetes_pod_name, job) aptos_state_sync_timestamp{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", type=\"synced\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
-          "legendFormat": "{{kubernetes_pod_name}}-{{job}}",
-          "refId": "B"
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "State Sync Lag",
-      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-      "type": "graph",
-      "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
-      "yaxes": [
-        { "format": "ms", "logBase": 1, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "yaxis": { "align": false }
+      "title": "State Sync Version",
+      "type": "timeseries"
     },
     {
       "aliasColors": {},
@@ -132,7 +124,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "description": "1 = It's fully synchronized\n0 = It's NOT synchronized",
+      "description": "",
       "editable": false,
       "error": false,
       "fill": 0,
@@ -140,7 +132,6 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
       "hiddenSeries": false,
       "id": 33,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -159,7 +150,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "10.2.0-60139",
       "pointradius": 0.5,
       "points": false,
       "renderer": "flot",
@@ -170,19 +161,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(aptos_state_sync_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", type=\"highest\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} - on(kubernetes_pod_name, kubernetes_pod_name) aptos_state_sync_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", type=\"committed\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}) < bool 15",
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "count(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",  role=\"validator_fullnode\", data_type=\"transactions\"}  - on(kubernetes_pod_name,role,run_uuid) aptos_state_sync_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"telemetry-service\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator_fullnode\", type=\"synced\"} > 50000)  OR on() vector(0)",
           "legendFormat": "{{kubernetes_pod_name}}-{{kubernetes_pod_name}}",
+          "range": true,
           "refId": "A"
-        },
-        {
-          "expr": "(aptos_state_sync_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", type=\"highest\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} - on(kubernetes_pod_name, job) aptos_state_sync_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", type=\"committed\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}) < bool 15",
-          "legendFormat": "{{kubernetes_pod_name}}-{{job}}",
-          "refId": "B"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Synchronized",
+      "title": "Fullnodes lagging behind",
       "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
@@ -206,7 +195,6 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
       "hiddenSeries": false,
       "id": 2,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -225,7 +213,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "10.2.0-60139",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -272,7 +260,6 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
       "hiddenSeries": false,
       "id": 13,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -291,7 +278,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "10.2.0-60139",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -302,19 +289,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(aptos_state_sync_active_upstream_peers{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}) by (kubernetes_pod_name, kubernetes_pod_name) ",
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "sum by (kubernetes_pod_name, network_id)(aptos_connections{kubernetes_pod_name=~\"$kubernetes_pod_name\", kubernetes_pod_name=~\".*fullnode.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{kubernetes_pod_name}}",
+          "range": true,
           "refId": "A"
-        },
-        {
-          "expr": "sum(aptos_state_sync_active_upstream_peers{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}) by (job, kubernetes_pod_name) ",
-          "legendFormat": "{{kubernetes_pod_name}}-{{job}}",
-          "refId": "B"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "State Sync Upstream Peers",
+      "title": "Fullnode Upstream Peers",
       "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
@@ -331,7 +316,6 @@
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
       "id": 31,
-      "isNew": false,
       "panels": [],
       "span": 0,
       "title": "Mempool",
@@ -351,7 +335,6 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
       "hiddenSeries": false,
       "id": 26,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -370,7 +353,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "10.2.0-60139",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -417,7 +400,6 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
       "hiddenSeries": false,
       "id": 34,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -436,7 +418,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "10.2.0-60139",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -476,7 +458,6 @@
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
       "id": 22,
-      "isNew": false,
       "panels": [],
       "span": 0,
       "title": "Networking",
@@ -492,9 +473,10 @@
       "editable": false,
       "error": false,
       "fill": 0,
+      "fillGradient": 0,
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 },
+      "hiddenSeries": false,
       "id": 24,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -511,10 +493,13 @@
       "lines": true,
       "linewidth": 1,
       "nullPointMode": "null",
+      "options": { "alertThreshold": true },
       "percentage": false,
+      "pluginVersion": "10.2.0-60139",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
+      "seriesOverrides": [],
       "spaceLength": 10,
       "span": 0,
       "stack": false,
@@ -526,14 +511,17 @@
           "refId": "A"
         }
       ],
+      "thresholds": [],
+      "timeRegions": [],
       "title": "Network Connections (Incoming)",
-      "tooltip": { "shared": true, "value_type": "individual" },
+      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
-      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
         { "format": "short", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
-      ]
+      ],
+      "yaxis": { "align": false }
     },
     {
       "aliasColors": {},
@@ -545,9 +533,10 @@
       "editable": false,
       "error": false,
       "fill": 0,
+      "fillGradient": 0,
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 27 },
+      "hiddenSeries": false,
       "id": 35,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -564,10 +553,13 @@
       "lines": true,
       "linewidth": 1,
       "nullPointMode": "null",
+      "options": { "alertThreshold": true },
       "percentage": false,
+      "pluginVersion": "10.2.0-60139",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
+      "seriesOverrides": [],
       "spaceLength": 10,
       "span": 0,
       "stack": false,
@@ -579,14 +571,17 @@
           "refId": "A"
         }
       ],
+      "thresholds": [],
+      "timeRegions": [],
       "title": "Network Connections (Outgoing)",
-      "tooltip": { "shared": true, "value_type": "individual" },
+      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
-      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
         { "format": "short", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
-      ]
+      ],
+      "yaxis": { "align": false }
     },
     {
       "aliasColors": {},
@@ -597,9 +592,10 @@
       "editable": false,
       "error": false,
       "fill": 0,
+      "fillGradient": 0,
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
+      "hiddenSeries": false,
       "id": 20,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -616,34 +612,46 @@
       "lines": true,
       "linewidth": 1,
       "nullPointMode": "null",
+      "options": { "alertThreshold": true },
       "percentage": false,
+      "pluginVersion": "10.2.0-60139",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
+      "seriesOverrides": [],
       "spaceLength": 10,
       "span": 0,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(irate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", pod=~\"$kubernetes_pod_name.*fullnode.*\"}[$interval])) by (pod)",
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "sum(irate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\"}[$interval])) by (instance)",
           "legendFormat": "{{pod}}",
+          "range": true,
           "refId": "A"
         },
         {
-          "expr": "sum(irate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", pod=~\"$kubernetes_pod_name.*fullnode.*\"}[$interval]))",
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "sum(irate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\"}[$interval]))",
           "legendFormat": "total",
+          "range": true,
           "refId": "B"
         }
       ],
+      "thresholds": [],
+      "timeRegions": [],
       "title": "Transmit Bandwidth",
-      "tooltip": { "shared": true, "value_type": "individual" },
+      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
-      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
         { "format": "Bps", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
-      ]
+      ],
+      "yaxis": { "align": false }
     },
     {
       "aliasColors": {},
@@ -654,9 +662,10 @@
       "editable": false,
       "error": false,
       "fill": 0,
+      "fillGradient": 0,
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
+      "hiddenSeries": false,
       "id": 19,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -673,10 +682,13 @@
       "lines": true,
       "linewidth": 1,
       "nullPointMode": "null",
+      "options": { "alertThreshold": true },
       "percentage": false,
+      "pluginVersion": "10.2.0-60139",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
+      "seriesOverrides": [],
       "spaceLength": 10,
       "span": 0,
       "stack": false,
@@ -693,14 +705,17 @@
           "refId": "B"
         }
       ],
+      "thresholds": [],
+      "timeRegions": [],
       "title": "Receive Bandwidth",
-      "tooltip": { "shared": true, "value_type": "individual" },
+      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
-      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
         { "format": "Bps", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
-      ]
+      ],
+      "yaxis": { "align": false }
     },
     {
       "collapsed": false,
@@ -709,7 +724,6 @@
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 },
       "id": 9,
-      "isNew": false,
       "panels": [],
       "span": 0,
       "title": "System",
@@ -721,12 +735,14 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "",
       "editable": false,
       "error": false,
       "fill": 0,
+      "fillGradient": 0,
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
+      "hiddenSeries": false,
       "id": 5,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -743,34 +759,46 @@
       "lines": true,
       "linewidth": 1,
       "nullPointMode": "null",
+      "options": { "alertThreshold": true },
       "percentage": false,
+      "pluginVersion": "10.2.0-60139",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
+      "seriesOverrides": [],
       "spaceLength": 10,
       "span": 0,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "1 - kubelet_volume_stats_available_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\"fn.$kubernetes_pod_name.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\"fn.$kubernetes_pod_name.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
-          "legendFormat": "{{persistentvolumeclaim}}",
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "1 - kubelet_volume_stats_available_bytes{cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\"fn.$kubernetes_pod_name.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} / kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\"fn.$kubernetes_pod_name.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "legendFormat": "{{persistentvolumeclaim}}:{{namespace}}",
+          "range": true,
           "refId": "A"
         },
         {
-          "expr": "1 - kubelet_volume_stats_available_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\"$kubernetes_pod_name.*fullnode.*\", kubernetes_pod_name!~\"val.*\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\"$kubernetes_pod_name.*fullnode.*\", kubernetes_pod_name!~\"val.*\"}",
-          "legendFormat": "{{persistentvolumeclaim}}",
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "1 - kubelet_volume_stats_available_bytes{cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\"$kubernetes_pod_name.*fullnode.*\", kubernetes_pod_name!~\"val.*\"} / kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\"$kubernetes_pod_name.*fullnode.*\", kubernetes_pod_name!~\"val.*\"}",
+          "legendFormat": "{{persistentvolumeclaim}}:{{namespace}}",
+          "range": true,
           "refId": "B"
         }
       ],
-      "title": "Percentage Disk Used",
-      "tooltip": { "shared": true, "value_type": "individual" },
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Percentage Disk Used (global)",
+      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
-      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
         { "format": "percentunit", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
-      ]
+      ],
+      "yaxis": { "align": false }
     },
     {
       "aliasColors": {},
@@ -781,9 +809,10 @@
       "editable": false,
       "error": false,
       "fill": 0,
+      "fillGradient": 0,
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+      "hiddenSeries": false,
       "id": 11,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -800,29 +829,38 @@
       "lines": true,
       "linewidth": 1,
       "nullPointMode": "null",
+      "options": { "alertThreshold": true },
       "percentage": false,
+      "pluginVersion": "10.2.0-60139",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
+      "seriesOverrides": [],
       "spaceLength": 10,
       "span": 0,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{container=\"fullnode\", pod=~\"$kubernetes_pod_name.*\", job=\"kubernetes-cadvisor\"}",
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "container_memory_working_set_bytes{container=\"fullnode\", pod=~\"$kubernetes_pod_name.*\", job=\"kubernetes-cadvisor\", cluster=\"$cluster\"}",
           "legendFormat": "{{pod}}",
+          "range": true,
           "refId": "A"
         }
       ],
+      "thresholds": [],
+      "timeRegions": [],
       "title": "Memory Usage",
-      "tooltip": { "shared": true, "value_type": "individual" },
+      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
-      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
         { "format": "bytes", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
-      ]
+      ],
+      "yaxis": { "align": false }
     },
     {
       "aliasColors": {},
@@ -833,9 +871,10 @@
       "editable": false,
       "error": false,
       "fill": 0,
+      "fillGradient": 0,
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 52 },
+      "hiddenSeries": false,
       "id": 17,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -852,34 +891,46 @@
       "lines": true,
       "linewidth": 1,
       "nullPointMode": "null",
+      "options": { "alertThreshold": true },
       "percentage": false,
+      "pluginVersion": "10.2.0-60139",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
+      "seriesOverrides": [],
       "spaceLength": 10,
       "span": 0,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(container_cpu_usage_seconds_total{container=\"fullnode\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "rate(container_cpu_usage_seconds_total{container=\"fullnode\", kubernetes_pod_name=~\"$kubernetes_pod_name\", cluster=\"$cluster\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{pod}}",
+          "range": true,
           "refId": "A"
         },
         {
-          "expr": "rate(container_cpu_usage_seconds_total{container=\"fullnode\", pod=~\"pfn.*\"}[$interval])",
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "rate(container_cpu_usage_seconds_total{container=\"fullnode\", pod=~\"pfn.*\", cluster=\"$cluster\"}[$interval])",
           "legendFormat": "{{pod}}",
+          "range": true,
           "refId": "B"
         }
       ],
+      "thresholds": [],
+      "timeRegions": [],
       "title": "CPU Usage",
-      "tooltip": { "shared": true, "value_type": "individual" },
+      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
-      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
         { "format": "short", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
-      ]
+      ],
+      "yaxis": { "align": false }
     },
     {
       "aliasColors": {},
@@ -890,9 +941,10 @@
       "editable": false,
       "error": false,
       "fill": 0,
+      "fillGradient": 0,
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 52 },
+      "hiddenSeries": false,
       "id": 15,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -909,33 +961,42 @@
       "lines": true,
       "linewidth": 1,
       "nullPointMode": "null",
+      "options": { "alertThreshold": true },
       "percentage": false,
+      "pluginVersion": "10.2.0-60139",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
+      "seriesOverrides": [],
       "spaceLength": 10,
       "span": 0,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "time() - container_start_time_seconds{container=\"fullnode\", pod=~\"$kubernetes_pod_name.*\", job=\"kubernetes-cadvisor\"}",
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "time() - container_start_time_seconds{container=\"fullnode\", pod=~\"$kubernetes_pod_name.*\", job=\"kubernetes-cadvisor\", cluster=\"$cluster\"}",
           "legendFormat": "{{pod}}",
+          "range": true,
           "refId": "A"
         }
       ],
+      "thresholds": [],
+      "timeRegions": [],
       "title": "Uptime",
-      "tooltip": { "shared": true, "value_type": "individual" },
+      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
-      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
         { "format": "s", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
-      ]
+      ],
+      "yaxis": { "align": false }
     }
   ],
-  "schemaVersion": 37,
-  "style": "dark",
+  "refresh": "",
+  "schemaVersion": 38,
   "tags": [],
   "templating": {
     "list": [
@@ -966,7 +1027,8 @@
         "allFormat": "",
         "allValue": ".*",
         "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
-        "datasource": null,
+        "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
@@ -980,16 +1042,18 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 0,
         "type": "query"
       },
       {
         "allFormat": "",
-        "allValue": "",
+        "allValue": ".*",
         "current": { "text": ["mainnet"], "value": "mainnet" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "",
         "multi": false,
         "multiFormat": "",
@@ -1001,6 +1065,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -1008,7 +1073,8 @@
         "allFormat": "",
         "allValue": ".*",
         "current": { "text": ["All"], "value": "$__all" },
-        "datasource": null,
+        "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
@@ -1022,6 +1088,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 0,
         "type": "query"
       },
@@ -1030,6 +1097,7 @@
         "allValue": ".*",
         "current": { "text": ["All"], "value": "$__all" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
@@ -1043,6 +1111,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -1051,6 +1120,7 @@
         "allValue": ".*",
         "current": { "text": ["All"], "value": ["$__all"] },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
@@ -1064,6 +1134,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -1102,6 +1173,6 @@
   "timezone": "",
   "title": "fullnodes",
   "uid": "fullnodes",
-  "version": 3,
+  "version": 12,
   "weekStart": ""
 }

@@ -19,7 +19,7 @@ struct Secondary {
 
 #[test]
 fn test_resource_groups() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::RESOURCE_GROUPS], vec![]);
+    let mut h = MoveHarness::new();
 
     let primary_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
     let primary_account = h.new_account_at(primary_addr);
@@ -81,7 +81,7 @@ fn test_resource_groups() {
     // Initialize secondary and verify it exists and nothing else does
     let result = h.run_entry_function(
         &user_account,
-        str::parse(&format!("0x{}::secondary::init", secondary_addr)).unwrap(),
+        str::parse(&format!("0x{}::secondary::init", secondary_addr.to_hex())).unwrap(),
         vec![],
         vec![bcs::to_bytes::<u32>(&22).unwrap()],
     );
@@ -112,7 +112,7 @@ fn test_resource_groups() {
     // Initialize primary and verify it exists with secondary
     let result = h.run_entry_function(
         &user_account,
-        str::parse(&format!("0x{}::primary::init", primary_addr)).unwrap(),
+        str::parse(&format!("0x{}::primary::init", primary_addr.to_hex())).unwrap(),
         vec![],
         vec![bcs::to_bytes::<u64>(&11122).unwrap()],
     );
@@ -145,7 +145,11 @@ fn test_resource_groups() {
     // Modify secondary and verify primary stays consistent
     let result = h.run_entry_function(
         &user_account,
-        str::parse(&format!("0x{}::secondary::set_value", secondary_addr)).unwrap(),
+        str::parse(&format!(
+            "0x{}::secondary::set_value",
+            secondary_addr.to_hex()
+        ))
+        .unwrap(),
         vec![],
         vec![bcs::to_bytes::<u32>(&5).unwrap()],
     );
@@ -178,7 +182,7 @@ fn test_resource_groups() {
     // Delete the first and verify the second remains
     let result = h.run_entry_function(
         &user_account,
-        str::parse(&format!("0x{}::primary::remove", primary_addr)).unwrap(),
+        str::parse(&format!("0x{}::primary::remove", primary_addr.to_hex())).unwrap(),
         vec![],
         vec![],
     );
@@ -209,7 +213,7 @@ fn test_resource_groups() {
     // Delete the second and verify nothing remains
     let result = h.run_entry_function(
         &user_account,
-        str::parse(&format!("0x{}::secondary::remove", secondary_addr)).unwrap(),
+        str::parse(&format!("0x{}::secondary::remove", secondary_addr.to_hex())).unwrap(),
         vec![],
         vec![],
     );
@@ -225,7 +229,7 @@ fn test_resource_groups() {
 
 #[test]
 fn test_resource_groups_container_not_enabled() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::RESOURCE_GROUPS], vec![]);
+    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::RESOURCE_GROUPS]);
 
     let primary_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
     let primary_account = h.new_account_at(primary_addr);
@@ -240,12 +244,12 @@ fn test_resource_groups_container_not_enabled() {
         &common::test_dir_path("../../../move-examples/resource_groups/primary"),
         build_options.clone(),
     );
-    assert_success!(result);
+    assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
 #[test]
-fn verify_resource_group_upgrades() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::RESOURCE_GROUPS], vec![]);
+fn verify_resource_group_member_upgrades() {
+    let mut h = MoveHarness::new();
     let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
 
     // Initial code
@@ -254,11 +258,114 @@ fn verify_resource_group_upgrades() {
             #[resource_group_member(group = 0xf00d::M::ResourceGroup)]
             struct ResourceGroupMember has key { }
 
+            struct NotResourceGroupMember has key { }
+
             #[resource_group(scope = address)]
             struct ResourceGroup { }
 
             #[resource_group(scope = address)]
             struct ResourceGroupExtra { }
+        }
+        "#;
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package(&account, path.path());
+    assert_success!(result);
+
+    // Incompatible change of ResourceGroupMember::group
+    let source = r#"
+        module 0xf00d::M {
+            #[resource_group_member(group = 0xf00d::M::ResourceGroupExtra)]
+            struct ResourceGroupMember has key { }
+
+            struct NotResourceGroupMember has key { }
+
+            #[resource_group(scope = address)]
+            struct ResourceGroup { }
+
+            #[resource_group(scope = address)]
+            struct ResourceGroupExtra { }
+        }
+        "#;
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package(&account, path.path());
+    assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
+
+    // Incompatible addition of ResourceGroupMember
+    let source = r#"
+        module 0xf00d::M {
+            #[resource_group_member(group = 0xf00d::M::ResourceGroup)]
+            struct ResourceGroupMember has key { }
+
+            #[resource_group_member(group = 0xf00d::M::ResourceGroup)]
+            struct NotResourceGroupMember has key { }
+
+            #[resource_group(scope = address)]
+            struct ResourceGroup { }
+
+            #[resource_group(scope = address)]
+            struct ResourceGroupExtra { }
+        }
+        "#;
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package(&account, path.path());
+    assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
+}
+
+#[test]
+fn verify_unsafe_resource_group_member_upgrades() {
+    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::SAFER_RESOURCE_GROUPS]);
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+
+    // Initial code
+    let source = r#"
+        module 0xf00d::M {
+            struct NotResourceGroupMember has key { }
+
+            #[resource_group(scope = address)]
+            struct ResourceGroup { }
+        }
+        "#;
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package(&account, path.path());
+    assert_success!(result);
+
+    // Incompatible addition of ResourceGroupMember
+    let source = r#"
+        module 0xf00d::M {
+            #[resource_group_member(group = 0xf00d::M::ResourceGroup)]
+            struct NotResourceGroupMember has key { }
+
+            #[resource_group(scope = address)]
+            struct ResourceGroup { }
+        }
+        "#;
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package(&account, path.path());
+    assert_success!(result);
+}
+
+#[test]
+fn verify_resource_group_upgrades() {
+    let mut h = MoveHarness::new();
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+
+    // Initial code
+    let source = r#"
+        module 0xf00d::M {
+            #[resource_group(scope = address)]
+            struct ResourceGroup { }
+
+            struct NotResourceGroup { }
         }
         "#;
     let mut builder = PackageBuilder::new("Package");
@@ -270,14 +377,10 @@ fn verify_resource_group_upgrades() {
     // Compatible increase on scope
     let source = r#"
         module 0xf00d::M {
-            #[resource_group_member(group = 0xf00d::M::ResourceGroup)]
-            struct ResourceGroupMember has key { }
-
             #[resource_group(scope = global)]
             struct ResourceGroup { }
 
-            #[resource_group(scope = address)]
-            struct ResourceGroupExtra { }
+            struct NotResourceGroup { }
         }
         "#;
     let mut builder = PackageBuilder::new("Package");
@@ -289,14 +392,10 @@ fn verify_resource_group_upgrades() {
     // Incompatible decrease on scope
     let source = r#"
         module 0xf00d::M {
-            #[resource_group_member(group = 0xf00d::M::ResourceGroup)]
-            struct ResourceGroupMember has key { }
-
             #[resource_group(scope = module_)]
             struct ResourceGroup { }
 
-            #[resource_group(scope = address)]
-            struct ResourceGroupExtra { }
+            struct NotResourceGroup { }
         }
         "#;
     let mut builder = PackageBuilder::new("Package");
@@ -305,15 +404,12 @@ fn verify_resource_group_upgrades() {
     let result = h.publish_package(&account, path.path());
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 
-    // Removal of ResourceGroupContainer is incompatible
+    // Incompatible removal of ResourceGroupContainer
     let source = r#"
         module 0xf00d::M {
-            struct ResourceGroupMember has key { }
-
-            #[resource_group(scope = global)]
             struct ResourceGroup { }
 
-            struct ResourceGroupExtra { }
+            struct NotResourceGroup { }
         }
         "#;
     let mut builder = PackageBuilder::new("Package");
@@ -322,17 +418,14 @@ fn verify_resource_group_upgrades() {
     let result = h.publish_package(&account, path.path());
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 
-    // Change of ResourceGroupMember::group is incompatible
+    // Incompatible promotion of ResourceGroup
     let source = r#"
         module 0xf00d::M {
-            #[resource_group_member(group = 0xf00d::M::ResourceGroupExtra)]
-            struct ResourceGroupMember has key { }
-
             #[resource_group(scope = global)]
             struct ResourceGroup { }
 
             #[resource_group(scope = address)]
-            struct ResourceGroupExtra { }
+            struct NotResourceGroup { }
         }
         "#;
     let mut builder = PackageBuilder::new("Package");
@@ -340,4 +433,41 @@ fn verify_resource_group_upgrades() {
     let path = builder.write_to_temp().unwrap();
     let result = h.publish_package(&account, path.path());
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
+}
+
+#[test]
+fn verify_unsafe_resource_group_upgrades() {
+    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::SAFER_RESOURCE_GROUPS]);
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+
+    // Initial code
+    let source = r#"
+        module 0xf00d::M {
+            #[resource_group(scope = address)]
+            struct ResourceGroup { }
+
+            struct NotResourceGroup { }
+        }
+        "#;
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package(&account, path.path());
+    assert_success!(result);
+
+    // Incompatible promotion of ResourceGroup
+    let source = r#"
+        module 0xf00d::M {
+            #[resource_group(scope = address)]
+            struct ResourceGroup { }
+
+            #[resource_group(scope = address)]
+            struct NotResourceGroup { }
+        }
+        "#;
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package(&account, path.path());
+    assert_success!(result);
 }

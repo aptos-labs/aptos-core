@@ -3,10 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{experimental::pipeline_phase::StatelessPipeline, state_replication::StateComputer};
-use anyhow::Result;
 use aptos_consensus_types::executed_block::ExecutedBlock;
 use aptos_crypto::HashValue;
-use aptos_executor_types::Error as ExecutionError;
+use aptos_executor_types::{ExecutorError, ExecutorResult};
 use async_trait::async_trait;
 use std::{
     fmt::{Debug, Display, Formatter},
@@ -37,7 +36,7 @@ impl Display for ExecutionRequest {
 
 pub struct ExecutionResponse {
     pub block_id: HashValue,
-    pub inner: Result<Vec<ExecutedBlock>, ExecutionError>,
+    pub inner: ExecutorResult<Vec<ExecutedBlock>>,
 }
 
 pub struct ExecutionPhase {
@@ -55,6 +54,8 @@ impl StatelessPipeline for ExecutionPhase {
     type Request = ExecutionRequest;
     type Response = ExecutionResponse;
 
+    const NAME: &'static str = "execution";
+
     async fn process(&self, req: ExecutionRequest) -> ExecutionResponse {
         let ExecutionRequest { ordered_blocks } = req;
 
@@ -62,7 +63,7 @@ impl StatelessPipeline for ExecutionPhase {
             // return err when the blocks are empty
             return ExecutionResponse {
                 block_id: HashValue::zero(),
-                inner: Err(ExecutionError::EmptyBlocks),
+                inner: Err(ExecutorError::EmptyBlocks),
             };
         }
 

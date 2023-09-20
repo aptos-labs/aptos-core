@@ -4,7 +4,9 @@ FROM ubuntu:20.04@sha256:a06ae92523384c2cd182dcfe7f8b2bf09075062e937d5653d7d0db0
 FROM rust:1.66.1-buster@sha256:e518dbab65069f4869f0159a460a989161ed277913c03427ed8b84542b771f7e AS rust-base
 
 WORKDIR /aptos
-RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev lld
+
+# Ensure all build dependencies are present
+RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev lld libudev-dev
 
 ### Build Rust code ###
 FROM rust-base as builder

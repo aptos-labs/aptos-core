@@ -1,10 +1,10 @@
 
 Diagnostics:
 error: expected `&mut integer` but found `integer`
-  ┌─ tests/checking/typing/mutate_non_ref.move:6:17
+  ┌─ tests/checking/typing/mutate_non_ref.move:7:10
   │
-6 │         let u = 0;
-  │                 ^
+7 │         *u = 1;
+  │          ^
 
 error: expected `&mut M::S` but found `M::S`
    ┌─ tests/checking/typing/mutate_non_ref.move:10:10

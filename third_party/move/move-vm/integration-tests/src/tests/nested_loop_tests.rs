@@ -28,7 +28,7 @@ fn test_publish_module_with_nested_loops() {
             }
         }
     "#;
-    let code = code.replace("{{ADDR}}", &format!("0x{}", TEST_ADDR));
+    let code = code.replace("{{ADDR}}", &format!("0x{}", TEST_ADDR.to_hex()));
     let mut units = compile_units(&code).unwrap();
 
     let m = as_module(units.pop().unwrap());
@@ -100,7 +100,7 @@ fn test_run_script_with_nested_loops() {
             }
         }
     "#;
-    let code = code.replace("{{ADDR}}", &format!("0x{}", TEST_ADDR));
+    let code = code.replace("{{ADDR}}", &format!("0x{}", TEST_ADDR.to_hex()));
     let mut units = compile_units(&code).unwrap();
 
     let s = as_script(units.pop().unwrap());

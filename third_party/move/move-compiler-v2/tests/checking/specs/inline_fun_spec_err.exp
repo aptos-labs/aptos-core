@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: functional spec blocks for inline functions are not supported yet
+  ┌─ tests/checking/specs/inline_fun_spec_err.move:5:10
+  │
+5 │     spec f {
+  │          ^

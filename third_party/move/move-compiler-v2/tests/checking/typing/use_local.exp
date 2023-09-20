@@ -21,4 +21,5 @@ module 0x8675309::M {
           }
         }
     }
+    spec fun $t();
 } // end 0x8675309::M

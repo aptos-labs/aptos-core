@@ -1,71 +1,77 @@
 ---
 remote_endpoint: ~
-name: "v1.6"
+name: "v1.7"
 proposals:
-  - name: upgrade_framework
+  - name: enable_module_event
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.6"
-      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.6"
-    execution_mode: MultiStep
-    update_sequence:
-      - DefaultGas
-      - Framework:
-          bytecode_version: 6
-          git_hash: ~
-  - name: enable_fee_payer
-    metadata:
-      title: "Enable fee payer"
-      description: "AIP-39: Support secondary fee payer to pay gas cost on behalf of the sender."
-      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/8904"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-39.md"
-    execution_mode: MultiStep
-    update_sequence:
-    - FeatureFlag:
-        enabled:
-          - gas_payer_enabled
-  - name: enable_block_gas_limit
-    metadata:
-      title: "Enable Block Gas Limit"
-      description: "AIP-33: The block gas limit is a feature that terminates block execution when the gas consumed by the committed prefix of transactions exceeds the limit, thus providing predictable latency."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/132"
-    execution_mode: MultiStep
-    update_sequence:
-    - Execution:
-        V2:
-          transaction_shuffler_type:
-            deprecated_sender_aware_v1: 32
-          block_gas_limit : 35000
-  - name: enable_aptos_unique_identifiers
-    metadata:
-      title: "Enable Aptos Unique Identifiers"
-      description: "AIP-36: Support for aptos unique identifiers (generated using native function generate_unique_address)"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/154"
-    execution_mode: MultiStep
-    update_sequence:
-    - FeatureFlag:
-        enabled:
-          - aptos_unique_identifiers
-  - name: enable_partial_voting
-    metadata:
-      title: "Enable partial voting"
-      description: "AIP-28:  Partial voting for on chain governance."
-      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/8090"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-28.md"
-    execution_mode: MultiStep
-    update_sequence:
-    - RawScript: aptos-move/aptos-release-builder/data/proposals/aip_28_initialization.move
-    - FeatureFlag:
-        enabled:
-          - partial_governance_voting
-          - delegation_pool_partial_governance_voting
-  - name: bulletproofs_natives
-    metadata:
-      title: "Bulletproofs natives"
-      description: "AIP-xx: TBD"
-      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/3444"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-xx.md"
+      title: "Enable module event"
+      description: "AIP-44: The new module event framework associates every event stream with a static struct type instead of an EventHandle of current event system."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/200"
     execution_mode: MultiStep
     update_sequence:
       - FeatureFlag:
           enabled:
-            - aptos_unique_identifiers
+            - module_event
+  - name: upgrade_framework
+    metadata:
+      title: "Multi-step proposal to upgrade mainnet framework to v1.7"
+      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.7"
+    execution_mode: MultiStep
+    update_sequence:
+      - DefaultGas
+      - FeatureFlag:
+          enabled:
+            - safer_resource_groups
+      - FeatureFlag:
+          enabled:
+            - safer_metadata
+      - Framework:
+          bytecode_version: 6
+          git_hash: ~
+  - name: enable_signature_checker_v2_fix
+    metadata:
+      title: "Enable a fix signature checker v2"
+      description: "Fixing a counting bug"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - signature_checker_v2_script_fix
+  - name: enable_block_gas_limit_and_transaction_shuffling
+    metadata:
+      title: "Enable Block Gas Limit and Transaction Shuffling"
+      description: "AIP-33: The block gas limit is a feature that terminates block execution when the gas consumed by the committed prefix of transactions exceeds the limit, thus providing predictable latency.
+                    AIP-27: Sender Aware Transaction Shuffling"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/132
+                       https://github.com/aptos-foundation/AIPs/issues/109"
+    execution_mode: MultiStep
+    update_sequence:
+      - Execution:
+          V3:
+            transaction_shuffler_type:
+              sender_aware_v2: 32
+            block_gas_limit: 35000
+            transaction_deduper_type: txn_hash_and_authenticator_v1
+  - name: enable_bulletproofs
+    metadata:
+      title: "Enable Bulletproofs Module"
+      description: "AIP-46: New modules for ElGamal, Pedersen and Bulletproofs over Ristretto255"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/222"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - bulletproofs_natives
+  - name: enable_storage_deletion_refund
+    metadata:
+      title: "Enable Storage Deletion Refund"
+      description: "AIP-32: Storage Deletion Refund"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/127"
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/aip_32_initialization.move
+      - FeatureFlag:
+          enabled:
+            - storage_slot_metadata
+            - emit_fee_statement
+            - storage_deletion_refund

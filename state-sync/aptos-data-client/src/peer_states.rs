@@ -16,6 +16,7 @@ use aptos_network::application::storage::PeersAndMetadata;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServerSummary,
 };
+use aptos_time_service::TimeService;
 use itertools::Itertools;
 use std::{
     cmp::min,
@@ -137,6 +138,7 @@ impl PeerStates {
     pub fn can_service_request(
         &self,
         peer: &PeerNetworkId,
+        time_service: TimeService,
         request: &StorageServiceRequest,
     ) -> bool {
         // Storage services can always respond to data advertisement requests.
@@ -152,7 +154,7 @@ impl PeerStates {
         self.peer_to_state
             .get(peer)
             .and_then(PeerState::storage_summary_if_not_ignored)
-            .map(|summary| summary.can_service(&self.data_client_config, request))
+            .map(|summary| summary.can_service(&self.data_client_config, time_service, request))
             .unwrap_or(false)
     }
 

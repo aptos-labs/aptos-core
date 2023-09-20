@@ -537,7 +537,7 @@ impl Account {
 
         resolver
             .as_converter(self.context.db.clone())
-            .move_struct_fields(resource_type, bytes.as_slice())
+            .move_struct_fields(resource_type, &bytes)
             .context("Failed to convert move structs from storage")
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(

@@ -25,9 +25,11 @@
 pub mod buffer;
 pub mod buffer_item;
 pub mod buffer_manager;
+pub mod commit_reliable_broadcast;
 pub mod decoupled_execution_utils;
 pub mod errors;
-pub mod execution_phase;
+pub mod execution_schedule_phase;
+pub mod execution_wait_phase;
 pub mod hashable;
 pub mod ordering_state_computer;
 pub mod persisting_phase;

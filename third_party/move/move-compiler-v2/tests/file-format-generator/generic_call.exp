@@ -38,7 +38,7 @@ fun Test::identity<#0>($t0: #0): #0 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v6
+// Move bytecode v4294967295
 module 42.Test {
 
 

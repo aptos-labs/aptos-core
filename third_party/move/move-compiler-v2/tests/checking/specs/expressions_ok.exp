@@ -1,0 +1,64 @@
+// ---- Model Dump
+module 0x42::M {
+    spec fun add1(x: num): num {
+        Add(x, 1)
+    }
+    spec fun call_other(x: num): num {
+        M::add1(x)
+    }
+    spec fun call_other_self(x: num): num {
+        M::add1(x)
+    }
+    spec fun add_any_unsigned(x: u64,y: u8): num {
+        Add(x, y)
+    }
+    spec fun compare_any_unsigned(x: u64,y: u128,z: num): bool {
+        Implies(And(Eq<u64>(x, y), Eq<u128>(y, z)), Eq<u64>(x, z))
+    }
+    spec fun some_range(upper: num): range {
+        Range(0, upper)
+    }
+    spec fun add_with_let(x: num,y: num): num {
+        {
+          let r: num = Add(x, y);
+          r
+        }
+    }
+    spec fun lambdas(p1: |num|bool,p2: |num|bool): |num|bool {
+        |x: num| And((p1)(x), (p2)(x))
+    }
+    spec fun call_lambdas(x: num): bool {
+        {
+          let f: |num|bool = M::lambdas(|y: num| Gt(y, 0), |y: num| Lt(y, 10));
+          (f)(x)
+        }
+    }
+    spec fun if_else(x: num,y: num): num {
+        if Gt(x, 0) {
+          x
+        } else {
+          y
+        }
+    }
+    spec fun vector_builtins(v: vector<num>): bool {
+        And(And(And(Gt(Len<num>(v), 2), forall x: num: v: Gt(x, 0)), exists x: num: v: Gt(x, 10)), Eq<num>(Index(UpdateVec<num>(v, 2, 23), 2), 23))
+    }
+    spec fun range_builtins(v: vector<num>): bool {
+        And(forall x: num: Range(1, 10): Gt(x, 0), exists x: num: Range(5, 10): Gt(x, 7))
+    }
+    spec fun vector_index(v: vector<num>): num {
+        Index(v, 2)
+    }
+    spec fun vector_slice(v: vector<num>): vector<num> {
+        Slice(v, Range(2, 3))
+    }
+    spec fun generic_function<T>(x: #0,y: #0): bool {
+        Eq<#0>(x, y)
+    }
+    spec fun generic_function_call(): bool {
+        M::generic_function<u256>(1, 2)
+    }
+    spec fun generic_function_instantiated_call(): bool {
+        M::generic_function<num>(3, 3)
+    }
+} // end 0x42::M

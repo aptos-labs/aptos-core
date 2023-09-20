@@ -34,6 +34,13 @@ pub struct ExecutedBlock {
     maybe_randomness: Option<Randomness>,
 }
 
+impl ExecutedBlock {
+    pub fn replace_result(mut self, result: StateComputeResult) -> Self {
+        self.state_compute_result = result;
+        self
+    }
+}
+
 impl Debug for ExecutedBlock {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{}", self)

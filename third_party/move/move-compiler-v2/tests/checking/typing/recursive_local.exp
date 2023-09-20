@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: type unification cycle check failed (`?3 =?= (?3, integer)`, try to annotate type)
+error: type unification cycle check failed (`?3 =?= (?3, integer)`, try to annotate type) (from assignment or declaration context)
   ┌─ tests/checking/typing/recursive_local.move:5:9
   │
 5 │         x = (x, 0);

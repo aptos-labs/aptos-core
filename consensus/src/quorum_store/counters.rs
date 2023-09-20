@@ -374,7 +374,7 @@ pub fn inc_rejected_pos_count(reason: &str) {
 }
 
 /// Count of the received batches since last restart.
-pub static RECEIVED_REMOTE_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+pub static RECEIVED_REMOTE_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_received_remote_batch_count",
         "Count of the received batches since last restart."

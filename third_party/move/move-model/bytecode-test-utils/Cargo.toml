@@ -1,0 +1,20 @@
+[package]
+name = "move-stackless-bytecode-test-utils"
+version = "0.1.0"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Move stackless bytecode"
+repository = "https://github.com/diem/diem"
+homepage = "https://diem.com"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.52"
+codespan-reporting = { version = "0.11.1", features = ["serde", "serialization"] }
+move-command-line-common = { path = "../../move-command-line-common" }
+move-compiler = { path = "../../move-compiler" }
+move-model = { path = ".." }
+move-prover-test-utils = { path = "../../move-prover/test-utils" }
+move-stackless-bytecode = { path = "../bytecode" }
+move-stdlib = { path = "../../move-stdlib" }

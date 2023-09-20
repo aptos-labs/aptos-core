@@ -1,31 +1,31 @@
 
 Diagnostics:
 error: invalid call of `M::mut`: mutability mismatch (&mut != &) for argument 1
-   ┌─ tests/checking/typing/subtype_args_invalid.move:10:9
+   ┌─ tests/checking/typing/subtype_args_invalid.move:10:18
    │
 10 │         mut<u64>(&0);
-   │         ^^^^^^^^^^^^
+   │                  ^^
 
 error: invalid call of `M::mut`: expected `u64` but found `M::S` for argument 1
-   ┌─ tests/checking/typing/subtype_args_invalid.move:11:9
+   ┌─ tests/checking/typing/subtype_args_invalid.move:11:18
    │
 11 │         mut<u64>(&S{});
-   │         ^^^^^^^^^^^^^^
+   │                  ^^^^
 
 error: invalid call of `M::imm_mut`: mutability mismatch (&mut != &) for argument 2
-   ┌─ tests/checking/typing/subtype_args_invalid.move:15:9
+   ┌─ tests/checking/typing/subtype_args_invalid.move:15:26
    │
 15 │         imm_mut<u64>(&0, &0);
-   │         ^^^^^^^^^^^^^^^^^^^^
+   │                          ^^
 
 error: invalid call of `M::mut_imm`: mutability mismatch (&mut != &) for argument 1
-   ┌─ tests/checking/typing/subtype_args_invalid.move:16:9
+   ┌─ tests/checking/typing/subtype_args_invalid.move:16:22
    │
 16 │         mut_imm<u64>(&0, &0);
-   │         ^^^^^^^^^^^^^^^^^^^^
+   │                      ^^
 
 error: invalid call of `M::mut_mut`: mutability mismatch (&mut != &) for argument 1
-   ┌─ tests/checking/typing/subtype_args_invalid.move:17:9
+   ┌─ tests/checking/typing/subtype_args_invalid.move:17:22
    │
 17 │         mut_mut<u64>(&0, &0);
-   │         ^^^^^^^^^^^^^^^^^^^^
+   │                      ^^

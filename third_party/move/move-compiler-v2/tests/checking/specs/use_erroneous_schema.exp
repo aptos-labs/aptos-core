@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: undeclared `M::x`
+  ┌─ tests/checking/specs/use_erroneous_schema.move:5:17
+  │
+5 │         ensures x > 0;
+  │                 ^
+
+error: invalid call of `<`: expected `num` but found `bool` for argument 2
+   ┌─ tests/checking/specs/use_erroneous_schema.move:13:21
+   │
+13 │         ensures 2 < true;
+   │                     ^^^^

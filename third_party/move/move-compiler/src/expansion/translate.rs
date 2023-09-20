@@ -13,7 +13,8 @@ use crate::{
         byte_string, hex_string,
     },
     parser::ast::{
-        self as P, Ability, ConstantName, Field, FunctionName, ModuleName, StructName, Var,
+        self as P, Ability, ConstantName, Field, FunctionName, ModuleMember, ModuleName,
+        StructName, Var,
     },
     shared::{
         known_attributes::{AttributeKind, AttributePosition, KnownAttribute},
@@ -457,6 +458,20 @@ fn module_(
 
     let mut new_scope = AliasMapBuilder::new();
     module_self_aliases(&mut new_scope, &current_module);
+
+    // Make a copy of the original UseDecls, to be passed on to the expansion AST before they are
+    // processed here.
+    let use_decls = members
+        .iter()
+        .filter_map(|member| {
+            if let ModuleMember::Use(decl) = member {
+                Some(decl.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+
     let members = members
         .into_iter()
         .filter_map(|member| aliases_from_member(context, &mut new_scope, &current_module, member))
@@ -502,6 +517,7 @@ fn module_(
         constants,
         functions,
         specs,
+        use_decls,
     };
     (current_module, def)
 }
@@ -528,7 +544,7 @@ fn script_(context: &mut Context, package_name: Option<Symbol>, pscript: P::Scri
     } = pscript;
 
     let attributes = flatten_attributes(context, AttributePosition::Script, attributes);
-    let new_scope = uses(context, puses);
+    let new_scope = uses(context, puses.clone());
     let old_aliases = context.aliases.add_and_shadow_all(new_scope);
     assert!(
         old_aliases.is_empty(),
@@ -583,6 +599,7 @@ fn script_(context: &mut Context, package_name: Option<Symbol>, pscript: P::Scri
         function_name,
         function,
         specs,
+        use_decls: puses,
     }
 }
 

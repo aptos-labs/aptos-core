@@ -3,5 +3,8 @@ name = "LargePackageExample"
 version = "1.0.0"
 upgrade_policy = "compatible"
 
+[dependencies]
+AptosFramework = { local = "../../../framework/aptos-framework" }
+
 [addresses]
 large_package_example = "_"

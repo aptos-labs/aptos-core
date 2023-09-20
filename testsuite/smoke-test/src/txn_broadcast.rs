@@ -8,7 +8,7 @@ use crate::{
         MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
     },
 };
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, OverrideNodeConfig};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use std::{
     sync::Arc,
@@ -32,7 +32,11 @@ async fn test_txn_broadcast() {
 
     let validator = validator_peer_ids[1];
     let vfn = swarm
-        .add_validator_fullnode(&version, NodeConfig::get_default_vfn_config(), validator)
+        .add_validator_fullnode(
+            &version,
+            OverrideNodeConfig::new_with_default_base(NodeConfig::get_default_vfn_config()),
+            validator,
+        )
         .unwrap();
 
     for fullnode in swarm.full_nodes_mut() {

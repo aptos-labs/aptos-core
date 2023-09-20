@@ -1,9 +1,9 @@
 // ---- Model Dump
 module 0x42::reference_conversion {
-    private fun deref(r: &u64) {
+    private fun deref(r: &u64): u64 {
         Deref(r)
     }
-    private fun use_it() {
+    private fun use_it(): u64 {
         {
           let x: u64 = 42;
           {
@@ -13,6 +13,10 @@ module 0x42::reference_conversion {
           }
         }
     }
+    spec fun $deref(r: u64): u64 {
+        r
+    }
+    spec fun $use_it(): u64;
 } // end 0x42::reference_conversion
 
 ============ initial bytecode ================

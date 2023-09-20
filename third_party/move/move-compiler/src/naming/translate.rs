@@ -370,6 +370,7 @@ fn module(
         functions: efunctions,
         constants: econstants,
         specs: _specs,
+        use_decls: _,
     } = mdef;
     let friends = efriends.filter_map(|mident, f| friend(context, mident, f));
     let unscoped = context.save_unscoped();
@@ -419,6 +420,7 @@ fn script(context: &mut Context, escript: E::Script) -> N::Script {
         function_name,
         function: efunction,
         specs: _specs,
+        use_decls: _,
     } = escript;
     let outer_unscoped = context.save_unscoped();
     for (loc, s, _) in &econstants {

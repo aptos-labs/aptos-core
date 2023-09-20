@@ -20,10 +20,10 @@ use move_model::{
 use move_prover_boogie_backend::{
     add_prelude, boogie_wrapper::BoogieWrapper, bytecode_translator::BoogieTranslator,
 };
-use move_stackless_bytecode::{
-    function_target_pipeline::FunctionTargetsHolder, number_operation::GlobalNumberOperationState,
-    pipeline_factory,
+use move_prover_bytecode_pipeline::{
+    number_operation::GlobalNumberOperationState, pipeline_factory,
 };
+use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
 use std::{
     fs,
     path::{Path, PathBuf},

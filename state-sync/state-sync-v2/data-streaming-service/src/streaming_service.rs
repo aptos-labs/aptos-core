@@ -410,109 +410,71 @@ mod streaming_service_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_drop_data_streams() {
-        // Create a new streaming service
-        let (_, mut streaming_service) =
-            tests::streaming_service::create_streaming_client_and_server(false, false, true);
+        for enable_subscription_stream in [false, true] {
+            // Create a new streaming service
+            let (_, mut streaming_service) =
+                tests::streaming_service::create_streaming_client_and_server(
+                    None,
+                    false,
+                    false,
+                    true,
+                    enable_subscription_stream,
+                );
 
-        // Create multiple data streams
-        let num_data_streams = 10;
-        let mut stream_ids = vec![];
-        for _ in 0..num_data_streams {
-            // Create a new data stream
-            let (new_stream_request, response_receiver) = create_new_stream_request();
-            streaming_service.handle_stream_request_message(new_stream_request);
-            let data_stream_listener = response_receiver.now_or_never().unwrap().unwrap().unwrap();
-            let data_stream_id = data_stream_listener.data_stream_id;
+            // Create multiple data streams
+            let num_data_streams = 10;
+            let mut stream_ids = vec![];
+            for _ in 0..num_data_streams {
+                // Create a new data stream
+                let (new_stream_request, response_receiver) = create_new_stream_request();
+                streaming_service.handle_stream_request_message(new_stream_request);
+                let data_stream_listener =
+                    response_receiver.now_or_never().unwrap().unwrap().unwrap();
+                let data_stream_id = data_stream_listener.data_stream_id;
 
-            // Remember the data stream id and drop the listener
-            stream_ids.push(data_stream_id);
-        }
-
-        // Verify the number of active data streams
-        assert_eq!(
-            streaming_service.get_all_data_stream_ids().len(),
-            num_data_streams
-        );
-
-        // Drive progress of the streaming service (the streaming service
-        // should detect the dropped listeners and remove the streams).
-        let timeout_deadline = Instant::now().add(Duration::from_secs(MAX_STREAM_WAIT_SECS));
-        while Instant::now() < timeout_deadline {
-            streaming_service.check_progress_of_all_data_streams().await;
-            if streaming_service.get_all_data_stream_ids().is_empty() {
-                return; // All streams were dropped!
+                // Remember the data stream id and drop the listener
+                stream_ids.push(data_stream_id);
             }
-            tokio::time::sleep(Duration::from_millis(100)).await;
+
+            // Verify the number of active data streams
+            assert_eq!(
+                streaming_service.get_all_data_stream_ids().len(),
+                num_data_streams
+            );
+
+            // Drive progress of the streaming service (the streaming service
+            // should detect the dropped listeners and remove the streams).
+            let timeout_deadline = Instant::now().add(Duration::from_secs(MAX_STREAM_WAIT_SECS));
+            while Instant::now() < timeout_deadline {
+                streaming_service.check_progress_of_all_data_streams().await;
+                if streaming_service.get_all_data_stream_ids().is_empty() {
+                    break; // All streams were dropped!
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+
+            // Verify the streams were terminated
+            if !streaming_service.get_all_data_stream_ids().is_empty() {
+                panic!("The streaming service failed to drop the data streams!");
+            }
         }
-        panic!("The streaming service failed to drop the data streams!");
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_terminate_data_streams() {
-        // Create a new streaming service
-        let (_, mut streaming_service) =
-            tests::streaming_service::create_streaming_client_and_server(false, false, true);
-
-        // Verify there are no data streams
-        assert!(streaming_service.get_all_data_stream_ids().is_empty());
-
-        // Create multiple data streams
-        let num_data_streams = 10;
-        let mut stream_ids_and_listeners = vec![];
-        for _ in 0..num_data_streams {
-            // Create a new data stream
-            let (new_stream_request, response_receiver) = create_new_stream_request();
-            streaming_service.handle_stream_request_message(new_stream_request);
-            let data_stream_listener = response_receiver.now_or_never().unwrap().unwrap().unwrap();
-            let data_stream_id = data_stream_listener.data_stream_id;
-
-            // Verify the data stream is actively held by the streaming service
-            let all_data_stream_ids = streaming_service.get_all_data_stream_ids();
-            assert!(all_data_stream_ids.contains(&data_stream_id));
-
-            // Remember the data stream id and listener
-            stream_ids_and_listeners.push((data_stream_id, data_stream_listener));
-        }
-
-        // Verify the number of active data streams
-        assert_eq!(
-            streaming_service.get_all_data_stream_ids().len(),
-            num_data_streams
-        );
-
-        // Try to terminate a data stream with an incorrect ID and verify
-        // an error is returned.
-        let terminate_stream_request = TerminateStreamRequest {
-            data_stream_id: 1919123,
-            notification_and_feedback: None,
-        };
-        streaming_service
-            .process_terminate_stream_request(&terminate_stream_request)
-            .unwrap_err();
-
-        // Terminate all the streams and verify they're no longer held
-        for (data_stream_id, _) in stream_ids_and_listeners {
-            // Terminate the data stream (with no feedback)
-            let (terminate_stream_request, _) =
-                create_terminate_stream_request(data_stream_id, None);
-            streaming_service.handle_stream_request_message(terminate_stream_request);
-
-            // Verify the stream has been removed
-            let all_data_stream_ids = streaming_service.get_all_data_stream_ids();
-            assert!(!all_data_stream_ids.contains(&data_stream_id));
-        }
-
-        // Verify there are no data streams
-        assert!(streaming_service.get_all_data_stream_ids().is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_terminate_data_streams_feedback() {
-        // Verify stream termination even if invalid feedback is given (i.e., id mismatch)
-        for invalid_feedback in [false, true] {
+        for enable_subscription_stream in [false, true] {
             // Create a new streaming service
             let (_, mut streaming_service) =
-                tests::streaming_service::create_streaming_client_and_server(false, false, true);
+                tests::streaming_service::create_streaming_client_and_server(
+                    None,
+                    false,
+                    false,
+                    true,
+                    enable_subscription_stream,
+                );
+
+            // Verify there are no data streams
+            assert!(streaming_service.get_all_data_stream_ids().is_empty());
 
             // Create multiple data streams
             let num_data_streams = 10;
@@ -525,48 +487,117 @@ mod streaming_service_tests {
                     response_receiver.now_or_never().unwrap().unwrap().unwrap();
                 let data_stream_id = data_stream_listener.data_stream_id;
 
+                // Verify the data stream is actively held by the streaming service
+                let all_data_stream_ids = streaming_service.get_all_data_stream_ids();
+                assert!(all_data_stream_ids.contains(&data_stream_id));
+
                 // Remember the data stream id and listener
                 stream_ids_and_listeners.push((data_stream_id, data_stream_listener));
             }
 
-            // Fetch a notification from each data stream and terminate the stream
-            for (data_stream_id, data_stream_listener) in &mut stream_ids_and_listeners {
-                let timeout_deadline =
-                    Instant::now().add(Duration::from_secs(MAX_STREAM_WAIT_SECS));
-                while Instant::now() < timeout_deadline {
-                    streaming_service.check_progress_of_all_data_streams().await;
-                    if let Ok(data_notification) = timeout(
-                        Duration::from_secs(1),
-                        data_stream_listener.select_next_some(),
-                    )
-                    .await
-                    {
-                        // Terminate the data stream
-                        let notification_id = if invalid_feedback {
-                            10101010 // Invalid notification id
-                        } else {
-                            data_notification.notification_id
-                        };
-                        let notification_and_feedback = Some(NotificationAndFeedback {
-                            notification_id,
-                            notification_feedback: NotificationFeedback::InvalidPayloadData,
-                        });
-                        let (terminate_stream_request, _) = create_terminate_stream_request(
-                            *data_stream_id,
-                            notification_and_feedback,
-                        );
-                        streaming_service.handle_stream_request_message(terminate_stream_request);
+            // Verify the number of active data streams
+            assert_eq!(
+                streaming_service.get_all_data_stream_ids().len(),
+                num_data_streams
+            );
 
-                        // Verify the stream has been removed
-                        let all_data_stream_ids = streaming_service.get_all_data_stream_ids();
-                        assert!(!all_data_stream_ids.contains(data_stream_id));
-                        break;
-                    }
-                }
+            // Try to terminate a data stream with an incorrect ID and verify
+            // an error is returned.
+            let terminate_stream_request = TerminateStreamRequest {
+                data_stream_id: 1919123,
+                notification_and_feedback: None,
+            };
+            streaming_service
+                .process_terminate_stream_request(&terminate_stream_request)
+                .unwrap_err();
+
+            // Terminate all the streams and verify they're no longer held
+            for (data_stream_id, _) in stream_ids_and_listeners {
+                // Terminate the data stream (with no feedback)
+                let (terminate_stream_request, _) =
+                    create_terminate_stream_request(data_stream_id, None);
+                streaming_service.handle_stream_request_message(terminate_stream_request);
+
+                // Verify the stream has been removed
+                let all_data_stream_ids = streaming_service.get_all_data_stream_ids();
+                assert!(!all_data_stream_ids.contains(&data_stream_id));
             }
 
             // Verify there are no data streams
             assert!(streaming_service.get_all_data_stream_ids().is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_terminate_data_streams_feedback() {
+        // Verify stream termination even if invalid feedback is given (i.e., id mismatch)
+        for enable_subscription_stream in [false, true] {
+            for invalid_feedback in [false, true] {
+                // Create a new streaming service
+                let (_, mut streaming_service) =
+                    tests::streaming_service::create_streaming_client_and_server(
+                        None,
+                        false,
+                        false,
+                        true,
+                        enable_subscription_stream,
+                    );
+
+                // Create multiple data streams
+                let num_data_streams = 10;
+                let mut stream_ids_and_listeners = vec![];
+                for _ in 0..num_data_streams {
+                    // Create a new data stream
+                    let (new_stream_request, response_receiver) = create_new_stream_request();
+                    streaming_service.handle_stream_request_message(new_stream_request);
+                    let data_stream_listener =
+                        response_receiver.now_or_never().unwrap().unwrap().unwrap();
+                    let data_stream_id = data_stream_listener.data_stream_id;
+
+                    // Remember the data stream id and listener
+                    stream_ids_and_listeners.push((data_stream_id, data_stream_listener));
+                }
+
+                // Fetch a notification from each data stream and terminate the stream
+                for (data_stream_id, data_stream_listener) in &mut stream_ids_and_listeners {
+                    let timeout_deadline =
+                        Instant::now().add(Duration::from_secs(MAX_STREAM_WAIT_SECS));
+                    while Instant::now() < timeout_deadline {
+                        streaming_service.check_progress_of_all_data_streams().await;
+                        if let Ok(data_notification) = timeout(
+                            Duration::from_secs(1),
+                            data_stream_listener.select_next_some(),
+                        )
+                        .await
+                        {
+                            // Terminate the data stream
+                            let notification_id = if invalid_feedback {
+                                10101010 // Invalid notification id
+                            } else {
+                                data_notification.notification_id
+                            };
+                            let notification_and_feedback = Some(NotificationAndFeedback {
+                                notification_id,
+                                notification_feedback: NotificationFeedback::InvalidPayloadData,
+                            });
+                            let (terminate_stream_request, _) = create_terminate_stream_request(
+                                *data_stream_id,
+                                notification_and_feedback,
+                            );
+                            streaming_service
+                                .handle_stream_request_message(terminate_stream_request);
+
+                            // Verify the stream has been removed
+                            let all_data_stream_ids = streaming_service.get_all_data_stream_ids();
+                            assert!(!all_data_stream_ids.contains(data_stream_id));
+                            break;
+                        }
+                    }
+                }
+
+                // Verify there are no data streams
+                assert!(streaming_service.get_all_data_stream_ids().is_empty());
+            }
         }
     }
 

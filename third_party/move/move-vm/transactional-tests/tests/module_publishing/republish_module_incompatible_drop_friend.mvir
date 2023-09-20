@@ -25,7 +25,7 @@ module 0x42.N {
     }
 }
 
-//# publish
+//# publish --verbose
 module 0x42.M {
     // cannot drop friends
     public(friend) foo() {

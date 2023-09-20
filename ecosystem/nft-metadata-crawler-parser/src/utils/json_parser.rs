@@ -2,7 +2,12 @@
 
 use crate::{
     get_uri_metadata,
-    utils::constants::{MAX_JSON_REQUEST_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
+    utils::{
+        constants::{MAX_JSON_REQUEST_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
+        counters::{
+            FAILED_TO_PARSE_JSON_COUNT, PARSE_JSON_INVOCATION_COUNT, SUCCESSFULLY_PARSED_JSON_COUNT,
+        },
+    },
 };
 use anyhow::Context;
 use backoff::{future::retry, ExponentialBackoff};
@@ -11,7 +16,7 @@ use image::ImageFormat;
 use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::info;
 
 pub struct JSONParser;
 
@@ -22,13 +27,20 @@ impl JSONParser {
         uri: String,
         max_file_size_bytes: u32,
     ) -> anyhow::Result<(Option<String>, Option<String>, Value)> {
+        PARSE_JSON_INVOCATION_COUNT.inc();
         let (mime, size) = get_uri_metadata(uri.clone()).await?;
         if ImageFormat::from_mime_type(mime.clone()).is_some() {
+            FAILED_TO_PARSE_JSON_COUNT
+                .with_label_values(&["found image instead"])
+                .inc();
             return Err(anyhow::anyhow!(format!(
                 "JSON parser received image file: {}, skipping",
                 mime
             )));
         } else if size > max_file_size_bytes {
+            FAILED_TO_PARSE_JSON_COUNT
+                .with_label_values(&["json file too large"])
+                .inc();
             return Err(anyhow::anyhow!(format!(
                 "JSON parser received file too large: {} bytes, skipping",
                 size
@@ -37,7 +49,7 @@ impl JSONParser {
 
         let op = || {
             async {
-                info!("Sending request for token_uri {}", uri);
+                info!(asset_uri = uri, "Sending request for asset_uri");
 
                 let client = Client::builder()
                     .timeout(Duration::from_secs(MAX_JSON_REQUEST_RETRY_SECONDS))
@@ -45,7 +57,7 @@ impl JSONParser {
                     .context("Failed to build reqwest client")?;
 
                 let response = client
-                    .get(&uri)
+                    .get(uri.trim())
                     .send()
                     .await
                     .context("Failed to get JSON")?;
@@ -70,13 +82,14 @@ impl JSONParser {
         };
 
         match retry(backoff, op).await {
-            Ok(result) => Ok(result),
+            Ok(result) => {
+                SUCCESSFULLY_PARSED_JSON_COUNT.inc();
+                Ok(result)
+            },
             Err(e) => {
-                warn!(
-                    uri = uri,
-                    error = ?e,
-                    "[NFT Metadata Parser] Exponential backoff timed out, skipping JSON"
-                );
+                FAILED_TO_PARSE_JSON_COUNT
+                    .with_label_values(&["other"])
+                    .inc();
                 Err(e)
             },
         }

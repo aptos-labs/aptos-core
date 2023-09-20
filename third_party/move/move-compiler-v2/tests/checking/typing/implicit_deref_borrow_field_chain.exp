@@ -16,4 +16,5 @@ module 0x8675309::M {
         select M::X3.f(select M::X2.x3(x2_mut));
         Tuple()
     }
+    spec fun $t0(x1: &M::X1,x1_mut: &mut M::X1,x2: &M::X2,x2_mut: &mut M::X2);
 } // end 0x8675309::M

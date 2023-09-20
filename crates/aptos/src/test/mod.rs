@@ -72,9 +72,8 @@ use std::{
     time::Duration,
 };
 use tempfile::TempDir;
-use thiserror::__private::PathAsDisplay;
 #[cfg(feature = "cli-framework-test-move")]
-use thiserror::__private::PathAsDisplay;
+use thiserror::__private::AsDisplay;
 use tokio::time::{sleep, Instant};
 
 #[cfg(test)]
@@ -541,12 +540,15 @@ impl CliTestFramework {
             network: Some(Network::Custom),
             rest_url: Some(self.endpoint.clone()),
             faucet_url: Some(self.faucet_endpoint.clone()),
+            faucet_auth_token: None,
             rng_args: RngArgs::from_seed([0; 32]),
             private_key_options: PrivateKeyInputOptions::from_private_key(private_key)?,
             profile_options: Default::default(),
             prompt_options: PromptOptions::yes(),
             encoding_options: EncodingOptions::default(),
             skip_faucet: false,
+            ledger: false,
+            hardware_wallet_options: Default::default(),
         }
         .execute()
         .await
@@ -973,7 +975,7 @@ impl CliTestFramework {
         let source_path = temp_dir.path().join("script.move");
         write_to_file(
             source_path.as_path(),
-            &source_path.as_display().to_string(),
+            &source_path.display().to_string(),
             script_contents.as_bytes(),
         )
         .unwrap();
@@ -1042,6 +1044,7 @@ impl CliTestFramework {
             named_addresses: Self::named_addresses(account_strs),
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
+            compiler_version: None,
             skip_attribute_checks: false,
         }
     }
@@ -1079,7 +1082,7 @@ impl CliTestFramework {
     }
 
     pub fn faucet_options(&self) -> FaucetOptions {
-        FaucetOptions::new(Some(self.faucet_endpoint.clone()))
+        FaucetOptions::new(Some(self.faucet_endpoint.clone()), None)
     }
 
     fn transaction_options(

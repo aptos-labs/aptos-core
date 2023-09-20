@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput};
-use aptos_aggregator::{
-    delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
-    transaction::AggregatorValue,
-};
+use aptos_aggregator::delta_change_set::{delta_add, delta_sub, serialize, DeltaOp};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
@@ -19,13 +16,15 @@ use aptos_types::{
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
+use aptos_vm_types::resolver::TExecutorView;
+use bytes::Bytes;
 use claims::assert_ok;
-use move_core_types::language_storage::TypeTag;
+use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout};
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
 use std::{
-    collections::{hash_map::DefaultHasher, BTreeSet},
+    collections::{hash_map::DefaultHasher, BTreeSet, HashMap},
     convert::TryInto,
     fmt::Debug,
     hash::{Hash, Hasher},
@@ -35,7 +34,6 @@ use std::{
         Arc,
     },
 };
-
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
 // TODO: extend to delta failures.
 pub(crate) const STORAGE_AGGREGATOR_VALUE: u128 = 100001;
@@ -54,9 +52,9 @@ where
 
     /// Gets the state value for a given state key.
     fn get_state_value(&self, _: &K) -> anyhow::Result<Option<StateValue>> {
-        Ok(Some(StateValue::new_legacy(serialize(
-            &STORAGE_AGGREGATOR_VALUE,
-        ))))
+        Ok(Some(StateValue::new_legacy(
+            serialize(&STORAGE_AGGREGATOR_VALUE).into(),
+        )))
     }
 
     fn id(&self) -> StateViewId {
@@ -127,26 +125,52 @@ impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> 
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
-pub struct ValueType<V: Into<Vec<u8>> + Debug + Clone + Eq + Arbitrary>(
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ValueType {
     /// Wrapping the types used for testing to add TransactionWrite trait implementation (below).
-    pub V,
-    /// Determines whether V is going to contain a value (o.w. deletion). This is useful for
-    /// testing the behavior of deleting aggregators, in which case we shouldn't panic
-    /// but let the Move-VM handle the read the same as for any deleted resource.
-    pub bool,
-);
+    bytes: Option<Bytes>,
+}
 
-impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> TransactionWrite
-    for ValueType<V>
-{
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
-        if self.1 {
-            let mut v = self.0.clone().into();
-            v.resize(16, 1);
-            Some(v)
-        } else {
-            None
+impl Arbitrary for ValueType {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        vec(any::<u8>(), 17)
+            .prop_map(|mut v| {
+                let use_value = v[0] < 128;
+                v.resize(16, 0);
+                ValueType::new(v, use_value)
+            })
+            .boxed()
+    }
+}
+
+impl ValueType {
+    /// If use_value is not set, the resulting Value will correspond to a deletion, i.e.
+    /// not contain a value (o.w. deletion).
+    pub(crate) fn new<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary>(
+        value: V,
+        use_value: bool,
+    ) -> Self {
+        Self {
+            bytes: use_value.then(|| {
+                let mut v = value.clone().into();
+                v.resize(16, 1);
+                v.into()
+            }),
+        }
+    }
+}
+
+impl TransactionWrite for ValueType {
+    fn bytes(&self) -> Option<&Bytes> {
+        self.bytes.as_ref()
+    }
+
+    fn from_state_value(maybe_state_value: Option<StateValue>) -> Self {
+        Self {
+            bytes: maybe_state_value.map(|state_value| state_value.bytes().clone()),
         }
     }
 
@@ -256,7 +280,9 @@ impl<
     > Transaction for MockTransaction<K, V, E>
 {
     type Event = E;
+    type Identifier = ();
     type Key = K;
+    type Tag = u32;
     type Value = V;
 }
 
@@ -293,7 +319,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
         allow_deletes: bool,
     ) -> Vec<(
-        /* writes = */ Vec<(KeyType<K>, ValueType<V>)>,
+        /* writes = */ Vec<(KeyType<K>, ValueType)>,
         /* deltas = */ Vec<(KeyType<K>, DeltaOp)>,
     )> {
         let mut ret = vec![];
@@ -311,14 +337,15 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                         None => {
                             // One out of 23 writes will be a deletion
                             let is_deletion = allow_deletes
-                                && AggregatorValue::from_write(&ValueType(value.clone(), true))
+                                && ValueType::new(value.clone(), true)
+                                    .as_u128()
                                     .unwrap()
-                                    .into()
+                                    .unwrap()
                                     % 23
                                     == 0;
                             incarnation_writes.push((
                                 KeyType(key, module_write_fn(i)),
-                                ValueType(value.clone(), !is_deletion),
+                                ValueType::new(value.clone(), !is_deletion),
                             ));
                         },
                     }
@@ -362,7 +389,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         module_write_fn: &dyn Fn(usize) -> bool,
         delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
         allow_deletes: bool,
-    ) -> MockTransaction<KeyType<K>, ValueType<V>, E> {
+    ) -> MockTransaction<KeyType<K>, ValueType, E> {
         let reads = Self::reads_from_gen(universe, self.reads, &module_read_fn);
         let gas = Self::gas_from_gen(self.gas);
 
@@ -396,7 +423,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         universe: &[K],
         // Are writes and reads module access (same access path).
         module_access: (bool, bool),
-    ) -> MockTransaction<KeyType<K>, ValueType<V>, E> {
+    ) -> MockTransaction<KeyType<K>, ValueType, E> {
         let is_module_read = |_| -> bool { module_access.1 };
         let is_module_write = |_| -> bool { module_access.0 };
         let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
@@ -420,14 +447,12 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         universe: &[K],
         delta_threshold: usize,
         allow_deletes: bool,
-    ) -> MockTransaction<KeyType<K>, ValueType<V>, E> {
+    ) -> MockTransaction<KeyType<K>, ValueType, E> {
         let is_module_read = |_| -> bool { false };
         let is_module_write = |_| -> bool { false };
         let is_delta = |i, v: &V| -> Option<DeltaOp> {
             if i >= delta_threshold {
-                let val = AggregatorValue::from_write(&ValueType(v.clone(), true))
-                    .unwrap()
-                    .into();
+                let val = ValueType::new(v.clone(), true).as_u128().unwrap().unwrap();
                 if val % 10 == 0 {
                     None
                 } else if val % 10 < 5 {
@@ -461,7 +486,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         // writes. This way there will be module accesses but no intersection.
         read_threshold: usize,
         write_threshold: usize,
-    ) -> MockTransaction<KeyType<K>, ValueType<V>, E> {
+    ) -> MockTransaction<KeyType<K>, ValueType, E> {
         assert!(read_threshold < universe.len());
         assert!(write_threshold > read_threshold);
         assert!(write_threshold < universe.len());
@@ -510,7 +535,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = K>,
+        view: &impl TExecutorView<K, MoveTypeLayout, ()>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,
@@ -529,19 +554,26 @@ where
                 let behavior = &incarnation_behaviors[idx % incarnation_behaviors.len()];
 
                 // Reads
-                let mut reads_result = vec![];
+                let mut read_results = vec![];
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
-                    match view.get_state_value_bytes(k) {
-                        Ok(v) => reads_result.push(v),
-                        Err(_) => reads_result.push(None),
+                    // TODO: test aggregator reads.
+                    match k.module_path() {
+                        Some(_) => match view.get_module_bytes(k) {
+                            Ok(v) => read_results.push(v.map(Into::into)),
+                            Err(_) => read_results.push(None),
+                        },
+                        None => match view.get_resource_bytes(k, None) {
+                            Ok(v) => read_results.push(v.map(Into::into)),
+                            Err(_) => read_results.push(None),
+                        },
                     }
                 }
                 ExecutionStatus::Success(MockOutput {
                     writes: behavior.writes.clone(),
                     deltas: behavior.deltas.clone(),
                     events: behavior.events.to_vec(),
-                    read_results: reads_result,
+                    read_results,
                     materialized_delta_writes: OnceCell::new(),
                     total_gas: behavior.gas,
                 })
@@ -555,7 +587,6 @@ where
 #[derive(Debug)]
 
 pub(crate) struct MockOutput<K, V, E> {
-    // TODO: Split writes into resources & modules.
     pub(crate) writes: Vec<(K, V)>,
     pub(crate) deltas: Vec<(K, DeltaOp)>,
     pub(crate) events: Vec<E>,
@@ -572,12 +603,30 @@ where
 {
     type Txn = MockTransaction<K, V, E>;
 
-    fn get_writes(&self) -> Vec<(K, V)> {
-        self.writes.clone()
+    fn resource_write_set(&self) -> HashMap<K, V> {
+        self.writes
+            .iter()
+            .filter(|(k, _)| k.module_path().is_none())
+            .cloned()
+            .collect()
     }
 
-    fn get_deltas(&self) -> Vec<(K, DeltaOp)> {
-        self.deltas.clone()
+    fn module_write_set(&self) -> HashMap<K, V> {
+        self.writes
+            .iter()
+            .filter(|(k, _)| k.module_path().is_some())
+            .cloned()
+            .collect()
+    }
+
+    // Aggregator v1 writes are included in resource_write_set for tests (writes are produced
+    // for all keys including ones for v1_aggregators without distinguishing).
+    fn aggregator_v1_write_set(&self) -> HashMap<K, V> {
+        HashMap::new()
+    }
+
+    fn aggregator_v1_delta_set(&self) -> HashMap<K, DeltaOp> {
+        self.deltas.iter().cloned().collect()
     }
 
     fn get_events(&self) -> Vec<E> {

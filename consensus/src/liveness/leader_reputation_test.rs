@@ -440,7 +440,7 @@ impl MockDbReader {
 
         self.events.lock().push(EventWithVersion::new(
             *idx,
-            ContractEvent::new(
+            ContractEvent::new_v1(
                 new_block_event_key(),
                 *idx,
                 TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),

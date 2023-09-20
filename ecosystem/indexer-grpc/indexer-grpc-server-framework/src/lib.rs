@@ -44,13 +44,19 @@ where
     });
     let main_task_handler = runtime.spawn(async move { config.run().await });
     tokio::select! {
-        _ = task_handler => {
-            error!("Probes and metrics handler exited");
-            process::exit(1);
+        res = task_handler => {
+            if let Err(e) = res {
+                error!("Probes and metrics handler panicked or was shutdown: {:?}", e);
+                process::exit(1);
+            }
+            Ok(())
         },
-        _ = main_task_handler => {
-            error!("Main task exited");
-            process::exit(1);
+        res = main_task_handler => {
+            if let Err(e) = res {
+                error!("Main task panicked or was shutdown: {:?}", e);
+                process::exit(1);
+            }
+            Ok(())
         },
     }
 }

@@ -236,12 +236,12 @@ pub async fn update_sequence_numbers(
     let (mut funder_seq, mut receiver_seq) =
         get_sequence_numbers(client, funder_account, receiver_address).await?;
     let our_funder_seq = {
-        let mut funder_account = funder_account.write().await;
+        let funder_account = funder_account.write().await;
 
         // If the onchain sequence_number is greater than what we have, update our
         // sequence_numbers
         if funder_seq > funder_account.sequence_number() {
-            *funder_account.sequence_number_mut() = funder_seq;
+            funder_account.set_sequence_number(funder_seq);
         }
         funder_account.sequence_number()
     };
@@ -294,10 +294,10 @@ pub async fn update_sequence_numbers(
     // If after 30 seconds we still have not caught up, we are likely unhealthy.
     if our_funder_seq >= funder_seq + MAX_NUM_OUTSTANDING_TRANSACTIONS {
         error!("We are unhealthy, transactions have likely expired.");
-        let mut funder_account = funder_account.write().await;
+        let funder_account = funder_account.write().await;
         if funder_account.sequence_number() >= funder_seq + MAX_NUM_OUTSTANDING_TRANSACTIONS {
             info!("Resetting the sequence number counter.");
-            *funder_account.sequence_number_mut() = funder_seq;
+            funder_account.set_sequence_number(funder_seq);
         } else {
             info!("Someone else reset the sequence number counter ahead of us.");
         }
@@ -386,16 +386,16 @@ pub async fn submit_transaction(
     match result {
         Ok(_) => {
             info!(
-                hash = signed_transaction.clone().committed_hash().to_hex_literal(),
+                hash = signed_transaction.clone().committed_hash(),
                 address = receiver_address,
                 event = event_on_success,
             );
             Ok(signed_transaction)
         },
         Err(e) => {
-            *faucet_account.write().await.sequence_number_mut() -= 1;
+            faucet_account.write().await.decrement_sequence_number();
             warn!(
-                hash = signed_transaction.clone().committed_hash().to_hex_literal(),
+                hash = signed_transaction.clone().committed_hash(),
                 address = receiver_address,
                 event = "transaction_failure",
                 error_message = format!("{:#}", e)

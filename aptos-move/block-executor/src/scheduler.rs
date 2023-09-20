@@ -4,7 +4,7 @@
 
 use crate::counters::GET_NEXT_TASK_SECONDS;
 use aptos_infallible::Mutex;
-use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
+use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use crossbeam::utils::CachePadded;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
@@ -54,8 +54,8 @@ pub enum ExecutionTaskType {
 /// there are no more tasks and the scheduler is done.
 #[derive(Debug)]
 pub enum SchedulerTask {
-    ExecutionTask(Version, ExecutionTaskType),
-    ValidationTask(Version, Wave),
+    ExecutionTask(TxnIndex, Incarnation, ExecutionTaskType),
+    ValidationTask(TxnIndex, Incarnation, Wave),
     NoTask,
     Done,
 }
@@ -375,15 +375,15 @@ impl Scheduler {
             }
 
             if prefer_validate {
-                if let Some((version_to_validate, wave)) =
+                if let Some((txn_idx, incarnation, wave)) =
                     self.try_validate_next_version(idx_to_validate, wave)
                 {
-                    return SchedulerTask::ValidationTask(version_to_validate, wave);
+                    return SchedulerTask::ValidationTask(txn_idx, incarnation, wave);
                 }
-            } else if let Some((version_to_execute, execution_task_type)) =
+            } else if let Some((txn_idx, incarnation, execution_task_type)) =
                 self.try_execute_next_version()
             {
-                return SchedulerTask::ExecutionTask(version_to_execute, execution_task_type);
+                return SchedulerTask::ExecutionTask(txn_idx, incarnation, execution_task_type);
             }
         }
     }
@@ -510,7 +510,7 @@ impl Scheduler {
             }
             // Update the minimum wave this txn needs to pass.
             validation_status.required_wave = cur_wave;
-            return SchedulerTask::ValidationTask((txn_idx, incarnation), cur_wave);
+            return SchedulerTask::ValidationTask(txn_idx, incarnation, cur_wave);
         }
 
         SchedulerTask::NoTask
@@ -549,10 +549,7 @@ impl Scheduler {
             // nothing to do, as another thread must have succeeded to incarnate and
             // obtain the task for re-execution.
             if let Some((new_incarnation, execution_task_type)) = self.try_incarnate(txn_idx) {
-                return SchedulerTask::ExecutionTask(
-                    (txn_idx, new_incarnation),
-                    execution_task_type,
-                );
+                return SchedulerTask::ExecutionTask(txn_idx, new_incarnation, execution_task_type);
             }
         }
 
@@ -726,7 +723,7 @@ impl Scheduler {
         &self,
         idx_to_validate: TxnIndex,
         wave: Wave,
-    ) -> Option<(Version, Wave)> {
+    ) -> Option<(TxnIndex, Incarnation, Wave)> {
         // We do compare-and-swap here instead of fetch-and-increment as for execution index
         // because we would like to not validate transactions when lower indices are in the
         // 'never_executed' state (to avoid unnecessarily reducing validation index and creating
@@ -750,7 +747,7 @@ impl Scheduler {
             // return version and wave for validation task, otherwise None.
             return self
                 .is_executed(idx_to_validate, false)
-                .map(|incarnation| ((idx_to_validate, incarnation), wave));
+                .map(|incarnation| (idx_to_validate, incarnation, wave));
         }
 
         None
@@ -763,7 +760,7 @@ impl Scheduler {
     /// to create the next incarnation (should happen exactly once), and if successful,
     /// return the version to the caller for the corresponding ExecutionTask.
     /// - Otherwise, return None.
-    fn try_execute_next_version(&self) -> Option<(Version, ExecutionTaskType)> {
+    fn try_execute_next_version(&self) -> Option<(TxnIndex, Incarnation, ExecutionTaskType)> {
         let idx_to_execute = self.execution_idx.fetch_add(1, Ordering::SeqCst);
 
         if idx_to_execute >= self.num_txns {
@@ -774,7 +771,7 @@ impl Scheduler {
         // return version for execution task, otherwise None.
         self.try_incarnate(idx_to_execute)
             .map(|(incarnation, execution_task_type)| {
-                ((idx_to_execute, incarnation), execution_task_type)
+                (idx_to_execute, incarnation, execution_task_type)
             })
     }
 

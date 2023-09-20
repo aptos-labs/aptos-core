@@ -75,7 +75,10 @@ use move_compiler::{
     PASS_TYPING,
 };
 use move_ir_types::location::*;
-use move_package::compilation::build_plan::BuildPlan;
+use move_package::{
+    compilation::{build_plan::BuildPlan, compiled_package::unimplemented_v2_driver},
+    CompilerConfig,
+};
 use move_symbol_pool::Symbol;
 use std::{
     cmp,
@@ -645,40 +648,45 @@ impl Symbolicator {
         let build_plan = BuildPlan::create(resolution_graph)?;
         let mut typed_ast = None;
         let mut diagnostics = None;
-        build_plan.compile_with_driver(&mut std::io::sink(), None, |compiler| {
-            let (files, compilation_result) = compiler.run::<PASS_TYPING>()?;
-            let (_, compiler) = match compilation_result {
-                Ok(v) => v,
-                Err(diags) => {
-                    let failure = true;
-                    diagnostics = Some((diags, failure));
-                    eprintln!("typed AST compilation failed");
-                    return Ok((files, vec![]));
-                },
-            };
-            eprintln!("compiled to typed AST");
-            let (compiler, typed_program) = compiler.into_ast();
-            typed_ast = Some(typed_program.clone());
-            eprintln!("compiling to bytecode");
-            let compilation_result = compiler.at_typing(typed_program).build();
-            let (units, diags) = match compilation_result {
-                Ok(v) => v,
-                Err(diags) => {
+        build_plan.compile_with_driver(
+            &mut std::io::sink(),
+            &CompilerConfig::default(),
+            |compiler| {
+                let (files, compilation_result) = compiler.run::<PASS_TYPING>()?;
+                let (_, compiler) = match compilation_result {
+                    Ok(v) => v,
+                    Err(diags) => {
+                        let failure = true;
+                        diagnostics = Some((diags, failure));
+                        eprintln!("typed AST compilation failed");
+                        return Ok((files, vec![]));
+                    },
+                };
+                eprintln!("compiled to typed AST");
+                let (compiler, typed_program) = compiler.into_ast();
+                typed_ast = Some(typed_program.clone());
+                eprintln!("compiling to bytecode");
+                let compilation_result = compiler.at_typing(typed_program).build();
+                let (units, diags) = match compilation_result {
+                    Ok(v) => v,
+                    Err(diags) => {
+                        let failure = false;
+                        diagnostics = Some((diags, failure));
+                        eprintln!("bytecode compilation failed");
+                        return Ok((files, vec![]));
+                    },
+                };
+                // warning diagnostics (if any) since compilation succeeded
+                if !diags.is_empty() {
+                    // assign only if non-empty, otherwise return None to reset previous diagnostics
                     let failure = false;
                     diagnostics = Some((diags, failure));
-                    eprintln!("bytecode compilation failed");
-                    return Ok((files, vec![]));
-                },
-            };
-            // warning diagnostics (if any) since compilation succeeded
-            if !diags.is_empty() {
-                // assign only if non-empty, otherwise return None to reset previous diagnostics
-                let failure = false;
-                diagnostics = Some((diags, failure));
-            }
-            eprintln!("compiled to bytecode");
-            Ok((files, units))
-        })?;
+                }
+                eprintln!("compiled to bytecode");
+                Ok((files, units))
+            },
+            unimplemented_v2_driver,
+        )?;
 
         let mut ide_diagnostics = lsp_empty_diagnostics(&file_name_mapping);
         if let Some((compiler_diagnostics, failure)) = diagnostics {

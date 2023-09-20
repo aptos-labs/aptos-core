@@ -8,6 +8,9 @@ use aptos_metrics_core::{
 };
 use once_cell::sync::Lazy;
 
+// Subscription stream termination labels
+pub const MAX_CONSECUTIVE_REQUESTS_LABEL: &str = "max_consecutive_requests";
+
 // Latency buckets for network latencies (i.e., the defaults only go up
 // to 10 seconds, but we usually require more).
 const NETWORK_LATENCY_BUCKETS: [f64; 14] = [
@@ -42,12 +45,31 @@ pub static CREATE_DATA_STREAM: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for the creation of new subscription streams
+pub static CREATE_SUBSCRIPTION_STREAM: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_data_streaming_service_create_subscription_stream",
+        "Counters related to the creation of new subscription streams",
+    )
+    .unwrap()
+});
+
 /// Counter for the termination of existing data streams
 pub static TERMINATE_DATA_STREAM: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_data_streaming_service_terminate_data_stream",
         "Counters related to the termination of existing data streams",
         &["feedback_type"]
+    )
+    .unwrap()
+});
+
+/// Counter for the termination of existing subscription streams
+pub static TERMINATE_SUBSCRIPTION_STREAM: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_data_streaming_service_terminate_subscription_stream",
+        "Counters related to the termination of existing subscription streams",
+        &["termination_reason"]
     )
     .unwrap()
 });

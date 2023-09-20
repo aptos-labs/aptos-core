@@ -405,8 +405,13 @@ pub const VERSION_5: u32 = 5;
 ///  + u16, u32, u256 integers and corresponding Ld, Cast bytecodes
 pub const VERSION_6: u32 = 6;
 
-// Mark which version is the latest version
+/// Mark which version is the latest version
 pub const VERSION_MAX: u32 = VERSION_6;
+
+/// A unique version value which is used for experimental code which is not allowed in
+/// production. The bytecode deserializer accepts modules with this version only when the
+/// cargo feature `testing` is enabled.
+pub const VERSION_EXPERIMENTAL: u32 = u32::MAX;
 
 // Mark which oldest version is supported.
 // TODO(#145): finish v4 compatibility; as of now, only metadata is implemented
@@ -446,7 +451,10 @@ pub(crate) mod versioned_data {
                         .with_message("Bad binary header".to_string()));
                 },
             };
-            if version == 0 || version > u32::min(max_version, VERSION_MAX) {
+            if version == 0
+                || (version > u32::min(max_version, VERSION_MAX)
+                    && !(version == VERSION_EXPERIMENTAL && cfg!(feature = "testing")))
+            {
                 return Err(PartialVMError::new(StatusCode::UNKNOWN_VERSION));
             }
             Ok((Self { version, binary }, cursor))

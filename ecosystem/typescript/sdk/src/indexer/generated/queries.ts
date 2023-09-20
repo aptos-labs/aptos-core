@@ -90,30 +90,47 @@ export const TokenActivitiesFieldsFragmentDoc = `
   type
 }
     `;
+export const GetAccountCoinsDataCount = `
+    query getAccountCoinsDataCount($address: String) {
+  current_fungible_asset_balances_aggregate(
+    where: {owner_address: {_eq: $address}}
+  ) {
+    aggregate {
+      count
+    }
+  }
+}
+    `;
 export const GetAccountCoinsData = `
-    query getAccountCoinsData($owner_address: String, $offset: Int, $limit: Int) {
-  current_coin_balances(
-    where: {owner_address: {_eq: $owner_address}}
+    query getAccountCoinsData($where_condition: current_fungible_asset_balances_bool_exp!, $offset: Int, $limit: Int, $order_by: [current_fungible_asset_balances_order_by!]) {
+  current_fungible_asset_balances(
+    where: $where_condition
     offset: $offset
     limit: $limit
+    order_by: $order_by
   ) {
     amount
-    coin_type
-    coin_type_hash
+    asset_type
+    is_frozen
+    is_primary
     last_transaction_timestamp
     last_transaction_version
     owner_address
-    coin_info {
-      coin_type
-      coin_type_hash
-      creator_address
-      decimals
-      name
-      supply_aggregator_table_handle
-      supply_aggregator_table_key
+    storage_id
+    token_standard
+    metadata {
+      token_standard
       symbol
-      transaction_created_timestamp
-      transaction_version_created
+      supply_aggregator_table_key_v1
+      supply_aggregator_table_handle_v1
+      project_uri
+      name
+      last_transaction_version
+      last_transaction_timestamp
+      icon_uri
+      decimals
+      creator_address
+      asset_type
     }
   }
 }
@@ -417,7 +434,10 @@ const defaultWrapper: SdkFunctionWrapper = (action, _operationName, _operationTy
 
 export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = defaultWrapper) {
   return {
-    getAccountCoinsData(variables?: Types.GetAccountCoinsDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountCoinsDataQuery> {
+    getAccountCoinsDataCount(variables?: Types.GetAccountCoinsDataCountQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountCoinsDataCountQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountCoinsDataCountQuery>(GetAccountCoinsDataCount, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountCoinsDataCount', 'query');
+    },
+    getAccountCoinsData(variables: Types.GetAccountCoinsDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountCoinsDataQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountCoinsDataQuery>(GetAccountCoinsData, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountCoinsData', 'query');
     },
     getAccountCurrentTokens(variables: Types.GetAccountCurrentTokensQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountCurrentTokensQuery> {

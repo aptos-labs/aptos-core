@@ -31,7 +31,7 @@ jobs:
     # Run on a machine with more local storage for large docker images
     runs-on: medium-perf-docker-with-local-ssd
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:
@@ -43,7 +43,7 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - name: Login to Docker Hub
-        uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.ENV_DOCKERHUB_USERNAME }}
           password: ${{ secrets.ENV_DOCKERHUB_PASSWORD }}
@@ -52,7 +52,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
+      - uses: pnpm/action-setup@v2
 
       - name: Release Images
         env:

@@ -17,6 +17,6 @@ anyhow = { workspace = true }
 aptos-api = { workspace = true }
 aptos-config = { workspace = true }
 aptos-mempool = { workspace = true, features = ["fuzzing"] }
-aptos-storage-interface = { workspace = true, features = ["fuzzing"] }
+aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 clap = { workspace = true }

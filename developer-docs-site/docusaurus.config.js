@@ -192,10 +192,6 @@ const config = {
               to: "nodes/full-node/public-fullnode",
             },
             {
-              label: "Run an Indexer",
-              to: "nodes/indexer-fullnode",
-            },
-            {
               label: "Monitor a Node",
               to: "nodes/measure/measure-index",
             },
@@ -324,6 +320,14 @@ const config = {
       "@docusaurus/plugin-client-redirects",
       {
         redirects: [
+          {
+            to: "/indexer/indexer-landing",
+            from: "/integration/indexing",
+          },
+          {
+            to: "/indexer/indexer-landing",
+            from: "/nodes/indexer-fullnode",
+          },
           {
             to: "/integration/creating-a-signed-transaction",
             from: "/tutorials/your-first-transaction-sdk",

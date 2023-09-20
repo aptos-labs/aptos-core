@@ -6,6 +6,7 @@
 
 use crate::{
     dag::DAGNetworkMessage,
+    experimental,
     dkg::DKGNetworkMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest},
 };
@@ -24,6 +25,7 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
+pub use experimental::commit_reliable_broadcast::CommitMessage;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -67,6 +69,8 @@ pub enum ConsensusMsg {
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
     /// DAG protocol message
     DAGMessage(DAGNetworkMessage),
+    /// Commit message
+    CommitMessage(Box<CommitMessage>),
     /// DKG protocol message
     DKGMessage(Box<DKGNetworkMessage>),
 }
@@ -92,6 +96,7 @@ impl ConsensusMsg {
             ConsensusMsg::SignedBatchInfo(_) => "SignedBatchInfo",
             ConsensusMsg::ProofOfStoreMsg(_) => "ProofOfStoreMsg",
             ConsensusMsg::DAGMessage(_) => "DAGMessage",
+            ConsensusMsg::CommitMessage(_) => "CommitMessage",
             ConsensusMsg::DKGMessage(_) => "DKGMessage",
         }
     }

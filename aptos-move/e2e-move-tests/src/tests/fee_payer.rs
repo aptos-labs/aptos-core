@@ -6,16 +6,13 @@ use aptos::move_tool::MemberId;
 use aptos_language_e2e_tests::{account::TransactionBuilder, transaction_status_eq};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::CoinStoreResource,
     on_chain_config::FeatureFlag,
     transaction::{EntryFunction, Script, TransactionArgument, TransactionStatus},
 };
-use move_core_types::{move_resource::MoveStructType, vm_status::StatusCode};
+use move_core_types::vm_status::StatusCode;
 
 fn read_coin(h: &MoveHarness, account: &AccountAddress) -> u64 {
-    h.read_resource::<CoinStoreResource>(account, CoinStoreResource::struct_tag())
-        .unwrap()
-        .coin()
+    h.read_aptos_balance(account)
 }
 
 #[test]

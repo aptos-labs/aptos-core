@@ -309,13 +309,13 @@ pub fn test_get_state_snapshot_before() {
             &Node::Null,
         )
         .unwrap();
-    db.state_merkle_db
+    db.state_merkle_db()
         .metadata_db()
         .write_schemas(batch)
         .unwrap();
 
     assert_eq!(
-        db.state_merkle_db
+        db.state_merkle_db()
             .get_state_snapshot_version_before(4)
             .unwrap(),
         Some(2)
@@ -325,13 +325,13 @@ pub fn test_get_state_snapshot_before() {
     batch
         .delete::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(2))
         .unwrap();
-    db.state_merkle_db
+    db.state_merkle_db()
         .metadata_db()
         .write_schemas(batch)
         .unwrap();
 
     assert_eq!(
-        db.state_merkle_db
+        db.state_merkle_db()
             .get_state_snapshot_version_before(4)
             .unwrap(),
         Some(0)

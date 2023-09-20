@@ -1,6 +1,7 @@
 import aptosClient from "@aptos-labs/aptos-client";
-import { AptosApiError, AptosRequest, AptosResponse, ClientConfig } from "./types";
+import { AptosApiError, AptosResponse } from "./types";
 import { VERSION } from "../version";
+import { ClientConfig, AptosRequest } from "../types";
 
 /**
  * Meaningful errors map
@@ -69,6 +70,7 @@ export async function aptosRequest<Req, Res>(options: AptosRequest): Promise<Apt
   if (result.status >= 200 && result.status < 300) {
     return result;
   }
+
   const errorMessage = errors[result.status];
   throw new AptosApiError(options, result, errorMessage ?? "Generic Error");
 }

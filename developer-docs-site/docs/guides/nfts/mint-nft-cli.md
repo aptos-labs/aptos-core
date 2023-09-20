@@ -335,7 +335,7 @@ The final phase of development is to make the smart contract module ready for pr
 We prepare the module for production by:
 
 * adding a `TokenMintingEvent` to emit a custom event for tracking minting of tokens from this module.
-* enabling signature verification and ntroducing the concept of a proof challenge to prevent bot spamming.
+* enabling signature verification and introducing the concept of a proof challenge to prevent bot spamming.
 * including [unit tests](../../move/book/unit-testing.md) to make sure our code works as expected.
 
 
@@ -526,7 +526,7 @@ In the [NFT Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-m
 
 ### Mint more NFTs and disable minting from admin account
 
-1. Mint another NFT using the `nft-receiver` profile, sustituting in the resource account's address:
+1. Mint another NFT using the `nft-receiver` profile, substituting in the resource account's address:
 
 ```shell
 aptos move run --function-id <resource-account-address>::minting::mint_nft --profile nft-receiver

@@ -16,7 +16,7 @@ use crate::{
         SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
-    ty::Type,
+    ty::{Constraint, Type},
 };
 use codespan_reporting::diagnostic::Severity;
 #[allow(unused_imports)]
@@ -67,6 +67,7 @@ pub(crate) struct SpecOrBuiltinFunEntry {
     pub loc: Loc,
     pub oper: Operation,
     pub type_params: Vec<TypeParameter>,
+    pub type_param_constraints: BTreeMap<usize, Constraint>,
     pub params: Vec<Parameter>,
     pub result_type: Type,
     pub visibility: EntryVisibility,
@@ -116,7 +117,7 @@ pub(crate) struct StructEntry {
     pub struct_id: StructId,
     pub type_params: Vec<TypeParameter>,
     pub abilities: AbilitySet,
-    pub fields: Option<BTreeMap<Symbol, (usize, Type)>>,
+    pub fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
     pub attributes: Vec<Attribute>,
 }
 
@@ -294,7 +295,7 @@ impl<'env> ModelBuilder<'env> {
         struct_id: StructId,
         abilities: AbilitySet,
         type_params: Vec<TypeParameter>,
-        fields: Option<BTreeMap<Symbol, (usize, Type)>>,
+        fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
     ) {
         let entry = StructEntry {
             loc,

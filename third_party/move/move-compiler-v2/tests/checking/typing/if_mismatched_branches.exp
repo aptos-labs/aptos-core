@@ -1,46 +1,46 @@
 
 Diagnostics:
 error: expected `()` but found `integer` (in if-else)
-  ┌─ tests/checking/typing/if_mismatched_branches.move:3:27
+  ┌─ tests/checking/typing/if_mismatched_branches.move:3:9
   │
 3 │         if (cond) () else 0;
-  │                           ^
+  │         ^^^^^^^^^^^^^^^^^^^
 
 error: expected `()` but found `integer` (in if-else)
-  ┌─ tests/checking/typing/if_mismatched_branches.move:4:19
+  ┌─ tests/checking/typing/if_mismatched_branches.move:4:9
   │
 4 │         if (cond) 0 else ();
-  │                   ^
+  │         ^^^^^^^^^^^^^^^^^^^
 
 error: expected `address` but found `integer` (in if-else)
-  ┌─ tests/checking/typing/if_mismatched_branches.move:8:29
+  ┌─ tests/checking/typing/if_mismatched_branches.move:8:9
   │
 8 │         if (cond) @0x0 else 0;
-  │                             ^
+  │         ^^^^^^^^^^^^^^^^^^^^^
 
 error: expected `bool` but found `integer` (in if-else)
-  ┌─ tests/checking/typing/if_mismatched_branches.move:9:19
+  ┌─ tests/checking/typing/if_mismatched_branches.move:9:9
   │
 9 │         if (cond) 0 else false;
-  │                   ^
+  │         ^^^^^^^^^^^^^^^^^^^^^^
 
 error: expected `bool` but found `integer` (in if-else)
-   ┌─ tests/checking/typing/if_mismatched_branches.move:13:39
+   ┌─ tests/checking/typing/if_mismatched_branches.move:13:9
    │
 13 │         if (cond) (0, false) else (1, 1);
-   │                                       ^
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: expected `bool` but found `integer` (in if-else)
-   ┌─ tests/checking/typing/if_mismatched_branches.move:14:20
+   ┌─ tests/checking/typing/if_mismatched_branches.move:14:9
    │
 14 │         if (cond) (0, false) else (false, false);
-   │                    ^
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: expected `bool` but found `integer` (in if-else)
-   ┌─ tests/checking/typing/if_mismatched_branches.move:15:20
+   ┌─ tests/checking/typing/if_mismatched_branches.move:15:9
    │
 15 │         if (cond) (0, false) else (true, @0x0);
-   │                    ^
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: tuples have different arity (3 != 2) (in if-else)
    ┌─ tests/checking/typing/if_mismatched_branches.move:19:9

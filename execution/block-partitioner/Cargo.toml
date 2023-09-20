@@ -27,6 +27,18 @@ move-core-types = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { workspace = true }
 
 [features]
 default = []
+
+[[bench]]
+name = "v2"
+harness = false
+

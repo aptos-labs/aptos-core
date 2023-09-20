@@ -156,7 +156,7 @@ async fn test_get_account_resources_by_invalid_ledger_version() {
 async fn test_get_account_modules_by_ledger_version() {
     let mut context = new_test_context(current_function_name!());
     let code = "a11ceb0b0300000006010002030205050703070a0c0816100c260900000001000100000102084d794d6f64756c650269640000000000000000000000000b1e55ed00010000000231010200";
-    let mut root_account = context.root_account().await;
+    let root_account = context.root_account().await;
     let txn = root_account.sign_with_transaction_builder(
         context
             .transaction_factory()

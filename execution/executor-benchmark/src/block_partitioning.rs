@@ -1,9 +1,7 @@
 // Copyright © Aptos Foundation
 
-use crate::pipeline::ExecuteBlockMessage;
-use aptos_block_partitioner::{
-    sharded_block_partitioner::ShardedBlockPartitioner, BlockPartitionerConfig,
-};
+use crate::{metrics::TIMER, pipeline::ExecuteBlockMessage};
+use aptos_block_partitioner::{BlockPartitioner, PartitionerConfig};
 use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_types::{
@@ -13,26 +11,22 @@ use aptos_types::{
 use std::time::Instant;
 
 pub(crate) struct BlockPartitioningStage {
+    num_executor_shards: usize,
     num_blocks_processed: usize,
-    maybe_partitioner: Option<ShardedBlockPartitioner>,
+    maybe_partitioner: Option<Box<dyn BlockPartitioner>>,
 }
 
 impl BlockPartitioningStage {
-    pub fn new(num_shards: usize, partition_last_round: bool) -> Self {
+    pub fn new(num_shards: usize, partitioner_config: &dyn PartitionerConfig) -> Self {
         let maybe_partitioner = if num_shards <= 1 {
             None
         } else {
-            info!("Starting a sharded block partitioner with {} shards and last round partitioning {}", num_shards, partition_last_round);
-            let partitioner = BlockPartitionerConfig::default()
-                .num_shards(num_shards)
-                .max_partitioning_rounds(4)
-                .cross_shard_dep_avoid_threshold(0.95)
-                .partition_last_round(partition_last_round)
-                .build();
+            let partitioner = partitioner_config.build();
             Some(partitioner)
         };
 
         Self {
+            num_executor_shards: num_shards,
             num_blocks_processed: 0,
             maybe_partitioner,
         }
@@ -51,7 +45,10 @@ impl BlockPartitioningStage {
             Some(partitioner) => {
                 let last_txn = txns.pop().unwrap();
                 let analyzed_transactions = txns.into_iter().map(|t| t.into()).collect();
-                let mut partitioned_txns = partitioner.partition(analyzed_transactions);
+                let timer = TIMER.with_label_values(&["partition"]).start_timer();
+                let mut partitioned_txns =
+                    partitioner.partition(analyzed_transactions, self.num_executor_shards);
+                timer.stop_and_record();
                 partitioned_txns.add_checkpoint_txn(last_txn);
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(partitioned_txns))
             },

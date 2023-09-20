@@ -38,6 +38,7 @@ use aptos_crypto::{
     HashValue,
 };
 use arr_macro::arr;
+use bytes::Bytes;
 use move_core_types::language_storage::TypeTag;
 use proptest::{
     collection::{vec, SizeRange},
@@ -55,7 +56,7 @@ use std::{
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
-        vec(any::<u8>(), 0..64).prop_map(WriteOp::Modification)
+        vec(any::<u8>(), 0..64).prop_map(|bytes| WriteOp::Modification(bytes.into()))
     }
 
     pub fn deletion_strategy() -> impl Strategy<Value = Self> {
@@ -622,6 +623,7 @@ pub struct ContractEventGen {
     type_tag: TypeTag,
     payload: Vec<u8>,
     use_sent_key: bool,
+    use_event_v2: bool,
 }
 
 impl ContractEventGen {
@@ -631,16 +633,20 @@ impl ContractEventGen {
         universe: &mut AccountInfoUniverse,
     ) -> ContractEvent {
         let account_info = universe.get_account_info_mut(account_index);
-        let event_handle = if self.use_sent_key {
-            &mut account_info.sent_event_handle
+        if self.use_event_v2 {
+            ContractEvent::new_v2(self.type_tag, self.payload)
         } else {
-            &mut account_info.received_event_handle
-        };
-        let sequence_number = event_handle.count();
-        *event_handle.count_mut() += 1;
-        let event_key = event_handle.key();
+            let event_handle = if self.use_sent_key {
+                &mut account_info.sent_event_handle
+            } else {
+                &mut account_info.received_event_handle
+            };
+            let sequence_number = event_handle.count();
+            *event_handle.count_mut() += 1;
+            let event_key = event_handle.key();
 
-        ContractEvent::new(*event_key, sequence_number, self.type_tag, self.payload)
+            ContractEvent::new_v1(*event_key, sequence_number, self.type_tag, self.payload)
+        }
     }
 }
 
@@ -726,7 +732,7 @@ impl ContractEvent {
             vec(any::<u8>(), 1..10),
         )
             .prop_map(|(event_key, seq_num, type_tag, event_data)| {
-                ContractEvent::new(event_key, seq_num, type_tag, event_data)
+                ContractEvent::new_v1(event_key, seq_num, type_tag, event_data)
             })
     }
 }
@@ -801,9 +807,9 @@ impl TransactionToCommitGen {
                         (
                             (
                                 state_key.clone(),
-                                Some(StateValue::new_legacy(value.clone())),
+                                Some(StateValue::new_legacy(Bytes::copy_from_slice(&value))),
                             ),
-                            (state_key, WriteOp::Modification(value)),
+                            (state_key, WriteOp::Modification(value.into())),
                         )
                     })
             })

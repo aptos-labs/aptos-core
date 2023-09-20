@@ -5,7 +5,7 @@ use crate::{
     assert_success, get_stake_pool, setup_staking, tests::common, transaction_fee, MoveHarness,
 };
 use aptos_cached_packages::aptos_stdlib;
-use aptos_language_e2e_tests::account::Account;
+use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::{
     account_address::AccountAddress,
     on_chain_config::FeatureFlag,
@@ -56,7 +56,8 @@ const NUM_USERS: usize = 200;
 impl TestUniverse {
     /// Creates a new testing universe with all necessary accounts created.
     pub fn new(num_validators: usize) -> Self {
-        let mut harness = MoveHarness::new();
+        let executor = FakeExecutor::from_head_genesis().set_parallel();
+        let mut harness = MoveHarness::new_with_executor(executor);
         harness.set_default_gas_unit_price(1);
         let core_resources =
             harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
@@ -479,7 +480,7 @@ fn test_leaving_validator_is_rewarded(burn_percentage: u8) {
 #[test]
 fn test_fee_collection_and_distribution_for_burn_percentages() {
     // Test multiple burn percentages including the cases of 0 and 100.
-    for burn_percentage in [0, 25, 75, 100] {
+    for burn_percentage in [0, 50, 100] {
         test_fee_collection_and_distribution_flow(burn_percentage);
         test_initialize_and_enable_fee_collection_and_distribution(burn_percentage);
         test_disable_fee_collection(burn_percentage);

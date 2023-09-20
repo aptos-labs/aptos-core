@@ -3,7 +3,10 @@
 
 use crate::{
     access_path::AccessPath,
-    account_config::{AccountResource, CoinStoreResource},
+    account_config::{AccountResource, CoinInfoResource, CoinStoreResource},
+    block_metadata::BlockMetadata,
+    chain_id::ChainId,
+    on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig, TransactionFeeBurnCap},
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{SignedTransaction, Transaction, TransactionPayload},
 };
@@ -23,10 +26,10 @@ pub struct AnalyzedTransaction {
     /// Set of storage locations that are read by the transaction - this doesn't include location
     /// that are written by the transactions to avoid duplication of locations across read and write sets
     /// This can be accurate or strictly overestimated.
-    read_hints: Vec<StorageLocation>,
+    pub read_hints: Vec<StorageLocation>,
     /// Set of storage locations that are written by the transaction. This can be accurate or strictly
     /// overestimated.
-    write_hints: Vec<StorageLocation>,
+    pub write_hints: Vec<StorageLocation>,
     /// A transaction is predictable if neither the read_hint or the write_hint have wildcards.
     predictable_transaction: bool,
     /// The hash of the transaction - this is cached for performance reasons.
@@ -121,18 +124,27 @@ impl AnalyzedTransaction {
         let mut write_hints = vec![
             Self::account_resource_location(sender_address),
             Self::coin_store_location(sender_address),
-            Self::coin_store_location(receiver_address),
         ];
+        if sender_address != receiver_address {
+            write_hints.push(Self::coin_store_location(receiver_address));
+        }
         if !receiver_exists {
             // If the receiver doesn't exist, we create the receiver account, so we need to write the
             // receiver account resource.
             write_hints.push(Self::account_resource_location(receiver_address));
         }
+
+        let read_hints = vec![
+            Self::current_ts_location(),
+            Self::features_location(),
+            Self::aptos_coin_info_location(),
+            Self::chain_id_location(),
+            Self::transaction_fee_burn_cap_location(),
+        ];
         AnalyzedTransaction::new(
             Transaction::UserTransaction(signed_txn),
             // Please note that we omit all the modules we read and the global supply we write to?
-            vec![],
-            // read and write locations are same for coin transfer
+            read_hints,
             write_hints,
         )
     }
@@ -149,6 +161,33 @@ impl AnalyzedTransaction {
             address,
             CoinStoreResource::struct_tag().access_vector(),
         )))
+    }
+
+    pub fn current_ts_location() -> StorageLocation {
+        StorageLocation::Specific(StateKey::access_path(
+            CurrentTimeMicroseconds::access_path().unwrap(),
+        ))
+    }
+
+    pub fn features_location() -> StorageLocation {
+        StorageLocation::Specific(StateKey::access_path(Features::access_path().unwrap()))
+    }
+
+    pub fn aptos_coin_info_location() -> StorageLocation {
+        StorageLocation::Specific(StateKey::access_path(AccessPath::new(
+            AccountAddress::ONE,
+            CoinInfoResource::struct_tag().access_vector(),
+        )))
+    }
+
+    pub fn chain_id_location() -> StorageLocation {
+        StorageLocation::Specific(StateKey::access_path(ChainId::access_path().unwrap()))
+    }
+
+    pub fn transaction_fee_burn_cap_location() -> StorageLocation {
+        StorageLocation::Specific(StateKey::access_path(
+            TransactionFeeBurnCap::access_path().unwrap(),
+        ))
     }
 
     pub fn analyzed_transaction_for_create_account(
@@ -168,6 +207,34 @@ impl AnalyzedTransaction {
             // read and write locations are same for create account
             read_hints,
         )
+    }
+
+    pub fn analyzed_transaction_for_block_metadata(block_meta: BlockMetadata) -> Self {
+        // TODO(ptx): Add read hints for block metadata
+        AnalyzedTransaction::new(Transaction::BlockMetadata(block_meta), vec![], vec![])
+    }
+
+    pub fn analyzed_transaction_for_state_checkpoint(hash_value: HashValue) -> Self {
+        AnalyzedTransaction::new(Transaction::StateCheckpoint(hash_value), vec![], vec![])
+    }
+
+    pub fn expect_p_txn(self) -> (Transaction, Vec<StateKey>, Vec<StateKey>) {
+        assert!(self.predictable_transaction());
+        (
+            self.transaction,
+            Self::expect_specific_locations(self.read_hints),
+            Self::expect_specific_locations(self.write_hints),
+        )
+    }
+
+    fn expect_specific_locations(locations: Vec<StorageLocation>) -> Vec<StateKey> {
+        locations
+            .into_iter()
+            .map(|loc| match loc {
+                StorageLocation::Specific(key) => key,
+                _ => unreachable!(),
+            })
+            .collect()
     }
 }
 
@@ -198,7 +265,7 @@ impl From<Transaction> for AnalyzedTransaction {
                         (AccountAddress::ONE, "coin", "transfer") => {
                             let sender_address = signed_txn.sender();
                             let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
-                            AnalyzedTransaction::analyzed_transaction_for_coin_transfer(
+                            Self::analyzed_transaction_for_coin_transfer(
                                 signed_txn,
                                 sender_address,
                                 receiver_address,
@@ -208,7 +275,7 @@ impl From<Transaction> for AnalyzedTransaction {
                         (AccountAddress::ONE, "aptos_account", "transfer") => {
                             let sender_address = signed_txn.sender();
                             let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
-                            AnalyzedTransaction::analyzed_transaction_for_coin_transfer(
+                            Self::analyzed_transaction_for_coin_transfer(
                                 signed_txn,
                                 sender_address,
                                 receiver_address,
@@ -218,7 +285,7 @@ impl From<Transaction> for AnalyzedTransaction {
                         (AccountAddress::ONE, "aptos_account", "create_account") => {
                             let sender_address = signed_txn.sender();
                             let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
-                            AnalyzedTransaction::analyzed_transaction_for_create_account(
+                            Self::analyzed_transaction_for_create_account(
                                 signed_txn,
                                 sender_address,
                                 receiver_address,
@@ -229,7 +296,13 @@ impl From<Transaction> for AnalyzedTransaction {
                 },
                 _ => todo!("Only entry function transactions are supported for now"),
             },
-            _ => AnalyzedTransaction::new_with_no_hints(txn),
+            Transaction::BlockMetadata(block_meta) => {
+                Self::analyzed_transaction_for_block_metadata(block_meta)
+            },
+            Transaction::StateCheckpoint(hash_value) => {
+                Self::analyzed_transaction_for_state_checkpoint(hash_value)
+            },
+            Transaction::GenesisTransaction(_) => Self::new_with_no_hints(txn),
         }
     }
 }

@@ -4,5 +4,7 @@
 
 #![forbid(unsafe_code)]
 
+mod benchmark_runner;
 pub mod measurement;
+pub mod transaction_bench_state;
 pub mod transactions;

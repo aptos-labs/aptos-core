@@ -8,10 +8,7 @@ use std::path::PathBuf;
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_abi() {
     let mut context = new_test_context(current_function_name!());
-    let mut root_account = context.root_account().await;
-    let mut account = context.gen_account();
-    let txn = context.create_user_account_by(&mut root_account, &account);
-    context.commit_block(&vec![txn]).await;
+    let mut account = context.create_account().await;
 
     // Publish packages
     let named_addresses = vec![("abi".to_string(), account.address())];

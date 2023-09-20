@@ -119,11 +119,11 @@ impl<'a> NativeTableContext<'a> {
                 match op {
                     Op::New(val) => {
                         let bytes = serialize(&value_layout, &val)?;
-                        entries.insert(key, Op::New(bytes));
+                        entries.insert(key, Op::New(bytes.into()));
                     },
                     Op::Modify(val) => {
                         let bytes = serialize(&value_layout, &val)?;
-                        entries.insert(key, Op::Modify(bytes));
+                        entries.insert(key, Op::Modify(bytes.into()));
                     },
                     Op::Delete => {
                         entries.insert(key, Op::Delete);

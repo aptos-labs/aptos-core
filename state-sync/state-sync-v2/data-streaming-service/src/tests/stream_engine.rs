@@ -9,6 +9,7 @@ use crate::{
     streaming_client::{GetAllEpochEndingLedgerInfosRequest, StreamRequest},
     tests::utils::initialize_logger,
 };
+use aptos_config::config::DataStreamingServiceConfig;
 use aptos_data_client::{
     global_summary::{GlobalDataSummary, OptimalChunkSizes},
     interface::ResponsePayload,
@@ -24,7 +25,11 @@ fn test_create_epoch_ending_requests() {
     let highest_ending_epoch = 900;
     let mut stream_engine = create_epoch_ending_stream_engine(0, highest_ending_epoch);
     let client_requests = stream_engine
-        .create_data_client_requests(5, &create_epoch_ending_chunk_sizes(10000))
+        .create_data_client_requests(
+            5,
+            &create_epoch_ending_chunk_sizes(10000),
+            create_notification_id_generator(),
+        )
         .unwrap();
     let expected_requests = vec![DataClientRequest::EpochEndingLedgerInfos(
         EpochEndingLedgerInfosRequest {
@@ -38,7 +43,11 @@ fn test_create_epoch_ending_requests() {
     let mut stream_engine = create_epoch_ending_stream_engine(0, highest_ending_epoch);
     let chunk_size = 50;
     let client_requests = stream_engine
-        .create_data_client_requests(3, &create_epoch_ending_chunk_sizes(chunk_size))
+        .create_data_client_requests(
+            3,
+            &create_epoch_ending_chunk_sizes(chunk_size),
+            create_notification_id_generator(),
+        )
         .unwrap();
     for (i, client_request) in client_requests.iter().enumerate() {
         let i = i as u64;
@@ -54,7 +63,11 @@ fn test_create_epoch_ending_requests() {
     let mut stream_engine = create_epoch_ending_stream_engine(0, highest_ending_epoch);
     let chunk_size = 14;
     let client_requests = stream_engine
-        .create_data_client_requests(100, &create_epoch_ending_chunk_sizes(chunk_size))
+        .create_data_client_requests(
+            100,
+            &create_epoch_ending_chunk_sizes(chunk_size),
+            create_notification_id_generator(),
+        )
         .unwrap();
     for (i, client_request) in client_requests.iter().enumerate() {
         let i = i as u64;
@@ -78,7 +91,11 @@ fn test_create_epoch_ending_requests_dynamic() {
 
     // Create a batch of client requests and verify the result
     let client_requests = stream_engine
-        .create_data_client_requests(5, &create_epoch_ending_chunk_sizes(700))
+        .create_data_client_requests(
+            5,
+            &create_epoch_ending_chunk_sizes(700),
+            create_notification_id_generator(),
+        )
         .unwrap();
     let expected_requests = vec![
         DataClientRequest::EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
@@ -98,7 +115,11 @@ fn test_create_epoch_ending_requests_dynamic() {
     // Create a batch of client requests and verify the result
     let chunk_size = 50;
     let client_requests = stream_engine
-        .create_data_client_requests(10, &create_epoch_ending_chunk_sizes(chunk_size))
+        .create_data_client_requests(
+            10,
+            &create_epoch_ending_chunk_sizes(chunk_size),
+            create_notification_id_generator(),
+        )
         .unwrap();
     for (i, client_request) in client_requests.iter().enumerate() {
         let i = i as u64;
@@ -115,7 +136,11 @@ fn test_create_epoch_ending_requests_dynamic() {
 
     // Create a batch of client requests and verify the result
     let client_requests = stream_engine
-        .create_data_client_requests(5, &create_epoch_ending_chunk_sizes(700))
+        .create_data_client_requests(
+            5,
+            &create_epoch_ending_chunk_sizes(700),
+            create_notification_id_generator(),
+        )
         .unwrap();
     let expected_requests = vec![DataClientRequest::EpochEndingLedgerInfos(
         EpochEndingLedgerInfosRequest {
@@ -129,8 +154,11 @@ fn test_create_epoch_ending_requests_dynamic() {
     stream_engine.next_request_epoch = highest_ending_epoch;
 
     // Create a batch of client requests and verify no error
-    let client_requests =
-        stream_engine.create_data_client_requests(10, &create_epoch_ending_chunk_sizes(50));
+    let client_requests = stream_engine.create_data_client_requests(
+        10,
+        &create_epoch_ending_chunk_sizes(50),
+        create_notification_id_generator(),
+    );
     assert_ok!(client_requests);
 }
 
@@ -144,7 +172,12 @@ fn test_epoch_ending_stream_engine() {
 
     // Try to create a stream engine where there is no advertised data
     // and verify an error is returned.
-    let result = StreamEngine::new(&stream_request, &GlobalDataSummary::empty().advertised_data);
+    let data_streaming_config = DataStreamingServiceConfig::default();
+    let result = StreamEngine::new(
+        data_streaming_config,
+        &stream_request,
+        &GlobalDataSummary::empty().advertised_data,
+    );
     assert_matches!(result, Err(Error::DataIsUnavailable(_)));
 
     // Create a data summary with various advertised epoch ranges (highest is one)
@@ -158,7 +191,11 @@ fn test_epoch_ending_stream_engine() {
     ];
 
     // Try to create a stream engine where the highest epoch is one
-    let result = StreamEngine::new(&stream_request, &global_data_summary.advertised_data);
+    let result = StreamEngine::new(
+        data_streaming_config,
+        &stream_request,
+        &global_data_summary.advertised_data,
+    );
     assert_ok!(result);
 
     // Create a global data summary with non-zero advertised epoch ranges
@@ -173,7 +210,13 @@ fn test_epoch_ending_stream_engine() {
     ];
 
     // Create a new data stream engine and verify the highest epoch is chosen
-    match StreamEngine::new(&stream_request, &global_data_summary.advertised_data).unwrap() {
+    match StreamEngine::new(
+        data_streaming_config,
+        &stream_request,
+        &global_data_summary.advertised_data,
+    )
+    .unwrap()
+    {
         StreamEngine::EpochEndingStreamEngine(stream_engine) => {
             assert_eq!(stream_engine.end_epoch, 1000);
         },
@@ -258,7 +301,14 @@ fn create_epoch_ending_stream_engine(start_epoch: u64, end_epoch: u64) -> EpochE
         .epoch_ending_ledger_infos = vec![CompleteDataRange::new(start_epoch, end_epoch).unwrap()];
 
     // Create a new epoch ending stream engine
-    match StreamEngine::new(&stream_request, &global_data_summary.advertised_data).unwrap() {
+    let data_streaming_config = DataStreamingServiceConfig::default();
+    match StreamEngine::new(
+        data_streaming_config,
+        &stream_request,
+        &global_data_summary.advertised_data,
+    )
+    .unwrap()
+    {
         StreamEngine::EpochEndingStreamEngine(stream_engine) => stream_engine,
         unexpected_engine => {
             panic!(

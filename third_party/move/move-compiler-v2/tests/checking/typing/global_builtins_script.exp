@@ -3,11 +3,15 @@ module 0x42::M {
     struct R {
         dummy_field: bool,
     }
-    public fun new() {
+    public fun new(): M::R {
+        pack M::R(false)
+    }
+    spec fun $new(): M::R {
         pack M::R(false)
     }
 } // end 0x42::M
 module <SELF> {
+    use 0x42::M; // resolved as: 0x42::M
     private fun test<Token>(account: signer) {
         {
           let r: M::R = M::new();
@@ -16,4 +20,5 @@ module <SELF> {
           Tuple()
         }
     }
+    spec fun $test<Token>(account: signer);
 } // end <SELF>

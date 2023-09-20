@@ -13,10 +13,10 @@ error: expected `S` but found `M::S`
   │                    ^^^^
 
 error: invalid call of `M::bar`: expected `M::S` but found `S` for argument 1
-  ┌─ tests/checking/naming/generics_shadowing_invalid.move:9:9
+  ┌─ tests/checking/naming/generics_shadowing_invalid.move:9:13
   │
 9 │         bar(s1);
-  │         ^^^^^^^
+  │             ^^
 
 error: expected `S` but found `M::S`
    ┌─ tests/checking/naming/generics_shadowing_invalid.move:10:9

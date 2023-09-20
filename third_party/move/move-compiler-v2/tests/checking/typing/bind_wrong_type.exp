@@ -12,11 +12,11 @@ error: expected `M::S` but found `M::R`
 7 │         let (S { g }, R { f }) = (R{ f: 0 }, R{ f: 1 });
   │              ^^^^^^^
 
-error: expected `()` but found `integer`
-   ┌─ tests/checking/typing/bind_wrong_type.move:12:18
+error: expected `()` but found `integer` (from assignment or declaration context)
+   ┌─ tests/checking/typing/bind_wrong_type.move:12:13
    │
 12 │         let () = 0;
-   │                  ^
+   │             ^^
 
 error: expected 4 item(s), found 3
    ┌─ tests/checking/typing/bind_wrong_type.move:13:13
@@ -42,7 +42,7 @@ error: expected `u64` but found `()`
 19 │         let (): u64 = ();
    │                       ^^
 
-error: expected `u64` but found `()`
+error: expected `()` but found `u64` (from assignment or declaration context)
    ┌─ tests/checking/typing/bind_wrong_type.move:19:13
    │
 19 │         let (): u64 = ();

@@ -3,13 +3,13 @@ module 0x42::borrow {
     struct S {
         f: u64,
     }
-    private fun field(s: &borrow::S) {
+    private fun field(s: &borrow::S): u64 {
         {
           let r: &u64 = Borrow(Immutable)(select borrow::S.f(s));
           Deref(r)
         }
     }
-    private fun local(param: u64) {
+    private fun local(param: u64): u64 {
         {
           let local: u64 = 33;
           {
@@ -18,20 +18,20 @@ module 0x42::borrow {
           }
         }
     }
-    private fun param(param: u64) {
+    private fun param(param: u64): u64 {
         {
           let r: &u64 = Borrow(Immutable)(param);
           Deref(r)
         }
     }
-    private fun mut_field(s: &mut borrow::S) {
+    private fun mut_field(s: &mut borrow::S): u64 {
         {
           let r: &mut u64 = Borrow(Mutable)(select borrow::S.f(s));
           r = 22;
           Deref(r)
         }
     }
-    private fun mut_local(param: u64) {
+    private fun mut_local(param: u64): u64 {
         {
           let local: u64 = 33;
           {
@@ -41,11 +41,35 @@ module 0x42::borrow {
           }
         }
     }
-    private fun mut_param(param: u64) {
+    private fun mut_param(param: u64): u64 {
         {
           let r: &mut u64 = Borrow(Mutable)(param);
           r = 22;
           Deref(r)
+        }
+    }
+    spec fun $field(s: borrow::S): u64 {
+        {
+          let r: u64 = select borrow::S.f(s);
+          r
+        }
+    }
+    spec fun $local(param: u64): u64 {
+        {
+          let local: u64 = 33;
+          {
+            let r: u64 = local;
+            r
+          }
+        }
+    }
+    spec fun $mut_field(s: &mut borrow::S): u64;
+    spec fun $mut_local(param: u64): u64;
+    spec fun $mut_param(param: u64): u64;
+    spec fun $param(param: u64): u64 {
+        {
+          let r: u64 = param;
+          r
         }
     }
 } // end 0x42::borrow

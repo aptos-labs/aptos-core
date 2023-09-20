@@ -7,7 +7,7 @@ A plugin is a component that can be added to the TypeScript SDK to extend or enh
 
 ## AptosToken class
 
-The [AptosToken](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/plugins/aptos_token.ts) class is compatible with the [token V2 standard](../../standards/aptos-token-v2.md) and provides methods for creating and querying NFT collections and tokens.
+The [AptosToken](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/plugins/aptos_token.ts) class is compatible with the [Aptos Digital Asset Standard](../../standards/digital-asset.md) and provides methods for creating and querying NFT collections and tokens.
 It covers write methods that support creating, transferring, mutating, and burning tokens on-chain.
 
 The main write methods supported by the AptosToken class are:

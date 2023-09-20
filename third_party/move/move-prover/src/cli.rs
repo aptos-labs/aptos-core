@@ -16,7 +16,7 @@ use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
 use move_model::{model::VerificationScope, options::ModelBuilderOptions};
 use move_prover_boogie_backend::options::{BoogieOptions, VectorTheory};
-use move_stackless_bytecode::options::{AutoTraceLevel, ProverOptions};
+use move_prover_bytecode_pipeline::options::{AutoTraceLevel, ProverOptions};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use simplelog::{

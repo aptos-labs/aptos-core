@@ -9,6 +9,7 @@ use aptos_types::{
 };
 use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
+use move_package::CompilerConfig;
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use std::{collections::BTreeMap, path::PathBuf};
@@ -34,7 +35,10 @@ pub fn run_tests_for_pkg(
             test_mode: true,
             install_dir: Some(tempdir().unwrap().path().to_path_buf()),
             additional_named_addresses: named_addr,
-            known_attributes: extended_checks::get_all_attribute_names().clone(),
+            compiler_config: CompilerConfig {
+                known_attributes: extended_checks::get_all_attribute_names().clone(),
+                ..Default::default()
+            },
             ..Default::default()
         },
         UnitTestingConfig::default_with_bound(Some(100_000)),

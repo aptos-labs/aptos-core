@@ -1,7 +1,7 @@
 
 Diagnostics:
 error: expected `bool` but found `integer`
-   ┌─ tests/checking/typing/type_variable_join_threaded_pack_invalid.move:39:32
+   ┌─ tests/checking/typing/type_variable_join_threaded_pack_invalid.move:42:9
    │
-39 │         Container::put(&mut v, 0);
-   │                                ^
+42 │         b
+   │         ^

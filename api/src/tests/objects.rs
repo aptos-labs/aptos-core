@@ -38,14 +38,14 @@ async fn test_gen_object() {
     let token_addr = account_address::create_token_address(user_addr, "Hero Quest!", "Wukong");
     let object_resource = "0x1::object::ObjectCore";
     let token_resource = "0x4::token::Token";
-    let hero_resource = format!("0x{}::hero::Hero", user_addr);
+    let hero_resource = format!("0x{}::hero::Hero", user_addr.to_hex());
 
     let collection0 = context.gen_all_resources(&collection_addr).await;
 
     context
         .api_execute_entry_function(
             &mut user,
-            &format!("0x{}::hero::mint_hero", user_addr),
+            &format!("0x{}::hero::mint_hero", user_addr.to_hex()),
             json!([]),
             json!(["The best hero ever!", "Male", "Wukong", "Monkey God", ""]),
         )

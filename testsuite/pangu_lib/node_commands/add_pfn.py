@@ -18,6 +18,8 @@ class AddPFNArgs:
     pfn_workspace: str  # workspace
     pfn_storage_class: str  # storage class
     pfn_storage_size: str
+    cpu: str
+    memory: str
 
 
 def add_pfn_main(
@@ -54,7 +56,7 @@ def add_pfn_main(
         args, system_context
     )
     pfn_statefulset: client.V1StatefulSet = _create_pfn_statefulset_object(
-        args.pfn_name, args.pfn_image
+        args.pfn_name, args.pfn_image, args.cpu, args.memory
     )
     pfn_service: client.V1Service = _create_pfn_service_object(args.pfn_name)
 
@@ -175,7 +177,7 @@ def _create_pfn_configmap_object(
 
 
 def _create_pfn_statefulset_object(
-    pfn_name: str, pfn_image: str
+    pfn_name: str, pfn_image: str, pfn_cpu: str, pfn_memory: str
 ) -> client.V1StatefulSet:
     """Create the statefulset object for the PFN
 
@@ -239,6 +241,9 @@ def _create_pfn_statefulset_object(
             client.V1ContainerPort(container_port=8081),
             client.V1ContainerPort(container_port=util.API_PORT),
         ],
+        resources=client.V1ResourceRequirements(
+            requests={"cpu": pfn_cpu, "memory": pfn_memory},
+        ),
     )
 
     spec_pod: client.V1PodSpec = client.V1PodSpec(

@@ -171,14 +171,14 @@ impl<'a> Disassembler<'a> {
         } else if let Some(alias) = self.module_aliases.get(&module_id) {
             Some(format!(
                 "use {}::{} as {};",
-                module_id.address(),
+                module_id.address().to_hex(),
                 module_id.name(),
                 alias
             ))
         } else {
             Some(format!(
                 "use {}::{};",
-                module_id.address(),
+                module_id.address().to_hex(),
                 module_id.name()
             ))
         }

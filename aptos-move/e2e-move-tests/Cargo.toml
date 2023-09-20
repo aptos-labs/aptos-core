@@ -21,16 +21,15 @@ aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-profiling = { workspace = true }
-aptos-gas-schedule = { workspace = true }
+aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-keygen = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-package-builder = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
+aptos-vm = { workspace = true, features = ["testing"] }
 aptos-vm-genesis = { workspace = true }
-aptos-writeset-generator = { workspace = true }
 bcs = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }

@@ -20,6 +20,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
 };
+use bytes::Bytes;
 use claims::assert_matches;
 use mockall::{predicate::eq, Sequence};
 use rand::Rng;
@@ -182,9 +183,10 @@ fn create_state_keys_and_values(
 ) -> Vec<(StateKey, StateValue)> {
     // Generate random bytes of the given size
     let mut rng = rand::thread_rng();
-    let random_bytes: Vec<u8> = (0..min_bytes_per_key_value)
+    let random_bytes: Bytes = (0..min_bytes_per_key_value)
         .map(|_| rng.gen::<u8>())
-        .collect();
+        .collect::<Vec<_>>()
+        .into();
 
     // Create the requested keys and values
     (0..num_keys_and_values)

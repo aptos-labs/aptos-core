@@ -544,7 +544,7 @@ pub fn test_open_publishing_invalid_address() {
             }}
         }}
         ",
-        receiver.address(),
+        receiver.address().to_hex(),
     );
 
     let random_module = compile_module(&module).1;
@@ -607,7 +607,7 @@ pub fn test_open_publishing() {
             }}
         }}
         ",
-        sender.address(),
+        sender.address().to_hex(),
     );
 
     let random_module = compile_module(&program).1;
@@ -671,7 +671,7 @@ fn good_module_uses_bad(
         }}
     }}
     ",
-        address,
+        address.to_hex(),
     );
 
     let framework_modules = aptos_cached_packages::head_release_bundle().compiled_modules();
@@ -904,7 +904,7 @@ fn test_module_transitive_dependency_fails_verification() {
         }}
     }}
     ",
-        sender.address()
+        sender.address().to_hex()
     );
     let module = {
         let compiler = Compiler {

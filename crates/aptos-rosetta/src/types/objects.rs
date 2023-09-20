@@ -1193,10 +1193,11 @@ async fn parse_operations_from_write_set(
         },
     };
 
-    let data = match write_op.bytes() {
+    let bytes = match write_op.bytes() {
         Some(bytes) => bytes,
         None => return Ok(vec![]),
     };
+    let data = &bytes;
 
     // Determine operation
     match (
@@ -1723,8 +1724,8 @@ async fn parse_delegation_pool_resource_changes(
                     } else {
                         warn!(
                             "Failed to parse withdraw undelegated event! Skipping for {}:{}",
-                            e.key().get_creator_address(),
-                            e.key().get_creation_number()
+                            e.v1()?.key().get_creator_address(),
+                            e.v1()?.key().get_creation_number()
                         );
                         continue;
                     };
@@ -1817,8 +1818,14 @@ fn filter_events<F: Fn(&EventKey, &ContractEvent) -> Option<T>, T>(
 ) -> Vec<T> {
     events
         .iter()
-        .filter(|event| event.key() == event_key)
-        .sorted_by(|a, b| a.sequence_number().cmp(&b.sequence_number()))
+        .filter(|event| event.is_v1())
+        .filter(|event| event.v1().unwrap().key() == event_key)
+        .sorted_by(|a, b| {
+            a.v1()
+                .unwrap()
+                .sequence_number()
+                .cmp(&b.v1().unwrap().sequence_number())
+        })
         .filter_map(|event| parser(event_key, event))
         .collect()
 }

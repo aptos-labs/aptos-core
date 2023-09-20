@@ -18,7 +18,7 @@
 use crate::{
     ast::{
         Address, Attribute, ConditionKind, Exp, ExpData, GlobalInvariant, ModuleName, PropertyBag,
-        PropertyValue, Spec, SpecBlockInfo, SpecFunDecl, SpecVarDecl, Value,
+        PropertyValue, Spec, SpecBlockInfo, SpecFunDecl, SpecVarDecl, UseDecl, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -88,7 +88,7 @@ pub const GHOST_MEMORY_PREFIX: &str = "Ghost$";
 /// # Locations
 
 /// A location, consisting of a FileId and a span in this file.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct Loc {
     file_id: FileId,
     span: Span,
@@ -163,9 +163,9 @@ impl Default for Loc {
     }
 }
 
-/// Alias for the Loc variant of MoveIR. This uses a `&static str` instead of `FileId` for the
-/// file name.
+/// Alias for the Loc variant of MoveIR.
 pub type MoveIrLoc = move_ir_types::location::Loc;
+pub type MoveIrByteIndex = move_ir_types::location::ByteIndex;
 
 // =================================================================================================
 /// # Identifiers
@@ -471,9 +471,10 @@ pub struct GlobalEnv {
     /// The comments are represented as map from ByteIndex into string, where the index is the
     /// start position of the associated language item in the source.
     pub(crate) doc_comments: BTreeMap<FileId, BTreeMap<ByteIndex, String>>,
-    /// A mapping from file hash to file name and associated FileId. Though this information is
-    /// already in `source_files`, we can't get it out of there so need to book keep here.
+    /// A mapping from file hash to file name and associated FileId.
     pub(crate) file_hash_map: BTreeMap<FileHash, (String, FileId)>,
+    /// Reverse of the above mapping, mapping FileId to hash.
+    pub(crate) reverse_file_hash_map: BTreeMap<FileId, FileHash>,
     /// A mapping from file id to associated alias map.
     pub(crate) file_alias_map: BTreeMap<FileId, Rc<BTreeMap<Symbol, NumericalAddress>>>,
     /// Bijective mapping between FileId and a plain int. FileId's are themselves wrappers around
@@ -521,6 +522,8 @@ pub struct GlobalEnv {
     /// The address of the standard and extension libaries.
     pub(crate) stdlib_address: Option<Address>,
     pub(crate) extlib_address: Option<Address>,
+    /// Address alias map
+    pub(crate) address_alias_map: BTreeMap<Symbol, AccountAddress>,
 }
 
 /// A helper type for implementing fmt::Display depending on GlobalEnv
@@ -534,12 +537,14 @@ impl GlobalEnv {
     pub fn new() -> Self {
         let mut source_files = Files::new();
         let mut file_hash_map = BTreeMap::new();
+        let mut reverse_file_hash_map = BTreeMap::new();
         let mut file_id_to_idx = BTreeMap::new();
         let mut file_idx_to_id = BTreeMap::new();
         let mut fake_loc = |content: &str| {
             let file_id = source_files.add(content, content.to_string());
             let file_hash = FileHash::new(content);
             file_hash_map.insert(file_hash, (content.to_string(), file_id));
+            reverse_file_hash_map.insert(file_id, file_hash);
             let file_idx = file_id_to_idx.len() as u16;
             file_id_to_idx.insert(file_id, file_idx);
             file_idx_to_id.insert(file_idx, file_id);
@@ -558,6 +563,7 @@ impl GlobalEnv {
             unknown_move_ir_loc,
             internal_loc,
             file_hash_map,
+            reverse_file_hash_map,
             file_alias_map: BTreeMap::new(),
             file_id_to_idx,
             file_idx_to_id,
@@ -575,6 +581,7 @@ impl GlobalEnv {
             extensions: Default::default(),
             stdlib_address: None,
             extlib_address: None,
+            address_alias_map: Default::default(),
         }
     }
 
@@ -582,6 +589,16 @@ impl GlobalEnv {
     /// of fmt::Display for an instance to work in formatting.
     pub fn display<'a, T>(&'a self, val: &'a T) -> EnvDisplay<'a, T> {
         EnvDisplay { env: self, val }
+    }
+
+    /// Sets the global address alias map
+    pub fn set_address_alias_map(&mut self, map: BTreeMap<Symbol, AccountAddress>) {
+        self.address_alias_map = map
+    }
+
+    /// Attempts to resolve address alias.
+    pub fn resolve_address_alias(&self, alias: Symbol) -> Option<AccountAddress> {
+        self.address_alias_map.get(&alias).cloned()
     }
 
     /// Stores extension data in the environment. This can be arbitrary data which is
@@ -688,6 +705,7 @@ impl GlobalEnv {
         self.file_alias_map.insert(file_id, address_aliases);
         self.file_hash_map
             .insert(file_hash, (file_name.to_string(), file_id));
+        self.reverse_file_hash_map.insert(file_id, file_hash);
         let file_idx = self.file_id_to_idx.len() as u16;
         self.file_id_to_idx.insert(file_id, file_idx);
         self.file_idx_to_id.insert(file_idx, file_id);
@@ -821,8 +839,6 @@ impl GlobalEnv {
     }
 
     /// Converts a Loc as used by the move-compiler compiler to the one we are using here.
-    /// TODO: move-compiler should use FileId as well so we don't need this here. There is already
-    /// a todo in their code to remove the current use of `&'static str` for file names in Loc.
     pub fn to_loc(&self, loc: &MoveIrLoc) -> Loc {
         let file_id = self.get_file_id(loc.file_hash()).unwrap_or_else(|| {
             panic!(
@@ -836,9 +852,24 @@ impl GlobalEnv {
         }
     }
 
-    /// Returns the file id for a file name, if defined.
+    /// Converts a location back into a MoveIrLoc. If the location is not convertible, unknown
+    /// location will be returned.
+    pub fn to_ir_loc(&self, loc: &Loc) -> MoveIrLoc {
+        if let Some(file_hash) = self.get_file_hash(loc.file_id()) {
+            MoveIrLoc::new(file_hash, loc.span().start().0, loc.span().end().0)
+        } else {
+            self.unknown_move_ir_loc()
+        }
+    }
+
+    /// Returns the file id for a file hash, if defined.
     pub fn get_file_id(&self, fhash: FileHash) -> Option<FileId> {
         self.file_hash_map.get(&fhash).map(|(_, id)| id).cloned()
+    }
+
+    /// Returns the file hash for the file id, if defined.
+    pub fn get_file_hash(&self, file_id: FileId) -> Option<FileHash> {
+        self.reverse_file_hash_map.get(&file_id).cloned()
     }
 
     /// Maps a FileId to an index which can be mapped back to a FileId.
@@ -880,6 +911,11 @@ impl GlobalEnv {
     /// Return the source text for the given location.
     pub fn get_source(&self, loc: &Loc) -> Result<&str, codespan_reporting::files::Error> {
         self.source_files.source_slice(loc.file_id, loc.span)
+    }
+
+    /// Return the source text for the given file.
+    pub fn get_file_source(&self, id: FileId) -> &str {
+        self.source_files.source(id)
     }
 
     /// Return the source file name for `file_id`
@@ -1134,6 +1170,7 @@ impl GlobalEnv {
         loc: Loc,
         name: ModuleName,
         attributes: Vec<Attribute>,
+        use_decls: Vec<UseDecl>,
         named_constants: BTreeMap<NamedConstantId, NamedConstantData>,
         mut struct_data: BTreeMap<StructId, StructData>,
         function_data: BTreeMap<FunId, FunctionData>,
@@ -1165,6 +1202,7 @@ impl GlobalEnv {
             .collect();
 
         let id = ModuleId(self.module_data.len() as RawIndex);
+        let used_modules = use_decls.iter().filter_map(|ud| ud.module_id).collect();
         self.module_data.push(ModuleData {
             name,
             id,
@@ -1180,10 +1218,11 @@ impl GlobalEnv {
             module_spec,
             loc,
             attributes,
+            use_decls,
             spec_block_infos,
-            used_modules: Default::default(),
+            used_modules,
             used_modules_including_specs: Default::default(),
-            friend_modules: Default::default(),
+            friend_modules: Default::default(), // TODO: friend declarations
         });
         id
     }
@@ -1350,6 +1389,7 @@ impl GlobalEnv {
         let field_id = FieldId::new(field_name);
         field_data.insert(field_id, FieldData {
             name: field_name,
+            loc: loc.clone(),
             offset: 0,
             ty,
         });
@@ -1533,7 +1573,7 @@ impl GlobalEnv {
     /// Converts a storage module id into an AST module name.
     pub fn to_module_name(&self, storage_id: &language_storage::ModuleId) -> ModuleName {
         ModuleName::from_str(
-            &storage_id.address().to_string(),
+            &storage_id.address().to_hex(),
             self.symbol_pool.make(storage_id.name().as_str()),
         )
     }
@@ -1812,6 +1852,47 @@ impl GlobalEnv {
             }
             emitln!(writer, "module {} {{", module.get_full_name_str());
             writer.indent();
+            let add_alias = |s: String, a_opt: Option<Symbol>| {
+                format!(
+                    "{}{}",
+                    s,
+                    if let Some(a) = a_opt {
+                        format!(" as {}", a.display(spool))
+                    } else {
+                        "".to_owned()
+                    }
+                )
+            };
+            for use_decl in module.get_use_decls() {
+                emitln!(
+                    writer,
+                    "use {}{};{}",
+                    add_alias(
+                        use_decl.module_name.display_full(self).to_string(),
+                        use_decl.alias
+                    ),
+                    if !use_decl.members.is_empty() {
+                        format!(
+                            "::{{{}}}",
+                            use_decl
+                                .members
+                                .iter()
+                                .map(|(_, n, a)| add_alias(n.display(spool).to_string(), *a))
+                                .join(", ")
+                        )
+                    } else {
+                        "".to_owned()
+                    },
+                    if let Some(mid) = use_decl.module_id {
+                        format!(
+                            " // resolved as: {}",
+                            self.get_module(mid).get_full_name_str()
+                        )
+                    } else {
+                        "".to_owned()
+                    },
+                )
+            }
             for str in module.get_structs() {
                 emitln!(writer, "struct {} {{", str.get_name().display(spool));
                 writer.indent();
@@ -1825,13 +1906,38 @@ impl GlobalEnv {
                 }
                 writer.unindent();
                 emitln!(writer, "}");
+                let spec = str.get_spec();
+                if !spec.conditions.is_empty() {
+                    emitln!(writer, "{}", self.display(spec))
+                }
             }
             for fun in module.get_functions() {
-                emit!(writer, "{}", fun.get_header());
+                emit!(writer, "{}", fun.get_header_string());
                 if let Some(exp) = fun.get_def() {
                     emitln!(writer, " {");
                     writer.indent();
                     emitln!(writer, "{}", exp.display_for_fun(fun.clone()));
+                    writer.unindent();
+                    emitln!(writer, "}");
+                } else {
+                    emitln!(writer, ";");
+                }
+                let spec = fun.get_spec();
+                if !spec.conditions.is_empty() {
+                    emitln!(writer, "{}", self.display(&*spec))
+                }
+            }
+            for (_, fun) in module.get_spec_funs() {
+                emit!(
+                    writer,
+                    "spec fun {}{}",
+                    fun.name.display(spool),
+                    self.get_fun_signature_string(&fun.type_params, &fun.params, &fun.result_type)
+                );
+                if let Some(exp) = &fun.body {
+                    emitln!(writer, " {");
+                    writer.indent();
+                    emitln!(writer, "{}", exp.display(self));
                     writer.unindent();
                     emitln!(writer, "}");
                 } else {
@@ -1842,6 +1948,38 @@ impl GlobalEnv {
             emitln!(writer, "}} // end {}", module.get_full_name_str())
         }
         writer.extract_result()
+    }
+
+    /// Helper to create a string for a function signature.
+    fn get_fun_signature_string(
+        &self,
+        type_params: &[TypeParameter],
+        params: &[Parameter],
+        result_type: &Type,
+    ) -> String {
+        let spool = self.symbol_pool();
+        let tctx = &self.get_type_display_ctx();
+        let type_params_str = if !type_params.is_empty() {
+            format!(
+                "<{}>",
+                type_params
+                    .iter()
+                    .map(|p| p.0.display(spool).to_string())
+                    .join(",")
+            )
+        } else {
+            "".to_owned()
+        };
+        let params_str = params
+            .iter()
+            .map(|p| format!("{}: {}", p.0.display(spool), p.1.display(tctx)))
+            .join(",");
+        let result_str = if result_type.is_unit() {
+            "".to_owned()
+        } else {
+            format!(": {}", result_type.display(&self.get_type_display_ctx()))
+        };
+        format!("{}({}){}", type_params_str, params_str, result_str)
     }
 }
 
@@ -1859,6 +1997,9 @@ pub struct ModuleData {
 
     /// Attributes attached to this module.
     attributes: Vec<Attribute>,
+
+    /// Use declarations
+    use_decls: Vec<UseDecl>,
 
     /// Module byte code, if available.
     pub(crate) compiled_module: Option<CompiledModule>,
@@ -1942,6 +2083,11 @@ impl<'env> ModuleEnv<'env> {
     /// Returns the attributes of this module.
     pub fn get_attributes(&self) -> &[Attribute] {
         &self.data.attributes
+    }
+
+    /// Returns the use declarations of this module.
+    pub fn get_use_decls(&self) -> &[UseDecl] {
+        &self.data.use_decls
     }
 
     /// Returns full name as a string.
@@ -2762,6 +2908,9 @@ pub struct FieldData {
     /// The name of this field.
     pub name: Symbol,
 
+    /// The location of the field declaration.
+    pub loc: Loc,
+
     /// The offset of this field.
     pub offset: usize,
 
@@ -2787,6 +2936,11 @@ impl<'env> FieldEnv<'env> {
     /// Gets the id of this field.
     pub fn get_id(&self) -> FieldId {
         FieldId(self.data.name)
+    }
+
+    /// Gets the location of the field declaration.
+    pub fn get_loc(&self) -> &Loc {
+        &self.data.loc
     }
 
     /// Get documentation associated with this field.
@@ -3024,6 +3178,15 @@ impl<'env> FunctionEnv<'env> {
         format!(
             "{}::{}",
             self.module_env.get_name().display(self.module_env.env),
+            self.get_name_str()
+        )
+    }
+
+    /// Gets full name with module address as string.
+    pub fn get_full_name_with_address(&self) -> String {
+        format!(
+            "{}::{}",
+            self.module_env.get_full_name_str(),
             self.get_name_str()
         )
     }
@@ -3603,7 +3766,7 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Returns a string representation of the functions 'header', as it is declared in Move.
-    pub fn get_header(&self) -> String {
+    pub fn get_header_string(&self) -> String {
         let mut s = String::new();
         s.push_str(match self.data.visibility {
             Visibility::Private => "private",
@@ -3618,32 +3781,15 @@ impl<'env> FunctionEnv<'env> {
         if self.is_native() {
             s.push_str(" native")
         }
-        let spool = self.symbol_pool();
-        let tctx = &self.get_type_display_ctx();
-        let generics = if !self.data.type_params.is_empty() {
-            format!(
-                "<{}>",
-                self.data
-                    .type_params
-                    .iter()
-                    .map(|p| p.0.display(spool).to_string())
-                    .join(",")
-            )
-        } else {
-            "".to_owned()
-        };
-        let args = self
-            .data
-            .params
-            .iter()
-            .map(|p| format!("{}: {}", p.0.display(spool), p.1.display(tctx)))
-            .join(",");
         write!(
             s,
-            " fun {}{}({})",
-            self.get_name().display(spool),
-            generics,
-            args
+            " fun {}{}",
+            self.get_name().display(self.symbol_pool()),
+            self.module_env.env.get_fun_signature_string(
+                &self.data.type_params,
+                &self.data.params,
+                &self.data.result_type
+            )
         )
         .unwrap();
         s

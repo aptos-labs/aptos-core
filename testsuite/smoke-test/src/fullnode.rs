@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_cached_packages::aptos_stdlib;
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, OverrideNodeConfig};
 use aptos_forge::{NodeExt, Result, Swarm};
 use aptos_rest_client::Client as RestClient;
 use aptos_types::account_address::AccountAddress;
@@ -19,14 +19,17 @@ async fn test_indexer() {
 
     let version = swarm.versions().max().unwrap();
     let fullnode_peer_id = swarm
-        .add_full_node(&version, NodeConfig::get_default_pfn_config())
+        .add_full_node(
+            &version,
+            OverrideNodeConfig::new_with_default_base(NodeConfig::get_default_pfn_config()),
+        )
         .await
         .unwrap();
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
     let _vfn_peer_id = swarm
         .add_validator_full_node(
             &version,
-            NodeConfig::get_default_vfn_config(),
+            OverrideNodeConfig::new_with_default_base(NodeConfig::get_default_vfn_config()),
             validator_peer_id,
         )
         .unwrap();
@@ -39,7 +42,7 @@ async fn test_indexer() {
 
     let client = fullnode.rest_client();
 
-    let mut account1 = swarm.aptos_public_info().random_account();
+    let account1 = swarm.aptos_public_info().random_account();
     let account2 = swarm.aptos_public_info().random_account();
 
     let mut chain_info = swarm.chain_info().into_aptos_public_info();

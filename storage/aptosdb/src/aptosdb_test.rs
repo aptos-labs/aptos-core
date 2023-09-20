@@ -90,7 +90,7 @@ fn test_pruner_config() {
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     for enable in [false, true] {
         let state_merkle_pruner = StateMerklePrunerManager::<StaleNodeIndexSchema>::new(
-            Arc::clone(&aptos_db.state_merkle_db),
+            Arc::clone(&aptos_db.state_merkle_db()),
             StateMerklePrunerConfig {
                 enable,
                 prune_window: 20,

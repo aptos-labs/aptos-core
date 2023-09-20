@@ -9,10 +9,17 @@ use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig, RoleType},
     network_id::NetworkId,
 };
-use aptos_storage_service_types::requests::{
-    DataRequest, NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest,
-    StorageServiceRequest, TransactionOutputsWithProofRequest,
+use aptos_storage_service_types::{
+    requests::{
+        DataRequest, NewTransactionOutputsWithProofRequest,
+        NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
+        StorageServiceRequest, SubscribeTransactionOutputsWithProofRequest,
+        SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
+        SubscriptionStreamMetadata, TransactionOutputsWithProofRequest,
+    },
+    responses::NUM_MICROSECONDS_IN_SECOND,
 };
+use aptos_time_service::TimeServiceTrait;
 use claims::assert_matches;
 
 #[tokio::test]
@@ -146,31 +153,21 @@ async fn prioritized_peer_request_selection() {
 async fn prioritized_peer_optimistic_fetch_selection() {
     ::aptos_logger::Logger::init_for_testing();
 
-    // Create a data client with a max version lag of 100
-    let max_optimistic_fetch_version_lag = 100;
+    // Create a data client with a max lag of 100
+    let max_optimistic_fetch_lag_secs = 100;
     let data_client_config = AptosDataClientConfig {
-        max_optimistic_fetch_version_lag,
+        max_optimistic_fetch_lag_secs,
         ..Default::default()
     };
-    let (mut mock_network, _, client, _) = MockNetwork::new(None, Some(data_client_config), None);
+    let (mut mock_network, time_service, client, _) =
+        MockNetwork::new(None, Some(data_client_config), None);
 
     // Create test data
     let known_version = 10000000;
     let known_epoch = 10;
 
-    // Ensure the properties hold for both optimistic fetch requests
-    let new_transactions_request =
-        DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
-            known_version,
-            known_epoch,
-            include_events: false,
-        });
-    let new_outputs_request =
-        DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
-            known_version,
-            known_epoch,
-        });
-    for data_request in [new_transactions_request, new_outputs_request] {
+    // Ensure the properties hold for all optimistic fetch requests
+    for data_request in enumerate_optimistic_fetch_requests(known_version, known_epoch) {
         let storage_request = StorageServiceRequest::new(data_request, true);
 
         // Ensure no peers can service the request (we have no connections)
@@ -187,13 +184,17 @@ async fn prioritized_peer_optimistic_fetch_selection() {
         );
 
         // Advertise the data for the regular peer and verify it is now selected
-        client.update_summary(regular_peer_1, utils::create_storage_summary(known_version));
+        let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
+        client.update_summary(
+            regular_peer_1,
+            utils::create_storage_summary_with_timestamp(known_version, timestamp_usecs),
+        );
         assert_eq!(
             client.choose_peer_for_request(&storage_request),
             Ok(regular_peer_1)
         );
 
-        // Add a priority peer and verify the regular peer is selected
+        // Add a priority peer and verify the regular peer is still selected
         let priority_peer_1 = mock_network.add_peer(true);
         assert_eq!(
             client.choose_peer_for_request(&storage_request),
@@ -203,52 +204,326 @@ async fn prioritized_peer_optimistic_fetch_selection() {
         // Advertise the data for the priority peer and verify it is now selected
         client.update_summary(
             priority_peer_1,
-            utils::create_storage_summary(known_version),
+            utils::create_storage_summary_with_timestamp(known_version, timestamp_usecs),
         );
         assert_eq!(
             client.choose_peer_for_request(&storage_request),
             Ok(priority_peer_1)
         );
 
-        // Update the priority peer to be too far behind and verify it is not selected
+        // Elapse enough time for both peers to be too far behind
+        time_service
+            .clone()
+            .advance_secs(max_optimistic_fetch_lag_secs + 1);
+
+        // Verify neither peer is now selected
+        assert_matches!(
+            client.choose_peer_for_request(&storage_request),
+            Err(Error::DataIsUnavailable(_))
+        );
+
+        // Update the regular peer to be up-to-date and verify it is now chosen
+        let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
+        let regular_peer_timestamp_usecs =
+            timestamp_usecs - ((max_optimistic_fetch_lag_secs / 2) * NUM_MICROSECONDS_IN_SECOND);
         client.update_summary(
-            priority_peer_1,
-            utils::create_storage_summary(known_version - max_optimistic_fetch_version_lag),
+            regular_peer_1,
+            utils::create_storage_summary_with_timestamp(
+                known_version,
+                regular_peer_timestamp_usecs,
+            ),
         );
         assert_eq!(
             client.choose_peer_for_request(&storage_request),
             Ok(regular_peer_1)
         );
 
-        // Update the regular peer to be too far behind and verify neither is selected
-        client.update_summary(
-            regular_peer_1,
-            utils::create_storage_summary(known_version - (max_optimistic_fetch_version_lag * 2)),
-        );
-        assert_matches!(
-            client.choose_peer_for_request(&storage_request),
-            Err(Error::DataIsUnavailable(_))
-        );
-
-        // Disconnect the regular peer and verify neither is selected
-        mock_network.disconnect_peer(regular_peer_1);
-        assert_matches!(
-            client.choose_peer_for_request(&storage_request),
-            Err(Error::DataIsUnavailable(_))
-        );
-
-        // Advertise the data for the priority peer and verify it is now selected again
+        // Update the priority peer to be up-to-date and verify it is now chosen
+        let priority_peer_timestamp_usecs =
+            timestamp_usecs - ((max_optimistic_fetch_lag_secs / 2) * NUM_MICROSECONDS_IN_SECOND);
         client.update_summary(
             priority_peer_1,
-            utils::create_storage_summary(known_version + 1000),
+            utils::create_storage_summary_with_timestamp(
+                known_version,
+                priority_peer_timestamp_usecs,
+            ),
         );
         assert_eq!(
             client.choose_peer_for_request(&storage_request),
             Ok(priority_peer_1)
         );
 
-        // Disconnect the priority peer so that we no longer have any connections
+        // Disconnect the priority peer and verify the regular peer is selected
         mock_network.disconnect_peer(priority_peer_1);
+        assert_eq!(
+            client.choose_peer_for_request(&storage_request),
+            Ok(regular_peer_1)
+        );
+
+        // Elapse enough time for the regular peer to be too far behind
+        time_service
+            .clone()
+            .advance_secs(max_optimistic_fetch_lag_secs);
+
+        // Verify neither peer is now select
+        assert_matches!(
+            client.choose_peer_for_request(&storage_request),
+            Err(Error::DataIsUnavailable(_))
+        );
+
+        // Disconnect the regular peer so that we no longer have any connections
+        mock_network.disconnect_peer(regular_peer_1);
+    }
+}
+
+#[tokio::test]
+async fn prioritized_peer_subscription_requests() {
+    ::aptos_logger::Logger::init_for_testing();
+
+    // Create a data client with a max lag of 10
+    let max_subscription_lag_secs = 10;
+    let data_client_config = AptosDataClientConfig {
+        max_subscription_lag_secs,
+        ..Default::default()
+    };
+    let (mut mock_network, time_service, client, _) =
+        MockNetwork::new(None, Some(data_client_config), None);
+
+    // Create test data
+    let known_version = 1000;
+    let known_epoch = 5;
+
+    // Ensure the properties hold for all subscription requests
+    for data_request in enumerate_subscription_requests(known_version, known_epoch) {
+        let storage_request = StorageServiceRequest::new(data_request, true);
+
+        // Ensure no peers can service the request (we have no connections)
+        assert_matches!(
+            client.choose_peer_for_request(&storage_request),
+            Err(Error::DataIsUnavailable(_))
+        );
+
+        // Add two priority peers and a regular peer
+        let priority_peer_1 = mock_network.add_peer(true);
+        let priority_peer_2 = mock_network.add_peer(true);
+        let regular_peer_1 = mock_network.add_peer(false);
+
+        // Verify no peers can service the request (no peers are advertising data)
+        assert_matches!(
+            client.choose_peer_for_request(&storage_request),
+            Err(Error::DataIsUnavailable(_))
+        );
+
+        // Advertise the data for all peers
+        let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
+        for peer in [priority_peer_1, priority_peer_2, regular_peer_1] {
+            client.update_summary(
+                peer,
+                utils::create_storage_summary_with_timestamp(known_version, timestamp_usecs),
+            );
+        }
+
+        // Verify a priority peer is selected
+        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        assert!(selected_peer == priority_peer_1 || selected_peer == priority_peer_2);
+
+        // Make several more requests and verify the same priority peer is selected
+        for _ in 0..10 {
+            let current_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+            assert_eq!(selected_peer, current_selected_peer);
+        }
+
+        // Elapse enough time for all peers to be too far behind
+        time_service
+            .clone()
+            .advance_secs(max_subscription_lag_secs + 1);
+
+        // Advertise new data for all peers (except the selected peer)
+        let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
+        for peer in [priority_peer_1, priority_peer_2, regular_peer_1] {
+            if peer != selected_peer {
+                client.update_summary(
+                    peer,
+                    utils::create_storage_summary_with_timestamp(known_version, timestamp_usecs),
+                );
+            }
+        }
+
+        // Verify no peers can service the request (because the
+        // previously selected peer is still too far behind).
+        assert_matches!(
+            client.choose_peer_for_request(&storage_request),
+            Err(Error::DataIsUnavailable(_))
+        );
+
+        // Verify the other priority peer is now select (as the
+        // previous request will terminate the subscription).
+        let next_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        assert!(selected_peer != next_selected_peer);
+        assert!(selected_peer == priority_peer_1 || selected_peer == priority_peer_2);
+
+        // Update the request's subscription ID and verify the other priority peer is selected
+        let storage_request = update_subscription_request_id(&storage_request);
+        let next_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        assert!(selected_peer != next_selected_peer);
+        assert!(next_selected_peer == priority_peer_1 || next_selected_peer == priority_peer_2);
+
+        // Make several more requests and verify the same priority peer is selected
+        for _ in 0..10 {
+            let current_select_peer = client.choose_peer_for_request(&storage_request).unwrap();
+            assert_eq!(current_select_peer, next_selected_peer);
+        }
+
+        // Disconnect all peers and verify no peers can service the request
+        for peer in [priority_peer_1, priority_peer_2, regular_peer_1] {
+            mock_network.disconnect_peer(peer);
+        }
+        assert_matches!(
+            client.choose_peer_for_request(&storage_request),
+            Err(Error::DataIsUnavailable(_))
+        );
+    }
+}
+
+#[tokio::test]
+async fn prioritized_peer_subscription_selection() {
+    ::aptos_logger::Logger::init_for_testing();
+
+    // Create a data client with a max lag of 100
+    let max_subscription_lag_secs = 100;
+    let data_client_config = AptosDataClientConfig {
+        max_subscription_lag_secs,
+        ..Default::default()
+    };
+    let (mut mock_network, time_service, client, _) =
+        MockNetwork::new(None, Some(data_client_config), None);
+
+    // Create test data
+    let known_version = 10000000;
+    let known_epoch = 10;
+
+    // Ensure the properties hold for all subscription requests
+    for data_request in enumerate_subscription_requests(known_version, known_epoch) {
+        let storage_request = StorageServiceRequest::new(data_request, true);
+
+        // Ensure no peers can service the request (we have no connections)
+        assert_matches!(
+            client.choose_peer_for_request(&storage_request),
+            Err(Error::DataIsUnavailable(_))
+        );
+
+        // Add a regular peer and verify the peer cannot support the request
+        let regular_peer_1 = mock_network.add_peer(false);
+        assert_matches!(
+            client.choose_peer_for_request(&storage_request),
+            Err(Error::DataIsUnavailable(_))
+        );
+
+        // Advertise the data for the regular peer and verify it is now selected
+        let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
+        client.update_summary(
+            regular_peer_1,
+            utils::create_storage_summary_with_timestamp(known_version, timestamp_usecs),
+        );
+        assert_eq!(
+            client.choose_peer_for_request(&storage_request),
+            Ok(regular_peer_1)
+        );
+
+        // Add a priority peer and verify the regular peer is still selected
+        let priority_peer_1 = mock_network.add_peer(true);
+        assert_eq!(
+            client.choose_peer_for_request(&storage_request),
+            Ok(regular_peer_1)
+        );
+
+        // Advertise the data for the priority peer and verify it is not selected
+        // (the previous subscription request went to the regular peer).
+        client.update_summary(
+            priority_peer_1,
+            utils::create_storage_summary_with_timestamp(known_version, timestamp_usecs),
+        );
+        assert_matches!(
+            client.choose_peer_for_request(&storage_request),
+            Err(Error::DataIsUnavailable(_))
+        );
+
+        // Update the request's subscription ID and verify it now goes to the priority peer
+        let storage_request = update_subscription_request_id(&storage_request);
+        assert_eq!(
+            client.choose_peer_for_request(&storage_request),
+            Ok(priority_peer_1)
+        );
+
+        // Elapse enough time for both peers to be too far behind
+        time_service
+            .clone()
+            .advance_secs(max_subscription_lag_secs + 1);
+
+        // Verify neither peer is now selected
+        assert_matches!(
+            client.choose_peer_for_request(&storage_request),
+            Err(Error::DataIsUnavailable(_))
+        );
+
+        // Update the request's subscription ID
+        let storage_request = update_subscription_request_id(&storage_request);
+
+        // Update the regular peer to be up-to-date and verify it is now chosen
+        let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
+        let regular_peer_timestamp_usecs =
+            timestamp_usecs - ((max_subscription_lag_secs / 2) * NUM_MICROSECONDS_IN_SECOND);
+        client.update_summary(
+            regular_peer_1,
+            utils::create_storage_summary_with_timestamp(
+                known_version,
+                regular_peer_timestamp_usecs,
+            ),
+        );
+        assert_eq!(
+            client.choose_peer_for_request(&storage_request),
+            Ok(regular_peer_1)
+        );
+
+        // Update the request's subscription ID
+        let storage_request = update_subscription_request_id(&storage_request);
+
+        // Update the priority peer to be up-to-date and verify it is now chosen
+        let priority_peer_timestamp_usecs =
+            timestamp_usecs - ((max_subscription_lag_secs / 2) * NUM_MICROSECONDS_IN_SECOND);
+        client.update_summary(
+            priority_peer_1,
+            utils::create_storage_summary_with_timestamp(
+                known_version,
+                priority_peer_timestamp_usecs,
+            ),
+        );
+        assert_eq!(
+            client.choose_peer_for_request(&storage_request),
+            Ok(priority_peer_1)
+        );
+
+        // Update the request's subscription ID
+        let storage_request = update_subscription_request_id(&storage_request);
+
+        // Disconnect the priority peer and verify the regular peer is selected
+        mock_network.disconnect_peer(priority_peer_1);
+        assert_eq!(
+            client.choose_peer_for_request(&storage_request),
+            Ok(regular_peer_1)
+        );
+
+        // Elapse enough time for the regular peer to be too far behind
+        time_service.clone().advance_secs(max_subscription_lag_secs);
+
+        // Verify neither peer is now select
+        assert_matches!(
+            client.choose_peer_for_request(&storage_request),
+            Err(Error::DataIsUnavailable(_))
+        );
+
+        // Disconnect the regular peer so that we no longer have any connections
+        mock_network.disconnect_peer(regular_peer_1);
     }
 }
 
@@ -323,4 +598,107 @@ async fn pfn_peer_prioritization() {
     let (priority_peers, regular_peers) = client.get_priority_and_regular_peers().unwrap();
     assert_eq!(priority_peers, vec![outbound_peer]);
     assert_eq!(regular_peers, vec![inbound_peer]);
+}
+
+/// Enumerates all optimistic fetch request types
+fn enumerate_optimistic_fetch_requests(known_version: u64, known_epoch: u64) -> Vec<DataRequest> {
+    // Create all optimistic fetch requests
+    let new_transactions_request =
+        DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
+            known_version,
+            known_epoch,
+            include_events: false,
+        });
+    let new_outputs_requests =
+        DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
+            known_version,
+            known_epoch,
+        });
+    let new_transactions_or_outputs_request = DataRequest::GetNewTransactionsOrOutputsWithProof(
+        NewTransactionsOrOutputsWithProofRequest {
+            known_version,
+            known_epoch,
+            include_events: false,
+            max_num_output_reductions: 0,
+        },
+    );
+
+    // Return all optimistic fetch requests
+    vec![
+        new_transactions_request,
+        new_outputs_requests,
+        new_transactions_or_outputs_request,
+    ]
+}
+
+/// Enumerates all subscription request types
+fn enumerate_subscription_requests(known_version: u64, known_epoch: u64) -> Vec<DataRequest> {
+    // Create all subscription requests
+    let subscribe_transactions_request =
+        DataRequest::SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest {
+            subscription_stream_metadata: SubscriptionStreamMetadata {
+                known_version_at_stream_start: known_version,
+                known_epoch_at_stream_start: known_epoch,
+                subscription_stream_id: 100,
+            },
+            subscription_stream_index: 0,
+            include_events: false,
+        });
+    let subscribe_outputs_request = DataRequest::SubscribeTransactionOutputsWithProof(
+        SubscribeTransactionOutputsWithProofRequest {
+            subscription_stream_metadata: SubscriptionStreamMetadata {
+                known_version_at_stream_start: known_version,
+                known_epoch_at_stream_start: known_epoch,
+                subscription_stream_id: 200,
+            },
+            subscription_stream_index: 0,
+        },
+    );
+    let subscribe_transactions_or_outputs_request =
+        DataRequest::SubscribeTransactionsOrOutputsWithProof(
+            SubscribeTransactionsOrOutputsWithProofRequest {
+                subscription_stream_metadata: SubscriptionStreamMetadata {
+                    known_version_at_stream_start: known_version,
+                    known_epoch_at_stream_start: known_epoch,
+                    subscription_stream_id: 300,
+                },
+                subscription_stream_index: 0,
+                include_events: false,
+                max_num_output_reductions: 0,
+            },
+        );
+
+    // Return all subscription requests
+    vec![
+        subscribe_transactions_request,
+        subscribe_outputs_request,
+        subscribe_transactions_or_outputs_request,
+    ]
+}
+
+/// Updates the subscription request ID in the given storage request
+/// and returns the updated storage request.
+fn update_subscription_request_id(
+    storage_service_request: &StorageServiceRequest,
+) -> StorageServiceRequest {
+    let mut storage_service_request = storage_service_request.clone();
+
+    // Update the subscription's request ID
+    match &mut storage_service_request.data_request {
+        DataRequest::SubscribeTransactionsWithProof(request) => {
+            request.subscription_stream_metadata.subscription_stream_id += 1
+        },
+        DataRequest::SubscribeTransactionOutputsWithProof(request) => {
+            request.subscription_stream_metadata.subscription_stream_id += 1
+        },
+        DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
+            request.subscription_stream_metadata.subscription_stream_id += 1
+        },
+        _ => panic!(
+            "Unexpected subscription request type! {:?}",
+            storage_service_request
+        ),
+    }
+
+    storage_service_request
 }

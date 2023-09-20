@@ -74,7 +74,7 @@ fn add_to_sized_pool<T>(
 impl TransactionGenerator for AccountGenerator {
     fn generate_transactions(
         &mut self,
-        account: &mut LocalAccount,
+        account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);

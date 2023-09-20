@@ -97,7 +97,9 @@ async fn test_upgrade_flow() {
         .unwrap()
         .status
         .success());
-    *env.aptos_public_info().root_account().sequence_number_mut() += 1;
+    env.aptos_public_info()
+        .root_account()
+        .increment_sequence_number();
 
     let upgrade_scripts_folder = TempPath::new();
     upgrade_scripts_folder.create_as_dir().unwrap();
@@ -189,7 +191,9 @@ async fn test_upgrade_flow() {
             .status
             .success());
 
-        *env.aptos_public_info().root_account().sequence_number_mut() += 1;
+        env.aptos_public_info()
+            .root_account()
+            .increment_sequence_number();
     }
 
     //TODO: Make sure gas schedule is indeed updated by the tool.
@@ -213,7 +217,7 @@ async fn test_upgrade_flow() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_release_validate_tool_multi_step() {
     let (mut env, _, _) = SwarmBuilder::new_local(1)
-        .with_init_config(Arc::new(|_, _, genesis_stake_amount| {
+        .with_init_genesis_stake(Arc::new(|_, genesis_stake_amount| {
             // make sure we have quorum
             *genesis_stake_amount = 2000000000000000;
         }))
@@ -261,7 +265,7 @@ async fn test_release_validate_tool_multi_step() {
 
     let root_account = env.aptos_public_info().root_account().address();
     // Test the module publishing workflow
-    *env.aptos_public_info().root_account().sequence_number_mut() = env
+    let sequence_number = env
         .aptos_public_info()
         .client()
         .get_account(root_account)
@@ -269,6 +273,9 @@ async fn test_release_validate_tool_multi_step() {
         .unwrap()
         .inner()
         .sequence_number;
+    env.aptos_public_info()
+        .root_account()
+        .set_sequence_number(sequence_number);
 
     let base_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     let base_path_v1 = base_dir.join("src/aptos/package_publish_modules_v1/");

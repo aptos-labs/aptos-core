@@ -47,7 +47,7 @@ impl ModuleSummary {
     pub fn summarize_csv<W: Write>(&self, summary_writer: &mut W) -> io::Result<()> {
         let module = format!(
             "{}::{}",
-            self.module_name.address(),
+            self.module_name.address().to_hex(),
             self.module_name.name()
         );
 
@@ -83,7 +83,7 @@ impl ModuleSummary {
         writeln!(
             summary_writer,
             "Module {}::{}",
-            self.module_name.address(),
+            self.module_name.address().to_hex(),
             self.module_name.name()
         )?;
 

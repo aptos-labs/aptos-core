@@ -60,7 +60,7 @@ fun pack_unpack::unpack($t0: pack_unpack::S): (u64, u64) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v6
+// Move bytecode v4294967295
 module 42.pack_unpack {
 struct T {
 	h: u64

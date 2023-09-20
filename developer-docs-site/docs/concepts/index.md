@@ -13,6 +13,7 @@ Start here to get into the core concepts of the Aptos blockchain. Then review ou
 - ### [Events](./events.md)
 - ### [Transactions and States](./txns-states.md)
 - ### [Gas and Transaction Fees](./gas-txn-fee.md)
+- ### [Computing Transaction Gas](./base-gas.md)
 - ### [Blocks](./blocks.md)
 - ### [Staking](./staking.md)
 - ### [Governance](./governance.md)

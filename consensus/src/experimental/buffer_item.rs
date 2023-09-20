@@ -2,12 +2,16 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{experimental::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
+use crate::{
+    experimental::{commit_reliable_broadcast::DropGuard, hashable::Hashable},
+    state_replication::StateComputerCommitCallBackType,
+};
 use anyhow::anyhow;
 use aptos_consensus_types::{
     common::Author, executed_block::ExecutedBlock, experimental::commit_vote::CommitVote,
 };
 use aptos_crypto::{bls12381, HashValue};
+use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
@@ -15,7 +19,9 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
     validator_verifier::ValidatorVerifier,
 };
+use futures::future::BoxFuture;
 use itertools::zip_eq;
+use tokio::time::Instant;
 
 fn generate_commit_ledger_info(
     commit_info: &BlockInfo,
@@ -105,6 +111,7 @@ pub struct SignedItem {
     pub partial_commit_proof: LedgerInfoWithPartialSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub commit_vote: CommitVote,
+    pub rb_handle: Option<(Instant, DropGuard)>,
 }
 
 pub struct AggregatedItem {
@@ -125,6 +132,8 @@ impl Hashable for BufferItem {
         self.block_id()
     }
 }
+
+pub type ExecutionFut = BoxFuture<'static, ExecutorResult<Vec<ExecutedBlock>>>;
 
 impl BufferItem {
     pub fn new_ordered(
@@ -244,6 +253,7 @@ impl BufferItem {
                     callback,
                     partial_commit_proof,
                     commit_vote,
+                    rb_handle: None,
                 }))
             },
             _ => {
@@ -438,9 +448,9 @@ impl BufferItem {
         matches!(self, Self::Aggregated(_))
     }
 
-    pub fn unwrap_signed_ref(&self) -> &SignedItem {
+    pub fn unwrap_signed_mut(&mut self) -> &mut SignedItem {
         match self {
-            BufferItem::Signed(item) => item.as_ref(),
+            BufferItem::Signed(item) => item.as_mut(),
             _ => panic!("Not signed item"),
         }
     }

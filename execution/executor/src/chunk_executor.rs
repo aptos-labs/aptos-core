@@ -146,9 +146,9 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             chunk_output.apply_to_ledger(latest_view, None)?;
         ensure_no_discard(to_discard)?;
         ensure_no_retry(to_retry)?;
+        executed_chunk.ensure_transaction_infos_match(transaction_infos)?;
         executed_chunk.ledger_info = executed_chunk
             .maybe_select_chunk_ending_ledger_info(verified_target_li, epoch_change_li)?;
-        executed_chunk.ensure_transaction_infos_match(transaction_infos)?;
 
         Ok(executed_chunk)
     }
