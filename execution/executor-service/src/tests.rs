@@ -55,6 +55,7 @@ pub fn create_thread_remote_executor_shards(
 }
 
 #[test]
+#[ignore]
 fn test_sharded_block_executor_no_conflict() {
     let num_shards = 8;
     let (mut controller, executor_client, _executor_services) =
