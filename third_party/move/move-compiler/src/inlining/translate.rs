@@ -19,7 +19,7 @@ use crate::{
             SpecLambdaLiftedFunction, UnannotatedExp_,
         },
         core::{infer_abilities, InferAbilityContext, Subst},
-        translate::lvalues_expected_types,
+        translate::{lvalues_expected_types, sequence_type},
     },
 };
 use move_ir_types::location::{sp, Loc};
@@ -692,27 +692,31 @@ impl<'l> Inliner<'l> {
             };
             Dispatcher::new(&mut sub_visitor).sequence(&mut seq);
             self.inline_stack.pop_front();
+
             // Construct the let
             for decl in decls_for_let.into_iter().rev() {
                 seq.push_front(decl)
             }
 
+            if seq.len() == 1 {
+                // special case a sequence with a single expression to reduce tree height
+                if let SequenceItem_::Seq(boxed_expr) = seq.pop_front().unwrap().value {
+                    let exp = boxed_expr.exp;
+                    return Some(exp.value);
+                }
+            }
             let body_loc = fdef.body.loc;
-            let block_expr = sp(body_loc, UnannotatedExp_::Block(seq));
-            Some(UnannotatedExp_::Annotate(
-                Box::new(Exp {
-                    exp: block_expr,
-                    ty: result_type.clone(),
-                }),
-                Box::new(result_type),
-            ))
+            let block_exp_type = sequence_type(&seq).clone();
+            let block_exp_ = UnannotatedExp_::Block(seq);
+            let res = make_unannotated_exp_of(block_exp_, block_exp_type, result_type, body_loc);
+            Some(res)
         } else {
             None
         }
     }
 
-    /// Process parameters, splitting them in those which are eagerly bound as regular
-    /// values and those which are lambdas which are going to be transitively inlined.
+    /// Process parameters, splitting them into (1) those which are eagerly evaluated and let-bound
+    /// as regular values, (2) those which are lambdas which are going to be transitively inlined.
     fn process_parameters(
         &mut self,
         loc: Loc,
@@ -743,14 +747,7 @@ impl<'l> Inliner<'l> {
                 let exp1 = exps.pop().unwrap();
                 let mut ty = tys.pop().unwrap();
                 self.infer_abilities(&mut ty);
-
-                Exp {
-                    ty: ty.clone(),
-                    exp: sp(
-                        loc,
-                        UnannotatedExp_::Annotate(Box::new(exp1), Box::new(ty.clone())),
-                    ),
-                }
+                make_annotated_exp_of(exp1, ty, loc)
             },
             _ => {
                 let mut ty = Type_::multiple(loc, tys.clone());
@@ -765,17 +762,8 @@ impl<'l> Inliner<'l> {
                                 .zip(tys.into_iter())
                                 .map(|(e, ty)| {
                                     ExpListItem::Single(
-                                        Exp {
-                                            exp: sp(
-                                                loc,
-                                                UnannotatedExp_::Annotate(
-                                                    Box::new(e),
-                                                    Box::new(ty.clone()),
-                                                ),
-                                            ),
-                                            ty: ty.clone(),
-                                        },
-                                        Box::new(ty.clone()),
+                                        make_annotated_exp_of(e, ty.clone(), loc),
+                                        Box::new(ty),
                                     )
                                 })
                                 .collect(),
@@ -793,6 +781,36 @@ impl<'l> Inliner<'l> {
             SequenceItem_::Bind(spanned_lvalues, lvalue_ty, Box::new(exp)),
         );
         (vec![decl], bindings)
+    }
+}
+
+fn make_annotated_exp_of(exp: Exp, ty: Type, loc: Loc) -> Exp {
+    if ty != exp.ty {
+        Exp {
+            ty: ty.clone(),
+            exp: sp(loc, UnannotatedExp_::Annotate(Box::new(exp), Box::new(ty))),
+        }
+    } else {
+        exp
+    }
+}
+
+fn make_unannotated_exp_of(
+    exp_: UnannotatedExp_,
+    exp_ty: Type,
+    result_ty: Type,
+    loc: Loc,
+) -> UnannotatedExp_ {
+    if result_ty != exp_ty {
+        UnannotatedExp_::Annotate(
+            Box::new(Exp {
+                exp: sp(loc, exp_),
+                ty: exp_ty,
+            }),
+            Box::new(result_ty),
+        )
+    } else {
+        exp_
     }
 }
 

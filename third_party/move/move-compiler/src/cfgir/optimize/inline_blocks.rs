@@ -126,7 +126,6 @@ fn inline_single_target_blocks(
         }
     }
 
-
     let changed = !remapping.is_empty();
     remap_to_last_target(remapping, start, finished_blocks);
     changed
