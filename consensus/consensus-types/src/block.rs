@@ -96,7 +96,7 @@ impl Block {
     }
 
     pub fn parent_id(&self) -> HashValue {
-        self.block_data.quorum_cert().certified_block().id()
+        self.block_data.parent_id()
     }
 
     pub fn payload(&self) -> Option<&Payload> {
@@ -211,9 +211,10 @@ impl Block {
         payload: Payload,
         author: Author,
         failed_authors: Vec<(Round, Author)>,
-        parent_block_info: BlockInfo,
+        parent_block_id: HashValue,
         parents_bitvec: BitVec,
-    ) -> anyhow::Result<Self> {
+        node_digests: Vec<HashValue>,
+    ) -> Self {
         let block_data = BlockData::new_for_dag(
             epoch,
             round,
@@ -221,10 +222,15 @@ impl Block {
             payload,
             author,
             failed_authors,
-            parent_block_info,
+            parent_block_id,
             parents_bitvec,
+            node_digests,
         );
-        Self::new_proposal_from_block_data(block_data, &ValidatorSigner::from_int(0))
+        Self {
+            id: block_data.hash(),
+            block_data,
+            signature: None,
+        }
     }
 
     pub fn new_proposal(
@@ -282,6 +288,7 @@ impl Block {
                 validator.verify(*author, &self.block_data, signature)?;
                 self.quorum_cert().verify(validator)
             },
+            BlockType::DAGBlock { .. } => bail!("We should not accept DAG block from others"),
         }
     }
 
@@ -392,18 +399,21 @@ impl Block {
         }
     }
 
+    fn previous_bitvec(&self) -> BitVec {
+        if let BlockType::DAGBlock { parents_bitvec, .. } = self.block_data.block_type() {
+            parents_bitvec.clone()
+        } else {
+            self.quorum_cert().ledger_info().get_voters_bitvec().clone()
+        }
+    }
+
     fn new_block_metadata(&self, validators: &[AccountAddress]) -> BlockMetadata {
         BlockMetadata::new(
             self.id(),
             self.epoch(),
             self.round(),
             self.author().unwrap_or(AccountAddress::ZERO),
-            // A bitvec of voters
-            self.quorum_cert()
-                .ledger_info()
-                .get_voters_bitvec()
-                .clone()
-                .into(),
+            self.previous_bitvec().into(),
             // For nil block, we use 0x0 which is convention for nil address in move.
             self.block_data()
                 .failed_authors()
