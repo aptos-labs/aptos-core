@@ -10,7 +10,7 @@ mod tracing;
 
 use crate::dkg::dkg_rounding::DKGRounding;
 use aptos_consensus_types::common::Author;
-use aptos_dkg::pvss::{das, traits::Transcript, WeightedTranscript};
+use aptos_dkg::{pvss::{das, traits::Transcript, WeightedTranscript}, constants::SEED_PVSS_PUBLIC_PARAMS};
 use aptos_logger::debug;
 use aptos_types::{dkg::DKGPvssConfig, on_chain_config::ValidatorSet};
 pub use types::{DKGAggNode, DKGMessage, DKGNetworkMessage, DKGNode};
@@ -61,7 +61,7 @@ pub fn build_dkg_pvss_config(
     let wc_1 = dkg_rounding.weighted_config_1().clone();
     let wc_2 = dkg_rounding.weighted_config_2().clone();
 
-    let pp = <WeightedTranscript<das::Transcript> as Transcript>::PvssPublicParameters::default();
+    let pp = <WeightedTranscript<das::Transcript> as Transcript>::PvssPublicParameters::new_from_seed_with_bls_base(SEED_PVSS_PUBLIC_PARAMS);
     let dkg_pvss_config =
         DKGPvssConfig::new(cur_epoch, wc_1.clone(), wc_2.clone(), pp, consensus_keys);
 
