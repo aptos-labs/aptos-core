@@ -27,6 +27,7 @@ futures = { workspace = true }
 futures-core = { workspace = true }
 futures-util = { workspace = true }
 itertools = { workspace = true }
+once_cell = { workspace = true }
 prometheus = { workspace = true }
 prost = { workspace = true }
 redis = { workspace = true }

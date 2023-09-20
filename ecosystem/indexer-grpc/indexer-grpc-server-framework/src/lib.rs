@@ -27,6 +27,9 @@ impl ServerArgs {
         setup_logging();
         setup_panic_handler();
         let config = load::<GenericConfig<C>>(&self.config_path)?;
+        config
+            .validate()
+            .context("Config did not pass validation")?;
         run_server_with_config(config).await
     }
 }
@@ -75,6 +78,10 @@ impl<T> RunnableConfig for GenericConfig<T>
 where
     T: RunnableConfig,
 {
+    fn validate(&self) -> Result<()> {
+        self.server_config.validate()
+    }
+
     async fn run(&self) -> Result<()> {
         self.server_config.run().await
     }
@@ -87,7 +94,15 @@ where
 /// RunnableConfig is a trait that all services must implement for their configuration.
 #[async_trait::async_trait]
 pub trait RunnableConfig: DeserializeOwned + Send + Sync + 'static {
+    // Validate the config.
+    fn validate(&self) -> Result<()> {
+        Ok(())
+    }
+
+    // Run something based on the config.
     async fn run(&self) -> Result<()>;
+
+    // Get the server name.
     fn get_server_name(&self) -> String;
 }
 
@@ -109,7 +124,7 @@ pub struct CrashInfo {
 
 /// Invoke to ensure process exits on a thread panic.
 ///
-/// Tokio's default behavior is to catch panics and ignore them.  Invoking this function will
+/// Tokio's default behavior is to catch panics and ignore them. Invoking this function will
 /// ensure that all subsequent thread panics (even Tokio threads) will report the
 /// details/backtrace and then exit.
 pub fn setup_panic_handler() {

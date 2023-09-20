@@ -39,13 +39,11 @@ pub fn bootstrap(
 
     let node_config = config.clone();
 
-    // We have defaults for these so they should all return something nonnull so unwrap is safe here
-    let processor_task_count = node_config.indexer_grpc.processor_task_count.unwrap();
-    let processor_batch_size = node_config.indexer_grpc.processor_batch_size.unwrap();
-    let output_batch_size = node_config.indexer_grpc.output_batch_size.unwrap();
-    let address = node_config.indexer_grpc.address.clone().unwrap();
-
-    let dev_mode_enabled = node_config.indexer_grpc.dev_mode.unwrap_or(false);
+    let address = node_config.indexer_grpc.address;
+    let use_data_service_interface = node_config.indexer_grpc.use_data_service_interface;
+    let processor_task_count = node_config.indexer_grpc.processor_task_count;
+    let processor_batch_size = node_config.indexer_grpc.processor_batch_size;
+    let output_batch_size = node_config.indexer_grpc.output_batch_size;
 
     runtime.spawn(async move {
         let context = Arc::new(Context::new(chain_id, db, mp_sender, node_config));
@@ -65,7 +63,7 @@ pub fn bootstrap(
             .http2_keepalive_interval(Some(std::time::Duration::from_secs(60)))
             .http2_keepalive_timeout(Some(std::time::Duration::from_secs(5)));
 
-        let router = match dev_mode_enabled {
+        let router = match use_data_service_interface {
             false => tonic_server.add_service(FullnodeDataServer::new(server)),
             true => tonic_server.add_service(RawDataServer::new(localnet_data_server)),
         };

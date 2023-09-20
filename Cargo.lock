@@ -1897,6 +1897,7 @@ dependencies = [
  "tokio",
  "tonic 0.10.0",
  "tracing",
+ "url",
 ]
 
 [[package]]
@@ -2031,6 +2032,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "itertools",
+ "once_cell",
  "prometheus",
  "prost 0.12.1",
  "redis",
@@ -2128,6 +2130,7 @@ dependencies = [
  "tonic 0.10.0",
  "tracing",
  "tracing-subscriber",
+ "url",
  "warp",
 ]
 

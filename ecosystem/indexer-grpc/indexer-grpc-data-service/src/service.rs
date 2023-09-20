@@ -6,6 +6,7 @@ use crate::metrics::{
     PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
     SHORT_CONNECTION_COUNT,
 };
+use anyhow::Context;
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
@@ -15,7 +16,9 @@ use aptos_indexer_grpc_utils::{
         BLOB_STORAGE_SIZE, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER, MESSAGE_SIZE_LIMIT,
     },
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
-    time_diff_since_pb_timestamp_in_secs, EncodedTransactionWithVersion,
+    time_diff_since_pb_timestamp_in_secs,
+    types::RedisUrl,
+    EncodedTransactionWithVersion,
 };
 use aptos_logger::prelude::{sample, SampleRate};
 use aptos_moving_average::MovingAverage;
@@ -49,9 +52,6 @@ const AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS: u64 = 50;
 // TODO(larry): fix all errors treated as transient errors.
 const TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS: u64 = 1000;
 
-// Default max response channel size.
-const DEFAULT_MAX_RESPONSE_CHANNEL_SIZE: usize = 3;
-
 // The server will retry to send the response to the client and give up after RESPONSE_CHANNEL_SEND_TIMEOUT.
 // This is to prevent the server from being occupied by a slow client.
 const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
@@ -65,23 +65,24 @@ const REQUEST_HEADER_APTOS_API_KEY_NAME: &str = "x-aptos-api-key-name";
 pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
-    pub data_service_response_channel_size: Option<usize>,
+    pub data_service_response_channel_size: usize,
 }
 
 impl RawDataServerWrapper {
     pub fn new(
-        redis_address: String,
+        redis_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
-        data_service_response_channel_size: Option<usize>,
-    ) -> Self {
-        Self {
+        data_service_response_channel_size: usize,
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
             redis_client: Arc::new(
-                redis::Client::open(format!("redis://{}", redis_address))
-                    .expect("Create redis client failed."),
+                redis::Client::open(redis_address.0.clone()).with_context(|| {
+                    format!("Failed to create redis client for {}", redis_address)
+                })?,
             ),
             file_store_config,
             data_service_response_channel_size,
-        }
+        })
     }
 }
 
@@ -123,10 +124,7 @@ impl RawData for RawDataServerWrapper {
         let transactions_count = request.transactions_count;
 
         // Response channel to stream the data to the client.
-        let (tx, rx) = channel(
-            self.data_service_response_channel_size
-                .unwrap_or(DEFAULT_MAX_RESPONSE_CHANNEL_SIZE),
-        );
+        let (tx, rx) = channel(self.data_service_response_channel_size);
         let mut current_version = match &request.starting_version {
             Some(version) => *version,
             None => {

@@ -39,4 +39,5 @@ toml = { workspace = true }
 tonic = { workspace = true }
 tracing =  { workspace = true }
 tracing-subscriber = { workspace = true }
+url = { workspace = true }
 warp = { workspace = true }
