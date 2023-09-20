@@ -18,6 +18,11 @@ const DEFAULT_PROCESSOR_TASK_COUNT: u16 = 20;
 pub struct IndexerGrpcConfig {
     pub enabled: bool,
 
+    /// If true, the exteranl grpc will be enabled in dev mode also,
+    /// the internal grpc will be **disabled** in dev mode, i.e.,
+    /// `enabled` will be ignored in dev mode.
+    pub dev_mode: Option<bool>,
+
     /// The address that the grpc server will listen on
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub address: Option<String>,
