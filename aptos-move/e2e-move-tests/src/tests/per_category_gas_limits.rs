@@ -19,7 +19,7 @@ fn execution_limit_reached() {
 
     // Publish the infinite loop module.
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
-    assert_success!(h.publish_package(
+    assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("infinite_loop.data/empty_loop"),
     ));
@@ -58,7 +58,7 @@ fn io_limit_reached() {
 
     // Publish the test module.
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
-    assert_success!(h.publish_package(&acc, &common::test_dir_path("execution_limit.data/test"),));
+    assert_success!(h.publish_package_cache_building(&acc, &common::test_dir_path("execution_limit.data/test"),));
 
     // Lower the max io gas to lower than a single load_resource
     h.modify_gas_schedule(|gas_params| {
@@ -81,7 +81,7 @@ fn storage_limit_reached() {
 
     // Publish the test module.
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
-    assert_success!(h.publish_package(&acc, &common::test_dir_path("execution_limit.data/test"),));
+    assert_success!(h.publish_package_cache_building(&acc, &common::test_dir_path("execution_limit.data/test"),));
 
     // Lower the max storage fee to 10 Octa.
     h.modify_gas_schedule(|gas_params| gas_params.vm.txn.max_storage_fee = Fee::new(10));
