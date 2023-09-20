@@ -266,16 +266,16 @@ impl Dag {
             })
     }
 
-    pub fn reachable(
+    pub fn reachable<'a>(
         &self,
-        targets: &[NodeMetadata],
+        targets: impl Iterator<Item = &'a NodeMetadata> + Clone,
         until: Option<Round>,
         // TODO: replace filter with bool to filter unordered
         filter: impl Fn(&NodeStatus) -> bool,
     ) -> impl Iterator<Item = &NodeStatus> {
         let until = until.unwrap_or(self.lowest_round());
-        let initial = targets.iter().map(|t| *t.digest()).collect();
-        let initial_round = targets[0].round();
+        let initial_round = targets.clone().map(|t| t.round()).max().unwrap();
+        let initial = targets.map(|t| *t.digest()).collect();
 
         let mut reachable_filter = Self::reachable_filter(initial);
         self.nodes_by_round

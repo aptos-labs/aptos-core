@@ -273,7 +273,7 @@ impl TDagFetcher for DagFetcher {
                     }
                 }
 
-                if dag.read().all_exists(remote_request.targets().iter()) {
+                if dag.read().all_exists(remote_request.targets()) {
                     return Ok(());
                 }
             }
@@ -317,7 +317,7 @@ impl RpcHandler for FetchRequestHandler {
         // `Node`: In the good case, the sender of the Node should have the parents in its local DAG
         // to satisfy this request.
         ensure!(
-            dag_reader.all_exists(message.targets().iter()),
+            dag_reader.all_exists(message.targets()),
             FetchRequestHandleError::TargetsMissing
         );
 
