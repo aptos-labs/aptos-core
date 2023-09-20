@@ -17,7 +17,7 @@ fn empty_while_loop() {
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
-    assert_success!(h.publish_package(
+    assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("infinite_loop.data/empty_loop"),
     ));

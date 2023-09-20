@@ -56,7 +56,7 @@ fn setup(harness: &mut MoveHarness) -> Account {
 
     let account = harness.new_account_at(AccountAddress::ONE);
 
-    assert_success!(harness.publish_package(&account, &path));
+    assert_success!(harness.publish_package_cache_building(&account, &path));
 
     account
 }
