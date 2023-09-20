@@ -3,6 +3,9 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+### Added
+- Added an option `--print-metadata` to the command `aptos move download` to print out the metadata of the package to be downloaded.
+  - Example: `aptos move download  --account 0x1 --package AptosFramework --url https://mainnet.aptoslabs.com/v1 --print-metadata`
 
 ## [2.1.0] - 2023/08/24
 ### Updated
