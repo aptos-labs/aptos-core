@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    counters::TIMER,
     move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
     natives::aptos_natives_with_builder,
 };
@@ -15,12 +16,18 @@ use aptos_framework::natives::{
 };
 use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
+use aptos_metrics_core::TimerHelper;
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    identifier::Identifier,
+    language_storage::{ModuleId, CORE_CODE_ADDRESS},
+};
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
     native_functions::NativeFunction,
@@ -113,9 +120,28 @@ impl MoveVmExt {
     fn new_move_vm(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
-        _resolver: &impl AptosMoveResolver,
+        resolver: &impl AptosMoveResolver,
     ) -> VMResult<MoveVM> {
-        MoveVM::new_with_config(natives, vm_config)
+        let vm = MoveVM::new_with_config(natives, vm_config)?;
+        Self::warm_vm_up(&vm, resolver);
+
+        Ok(vm)
+    }
+
+    fn warm_vm_up(vm: &MoveVM, resolver: &impl AptosMoveResolver) {
+        let _timer = TIMER.timer_with(&["vm_warm_up"]);
+
+        // Loading `0x1::account` and its transitive dependency into the code cache.
+        //
+        // This should give us a warm VM to avoid the overhead of VM cold start.
+        // Result of this load could be omitted as this is a best effort approach and won't hurt if that fails.
+        //
+        // Loading up `0x1::account` should be sufficient as this is the most common module
+        // used for prologue, epilogue and transfer functionality.
+        let _ = vm.load_module(
+            &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
+            &resolver,
+        );
     }
 
     pub fn new(
