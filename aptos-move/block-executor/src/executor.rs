@@ -636,7 +636,7 @@ where
                                     *skip_index = Some(idx);
                                 }
                                 output
-                            }
+                            },
                             Some(ExecutionStatus::Abort(err)) => {
                                 *maybe_err.lock().unwrap() = Some(err);
                                 E::Output::skip_output()
