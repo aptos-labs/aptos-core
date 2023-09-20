@@ -134,7 +134,7 @@ describe("Indexer", () => {
     it(
       "gets account owned objects data",
       async () => {
-        const accountObjects = await indexerClient.getOwnedObjects(alice.address().hex());
+        const accountObjects = await indexerClient.getAccountOwnedObjects(alice.address().hex());
         expect(accountObjects.current_objects.length).toBe(2);
       },
       longTestTimeout,

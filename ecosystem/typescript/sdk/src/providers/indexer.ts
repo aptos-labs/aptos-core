@@ -880,7 +880,7 @@ export class IndexerClient {
    * @param ownerAddress Owner address
    * @returns GetCurrentObjectsQuery response type
    */
-  async getOwnedObjects(
+  async getAccountOwnedObjects(
     ownerAddress: MaybeHexString,
     extraArgs?: {
       options?: IndexerPaginationArgs;
