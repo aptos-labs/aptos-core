@@ -4,7 +4,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
-- Add current objects queries support - `getAccountCurrentObjects`
+- Add current objects queries support - `getAccountOwnedObjects`
 
 ## 1.19.0 (2023-08-24)
 
