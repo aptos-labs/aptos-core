@@ -9,31 +9,31 @@ edition = "2021"
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
-# TODO: move these to workspace
+bcs =  { workspace = true }
+blstrs = { workspace = true }
+criterion = { workspace = true }
+group = { workspace = true }
+hex = { workspace = true }
+merlin = { workspace = true }
+more-asserts = {  workspace = true }
+num-traits = { workspace = true }
+once_cell = { workspace = true }
+rand = { workspace = true }
+rand_core = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+sha3 = { workspace = true }
+static_assertions = { workspace = true }
+
+# TODO: Move these into the main Cargo.toml eventually
 bellman = { version = "0.13.1", default-features = false }
-num-bigint = { version = "0.3.2", features = ["rand"] } # need this version because it in turn depends on the right version of `rand` and `rand_core`
-num-integer = "0.1.42"
-num-traits = "0.2.11"
-#bincode = "0.9.2"
-bcs =  { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
-blstrs = { version = "0.7.0", features = ["serde"] }
-criterion = "0.4.0"
 derive_more = "0.99.17"
-hex = "0.4.3"
 ff = "0.13"
-group = "0.13"
-merlin = "1.3.0"
-more-asserts = "0.3.1"
-once_cell = "1.17.0"
+# Need this version because it in turn depends on the right version of `rand` and `rand_core`
+num-bigint = { version = "0.3.2", features = ["rand"] }
+num-integer = "0.1.42"
 pairing = "0.23"
-rand = "0.7.3"
-rand_core = "0.5.1"
-#rand_core_0_6_4 = { package = "rand_core", version = "0.6.4" }
-serde = { version = "1.0.137", features = ["derive"] }
-serde_bytes = "0.11.6"
 serde_with = "2.2.0"
-sha3 = "0.10.6"
-static_assertions = "1.1.0"
 
 [features]
 assert-private-keys-not-cloneable = []

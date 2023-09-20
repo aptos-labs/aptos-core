@@ -1,16 +1,31 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    bls12381,
-    bls12381::{PrivateKey, ProofOfPossession, PublicKey},
-    test_utils::{random_subset, KeyPair, TestAptosCrypto},
-    validatable::{Validatable, Validate},
-    Signature, SigningKey, Uniform,
-};
-use rand::{distributions::Alphanumeric, Rng};
+use crate::{bls12381, bls12381::{PrivateKey, ProofOfPossession, PublicKey}, test_utils::{random_subset, KeyPair, TestAptosCrypto}, validatable::{Validatable, Validate}, Signature, SigningKey, Uniform};
+use rand::{distributions::Alphanumeric, Rng, thread_rng};
 use rand_core::OsRng;
 use std::{convert::TryFrom, iter::zip};
+use blstrs::{G1Projective, Scalar};
+use group::Group;
+use std::ops::Mul;
+
+/// Test that `blstrs` returns the same G1 generator as used in `blst`.
+#[test]
+fn bls12381_g1_generator() {
+    let mut rng = thread_rng();
+
+    let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+    let serialized_sk = key_pair.private_key.to_bytes();
+    let serialized_pk = key_pair.public_key.to_bytes();
+
+    let g = G1Projective::generator();
+    let sk_same = Scalar::from_bytes_be(&serialized_sk).unwrap();
+
+    let pk_same = g.mul(&sk_same);
+
+    assert_eq!(serialized_pk, pk_same.to_compressed())
+}
+
 
 /// Tests that an individual signature share computed correctly on a message m passes verification on m.
 /// Tests that a signature share computed on a different message m' fails verification on m.

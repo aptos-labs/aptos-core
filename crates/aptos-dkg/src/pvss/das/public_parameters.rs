@@ -5,11 +5,11 @@
 use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey};
 use blstrs::{G1Projective, G2Projective};
+use pairing::group::Group;
 
 use crate::constants::{DST_PVSS_PUBLIC_PARAMS, G2_PROJ_NUM_BYTES, SEED_PVSS_PUBLIC_PARAMS};
 use crate::pvss::encryption_elgamal;
 use crate::pvss::traits;
-use crate::utils::serialization::g1_proj_from_bytes;
 
 /// The size, in number of bytes, of a serialized `PublicParameters` struct.
 const NUM_BYTES: usize = encryption_elgamal::g1::PUBLIC_PARAMS_NUM_BYTES + G2_PROJ_NUM_BYTES;
@@ -36,14 +36,24 @@ impl PublicParameters {
     }
     /// Verifiably creates public parameters from a public sequence of bytes `seed` but sets
     /// the encryption pubkey (and randomness) base $g$ to be `ek_base`.
-    pub fn new_from_seed_with_ek_base(seed: &[u8], ek_base: &[u8]) -> anyhow::Result<Self> {
-        Ok(PublicParameters {
+    pub fn new_from_seed_with_bls_base(seed: &[u8]) -> Self {
+        PublicParameters {
             enc: encryption_elgamal::g1::PublicParameters::new(
-                g1_proj_from_bytes(ek_base)?,
-                G1Projective::hash_to_curve(seed, DST_PVSS_PUBLIC_PARAMS.as_slice(), b"h1_with_ek_base"),
+                // Our BLS signatures over BLS12-381 curves use this generator as the base of their
+                // PKs. We plan on (safely) reusing those BLS PKs as encryption PKs.
+                G1Projective::generator(),
+                G1Projective::hash_to_curve(
+                    seed,
+                    DST_PVSS_PUBLIC_PARAMS.as_slice(),
+                    b"h1_with_ek_base",
+                ),
             ),
-            g_2: G2Projective::hash_to_curve(seed, DST_PVSS_PUBLIC_PARAMS.as_slice(), b"g2_with_ek_base"),
-        })
+            g_2: G2Projective::hash_to_curve(
+                seed,
+                DST_PVSS_PUBLIC_PARAMS.as_slice(),
+                b"g2_with_ek_base",
+            ),
+        }
     }
 
     /// Returns the base $g_2$ for the commitment to the polynomial.

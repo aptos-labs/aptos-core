@@ -448,6 +448,8 @@ bitvec = "1.0.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
 blst = "0.3.7"
+# TODO: Upgrade to 0.7.1 and check the bug disappeared.
+blstrs = { version = "0.7.0", features = ["serde"] }
 bulletproofs = { version = "4.0.0" }
 byteorder = "1.4.3"
 bytes = { version = "1.4.0", features = ["serde"] }
@@ -505,6 +507,7 @@ glob = "0.3.0"
 goldenfile = "1.1.0"
 google-cloud-pubsub = "0.18.0"
 google-cloud-storage = "0.13.0"
+group = "0.13"
 handlebars = "4.2.2"
 heck = "0.3.2"
 hex = "0.4.3"

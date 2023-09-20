@@ -20,6 +20,7 @@ ark-ff = { workspace = true }
 ark-std = { workspace = true }
 bcs = { workspace = true }
 blst = { workspace = true }
+blstrs = { workspace = true }
 bulletproofs = { workspace = true }
 bytes = { workspace = true }
 curve25519-dalek = { workspace = true }
@@ -56,6 +57,7 @@ blake2 = { workspace = true }
 blake2-rfc = { workspace = true }
 byteorder = { workspace = true }
 criterion = { workspace = true }
+group = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 serde_json = { workspace = true }

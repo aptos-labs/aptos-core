@@ -129,12 +129,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anes"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
-
-[[package]]
 name = "ansi-escapes"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -582,7 +576,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "claims",
- "criterion 0.3.6",
+ "criterion",
  "crossbeam",
  "dashmap",
  "itertools 0.10.5",
@@ -609,7 +603,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "clap 4.4.4",
- "criterion 0.3.6",
+ "criterion",
  "dashmap",
  "itertools 0.10.5",
  "jemallocator",
@@ -856,18 +850,20 @@ dependencies = [
  "blake2",
  "blake2-rfc",
  "blst",
+ "blstrs",
  "bulletproofs",
  "byteorder",
  "bytes",
- "criterion 0.3.6",
+ "criterion",
  "curve25519-dalek",
  "curve25519-dalek-ng",
  "digest 0.9.0",
  "ed25519-dalek",
+ "group 0.13.0",
  "hex",
  "hkdf 0.10.0",
  "libsecp256k1",
- "merlin 3.0.0",
+ "merlin",
  "more-asserts",
  "once_cell",
  "proptest",
@@ -1126,12 +1122,12 @@ dependencies = [
  "bcs 0.1.4",
  "bellman",
  "blstrs",
- "criterion 0.4.0",
+ "criterion",
  "derive_more",
  "ff 0.13.0",
  "group 0.13.0",
  "hex",
- "merlin 1.3.0",
+ "merlin",
  "more-asserts",
  "num-bigint 0.3.3",
  "num-integer",
@@ -1143,7 +1139,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_with",
- "sha3 0.10.8",
+ "sha3 0.9.1",
  "static_assertions",
 ]
 
@@ -1633,7 +1629,7 @@ dependencies = [
  "libsecp256k1",
  "log",
  "lru 0.7.8",
- "merlin 3.0.0",
+ "merlin",
  "move-binary-format",
  "move-cli",
  "move-command-line-common",
@@ -3177,7 +3173,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vault-client",
- "criterion 0.3.6",
+ "criterion",
  "once_cell",
  "proptest",
  "rand 0.7.3",
@@ -3213,7 +3209,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-types",
  "bitvec 1.0.1",
- "criterion 0.3.6",
+ "criterion",
  "itertools 0.10.5",
  "jemallocator",
  "once_cell",
@@ -3678,7 +3674,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-logging",
  "clap 4.4.4",
- "criterion 0.3.6",
+ "criterion",
  "criterion-cpu-time",
  "num_cpus",
  "once_cell",
@@ -4953,7 +4949,7 @@ dependencies = [
  "clear_on_drop",
  "curve25519-dalek-ng",
  "digest 0.9.0",
- "merlin 3.0.0",
+ "merlin",
  "rand 0.8.5",
  "rand_core 0.6.4",
  "serde",
@@ -5157,33 +5153,6 @@ name = "chunked_transfer"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cca491388666e04d7248af3f60f0c40cfb0991c72205595d7c396e3510207d1a"
-
-[[package]]
-name = "ciborium"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "effd91f6c78e5a4ace8a5d3c0b6bfaec9e2baaef55f3efc00e45fb2e477ee926"
-dependencies = [
- "ciborium-io",
- "ciborium-ll",
- "serde",
-]
-
-[[package]]
-name = "ciborium-io"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdf919175532b369853f5d5e20b26b43112613fd6fe7aee757e35f7a44642656"
-
-[[package]]
-name = "ciborium-ll"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "defaa24ecc093c77630e6c15e17c51f5e187bf35ee514f4e2d67baaa96dae22b"
-dependencies = [
- "ciborium-io",
- "half 1.8.2",
-]
 
 [[package]]
 name = "cipher"
@@ -5614,7 +5583,7 @@ dependencies = [
  "atty",
  "cast",
  "clap 2.34.0",
- "criterion-plot 0.4.5",
+ "criterion-plot",
  "csv",
  "itertools 0.10.5",
  "lazy_static",
@@ -5632,38 +5601,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "criterion"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7c76e09c1aae2bc52b3d2f29e13c6572553b30c4aa1b8a49fd70de6412654cb"
-dependencies = [
- "anes",
- "atty",
- "cast",
- "ciborium",
- "clap 3.2.25",
- "criterion-plot 0.5.0",
- "itertools 0.10.5",
- "lazy_static",
- "num-traits",
- "oorandom",
- "plotters",
- "rayon",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
- "tinytemplate",
- "walkdir",
-]
-
-[[package]]
 name = "criterion-cpu-time"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63aaaf47e457badbcb376c65a49d0f182c317ebd97dc6d1ced94c8e1d09c0f3a"
 dependencies = [
- "criterion 0.3.6",
+ "criterion",
  "libc",
 ]
 
@@ -5672,16 +5615,6 @@ name = "criterion-plot"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2673cc8207403546f45f5fd319a974b1e6983ad1a3ee7e6041650013be041876"
-dependencies = [
- "cast",
- "itertools 0.10.5",
-]
-
-[[package]]
-name = "criterion-plot"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
 dependencies = [
  "cast",
  "itertools 0.10.5",
@@ -8934,18 +8867,6 @@ dependencies = [
 
 [[package]]
 name = "merlin"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b0942b357c1b4d0dc43ba724674ec89c3218e6ca2b3e8269e7cb53bcecd2f6e"
-dependencies = [
- "byteorder",
- "keccak",
- "rand_core 0.4.2",
- "zeroize",
-]
-
-[[package]]
-name = "merlin"
 version = "3.0.0"
 source = "git+https://github.com/aptos-labs/merlin#3454ccc85e37355c729ba40e6dac6e867ddf59f5"
 dependencies = [
@@ -11702,12 +11623,6 @@ dependencies = [
  "ppv-lite86",
  "rand_core 0.6.4",
 ]
-
-[[package]]
-name = "rand_core"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c33a3c44ca05fa6f1807d8e6743f3824e8509beca625669633be0acbdf509dc"
 
 [[package]]
 name = "rand_core"
