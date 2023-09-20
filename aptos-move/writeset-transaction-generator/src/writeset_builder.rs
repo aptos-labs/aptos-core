@@ -109,6 +109,7 @@ pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F, chain_id: 
 where
     F: FnOnce(&mut GenesisSession),
 {
+    let resolver = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
@@ -116,9 +117,9 @@ where
         chain_id,
         Features::default(),
         TimedFeatures::enable_all(),
+        &resolver,
     )
     .unwrap();
-    let resolver = state_view.as_move_resolver();
     let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
