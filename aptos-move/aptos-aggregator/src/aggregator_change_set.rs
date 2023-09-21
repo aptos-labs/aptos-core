@@ -33,6 +33,46 @@ pub enum AggregatorChange {
     Apply(AggregatorApplyChange),
 }
 
+pub enum ApplyBase {
+    Previous(AggregatorID),
+    Current(AggregatorID),
+}
+
+impl AggregatorApplyChange {
+    pub fn get_apply_base_id_option(&self) -> Option<ApplyBase> {
+        use AggregatorApplyChange::*;
+
+        match self {
+            AggregatorDelta { .. } => None,
+            SnapshotDelta {
+                base_aggregator, ..
+            } => Some(ApplyBase::Previous(*base_aggregator)),
+            SnapshotDerived { base_snapshot, .. } => Some(ApplyBase::Current(*base_snapshot)),
+        }
+    }
+
+    pub fn get_apply_base_id(&self, self_id: &AggregatorID) -> ApplyBase {
+        self.get_apply_base_id_option()
+            .unwrap_or(ApplyBase::Previous(*self_id))
+    }
+
+    pub fn apply_to_base(&self, base_value: AggregatorValue) -> PartialVMResult<AggregatorValue> {
+        use AggregatorApplyChange::*;
+
+        Ok(match self {
+            AggregatorDelta { delta } => {
+                AggregatorValue::Aggregator(delta.apply_to(base_value.into_aggregator_value()?)?)
+            },
+            SnapshotDelta { delta, .. } => {
+                AggregatorValue::Snapshot(delta.apply_to(base_value.into_aggregator_value()?)?)
+            },
+            SnapshotDerived { formula, .. } => {
+                AggregatorValue::Derived(formula.apply(base_value.into_snapshot_value()?))
+            },
+        })
+    }
+}
+
 impl AggregatorChange {
     pub fn get_merge_dependent_id(&self) -> Option<AggregatorID> {
         use AggregatorApplyChange::*;

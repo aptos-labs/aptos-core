@@ -3,7 +3,7 @@
 
 use crate::types::{AtomicTxnIndex, MVAggregatorsError, TxnIndex};
 use aptos_aggregator::{
-    aggregator_change_set::AggregatorApplyChange,
+    aggregator_change_set::{AggregatorApplyChange, ApplyBase},
     delta_change_set::DeltaOp,
     types::{AggregatorID, AggregatorValue},
 };
@@ -22,7 +22,7 @@ use std::{
 #[derive(Clone, Debug, PartialEq)]
 enum EstimatedEntry {
     NoBypass,
-    // If applicable, can bypass the Estimate by considering a Delta Change instead.
+    // If applicable, can bypass the Estimate by considering a apply change instead.
     Bypass(AggregatorApplyChange),
 }
 
@@ -36,9 +36,9 @@ enum AggregatorEntry {
     // if speculative execution aborts and the entry is marked as estimate, as the delta
     // may be used to avoid waiting on the Estimate entry. More in comments below.
     Value(AggregatorValue, Option<AggregatorApplyChange>),
-    // Applies the change on top of the previous entry.
-    // Applies the delta on top of a 'snapshot' of an aggregator with a given ID (at
-    // a corresponding, i.e. one less than where the given entry is stored, version).
+    // Applies the change on top of the previous entry - either for the same ID corresponding
+    // to this change, or for the apply_base_id given by the change, at a specific point defined
+    // by the it's ApplyBase.
     Apply(AggregatorApplyChange),
     // Marks the entry as an estimate, indicating that the next incarnation of the
     // transaction is estimated to populate the entry. May contain a bypass internally
@@ -195,16 +195,6 @@ impl VersionedValue {
             )
     }
 
-    // // Gate the estimate bypass logic by whether that functionality is enabled
-    // // (read_estimate_deltas flag) for the aggregator.
-    // fn applicable_bypass(&self, bypass: &EstimatedEntry) -> EstimatedEntry {
-    //     if self.read_estimate_deltas {
-    //         bypass
-    //     } else {
-    //         EstimatedEntry::NoBypass
-    //     }
-    // }
-
     // Traverse down from txn_idx and accumulate encountered deltas until resolving it to
     // a value or return an error. Errors of not finding a value to resolve to take
     // precedence over a DeltaApplicationError.
@@ -250,11 +240,11 @@ impl VersionedValue {
 
         // Finally, resolve if needed with the base value.
         self.base_value
-            .clone()
+            .as_ref()
             .ok_or(MVAggregatorsError::NotFound)
             .and_then(|base_value| match base_value {
                 AggregatorValue::Aggregator(v) => accumulator
-                    .apply_to(v)
+                    .apply_to(*v)
                     .map_err(|_| MVAggregatorsError::DeltaApplicationFailure),
                 _ => Err(MVAggregatorsError::DeltaApplicationFailure),
             })
@@ -282,58 +272,31 @@ impl VersionedValue {
             // Consider the latest entry below the provided version.
             |(idx, entry)| match (&**entry, self.read_estimate_deltas) {
                 (Value(v, _), _) => Ok(VersionedRead::Value(v.clone())),
-                // If read encounters a delta, it must traverse the block of transactions
-                // (top-down) until it encounters a value or use the base value.
-                (Apply(AggregatorDelta { delta }), _)
-                | (Estimate(Bypass(AggregatorDelta { delta })), true) => self
-                    .apply_delta_suffix(&mut iter, *delta)
-                    .map(AggregatorValue::Aggregator)
-                    .map(VersionedRead::Value),
-                (
-                    Apply(SnapshotDelta {
-                        base_aggregator,
-                        delta,
-                    }),
-                    _,
-                )
-                | (
-                    Estimate(Bypass(SnapshotDelta {
-                        base_aggregator,
-                        delta,
-                    })),
-                    true,
-                ) => Ok(VersionedRead::DependentApply(
-                    *base_aggregator,
-                    // Snapshots look at previous version
-                    *idx,
-                    AggregatorApplyChange::SnapshotDelta {
-                        base_aggregator: *base_aggregator,
-                        delta: *delta,
-                    },
-                )),
-                (
-                    Apply(SnapshotDerived {
-                        base_snapshot,
-                        formula,
-                    }),
-                    _,
-                )
-                | (
-                    Estimate(Bypass(SnapshotDerived {
-                        base_snapshot,
-                        formula,
-                    })),
-                    true,
-                ) => Ok(VersionedRead::DependentApply(
-                    *base_snapshot,
-                    // Derived values look at the same version
-                    // (Alternatively, we would need to copy snapshot information from the same transaction into it)
-                    *idx + 1,
-                    AggregatorApplyChange::SnapshotDerived {
-                        base_snapshot: *base_snapshot,
-                        formula: formula.clone(),
-                    },
-                )),
+                (Apply(apply), _) | (Estimate(Bypass(apply)), true) => {
+                    match apply.get_apply_base_id_option() {
+                        None => {
+                            if let AggregatorDelta { delta } = apply {
+                                self.apply_delta_suffix(&mut iter, *delta)
+                                    .map(AggregatorValue::Aggregator)
+                                    .map(VersionedRead::Value)
+                            } else {
+                                unreachable!("Only AggregatorDelta has no apply_base_id")
+                            }
+                        },
+                        Some(apply_base) => {
+                            let (base_id, end_index) = match apply_base {
+                                ApplyBase::Previous(id) => (id, *idx),
+                                ApplyBase::Current(id) => (id, *idx + 1),
+                            };
+
+                            Ok(VersionedRead::DependentApply(
+                                base_id,
+                                end_index,
+                                apply.clone(),
+                            ))
+                        },
+                    }
+                },
                 (Estimate(NoBypass), _) | (Estimate(_), false) => Err(Dependency(*idx)),
             },
         )
@@ -423,23 +386,15 @@ impl VersionedAggregators {
             .read(txn_idx)?;
         // The lock on id is out of scope.
 
-        use AggregatorApplyChange::*;
-
         match read_res {
             VersionedRead::Value(v) => Ok(v),
-            VersionedRead::DependentApply(_, _, delta) => {
+            VersionedRead::DependentApply(dependend_id, dependent_txn_idx, apply) => {
                 // Read the source aggregator of snapshot.
-                let source_value = self.read(id, txn_idx)?;
-                match (source_value, delta) {
-                    (AggregatorValue::Aggregator(v), SnapshotDelta { delta, .. }) => delta
-                        .apply_to(v)
-                        .map_err(|_| MVAggregatorsError::DeltaApplicationFailure)
-                        .map(AggregatorValue::Snapshot),
-                    (AggregatorValue::Snapshot(v), SnapshotDerived { formula, .. }) => {
-                        Ok(AggregatorValue::Derived(formula.apply(v)))
-                    },
-                    _ => unreachable!("Type missmatch between change and value"),
-                }
+                let source_value = self.read(dependend_id, dependent_txn_idx)?;
+                // TODO distinguish between delta application and code invariant broken errors
+                apply
+                    .apply_to_base(source_value)
+                    .map_err(|_| MVAggregatorsError::DeltaApplicationFailure)
             },
         }
     }
@@ -485,19 +440,6 @@ impl VersionedAggregators {
             .expect("VersionedValue for an (resolved) ID must already exist")
             .insert(txn_idx, AggregatorEntry::Apply(apply));
     }
-
-    // pub fn record_snapshot(
-    //     &self,
-    //     id: AggregatorID,
-    //     txn_idx: TxnIndex,
-    //     source_id: AggregatorID,
-    //     delta: DeltaOp,
-    // ) {
-    //     self.values
-    //         .get_mut(&id)
-    //         .expect("VersionedValue for an (resolved) ID must already exist")
-    //         .insert(txn_idx, AggregatorEntry::Snapshot(source_id, delta));
-    // }
 
     pub fn mark_estimate(&self, id: AggregatorID, txn_idx: TxnIndex) {
         self.values
