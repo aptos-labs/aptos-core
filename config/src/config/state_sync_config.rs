@@ -255,15 +255,46 @@ impl Default for DataStreamingServiceConfig {
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
+pub struct AptosDataPollerConfig {
+    /// The additional number of polls to send per peer bucket (per second)
+    pub additional_polls_per_peer_bucket: u64,
+    /// The minimum number of polls that should be sent per second
+    pub min_polls_per_second: u64,
+    /// The maximum number of in-flight polls for priority peers
+    pub max_num_in_flight_priority_polls: u64,
+    /// The maximum number of in-flight polls for regular peers
+    pub max_num_in_flight_regular_polls: u64,
+    /// The maximum number of polls that should be sent per second
+    pub max_polls_per_second: u64,
+    /// The number of peers per bucket
+    pub peer_bucket_size: u64,
+    /// Interval (in ms) between summary poll loop executions
+    pub poll_loop_interval_ms: u64,
+}
+
+impl Default for AptosDataPollerConfig {
+    fn default() -> Self {
+        Self {
+            additional_polls_per_peer_bucket: 1,
+            min_polls_per_second: 5,
+            max_num_in_flight_priority_polls: 30,
+            max_num_in_flight_regular_polls: 30,
+            max_polls_per_second: 20,
+            peer_bucket_size: 10,
+            poll_loop_interval_ms: 100,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct AptosDataClientConfig {
+    /// The aptos data poller config for the data client
+    pub data_poller_config: AptosDataPollerConfig,
     /// The interval (milliseconds) at which to refresh the latency monitor
     pub latency_monitor_loop_interval_ms: u64,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
-    /// Maximum number of in-flight polls for priority peers
-    pub max_num_in_flight_priority_polls: u64,
-    /// Maximum number of in-flight polls for regular peers
-    pub max_num_in_flight_regular_polls: u64,
     /// Maximum number of output reductions before transactions are returned
     pub max_num_output_reductions: u64,
     /// Maximum lag (in seconds) we'll tolerate when sending optimistic fetch requests
@@ -284,8 +315,6 @@ pub struct AptosDataClientConfig {
     pub response_timeout_ms: u64,
     /// Timeout (in ms) when waiting for a subscription response
     pub subscription_response_timeout_ms: u64,
-    /// Interval (in ms) between data summary poll loop executions
-    pub summary_poll_loop_interval_ms: u64,
     /// Whether or not to request compression for incoming data
     pub use_compression: bool,
 }
@@ -293,10 +322,9 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
+            data_poller_config: AptosDataPollerConfig::default(),
             latency_monitor_loop_interval_ms: 100,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
-            max_num_in_flight_priority_polls: 10,
-            max_num_in_flight_regular_polls: 10,
             max_num_output_reductions: 0,
             max_optimistic_fetch_lag_secs: 30, // 30 seconds
             max_response_timeout_ms: 60_000,   // 60 seconds
@@ -304,9 +332,8 @@ impl Default for AptosDataClientConfig {
             max_subscription_lag_secs: 30, // 30 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
-            optimistic_fetch_timeout_ms: 5000, // 5 seconds
-            response_timeout_ms: 10_000,       // 10 seconds
-            summary_poll_loop_interval_ms: 200,
+            optimistic_fetch_timeout_ms: 5000,        // 5 seconds
+            response_timeout_ms: 10_000,              // 10 seconds
             subscription_response_timeout_ms: 20_000, // 20 seconds (must be longer than a regular timeout because of pre-fetching)
             use_compression: true,
         }
