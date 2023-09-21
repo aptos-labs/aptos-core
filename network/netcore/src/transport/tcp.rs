@@ -118,20 +118,23 @@ impl Transport for TcpTransport {
 
         if let Some(rx_buf) = self.tcp_buff_cfg.inbound_rx_buffer_bytes {
             socket.set_recv_buffer_size(rx_buf)?;
+            if socket.recv_buffer_size()? < rx_buf * 2 {
+                panic!(
+                    "inbound cfg recv: {}, actual: {}",
+                    rx_buf,
+                    socket.recv_buffer_size()?
+                );
+            }
         }
         if let Some(tx_buf) = self.tcp_buff_cfg.inbound_tx_buffer_bytes {
             socket.set_send_buffer_size(tx_buf)?;
-        }
-        if socket.recv_buffer_size()? < self.tcp_buff_cfg.inbound_rx_buffer_bytes * 2
-            || socket.send_buffer_size()? < self.tcp_buff_cfg.inbound_tx_buffer_bytes * 2
-        {
-            panic!(
-                "inbound cfg: ({:?},{:?}), actual: ({},{})",
-                self.tcp_buff_cfg.inbound_rx_buffer_bytes,
-                self.tcp_buff_cfg.inbound_tx_buffer_bytes,
-                socket.recv_buffer_size()?,
-                socket.send_buffer_size()?
-            );
+            if socket.send_buffer_size()? < tx_buf * 2 {
+                panic!(
+                    "inbound cfg send: {}, actual: {}",
+                    tx_buf,
+                    socket.send_buffer_size()?
+                );
+            }
         }
         socket.set_reuseaddr(true)?;
         socket.bind(addr)?;
@@ -223,20 +226,23 @@ pub async fn connect_with_config(
 
     if let Some(rx_buf) = tcp_buff_cfg.outbound_rx_buffer_bytes {
         socket.set_recv_buffer_size(rx_buf)?;
+        if socket.recv_buffer_size()? < rx_buf * 2 {
+            panic!(
+                "outbound cfg recv: {}, actual: {}",
+                rx_buf,
+                socket.recv_buffer_size()?
+            );
+        }
     }
     if let Some(tx_buf) = tcp_buff_cfg.outbound_tx_buffer_bytes {
         socket.set_send_buffer_size(tx_buf)?;
-    }
-    if socket.recv_buffer_size()? < tcp_buff_cfg.outbound_rx_buffer_bytes * 2
-        || socket.send_buffer_size()? < tcp_buff_cfg.outbound_tx_buffer_bytes * 2
-    {
-        panic!(
-            "outbound cfg: ({:?},{:?}), actual: ({},{})",
-            tcp_buff_cfg.outbound_rx_buffer_bytes,
-            tcp_buff_cfg.outbound_tx_buffer_bytes,
-            socket.recv_buffer_size()?,
-            socket.send_buffer_size()?
-        );
+        if socket.send_buffer_size()? < tx_buf * 2 {
+            panic!(
+                "outbound cfg send: {}, actual: {}",
+                tx_buf,
+                socket.send_buffer_size()?
+            );
+        }
     }
     socket.connect(addr).await
 }
