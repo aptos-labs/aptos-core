@@ -674,6 +674,7 @@ impl<'l> Inliner<'l> {
                 .map(fix_types)
                 .zip(get_args_from_exp(&inlined_args))
                 .collect();
+
             let (decls_for_let, bindings) =
                 self.process_parameters(call_loc, mapped_params.into_iter());
 
@@ -719,7 +720,7 @@ impl<'l> Inliner<'l> {
     /// as regular values, (2) those which are lambdas which are going to be transitively inlined.
     fn process_parameters(
         &mut self,
-        loc: Loc,
+        call_loc: Loc,
         params: impl Iterator<Item = ((Var, Type), Exp)>,
     ) -> (Vec<SequenceItem>, BTreeMap<Symbol, Exp>) {
         let mut bindings = BTreeMap::new();
@@ -732,7 +733,7 @@ impl<'l> Inliner<'l> {
             if ty.value.is_fun() {
                 bindings.insert(var.0.value, e);
             } else {
-                lvalues.push(sp(loc, LValue_::Var(var, Box::new(ty.clone()))));
+                lvalues.push(sp(var.loc(), LValue_::Var(var, Box::new(ty.clone()))));
                 tys.push(ty.clone());
                 exps.push(e);
             }
@@ -740,29 +741,29 @@ impl<'l> Inliner<'l> {
 
         let exp = match exps.len() {
             0 => Exp {
-                ty: sp(loc, Type_::Unit),
-                exp: sp(loc, UnannotatedExp_::Unit { trailing: false }),
+                ty: sp(call_loc, Type_::Unit),
+                exp: sp(call_loc, UnannotatedExp_::Unit { trailing: false }),
             },
             1 => {
                 let exp1 = exps.pop().unwrap();
                 let mut ty = tys.pop().unwrap();
                 self.infer_abilities(&mut ty);
-                make_annotated_exp_of(exp1, ty, loc)
+                make_annotated_exp_of(exp1, ty, call_loc)
             },
             _ => {
-                let mut ty = Type_::multiple(loc, tys.clone());
+                let mut ty = Type_::multiple(call_loc, tys.clone());
                 self.infer_abilities(&mut ty);
 
                 Exp {
                     ty,
                     exp: sp(
-                        loc,
+                        call_loc,
                         UnannotatedExp_::ExpList(
                             exps.into_iter()
                                 .zip(tys.into_iter())
                                 .map(|(e, ty)| {
                                     ExpListItem::Single(
-                                        make_annotated_exp_of(e, ty.clone(), loc),
+                                        make_annotated_exp_of(e, ty.clone(), call_loc),
                                         Box::new(ty),
                                     )
                                 })
@@ -773,11 +774,11 @@ impl<'l> Inliner<'l> {
             },
         };
 
-        let spanned_lvalues = sp(loc, lvalues);
+        let spanned_lvalues = sp(call_loc, lvalues);
         let lvalue_ty = lvalues_expected_types(&spanned_lvalues);
 
         let decl = sp(
-            loc,
+            call_loc,
             SequenceItem_::Bind(spanned_lvalues, lvalue_ty, Box::new(exp)),
         );
         (vec![decl], bindings)
