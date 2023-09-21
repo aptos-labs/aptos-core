@@ -4,11 +4,11 @@
 #![forbid(unsafe_code)]
 
 use crate::{counters::TIMER, move_vm_ext::AptosMoveResolver};
-use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PackageRegistry;
 use aptos_infallible::RwLock;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::on_chain_config::OnChainConfig;
+use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -19,7 +19,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{config::VMConfig, move_vm::MoveVM, native_functions::NativeFunction};
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, hash::Hash};
+use std::collections::HashMap;
 
 const WARM_VM_CACHE_SIZE: usize = 8;
 
@@ -46,12 +46,10 @@ impl WarmVmCache {
         vm_config: VMConfig,
         resolver: &impl AptosMoveResolver,
     ) -> VMResult<MoveVM> {
+        let _timer = TIMER.timer_with(&["warm_vm_get"]);
         let id = {
             let _timer = TIMER.timer_with(&["get_warm_vm_id"]);
-            WarmVmId {
-                vm_config_id: VmConfigId::new(&vm_config),
-                framework_id: FrameworkId::new(resolver)?,
-            }
+            WarmVmId::new(&vm_config, resolver)?
         };
 
         if let Some(vm) = self.cache.read().get(&id) {
@@ -97,20 +95,27 @@ impl WarmVmCache {
 }
 
 #[derive(Eq, Hash, PartialEq)]
-struct VmConfigId(HashValue);
-
-impl VmConfigId {
-    fn new(vm_config: &VMConfig) -> Self {
-        let bytes = bcs::to_bytes(vm_config).expect("failed to serialize VMConfig.");
-        Self(HashValue::sha3_256_of(&bytes))
-    }
+struct WarmVmId {
+    vm_config: Bytes,
+    core_packages_registry: Option<Bytes>,
 }
 
-#[derive(Eq, Hash, PartialEq)]
-struct FrameworkId(Option<HashValue>);
+impl WarmVmId {
+    fn new(vm_config: &VMConfig, resolver: &impl AptosMoveResolver) -> VMResult<Self> {
+        Ok(Self {
+            vm_config: Self::vm_config_bytes(vm_config),
+            core_packages_registry: Self::framework_id_bytes(resolver)?,
+        })
+    }
 
-impl FrameworkId {
-    fn new(resolver: &impl AptosMoveResolver) -> VMResult<Self> {
+    fn vm_config_bytes(vm_config: &VMConfig) -> Bytes {
+        let _timer = TIMER.timer_with(&["serialize_vm_config"]);
+        bcs::to_bytes(vm_config)
+            .expect("Failed to serialize VMConfig.")
+            .into()
+    }
+
+    fn framework_id_bytes(resolver: &impl AptosMoveResolver) -> VMResult<Option<Bytes>> {
         let bytes = {
             let _timer = TIMER.timer_with(&["fetch_pkgreg"]);
             resolver.fetch_config(PackageRegistry::access_path().unwrap())
@@ -137,9 +142,7 @@ impl FrameworkId {
                 .transpose()?;
         }
 
-        Ok(Self(
-            bytes.as_ref().map(|bytes| HashValue::sha3_256_of(bytes)),
-        ))
+        Ok(bytes)
     }
 
     fn ensure_no_external_dependency(core_package_registry: &PackageRegistry) -> VMResult<()> {
@@ -156,10 +159,4 @@ impl FrameworkId {
         }
         Ok(())
     }
-}
-
-#[derive(Eq, Hash, PartialEq)]
-struct WarmVmId {
-    vm_config_id: VmConfigId,
-    framework_id: FrameworkId,
 }
