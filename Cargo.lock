@@ -7039,9 +7039,9 @@ dependencies = [
 
 [[package]]
 name = "goldenfile"
-version = "1.4.3"
+version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03bd0e9c2ea26ce269d37016d6b95556bbfa544cbbbdeff40102ac54121c990b"
+checksum = "86342e69ffaa1cd5450d6bad08a80da96c441d891a0e07c72c62c4abdd281713"
 dependencies = [
  "similar-asserts",
  "tempfile",
