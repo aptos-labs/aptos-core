@@ -21,10 +21,11 @@ use aptos_storage_service_types::{
 };
 use aptos_time_service::TimeServiceTrait;
 use claims::assert_matches;
+use maplit::hashset;
 
 #[tokio::test]
 async fn all_peer_request_selection() {
-    ::aptos_logger::Logger::init_for_testing();
+    // Create the mock network and client
     let (mut mock_network, _, client, _) = MockNetwork::new(None, None, None);
 
     // Ensure no peers can service the given request (we have no connections)
@@ -60,20 +61,20 @@ async fn all_peer_request_selection() {
     );
 
     // Advertise the data for the regular peer and verify it is now selected
-    client.update_summary(regular_peer_1, utils::create_storage_summary(100));
+    client.update_peer_storage_summary(regular_peer_1, utils::create_storage_summary(100));
     assert_eq!(
         client.choose_peer_for_request(&storage_request),
         Ok(regular_peer_1)
     );
 
     // Advertise the data for the priority peer and verify the priority peer is selected
-    client.update_summary(priority_peer_2, utils::create_storage_summary(100));
+    client.update_peer_storage_summary(priority_peer_2, utils::create_storage_summary(100));
     let peer_for_request = client.choose_peer_for_request(&storage_request).unwrap();
     assert_eq!(peer_for_request, priority_peer_2);
 
     // Reconnect priority peer 1 and remove the advertised data for priority peer 2
     mock_network.reconnect_peer(priority_peer_1);
-    client.update_summary(priority_peer_2, utils::create_storage_summary(0));
+    client.update_peer_storage_summary(priority_peer_2, utils::create_storage_summary(0));
 
     // Request the data again and verify the regular peer is chosen
     assert_eq!(
@@ -82,19 +83,19 @@ async fn all_peer_request_selection() {
     );
 
     // Advertise the data for priority peer 1 and verify the priority peer is selected
-    client.update_summary(priority_peer_1, utils::create_storage_summary(100));
+    client.update_peer_storage_summary(priority_peer_1, utils::create_storage_summary(100));
     let peer_for_request = client.choose_peer_for_request(&storage_request).unwrap();
     assert_eq!(peer_for_request, priority_peer_1);
 
     // Advertise the data for priority peer 2 and verify either priority peer is selected
-    client.update_summary(priority_peer_2, utils::create_storage_summary(100));
+    client.update_peer_storage_summary(priority_peer_2, utils::create_storage_summary(100));
     let peer_for_request = client.choose_peer_for_request(&storage_request).unwrap();
     assert!(peer_for_request == priority_peer_1 || peer_for_request == priority_peer_2);
 }
 
 #[tokio::test]
 async fn prioritized_peer_request_selection() {
-    ::aptos_logger::Logger::init_for_testing();
+    // Create the mock network and client
     let (mut mock_network, _, client, _) = MockNetwork::new(None, None, None);
 
     // Ensure the properties hold for storage summary and version requests
@@ -151,14 +152,14 @@ async fn prioritized_peer_request_selection() {
 
 #[tokio::test]
 async fn prioritized_peer_optimistic_fetch_selection() {
-    ::aptos_logger::Logger::init_for_testing();
-
     // Create a data client with a max lag of 100
     let max_optimistic_fetch_lag_secs = 100;
     let data_client_config = AptosDataClientConfig {
         max_optimistic_fetch_lag_secs,
         ..Default::default()
     };
+
+    // Create the mock network, time service and client
     let (mut mock_network, time_service, client, _) =
         MockNetwork::new(None, Some(data_client_config), None);
 
@@ -185,7 +186,7 @@ async fn prioritized_peer_optimistic_fetch_selection() {
 
         // Advertise the data for the regular peer and verify it is now selected
         let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
-        client.update_summary(
+        client.update_peer_storage_summary(
             regular_peer_1,
             utils::create_storage_summary_with_timestamp(known_version, timestamp_usecs),
         );
@@ -202,7 +203,7 @@ async fn prioritized_peer_optimistic_fetch_selection() {
         );
 
         // Advertise the data for the priority peer and verify it is now selected
-        client.update_summary(
+        client.update_peer_storage_summary(
             priority_peer_1,
             utils::create_storage_summary_with_timestamp(known_version, timestamp_usecs),
         );
@@ -226,7 +227,7 @@ async fn prioritized_peer_optimistic_fetch_selection() {
         let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
         let regular_peer_timestamp_usecs =
             timestamp_usecs - ((max_optimistic_fetch_lag_secs / 2) * NUM_MICROSECONDS_IN_SECOND);
-        client.update_summary(
+        client.update_peer_storage_summary(
             regular_peer_1,
             utils::create_storage_summary_with_timestamp(
                 known_version,
@@ -241,7 +242,7 @@ async fn prioritized_peer_optimistic_fetch_selection() {
         // Update the priority peer to be up-to-date and verify it is now chosen
         let priority_peer_timestamp_usecs =
             timestamp_usecs - ((max_optimistic_fetch_lag_secs / 2) * NUM_MICROSECONDS_IN_SECOND);
-        client.update_summary(
+        client.update_peer_storage_summary(
             priority_peer_1,
             utils::create_storage_summary_with_timestamp(
                 known_version,
@@ -278,14 +279,14 @@ async fn prioritized_peer_optimistic_fetch_selection() {
 
 #[tokio::test]
 async fn prioritized_peer_subscription_requests() {
-    ::aptos_logger::Logger::init_for_testing();
-
     // Create a data client with a max lag of 10
     let max_subscription_lag_secs = 10;
     let data_client_config = AptosDataClientConfig {
         max_subscription_lag_secs,
         ..Default::default()
     };
+
+    // Create the mock network, time service and client
     let (mut mock_network, time_service, client, _) =
         MockNetwork::new(None, Some(data_client_config), None);
 
@@ -317,7 +318,7 @@ async fn prioritized_peer_subscription_requests() {
         // Advertise the data for all peers
         let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
         for peer in [priority_peer_1, priority_peer_2, regular_peer_1] {
-            client.update_summary(
+            client.update_peer_storage_summary(
                 peer,
                 utils::create_storage_summary_with_timestamp(known_version, timestamp_usecs),
             );
@@ -342,7 +343,7 @@ async fn prioritized_peer_subscription_requests() {
         let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
         for peer in [priority_peer_1, priority_peer_2, regular_peer_1] {
             if peer != selected_peer {
-                client.update_summary(
+                client.update_peer_storage_summary(
                     peer,
                     utils::create_storage_summary_with_timestamp(known_version, timestamp_usecs),
                 );
@@ -387,14 +388,14 @@ async fn prioritized_peer_subscription_requests() {
 
 #[tokio::test]
 async fn prioritized_peer_subscription_selection() {
-    ::aptos_logger::Logger::init_for_testing();
-
     // Create a data client with a max lag of 100
     let max_subscription_lag_secs = 100;
     let data_client_config = AptosDataClientConfig {
         max_subscription_lag_secs,
         ..Default::default()
     };
+
+    // Create the mock network, time service and client
     let (mut mock_network, time_service, client, _) =
         MockNetwork::new(None, Some(data_client_config), None);
 
@@ -421,7 +422,7 @@ async fn prioritized_peer_subscription_selection() {
 
         // Advertise the data for the regular peer and verify it is now selected
         let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
-        client.update_summary(
+        client.update_peer_storage_summary(
             regular_peer_1,
             utils::create_storage_summary_with_timestamp(known_version, timestamp_usecs),
         );
@@ -439,7 +440,7 @@ async fn prioritized_peer_subscription_selection() {
 
         // Advertise the data for the priority peer and verify it is not selected
         // (the previous subscription request went to the regular peer).
-        client.update_summary(
+        client.update_peer_storage_summary(
             priority_peer_1,
             utils::create_storage_summary_with_timestamp(known_version, timestamp_usecs),
         );
@@ -473,7 +474,7 @@ async fn prioritized_peer_subscription_selection() {
         let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
         let regular_peer_timestamp_usecs =
             timestamp_usecs - ((max_subscription_lag_secs / 2) * NUM_MICROSECONDS_IN_SECOND);
-        client.update_summary(
+        client.update_peer_storage_summary(
             regular_peer_1,
             utils::create_storage_summary_with_timestamp(
                 known_version,
@@ -491,7 +492,7 @@ async fn prioritized_peer_subscription_selection() {
         // Update the priority peer to be up-to-date and verify it is now chosen
         let priority_peer_timestamp_usecs =
             timestamp_usecs - ((max_subscription_lag_secs / 2) * NUM_MICROSECONDS_IN_SECOND);
-        client.update_summary(
+        client.update_peer_storage_summary(
             priority_peer_1,
             utils::create_storage_summary_with_timestamp(
                 known_version,
@@ -529,75 +530,75 @@ async fn prioritized_peer_subscription_selection() {
 
 #[tokio::test]
 async fn validator_peer_prioritization() {
-    ::aptos_logger::Logger::init_for_testing();
-
     // Create a validator node
     let base_config = BaseConfig {
         role: RoleType::Validator,
         ..Default::default()
     };
+
+    // Create the mock network and client
     let (mut mock_network, _, client, _) = MockNetwork::new(Some(base_config), None, None);
 
     // Add a validator peer and ensure it's prioritized
     let validator_peer = mock_network.add_peer_with_network_id(NetworkId::Validator, false);
     let (priority_peers, regular_peers) = client.get_priority_and_regular_peers().unwrap();
-    assert_eq!(priority_peers, vec![validator_peer]);
-    assert_eq!(regular_peers, vec![]);
+    assert_eq!(priority_peers, hashset![validator_peer]);
+    assert_eq!(regular_peers, hashset![]);
 
     // Add a vfn peer and ensure it's not prioritized
     let vfn_peer = mock_network.add_peer_with_network_id(NetworkId::Vfn, true);
     let (priority_peers, regular_peers) = client.get_priority_and_regular_peers().unwrap();
-    assert_eq!(priority_peers, vec![validator_peer]);
-    assert_eq!(regular_peers, vec![vfn_peer]);
+    assert_eq!(priority_peers, hashset![validator_peer]);
+    assert_eq!(regular_peers, hashset![vfn_peer]);
 }
 
 #[tokio::test]
 async fn vfn_peer_prioritization() {
-    ::aptos_logger::Logger::init_for_testing();
-
     // Create a validator fullnode
     let base_config = BaseConfig {
         role: RoleType::FullNode,
         ..Default::default()
     };
+
+    // Create the mock network and client
     let (mut mock_network, _, client, _) = MockNetwork::new(Some(base_config), None, None);
 
     // Add a validator peer and ensure it's prioritized
     let validator_peer = mock_network.add_peer_with_network_id(NetworkId::Vfn, false);
     let (priority_peers, regular_peers) = client.get_priority_and_regular_peers().unwrap();
-    assert_eq!(priority_peers, vec![validator_peer]);
-    assert_eq!(regular_peers, vec![]);
+    assert_eq!(priority_peers, hashset![validator_peer]);
+    assert_eq!(regular_peers, hashset![]);
 
     // Add a pfn peer and ensure it's not prioritized
     let pfn_peer = mock_network.add_peer_with_network_id(NetworkId::Public, true);
     let (priority_peers, regular_peers) = client.get_priority_and_regular_peers().unwrap();
-    assert_eq!(priority_peers, vec![validator_peer]);
-    assert_eq!(regular_peers, vec![pfn_peer]);
+    assert_eq!(priority_peers, hashset![validator_peer]);
+    assert_eq!(regular_peers, hashset![pfn_peer]);
 }
 
 #[tokio::test]
 async fn pfn_peer_prioritization() {
-    ::aptos_logger::Logger::init_for_testing();
-
     // Create a public fullnode
     let base_config = BaseConfig {
         role: RoleType::FullNode,
         ..Default::default()
     };
+
+    // Create the mock network and client
     let (mut mock_network, _, client, _) =
         MockNetwork::new(Some(base_config), None, Some(vec![NetworkId::Public]));
 
     // Add an inbound pfn peer and ensure it's not prioritized
     let inbound_peer = mock_network.add_peer_with_network_id(NetworkId::Public, false);
     let (priority_peers, regular_peers) = client.get_priority_and_regular_peers().unwrap();
-    assert_eq!(priority_peers, vec![]);
-    assert_eq!(regular_peers, vec![inbound_peer]);
+    assert_eq!(priority_peers, hashset![]);
+    assert_eq!(regular_peers, hashset![inbound_peer]);
 
     // Add an outbound pfn peer and ensure it's prioritized
     let outbound_peer = mock_network.add_peer_with_network_id(NetworkId::Public, true);
     let (priority_peers, regular_peers) = client.get_priority_and_regular_peers().unwrap();
-    assert_eq!(priority_peers, vec![outbound_peer]);
-    assert_eq!(regular_peers, vec![inbound_peer]);
+    assert_eq!(priority_peers, hashset![outbound_peer]);
+    assert_eq!(regular_peers, hashset![inbound_peer]);
 }
 
 /// Enumerates all optimistic fetch request types
