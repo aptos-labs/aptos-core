@@ -17,8 +17,8 @@ use crate::{
 };
 use aptos_aggregator::{
     aggregator_change_set::{AggregatorChange, ApplyBase},
-    bounded_math::expect_ok,
     delta_change_set::serialize,
+    types::expect_ok,
 };
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{

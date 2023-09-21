@@ -6,10 +6,10 @@
 //! postcondition.
 
 use crate::{
-    bounded_math::{code_invariant_error, SignedU128},
+    bounded_math::SignedU128,
     delta_math::{merge_data_and_delta, merge_two_deltas, DeltaHistory},
+    types::{code_invariant_error, DelayedFieldsSpeculativeError, PanicOrResult},
 };
-use move_binary_format::errors::PartialVMResult;
 
 /// Represents an update from aggregator's operation.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -39,18 +39,18 @@ impl DeltaOp {
 
     /// Returns the result of delta application to `base` or error if
     /// postcondition is not satisfied.
-    pub fn apply_to(&self, base: u128) -> PartialVMResult<u128> {
+    pub fn apply_to(&self, base: u128) -> PanicOrResult<u128, DelayedFieldsSpeculativeError> {
         merge_data_and_delta(base, &self.update, &self.history, self.max_value)
     }
 
     pub fn create_merged_delta(
         prev_delta: &DeltaOp,
         next_delta: &DeltaOp,
-    ) -> PartialVMResult<DeltaOp> {
+    ) -> PanicOrResult<DeltaOp, DelayedFieldsSpeculativeError> {
         if prev_delta.max_value != next_delta.max_value {
-            return Err(code_invariant_error(
+            Err(code_invariant_error(
                 "Cannot merge deltas with different limits",
-            ));
+            ))?;
         }
 
         let (new_update, new_history) = merge_two_deltas(
@@ -67,14 +67,20 @@ impl DeltaOp {
     /// Applies self on top of previous delta, merging them together. Note
     /// that the strict ordering here is crucial for catching overflows
     /// correctly.
-    pub fn merge_with_previous_delta(&mut self, previous_delta: DeltaOp) -> PartialVMResult<()> {
+    pub fn merge_with_previous_delta(
+        &mut self,
+        previous_delta: DeltaOp,
+    ) -> PanicOrResult<(), DelayedFieldsSpeculativeError> {
         *self = Self::create_merged_delta(&previous_delta, self)?;
         Ok(())
     }
 
     /// Applies next delta on top of self, merging two deltas together. This is a reverse
     /// of `merge_with_previous_delta`.
-    pub fn merge_with_next_delta(&mut self, next_delta: DeltaOp) -> PartialVMResult<()> {
+    pub fn merge_with_next_delta(
+        &mut self,
+        next_delta: DeltaOp,
+    ) -> PanicOrResult<(), DelayedFieldsSpeculativeError> {
         *self = Self::create_merged_delta(self, &next_delta)?;
         Ok(())
     }
@@ -130,7 +136,6 @@ pub fn delta_add(v: u128, max_value: u128) -> DeltaOp {
 mod test {
     use super::*;
     use crate::{
-        bounded_math::{EBOUND_OVERFLOW, EBOUND_UNDERFLOW},
         resolver::{AggregatorReadMode, TAggregatorView},
         types::AggregatorValue,
         FakeAggregatorView,
@@ -397,7 +402,7 @@ mod test {
                 AggregatorReadMode::Aggregated
             ),
             Err(VMStatus::Error {
-                status_code: StatusCode::STORAGE_ERROR,
+                status_code: StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
                 message: Some(_),
                 sub_status: None
             })
@@ -416,7 +421,7 @@ mod test {
             _mode: AggregatorReadMode,
         ) -> anyhow::Result<Option<StateValue>> {
             Err(anyhow::Error::new(VMStatus::error(
-                StatusCode::STORAGE_ERROR,
+                StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
                 Some("Error message from BadStorage.".to_string()),
             )))
         }
@@ -427,7 +432,7 @@ mod test {
             _mode: AggregatorReadMode,
         ) -> anyhow::Result<AggregatorValue> {
             Err(anyhow::Error::new(VMStatus::error(
-                StatusCode::STORAGE_ERROR,
+                StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
                 Some("Error message from BadStorage.".to_string()),
             )))
         }
@@ -438,7 +443,7 @@ mod test {
     }
 
     #[test]
-    fn test_failed_write_op_conversion_because_of_storage_error() {
+    fn test_failed_write_op_conversion_because_of_speculative_error() {
         let state_view = BadStorage;
         let delta_op = delta_add(10, 1000);
         assert_matches!(
@@ -448,7 +453,7 @@ mod test {
                 AggregatorReadMode::Aggregated
             ),
             Err(VMStatus::Error {
-                status_code: StatusCode::STORAGE_ERROR,
+                status_code: StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
                 message: Some(_),
                 sub_status: None
             })
@@ -494,7 +499,10 @@ mod test {
                 &add_op,
                 AggregatorReadMode::Aggregated
             ),
-            Err(VMStatus::MoveAbort(_, EBOUND_OVERFLOW))
+            Err(VMStatus::ExecutionFailure {
+                status_code: StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
+                ..
+            })
         );
         assert_matches!(
             state_view.try_convert_aggregator_v1_delta_into_write_op(
@@ -502,7 +510,10 @@ mod test {
                 &sub_op,
                 AggregatorReadMode::Aggregated
             ),
-            Err(VMStatus::MoveAbort(_, EBOUND_UNDERFLOW))
+            Err(VMStatus::ExecutionFailure {
+                status_code: StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
+                ..
+            })
         );
     }
 }

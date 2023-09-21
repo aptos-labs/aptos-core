@@ -729,9 +729,15 @@ pub enum StatusCode {
     // Failed to resolve type due to linking being broken after verification
     TYPE_RESOLUTION_FAILURE = 2021,
     DUPLICATE_NATIVE_FUNCTION = 2022,
+    // code invariant error while handling delayed fields, should never happen,
+    // always indicates a code bug.
+    DELAYED_FIELDS_CODE_INVARIANT_ERROR = 2023,
+    // Speculative error during handling of delayed fields, means that
+    // the transaction needs to be re-executed.
+    // Should never be committed on chain
+    DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR = 2024,
+
     // Reserved error code for future use
-    RESERVED_INVARIANT_VIOLATION_ERROR_1 = 2023,
-    RESERVED_INVARIANT_VIOLATION_ERROR_2 = 2024,
     RESERVED_INVARIANT_VIOLATION_ERROR_3 = 2025,
     RESERVED_INVARIANT_VIOLATION_ERROR_4 = 2026,
     RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2027,

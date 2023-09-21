@@ -422,12 +422,16 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 match ret {
                     // ExecutionHalted indicates that the parallel execution is halted.
                     // The read should return immediately and log the error.
-                    // For now we use STORAGE_ERROR as the VM will not log the speculative error,
+                    // For now we use DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR as the VM
+                    // will not log the speculative error,
                     // so no actual error will be logged once the execution is halted and
                     // the speculative logging is flushed.
-                    ReadResult::HaltSpeculativeExecution(msg) => Err(anyhow::Error::new(
-                        VMStatus::error(StatusCode::STORAGE_ERROR, Some(msg)),
-                    )),
+                    ReadResult::HaltSpeculativeExecution(msg) => {
+                        Err(anyhow::Error::new(VMStatus::error(
+                            StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
+                            Some(msg),
+                        )))
+                    },
                     ReadResult::Uninitialized => {
                         unreachable!("base value must already be recorded in the MV data structure")
                     },
@@ -586,14 +590,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
                 };
                 result.map_err(|e| {
                     anyhow::Error::new(VMStatus::error(
-                        StatusCode::STORAGE_ERROR,
+                        StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
                         Some(format!("Error during read: {:?}", e)),
                     ))
                 })
             },
             ViewState::Unsync(state) => state.unsync_map.fetch_aggregator(id).ok_or_else(|| {
                 anyhow::Error::new(VMStatus::error(
-                    StatusCode::STORAGE_ERROR,
+                    StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
                     Some(format!("Aggregator for id {:?} doesn't exist", id)),
                 ))
             }),
@@ -637,7 +641,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
             },
         };
         id.try_into_move_value(layout)
-            .map_err(|e| TransformationError(e.to_string()))
+            .map_err(|e| TransformationError(format!("{:?}", e)))
     }
 
     fn identifier_to_value(
@@ -646,7 +650,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
         identifier_value: Value,
     ) -> TransformationResult<Value> {
         let id = T::Identifier::try_from_move_value(layout, identifier_value, &())
-            .map_err(|e| TransformationError(e.to_string()))?;
+            .map_err(|e| TransformationError(format!("{:?}", e)))?;
         match &self.latest_view {
             // TODO are we at this point always supposed to read a value this transaction committed (i.e. AfterCurrentTxn)?
             ViewState::Sync(state) => Ok(state

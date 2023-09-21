@@ -208,7 +208,9 @@ pub fn expect_only_successful_execution(
         VMStatus::Executed => VMStatus::Executed,
         // Storage error can be a result of speculation failure so throw the error back for caller to handle.
         e @ VMStatus::Error {
-            status_code: StatusCode::STORAGE_ERROR,
+            status_code:
+                StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR
+                | StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
             ..
         } => e,
         status => {

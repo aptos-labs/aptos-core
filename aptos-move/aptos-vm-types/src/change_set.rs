@@ -4,10 +4,9 @@
 use crate::check_change_set::CheckChangeSet;
 use aptos_aggregator::{
     aggregator_change_set::AggregatorChange,
-    bounded_math::code_invariant_error,
     delta_change_set::{serialize, DeltaOp},
     resolver::{AggregatorReadMode, AggregatorResolver},
-    types::AggregatorID,
+    types::{code_invariant_error, AggregatorID},
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -15,7 +14,7 @@ use aptos_types::{
     transaction::ChangeSet as StorageChangeSet,
     write_set::{WriteOp, WriteSetMut},
 };
-use move_binary_format::errors::Location;
+use move_binary_format::errors::{Location, PartialVMError};
 use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
@@ -295,6 +294,7 @@ impl VMChangeSet {
                             .expect("Deserializing into an aggregator value always succeeds");
                         let value = additional_delta_op
                             .apply_to(base)
+                            .map_err(PartialVMError::from)
                             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                         *data = serialize(&value).into();
                     },
@@ -318,6 +318,7 @@ impl VMChangeSet {
                         entry
                             .into_mut()
                             .merge_with_next_delta(additional_delta_op)
+                            .map_err(PartialVMError::from)
                             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                     },
                     Vacant(entry) => {
@@ -372,7 +373,8 @@ impl VMChangeSet {
                                 Err(code_invariant_error(format!(
                                 "Aggregator change set contains both {:?} and its dependent {:?}",
                                 id, dependent_id
-                            ))),
+                            ))
+                                .into()),
                             );
                         }
                         change_set.get(&dependent_id)
@@ -389,7 +391,9 @@ impl VMChangeSet {
         for (id, merged_change) in merged_changes.into_iter() {
             change_set.insert(
                 id,
-                merged_change.map_err(|e| e.finish(Location::Undefined).into_vm_status())?,
+                merged_change
+                    .map_err(PartialVMError::from)
+                    .map_err(|e| e.finish(Location::Undefined).into_vm_status())?,
             );
         }
         Ok(())

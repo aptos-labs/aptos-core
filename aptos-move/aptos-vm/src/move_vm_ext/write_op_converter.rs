@@ -99,7 +99,7 @@ impl<'r> WriteOpConverter<'r> {
 
         let maybe_existing_metadata = state_value_metadata_result.map_err(|_| {
             VMStatus::error(
-                StatusCode::STORAGE_ERROR,
+                StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
                 err_msg("Storage read failed when converting change set."),
             )
         })?;
@@ -107,15 +107,15 @@ impl<'r> WriteOpConverter<'r> {
         let write_op = match (maybe_existing_metadata, move_storage_op) {
             (None, Modify(_) | Delete) => {
                 return Err(VMStatus::error(
-                    // Possible under speculative execution, returning storage error waiting for re-execution
-                    StatusCode::STORAGE_ERROR,
+                    // Possible under speculative execution, returning speculative error waiting for re-execution
+                    StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
                     err_msg("When converting write op: updating non-existent value."),
                 ));
             },
             (Some(_), New(_)) => {
                 return Err(VMStatus::error(
-                    // Possible under speculative execution, returning storage error waiting for re-execution
-                    StatusCode::STORAGE_ERROR,
+                    // Possible under speculative execution, returning speculative error waiting for re-execution
+                    StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
                     err_msg("When converting write op: Recreating existing value."),
                 ));
             },
@@ -158,7 +158,9 @@ impl<'r> WriteOpConverter<'r> {
         let maybe_existing_metadata = self
             .remote
             .get_aggregator_v1_state_value_metadata(state_key)
-            .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+            .map_err(|_| {
+                VMStatus::error(StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR, None)
+            })?;
         let data = serialize(&value).into();
 
         let op = match maybe_existing_metadata {
