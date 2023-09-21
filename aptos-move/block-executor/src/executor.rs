@@ -417,6 +417,7 @@ where
         let mut scheduler_task = SchedulerTask::NoTask;
 
         loop {
+            // Priorotize committing validated transactions
             while scheduler.should_coordinate_commits() {
                 self.queue_ready_commits(
                     self.maybe_block_gas_limit,
