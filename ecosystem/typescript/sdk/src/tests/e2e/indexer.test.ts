@@ -129,6 +129,17 @@ describe("Indexer", () => {
       expect(ledgerInfo.ledger_infos[0].chain_id).toBeGreaterThan(1);
     });
 
+    // OBJECTS //
+
+    it(
+      "gets account owned objects data",
+      async () => {
+        const accountObjects = await indexerClient.getAccountOwnedObjects(alice.address().hex());
+        expect(accountObjects.current_objects.length).toBe(2);
+      },
+      longTestTimeout,
+    );
+
     // TOKENS //
 
     it(
