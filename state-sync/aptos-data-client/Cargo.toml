@@ -26,6 +26,7 @@ aptos-storage-service-client = { workspace = true }
 aptos-storage-service-types = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
+arc-swap = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }

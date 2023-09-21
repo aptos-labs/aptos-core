@@ -46,9 +46,10 @@ use aptos_types::{
     state_store::state_value::StateValueChunkWithProof,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
+use arc_swap::ArcSwap;
 use async_trait::async_trait;
 use rand::prelude::SliceRandom;
-use std::{fmt, sync::Arc, time::Duration};
+use std::{fmt, ops::Deref, sync::Arc, time::Duration};
 use tokio::runtime::Handle;
 
 // Useful constants
@@ -84,7 +85,7 @@ pub struct AptosDataClient {
     /// All of the data-client specific data we have on each network peer.
     peer_states: Arc<RwLock<PeerStates>>,
     /// A cached, aggregate data summary of all unbanned peers' data summaries.
-    global_summary_cache: Arc<RwLock<GlobalDataSummary>>,
+    global_summary_cache: Arc<ArcSwap<GlobalDataSummary>>,
     /// Used for generating the next request/response id.
     response_id_generator: Arc<U64IdGenerator>,
     /// Time service used for calculating peer lag
@@ -110,7 +111,7 @@ impl AptosDataClient {
                 data_client_config,
                 storage_service_client.get_peers_and_metadata(),
             ))),
-            global_summary_cache: Arc::new(RwLock::new(GlobalDataSummary::empty())),
+            global_summary_cache: Arc::new(ArcSwap::from(Arc::new(GlobalDataSummary::empty()))),
             response_id_generator: Arc::new(U64IdGenerator::new()),
             time_service: time_service.clone(),
         };
@@ -159,9 +160,12 @@ impl AptosDataClient {
         // the peer states (to handle disconnected peers).
         self.garbage_collect_peer_states()?;
 
-        // Calculate the aggregate data summary
-        let aggregate = self.peer_states.read().calculate_aggregate_summary();
-        *self.global_summary_cache.write() = aggregate;
+        // Calculate the global data summary
+        let global_data_summary = self.peer_states.read().calculate_global_data_summary();
+
+        // Update the cached data summary
+        self.global_summary_cache
+            .store(Arc::new(global_data_summary));
 
         Ok(())
     }
@@ -596,7 +600,7 @@ impl AptosDataClient {
 #[async_trait]
 impl AptosDataClientInterface for AptosDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
-        self.global_summary_cache.read().clone()
+        self.global_summary_cache.load().clone().deref().clone()
     }
 
     async fn get_epoch_ending_ledger_infos(

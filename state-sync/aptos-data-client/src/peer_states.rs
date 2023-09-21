@@ -306,7 +306,7 @@ impl PeerStates {
     }
 
     /// Calculates a global data summary using all known storage summaries
-    pub fn calculate_aggregate_summary(&self) -> GlobalDataSummary {
+    pub fn calculate_global_data_summary(&self) -> GlobalDataSummary {
         // Only include likely-not-malicious peers in the data summary aggregation
         let summaries: Vec<StorageServerSummary> = self
             .peer_to_state
