@@ -13,13 +13,18 @@ spec aptos_framework::stake {
 
         // property 1: the validator set resource stores consensus information for each validator.
         // the consensus scheme remains consistent across all validators within the set.
-        // this property cause timeout and haven't proved yet
+        // this property cause timeout (not proved)
+
         // apply ConsensusInv to * except on_new_epoch;
 
         // property 2: The owner of a validator remains immutable.
         apply ValidatorOwnerNoChange to *;
+
         // property 3: The total staked value in the stake pool should be constant (excluding adding and withdrawing operations).
-        apply StakedValueNochange to * except add_stake, add_stake_with_cap, withdraw, withdraw_with_cap, on_new_epoch, update_stake_pool;
+        // this property cause timeout (proved)
+
+        // apply StakedValueNochange to * except add_stake, add_stake_with_cap, withdraw, withdraw_with_cap, on_new_epoch, update_stake_pool;
+
         // ghost variable
         global ghost_valid_perf: ValidatorPerformance;
         global ghost_proposer_idx: Option<u64>;
