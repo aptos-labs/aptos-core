@@ -47,13 +47,13 @@ export class PublicKey {
   }
 
   /**
-   * Verifies the signature of the message with the public key
-   * @param args.message a signed message
+   * Verifies a signed data with a public key
+   * @param args.data a signed message
    * @param args.signature the signature of the message
    */
-  verifySignature(args: { message: HexInput; signature: HexInput }): boolean {
-    const { message, signature } = args;
-    const rawMessage = Hex.fromHexInput({ hexInput: message }).toUint8Array();
+  verifySignature(args: { data: HexInput; signature: HexInput }): boolean {
+    const { data, signature } = args;
+    const rawMessage = Hex.fromHexInput({ hexInput: data }).toUint8Array();
     const rawSignature = Hex.fromHexInput({ hexInput: signature }).toUint8Array();
     return nacl.sign.detached.verify(rawMessage, rawSignature, this.key.toUint8Array());
   }
@@ -119,7 +119,7 @@ export class PrivateKey {
   sign(args: { message: HexInput }): Signature {
     const hex = Hex.fromHexInput({ hexInput: args.message });
     const signature = nacl.sign.detached(hex.toUint8Array(), this.signingKeyPair.secretKey);
-    return new Signature({ value: signature });
+    return new Signature({ data: signature });
   }
 
   serialize(serializer: Serializer): void {
@@ -129,6 +129,16 @@ export class PrivateKey {
   static deserialize(deserializer: Deserializer): PrivateKey {
     const value = deserializer.deserializeBytes();
     return new PrivateKey({ value });
+  }
+
+  /**
+   * Generate a new random private key.
+   *
+   * @returns
+   */
+  static generate(): PrivateKey {
+    const keyPair = nacl.sign.keyPair();
+    return new PrivateKey({ value: keyPair.secretKey.slice(0, 32) });
   }
 }
 
@@ -140,15 +150,15 @@ export class Signature {
   static readonly LENGTH = 64;
 
   // Hex value of the signature
-  private readonly value: Hex;
+  private readonly data: Hex;
 
-  constructor(args: { value: HexInput }) {
-    const hex = Hex.fromHexInput({ hexInput: args.value });
+  constructor(args: { data: HexInput }) {
+    const hex = Hex.fromHexInput({ hexInput: args.data });
     if (hex.toUint8Array().length !== Signature.LENGTH) {
       throw new Error(`Signature length should be ${Signature.LENGTH}`);
     }
 
-    this.value = hex;
+    this.data = hex;
   }
 
   /**
@@ -157,7 +167,7 @@ export class Signature {
    * @returns Uint8Array representation of the signature
    */
   toUint8Array(): Uint8Array {
-    return this.value.toUint8Array();
+    return this.data.toUint8Array();
   }
 
   /**
@@ -166,15 +176,15 @@ export class Signature {
    * @returns string representation of the signature
    */
   toString(): string {
-    return this.value.toString();
+    return this.data.toString();
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeBytes(this.value.toUint8Array());
+    serializer.serializeBytes(this.data.toUint8Array());
   }
 
   static deserialize(deserializer: Deserializer): Signature {
-    const value = deserializer.deserializeBytes();
-    return new Signature({ value });
+    const data = deserializer.deserializeBytes();
+    return new Signature({ data });
   }
 }
