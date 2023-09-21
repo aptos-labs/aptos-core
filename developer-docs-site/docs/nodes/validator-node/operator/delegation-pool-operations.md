@@ -93,6 +93,7 @@ This section describes the available operations that can be performed on this re
   --args address:<pool_address> u64:<amount>
   ```
 
+
 ## Perform pool owner operations
  
 Delegation pool owners have access to specific methods designed for modifying the `operator` and `voter` roles of the delegation pool. Use the following Aptos CLI commands and include the relevant addresses:
@@ -105,13 +106,6 @@ Delegation pool owners have access to specific methods designed for modifying th
   --args address:<new_operator_address>
   ```
 
-* Set the delegated voter address for the delegation pool:
-
-  ```bash
-  aptos move run --profile delegation_pool_owner \
-  --function-id 0x1::delegation_pool::set_delegated_voter \
-  --args address:<new_delegated_voter_address>
-  ```
   
 ## Check delegation pool information
 
