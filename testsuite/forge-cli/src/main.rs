@@ -1367,12 +1367,12 @@ fn netbench_config_100_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
     netbench_config.direct_send_per_second = 1000;
 }
 
-fn netbench_config_2_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
+fn netbench_config_3_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
     netbench_config.enabled = true;
     netbench_config.max_network_channel_size = 1000;
     netbench_config.enable_direct_send_testing = true;
     netbench_config.direct_send_data_size = 100000;
-    netbench_config.direct_send_per_second = 20;
+    netbench_config.direct_send_per_second = 30;
 }
 
 fn net_bench() -> ForgeConfig {
@@ -1393,7 +1393,7 @@ fn net_bench_two_region_env() -> ForgeConfig {
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Not using 100 MBps here, as it will lead to throughput collapse
             let mut netbench_config = NetbenchConfig::default();
-            netbench_config_2_megabytes_per_sec(&mut netbench_config);
+            netbench_config_3_megabytes_per_sec(&mut netbench_config);
             config.netbench = Some(netbench_config);
         }))
 }
@@ -2062,13 +2062,7 @@ fn pfn_performance(
     add_network_emulation: bool,
 ) -> ForgeConfig {
     // Determine the minimum expected TPS
-    let min_expected_tps = if add_cpu_chaos {
-        3000
-    } else if add_network_emulation {
-        4000
-    } else {
-        4500
-    };
+    let min_expected_tps = 4500;
 
     // Create the forge config
     ForgeConfig::default()
