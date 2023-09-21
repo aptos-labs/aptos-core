@@ -53,10 +53,10 @@ pub const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024; /* 64 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;
 pub const IP_BYTE_BUCKET_RATE: usize = 102400 /* 100 KiB */;
 pub const IP_BYTE_BUCKET_SIZE: usize = IP_BYTE_BUCKET_RATE;
-pub const INBOUND_TCP_RX_BUFFER_SIZE: u32 = 3 * 1024 * 1024; // 3MB ~6MB/s with 500ms latency
-pub const INBOUND_TCP_TX_BUFFER_SIZE: u32 = 512 * 1024; // 1MB use a bigger spoon
-pub const OUTBOUND_TCP_RX_BUFFER_SIZE: u32 = 3 * 1024 * 1024; // 3MB ~6MB/s with 500ms latency
-pub const OUTBOUND_TCP_TX_BUFFER_SIZE: u32 = 1024 * 1024; // 1MB use a bigger spoon
+pub const INBOUND_TCP_RX_BUFFER_SIZE: u32 = 16 * 1024 * 1024; // 16MB = ~64 MB/s with 250ms latency
+pub const INBOUND_TCP_TX_BUFFER_SIZE: u32 = 16 * 1024 * 1024; // 16MB = ~64 MB/s with 250ms latency
+pub const OUTBOUND_TCP_RX_BUFFER_SIZE: u32 = 16 * 1024 * 1024; // 16MB = ~64 MB/s with 250ms latency
+pub const OUTBOUND_TCP_TX_BUFFER_SIZE: u32 = 16 * 1024 * 1024; // 16MB = ~64 MB/s with 250ms latency
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
