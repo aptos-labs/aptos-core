@@ -2,8 +2,8 @@
 
 mod enc;
 mod input_secret;
-mod public_parameters;
-mod transcript;
+pub mod public_parameters;
+pub mod transcript;
 
 use crate::pvss::das;
 

@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 
-use crate::{dkg::wait_for_epoch_fully_entered, smoke_test_environment::SwarmBuilder};
-use aptos_consensus::dkg::build_dkg_pvss_config;
+use crate::{
+    dkg::{decrypt_key_map, verify_dkg_transcript, wait_for_epoch_fully_entered},
+    smoke_test_environment::SwarmBuilder,
+};
 use aptos_forge::NodeExt;
-use aptos_types::{dkg::DKGTranscriptWrapper, validator_verifier::ValidatorVerifier};
 use std::sync::Arc;
 
 #[tokio::test]
@@ -38,12 +39,10 @@ async fn dkg_basic() {
         dkg_state_2.target_epoch, dkg_state_1.target_epoch
     );
 
-    let verifier = ValidatorVerifier::from(dkg_state_1.validator_set.as_ref().unwrap());
-    let (_, pvss_config) = build_dkg_pvss_config(
-        dkg_state_1.target_epoch,
-        dkg_state_2.validator_set.as_ref().unwrap(),
-    );
-    let trxs: DKGTranscriptWrapper =
-        bcs::from_bytes(dkg_state_2.serialized_transcript.as_slice()).unwrap();
-    assert!(trxs.verify(&pvss_config, &verifier).is_ok());
+    let decrypt_key_map = decrypt_key_map(&swarm);
+    assert!(verify_dkg_transcript(
+        &dkg_state_1,
+        &dkg_state_2,
+        &decrypt_key_map
+    ));
 }

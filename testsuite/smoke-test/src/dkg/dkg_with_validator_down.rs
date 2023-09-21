@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg::{verify_dkg_transcript, wait_for_epoch_fully_entered},
+    dkg::{decrypt_key_map, verify_dkg_transcript, wait_for_epoch_fully_entered},
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::NodeExt;
@@ -20,6 +20,7 @@ async fn dkg_with_validator_down() {
         }))
         .build()
         .await;
+    let decrypt_key_map = decrypt_key_map(&swarm);
 
     let client = swarm.validators().last().unwrap().rest_client();
     println!("Wait for an epoch start.");
@@ -42,5 +43,9 @@ async fn dkg_with_validator_down() {
         wait_for_epoch_fully_entered(&client, Some(dkg_state_1.target_epoch + 1), time_limit_secs)
             .await;
 
-    assert!(verify_dkg_transcript(&dkg_state_1, &dkg_state_2));
+    assert!(verify_dkg_transcript(
+        &dkg_state_1,
+        &dkg_state_2,
+        &decrypt_key_map
+    ));
 }

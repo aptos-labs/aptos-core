@@ -21,6 +21,7 @@ aptos-config = { workspace = true }
 aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-debugger = { workspace = true }
+aptos-dkg = { workspace = true }
 aptos-faucet-core = { workspace = true }
 aptos-forge = { workspace = true }
 aptos-framework = { workspace = true }
@@ -43,6 +44,7 @@ bcs = { workspace = true }
 diesel = { workspace = true }
 hex = { workspace = true }
 move-core-types = { workspace = true }
+num-traits = { workspace = true }
 proptest = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }

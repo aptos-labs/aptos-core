@@ -104,6 +104,17 @@ macro_rules! encryption_dlog_keys_impl {
             pub fn to_bytes(&self) -> [u8; DECRYPT_KEY_NUM_BYTES] {
                 self.dk.to_bytes_le()
             }
+
+            pub fn to_bytes_be(&self) -> [u8; DECRYPT_KEY_NUM_BYTES] {
+                self.dk.to_bytes_be()
+            }
+
+            pub fn from_bytes_be(bytes: &[u8; DECRYPT_KEY_NUM_BYTES]) -> Self {
+                Self {
+                    dk: Scalar::from_bytes_be(bytes).unwrap()
+                }
+            }
+
         }
 
         // impl fmt::Debug for DecryptPrivKey {

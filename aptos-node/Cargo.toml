@@ -88,3 +88,4 @@ failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/f
 indexer = ["aptos-indexer"]
 network-perf-test = ["aptos-peer-monitoring-service-client/network-perf-test", "aptos-peer-monitoring-service-server/network-perf-test", "aptos-peer-monitoring-service-types/network-perf-test", "aptos-config/network-perf-test"]
 tokio-console = ["aptos-logger/tokio-console", "aptos-config/tokio-console"]
+dkg-test = ["aptos-consensus/dkg-test"]

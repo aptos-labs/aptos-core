@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::{dkg, smoke_test_environment::SwarmBuilder};
+use crate::{dkg, dkg::decrypt_key_map, smoke_test_environment::SwarmBuilder};
 use aptos::test::CliTestFramework;
 use aptos_forge::{Node, Swarm};
 use std::sync::Arc;
@@ -19,6 +19,8 @@ async fn dkg_with_validator_join_leave() {
         }))
         .build()
         .await;
+
+    let decrypt_key_map = decrypt_key_map(&swarm);
 
     println!("Wait for a moment when DKG is not running.");
     let client_endpoint = swarm
@@ -100,7 +102,11 @@ async fn dkg_with_validator_join_leave() {
         dkg::num_validators(&dkg_state_3)
     );
 
-    assert!(dkg::verify_dkg_transcript(&dkg_state_2, &dkg_state_3));
+    assert!(dkg::verify_dkg_transcript(
+        &dkg_state_2,
+        &dkg_state_3,
+        &decrypt_key_map
+    ));
     assert_eq!(
         dkg::num_validators(&dkg_state_3),
         dkg::num_validators(&dkg_state_2) - 1
@@ -126,7 +132,11 @@ async fn dkg_with_validator_join_leave() {
         dkg::num_validators(&dkg_state_4)
     );
 
-    assert!(dkg::verify_dkg_transcript(&dkg_state_3, &dkg_state_4));
+    assert!(dkg::verify_dkg_transcript(
+        &dkg_state_3,
+        &dkg_state_4,
+        &decrypt_key_map
+    ));
     assert_eq!(
         dkg::num_validators(&dkg_state_4),
         dkg::num_validators(&dkg_state_3) + 1
