@@ -17,14 +17,10 @@ const VALUE_FIELD_INDEX: usize = 0;
 const LIMIT_FIELD_INDEX: usize = 1;
 
 pub fn u128_to_u64(value: u128) -> PartialVMResult<u64> {
-    if let Ok(cast_value) = u64::try_from(value) {
-        Ok(cast_value)
-    } else {
-        Err(
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Cannot cast u128 into u64".to_string()),
-        )
-    }
+    u64::try_from(value).map_err(|_| {
+        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+            .with_message("Cannot cast u128 into u64".to_string())
+    })
 }
 
 pub(crate) fn aggregator_value_field_as_id(value: u128) -> PartialVMResult<AggregatorID> {

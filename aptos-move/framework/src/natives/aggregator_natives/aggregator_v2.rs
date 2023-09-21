@@ -45,7 +45,8 @@ pub const EAGGREGATOR_API_NOT_ENABLED: u64 = 0x03_0006;
 /// The generic type supplied to the aggregators is not supported.
 pub const EUNSUPPORTED_AGGREGATOR_TYPE: u64 = 0x03_0007;
 
-/// The aggregator api feature is not enabled.
+/// The native aggregator function, that is in the move file, is not yet supported.
+/// and any calls will raise this error.
 pub const EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED: u64 = 0x03_0009;
 
 /// Checks if the type argument `type_arg` is a string type.

@@ -403,7 +403,8 @@ impl AggregatorData {
     }
 
     /// Returns a mutable reference to an aggregator with `id` and a `max_value`.
-    /// If transaction that is currently executing did not initialize it, a new aggregator instance is created.
+    /// If transaction that is currently executing did not initialize it,
+    /// a new aggregator instance is created.
     /// Note: when we say "aggregator instance" here we refer to Rust struct and
     /// not to the Move aggregator.
     pub fn get_aggregator(
@@ -494,8 +495,9 @@ impl AggregatorData {
         });
     }
 
-    /// Returns a mutable reference to an aggregator snapshot with `id`.
-    /// If transaction that is currently executing did not initialize it, a new aggregator snapshot instance is created.
+    /// Returns a reference to an AggregatorSnapshot with `id`.
+    /// If transaction that is currently executing did not initialize it,
+    /// a new AggregatorSnapshot instance is created.
     /// Note: when we say "aggregator snapshot instance" here we refer to Rust struct and
     /// not to the Move aggregator snapshot.
     pub fn get_snapshot(
@@ -531,9 +533,10 @@ impl AggregatorData {
         id: AggregatorID,
         resolver: &dyn AggregatorResolver,
     ) -> PartialVMResult<SnapshotValue> {
+        // need to clone here, so we can call self.read_snapshot below.
         let snapshot_state = self.get_snapshot(id, resolver)?.state.clone();
         match snapshot_state {
-            AggregatorSnapshotState::Create { value } => Ok(value.clone()),
+            AggregatorSnapshotState::Create { value } => Ok(value),
             AggregatorSnapshotState::Delta {
                 base_aggregator,
                 delta,
