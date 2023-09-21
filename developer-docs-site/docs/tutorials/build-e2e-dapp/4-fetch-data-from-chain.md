@@ -74,7 +74,7 @@ function App() {
    Import `useState` by using `import { useState, useEffect } from "react"; `
    Next create a state variable `accountHasList` and its setter `setAccountHasList`
 
-```js
+```jsx
 function App (
   ...
   const [accountHasList, setAccountHasList] = useState<boolean>(false);
