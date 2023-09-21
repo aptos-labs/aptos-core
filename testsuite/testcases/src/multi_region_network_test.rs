@@ -213,6 +213,10 @@ impl MultiRegionNetworkEmulationConfig {
     pub fn two_region() -> Self {
         Self {
             link_stats_table: get_link_stats_table(TWO_REGION_LINK_STATS),
+            inter_region_config: InterRegionNetEmConfig {
+                loss_percentage: 0,
+                ..Default::default()
+            },
             ..Default::default()
         }
     }
