@@ -919,6 +919,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "claims",
+ "dashmap",
  "futures",
  "itertools",
  "maplit",
