@@ -5,14 +5,8 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
-use crate::module::AGGREGATOR_MODULE;
-use aptos_state_view::StateView;
-use aptos_types::{
-    state_store::state_key::StateKey,
-    vm_status::{StatusCode, VMStatus},
-    write_set::WriteOp,
-};
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
+use aptos_types::vm_status::StatusCode;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 
 /// When `Addition` operation overflows the `limit`.
 const EADD_OVERFLOW: u64 = 0x02_0001;
@@ -176,41 +170,6 @@ impl DeltaOp {
         self.merge_with_previous_delta(previous_delta)?;
         Ok(())
     }
-
-    /// Consumes a single delta and tries to materialize it with a given state
-    /// key. If materialization succeeds, a write op is produced. Otherwise, an
-    /// error VM status is returned.
-    pub fn try_into_write_op(
-        self,
-        state_view: &dyn StateView,
-        state_key: &StateKey,
-    ) -> anyhow::Result<WriteOp, VMStatus> {
-        // In case storage fails to fetch the value, return immediately.
-        let maybe_value = state_view
-            .get_state_value_u128(state_key)
-            .map_err(|e| VMStatus::error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?;
-
-        // Otherwise we have to apply delta to the storage value.
-        match maybe_value {
-            Some(base) => {
-                self.apply_to(base)
-                    .map_err(|partial_error| {
-                        // If delta application fails, transform partial VM
-                        // error into an appropriate VM status.
-                        partial_error
-                            .finish(Location::Module(AGGREGATOR_MODULE.clone()))
-                            .into_vm_status()
-                    })
-                    .map(|result| WriteOp::Modification(serialize(&result).into()))
-            },
-            // Something is wrong, the value to which we apply delta should
-            // always exist. Guard anyway.
-            None => Err(VMStatus::error(
-                StatusCode::STORAGE_ERROR,
-                Some("Aggregator value does not exist in storage.".to_string()),
-            )),
-        }
-    }
 }
 
 /// Implements application of `Addition` to `base`.
@@ -271,12 +230,12 @@ pub fn serialize(value: &u128) -> Vec<u8> {
     bcs::to_bytes(value).expect("unexpected serialization error in aggregator")
 }
 
-// Helper for tests, #[cfg(test)] doesn't work for cross-crate.
+#[cfg(any(test, feature = "testing"))]
 pub fn delta_sub(v: u128, limit: u128) -> DeltaOp {
     DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v)
 }
 
-// Helper for tests, #[cfg(test)] doesn't work for cross-crate.
+#[cfg(any(test, feature = "testing"))]
 pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
     DeltaOp::new(DeltaUpdate::Plus(v), limit, v, 0)
 }
@@ -284,12 +243,16 @@ pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::AggregatorStore;
-    use aptos_state_view::TStateView;
-    use aptos_types::state_store::{
-        state_storage_usage::StateStorageUsage, state_value::StateValue,
+    use crate::{
+        resolver::{AggregatorReadMode, TAggregatorView},
+        AggregatorStore,
+    };
+    use aptos_types::{
+        state_store::{state_key::StateKey, state_value::StateValue},
+        write_set::WriteOp,
     };
     use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq};
+    use move_core_types::vm_status::VMStatus;
     use once_cell::sync::Lazy;
 
     fn delta_add_with_history(v: u128, limit: u128, max: u128, min: u128) -> DeltaOp {
@@ -540,7 +503,11 @@ mod test {
         let state_view = AggregatorStore::default();
         let delta_op = delta_add(10, 1000);
         assert_matches!(
-            delta_op.try_into_write_op(&state_view, &KEY),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(
+                &KEY,
+                &delta_op,
+                AggregatorReadMode::Precise
+            ),
             Err(VMStatus::Error {
                 status_code: StatusCode::STORAGE_ERROR,
                 message: Some(_),
@@ -551,18 +518,19 @@ mod test {
 
     struct BadStorage;
 
-    impl TStateView for BadStorage {
-        type Key = StateKey;
+    impl TAggregatorView for BadStorage {
+        type IdentifierV1 = StateKey;
+        type IdentifierV2 = ();
 
-        fn get_state_value(&self, _state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        fn get_aggregator_v1_state_value(
+            &self,
+            _id: &Self::IdentifierV1,
+            _mode: AggregatorReadMode,
+        ) -> anyhow::Result<Option<StateValue>> {
             Err(anyhow::Error::new(VMStatus::error(
                 StatusCode::STORAGE_ERROR,
                 Some("Error message from BadStorage.".to_string()),
             )))
-        }
-
-        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-            unreachable!()
         }
     }
 
@@ -571,7 +539,11 @@ mod test {
         let state_view = BadStorage;
         let delta_op = delta_add(10, 1000);
         assert_matches!(
-            delta_op.try_into_write_op(&state_view, &KEY),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(
+                &KEY,
+                &delta_op,
+                AggregatorReadMode::Precise
+            ),
             Err(VMStatus::Error {
                 status_code: StatusCode::STORAGE_ERROR,
                 message: Some(_),
@@ -589,10 +561,18 @@ mod test {
         let add_op = delta_add(100, 200);
         let sub_op = delta_sub(100, 200);
 
-        let add_result = add_op.try_into_write_op(&state_view, &KEY);
+        let add_result = state_view.try_convert_aggregator_v1_delta_into_write_op(
+            &KEY,
+            &add_op,
+            AggregatorReadMode::Precise,
+        );
         assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200).into()));
 
-        let sub_result = sub_op.try_into_write_op(&state_view, &KEY);
+        let sub_result = state_view.try_convert_aggregator_v1_delta_into_write_op(
+            &KEY,
+            &sub_op,
+            AggregatorReadMode::Precise,
+        );
         assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0).into()));
     }
 
@@ -606,11 +586,19 @@ mod test {
         let sub_op = delta_sub(101, 1000);
 
         assert_matches!(
-            add_op.try_into_write_op(&state_view, &KEY),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(
+                &KEY,
+                &add_op,
+                AggregatorReadMode::Precise
+            ),
             Err(VMStatus::MoveAbort(_, EADD_OVERFLOW))
         );
         assert_matches!(
-            sub_op.try_into_write_op(&state_view, &KEY),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(
+                &KEY,
+                &sub_op,
+                AggregatorReadMode::Precise
+            ),
             Err(VMStatus::MoveAbort(_, ESUB_UNDERFLOW))
         );
     }

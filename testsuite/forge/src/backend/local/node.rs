@@ -5,7 +5,7 @@
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
-use aptos_db::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
+use aptos_db::{fast_sync_aptos_db::SECONDARY_DB_DIR, LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use aptos_logger::{debug, info};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
@@ -83,6 +83,10 @@ impl LocalNode {
             directory,
             config,
         })
+    }
+
+    pub fn base_dir(&self) -> PathBuf {
+        self.directory.clone()
     }
 
     pub fn config_path(&self) -> PathBuf {
@@ -291,13 +295,15 @@ impl Node for LocalNode {
         let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
         let secure_storage_path = node_config.get_working_dir().join("secure_storage.json");
         let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
+        let secondary_db_path = node_config.storage.dir().join(SECONDARY_DB_DIR);
 
         debug!(
-            "Deleting ledger, state, secure and state sync db paths ({:?}, {:?}, {:?}, {:?}) for node {:?}",
+            "Deleting ledger, state, secure and state sync db paths ({:?}, {:?}, {:?}, {:?}, {:?}) for node {:?}",
             ledger_db_path.as_path(),
             state_db_path.as_path(),
             secure_storage_path.as_path(),
             state_sync_db_path.as_path(),
+            secondary_db_path.as_path(),
             self.name
         );
 
@@ -318,6 +324,13 @@ impl Node for LocalNode {
         fs::remove_dir_all(state_sync_db_path)
             .map_err(anyhow::Error::from)
             .context("Failed to delete state_sync_db_path")?;
+
+        // remove secondary db if the path exists
+        if secondary_db_path.as_path().exists() {
+            fs::remove_dir_all(secondary_db_path)
+                .map_err(anyhow::Error::from)
+                .context("Failed to delete secondary_db_path")?;
+        }
         if self.config.base.role.is_validator() {
             fs::remove_file(secure_storage_path)
                 .map_err(anyhow::Error::from)

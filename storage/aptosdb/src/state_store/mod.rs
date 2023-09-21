@@ -1067,7 +1067,6 @@ impl StateStore {
 
     #[cfg(test)]
     pub fn get_all_jmt_nodes(&self) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
-        // TODO(grao): Support sharding here.
         let mut iter = self
             .state_db
             .state_merkle_db
@@ -1076,8 +1075,26 @@ impl StateStore {
             Default::default(),
         )?;
         iter.seek_to_first();
+
         let all_rows = iter.collect::<Result<Vec<_>>>()?;
-        Ok(all_rows.into_iter().map(|(k, _v)| k).collect())
+
+        let mut keys: Vec<aptos_jellyfish_merkle::node_type::NodeKey> =
+            all_rows.into_iter().map(|(k, _v)| k).collect();
+        if self.state_merkle_db.sharding_enabled() {
+            for i in 0..NUM_STATE_SHARDS as u8 {
+                let mut iter = self
+                    .state_merkle_db
+                    .db_shard(i)
+                    .iter::<crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
+                    Default::default(),
+                )?;
+                iter.seek_to_first();
+
+                let all_rows = iter.collect::<Result<Vec<_>>>()?;
+                keys.extend(all_rows.into_iter().map(|(k, _v)| k).collect::<Vec<_>>());
+            }
+        }
+        Ok(keys)
     }
 
     fn prepare_version_in_cache(

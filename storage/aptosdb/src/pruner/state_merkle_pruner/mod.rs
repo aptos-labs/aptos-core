@@ -178,10 +178,11 @@ where
                 s.spawn(move |_| {
                     shard_pruner
                         .prune(current_progress, target_version)
-                        .unwrap_or_else(|_| {
+                        .unwrap_or_else(|err| {
                             panic!(
-                                "Failed to prune state merkle shard {}.",
-                                shard_pruner.shard_id()
+                                "Failed to prune state merkle shard {}: {}",
+                                shard_pruner.shard_id(),
+                                err,
                             )
                         });
                 });

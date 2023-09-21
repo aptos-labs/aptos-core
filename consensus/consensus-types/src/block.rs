@@ -8,6 +8,7 @@ use crate::{
     quorum_cert::QuorumCert,
 };
 use anyhow::{bail, ensure, format_err};
+use aptos_bitvec::BitVec;
 use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_infallible::duration_since_epoch;
 use aptos_types::{
@@ -210,9 +211,19 @@ impl Block {
         payload: Payload,
         author: Author,
         failed_authors: Vec<(Round, Author)>,
+        parent_block_info: BlockInfo,
+        parents_bitvec: BitVec,
     ) -> anyhow::Result<Self> {
-        let block_data =
-            BlockData::new_for_dag(epoch, round, timestamp, payload, author, failed_authors);
+        let block_data = BlockData::new_for_dag(
+            epoch,
+            round,
+            timestamp,
+            payload,
+            author,
+            failed_authors,
+            parent_block_info,
+            parents_bitvec,
+        );
         Self::new_proposal_from_block_data(block_data, &ValidatorSigner::from_int(0))
     }
 

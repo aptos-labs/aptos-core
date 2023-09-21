@@ -3,9 +3,9 @@
 
 use crate::{
     errors::AptosDbError,
+    fast_sync_aptos_db::FastSyncStorageWrapper,
     gauged_api,
     metrics::{LATEST_CHECKPOINT_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH},
-    AptosDB,
 };
 use anyhow::{ensure, format_err, Result};
 use aptos_accumulator::{HashReader, MerkleAccumulator};
@@ -142,7 +142,7 @@ impl FakeBufferedState {
 /// features of [AptosDB] while passing through remaining features to the wrapped inner
 /// [AptosDB].
 pub struct FakeAptosDB {
-    inner: AptosDB,
+    inner: FastSyncStorageWrapper,
     // A map of transaction hash to transaction version
     txn_version_by_hash: Arc<DashMap<HashValue, Version>>,
     // A map of transaction version to Transaction
@@ -160,7 +160,7 @@ pub struct FakeAptosDB {
 }
 
 impl FakeAptosDB {
-    pub fn new(db: AptosDB) -> Self {
+    pub fn new<D: DbReader + DbWriter>(db: D) -> Self {
         Self {
             inner: db,
             txn_by_version: Arc::new(DashMap::new()),
@@ -349,7 +349,9 @@ impl FakeAptosDB {
 
             // Once everything is successfully stored, update the latest in-memory ledger info.
             if let Some(x) = ledger_info_with_sigs {
-                self.inner.ledger_store.set_latest_ledger_info(x.clone());
+                self.inner
+                    .get_ledger_store()?
+                    .set_latest_ledger_info(x.clone());
 
                 LEDGER_VERSION.set(x.ledger_info().version() as i64);
                 NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);

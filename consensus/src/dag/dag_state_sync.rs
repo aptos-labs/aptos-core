@@ -2,11 +2,10 @@
 
 use super::{
     adapter::Notifier,
-    dag_fetcher::{DagFetcher, TDagFetcher},
+    dag_fetcher::TDagFetcher,
     dag_store::Dag,
     storage::DAGStorage,
     types::{CertifiedNodeMessage, RemoteFetchRequest},
-    TDAGNetworkSender,
 };
 use crate::state_replication::StateComputer;
 use aptos_consensus_types::common::Round;
@@ -24,66 +23,62 @@ use std::sync::Arc;
 pub const DAG_WINDOW: usize = 1;
 pub const STATE_SYNC_WINDOW_MULTIPLIER: usize = 30;
 
-pub(super) struct StateSyncManager {
-    epoch_state: Arc<EpochState>,
-    network: Arc<dyn TDAGNetworkSender>,
-    notifier: Arc<dyn Notifier>,
-    time_service: TimeService,
-    state_computer: Arc<dyn StateComputer>,
-    storage: Arc<dyn DAGStorage>,
-    dag_store: Arc<RwLock<Dag>>,
+pub(super) enum StateSyncStatus {
+    NeedsSync(CertifiedNodeMessage),
+    Synced,
 }
 
-impl StateSyncManager {
-    pub fn new(
-        epoch_state: Arc<EpochState>,
-        network: Arc<dyn TDAGNetworkSender>,
-        notifier: Arc<dyn Notifier>,
-        time_service: TimeService,
-        state_computer: Arc<dyn StateComputer>,
-        storage: Arc<dyn DAGStorage>,
-        dag_store: Arc<RwLock<Dag>>,
-    ) -> Self {
+pub(super) struct StateSyncTrigger {
+    dag_store: Arc<RwLock<Dag>>,
+    downstream_notifier: Arc<dyn Notifier>,
+}
+
+impl StateSyncTrigger {
+    pub(super) fn new(dag_store: Arc<RwLock<Dag>>, downstream_notifier: Arc<dyn Notifier>) -> Self {
         Self {
-            epoch_state,
-            network,
-            notifier,
-            time_service,
-            state_computer,
-            storage,
             dag_store,
+            downstream_notifier,
         }
     }
 
-    pub async fn sync_to(
+    /// This method checks if a state sync is required, and if so,
+    /// notifies the bootstraper, to let the bootstraper can abort this task.
+    pub(super) async fn check(
         &self,
-        node: &CertifiedNodeMessage,
-    ) -> anyhow::Result<Option<Arc<RwLock<Dag>>>> {
-        self.sync_to_highest_commit_cert(node.ledger_info()).await;
-        self.try_sync_to_highest_ordered_anchor(node).await
+        node: CertifiedNodeMessage,
+    ) -> (StateSyncStatus, Option<CertifiedNodeMessage>) {
+        let ledger_info = node.ledger_info();
+
+        self.notify_commit_proof(ledger_info).await;
+
+        if self.need_sync_for_ledger_info(ledger_info) {
+            return (StateSyncStatus::NeedsSync(node), None);
+        }
+        (StateSyncStatus::Synced, Some(node))
     }
 
     /// Fast forward in the decoupled-execution pipeline if the block exists there
-    pub async fn sync_to_highest_commit_cert(&self, ledger_info: &LedgerInfoWithSignatures) {
-        let send_commit_proof = {
-            let dag_reader = self.dag_store.read();
-            dag_reader.highest_committed_anchor_round() < ledger_info.commit_info().round()
-                && dag_reader
-                    .highest_ordered_anchor_round()
-                    .unwrap_or_default()
-                    >= ledger_info.commit_info().round()
-        };
-
+    async fn notify_commit_proof(&self, ledger_info: &LedgerInfoWithSignatures) {
         // if the anchor exists between ledger info round and highest ordered round
         // Note: ledger info round <= highest ordered round
-        if send_commit_proof {
-            self.notifier.send_commit_proof(ledger_info.clone()).await
+        if self.dag_store.read().highest_committed_anchor_round()
+            < ledger_info.commit_info().round()
+            && self
+                .dag_store
+                .read()
+                .highest_ordered_anchor_round()
+                .unwrap_or_default()
+                >= ledger_info.commit_info().round()
+        {
+            self.downstream_notifier
+                .send_commit_proof(ledger_info.clone())
+                .await
         }
     }
 
     /// Check if we're far away from this ledger info and need to sync.
     /// This ensures that the block referred by the ledger info is not in buffer manager.
-    pub fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
+    fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
         let dag_reader = self.dag_store.read();
         // check whether if DAG order round is behind the given ledger info round
         // (meaning consensus is behind) or
@@ -97,33 +92,54 @@ impl StateSyncManager {
                 + ((STATE_SYNC_WINDOW_MULTIPLIER * DAG_WINDOW) as Round)
                 < li.commit_info().round()
     }
+}
 
-    pub async fn try_sync_to_highest_ordered_anchor(
-        &self,
-        node: &CertifiedNodeMessage,
-    ) -> anyhow::Result<Option<Arc<RwLock<Dag>>>> {
-        // Check whether to actually sync
-        let commit_li = node.ledger_info();
-        if !self.need_sync_for_ledger_info(commit_li) {
-            return Ok(None);
+pub(super) struct DagStateSynchronizer {
+    epoch_state: Arc<EpochState>,
+    notifier: Arc<dyn Notifier>,
+    time_service: TimeService,
+    state_computer: Arc<dyn StateComputer>,
+    storage: Arc<dyn DAGStorage>,
+}
+
+impl DagStateSynchronizer {
+    pub fn new(
+        epoch_state: Arc<EpochState>,
+        notifier: Arc<dyn Notifier>,
+        time_service: TimeService,
+        state_computer: Arc<dyn StateComputer>,
+        storage: Arc<dyn DAGStorage>,
+    ) -> Self {
+        Self {
+            epoch_state,
+            notifier,
+            time_service,
+            state_computer,
+            storage,
         }
-
-        let dag_fetcher = Arc::new(DagFetcher::new(
-            self.epoch_state.clone(),
-            self.network.clone(),
-            self.time_service.clone(),
-        ));
-
-        self.sync_to_highest_ordered_anchor(node, dag_fetcher).await
     }
 
     /// Note: Assumes that the sync checks have been done
-    pub async fn sync_to_highest_ordered_anchor(
+    pub async fn sync_dag_to(
         &self,
         node: &CertifiedNodeMessage,
-        dag_fetcher: Arc<impl TDagFetcher>,
-    ) -> anyhow::Result<Option<Arc<RwLock<Dag>>>> {
+        dag_fetcher: impl TDagFetcher,
+        current_dag_store: Arc<RwLock<Dag>>,
+    ) -> anyhow::Result<Option<Dag>> {
         let commit_li = node.ledger_info();
+
+        {
+            let dag_reader = current_dag_store.read();
+            assert!(
+                dag_reader
+                    .highest_ordered_anchor_round()
+                    .unwrap_or_default()
+                    < commit_li.commit_info().round()
+                    || dag_reader.highest_committed_anchor_round()
+                        + ((STATE_SYNC_WINDOW_MULTIPLIER * DAG_WINDOW) as Round)
+                        < commit_li.commit_info().round()
+            );
+        }
 
         if commit_li.ledger_info().ends_epoch() {
             self.notifier
@@ -179,6 +195,6 @@ impl StateSyncManager {
 
         // TODO: the caller should rebootstrap the order rule
 
-        Ok(Some(sync_dag_store))
+        Ok(Arc::into_inner(sync_dag_store).map(|r| r.into_inner()))
     }
 }

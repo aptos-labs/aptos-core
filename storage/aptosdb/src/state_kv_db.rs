@@ -108,7 +108,7 @@ impl StateKvDb {
                 s.spawn(move |_| {
                     // TODO(grao): Consider propagating the error instead of panic, if necessary.
                     self.commit_single_shard(version, shard_id as u8, state_kv_batch)
-                        .unwrap_or_else(|_| panic!("Failed to commit shard {shard_id}."));
+                        .unwrap_or_else(|err| panic!("Failed to commit shard {shard_id}: {err}."));
                 });
             }
         });

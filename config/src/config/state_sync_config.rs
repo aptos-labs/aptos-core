@@ -204,6 +204,9 @@ impl Default for StorageServiceConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DataStreamingServiceConfig {
+    /// Whether or not to enable data subscription streaming.
+    pub enable_subscription_streaming: bool,
+
     /// The interval (milliseconds) at which to refresh the global data summary.
     pub global_summary_refresh_interval_ms: u64,
 
@@ -226,6 +229,10 @@ pub struct DataStreamingServiceConfig {
     /// memory. Once the number grows beyond this value, garbage collection occurs.
     pub max_notification_id_mappings: u64,
 
+    /// Maxinum number of consecutive subscriptions that can be made before
+    /// the subscription stream is terminated and a new stream must be created.
+    pub max_num_consecutive_subscriptions: u64,
+
     /// The interval (milliseconds) at which to check the progress of each stream.
     pub progress_check_interval_ms: u64,
 }
@@ -233,12 +240,14 @@ pub struct DataStreamingServiceConfig {
 impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
+            enable_subscription_streaming: false,
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,
             max_data_stream_channel_sizes: 300,
             max_request_retry: 5,
             max_notification_id_mappings: 300,
+            max_num_consecutive_subscriptions: 50,
             progress_check_interval_ms: 50,
         }
     }
@@ -257,14 +266,14 @@ pub struct AptosDataClientConfig {
     pub max_num_in_flight_regular_polls: u64,
     /// Maximum number of output reductions before transactions are returned
     pub max_num_output_reductions: u64,
-    /// Maximum version lag we'll tolerate when sending optimistic fetch requests
-    pub max_optimistic_fetch_version_lag: u64,
+    /// Maximum lag (in seconds) we'll tolerate when sending optimistic fetch requests
+    pub max_optimistic_fetch_lag_secs: u64,
     /// Maximum timeout (in ms) when waiting for a response (after exponential increases)
     pub max_response_timeout_ms: u64,
     /// Maximum number of state keys and values per chunk
     pub max_state_chunk_size: u64,
-    /// Maximum version lag we'll tolerate when sending subscription requests
-    pub max_subscription_version_lag: u64,
+    /// Maximum lag (in seconds) we'll tolerate when sending subscription requests
+    pub max_subscription_lag_secs: u64,
     /// Maximum number of transactions per chunk
     pub max_transaction_chunk_size: u64,
     /// Maximum number of transaction outputs per chunk
@@ -273,6 +282,8 @@ pub struct AptosDataClientConfig {
     pub optimistic_fetch_timeout_ms: u64,
     /// First timeout (in ms) when waiting for a response
     pub response_timeout_ms: u64,
+    /// Timeout (in ms) when waiting for a subscription response
+    pub subscription_response_timeout_ms: u64,
     /// Interval (in ms) between data summary poll loop executions
     pub summary_poll_loop_interval_ms: u64,
     /// Whether or not to request compression for incoming data
@@ -287,15 +298,16 @@ impl Default for AptosDataClientConfig {
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
             max_num_output_reductions: 0,
-            max_optimistic_fetch_version_lag: 50_000, // Assumes 5K TPS for 10 seconds, which should be plenty
-            max_response_timeout_ms: 60_000,          // 60 seconds
+            max_optimistic_fetch_lag_secs: 30, // 30 seconds
+            max_response_timeout_ms: 60_000,   // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_version_lag: 100_000, // Assumes 5K TPS for 20 seconds, which should be plenty
+            max_subscription_lag_secs: 30, // 30 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             optimistic_fetch_timeout_ms: 5000, // 5 seconds
             response_timeout_ms: 10_000,       // 10 seconds
             summary_poll_loop_interval_ms: 200,
+            subscription_response_timeout_ms: 20_000, // 20 seconds (must be longer than a regular timeout because of pre-fetching)
             use_compression: true,
         }
     }

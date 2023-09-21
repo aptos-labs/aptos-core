@@ -27,4 +27,5 @@ move-core-types = { workspace = true }
 
 [dev-dependencies]
 aptos-language-e2e-tests = { workspace = true }
+aptos-vm = { workspace = true }
 claims = { workspace = true }

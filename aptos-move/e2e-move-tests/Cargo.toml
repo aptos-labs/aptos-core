@@ -30,7 +30,6 @@ aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 aptos-vm-genesis = { workspace = true }
-aptos-writeset-generator = { workspace = true }
 bcs = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }

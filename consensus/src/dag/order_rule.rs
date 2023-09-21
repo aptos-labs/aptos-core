@@ -4,6 +4,7 @@
 use crate::dag::{
     adapter::Notifier,
     anchor_election::AnchorElection,
+    dag_state_sync::DAG_WINDOW,
     dag_store::{Dag, NodeStatus},
     storage::DAGStorage,
     types::NodeMetadata,
@@ -20,7 +21,7 @@ pub struct OrderRule {
     lowest_unordered_anchor_round: Round,
     dag: Arc<RwLock<Dag>>,
     anchor_election: Box<dyn AnchorElection>,
-    notifier: Box<dyn Notifier>,
+    notifier: Arc<dyn Notifier>,
     storage: Arc<dyn DAGStorage>,
 }
 
@@ -29,55 +30,51 @@ impl OrderRule {
         epoch_state: Arc<EpochState>,
         latest_ledger_info: LedgerInfo,
         dag: Arc<RwLock<Dag>>,
-        anchor_election: Box<dyn AnchorElection>,
-        notifier: Box<dyn Notifier>,
+        mut anchor_election: Box<dyn AnchorElection>,
+        notifier: Arc<dyn Notifier>,
         storage: Arc<dyn DAGStorage>,
     ) -> Self {
-        // TODO: we need to initialize the anchor election based on the dag
-        let mut anchors = storage.get_ordered_anchor_ids().unwrap();
-        let mut expired = anchors.clone();
-        expired.retain(|(id, _)| id.epoch() < epoch_state.epoch);
-        if let Err(e) =
-            storage.delete_ordered_anchor_ids(expired.into_iter().map(|(id, _)| id).collect())
-        {
-            error!("Failed to delete expired anchors: {:?}", e);
-        }
-        anchors.retain(|(id, _)| id.epoch() == epoch_state.epoch);
         let committed_round = if latest_ledger_info.ends_epoch() {
             0
         } else {
             latest_ledger_info.round()
         };
+        let commit_events = storage
+            .get_latest_k_committed_events(DAG_WINDOW as u64)
+            .expect("Failed to read commit events from storage");
+        // make sure it's sorted
+        assert!(commit_events
+            .windows(2)
+            .all(|w| (w[0].epoch(), w[0].round()) < (w[1].epoch(), w[1].round())));
+        for event in commit_events {
+            if event.epoch() == epoch_state.epoch {
+                let maybe_anchor = dag
+                    .read()
+                    .get_node_by_round_author(event.round(), event.author())
+                    .cloned();
+                if let Some(anchor) = maybe_anchor {
+                    dag.write()
+                        .reachable_mut(&anchor, None)
+                        .for_each(|node_status| node_status.mark_as_ordered());
+                }
+            }
+            anchor_election.update_reputation(
+                event.round(),
+                event.author(),
+                event.parents(),
+                event.failed_authors(),
+            );
+        }
         let mut order_rule = Self {
             epoch_state,
-            lowest_unordered_anchor_round: latest_ledger_info.commit_info().round() + 1,
+            lowest_unordered_anchor_round: committed_round + 1,
             dag,
             anchor_election,
             notifier,
             storage,
         };
-        // Sort by round first, TODO: make the schema encode support the ordering directly
-        anchors.sort_by(|(a, _), (b, _)| a.round().cmp(&b.round()));
-        for (id, _) in anchors {
-            let maybe_anchor = order_rule
-                .dag
-                .read()
-                .get_node_by_round_author(id.round(), id.author())
-                .cloned();
-            if id.round() <= committed_round {
-                // mark already committed node
-                if let Some(anchor) = maybe_anchor {
-                    order_rule
-                        .dag
-                        .write()
-                        .reachable_mut(&anchor, None)
-                        .for_each(|node_status| node_status.mark_as_ordered());
-                }
-            } else {
-                // re-process pending anchors
-                order_rule.finalize_order(maybe_anchor.expect("Uncommitted anchor should exist"));
-            }
-        }
+        // re-check if anything can be ordered to recover pending anchors
+        order_rule.process_all();
         order_rule
     }
 
@@ -141,7 +138,7 @@ impl OrderRule {
         };
         while let Some(prev_anchor) = dag_reader
             .reachable(
-                &[current_anchor.metadata().clone()],
+                Some(current_anchor.metadata().clone()).iter(),
                 Some(self.lowest_unordered_anchor_round),
                 |node_status| matches!(node_status, NodeStatus::Unordered(_)),
             )
@@ -165,6 +162,17 @@ impl OrderRule {
             self.lowest_unordered_anchor_round,
             anchor.round(),
         ));
+        let parents = anchor
+            .parents()
+            .iter()
+            .map(|cert| *cert.metadata().author())
+            .collect();
+        self.anchor_election.update_reputation(
+            anchor.round(),
+            anchor.author(),
+            parents,
+            failed_authors.iter().map(|(_, author)| *author).collect(),
+        );
         self.lowest_unordered_anchor_round = anchor.round() + 1;
 
         let mut dag_writer = self.dag.write();
@@ -177,12 +185,8 @@ impl OrderRule {
             .collect();
         ordered_nodes.reverse();
         if let Err(e) = self
-            .storage
-            .save_ordered_anchor_id(&anchor.id())
-            .and_then(|_| {
-                self.notifier
-                    .send_ordered_nodes(ordered_nodes, failed_authors)
-            })
+            .notifier
+            .send_ordered_nodes(ordered_nodes, failed_authors)
         {
             error!("Failed to send ordered nodes {:?}", e);
         }

@@ -5,7 +5,7 @@
 
 use crate::{
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    ledger_db::LedgerDb,
+    ledger_db::{LedgerDb, LedgerDbSchemaBatches},
     schema::{
         epoch_by_version::EpochByVersionSchema, jellyfish_merkle_node::JellyfishMerkleNodeSchema,
         ledger_info::LedgerInfoSchema, stale_node_index::StaleNodeIndexSchema,
@@ -68,7 +68,6 @@ pub(crate) fn truncate_ledger_db(ledger_db: Arc<LedgerDb>, target_version: Versi
     let transaction_store = TransactionStore::new(Arc::clone(&ledger_db));
 
     let start_version = target_version + 1;
-    // TODO(grao): Support split ledger DBs here.
     truncate_ledger_db_single_batch(
         ledger_db.clone(),
         &event_store,
@@ -218,11 +217,12 @@ pub(crate) fn num_frozen_nodes_in_accumulator(num_leaves: u64) -> u64 {
 }
 
 fn truncate_transaction_accumulator(
-    ledger_db: &DB,
+    transaction_accumulator_db: &DB,
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let mut iter = ledger_db.iter::<TransactionAccumulatorSchema>(ReadOptions::default())?;
+    let mut iter =
+        transaction_accumulator_db.iter::<TransactionAccumulatorSchema>(ReadOptions::default())?;
     iter.seek_to_last();
     let (position, _) = iter.next().transpose()?.unwrap();
     let num_frozen_nodes = position.to_postorder_index() + 1;
@@ -249,25 +249,36 @@ fn truncate_ledger_db_single_batch(
     transaction_store: &TransactionStore,
     start_version: Version,
 ) -> Result<()> {
-    let batch = SchemaBatch::new();
+    let batch = LedgerDbSchemaBatches::new();
 
-    delete_transaction_index_data(transaction_store, start_version, &batch)?;
-    delete_per_epoch_data(ledger_db.metadata_db(), start_version, &batch)?;
+    delete_transaction_index_data(
+        transaction_store,
+        start_version,
+        &batch.transaction_db_batches,
+    )?;
+    delete_per_epoch_data(
+        ledger_db.metadata_db(),
+        start_version,
+        &batch.ledger_metadata_db_batches,
+    )?;
     delete_per_version_data(&ledger_db, start_version, &batch)?;
 
-    delete_event_data(event_store, start_version, &batch)?;
+    delete_event_data(event_store, start_version, &batch.event_db_batches)?;
 
     truncate_transaction_accumulator(
         ledger_db.transaction_accumulator_db(),
         start_version,
-        &batch,
+        &batch.transaction_accumulator_db_batches,
     )?;
 
-    batch.put::<DbMetadataSchema>(
+    let progress_batch = SchemaBatch::new();
+    progress_batch.put::<DbMetadataSchema>(
         &DbMetadataKey::LedgerCommitProgress,
         &DbMetadataValue::Version(start_version - 1),
     )?;
-    ledger_db.metadata_db().write_schemas(batch)
+    ledger_db.metadata_db().write_schemas(progress_batch)?;
+
+    ledger_db.write_schemas(batch)
 }
 
 fn delete_transaction_index_data(
@@ -331,24 +342,28 @@ fn delete_per_epoch_data(
 fn delete_per_version_data(
     ledger_db: &LedgerDb,
     start_version: Version,
-    batch: &SchemaBatch,
+    batch: &LedgerDbSchemaBatches,
 ) -> Result<()> {
     delete_per_version_data_impl::<TransactionInfoSchema>(
         ledger_db.transaction_info_db(),
         start_version,
-        batch,
+        &batch.transaction_info_db_batches,
     )?;
     delete_per_version_data_impl::<TransactionSchema>(
         ledger_db.transaction_db(),
         start_version,
-        batch,
+        &batch.transaction_db_batches,
     )?;
     delete_per_version_data_impl::<VersionDataSchema>(
         ledger_db.metadata_db(),
         start_version,
-        batch,
+        &batch.ledger_metadata_db_batches,
     )?;
-    delete_per_version_data_impl::<WriteSetSchema>(ledger_db.write_set_db(), start_version, batch)?;
+    delete_per_version_data_impl::<WriteSetSchema>(
+        ledger_db.write_set_db(),
+        start_version,
+        &batch.write_set_db_batches,
+    )?;
 
     Ok(())
 }

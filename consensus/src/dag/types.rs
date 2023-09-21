@@ -431,12 +431,12 @@ impl CertifiedNodeMessage {
         }
     }
 
-    pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
-        &self.ledger_info
-    }
-
     pub fn certified_node(self) -> CertifiedNode {
         self.inner
+    }
+
+    pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
+        &self.ledger_info
     }
 }
 
@@ -580,8 +580,8 @@ impl RemoteFetchRequest {
         self.epoch
     }
 
-    pub fn targets(&self) -> &[NodeMetadata] {
-        &self.targets
+    pub fn targets(&self) -> impl Iterator<Item = &NodeMetadata> + Clone {
+        self.targets.iter()
     }
 
     pub fn exists_bitmask(&self) -> &DagSnapshotBitmask {
