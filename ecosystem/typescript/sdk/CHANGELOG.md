@@ -9,6 +9,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 - Add current objects queries support - `getAccountOwnedObjects`
 - Add `burnObject` transaction support in `AptosToken`
+- Add `getEvents` query on `IndexerClient` for a better support
 
 ## 1.19.0 (2023-08-24)
 

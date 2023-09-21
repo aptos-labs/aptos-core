@@ -379,6 +379,41 @@ describe("Indexer", () => {
       longTestTimeout,
     );
 
+    // EVENTS //
+
+    it(
+      "gets events",
+      async () => {
+        const events = await indexerClient.getEvents();
+        expect(events.events.length).toBeGreaterThan(0);
+      },
+      longTestTimeout,
+    );
+
+    it("gets events by type", async () => {
+      const events = await indexerClient.getEvents({
+        where: {
+          type: { _eq: "0x1::block::NewBlockEvent" },
+        },
+      });
+      expect(events.events.length).toBeGreaterThan(0);
+      expect(events.events[0].type).toBe("0x1::block::NewBlockEvent");
+    });
+
+    it("gets events by type and account address", async () => {
+      const events = await indexerClient.getEvents({
+        where: {
+          type: { _eq: "0x1::block::NewBlockEvent" },
+          account_address: { _eq: "0x0000000000000000000000000000000000000000000000000000000000000001" },
+        },
+      });
+      expect(events.events.length).toBeGreaterThan(0);
+      expect(events.events[0].type).toBe("0x1::block::NewBlockEvent");
+      expect(events.events[0].account_address).toBe(
+        "0x0000000000000000000000000000000000000000000000000000000000000001",
+      );
+    });
+
     // TOKEN STANDARD FILTER //
 
     it("gets account owned tokens with a specified token standard", async () => {

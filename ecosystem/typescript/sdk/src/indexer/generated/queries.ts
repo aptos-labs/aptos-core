@@ -286,6 +286,25 @@ export const GetDelegatedStakingActivities = `
   }
 }
     `;
+export const GetEvents = `
+    query getEvents($where_condition: events_bool_exp, $offset: Int, $limit: Int, $order_by: [events_order_by!]) {
+  events(
+    where: $where_condition
+    offset: $offset
+    limit: $limit
+    order_by: $order_by
+  ) {
+    account_address
+    creation_number
+    data
+    event_index
+    sequence_number
+    transaction_block_height
+    transaction_version
+    type
+  }
+}
+    `;
 export const GetIndexerLedgerInfo = `
     query getIndexerLedgerInfo {
   ledger_infos {
@@ -481,6 +500,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     },
     getDelegatedStakingActivities(variables?: Types.GetDelegatedStakingActivitiesQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetDelegatedStakingActivitiesQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetDelegatedStakingActivitiesQuery>(GetDelegatedStakingActivities, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getDelegatedStakingActivities', 'query');
+    },
+    getEvents(variables?: Types.GetEventsQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetEventsQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetEventsQuery>(GetEvents, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getEvents', 'query');
     },
     getIndexerLedgerInfo(variables?: Types.GetIndexerLedgerInfoQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetIndexerLedgerInfoQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetIndexerLedgerInfoQuery>(GetIndexerLedgerInfo, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getIndexerLedgerInfo', 'query');

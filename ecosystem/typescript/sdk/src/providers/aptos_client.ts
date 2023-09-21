@@ -410,6 +410,8 @@ export class AptosClient {
   }
 
   /**
+   * NOTE: for a better events query support, consider using IndexerClient.getEvents() query
+   *
    * Event types are globally identifiable by an account `address` and
    * monotonically increasing `creation_number`, one per event type emitted
    * to the given account. This API returns events corresponding to that
@@ -437,6 +439,8 @@ export class AptosClient {
   }
 
   /**
+   * NOTE: for a better events query support, consider using IndexerClient.getEvents() query
+   *
    * This API uses the given account `address`, `eventHandle`, and `fieldName`
    * to build a key that can globally identify an event types. It then uses this
    * key to return events emitted to the given account matching that event type.

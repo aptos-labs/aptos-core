@@ -23,6 +23,7 @@ import {
   GetOwnedTokensByTokenDataQuery,
   GetAccountCoinsDataCountQuery,
   GetCurrentObjectsQuery,
+  GetEventsQuery,
 } from "../indexer/generated/operations";
 import {
   GetAccountTokensCount,
@@ -47,6 +48,7 @@ import {
   GetOwnedTokensByTokenData,
   GetAccountCoinsDataCount,
   GetCurrentObjects,
+  GetEvents,
 } from "../indexer/generated/queries";
 import { ClientConfig, post } from "../client";
 import { ApiError } from "./aptos_client";
@@ -61,6 +63,8 @@ import {
   Token_Activities_V2_Order_By,
   User_Transactions_Order_By,
   Current_Objects_Order_By,
+  Events_Order_By,
+  Events_Bool_Exp,
 } from "../indexer/generated/types";
 
 /**
@@ -900,6 +904,42 @@ export class IndexerClient {
       query: GetCurrentObjects,
       variables: {
         where_condition: whereCondition,
+        offset: extraArgs?.options?.offset,
+        limit: extraArgs?.options?.limit,
+        order_by: extraArgs?.orderBy,
+      },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  // EVENTS //
+
+  /**
+   * Queries for events
+   *
+   * An optional `where` can be passed in to filter out the response.
+   *
+   * @example
+   * ```
+   * { where:
+   *  {
+   *   type: { _eq: "0x1::block::NewBlockEvent" },
+   *   account_address: { _eq: "0x123" }
+   *  }
+   * }
+   * ```
+   *
+   * @returns GetEventsQuery response type
+   */
+  async getEvents(extraArgs?: {
+    where?: Events_Bool_Exp;
+    options?: IndexerPaginationArgs;
+    orderBy?: IndexerSortBy<Events_Order_By>[];
+  }): Promise<GetEventsQuery> {
+    const graphqlQuery = {
+      query: GetEvents,
+      variables: {
+        where_condition: extraArgs?.where,
         offset: extraArgs?.options?.offset,
         limit: extraArgs?.options?.limit,
         order_by: extraArgs?.orderBy,

@@ -96,6 +96,16 @@ export type GetDelegatedStakingActivitiesQueryVariables = Types.Exact<{
 
 export type GetDelegatedStakingActivitiesQuery = { __typename?: 'query_root', delegated_staking_activities: Array<{ __typename?: 'delegated_staking_activities', amount: any, delegator_address: string, event_index: any, event_type: string, pool_address: string, transaction_version: any }> };
 
+export type GetEventsQueryVariables = Types.Exact<{
+  where_condition?: Types.InputMaybe<Types.Events_Bool_Exp>;
+  offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.Events_Order_By> | Types.Events_Order_By>;
+}>;
+
+
+export type GetEventsQuery = { __typename?: 'query_root', events: Array<{ __typename?: 'events', account_address: string, creation_number: any, data: any, event_index?: any | null, sequence_number: any, transaction_block_height: any, transaction_version: any, type: string }> };
+
 export type GetIndexerLedgerInfoQueryVariables = Types.Exact<{ [key: string]: never; }>;
 
 
