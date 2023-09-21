@@ -80,7 +80,7 @@ pub enum ExecutionTaskType {
 /// A holder for potential task returned from the Scheduler. ExecutionTask and ValidationTask
 /// each contain a version of transaction that must be executed or validated, respectively.
 /// NoTask holds no task (similar None if we wrapped tasks in Option), and Done implies that
-/// `there are no more tasks and the scheduler is done.
+/// there are no more tasks and the scheduler is done.
 #[derive(Debug)]
 pub enum SchedulerTask {
     ExecutionTask(TxnIndex, Incarnation, ExecutionTaskType),
