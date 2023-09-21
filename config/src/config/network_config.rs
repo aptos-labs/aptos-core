@@ -53,10 +53,6 @@ pub const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024; /* 64 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;
 pub const IP_BYTE_BUCKET_RATE: usize = 102400 /* 100 KiB */;
 pub const IP_BYTE_BUCKET_SIZE: usize = IP_BYTE_BUCKET_RATE;
-pub const INBOUND_TCP_RX_BUFFER_SIZE: u32 = 3 * 1024 * 1024; // 3MB ~6MB/s with 500ms latency
-pub const INBOUND_TCP_TX_BUFFER_SIZE: u32 = 512 * 1024; // 1MB use a bigger spoon
-pub const OUTBOUND_TCP_RX_BUFFER_SIZE: u32 = 3 * 1024 * 1024; // 3MB ~6MB/s with 500ms latency
-pub const OUTBOUND_TCP_TX_BUFFER_SIZE: u32 = 1024 * 1024; // 1MB use a bigger spoon
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -89,10 +85,6 @@ pub struct NetworkConfig {
     pub network_id: NetworkId,
     /// Number of threads to run for networking
     pub runtime_threads: Option<usize>,
-    pub inbound_rx_buffer_size_bytes: Option<u32>,
-    pub inbound_tx_buffer_size_bytes: Option<u32>,
-    pub outbound_rx_buffer_size_bytes: Option<u32>,
-    pub outbound_tx_buffer_size_bytes: Option<u32>,
     /// Addresses of initial peers to connect to. In a mutual_authentication network,
     /// we will extract the public keys from these addresses to set our initial
     /// trusted peers set.  TODO: Replace usage in configs with `seeds` this is for backwards compatibility
@@ -157,10 +149,6 @@ impl NetworkConfig {
             inbound_rate_limit_config: None,
             outbound_rate_limit_config: None,
             max_message_size: MAX_MESSAGE_SIZE,
-            inbound_rx_buffer_size_bytes: Some(INBOUND_TCP_RX_BUFFER_SIZE),
-            inbound_tx_buffer_size_bytes: Some(INBOUND_TCP_TX_BUFFER_SIZE),
-            outbound_rx_buffer_size_bytes: Some(OUTBOUND_TCP_RX_BUFFER_SIZE),
-            outbound_tx_buffer_size_bytes: Some(OUTBOUND_TCP_TX_BUFFER_SIZE),
             max_parallel_deserialization_tasks: None,
         };
 

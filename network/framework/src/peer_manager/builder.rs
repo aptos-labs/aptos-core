@@ -24,7 +24,7 @@ use aptos_logger::prelude::*;
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 use aptos_netcore::transport::memory::MemoryTransport;
 use aptos_netcore::transport::{
-    tcp::{TCPBufferCfg, TcpSocket, TcpTransport},
+    tcp::{TcpSocket, TcpTransport},
     Transport,
 };
 use aptos_time_service::TimeService;
@@ -78,7 +78,6 @@ struct PeerManagerContext {
     max_frame_size: usize,
     max_message_size: usize,
     inbound_connection_limit: usize,
-    tcp_buffer_cfg: TCPBufferCfg,
 }
 
 impl PeerManagerContext {
@@ -101,7 +100,6 @@ impl PeerManagerContext {
         max_frame_size: usize,
         max_message_size: usize,
         inbound_connection_limit: usize,
-        tcp_buffer_cfg: TCPBufferCfg,
     ) -> Self {
         Self {
             pm_reqs_tx,
@@ -118,7 +116,6 @@ impl PeerManagerContext {
             max_frame_size,
             max_message_size,
             inbound_connection_limit,
-            tcp_buffer_cfg,
         }
     }
 
@@ -176,7 +173,6 @@ impl PeerManagerBuilder {
         max_message_size: usize,
         enable_proxy_protocol: bool,
         inbound_connection_limit: usize,
-        tcp_buffer_cfg: TCPBufferCfg,
     ) -> Self {
         // Setup channel to send requests to peer manager.
         let (pm_reqs_tx, pm_reqs_rx) = aptos_channel::new(
@@ -211,7 +207,6 @@ impl PeerManagerBuilder {
                 max_frame_size,
                 max_message_size,
                 inbound_connection_limit,
-                tcp_buffer_cfg,
             )),
             peer_manager: None,
             listen_address,
@@ -267,15 +262,11 @@ impl PeerManagerBuilder {
             ),
         };
 
-        let mut aptos_tcp_transport = APTOS_TCP_TRANSPORT.clone();
-        let tcp_cfg = self.get_tcp_buffers_cfg();
-        aptos_tcp_transport.set_tcp_buffers(&tcp_cfg);
-
         self.peer_manager = match self.listen_address.as_slice() {
             [Ip4(_), Tcp(_)] | [Ip6(_), Tcp(_)] => {
                 Some(TransportPeerManager::Tcp(self.build_with_transport(
                     AptosNetTransport::new(
-                        aptos_tcp_transport,
+                        APTOS_TCP_TRANSPORT.clone(),
                         self.network_context,
                         self.time_service.clone(),
                         key,
@@ -384,13 +375,6 @@ impl PeerManagerBuilder {
             .as_mut()
             .expect("Cannot add an event listener if PeerManager has already been built.")
             .add_connection_event_listener()
-    }
-
-    pub fn get_tcp_buffers_cfg(&self) -> TCPBufferCfg {
-        self.peer_manager_context
-            .as_ref()
-            .expect("Cannot add an event listener if PeerManager has already been built.")
-            .tcp_buffer_cfg
     }
 
     /// Register a client that's interested in some set of protocols and return

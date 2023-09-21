@@ -18,7 +18,7 @@ use aptos_crypto::x25519;
 use aptos_id_generator::{IdGenerator, U32IdGenerator};
 use aptos_logger::prelude::*;
 // Re-exposed for aptos-network-checker
-pub use aptos_netcore::transport::tcp::{resolve_and_connect, TCPBufferCfg, TcpSocket};
+pub use aptos_netcore::transport::tcp::{resolve_and_connect, TcpSocket};
 use aptos_netcore::transport::{proxy_protocol, tcp, ConnectionOrigin, Transport};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{timeout, TimeService, TimeServiceTrait};
@@ -54,8 +54,6 @@ pub const APTOS_TCP_TRANSPORT: tcp::TcpTransport = tcp::TcpTransport {
     ttl: None,
     // Use TCP_NODELAY for Aptos tcp connections.
     nodelay: Some(true),
-    // Use default TCP setting, overridden by Network config
-    tcp_buff_cfg: tcp::TCPBufferCfg::new(),
 };
 
 /// A trait alias for "socket-like" things.
