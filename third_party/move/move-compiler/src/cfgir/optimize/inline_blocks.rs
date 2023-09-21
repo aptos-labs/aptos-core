@@ -33,12 +33,11 @@ fn optimize_(start: Label, blocks: &mut BasicBlocks) -> bool {
 }
 
 // Return a list of labels that have just a single branch to them.
-
 fn find_single_target_labels(start: Label, blocks: &BasicBlocks) -> BTreeSet<Label> {
     use Command_ as C;
     let mut counts = BTreeMap::new();
-    // 'start' block doesn't count as single entry for these purposes.  Give it 2.
-    counts.insert(start, 2);
+    // 'start' block has an implicit branch to it.
+    counts.insert(start, 1);
     for block in blocks.values() {
         match &block.back().unwrap().value {
             C::JumpIf {
@@ -69,8 +68,12 @@ fn inline_single_target_blocks(
     //cleanup of needless_collect would result in mut and non mut borrows, and compilation warning.
     let labels_vec = blocks.keys().cloned().collect::<Vec<_>>();
 
-    // all blocks
+    // Blocks move from working_blocks to finished_blocks as
+    // they are processed (unless they are dropped).
     let mut working_blocks = std::mem::take(blocks);
+    // Note that std::mem::take() replaces `*blocks` by
+    // the default (a new empty BTreeMap), which we
+    // borrow &mut to as finished_blocks.
     let finished_blocks = blocks;
 
     let mut remapping = BTreeMap::new();
@@ -89,35 +92,22 @@ fn inline_single_target_blocks(
         };
 
         match block.back().unwrap() {
-            // Do not need to worry about infinitely unwrapping loops as loop heads will always
-            // be the target of at least 2 jumps: the jump to the loop and the "continue" jump
-            // This is always true as long as we start the count for the start label at 1
             sp!(_, Command_::Jump { target, .. }) if single_jump_targets.contains(target) => {
                 // Note that only the last merged block will be left for cur.
                 remapping.insert(cur, *target);
-                match working_blocks.remove(target) {
-                    Some(target_block) => {
-                        block.pop_back();
-                        block.extend(target_block);
-                    },
-                    None => {
-                        match finished_blocks.remove(target) {
-                            Some(target_block) => {
-                                block.pop_back();
-                                block.extend(target_block);
-                            },
-                            None => {
-                                panic!(
-                                    "ICE: Target {} not found in working_blocks or finished_blocks",
-                                    target
-                                );
-                            },
-                        };
-                    },
-                };
+                let target_block = working_blocks.remove(target).unwrap_or_else(|| {
+                    finished_blocks.remove(target).unwrap_or_else(|| {
+                        panic!(
+                            "ICE: Target {} not found in working_blocks or finished_blocks",
+                            target
+                        )
+                    })
+                });
+                block.pop_back();
+                block.extend(target_block);
                 // put cur's block back into working_blocks, as we will revisit it on next iter.
                 working_blocks.insert(cur, block);
-                // Note that target block is droppped.
+                // Note that target_block is droppped.
             },
             _ => {
                 next = labels.next();
