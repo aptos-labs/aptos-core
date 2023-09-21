@@ -71,7 +71,7 @@ function App() {
 ```
 
 4. Before creating our `fetchList` function, let’s also create a local state to store whether the account has a list.
-   Import `useState` by using `import { useState, useEffect } from "react"; `
+   Import `useState` by using ```import { useState, useEffect } from "react"; ```
    Next create a state variable `accountHasList` and its setter `setAccountHasList`
 
 ```jsx
