@@ -116,9 +116,7 @@ fn inline_single_target_blocks(
         }
     }
 
-    let changed = !remapping.is_empty();
-    remap_to_last_target(remapping, start, finished_blocks);
-    changed
+    remap_to_last_target(remapping, start, finished_blocks)
 }
 
 /// In order to preserve loop invariants at the bytecode level, when a block is "inlined", that
@@ -134,32 +132,49 @@ fn inline_single_target_blocks(
 ///
 /// After:
 ///   B: block_a; block_b
+/// Returns true if a label might have changed.
 fn remap_to_last_target(
     mut remapping: BTreeMap<Label, Label>,
     start: Label,
     blocks: &mut BasicBlocks,
-) {
+) -> bool {
     // The start block can't be relabelled in the current CFG API.
     // But it does not need to be since it will always be the first block, thus it will not run
     // into issues in the bytecode verifier
     remapping.remove(&start);
     if remapping.is_empty() {
-        return;
+        return false;
     }
-    // populate remapping for non changed blocks, and also
+
     // close transitive chains (lab1 -> lab2 -> lab3 becomes lab1 -> lab3).
     for label in blocks.keys() {
-        let mut label2 = *label;
-        while let Some(target) = remapping.get(&label2) {
-            // proceed until label2 has no mapping, or is self-mapping.
-            if label2 == *target {
-                break;
+        if let Some(target_label) = remapping.get(label) {
+            let mut prev_label = label;
+            let mut next_label = target_label;
+            while prev_label != next_label {
+                match remapping.get(next_label) {
+                    Some(next_next_label) => {
+                        prev_label = next_label;
+                        next_label = next_next_label;
+                    },
+                    None => {
+                        break;
+                    },
+                };
             }
-            label2 = *target;
+            if next_label != label {
+                remapping.insert(*label, *next_label);
+            } else {
+                remapping.remove(label);
+            }
         }
-        remapping.entry(*label).or_insert(label2);
     }
-    let owned_blocks = std::mem::take(blocks);
-    let (_start, remapped_blocks) = remap_labels(&remapping, start, owned_blocks);
-    *blocks = remapped_blocks;
+    if !remapping.is_empty() {
+        let owned_blocks = std::mem::take(blocks);
+        let (_start, remapped_blocks) = remap_labels(&remapping, start, owned_blocks);
+        *blocks = remapped_blocks;
+        true
+    } else {
+        false
+    }
 }
