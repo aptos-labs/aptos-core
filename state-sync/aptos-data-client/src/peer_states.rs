@@ -6,20 +6,14 @@ use crate::{
     interface::ResponseError,
     logging::{LogEntry, LogEvent, LogSchema},
 };
-use aptos_config::{
-    config::{AptosDataClientConfig, BaseConfig},
-    network_id::{NetworkId, PeerNetworkId},
-};
+use aptos_config::{config::AptosDataClientConfig, network_id::PeerNetworkId};
 use aptos_logger::prelude::*;
-use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::application::storage::PeersAndMetadata;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServerSummary,
 };
 use aptos_time_service::TimeService;
-use dashmap::{DashMap, DashSet};
-use itertools::Itertools;
-use std::{cmp::min, sync::Arc};
+use dashmap::DashMap;
+use std::{cmp::min, collections::HashSet, sync::Arc};
 
 /// Scores for peer rankings based on preferences and behavior.
 const MAX_SCORE: f64 = 100.0;
@@ -79,7 +73,7 @@ impl PeerState {
     }
 
     /// Returns the storage summary iff the peer is not below the ignore threshold
-    fn get_storage_summary_if_not_ignored(&self) -> Option<&StorageServerSummary> {
+    pub(crate) fn get_storage_summary_if_not_ignored(&self) -> Option<&StorageServerSummary> {
         if self.score <= IGNORE_PEER_THRESHOLD {
             None
         } else {
@@ -106,27 +100,15 @@ impl PeerState {
 /// advertisements and data-client internal metadata for scoring.
 #[derive(Clone, Debug)]
 pub(crate) struct PeerStates {
-    base_config: Arc<BaseConfig>,
     data_client_config: Arc<AptosDataClientConfig>,
-    peer_to_state: DashMap<PeerNetworkId, PeerState>,
-    in_flight_priority_polls: DashSet<PeerNetworkId>, // The priority peers with in-flight polls
-    in_flight_regular_polls: DashSet<PeerNetworkId>,  // The regular peers with in-flight polls
-    peers_and_metadata: Arc<PeersAndMetadata>,
+    peer_to_state: Arc<DashMap<PeerNetworkId, PeerState>>,
 }
 
 impl PeerStates {
-    pub fn new(
-        base_config: Arc<BaseConfig>,
-        data_client_config: Arc<AptosDataClientConfig>,
-        peers_and_metadata: Arc<PeersAndMetadata>,
-    ) -> Self {
+    pub fn new(data_client_config: Arc<AptosDataClientConfig>) -> Self {
         Self {
-            base_config,
             data_client_config,
-            peer_to_state: DashMap::new(),
-            in_flight_priority_polls: DashSet::new(),
-            in_flight_regular_polls: DashSet::new(),
-            peers_and_metadata,
+            peer_to_state: Arc::new(DashMap::new()),
         }
     }
 
@@ -205,114 +187,16 @@ impl PeerStates {
         }
     }
 
-    /// Returns the number of in-flight priority polls
-    pub fn num_in_flight_priority_polls(&self) -> u64 {
-        self.in_flight_priority_polls.len() as u64
-    }
-
-    /// Returns the number of in-flight regular polls
-    pub fn num_in_flight_regular_polls(&self) -> u64 {
-        self.in_flight_regular_polls.len() as u64
-    }
-
-    /// Returns true iff there is an existing in-flight request
-    pub fn existing_in_flight_request(&self, peer: &PeerNetworkId) -> bool {
-        self.in_flight_priority_polls.contains(peer) || self.in_flight_regular_polls.contains(peer)
-    }
-
-    /// Marks an in-flight request as started for the specified peer
-    pub fn new_in_flight_request(&self, peer: &PeerNetworkId) {
-        // Get the current in-flight polls
-        let is_priority_peer = self.is_priority_peer(peer);
-        let in_flight_polls = if is_priority_peer {
-            &self.in_flight_priority_polls
-        } else {
-            &self.in_flight_regular_polls
-        };
-
-        // Insert the new peer
-        if !in_flight_polls.insert(*peer) {
-            error!(
-                (LogSchema::new(LogEntry::PeerStates)
-                    .event(LogEvent::PriorityAndRegularPeers)
-                    .message(&format!(
-                        "Peer already found with an in-flight poll! Priority: {:?}",
-                        is_priority_peer
-                    ))
-                    .peer(peer))
-            );
-        }
-    }
-
-    /// Marks the pending in-flight request as complete for the specified peer
-    pub fn mark_in_flight_request_complete(&self, peer: &PeerNetworkId) {
-        // The priority of the peer might have changed since we
-        // last polled it, so we attempt to remove it from both
-        // the regular and priority in-flight requests.
-        if self.in_flight_priority_polls.remove(peer).is_none()
-            && self.in_flight_regular_polls.remove(peer).is_none()
-        {
-            error!(
-                (LogSchema::new(LogEntry::PeerStates)
-                    .event(LogEvent::PriorityAndRegularPeers)
-                    .message("Peer not found with an in-flight poll!")
-                    .peer(peer))
-            );
-        }
-    }
-
-    /// Returns true iff the given peer is high-priority.
-    ///
-    /// TODO(joshlind): make this less hacky using network topological awareness.
-    pub fn is_priority_peer(&self, peer: &PeerNetworkId) -> bool {
-        // Validators should only prioritize other validators
-        let peer_network_id = peer.network_id();
-        if self.base_config.role.is_validator() {
-            return peer_network_id.is_validator_network();
-        }
-
-        // VFNs should only prioritize validators
-        if self
-            .peers_and_metadata
-            .get_registered_networks()
-            .contains(&NetworkId::Vfn)
-        {
-            return peer_network_id.is_vfn_network();
-        }
-
-        // PFNs should only prioritize outbound connections (this targets seed peers and VFNs)
-        match self.peers_and_metadata.get_metadata_for_peer(*peer) {
-            Ok(peer_metadata) => {
-                if peer_metadata.get_connection_metadata().origin == ConnectionOrigin::Outbound {
-                    return true;
-                }
-            },
-            Err(error) => {
-                warn!(
-                    (LogSchema::new(LogEntry::PeerStates)
-                        .event(LogEvent::PriorityAndRegularPeers)
-                        .message(&format!(
-                            "Unable to locate metadata for peer! Error: {:?}",
-                            error
-                        ))
-                        .peer(peer))
-                );
-            },
-        }
-
-        false
-    }
-
     /// Updates the storage summary for the given peer
-    pub fn update_summary(&self, peer: PeerNetworkId, summary: StorageServerSummary) {
+    pub fn update_summary(&self, peer: PeerNetworkId, storage_summary: StorageServerSummary) {
         self.peer_to_state
             .entry(peer)
             .or_default()
-            .update_storage_summary(summary);
+            .update_storage_summary(storage_summary);
     }
 
     /// Garbage collects the peer states to remove data for disconnected peers
-    pub fn garbage_collect_peer_states(&self, connected_peers: Vec<PeerNetworkId>) {
+    pub fn garbage_collect_peer_states(&self, connected_peers: HashSet<PeerNetworkId>) {
         self.peer_to_state
             .retain(|peer_network_id, _| connected_peers.contains(peer_network_id));
     }
@@ -391,7 +275,7 @@ impl PeerStates {
 
     #[cfg(test)]
     /// Returns a copy of the peer to states map for test purposes
-    pub fn get_peer_to_states(&self) -> DashMap<PeerNetworkId, PeerState> {
+    pub fn get_peer_to_states(&self) -> Arc<DashMap<PeerNetworkId, PeerState>> {
         self.peer_to_state.clone()
     }
 }
