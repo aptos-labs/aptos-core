@@ -17,7 +17,7 @@ use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
 use std::{net::ToSocketAddrs, sync::Arc};
 use tokio::runtime::Runtime;
-use tonic::transport::Server;
+use tonic::{codec::CompressionEncoding, transport::Server};
 
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;
@@ -58,14 +58,18 @@ pub fn bootstrap(
             service_context: service_context.clone(),
         };
         let localnet_data_server = LocalnetDataService { service_context };
-
         let mut tonic_server = Server::builder()
             .http2_keepalive_interval(Some(std::time::Duration::from_secs(60)))
             .http2_keepalive_timeout(Some(std::time::Duration::from_secs(5)));
 
         let router = match use_data_service_interface {
             false => tonic_server.add_service(FullnodeDataServer::new(server)),
-            true => tonic_server.add_service(RawDataServer::new(localnet_data_server)),
+            true => {
+                let svc = RawDataServer::new(localnet_data_server)
+                    .send_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Gzip);
+                tonic_server.add_service(svc)
+            },
         };
         // Make port into a config
         router
