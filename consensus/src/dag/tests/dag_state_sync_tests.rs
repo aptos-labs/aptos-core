@@ -21,7 +21,6 @@ use aptos_time_service::TimeService;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
-    epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_verifier::random_validator_verifier,
@@ -113,12 +112,7 @@ fn setup(epoch_state: Arc<EpochState>, storage: Arc<dyn DAGStorage>) -> DagState
     let time_service = TimeService::mock();
     let state_computer = Arc::new(EmptyStateComputer {});
 
-    DagStateSynchronizer::new(
-        epoch_state,
-        time_service,
-        state_computer,
-        storage,
-    )
+    DagStateSynchronizer::new(epoch_state, time_service, state_computer, storage)
 }
 
 #[tokio::test]

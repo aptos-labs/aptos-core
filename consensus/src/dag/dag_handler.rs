@@ -3,11 +3,8 @@
 use super::{
     dag_driver::DagDriver,
     dag_fetcher::{FetchRequestHandler, FetchWaiter},
-    dag_state_sync::{
-        StateSyncStatus,
-        StateSyncTrigger,
-    },
-    types::{CertifiedNodeMessage, TDAGMessage},
+    dag_state_sync::{StateSyncStatus, StateSyncTrigger},
+    types::TDAGMessage,
     CertifiedNode, Node,
 };
 use crate::{
@@ -133,7 +130,7 @@ impl NetworkHandler {
                         self.node_receiver.process(node).await.map(|r| r.into())
                     },
                     DAGMessage::CertifiedNodeMsg(certified_node_msg) => {
-                        match self.state_sync_trigger.check(certified_node_msg).await {
+                        match self.state_sync_trigger.check(certified_node_msg).await? {
                             StateSyncStatus::Synced(Some(certified_node_msg)) => self
                                 .dag_driver
                                 .process(certified_node_msg.certified_node())

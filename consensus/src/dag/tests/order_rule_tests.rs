@@ -16,10 +16,7 @@ use crate::{
 };
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::{Mutex, RwLock};
-use aptos_types::{
-    epoch_change::EpochChangeProof, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    validator_verifier::random_validator_verifier,
-};
+use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
 use async_trait::async_trait;
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use proptest::prelude::*;

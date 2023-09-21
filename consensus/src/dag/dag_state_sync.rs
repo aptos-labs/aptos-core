@@ -8,6 +8,7 @@ use super::{
     ProofNotifier,
 };
 use crate::state_replication::StateComputer;
+use anyhow::ensure;
 use aptos_consensus_types::common::Round;
 use aptos_infallible::RwLock;
 use aptos_logger::error;
@@ -30,40 +31,64 @@ pub enum StateSyncStatus {
 }
 
 pub(super) struct StateSyncTrigger {
+    epoch_state: Arc<EpochState>,
     dag_store: Arc<RwLock<Dag>>,
     proof_notifier: Arc<dyn ProofNotifier>,
 }
 
 impl StateSyncTrigger {
-    pub(super) fn new(dag_store: Arc<RwLock<Dag>>, proof_notifier: Arc<dyn ProofNotifier>) -> Self {
+    pub(super) fn new(
+        epoch_state: Arc<EpochState>,
+        dag_store: Arc<RwLock<Dag>>,
+        proof_notifier: Arc<dyn ProofNotifier>,
+    ) -> Self {
         Self {
+            epoch_state,
             dag_store,
             proof_notifier,
         }
     }
 
-    /// This method checks if a state sync is required, and if so,
-    /// notifies the bootstraper, to let the bootstraper can abort this task.
-    pub(super) async fn check(&self, node: CertifiedNodeMessage) -> StateSyncStatus {
-        let ledger_info = node.ledger_info();
+    fn verify_ledger_info(&self, ledger_info: &LedgerInfoWithSignatures) -> anyhow::Result<()> {
+        ensure!(ledger_info.commit_info().epoch() == self.epoch_state.epoch);
 
-        self.notify_commit_proof(ledger_info).await;
-
-        if !self.need_sync_for_ledger_info(ledger_info) {
-            return StateSyncStatus::Synced(Some(node));
+        if ledger_info.commit_info().round() > 0 {
+            ledger_info
+                .verify_signatures(&self.epoch_state.verifier)
+                .map_err(|e| anyhow::anyhow!("unable to verify ledger info: {}", e))?;
         }
 
-        if ledger_info.ledger_info().ends_epoch() {
+        Ok(())
+    }
+
+    /// This method checks if a state sync is required, and if so,
+    /// notifies the bootstraper, to let the bootstraper can abort this task.
+    pub(super) async fn check(
+        &self,
+        node: CertifiedNodeMessage,
+    ) -> anyhow::Result<StateSyncStatus> {
+        let ledger_info_with_sigs = node.ledger_info();
+
+        if !self.need_sync_for_ledger_info(ledger_info_with_sigs) {
+            return Ok(StateSyncStatus::Synced(Some(node)));
+        }
+
+        // Only verify the certificate if we need to sync
+        self.verify_ledger_info(ledger_info_with_sigs)?;
+
+        self.notify_commit_proof(ledger_info_with_sigs).await;
+
+        if ledger_info_with_sigs.ledger_info().ends_epoch() {
             self.proof_notifier
                 .send_epoch_change(EpochChangeProof::new(
-                    vec![ledger_info.clone()],
+                    vec![ledger_info_with_sigs.clone()],
                     /* more = */ false,
                 ))
                 .await;
-            return StateSyncStatus::EpochEnds;
+            return Ok(StateSyncStatus::EpochEnds);
         }
 
-        StateSyncStatus::NeedsSync(node)
+        Ok(StateSyncStatus::NeedsSync(node))
     }
 
     /// Fast forward in the decoupled-execution pipeline if the block exists there
@@ -88,6 +113,10 @@ impl StateSyncTrigger {
     /// Check if we're far away from this ledger info and need to sync.
     /// This ensures that the block referred by the ledger info is not in buffer manager.
     fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
+        if li.commit_info().round() <= self.dag_store.read().highest_committed_anchor_round() {
+            return false;
+        }
+
         let dag_reader = self.dag_store.read();
         // check whether if DAG order round is behind the given ledger info round
         // (meaning consensus is behind) or

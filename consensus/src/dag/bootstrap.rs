@@ -196,13 +196,17 @@ impl DagBootstrapper {
             let adapter = Arc::new(OrderedNotifierAdapter::new(
                 ordered_nodes_tx.clone(),
                 self.storage.clone(),
+                self.epoch_state.clone(),
             ));
 
             let (dag_store, order_rule) =
                 self.bootstrap_dag_store(ledger_info.ledger_info().clone(), adapter.clone());
 
-            let state_sync_trigger =
-                StateSyncTrigger::new(dag_store.clone(), self.proof_notifier.clone());
+            let state_sync_trigger = StateSyncTrigger::new(
+                self.epoch_state.clone(),
+                dag_store.clone(),
+                self.proof_notifier.clone(),
+            );
 
             let (handler, fetch_service) =
                 self.bootstrap_components(dag_store.clone(), order_rule, state_sync_trigger);
@@ -279,13 +283,15 @@ pub(super) fn bootstrap_dag_for_test(
     let adapter = Arc::new(OrderedNotifierAdapter::new(
         ordered_nodes_tx,
         storage.clone(),
+        epoch_state.clone(),
     ));
     let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
 
     let (dag_store, order_rule) =
         bootstraper.bootstrap_dag_store(latest_ledger_info, adapter.clone());
 
-    let state_sync_trigger = StateSyncTrigger::new(dag_store.clone(), proof_notifier.clone());
+    let state_sync_trigger =
+        StateSyncTrigger::new(epoch_state, dag_store.clone(), proof_notifier.clone());
 
     let (handler, fetch_service) =
         bootstraper.bootstrap_components(dag_store.clone(), order_rule, state_sync_trigger);

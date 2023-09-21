@@ -5,7 +5,7 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
-    dag::{DAGMessage, DAGNetworkMessage, RpcWithFallback, TDAGNetworkSender, ProofNotifier},
+    dag::{DAGMessage, DAGNetworkMessage, ProofNotifier, RpcWithFallback, TDAGNetworkSender},
     experimental::commit_reliable_broadcast::CommitMessage,
     logging::LogEvent,
     monitor,
