@@ -6,22 +6,15 @@ use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
-    move_vm_ext::write_op_converter::WriteOpConverter,
     storage_adapter::AsExecutorView,
 };
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
-use aptos_types::{
-    state_store::state_key::{StateKey, StateKeyInner},
-    write_set::WriteOp,
-};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::ExecutorView;
-use bytes::Bytes;
 use move_core_types::{
-    effects::Op as MoveStorageOp,
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::VMStatus,
@@ -115,36 +108,5 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             },
             Err(err) => ExecutionStatus::Abort(err),
         }
-    }
-
-    fn convert_resource_group_write_to_value(
-        &self,
-        executor_view: &impl ExecutorView,
-        state_key: &StateKey,
-        maybe_resource_group_blob: Option<Bytes>,
-        creation: bool,
-    ) -> anyhow::Result<WriteOp> {
-        debug_assert!(
-            matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_resource_group()),
-            "Should only be used to convert resource group blobs to WriteOps"
-        );
-
-        let resolver = self.vm.as_move_resolver(executor_view);
-        let wop_converter =
-            WriteOpConverter::new(&resolver, self.vm.is_storage_slot_metadata_enabled());
-
-        let move_op = match maybe_resource_group_blob {
-            Some(blob) => {
-                if creation {
-                    MoveStorageOp::New(blob)
-                } else {
-                    MoveStorageOp::Modify(blob)
-                }
-            },
-            None => MoveStorageOp::Delete,
-        };
-        wop_converter
-            .convert_resource(state_key, move_op, false)
-            .map_err(|_| anyhow::Error::msg("Error on converting resource group blob to WriteOp"))
     }
 }

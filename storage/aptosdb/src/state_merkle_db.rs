@@ -121,8 +121,8 @@ impl StateMerkleDb {
                 let state_merkle_batch = batches.next().unwrap();
                 s.spawn(move |_| {
                     self.commit_single_shard(version, shard_id as u8, state_merkle_batch)
-                        .unwrap_or_else(|_| {
-                            panic!("Failed to commit state merkle shard {shard_id}.")
+                        .unwrap_or_else(|err| {
+                            panic!("Failed to commit state merkle shard {shard_id}: {err}")
                         });
                 });
             }

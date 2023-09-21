@@ -26,6 +26,7 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,
+    epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
 use async_trait::async_trait;
@@ -48,12 +49,14 @@ pub struct NotifierAdapter {
     executor_channel: UnboundedSender<OrderedBlocks>,
     storage: Arc<dyn DAGStorage>,
     parent_block_info: Arc<RwLock<BlockInfo>>,
+    epoch_state: Arc<EpochState>,
 }
 
 impl NotifierAdapter {
     pub fn new(
         executor_channel: UnboundedSender<OrderedBlocks>,
         storage: Arc<dyn DAGStorage>,
+        epoch_state: Arc<EpochState>,
     ) -> Self {
         let ledger_info_from_storage = storage
             .get_latest_ledger_info()
@@ -79,6 +82,7 @@ impl NotifierAdapter {
             executor_channel,
             storage,
             parent_block_info: Arc::new(RwLock::new(parent_block_info)),
+            epoch_state,
         }
     }
 }
@@ -102,6 +106,19 @@ impl Notifier for NotifierAdapter {
             node_digests.push(node.digest());
         }
         let parent_block_info = self.parent_block_info.read().clone();
+        // construct the bitvec that indicates which nodes present in the previous round in CommitEvent
+        let mut parents_bitvec = BitVec::with_num_bits(self.epoch_state.verifier.len() as u16);
+        for parent in anchor.parents().iter() {
+            if let Some(idx) = self
+                .epoch_state
+                .verifier
+                .address_to_validator_index()
+                .get(parent.metadata().author())
+            {
+                parents_bitvec.set(*idx as u16);
+            }
+        }
+
         // TODO: we may want to split payload into multiple blocks
         let block = ExecutedBlock::new(
             Block::new_for_dag(
@@ -112,6 +129,7 @@ impl Notifier for NotifierAdapter {
                 author,
                 failed_author,
                 parent_block_info,
+                parents_bitvec,
             )?,
             StateComputeResult::new_dummy(),
         );

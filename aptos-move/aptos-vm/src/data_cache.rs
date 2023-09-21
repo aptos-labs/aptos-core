@@ -25,9 +25,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadataKind},
     },
 };
-use aptos_vm_types::resolver::{
-    ExecutorView, StateStorageView, StateValueMetadataResolver, TResourceGroupResolver,
-};
+use aptos_vm_types::resolver::{ExecutorView, StateStorageView, StateValueMetadataResolver};
 use bytes::Bytes;
 use claims::assert_none;
 use move_binary_format::{errors::*, CompiledModule};
@@ -199,17 +197,6 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             Ok((buf, buf_size))
         }
     }
-}
-
-impl<'e, E: ExecutorView> AptosMoveResolver for StorageAdapter<'e, E> {
-    fn release_resource_group_cache(&self) -> HashMap<StateKey, BTreeMap<StructTag, Bytes>> {
-        self.resource_group_cache.take()
-    }
-}
-
-impl<'e, E: ExecutorView> TResourceGroupResolver for StorageAdapter<'e, E> {
-    type Key = StateKey;
-    type Tag = StructTag;
 
     fn get_resource_from_group(
         &self,
@@ -258,6 +245,12 @@ impl<'e, E: ExecutorView> TResourceGroupResolver for StorageAdapter<'e, E> {
         } else {
             Ok((None, None))
         }
+    }
+}
+
+impl<'e, E: ExecutorView> AptosMoveResolver for StorageAdapter<'e, E> {
+    fn release_resource_group_cache(&self) -> HashMap<StateKey, BTreeMap<StructTag, Bytes>> {
+        self.resource_group_cache.take()
     }
 }
 
@@ -368,6 +361,14 @@ impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
         self.executor_view
             .get_resource_state_value_metadata(state_key)
     }
+
+    fn get_resource_group_state_value_metadata(
+        &self,
+        _state_key: &StateKey,
+    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+        // TODO: forward to self.executor_view.
+        unimplemented!("Resource group metadata handling not yet implemented");
+    }
 }
 
 // Allows to extract the view from `StorageAdapter`.
@@ -381,7 +382,7 @@ impl<'e, E: ExecutorView> AsExecutorView for StorageAdapter<'e, E> {
 mod tests {
     use super::*;
     use aptos_state_view::TStateView;
-    use claims::{assert_gt, assert_lt, assert_ok_eq, assert_some, assert_some_eq};
+    use claims::{assert_gt, assert_lt, assert_some, assert_some_eq};
     use move_core_types::{identifier::Identifier, language_storage::TypeTag};
     use std::cmp::max;
 
@@ -664,32 +665,36 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_exists_resource_in_group() {
-        let state_view = MockStateView::new();
-        let mut s = state_view.as_move_resolver();
-        s = s.init(&Features::default(), 10);
-        // Tested separately, but re-confirm for the sanity of this test.
-        assert!(s.accurate_byte_count);
-        assert!(!s.group_byte_count_as_sum);
+    // TODO: bring back with proper implementation of resource exists in a group. Storage adapter
+    // needs this because resource group change-set preparation will check existence.
+    // #[test]
+    // fn test_exists_resource_in_group() {
+    //     let state_view = MockStateView::new();
+    //     let mut s = state_view.as_move_resolver();
+    //     s = s.init(&Features::default(), 10);
+    //     // Tested separately, but re-confirm for the sanity of this test.
+    //     assert!(s.accurate_byte_count);
+    //     assert!(!s.group_byte_count_as_sum);
 
-        let key_1 = StateKey::raw(vec![1]);
-        let tag_0 = tag_0();
-        let tag_1 = tag_1();
-        let tag_2 = tag_2();
+    //     let key_1 = StateKey::raw(vec![1]);
+    //     let tag_0 = tag_0();
+    //     let tag_1 = tag_1();
+    //     let tag_2 = tag_2();
 
-        assert_ok_eq!(s.resource_exists_in_group(&key_1, &tag_0), true);
-        // Release the cache to test contents, and to avoid assert when querying key_1 again.
-        let cache = s.release_resource_group_cache();
-        assert_eq!(cache.len(), 1);
-        assert_some!(cache.get(&key_1));
+    //     // TODO: test when we implement the group methods.
+    //     assert_ok_eq!(s.resource_exists_in_group(&key_1, &tag_0), true);
 
-        assert_ok_eq!(s.resource_exists_in_group(&key_1, &tag_1), true);
-        // Release the cache to test contents, and to avoid assert when querying key_1 again.
-        let cache = s.release_resource_group_cache();
-        assert_eq!(cache.len(), 1);
-        assert_some!(cache.get(&key_1));
+    //     // Release the cache to test contents, and to avoid assert when querying key_1 again.
+    //     let cache = s.release_resource_group_cache();
+    //     assert_eq!(cache.len(), 1);
+    //     assert_some!(cache.get(&key_1));
 
-        assert_ok_eq!(s.resource_exists_in_group(&key_1, &tag_2), false);
-    }
+    //     assert_ok_eq!(s.resource_exists_in_group(&key_1, &tag_1), true);
+    //     // Release the cache to test contents, and to avoid assert when querying key_1 again.
+    //     let cache = s.release_resource_group_cache();
+    //     assert_eq!(cache.len(), 1);
+    //     assert_some!(cache.get(&key_1));
+
+    //     assert_ok_eq!(s.resource_exists_in_group(&key_1, &tag_2), false);
+    // }
 }

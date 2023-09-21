@@ -40,6 +40,7 @@ mod aptosdb_test;
 
 #[cfg(feature = "db-debugger")]
 pub mod db_debugger;
+pub mod fast_sync_storage_wrapper;
 
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
@@ -328,12 +329,11 @@ impl Drop for RocksdbPropertyReporter {
 /// access to the core Aptos data structures.
 pub struct AptosDB {
     ledger_db: Arc<LedgerDb>,
-    state_merkle_db: Arc<StateMerkleDb>,
     state_kv_db: Arc<StateKvDb>,
-    event_store: Arc<EventStore>,
-    ledger_store: Arc<LedgerStore>,
-    state_store: Arc<StateStore>,
-    transaction_store: Arc<TransactionStore>,
+    pub(crate) event_store: Arc<EventStore>,
+    pub(crate) ledger_store: Arc<LedgerStore>,
+    pub(crate) state_store: Arc<StateStore>,
+    pub(crate) transaction_store: Arc<TransactionStore>,
     ledger_pruner: LedgerPrunerManager,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
     ledger_commit_lock: std::sync::Mutex<()>,
@@ -383,7 +383,6 @@ impl AptosDB {
 
         AptosDB {
             ledger_db: Arc::clone(&ledger_db),
-            state_merkle_db: Arc::clone(&state_merkle_db),
             state_kv_db: Arc::clone(&state_kv_db),
             event_store: Arc::new(EventStore::new(ledger_db.event_db_arc())),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&ledger_db))),
@@ -653,6 +652,11 @@ impl AptosDB {
         self.state_store.buffered_state()
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
+    fn state_merkle_db(&self) -> Arc<StateMerkleDb> {
+        self.state_store.state_db.state_merkle_db.clone()
+    }
+
     /// Returns ledger infos reflecting epoch bumps starting with the given epoch. If there are no
     /// more than `MAX_NUM_EPOCH_ENDING_LEDGER_INFO` results, this function returns all of them,
     /// otherwise the first `MAX_NUM_EPOCH_ENDING_LEDGER_INFO` results are returned and a flag
@@ -683,6 +687,7 @@ impl AptosDB {
         );
         // Note that the latest epoch can be the same with the current epoch (in most cases), or
         // current_epoch + 1 (when the latest ledger_info carries next validator set)
+
         let latest_epoch = self
             .ledger_store
             .get_latest_ledger_info()?
@@ -705,6 +710,7 @@ impl AptosDB {
             .ledger_store
             .get_epoch_ending_ledger_info_iter(start_epoch, paging_epoch)?
             .collect::<Result<Vec<_>>>()?;
+
         ensure!(
             lis.len() == (paging_epoch - start_epoch) as usize,
             "DB corruption: missing epoch ending ledger info for epoch {}",
@@ -2218,6 +2224,7 @@ impl DbWriter for AptosDB {
         })
     }
 
+    // TODO(bowu): populate the flag indicating the fast_sync is done.
     fn finalize_state_snapshot(
         &self,
         version: Version,

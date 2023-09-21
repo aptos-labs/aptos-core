@@ -13,7 +13,6 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
-use aptos_infallible::Mutex;
 use aptos_logger::Level;
 use aptos_network::protocols::network::RpcError;
 use aptos_storage_service_notifications::{
@@ -776,13 +775,13 @@ pub fn update_storage_summary_cache(
 /// Verifies that the peer has an active subscription stream
 /// and that the stream has the appropriate ID.
 pub fn verify_active_stream_id_for_peer(
-    active_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
+    active_subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
     peer_network_id: PeerNetworkId,
     new_stream_id: u64,
 ) {
     // Get the subscription stream requests for the peer
-    let mut active_subscriptions = active_subscriptions.lock();
-    let subscription_stream_requests = active_subscriptions.get_mut(&peer_network_id).unwrap();
+    let subscription = active_subscriptions.get(&peer_network_id).unwrap();
+    let subscription_stream_requests = subscription.value();
 
     // Verify the stream ID is correct
     assert_eq!(
@@ -910,7 +909,7 @@ pub async fn verify_output_subscription_response(
 /// Verifies the state of an active subscription stream entry.
 /// This is useful for manually testing internal logic.
 pub fn verify_subscription_stream_entry(
-    active_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
+    active_subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
     peer_network_id: PeerNetworkId,
     num_requests_per_batch: u64,
     peer_known_version: u64,
@@ -918,8 +917,8 @@ pub fn verify_subscription_stream_entry(
     max_transaction_output_chunk_size: u64,
 ) {
     // Get the subscription stream for the specified peer
-    let mut active_subscriptions = active_subscriptions.lock();
-    let subscription_stream_requests = active_subscriptions.get_mut(&peer_network_id).unwrap();
+    let mut subscription = active_subscriptions.get_mut(&peer_network_id).unwrap();
+    let subscription_stream_requests = subscription.value_mut();
 
     // Get the next index to serve on the stream
     let next_index_to_serve = subscription_stream_requests.get_next_index_to_serve();
@@ -975,7 +974,7 @@ pub async fn wait_for_active_optimistic_fetches(
 /// Waits for the specified number of active stream requests for
 /// the given peer ID.
 pub async fn wait_for_active_stream_requests(
-    active_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
+    active_subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
     peer_network_id: PeerNetworkId,
     expected_num_active_stream_requests: usize,
 ) {
@@ -983,10 +982,9 @@ pub async fn wait_for_active_stream_requests(
     let check_active_stream_requests = async move {
         loop {
             // Check if the number of active stream requests matches
-            if let Some(subscription_stream_requests) =
-                active_subscriptions.lock().get_mut(&peer_network_id)
-            {
-                let num_active_stream_requests = subscription_stream_requests
+            if let Some(mut subscription) = active_subscriptions.get_mut(&peer_network_id) {
+                let num_active_stream_requests = subscription
+                    .value_mut()
                     .get_pending_subscription_requests()
                     .len();
                 if num_active_stream_requests == expected_num_active_stream_requests {
@@ -1012,15 +1010,14 @@ pub async fn wait_for_active_stream_requests(
 
 /// Waits for the specified number of subscriptions to be active
 pub async fn wait_for_active_subscriptions(
-    active_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
+    active_subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
     expected_num_active_subscriptions: usize,
 ) {
     // Wait for the specified number of active subscriptions
     let check_active_subscriptions = async move {
         loop {
             // Check if the number of active subscriptions matches
-            let num_active_subscriptions = active_subscriptions.lock().len();
-            if num_active_subscriptions == expected_num_active_subscriptions {
+            if active_subscriptions.len() == expected_num_active_subscriptions {
                 return; // We found the expected number of active subscriptions
             }
 

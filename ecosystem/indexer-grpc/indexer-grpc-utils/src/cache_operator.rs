@@ -118,21 +118,21 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
     }
 
     // Set up the cache if needed.
-    pub async fn cache_setup_if_needed(&mut self) -> bool {
+    pub async fn cache_setup_if_needed(&mut self) -> anyhow::Result<bool> {
         let version_inserted: bool = redis::cmd("SET")
             .arg(CACHE_KEY_LATEST_VERSION)
             .arg(CACHE_DEFAULT_LATEST_VERSION_NUMBER)
             .arg("NX")
             .query_async(&mut self.conn)
             .await
-            .expect("Redis latest_version check failed.");
+            .context("Redis latest_version check failed.")?;
         if version_inserted {
             tracing::info!(
                 initialized_latest_version = CACHE_DEFAULT_LATEST_VERSION_NUMBER,
                 "Cache latest version is initialized."
             );
         }
-        version_inserted
+        Ok(version_inserted)
     }
 
     // Update the chain id in cache if missing; otherwise, verify the chain id.
@@ -144,7 +144,7 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
             .arg(chain_id)
             .invoke_async(&mut self.conn)
             .await
-            .expect("Redis chain id update/verification failed.");
+            .context("Redis chain id update/verification failed.")?;
         if result != 1 {
             anyhow::bail!("Chain id is not correct.");
         }
@@ -255,11 +255,11 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
             .arg(version)
             .invoke_async(&mut self.conn)
             .await
-            .expect("Redis latest version update failed.")
+            .context("Redis latest version update failed.")?
         {
             2 => {
                 tracing::error!(version=version, "Redis latest version update failed. The version is beyond the next expected version.");
-                panic!("version is not right.");
+                Err(anyhow::anyhow!("Version is not right."))
             },
             _ => Ok(()),
         }
@@ -308,7 +308,7 @@ mod tests {
         let mut cache_operator: CacheOperator<MockRedisConnection> =
             CacheOperator::new(mock_connection);
 
-        assert!(cache_operator.cache_setup_if_needed().await);
+        assert!(cache_operator.cache_setup_if_needed().await.unwrap());
     }
 
     #[tokio::test]
@@ -324,7 +324,7 @@ mod tests {
         let mut cache_operator: CacheOperator<MockRedisConnection> =
             CacheOperator::new(mock_connection);
 
-        assert!(!cache_operator.cache_setup_if_needed().await);
+        assert!(!cache_operator.cache_setup_if_needed().await.unwrap());
     }
     // Cache coverage status tests.
     #[tokio::test]

@@ -32,7 +32,7 @@ use handler::Handler;
 use lru::LruCache;
 use moderator::RequestModerator;
 use optimistic_fetch::OptimisticFetchRequest;
-use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
+use std::{ops::Deref, sync::Arc, time::Duration};
 use storage::StorageReaderInterface;
 use thiserror::Error;
 use tokio::runtime::Handle;
@@ -78,9 +78,8 @@ pub struct StorageServiceServer<T> {
     // A set of active optimistic fetches for peers waiting for new data
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
 
-    // TODO: Reduce lock contention on the mutex.
     // A set of active subscriptions for peers waiting for new data
-    subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
+    subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
 
     // A moderator for incoming peer requests
     request_moderator: Arc<RequestModerator>,
@@ -114,7 +113,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         let lru_response_cache = Arc::new(Mutex::new(LruCache::new(
             storage_service_config.max_lru_cache_size as usize,
         )));
-        let subscriptions = Arc::new(Mutex::new(HashMap::new()));
+        let subscriptions = Arc::new(DashMap::new());
         let request_moderator = Arc::new(RequestModerator::new(
             aptos_data_client_config,
             cached_storage_server_summary.clone(),
@@ -463,7 +462,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
     /// Returns a copy of the active subscriptions for test purposes
     pub(crate) fn get_subscriptions(
         &self,
-    ) -> Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>> {
+    ) -> Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>> {
         self.subscriptions.clone()
     }
 }
@@ -478,7 +477,7 @@ async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
-    subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
+    subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
     time_service: TimeService,
 ) {
     if let Err(error) = optimistic_fetch::handle_active_optimistic_fetches(
@@ -510,7 +509,7 @@ async fn handle_active_subscriptions<T: StorageReaderInterface>(
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
-    subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
+    subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
     time_service: TimeService,
 ) {
     if let Err(error) = subscription::handle_active_subscriptions(

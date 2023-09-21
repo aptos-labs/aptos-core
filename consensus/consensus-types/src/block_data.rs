@@ -7,6 +7,7 @@ use crate::{
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
+use aptos_bitvec::BitVec;
 use aptos_crypto::hash::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
@@ -219,6 +220,7 @@ impl BlockData {
         author: Author,
         failed_authors: Vec<(Round, Author)>,
         parent_block_info: BlockInfo,
+        parents_bitvec: BitVec,
     ) -> Self {
         Self {
             epoch,
@@ -228,7 +230,7 @@ impl BlockData {
                 VoteData::new(parent_block_info, BlockInfo::empty()),
                 LedgerInfoWithSignatures::new(
                     LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
-                    AggregateSignature::empty(),
+                    AggregateSignature::new(parents_bitvec, None),
                 ),
             ),
             block_type: BlockType::Proposal {

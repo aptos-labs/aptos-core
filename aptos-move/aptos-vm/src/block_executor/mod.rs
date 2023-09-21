@@ -35,7 +35,7 @@ use aptos_types::{
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::output::VMOutput;
-use move_core_types::vm_status::VMStatus;
+use move_core_types::{language_storage::StructTag, vm_status::VMStatus};
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::{collections::HashMap, sync::Arc};
@@ -44,6 +44,7 @@ impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
     type Identifier = AggregatorID;
     type Key = StateKey;
+    type Tag = StructTag;
     type Value = WriteOp;
 }
 

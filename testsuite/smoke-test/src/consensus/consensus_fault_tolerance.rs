@@ -23,7 +23,7 @@ use std::{
 
 pub async fn create_swarm(num_nodes: usize, max_block_txns: u64) -> LocalSwarm {
     let swarm = SwarmBuilder::new_local(num_nodes)
-        .with_init_config(Arc::new(move |_, config| {
+        .with_init_config(Arc::new(move |_, config, _| {
             config.api.failpoints_enabled = true;
             config.consensus.max_sending_block_txns = max_block_txns;
             config

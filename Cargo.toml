@@ -136,12 +136,12 @@ members = [
     "secure/storage",
     "secure/storage/vault",
     "state-sync/aptos-data-client",
+    "state-sync/data-streaming-service",
     "state-sync/inter-component/consensus-notifications",
     "state-sync/inter-component/event-notifications",
     "state-sync/inter-component/mempool-notifications",
     "state-sync/inter-component/storage-service-notifications",
-    "state-sync/state-sync-v2/data-streaming-service",
-    "state-sync/state-sync-v2/state-sync-driver",
+    "state-sync/state-sync-driver",
     "state-sync/storage-service/client",
     "state-sync/storage-service/server",
     "state-sync/storage-service/types",
@@ -288,7 +288,7 @@ aptos-crash-handler = { path = "crates/crash-handler" }
 aptos-crypto = { path = "crates/aptos-crypto" }
 aptos-crypto-derive = { path = "crates/aptos-crypto-derive" }
 aptos-data-client = { path = "state-sync/aptos-data-client" }
-aptos-data-streaming-service = { path = "state-sync/state-sync-v2/data-streaming-service" }
+aptos-data-streaming-service = { path = "state-sync/data-streaming-service" }
 aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
 aptos-db-tool = { path = "storage/db-tool" }
@@ -388,7 +388,7 @@ aptos-secure-net = { path = "secure/net" }
 aptos-secure-storage = { path = "secure/storage" }
 aptos-short-hex-str = { path = "crates/short-hex-str" }
 aptos-speculative-state-helper = { path = "crates/aptos-speculative-state-helper" }
-aptos-state-sync-driver = { path = "state-sync/state-sync-v2/state-sync-driver" }
+aptos-state-sync-driver = { path = "state-sync/state-sync-driver" }
 aptos-state-view = { path = "storage/state-view" }
 aptos-storage-interface = { path = "storage/storage-interface" }
 aptos-storage-service-client = { path = "state-sync/storage-service/client" }
@@ -454,8 +454,8 @@ cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 claims = "0.7"
 clap = { version = "4.3.9", features = ["derive", "unstable-styles"] }
-clap_complete = "4.3.1"
-cloud-storage = { version = "0.11.1", features = ["global-client"] }
+clap_complete = "4.4.1"
+cloud-storage = { version = "0.11.1", features = ["global-client", "rustls-tls"], default-features = false }
 codespan-reporting = "0.11.1"
 console-subscriber = "0.1.8"
 const_format = "0.2.26"
@@ -500,7 +500,7 @@ gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
 git2 = "0.16.1"
 glob = "0.3.0"
-goldenfile = "1.1.0"
+goldenfile = "1.5.2"
 google-cloud-pubsub = "0.18.0"
 google-cloud-storage = "0.13.0"
 handlebars = "4.2.2"
@@ -612,6 +612,7 @@ syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = "0.28.4"
 tempfile = "3.3.0"
 termcolor = "1.1.2"
+test-case = "3.1.0"
 textwrap = "0.15.0"
 thiserror = "1.0.37"
 time = { version = "0.3.24", features = ["serde"] }

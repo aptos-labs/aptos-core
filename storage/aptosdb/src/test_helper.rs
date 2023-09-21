@@ -905,7 +905,7 @@ pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &Transacti
 
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
     let leaf_node = Node::new_leaf(key.hash(), value.hash(), (key.clone(), version));
-    db.state_merkle_db
+    db.state_merkle_db()
         .metadata_db()
         .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
         .unwrap();

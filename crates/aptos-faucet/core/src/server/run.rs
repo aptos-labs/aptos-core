@@ -825,7 +825,7 @@ mod test {
 
         // Assert that the account exists now with the expected balance.
         let response = aptos_node_api_client
-            .get_account_balance(AccountAddress::from_hex(fund_request.address.unwrap()).unwrap())
+            .get_account_balance(AccountAddress::from_str(&fund_request.address.unwrap()).unwrap())
             .await?;
 
         assert_eq!(response.into_inner().get(), 10);
@@ -883,7 +883,7 @@ mod test {
 
         // Assert that the account exists now with the expected balance.
         let response = aptos_node_api_client
-            .get_account_balance(AccountAddress::from_hex(fund_request.address.unwrap()).unwrap())
+            .get_account_balance(AccountAddress::from_str(&fund_request.address.unwrap()).unwrap())
             .await?;
 
         assert_eq!(response.into_inner().get(), 10);
@@ -931,7 +931,7 @@ mod test {
 
         // Confirm that the account was given the full 1000 OCTA as requested.
         let response = aptos_node_api_client
-            .get_account_balance(AccountAddress::from_hex(fund_request.address.unwrap()).unwrap())
+            .get_account_balance(AccountAddress::from_str(&fund_request.address.unwrap()).unwrap())
             .await?;
 
         assert_eq!(response.into_inner().get(), 1000);
@@ -949,7 +949,7 @@ mod test {
 
         // Confirm that the account was only given 100 OCTA (maximum_amount), not 1000.
         let response = aptos_node_api_client
-            .get_account_balance(AccountAddress::from_hex(fund_request.address.unwrap()).unwrap())
+            .get_account_balance(AccountAddress::from_str(&fund_request.address.unwrap()).unwrap())
             .await?;
 
         assert_eq!(response.into_inner().get(), 100);

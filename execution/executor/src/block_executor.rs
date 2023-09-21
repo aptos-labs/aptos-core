@@ -276,6 +276,10 @@ where
         state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult> {
         let _timer = APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.start_timer();
+        info!(
+            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+            "ledger_update"
+        );
         let committed_block_id = self.committed_block_id();
         let mut block_vec = self
             .block_tree

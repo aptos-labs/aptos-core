@@ -63,7 +63,7 @@ async fn setup_simple_test(
     JoinHandle<anyhow::Result<()>>,
     RosettaClient,
 ) {
-    setup_test(num_accounts, Arc::new(|_, _| {})).await
+    setup_test(num_accounts, Arc::new(|_, _, _| {})).await
 }
 
 async fn setup_test(
@@ -128,7 +128,7 @@ async fn test_block_transactions() {
 
     let (swarm, cli, _faucet, rosetta_client) = setup_test(
         2,
-        Arc::new(|_, config| config.api.max_transactions_page_size = NUM_TXNS_PER_PAGE),
+        Arc::new(|_, config, _| config.api.max_transactions_page_size = NUM_TXNS_PER_PAGE),
     )
     .await;
 
@@ -2478,7 +2478,7 @@ async fn test_delegation_pool_operations() {
 
     let (mut swarm, cli, _, rosetta_client) = setup_test(
         2,
-        Arc::new(|_, config| config.api.max_transactions_page_size = NUM_TXNS_PER_PAGE),
+        Arc::new(|_, config, _| config.api.max_transactions_page_size = NUM_TXNS_PER_PAGE),
     )
     .await;
 

@@ -28,16 +28,6 @@ proposals:
       - Framework:
           bytecode_version: 6
           git_hash: ~
-  - name: enable_aggregator_snapshots
-    metadata:
-      title: "Enable Aggregator Snapshots"
-      description: "AIP-43: Aggregator snapshots can be used to postpone the read operations on aggregators to the commit phase and improve concurrency of transaction execution."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - aggregator_snapshots
   - name: enable_signature_checker_v2_fix
     metadata:
       title: "Enable a fix signature checker v2"

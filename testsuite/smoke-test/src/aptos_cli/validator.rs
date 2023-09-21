@@ -188,7 +188,7 @@ async fn check_vote_to_elected(swarm: &mut LocalSwarm) -> (Option<u64>, Option<u
 #[ignore]
 async fn test_onchain_config_change() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
-        .with_init_config(Arc::new(|_, conf| {
+        .with_init_config(Arc::new(|_, conf, _| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 400;
             conf.consensus.quorum_store_poll_time_ms = 100;
@@ -606,7 +606,7 @@ async fn test_nodes_rewards() {
     const BASE: u64 = 3600u64 * 24 * 365 * 10 * 100;
 
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
-        .with_init_config(Arc::new(|_, conf| {
+        .with_init_config(Arc::new(|_, conf, _| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
             conf.consensus.quorum_store_poll_time_ms = 100;
@@ -1036,7 +1036,7 @@ async fn test_register_and_update_validator() {
 async fn test_join_and_leave_validator() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
-        .with_init_config(Arc::new(|_i, conf| {
+        .with_init_config(Arc::new(|_i, conf, _| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
             conf.consensus.quorum_store_poll_time_ms = 100;
@@ -1200,7 +1200,7 @@ async fn test_join_and_leave_validator() {
 async fn test_owner_create_and_delegate_flow() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
-        .with_init_config(Arc::new(|_i, conf| {
+        .with_init_config(Arc::new(|_i, conf, _| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
             conf.consensus.quorum_store_poll_time_ms = 100;

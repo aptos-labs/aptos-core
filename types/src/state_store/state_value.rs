@@ -157,6 +157,13 @@ impl StateValue {
             StateValueInner::WithMetadata { metadata, .. } => Some(metadata),
         }
     }
+
+    pub fn into(self) -> (Option<StateValueMetadata>, Bytes) {
+        match self.inner {
+            StateValueInner::V0(bytes) => (None, bytes),
+            StateValueInner::WithMetadata { data, metadata } => (Some(metadata), data),
+        }
+    }
 }
 
 // #[cfg(any(test, feature = "fuzzing"))]

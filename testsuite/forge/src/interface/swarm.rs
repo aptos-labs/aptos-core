@@ -6,7 +6,7 @@ use crate::{
     AptosPublicInfo, ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version,
 };
 use anyhow::{anyhow, bail};
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, OverrideNodeConfig};
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
@@ -58,12 +58,16 @@ pub trait Swarm: Sync {
     fn add_validator_full_node(
         &mut self,
         version: &Version,
-        template: NodeConfig,
+        config: OverrideNodeConfig,
         id: PeerId,
     ) -> Result<PeerId>;
 
     /// Adds a FullNode to the swarm and returns the PeerId
-    async fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId>;
+    async fn add_full_node(
+        &mut self,
+        version: &Version,
+        config: OverrideNodeConfig,
+    ) -> Result<PeerId>;
 
     /// Removes the FullNode with the provided PeerId
     fn remove_full_node(&mut self, id: PeerId) -> Result<()>;
