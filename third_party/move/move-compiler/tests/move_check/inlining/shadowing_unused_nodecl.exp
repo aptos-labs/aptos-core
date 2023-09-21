@@ -1,0 +1,15 @@
+warning[W09003]: unused assignment
+   ┌─ tests/move_check/inlining/shadowing_unused_nodecl.move:13:9
+   │
+13 │         quux(|a, b| f(a, b), z);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^ Unused assignment or binding for local 'z'. Consider removing, replacing with '_', or prefixing with '_' (e.g., '_z')
+
+warning[W09003]: unused assignment
+   ┌─ tests/move_check/inlining/shadowing_unused_nodecl.move:29:9
+   │  
+29 │ ╭         quux(|y, _q| {
+30 │ │             _x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+31 │ │                     // have the value 1.
+32 │ │         }, z);
+   │ ╰─────────────^ Unused assignment or binding for local 'z'. Consider removing, replacing with '_', or prefixing with '_' (e.g., '_z')
+
