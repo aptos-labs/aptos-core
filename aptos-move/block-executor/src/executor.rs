@@ -591,60 +591,103 @@ where
         ret
     }
 
+    fn set_error_if_needed(
+        maybe_err: &Arc<Mutex<Option<Error<E::Error>>>>,
+        min_error_index: &Arc<Mutex<Option<usize>>>,
+        err: Error<E::Error>,
+        idx: usize,
+    ) {
+        let mut min_error_index = min_error_index.lock().unwrap();
+        if let Some(existing_index) = *min_error_index {
+            if idx < existing_index {
+                *maybe_err.lock().unwrap() = Some(err);
+                *min_error_index = Some(idx);
+            }
+        } else {
+            *min_error_index = Some(idx);
+            *maybe_err.lock().unwrap() = Some(err);
+        }
+    }
+
+    fn set_skip_index_if_needed(skip_rest_index: &Arc<Mutex<Option<usize>>>, idx: usize) {
+        let mut skip_index = skip_rest_index.lock().unwrap();
+        if let Some(existing_index) = *skip_index {
+            *skip_index = Some(std::cmp::min(existing_index, idx));
+        } else {
+            *skip_index = Some(idx);
+        }
+    }
+
+    // This function processes the transaction output in parallel and returns the final result.
+    // Following semantic is guaranteed to ensure the output of the parallel result collection is
+    // deterministic and is same as sequential result collection
+    // 1. If there is an error in any of the transaction and no transaction is skipped, then the
+    //    error is returned.
+    // 2. If there is no error in any of the transaction and some transaction is skipped, then the
+    // the all transaction output after the skipped transaction is set to skip.
+    // 3. If there is error in any of the transaction and some transaction is skipped, then the
+    // we check the minimum index of the error and skipped transaction. If the error transaction
+    // index is less than the skipped transaction index, then the error is returned. Otherwise,
+    // the all transaction output after the skipped transaction is set to skip.
     fn make_final_result_in_parallel(
         &self,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         num_txns: usize,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTOR_FINAL_RESULT_SECONDS.start_timer();
-        let skip_rest_index = Arc::new(Mutex::new(None));
-        let maybe_err = Arc::new(Mutex::new(None));
-        let mut final_results = if last_input_output.module_publishing_may_race() {
+        if last_input_output.module_publishing_may_race() {
             counters::MODULE_PUBLISHING_FALLBACK_COUNT.inc();
-            *maybe_err.lock().unwrap() = Some(Error::ModulePathReadWrite);
-            vec![]
-        } else {
-            self.executor_thread_pool.scope(|_| {
-                (0..num_txns)
-                    .into_par_iter()
-                    .map(
-                        |idx| match last_input_output.try_take_output(idx as TxnIndex) {
-                            Some(ExecutionStatus::Success(output)) => output,
-                            Some(ExecutionStatus::SkipRest(output)) => {
-                                let mut skip_index = skip_rest_index.lock().unwrap();
-                                if let Some(existing_index) = *skip_index {
-                                    *skip_index = Some(std::cmp::min(existing_index, idx));
-                                } else {
-                                    *skip_index = Some(idx);
-                                }
-                                output
-                            },
-                            Some(ExecutionStatus::Abort(err)) => {
-                                *maybe_err.lock().unwrap() = Some(err);
-                                E::Output::skip_output()
-                            },
-                            None => {
-                                // This is the case when there is an error or txn is skipped by the scheduler.
-                                E::Output::skip_output()
-                            },
+            return Err(Error::ModulePathReadWrite);
+        }
+        let skip_rest_index = Arc::new(Mutex::new(None));
+        let min_error_index = Arc::new(Mutex::new(None));
+        let maybe_err = Arc::new(Mutex::new(None));
+
+        let mut final_results: Vec<E::Output> = self.executor_thread_pool.scope(|_| {
+            (0..num_txns)
+                .into_par_iter()
+                .map(
+                    |idx| match last_input_output.try_take_output(idx as TxnIndex) {
+                        Some(ExecutionStatus::Success(output)) => output,
+                        Some(ExecutionStatus::SkipRest(output)) => {
+                            Self::set_skip_index_if_needed(&skip_rest_index, idx);
+                            output
                         },
-                    )
-                    .collect()
-            })
-        };
+                        Some(ExecutionStatus::Abort(err)) => {
+                            Self::set_error_if_needed(&maybe_err, &min_error_index, err, idx);
+                            E::Output::skip_output()
+                        },
+                        None => {
+                            // This is the case when there is an error or txn is skipped by the scheduler.
+                            E::Output::skip_output()
+                        },
+                    },
+                )
+                .collect()
+        });
 
         let maybe_err = maybe_err.lock().unwrap().take();
-        match maybe_err {
-            Some(err) => Err(err),
-            None => {
-                if let Some(skip_index) = *skip_rest_index.lock().unwrap() {
-                    final_results[skip_index..].iter_mut().for_each(|t| {
-                        *t = E::Output::skip_output();
-                    });
+        let maybe_skip_index = skip_rest_index.lock().unwrap().take();
+        let maybe_err_index = min_error_index.lock().unwrap().take();
+
+        if let Some(err_index) = maybe_err_index {
+            if let Some(skip_index) = maybe_skip_index {
+                if skip_index > err_index {
+                    return Err(maybe_err.unwrap());
                 }
-                Ok(final_results)
-            },
+            } else {
+                return Err(maybe_err.unwrap());
+            }
         }
+        if let Some(skip_index) = maybe_skip_index {
+            // Everything after skip_index is skipped.
+            final_results[skip_index + 1..]
+                .iter_mut()
+                .for_each(|output| {
+                    *output = E::Output::skip_output();
+                });
+        }
+        Ok(final_results)
     }
 
     pub(crate) fn execute_transactions_sequential(
