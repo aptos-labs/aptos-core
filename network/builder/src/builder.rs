@@ -197,12 +197,7 @@ impl NetworkBuilder {
             config.network_channel_size,
             config.max_concurrent_network_reqs,
             config.max_inbound_connections,
-            TCPBufferCfg::new_configs(
-                config.inbound_rx_buffer_size_bytes,
-                config.inbound_tx_buffer_size_bytes,
-                config.outbound_rx_buffer_size_bytes,
-                config.outbound_tx_buffer_size_bytes,
-            ),
+            TCPBufferCfg::new(),
         );
 
         network_builder.add_connection_monitoring(
