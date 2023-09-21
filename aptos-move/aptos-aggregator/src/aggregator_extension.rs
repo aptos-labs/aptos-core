@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    bounded_math::{code_invariant_error, expect_ok, ok_overflow, BoundedMath, SignedU128},
+    bounded_math::{ok_overflow, BoundedMath, SignedU128},
     delta_math::DeltaHistory,
     resolver::{AggregatorReadMode, AggregatorResolver},
     types::{
-        AggregatorID, AggregatorVersionedID, ReadPosition, SnapshotToStringFormula, SnapshotValue,
+        code_invariant_error, expect_ok, AggregatorID, AggregatorValue, AggregatorVersionedID,
+        DelayedFieldsSpeculativeError, PanicError, PanicOr, PanicOrResult, ReadPosition,
+        SnapshotToStringFormula, SnapshotValue,
     },
 };
 use aptos_types::{state_store::state_key::StateKey, vm_status::StatusCode};
@@ -39,7 +41,7 @@ impl SpeculativeStartValue {
     // read conflict!!
     // Only current restriction is DeltaHistory, and only correct usage is
     // that can be returned to the caller is via try_add/try_sub methods!
-    pub fn get_any_value(&self) -> PartialVMResult<u128> {
+    pub fn get_any_value(&self) -> Result<u128, PanicError> {
         match self {
             SpeculativeStartValue::Unset => Err(code_invariant_error(
                 "Tried calling get_any_value on Unset speculative value",
@@ -49,7 +51,7 @@ impl SpeculativeStartValue {
         }
     }
 
-    pub fn get_value_for_read(&self) -> PartialVMResult<u128> {
+    pub fn get_value_for_read(&self) -> Result<u128, PanicError> {
         match self {
             SpeculativeStartValue::Unset => Err(code_invariant_error(
                 "Tried calling get_value_for_read on Unset speculative value",
@@ -127,6 +129,17 @@ pub struct Aggregator {
     pub max_value: u128,
     // Describes a state of an aggregator.
     pub state: AggregatorState,
+}
+
+fn get_aggregator_v2_value_from_storage(
+    id: &AggregatorID,
+    resolver: &dyn AggregatorResolver,
+    mode: AggregatorReadMode,
+) -> PanicOrResult<AggregatorValue, DelayedFieldsSpeculativeError> {
+    // TODO transform unexpected errors into PanicError
+    resolver
+        .get_aggregator_v2_value(id, mode)
+        .map_err(|_err| PanicOr::Or(DelayedFieldsSpeculativeError::NotFound(*id)))
 }
 
 impl Aggregator {
@@ -256,25 +269,23 @@ impl Aggregator {
         resolver: &dyn AggregatorResolver,
         mode: AggregatorReadMode,
     ) -> PartialVMResult<u128> {
-        let maybe_value_from_storage = match id {
-            AggregatorVersionedID::V1(state_key) => {
-                resolver.get_aggregator_v1_value(state_key, mode)
+        match id {
+            AggregatorVersionedID::V1(state_key) => resolver
+                .get_aggregator_v1_value(state_key, mode)
+                .map_err(|e| {
+                    extension_error(format!("Could not find the value of the aggregator: {}", e))
+                })?
+                .ok_or_else(|| {
+                    extension_error(format!(
+                        "Could not read from deleted aggregator at {:?}",
+                        id
+                    ))
+                }),
+            AggregatorVersionedID::V2(id) => {
+                let value = get_aggregator_v2_value_from_storage(id, resolver, mode)?;
+                Ok(value.into_aggregator_value()?)
             },
-            AggregatorVersionedID::V2(id) => resolver
-                .get_aggregator_v2_value(id, mode)
-                .and_then(|v| Ok(v.into_aggregator_value()?))
-                .map(Some),
-        };
-        maybe_value_from_storage
-            .map_err(|e| {
-                extension_error(format!("Could not find the value of the aggregator: {}", e))
-            })?
-            .ok_or_else(|| {
-                extension_error(format!(
-                    "Could not read from deleted aggregator at {:?}",
-                    id
-                ))
-            })
+        }
     }
 
     /// Implements logic for doing a "cheap read" of an aggregator.
@@ -299,9 +310,9 @@ impl Aggregator {
             // If value is Unset, we read it
             if let SpeculativeStartValue::Unset = speculative_start_value {
                 if !delta.is_zero() || !history.is_empty() {
-                    return Err(code_invariant_error(
+                    Err(code_invariant_error(
                         "Delta or history not empty with Unset speculative value",
-                    ));
+                    ))?;
                 }
 
                 let value_from_storage = Self::get_aggregator_value_from_storage(
@@ -336,7 +347,7 @@ impl Aggregator {
                     ReadPosition::BeforeCurrentTxn => {
                         Err(code_invariant_error(
                             "Asking for aggregator value BeforeCurrentTxn that was created in this transaction",
-                        ))
+                        ).into())
                     },
                     ReadPosition::AfterCurrentTxn => {
                         // If aggregator knows the value, return it.
@@ -358,15 +369,16 @@ impl Aggregator {
                             return Ok(*start_value);
                         },
                         ReadPosition::AfterCurrentTxn => {
-                            return Ok(math.unsigned_add_delta(*start_value, delta)?);
+                            // state should always be valid, so this should never fail
+                            return Ok(expect_ok(math.unsigned_add_delta(*start_value, delta))?);
                         },
                     }
                 }
                 if let SpeculativeStartValue::Unset = speculative_start_value {
                     if !delta.is_zero() || !history.is_empty() {
-                        return Err(code_invariant_error(
+                        Err(code_invariant_error(
                             "Delta or history not empty with Unset speculative value",
-                        ));
+                        ))?;
                     }
                 }
 
@@ -439,10 +451,10 @@ impl AggregatorData {
                 max_value,
             });
         if aggregator.max_value != max_value {
-            return Err(code_invariant_error(format!(
+            Err(code_invariant_error(format!(
                 "Max value for the aggregator changed ({} -> {})",
                 aggregator.max_value, max_value
-            )));
+            )))?;
         }
         Ok(aggregator)
     }
@@ -538,14 +550,11 @@ impl AggregatorData {
         // need to clone here, so we can call self.read_snapshot below.
         let snapshot_state = match self.aggregator_snapshots.entry(snapshot_id) {
             Entry::Vacant(entry) => {
-                let value_from_storage = resolver
-                    .get_aggregator_v2_value(&snapshot_id, AggregatorReadMode::Aggregated)
-                    .map_err(|e| {
-                        extension_error(format!(
-                            "Could not find the value of the aggregator: {}",
-                            e
-                        ))
-                    })?;
+                let value_from_storage = get_aggregator_v2_value_from_storage(
+                    &snapshot_id,
+                    resolver,
+                    AggregatorReadMode::Aggregated,
+                )?;
                 entry
                     .insert(AggregatorSnapshot {
                         id: snapshot_id,
@@ -579,9 +588,9 @@ impl AggregatorData {
                             .unsigned_add_delta(speculative_start_value, &delta),
                     )?))
                 },
-                None => Err(code_invariant_error(
+                None => Err(PartialVMError::from(code_invariant_error(
                     "AggregatorSnapshotState::Delta without base aggregator being set",
-                )),
+                ))),
             },
             AggregatorSnapshotState::Derived {
                 base_snapshot,
@@ -590,9 +599,9 @@ impl AggregatorData {
                 let base = self.read_snapshot(base_snapshot, resolver)?;
                 match base {
                     SnapshotValue::Integer(v) => Ok(SnapshotValue::String(formula.apply_to(v))),
-                    SnapshotValue::String(_) => Err(code_invariant_error(
+                    SnapshotValue::String(_) => Err(PartialVMError::from(code_invariant_error(
                         "Tried calling concat on String SnapshotValue",
-                    )),
+                    ))),
                 }
             },
             AggregatorSnapshotState::Reference { speculative_value } => Ok(speculative_value),

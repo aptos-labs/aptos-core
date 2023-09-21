@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    bounded_math::code_invariant_error,
     delta_change_set::DeltaOp,
-    types::{AggregatorValue, SnapshotToStringFormula},
+    types::{
+        code_invariant_error, AggregatorValue, DelayedFieldsSpeculativeError, PanicOr,
+        PanicOrResult, SnapshotToStringFormula,
+    },
 };
-use move_binary_format::errors::PartialVMResult;
 
 // TODO To be renamed to DelayedApplyChange
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -65,7 +66,10 @@ impl<I: Copy + Clone> AggregatorApplyChange<I> {
             .unwrap_or(ApplyBase::Previous(*self_id))
     }
 
-    pub fn apply_to_base(&self, base_value: AggregatorValue) -> PartialVMResult<AggregatorValue> {
+    pub fn apply_to_base(
+        &self,
+        base_value: AggregatorValue,
+    ) -> PanicOrResult<AggregatorValue, DelayedFieldsSpeculativeError> {
         use AggregatorApplyChange::*;
 
         Ok(match self {
@@ -113,7 +117,7 @@ impl<I: Copy + Clone> AggregatorChange<I> {
     pub fn merge_two_changes(
         prev_change: Option<&AggregatorChange<I>>,
         next_change: &AggregatorChange<I>,
-    ) -> PartialVMResult<AggregatorChange<I>> {
+    ) -> PanicOrResult<AggregatorChange<I>, DelayedFieldsSpeculativeError> {
         use AggregatorApplyChange::*;
         use AggregatorChange::*;
         use AggregatorValue::*;
@@ -124,9 +128,9 @@ impl<I: Copy + Clone> AggregatorChange<I> {
         // everything else is invalid for various reasons
         match (&prev_change, next_change) {
             (None, v) => Ok(v.clone()),
-            (_, Create(_)) => Err(code_invariant_error(
+            (_, Create(_)) => Err(PanicOr::from(code_invariant_error(
                 "Trying to merge Create with an older change. Create should always be the first change.",
-            )),
+            ))),
 
             // Aggregators:
             (Some(Create(Aggregator(prev_value))), Apply(AggregatorDelta { delta: next_delta })) => {
@@ -139,12 +143,12 @@ impl<I: Copy + Clone> AggregatorChange<I> {
             },
 
             // Snapshots:
-            (Some(Create(Snapshot(_) | Derived(_)) | Apply(SnapshotDelta {..} | SnapshotDerived { .. })), _) => Err(code_invariant_error(
+            (Some(Create(Snapshot(_) | Derived(_)) | Apply(SnapshotDelta {..} | SnapshotDerived { .. })), _) => Err(PanicOr::from(code_invariant_error(
                 "Snapshots are immutable, previous change cannot be any of the snapshots type",
-            )),
-            (_, Apply(SnapshotDerived { .. })) => Err(code_invariant_error(
+            ))),
+            (_, Apply(SnapshotDerived { .. })) => Err(PanicOr::from(code_invariant_error(
                 "Trying to merge SnapshotDerived with an older change. Snapshots are immutable, should only ever have one change.",
-            )),
+            ))),
             (Some(Create(Aggregator(prev_value))), Apply(SnapshotDelta { delta: next_delta, .. })) => {
                 let new_data = next_delta.apply_to(*prev_value)?;
                 Ok(Create(Snapshot(new_data)))

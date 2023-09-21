@@ -4,9 +4,11 @@
 use crate::types::{AtomicTxnIndex, MVAggregatorsError, TxnIndex};
 use aptos_aggregator::{
     aggregator_change_set::{AggregatorApplyChange, AggregatorChange, ApplyBase},
-    types::{AggregatorValue, ReadPosition},
+    types::{
+        code_invariant_error, AggregatorValue, PanicError, PanicOr, PanicOrResult, ReadPosition,
+    },
 };
-use claims::{assert_matches, assert_none};
+use claims::assert_matches;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
@@ -145,9 +147,9 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                         } else {
                             // TODO: change to code_invariant_error
                             unreachable!(
-                            "Storing {:?} for aggregator ID that previously had a different type of entry - {:?}",
-                            apply_r, apply_l,
-                        )
+                                "Storing {:?} for aggregator ID that previously had a different type of entry - {:?}",
+                                apply_r, apply_l,
+                            )
                         }
                     },
                     // There was a value without fallback delta bypass before and still.
@@ -212,7 +214,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
         &self,
         iter: &mut dyn DoubleEndedIterator<Item = (&TxnIndex, &CachePadded<VersionEntry<K>>)>,
         suffix: &AggregatorApplyChange<K>,
-    ) -> Result<VersionedRead<K>, MVAggregatorsError> {
+    ) -> PanicOrResult<VersionedRead<K>, MVAggregatorsError> {
         use AggregatorApplyChange::*;
         use EstimatedEntry::*;
         use VersionEntry::*;
@@ -229,7 +231,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                     // Apply accumulated delta to resolve the aggregator value.
                     return accumulator
                         .apply_to(*v)
-                        .map_err(|_| MVAggregatorsError::DeltaApplicationFailure)
+                        .map_err(MVAggregatorsError::from_panic_or)
                         .map(AggregatorValue::Aggregator)
                         .map(VersionedRead::Value);
                 },
@@ -240,7 +242,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                 | (Estimate(Bypass(AggregatorDelta { delta })), true) => *delta,
                 (Estimate(NoBypass), _) | (Estimate(_), false) => {
                     // We must wait on Estimates, or a bypass isn't available.
-                    return Err(MVAggregatorsError::Dependency(*idx));
+                    return Err(PanicOr::Or(MVAggregatorsError::Dependency(*idx)));
                 },
                 (Apply(_), _) | (Estimate(Bypass(_)), true) => {
                     unreachable!("Apply change type not AggregatorDelta for aggregator")
@@ -248,31 +250,34 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
             };
 
             // Read hit a delta during traversing the block and aggregating other deltas. We merge the
-            // two deltas together. If there is an error, we return DeltaApplicationError (there is no
-            // determinism concern as DeltaApplicationError may not occur in committed output).
+            // two deltas together. If there is an error, we return appropriate error
+            // (DeltaApplicationError or PanicOr::CodeInvariantError
+            // (there is no determinism concern as DeltaApplicationError may not occur in committed output).
             accumulator
                 .merge_with_previous_delta(delta)
-                .map_err(|_| MVAggregatorsError::DeltaApplicationFailure)?;
+                .map_err(MVAggregatorsError::from_panic_or)?;
         }
 
         // Finally, resolve if needed with the base value.
         self.base_value
             .as_ref()
-            .ok_or(MVAggregatorsError::NotFound)
+            .ok_or(PanicOr::Or(MVAggregatorsError::NotFound))
             .and_then(|base_value| match base_value {
                 AggregatorValue::Aggregator(v) => accumulator
                     .apply_to(*v)
-                    .map_err(|_| MVAggregatorsError::DeltaApplicationFailure)
+                    .map_err(MVAggregatorsError::from_panic_or)
                     .map(AggregatorValue::Aggregator)
                     .map(VersionedRead::Value),
-                _ => Err(MVAggregatorsError::DeltaApplicationFailure),
+                _ => Err(PanicOr::from(code_invariant_error(
+                    "Found non-AggregatorValue::Aggregator base value for aggregator with delta",
+                ))),
             })
     }
 
     // Reads a given aggregator value at a given version (transaction index) and produces
     // a ReadResult if successful, which is either a u128 value, or a snapshot specifying
     // a different aggregator (with ID) at a given version and a delta to apply on top.
-    fn read(&self, txn_idx: TxnIndex) -> Result<VersionedRead<K>, MVAggregatorsError> {
+    fn read(&self, txn_idx: TxnIndex) -> PanicOrResult<VersionedRead<K>, MVAggregatorsError> {
         use EstimatedEntry::*;
         use MVAggregatorsError::*;
         use VersionEntry::*;
@@ -284,7 +289,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
             || {
                 self.base_value
                     .clone()
-                    .ok_or(NotFound)
+                    .ok_or(PanicOr::Or(NotFound))
                     .map(VersionedRead::Value)
             },
             // Consider the latest entry below the provided version.
@@ -307,7 +312,9 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                         },
                     )
                 },
-                (Estimate(NoBypass), _) | (Estimate(_), false) => Err(Dependency(*idx)),
+                (Estimate(NoBypass), _) | (Estimate(_), false) => {
+                    Err(PanicOr::Or(Dependency(*idx)))
+                },
             },
         )
     }
@@ -343,7 +350,6 @@ pub struct VersionedAggregators<K: Clone> {
 }
 
 impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
-    // TODO: integrate into the rest of the system.
     /// Part of the big multi-versioned data-structure, which creates different types of
     /// versioned maps (including this one for aggregators), and delegates access. Hence,
     /// new should only be used from the crate.
@@ -368,14 +374,22 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
 
     /// Must be called when an aggregator creation with a given ID and initial value is observed
     /// in the outputs of txn_idx.
-    pub fn initialize_delayed_field(&self, id: K, txn_idx: TxnIndex, value: AggregatorValue) {
+    pub fn initialize_delayed_field(
+        &self,
+        id: K,
+        txn_idx: TxnIndex,
+        value: AggregatorValue,
+    ) -> Result<(), PanicError> {
         let mut created = VersionedValue::new(None);
         created.insert(txn_idx, VersionEntry::Value(value, None));
 
-        assert_none!(
-            self.values.insert(id, created),
-            "VersionedValue when creating aggregator ID may not already exist"
-        );
+        if self.values.insert(id, created).is_some() {
+            Err(code_invariant_error(
+                "VersionedValue when initializing delayed field may not already exist for same id",
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     /// Must be called when a snapshot (delta or derived) creation with a given ID
@@ -386,44 +400,53 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
         id: K,
         txn_idx: TxnIndex,
         apply: AggregatorApplyChange<K>,
-    ) {
+    ) -> Result<(), PanicError> {
         let mut created = VersionedValue::new(None);
         created.insert(txn_idx, VersionEntry::Apply(apply));
 
-        assert_none!(
-            self.values.insert(id, created),
-            "VersionedValue when creating aggregator ID may not already exist"
-        );
+        if self.values.insert(id, created).is_some() {
+            Err(code_invariant_error("VersionedValue when initializing dependent delayed field may not already exist for same id"))
+        } else {
+            Ok(())
+        }
     }
 
-    pub fn record_change(&self, id: K, txn_idx: TxnIndex, change: AggregatorChange<K>) {
+    pub fn record_change(
+        &self,
+        id: K,
+        txn_idx: TxnIndex,
+        change: AggregatorChange<K>,
+    ) -> PanicOrResult<(), MVAggregatorsError> {
         match change {
-            AggregatorChange::Create(value) => self.initialize_delayed_field(id, txn_idx, value),
+            AggregatorChange::Create(value) => self.initialize_delayed_field(id, txn_idx, value)?,
             AggregatorChange::Apply(apply) => match &apply {
-                AggregatorApplyChange::AggregatorDelta { .. } => {
-                    self.values
-                        .get_mut(&id)
-                        // TODO we probably cannot panic here any more (i.e. in V2 this might not be guaranteed)
-                        .expect("VersionedValue for an (resolved) ID must already exist")
-                        .insert(txn_idx, VersionEntry::Apply(apply))
-                },
+                AggregatorApplyChange::AggregatorDelta { .. } => self
+                    .values
+                    .get_mut(&id)
+                    .ok_or(PanicOr::Or(MVAggregatorsError::NotFound))?
+                    .insert(txn_idx, VersionEntry::Apply(apply)),
                 AggregatorApplyChange::SnapshotDelta { .. }
                 | AggregatorApplyChange::SnapshotDerived { .. } => {
-                    self.initialize_dependent_delayed_field(id, txn_idx, apply)
+                    self.initialize_dependent_delayed_field(id, txn_idx, apply)?
                 },
             },
         };
+        Ok(())
     }
 
     /// The caller must maintain the invariant that prior to calling the methods below w.
     /// a particular aggregator ID, an invocation of either create_aggregator (for newly created
     /// aggregators), or set_base_value (for existing aggregators) must have been completed.
 
-    pub fn read(&self, id: K, txn_idx: TxnIndex) -> Result<AggregatorValue, MVAggregatorsError> {
+    pub fn read(
+        &self,
+        id: K,
+        txn_idx: TxnIndex,
+    ) -> PanicOrResult<AggregatorValue, MVAggregatorsError> {
         let read_res = self
             .values
             .get(&id)
-            .expect("VersionedValue for an (resolved) ID must already exist")
+            .ok_or(PanicOr::Or(MVAggregatorsError::NotFound))?
             .read(txn_idx)?;
         // The lock on id is out of scope.
 
@@ -433,10 +456,10 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
                 // Read the source aggregator of snapshot.
                 // TODO: check/limit recursion depth is not more than 2
                 let source_value = self.read(dependend_id, dependent_txn_idx)?;
-                // TODO distinguish between delta application and code invariant broken errors
+
                 apply
                     .apply_to_base(source_value)
-                    .map_err(|_| MVAggregatorsError::DeltaApplicationFailure)
+                    .map_err(MVAggregatorsError::from_panic_or)
             },
         }
     }
@@ -464,16 +487,16 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
             })
     }
 
-    pub fn mark_estimate(&self, id: K, txn_idx: TxnIndex) {
+    pub fn mark_estimate(&self, id: &K, txn_idx: TxnIndex) {
         self.values
-            .get_mut(&id)
+            .get_mut(id)
             .expect("VersionedValue for an (resolved) ID must already exist")
             .mark_estimate(txn_idx);
     }
 
-    pub fn remove(&self, id: K, txn_idx: TxnIndex) {
+    pub fn remove(&self, id: &K, txn_idx: TxnIndex) {
         self.values
-            .get_mut(&id)
+            .get_mut(id)
             .expect("VersionedValue for an (resolved) ID must already exist")
             .remove(txn_idx);
     }
@@ -887,7 +910,7 @@ mod test {
             &**val_no_bypass.unwrap(),
             VersionEntry::Estimate(EstimatedEntry::NoBypass)
         );
-        assert_err_eq!(v.read(5), MVAggregatorsError::Dependency(2));
+        assert_err_eq!(v.read(5), PanicOr::Or(MVAggregatorsError::Dependency(2)));
 
         // Next, ensure read_estimate_deltas remains true if entries are overwritten
         // with matching deltas. Check at each point to not rely on the invariant that
@@ -924,7 +947,7 @@ mod test {
                 &**val_no_bypass.unwrap(),
                 VersionEntry::Estimate(EstimatedEntry::NoBypass)
             );
-            assert_err_eq!(v.read(7), MVAggregatorsError::Dependency(6));
+            assert_err_eq!(v.read(7), PanicOr::Or(MVAggregatorsError::Dependency(6)));
         }
 
         {
@@ -976,7 +999,7 @@ mod test {
                 &**val_no_bypass.unwrap(),
                 VersionEntry::Estimate(EstimatedEntry::NoBypass)
             );
-            assert_err_eq!(v.read(7), MVAggregatorsError::Dependency(6));
+            assert_err_eq!(v.read(7), PanicOr::Or(MVAggregatorsError::Dependency(6)));
         }
 
         {
@@ -1122,7 +1145,7 @@ mod test {
         let mut v = VersionedValue::new(None);
         v.insert(2, aggregator_entry(VALUE_AGGREGATOR).unwrap());
 
-        assert_err_eq!(v.read(1), MVAggregatorsError::NotFound);
+        assert_err_eq!(v.read(1), PanicOr::Or(MVAggregatorsError::NotFound));
 
         v.insert(
             8,
@@ -1130,7 +1153,10 @@ mod test {
                 delta: negative_delta(),
             }),
         );
-        assert_err_eq!(v.read(9), MVAggregatorsError::DeltaApplicationFailure);
+        assert_err_eq!(
+            v.read(9),
+            PanicOr::Or(MVAggregatorsError::DeltaApplicationFailure)
+        );
         // Ensure without underflow there would not be a failure.
 
         v.insert(4, aggregator_entry(APPLY_AGGREGATOR).unwrap()); // adds 30.
@@ -1143,7 +1169,7 @@ mod test {
         assert_read_aggregator_value!(v.read(9), 5);
 
         v.mark_estimate(2);
-        assert_err_eq!(v.read(3), MVAggregatorsError::Dependency(2));
+        assert_err_eq!(v.read(3), PanicOr::Or(MVAggregatorsError::Dependency(2)));
     }
 
     // TODO : add tests for try-commit

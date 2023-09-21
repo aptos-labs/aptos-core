@@ -11,19 +11,22 @@ use crate::{
     },
     errors::*,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
-    task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
+    task::{
+        CategorizeError, ErrorCategory, ExecutionStatus, ExecutorTask, Transaction,
+        TransactionOutput,
+    },
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
 use aptos_aggregator::{
     aggregator_change_set::{AggregatorChange, ApplyBase},
-    bounded_math::expect_ok,
     delta_change_set::serialize,
+    types::{expect_ok, PanicOr},
 };
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
-    types::{Incarnation, TxnIndex},
+    types::{Incarnation, MVAggregatorsError, TxnIndex},
     unsync_map::UnsyncMap,
     versioned_aggregators::CommitError,
     MVHashMap,
@@ -98,6 +101,7 @@ impl<T, E, S, L, X> BlockExecutor<T, E, S, L, X>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
+    E::Error: CategorizeError,
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
     X: Executable + 'static,
@@ -150,6 +154,8 @@ where
         //     .aggregator_v2_keys(idx_to_execute)
         //     .map_or(HashSet::new(), |keys| keys.collect());
 
+        let mut speculative_inconsistent = false;
+
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
         let mut updates_outside = false;
         let mut apply_updates = |output: &E::Output| {
@@ -189,9 +195,16 @@ where
                 // }
 
                 // TODO: figure out if change should update updates_outside
-                versioned_cache
-                    .aggregators()
-                    .record_change(id, idx_to_execute, change);
+                if let Err(e) =
+                    versioned_cache
+                        .aggregators()
+                        .record_change(id, idx_to_execute, change)
+                {
+                    match e {
+                        PanicOr::CodeInvariantError(m) => panic!("{}", m),
+                        PanicOr::Or(_) => speculative_inconsistent = true,
+                    };
+                }
             }
         };
 
@@ -211,6 +224,17 @@ where
                 ExecutionStatus::SkipRest(output)
             },
             ExecutionStatus::Abort(err) => {
+                match err.categorize() {
+                    ErrorCategory::CodeInvariantError => {
+                        // TODO fallback to speculative execution
+                        panic!("");
+                    },
+                    ErrorCategory::SpeculativeExecutionError => {
+                        speculative_inconsistent = true;
+                    },
+                    _ => (),
+                };
+
                 // Record the status indicating abort.
                 ExecutionStatus::Abort(Error::UserError(err))
             },
@@ -225,8 +249,15 @@ where
             }
         }
 
+        let mut read_set = sync_view.take_reads();
+        if speculative_inconsistent {
+            read_set.capture_delayed_field_read_error(&PanicOr::Or(
+                MVAggregatorsError::DeltaApplicationFailure,
+            ));
+        }
+
         if last_input_output
-            .record(idx_to_execute, sync_view.take_reads(), result)
+            .record(idx_to_execute, read_set, result)
             .is_err()
         {
             // When there is module publishing r/w intersection, can early halt BlockSTM to
@@ -249,6 +280,11 @@ where
         let read_set = last_input_output
             .read_set(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
+
+        if read_set.validate_incorrect_use() {
+            // TODO fallback to speculative
+            panic!("Incorrect use !");
+        }
 
         // Note: we validate delayed field reads only at try_commit.
         // TODO: potentially add some basic validation.
@@ -280,6 +316,14 @@ where
                 }
             }
 
+            if let Some(keys) = last_input_output.aggregator_v2_keys(idx_to_validate) {
+                for k in keys {
+                    versioned_cache
+                        .aggregators()
+                        .mark_estimate(&k, idx_to_validate);
+                }
+            }
+
             scheduler.finish_abort(idx_to_validate, incarnation)
         } else {
             scheduler.finish_validation(idx_to_validate, validation_wave);
@@ -305,6 +349,17 @@ where
                 .expect("Read set must be recorded");
             let mut execution_still_valid =
                 read_set.validate_delayed_field_reads(versioned_cache.aggregators(), txn_idx);
+
+            match last_input_output.output_category(txn_idx) {
+                Some(ErrorCategory::SpeculativeExecutionError) => {
+                    assert!(!execution_still_valid);
+                },
+                Some(ErrorCategory::CodeInvariantError) => {
+                    panic!();
+                },
+                _ => (),
+            };
+
             if execution_still_valid {
                 if let Some(aggregator_ids) = last_input_output.aggregator_v2_keys(txn_idx) {
                     if let Err(e) = versioned_cache
@@ -888,6 +943,15 @@ where
                     ret.push(output);
                 },
                 ExecutionStatus::Abort(err) => {
+                    match err.categorize() {
+                        ErrorCategory::CodeInvariantError
+                        | ErrorCategory::SpeculativeExecutionError => panic!(
+                            "Sequential execution must not have delayed fields errors: {:?}",
+                            err
+                        ),
+                        _ => (),
+                    };
+
                     if let Some(commit_hook) = &self.transaction_commit_hook {
                         commit_hook.on_execution_aborted(idx as TxnIndex);
                     }

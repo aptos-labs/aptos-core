@@ -1,15 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::bounded_math::{
-    abort_error, expect_ok, ok_overflow, ok_underflow, BoundedMath, SignedU128, EEXPECTED_OVERFLOW,
-    EEXPECTED_UNDERFLOW,
+use crate::{
+    bounded_math::{ok_overflow, ok_underflow, BoundedMath, SignedU128},
+    types::{
+        expect_ok, DelayedFieldsSpeculativeError, DeltaApplicationFailureReason,
+        DeltaHistoryMergeOffsetFailureReason, PanicOrResult,
+    },
 };
-use move_binary_format::errors::PartialVMResult;
-
-/// When merging aggregator changes of two transactions,
-/// unable to merge the histories of the transactions.
-pub(crate) const EMERGE_HISTORIES: u64 = 0x02_0008;
 
 /// Tracks values seen by aggregator. In particular, stores information about
 /// the biggest and the smallest deltas that were applied successfully during
@@ -150,41 +148,47 @@ impl DeltaHistory {
         &self,
         base_value: u128,
         max_value: u128,
-    ) -> PartialVMResult<()> {
+    ) -> Result<(), DelayedFieldsSpeculativeError> {
         let math = BoundedMath::new(max_value);
         // We need to make sure the following 4 conditions are satisified.
         //     base_value + max_achieved_positive_delta <= self.max_value
         //     base_value >= min_achieved_negative_delta
         //     base_value + min_overflow_positive_delta > self.max_value
         //     base_value < max_underflow_negative_delta
-        math.unsigned_add(base_value, self.max_achieved_positive_delta)?;
-        math.unsigned_subtract(base_value, self.min_achieved_negative_delta)?;
+        math.unsigned_add(base_value, self.max_achieved_positive_delta)
+            .map_err(|_e| DelayedFieldsSpeculativeError::DeltaApplication {
+                base_value,
+                max_value,
+                delta: SignedU128::Positive(self.max_achieved_positive_delta),
+                reason: DeltaApplicationFailureReason::Overflow,
+            })?;
+        math.unsigned_subtract(base_value, self.min_achieved_negative_delta)
+            .map_err(|_e| DelayedFieldsSpeculativeError::DeltaApplication {
+                base_value,
+                max_value,
+                delta: SignedU128::Negative(self.min_achieved_negative_delta),
+                reason: DeltaApplicationFailureReason::Underflow,
+            })?;
 
         if let Some(min_overflow_positive_delta) = self.min_overflow_positive_delta {
             if base_value <= max_value - min_overflow_positive_delta {
-                return Err(abort_error(
-                    format!(
-                        "Overflow was expected when checking history against the base value of {}. Min overflow delta = {}, Max value = {}",
-                        base_value,
-                        min_overflow_positive_delta,
-                        max_value
-                    ),
-                    EEXPECTED_OVERFLOW,
-                ));
+                return Err(DelayedFieldsSpeculativeError::DeltaApplication {
+                    base_value,
+                    max_value,
+                    delta: SignedU128::Positive(min_overflow_positive_delta),
+                    reason: DeltaApplicationFailureReason::ExpectedOverflow,
+                });
             }
         }
 
         if let Some(max_underflow_negative_delta) = self.max_underflow_negative_delta {
             if base_value >= max_underflow_negative_delta {
-                return Err(abort_error(
-                    format!(
-                        "Underflow was expected when checking history against the base value of {}. Max underflow delta = {}, Max value = {}",
-                        base_value,
-                        max_underflow_negative_delta,
-                        max_value
-                    ),
-                    EEXPECTED_UNDERFLOW,
-                ));
+                return Err(DelayedFieldsSpeculativeError::DeltaApplication {
+                    base_value,
+                    max_value,
+                    delta: SignedU128::Negative(max_underflow_negative_delta),
+                    reason: DeltaApplicationFailureReason::ExpectedUnderflow,
+                });
             }
         }
 
@@ -196,20 +200,23 @@ impl DeltaHistory {
         prev_delta: &SignedU128,
         prev_min_overflow: &Option<u128>,
         math: &BoundedMath,
-    ) -> PartialVMResult<Option<u128>> {
-        let adjusted_min_overflow = min_overflow
-            .map_or(
-                Ok(None),
-                // Return Result<Option<u128>>. we want to have None on overflow,
-                // and to fail the merging on underflow
-                |min_overflow| ok_overflow(math.unsigned_add_delta(min_overflow, prev_delta)),
-            )
-            .map_err(|_| {
-                abort_error(
-                "Unable to merge histories, due to overflow/underflow not being satisfied any more",
-                EMERGE_HISTORIES
-            )
-            })?;
+    ) -> Result<Option<u128>, DelayedFieldsSpeculativeError> {
+        let adjusted_min_overflow = min_overflow.map_or(
+            Ok(None),
+            // Return Result<Option<u128>>. we want to have None on overflow,
+            // and to fail the merging on underflow
+            |min_overflow| {
+                ok_overflow(math.unsigned_add_delta(min_overflow, prev_delta)).map_err(|_| {
+                    DelayedFieldsSpeculativeError::DeltaHistoryMergeOffset {
+                        target: min_overflow,
+                        delta: *prev_delta,
+                        max_value: math.get_max_value(),
+                        reason:
+                            DeltaHistoryMergeOffsetFailureReason::FailureNotExceedingBoundsAnyMore,
+                    }
+                })
+            },
+        )?;
 
         Ok(match (adjusted_min_overflow, prev_min_overflow) {
             (Some(a), Some(b)) => Some(u128::min(a, *b)),
@@ -222,14 +229,14 @@ impl DeltaHistory {
         prev_delta: &SignedU128,
         prev_max_achieved: u128,
         math: &BoundedMath,
-    ) -> PartialVMResult<u128> {
+    ) -> Result<u128, DelayedFieldsSpeculativeError> {
         Ok(
             ok_underflow(math.unsigned_add_delta(max_achieved, prev_delta))
-                .map_err(|_| {
-                    abort_error(
-                        "Unable to merge histories, due to achieved not being satisfied any more",
-                        EMERGE_HISTORIES,
-                    )
+                .map_err(|_| DelayedFieldsSpeculativeError::DeltaHistoryMergeOffset {
+                    target: max_achieved,
+                    delta: *prev_delta,
+                    max_value: math.get_max_value(),
+                    reason: DeltaHistoryMergeOffsetFailureReason::AchievedExceedsBounds,
                 })?
                 .map_or(prev_max_achieved, |value| {
                     u128::max(prev_max_achieved, value)
@@ -242,7 +249,7 @@ impl DeltaHistory {
         prev_delta: &SignedU128,
         prev_history: &Self,
         max_value: u128,
-    ) -> PartialVMResult<DeltaHistory> {
+    ) -> Result<DeltaHistory, DelayedFieldsSpeculativeError> {
         let math = BoundedMath::new(max_value);
 
         let new_min_overflow = Self::offset_and_merge_min_overflow(
@@ -279,14 +286,22 @@ impl DeltaHistory {
             &math,
         )?;
 
-        if new_min_overflow.is_some_and(|v| v <= new_max_achieved)
-            || new_max_underflow.is_some_and(|v| v <= new_min_achieved)
-        {
-            return Err(abort_error(
-                "Unable to merge aggregator change histories",
-                EMERGE_HISTORIES,
-            ));
-        };
+        if new_min_overflow.is_some_and(|v| v <= new_max_achieved) {
+            return Err(
+                DelayedFieldsSpeculativeError::DeltaHistoryMergeAchievedAndOverflowOverlap {
+                    achieved: SignedU128::Positive(new_max_achieved),
+                    overflow: SignedU128::Positive(new_min_overflow.unwrap()),
+                },
+            );
+        }
+        if new_max_underflow.is_some_and(|v| v <= new_min_achieved) {
+            return Err(
+                DelayedFieldsSpeculativeError::DeltaHistoryMergeAchievedAndOverflowOverlap {
+                    achieved: SignedU128::Negative(new_min_achieved),
+                    overflow: SignedU128::Negative(new_max_underflow.unwrap()),
+                },
+            );
+        }
 
         Ok(Self {
             max_achieved_positive_delta: new_max_achieved,
@@ -302,11 +317,13 @@ pub fn merge_data_and_delta(
     delta: &SignedU128,
     history: &DeltaHistory,
     max_value: u128,
-) -> PartialVMResult<u128> {
+) -> PanicOrResult<u128, DelayedFieldsSpeculativeError> {
     // First, validate if the current delta operation can be applied to the base.
     history.validate_against_base_value(prev_value, max_value)?;
     // Then, apply the delta. Since history was validated, this should never fail.
-    expect_ok(BoundedMath::new(max_value).unsigned_add_delta(prev_value, delta))
+    Ok(expect_ok(
+        BoundedMath::new(max_value).unsigned_add_delta(prev_value, delta),
+    )?)
 }
 
 pub fn merge_two_deltas(
@@ -315,7 +332,7 @@ pub fn merge_two_deltas(
     next_delta: &SignedU128,
     next_history: &DeltaHistory,
     max_value: u128,
-) -> PartialVMResult<(SignedU128, DeltaHistory)> {
+) -> PanicOrResult<(SignedU128, DeltaHistory), DelayedFieldsSpeculativeError> {
     let new_history = next_history.offset_and_merge_history(prev_delta, prev_history, max_value)?;
     let new_delta = expect_ok(BoundedMath::new(max_value).signed_add(prev_delta, next_delta))?;
     Ok((new_delta, new_history))

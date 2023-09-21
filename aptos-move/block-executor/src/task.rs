@@ -15,7 +15,10 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_types::resolver::TExecutorView;
-use move_core_types::value::MoveTypeLayout;
+use move_core_types::{
+    value::MoveTypeLayout,
+    vm_status::{StatusCode, VMStatus},
+};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
 
@@ -73,6 +76,34 @@ pub struct Accesses<K> {
     pub keys_written: Vec<K>,
 }
 
+pub enum ErrorCategory {
+    CodeInvariantError,
+    SpeculativeExecutionError,
+    ValidError,
+}
+
+pub trait CategorizeError {
+    fn categorize(&self) -> ErrorCategory;
+}
+
+impl CategorizeError for usize {
+    fn categorize(&self) -> ErrorCategory {
+        ErrorCategory::ValidError
+    }
+}
+
+impl CategorizeError for VMStatus {
+    fn categorize(&self) -> ErrorCategory {
+        match self.status_code() {
+            StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR => ErrorCategory::CodeInvariantError,
+            StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR => {
+                ErrorCategory::SpeculativeExecutionError
+            },
+            _ => ErrorCategory::ValidError,
+        }
+    }
+}
+
 /// Trait for single threaded transaction executor.
 // TODO: Sync should not be required. Sync is only introduced because this trait occurs as a phantom type of executor struct.
 pub trait ExecutorTask: Sync {
@@ -83,7 +114,7 @@ pub trait ExecutorTask: Sync {
     type Output: TransactionOutput<Txn = Self::Txn> + 'static;
 
     /// Type of error when the executor failed to process a transaction and needs to abort.
-    type Error: Debug + Clone + Send + Sync + Eq + 'static;
+    type Error: Debug + Clone + Send + Sync + Eq + CategorizeError + 'static;
 
     /// Type to initialize the single thread transaction executor. Copy and Sync are required because
     /// we will create an instance of executor on each individual thread.
