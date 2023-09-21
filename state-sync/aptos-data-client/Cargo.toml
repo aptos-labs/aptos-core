@@ -28,6 +28,7 @@ aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 arc-swap = { workspace = true }
 async-trait = { workspace = true }
+dashmap = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
 rand = { workspace = true }
