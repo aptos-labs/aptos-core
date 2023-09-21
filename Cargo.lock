@@ -915,6 +915,7 @@ dependencies = [
  "aptos-storage-service-types",
  "aptos-time-service",
  "aptos-types",
+ "arc-swap",
  "async-trait",
  "bcs 0.1.4",
  "claims",
