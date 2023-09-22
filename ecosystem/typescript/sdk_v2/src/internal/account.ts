@@ -15,11 +15,14 @@ import {
   PaginationArgs,
   TransactionResponse,
   HexInput,
+  GetAccountTokensCountQueryResponse,
+  GetAccountTokensCountQueryResult,
 } from "../types";
-import { get } from "../client";
+import { get, post } from "../client";
 import { paginateWithCursor } from "../utils/paginate_with_cursor";
 import { AccountAddress } from "../core";
 import { AptosApiType } from "../utils/const";
+import { GetAccountTokensCount } from "./queries/getAccountTokensAcount";
 
 export async function getInfo(args: { aptosConfig: AptosConfig; accountAddress: HexInput }): Promise<AccountData> {
   const { aptosConfig, accountAddress } = args;
@@ -120,4 +123,26 @@ export async function getResource(args: {
     overrides: { ...aptosConfig.clientConfig },
   });
   return data;
+}
+
+export async function getAccountTokensCount(args: {
+  aptosConfig: AptosConfig;
+  accountAddress: HexInput;
+}): Promise<GetAccountTokensCountQueryResult> {
+  const { aptosConfig, accountAddress } = args;
+
+  const address = AccountAddress.fromHexInput({ input: accountAddress }).toString();
+
+  const whereCondition: any = {
+    owner_address: { _eq: address },
+    amount: { _gt: "0" },
+  };
+
+  const { data } = await post<{}, GetAccountTokensCountQueryResponse>({
+    url: aptosConfig.getRequestUrl(AptosApiType.INDEXER),
+    body: { query: GetAccountTokensCount, variables: { where_condition: whereCondition } },
+    originMethod: "getAccountTokensCount",
+    overrides: { ...aptosConfig.clientConfig },
+  });
+  return data.current_token_ownerships_v2_aggregate.aggregate?.count;
 }

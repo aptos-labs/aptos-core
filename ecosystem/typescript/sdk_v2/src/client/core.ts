@@ -61,7 +61,9 @@ export async function aptosRequest<Req, Res>(options: AptosRequest): Promise<Apt
   const result: AptosResponse<Req, Res> = {
     status: response.status,
     statusText: response.statusText!,
-    data: response.data,
+    // to support both indexer/graphql and fullnode responses
+    // response.data.data format from indexer/graphql response, response.data format from fullnode response
+    data: response.data.data ?? response.data,
     headers: response.headers,
     config: response.config,
     url: fullEndpoint,

@@ -8,8 +8,20 @@ import {
   PaginationArgs,
   TransactionResponse,
   HexInput,
+  IndexerPaginationArgs,
+  GetAccountTokensCountQueryResult,
+  TokenStandard,
+  IndexerSortBy,
 } from "../types";
-import { getInfo, getModule, getModules, getResource, getResources, getTransactions } from "../internal/account";
+import {
+  getAccountTokensCount,
+  getInfo,
+  getModule,
+  getModules,
+  getResource,
+  getResources,
+  getTransactions,
+} from "../internal/account";
 
 /**
  * A class to query all `Account` related queries on Aptos.
@@ -143,4 +155,20 @@ export class Account {
     const resource = await getResource({ aptosConfig: this.config, ...args });
     return resource;
   }
+
+  async getAccountTokensCount(args: {
+    accountAddress: HexInput;
+    options?: IndexerPaginationArgs;
+  }): Promise<GetAccountTokensCountQueryResult> {
+    const resource = await getAccountTokensCount({ aptosConfig: this.config, ...args });
+    return resource;
+  }
+
+  async getAccountOwnedTokens(args: {
+    accountAddress: HexInput;
+    options?: IndexerPaginationArgs & {
+      tokenStandard?: TokenStandard;
+      orderBy?: IndexerSortBy<Current_Token_Ownerships_V2_Order_By>[];
+    };
+  });
 }

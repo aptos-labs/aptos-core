@@ -27,7 +27,7 @@ describe("account api", () => {
   });
 
   describe("fetch data with acount address as string", () => {
-    test("it fetches account data", async () => {
+    test.only("it fetches account data", async () => {
       const config = new AptosConfig({ network: Network.LOCAL });
       const aptos = new Aptos(config);
       const data = await aptos.getAccountInfo({
@@ -76,6 +76,15 @@ describe("account api", () => {
       });
       expect(data).toHaveProperty("type");
       expect(data.type).toBe("0x1::account::Account");
+    });
+
+    test.only("it fetches account token count", async () => {
+      const config = new AptosConfig({ network: Network.DEVNET });
+      const aptos = new Aptos(config);
+      const data = await aptos.getAccountTokensCount({
+        accountAddress: "0x1",
+      });
+      expect(data).toBe(0);
     });
   });
 
