@@ -5,7 +5,7 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
-    dag::{DAGMessage, DAGNetworkMessage, RpcWithFallback, TDAGNetworkSender},
+    dag::{DAGMessage, DAGNetworkMessage, ProofNotifier, RpcWithFallback, TDAGNetworkSender},
     experimental::commit_reliable_broadcast::CommitMessage,
     logging::LogEvent,
     monitor,
@@ -489,6 +489,17 @@ impl RBNetworkSender<DAGMessage> for NetworkSender {
             .await
             .map_err(|e| anyhow!("invalid rpc response: {}", e))
             .and_then(TConsensusMsg::from_network_message)
+    }
+}
+
+#[async_trait]
+impl ProofNotifier for NetworkSender {
+    async fn send_epoch_change(&self, proof: EpochChangeProof) {
+        self.send_epoch_change(proof).await
+    }
+
+    async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
+        self.send_commit_proof(ledger_info).await
     }
 }
 
