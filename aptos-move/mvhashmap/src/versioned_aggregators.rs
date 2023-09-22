@@ -217,7 +217,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
         let mut accumulator = delta;
         while let Some((idx, entry)) = iter.next_back() {
             let delta = match (&**entry, self.read_estimate_deltas) {
-                (Value(AggregatorValue::Aggregator(v), _), _) => {
+                (Value(AggregatorValue::Integer(v), _), _) => {
                     // Apply accumulated delta to resolve the aggregator value.
                     return accumulator
                         .apply_to(*v)
@@ -250,7 +250,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
             .as_ref()
             .ok_or(MVAggregatorsError::NotFound)
             .and_then(|base_value| match base_value {
-                AggregatorValue::Aggregator(v) => accumulator
+                AggregatorValue::Integer(v) => accumulator
                     .apply_to(*v)
                     .map_err(|_| MVAggregatorsError::DeltaApplicationFailure),
                 _ => Err(MVAggregatorsError::DeltaApplicationFailure),
@@ -286,7 +286,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                             // (top-down) until it encounters a value or use the base value.
                             if let AggregatorDelta { delta } = apply {
                                 self.apply_delta_suffix(&mut iter, *delta)
-                                    .map(AggregatorValue::Aggregator)
+                                    .map(AggregatorValue::Integer)
                                     .map(VersionedRead::Value)
                             } else {
                                 unreachable!("Only AggregatorDelta has no apply_base_id")
@@ -484,7 +484,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
                 AggregatorEntry::Apply(AggregatorDelta { delta }) => {
                     let prev_value = versioned_value.read_latest_committed_value(idx_to_commit)
                         .map_err(|e| CommitError::CodeInvariantError(format!("Cannot read latest committed value for Apply(AggregatorDelta) during commit: {:?}", e)))?;
-                    if let AggregatorValue::Aggregator(base) = prev_value {
+                    if let AggregatorValue::Integer(base) = prev_value {
                         let new_value = delta.apply_to(base).map_err(|e| {
                             CommitError::ReExecutionNeeded(format!(
                                 "Failed to apply delta to base: {:?}",
@@ -492,12 +492,12 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
                             ))
                         })?;
                         Some(AggregatorEntry::Value(
-                            AggregatorValue::Aggregator(new_value),
+                            AggregatorValue::Integer(new_value),
                             Some(AggregatorDelta { delta: *delta }),
                         ))
                     } else {
                         return Err(CommitError::CodeInvariantError(
-                            "Cannot apply delta to non-AggregatorValue::Aggregator".to_string(),
+                            "Cannot apply delta to non-AggregatorValue::Integer".to_string(),
                         ));
                     }
                 },
@@ -511,7 +511,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
                         .read_latest_committed_value(idx_to_commit)
                         .map_err(|e| CommitError::CodeInvariantError(format!("Cannot read latest committed value for base aggregator for ApplySnapshotDelta) during commit: {:?}", e)))?;
 
-                    if let AggregatorValue::Aggregator(base) = prev_value {
+                    if let AggregatorValue::Integer(base) = prev_value {
                         let new_value = delta.apply_to(base).map_err(|e| {
                             CommitError::ReExecutionNeeded(format!(
                                 "Failed to apply delta to base: {:?}",
@@ -519,7 +519,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
                             ))
                         })?;
                         Some(AggregatorEntry::Value(
-                            AggregatorValue::Snapshot(new_value),
+                            AggregatorValue::Integer(new_value),
                             Some(SnapshotDelta {
                                 base_aggregator: *base_aggregator,
                                 delta: *delta,
@@ -527,7 +527,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
                         ))
                     } else {
                         return Err(CommitError::CodeInvariantError(
-                            "Cannot apply delta to non-AggregatorValue::Aggregator".to_string(),
+                            "Cannot apply delta to non-AggregatorValue::Integer".to_string(),
                         ));
                     }
                 },
@@ -569,10 +569,10 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
                         .read_latest_committed_value(idx_to_commit + 1)
                         .map_err(|e| CommitError::CodeInvariantError(format!("Cannot read latest committed value for base aggregator for ApplySnapshotDelta) during commit: {:?}", e)))?;
 
-                    if let AggregatorValue::Snapshot(base) = prev_value {
+                    if let AggregatorValue::Integer(base) = prev_value {
                         let new_value = formula.apply(base);
                         AggregatorEntry::Value(
-                            AggregatorValue::Derived(new_value),
+                            AggregatorValue::String(new_value),
                             Some(SnapshotDerived {
                                 base_snapshot: *base_snapshot,
                                 formula: formula.clone(),
@@ -580,7 +580,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
                         )
                     } else {
                         return Err(CommitError::CodeInvariantError(
-                            "Cannot apply delta to non-AggregatorValue::Aggregator".to_string(),
+                            "Cannot apply delta to non-AggregatorValue::Integer".to_string(),
                         ));
                     }
                 },
@@ -659,13 +659,10 @@ mod test {
     fn aggregator_entry(type_index: usize) -> Option<AggregatorEntry<AggregatorID>> {
         match type_index {
             NO_ENTRY => None,
-            VALUE_AGGREGATOR => Some(AggregatorEntry::Value(
-                AggregatorValue::Aggregator(10),
-                None,
-            )),
-            VALUE_SNAPSHOT => Some(AggregatorEntry::Value(AggregatorValue::Snapshot(13), None)),
+            VALUE_AGGREGATOR => Some(AggregatorEntry::Value(AggregatorValue::Integer(10), None)),
+            VALUE_SNAPSHOT => Some(AggregatorEntry::Value(AggregatorValue::Integer(13), None)),
             VALUE_DERIVED => Some(AggregatorEntry::Value(
-                AggregatorValue::Derived(vec![70, 80, 90]),
+                AggregatorValue::String(vec![70, 80, 90]),
                 None,
             )),
             APPLY_AGGREGATOR => Some(AggregatorEntry::Apply(
@@ -695,7 +692,7 @@ mod test {
         delta: DeltaOp,
     ) -> AggregatorEntry<AggregatorID> {
         AggregatorEntry::Value(
-            AggregatorValue::Aggregator(value),
+            AggregatorValue::Integer(value),
             Some(AggregatorApplyChange::AggregatorDelta { delta }),
         )
     }
@@ -706,7 +703,7 @@ mod test {
         base_aggregator: AggregatorID,
     ) -> AggregatorEntry<AggregatorID> {
         AggregatorEntry::Value(
-            AggregatorValue::Snapshot(value),
+            AggregatorValue::Integer(value),
             Some(AggregatorApplyChange::SnapshotDelta {
                 base_aggregator,
                 delta,
@@ -720,7 +717,7 @@ mod test {
         base_snapshot: AggregatorID,
     ) -> AggregatorEntry<AggregatorID> {
         AggregatorEntry::Value(
-            AggregatorValue::Derived(value),
+            AggregatorValue::String(value),
             Some(AggregatorApplyChange::SnapshotDerived {
                 base_snapshot,
                 formula,
@@ -728,29 +725,20 @@ mod test {
         )
     }
 
-    macro_rules! assert_read_aggregator_value {
+    macro_rules! assert_read_integer_value {
         ($cond:expr, $expected:expr) => {
             assert_ok_eq!(
                 $cond,
-                VersionedRead::Value(AggregatorValue::Aggregator($expected))
+                VersionedRead::Value(AggregatorValue::Integer($expected))
             );
         };
     }
 
-    macro_rules! assert_read_snapshot_value {
+    macro_rules! assert_read_string_value {
         ($cond:expr, $expected:expr) => {
             assert_ok_eq!(
                 $cond,
-                VersionedRead::Value(AggregatorValue::Snapshot($expected))
-            );
-        };
-    }
-
-    macro_rules! assert_read_derived_value {
-        ($cond:expr, $expected:expr) => {
-            assert_ok_eq!(
-                $cond,
-                VersionedRead::Value(AggregatorValue::Derived($expected))
+                VersionedRead::Value(AggregatorValue::String($expected))
             );
         };
     }
@@ -848,7 +836,7 @@ mod test {
         );
 
         // Delta + Value(15)
-        assert_read_aggregator_value!(v.read(5), 45);
+        assert_read_integer_value!(v.read(5), 45);
 
         v.mark_estimate(3);
         let val_bypass = v.versioned_map.get(&3);
@@ -860,7 +848,7 @@ mod test {
             ))
         );
         // Delta(30) + Value delta bypass(30) + Value(10)
-        assert_read_aggregator_value!(v.read(5), 70);
+        assert_read_integer_value!(v.read(5), 70);
 
         v.mark_estimate(4);
         let delta_bypass = v.versioned_map.get(&4);
@@ -872,7 +860,7 @@ mod test {
             ))
         );
         // Delta bypass(30) + Value delta bypass(30) + Value(10)
-        assert_read_aggregator_value!(v.read(5), 70);
+        assert_read_integer_value!(v.read(5), 70);
 
         v.mark_estimate(2);
         let val_no_bypass = v.versioned_map.get(&2);
@@ -909,7 +897,7 @@ mod test {
             let mut v = VersionedValue::new(None);
 
             v.insert(6, aggregator_entry(VALUE_SNAPSHOT).unwrap());
-            assert_read_snapshot_value!(v.read(7), 13);
+            assert_read_integer_value!(v.read(7), 13);
 
             v.mark_estimate(6);
             let val_no_bypass = v.versioned_map.get(&6);
@@ -928,7 +916,7 @@ mod test {
                 aggregator_entry_snapshot_value_and_delta(13, test_delta(), AggregatorID::new(2)),
             );
 
-            assert_read_snapshot_value!(v.read(9), 13);
+            assert_read_integer_value!(v.read(9), 13);
 
             v.mark_estimate(8);
             let snapshot_bypass = v.versioned_map.get(&8);
@@ -948,7 +936,7 @@ mod test {
 
         {
             // old value shouldn't affect snapshot computation, as it depends on aggregator value.
-            let mut v = VersionedValue::new(Some(AggregatorValue::Snapshot(3)));
+            let mut v = VersionedValue::new(Some(AggregatorValue::Integer(3)));
             v.insert(10, aggregator_entry(APPLY_SNAPSHOT).unwrap());
 
             assert_read_snapshot_dependent_apply!(v.read(12), 2, 10, test_delta());
@@ -961,7 +949,7 @@ mod test {
             let mut v = VersionedValue::new(None);
 
             v.insert(6, aggregator_entry(VALUE_DERIVED).unwrap());
-            assert_read_derived_value!(v.read(7), vec![70, 80, 90]);
+            assert_read_string_value!(v.read(7), vec![70, 80, 90]);
 
             v.mark_estimate(6);
             let val_no_bypass = v.versioned_map.get(&6);
@@ -984,7 +972,7 @@ mod test {
                 ),
             );
 
-            assert_read_derived_value!(v.read(10), vec![70, 80, 90]);
+            assert_read_string_value!(v.read(10), vec![70, 80, 90]);
 
             v.mark_estimate(8);
             let snapshot_bypass = v.versioned_map.get(&8);
@@ -1004,7 +992,7 @@ mod test {
 
         {
             // old value shouldn't affect derived computation, as it depends on Snapshot value.
-            let mut v = VersionedValue::new(Some(AggregatorValue::Derived(vec![80])));
+            let mut v = VersionedValue::new(Some(AggregatorValue::String(vec![80])));
             v.insert(10, aggregator_entry(APPLY_DERIVED).unwrap());
 
             assert_read_derived_dependent_apply!(v.read(12), 3, 11, test_formula());
@@ -1075,7 +1063,7 @@ mod test {
 
     #[test]
     fn read_latest_committed_value() {
-        let mut v = VersionedValue::new(Some(AggregatorValue::Aggregator(5)));
+        let mut v = VersionedValue::new(Some(AggregatorValue::Integer(5)));
         v.insert(2, aggregator_entry(VALUE_AGGREGATOR).unwrap());
         v.insert(
             4,
@@ -1084,31 +1072,31 @@ mod test {
 
         assert_ok_eq!(
             v.read_latest_committed_value(5),
-            AggregatorValue::Aggregator(15)
+            AggregatorValue::Integer(15)
         );
         assert_ok_eq!(
             v.read_latest_committed_value(4),
-            AggregatorValue::Aggregator(10)
+            AggregatorValue::Integer(10)
         );
         assert_ok_eq!(
             v.read_latest_committed_value(2),
-            AggregatorValue::Aggregator(5)
+            AggregatorValue::Integer(5)
         );
     }
 
     #[test]
     fn read_delta_chain() {
-        let mut v = VersionedValue::new(Some(AggregatorValue::Aggregator(5)));
+        let mut v = VersionedValue::new(Some(AggregatorValue::Integer(5)));
         v.insert(4, aggregator_entry(APPLY_AGGREGATOR).unwrap());
         v.insert(8, aggregator_entry(APPLY_AGGREGATOR).unwrap());
         v.insert(12, aggregator_entry(APPLY_AGGREGATOR).unwrap());
         v.insert(16, aggregator_entry(APPLY_AGGREGATOR).unwrap());
 
-        assert_read_aggregator_value!(v.read(0), 5);
-        assert_read_aggregator_value!(v.read(5), 35);
-        assert_read_aggregator_value!(v.read(9), 65);
-        assert_read_aggregator_value!(v.read(13), 95);
-        assert_read_aggregator_value!(v.read(17), 125);
+        assert_read_integer_value!(v.read(0), 5);
+        assert_read_integer_value!(v.read(5), 35);
+        assert_read_integer_value!(v.read(9), 65);
+        assert_read_integer_value!(v.read(13), 95);
+        assert_read_integer_value!(v.read(17), 125);
     }
 
     #[test]
@@ -1128,13 +1116,13 @@ mod test {
         // Ensure without underflow there would not be a failure.
 
         v.insert(4, aggregator_entry(APPLY_AGGREGATOR).unwrap()); // adds 30.
-        assert_read_aggregator_value!(v.read(9), 10);
+        assert_read_integer_value!(v.read(9), 10);
 
         v.insert(
             6,
-            AggregatorEntry::Value(AggregatorValue::Aggregator(35), None),
+            AggregatorEntry::Value(AggregatorValue::Integer(35), None),
         );
-        assert_read_aggregator_value!(v.read(9), 5);
+        assert_read_integer_value!(v.read(9), 5);
 
         v.mark_estimate(2);
         assert_err_eq!(v.read(3), MVAggregatorsError::Dependency(2));

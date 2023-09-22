@@ -281,7 +281,7 @@ impl Aggregator {
                         .get_aggregator_v1_value(state_key, AggregatorReadMode::LastCommitted),
                     AggregatorVersionedID::V2(id) => resolver
                         .get_aggregator_v2_value(id, AggregatorReadMode::LastCommitted)
-                        .and_then(|v| Ok(v.into_aggregator_value()?))
+                        .and_then(|v| Ok(v.into_integer_value()?))
                         .map(Some),
                 };
                 let value_from_storage = maybe_value_from_storage
@@ -341,7 +341,7 @@ impl Aggregator {
                     },
                     AggregatorVersionedID::V2(id) => resolver
                         .get_aggregator_v2_value(id, AggregatorReadMode::Aggregated)
-                        .and_then(|v| Ok(v.into_aggregator_value()?))
+                        .and_then(|v| Ok(v.into_integer_value()?))
                         .map(Some),
                 };
                 let value_from_storage = maybe_value_from_storage

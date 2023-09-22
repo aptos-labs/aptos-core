@@ -64,50 +64,31 @@ impl TryFrom<AggregatorVersionedID> for StateKey {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AggregatorValue {
-    Aggregator(u128),
-    Snapshot(u128),
-    Derived(Vec<u8>),
+    Integer(u128),
+    String(Vec<u8>),
 }
 
 impl AggregatorValue {
-    pub fn into_aggregator_value(self) -> PartialVMResult<u128> {
+    pub fn into_integer_value(self) -> PartialVMResult<u128> {
         match self {
-            AggregatorValue::Aggregator(value) => Ok(value),
-            AggregatorValue::Snapshot(_) => Err(code_invariant_error(
-                "Tried calling into_aggregator_value on Snapshot value",
-            )),
-            AggregatorValue::Derived(_) => Err(code_invariant_error(
-                "Tried calling into_aggregator_value on String SnapshotValue",
+            AggregatorValue::Integer(value) => Ok(value),
+            AggregatorValue::String(_) => Err(code_invariant_error(
+                "Tried calling into_integer_value on String value",
             )),
         }
     }
 
-    pub fn into_snapshot_value(self) -> PartialVMResult<u128> {
+    pub fn into_string_value(self) -> PartialVMResult<Vec<u8>> {
         match self {
-            AggregatorValue::Snapshot(value) => Ok(value),
-            AggregatorValue::Aggregator(_) => Err(code_invariant_error(
-                "Tried calling into_snapshot_value on Aggregator value",
-            )),
-            AggregatorValue::Derived(_) => Err(code_invariant_error(
-                "Tried calling into_snapshot_value on String SnapshotValue",
-            )),
-        }
-    }
-
-    pub fn into_derived_value(self) -> PartialVMResult<Vec<u8>> {
-        match self {
-            AggregatorValue::Derived(value) => Ok(value),
-            AggregatorValue::Aggregator(_) => Err(code_invariant_error(
-                "Tried calling into_derived_value on Aggregator value",
-            )),
-            AggregatorValue::Snapshot(_) => Err(code_invariant_error(
-                "Tried calling into_derived_value on Snapshot value",
+            AggregatorValue::String(value) => Ok(value),
+            AggregatorValue::Integer(_) => Err(code_invariant_error(
+                "Tried calling into_string_value on Integer value",
             )),
         }
     }
 }
 
-// TODO see if we need both AggregatorValue and SnapshotValue. Also, maybe they should be nested
+// TODO this is now same as AggregatorValue, and can just be replaced, but keeping it for simplicity of comparison
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SnapshotValue {
     Integer(u128),
@@ -130,11 +111,8 @@ impl TryFrom<AggregatorValue> for SnapshotValue {
 
     fn try_from(value: AggregatorValue) -> PartialVMResult<SnapshotValue> {
         match value {
-            AggregatorValue::Aggregator(_) => Err(code_invariant_error(
-                "Tried calling SnapshotValue::try_from on AggregatorValue(Aggregator)",
-            )),
-            AggregatorValue::Snapshot(v) => Ok(SnapshotValue::Integer(v)),
-            AggregatorValue::Derived(v) => Ok(SnapshotValue::String(v)),
+            AggregatorValue::Integer(v) => Ok(SnapshotValue::Integer(v)),
+            AggregatorValue::String(v) => Ok(SnapshotValue::String(v)),
         }
     }
 }

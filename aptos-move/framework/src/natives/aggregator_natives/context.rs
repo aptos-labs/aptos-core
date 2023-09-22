@@ -76,10 +76,10 @@ impl<'a> NativeAggregatorContext<'a> {
             let change = match state {
                 AggregatorSnapshotState::Create {
                     value: SnapshotValue::Integer(value),
-                } => Some(AggregatorChange::Create(AggregatorValue::Snapshot(value))),
+                } => Some(AggregatorChange::Create(AggregatorValue::Integer(value))),
                 AggregatorSnapshotState::Create {
                     value: SnapshotValue::String(value),
-                } => Some(AggregatorChange::Create(AggregatorValue::Derived(value))),
+                } => Some(AggregatorChange::Create(AggregatorValue::String(value))),
                 AggregatorSnapshotState::Delta {
                     base_aggregator,
                     delta,
@@ -132,7 +132,7 @@ impl<'a> NativeAggregatorContext<'a> {
                 AggregatorVersionedID::V2(id) => {
                     let change = match state {
                         AggregatorState::Create { value } => {
-                            Some(AggregatorChange::Create(AggregatorValue::Aggregator(value)))
+                            Some(AggregatorChange::Create(AggregatorValue::Integer(value)))
                         },
                         AggregatorState::Delta { delta, history, .. } => {
                             if delta.is_zero() && history.is_empty() {
@@ -359,7 +359,7 @@ mod test {
         );
         assert_some_eq!(
             aggregator_v2_changes.get(&AggregatorID::new(1100)),
-            &AggregatorChange::Create(AggregatorValue::Aggregator(200)),
+            &AggregatorChange::Create(AggregatorValue::Integer(200)),
         );
     }
 }

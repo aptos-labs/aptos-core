@@ -31,7 +31,7 @@ impl FakeAggregatorView {
     }
 
     pub fn set_from_aggregator_id(&mut self, id: AggregatorID, value: u128) {
-        self.v2_store.insert(id, AggregatorValue::Aggregator(value));
+        self.v2_store.insert(id, AggregatorValue::Integer(value));
     }
 }
 

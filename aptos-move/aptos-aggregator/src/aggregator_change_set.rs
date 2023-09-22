@@ -59,15 +59,15 @@ impl<I: Copy + Clone> AggregatorApplyChange<I> {
     pub fn apply_to_base(&self, base_value: AggregatorValue) -> PartialVMResult<AggregatorValue> {
         use AggregatorApplyChange::*;
 
+        // currently all "applications" are on top of int value, so we can do this once
+        let base_value_int = base_value.into_integer_value()?;
         Ok(match self {
-            AggregatorDelta { delta } => {
-                AggregatorValue::Aggregator(delta.apply_to(base_value.into_aggregator_value()?)?)
-            },
+            AggregatorDelta { delta } => AggregatorValue::Integer(delta.apply_to(base_value_int)?),
             SnapshotDelta { delta, .. } => {
-                AggregatorValue::Snapshot(delta.apply_to(base_value.into_aggregator_value()?)?)
+                AggregatorValue::Integer(delta.apply_to(base_value_int)?)
             },
             SnapshotDerived { formula, .. } => {
-                AggregatorValue::Derived(formula.apply(base_value.into_snapshot_value()?))
+                AggregatorValue::String(formula.apply(base_value_int))
             },
         })
     }
@@ -108,9 +108,9 @@ impl<I: Copy + Clone> AggregatorChange<I> {
             )),
 
             // Aggregators:
-            (Some(Create(Aggregator(prev_value))), None, Apply(AggregatorDelta { delta: next_delta })) => {
+            (Some(Create(Integer(prev_value))), None, Apply(AggregatorDelta { delta: next_delta })) => {
                 let new_data = next_delta.apply_to(*prev_value)?;
-                Ok(Create(Aggregator(new_data)))
+                Ok(Create(Integer(new_data)))
             },
             (Some(Apply(AggregatorDelta { delta: prev_delta })), None, Apply(AggregatorDelta { delta: next_delta })) => {
                 let new_delta = DeltaOp::create_merged_delta(prev_delta, next_delta)?;
@@ -118,7 +118,7 @@ impl<I: Copy + Clone> AggregatorChange<I> {
             },
 
             // Snapshots:
-            (Some(Create(Snapshot(_) | Derived(_)) | Apply(SnapshotDelta {..} | SnapshotDerived { .. })), _, _) => Err(code_invariant_error(
+            (Some(Create(Integer(_) | String(_)) | Apply(SnapshotDelta {..} | SnapshotDerived { .. })), _, _) => Err(code_invariant_error(
                 "Snapshots are immutable, previous change cannot be any of the snapshots type",
             )),
             (_, Some(_), Apply(AggregatorDelta { .. } | SnapshotDerived { .. })) =>
@@ -129,15 +129,15 @@ impl<I: Copy + Clone> AggregatorChange<I> {
             (Some(_), _, Apply(SnapshotDelta { .. })) => Err(code_invariant_error(
                 "Trying to merge Snapshot (delta or derived) with an older change on the same ID. Snapshots are immutable, should only ever have one change - that creates them",
             )),
-            (None, Some(Create(Aggregator(prev_value))), Apply(SnapshotDelta { delta: next_delta, .. })) => {
+            (None, Some(Create(Integer(prev_value))), Apply(SnapshotDelta { delta: next_delta, .. })) => {
                 let new_data = next_delta.apply_to(*prev_value)?;
-                Ok(Create(Snapshot(new_data)))
+                Ok(Create(Integer(new_data)))
             }
             (None, Some(Apply(AggregatorDelta { delta: prev_delta })), Apply(SnapshotDelta { delta: next_delta, base_aggregator })) => {
                 let new_delta = DeltaOp::create_merged_delta(prev_delta, next_delta)?;
                 Ok(Apply(SnapshotDelta { delta: new_delta, base_aggregator: *base_aggregator }))
             }
-            (None, Some(Create(Snapshot(_) | Derived(_)) | Apply(SnapshotDelta {..} | SnapshotDerived { .. })), Apply(SnapshotDelta { .. })) => Err(code_invariant_error(
+            (None, Some(Create(String(_)) | Apply(SnapshotDelta {..} | SnapshotDerived { .. })), Apply(SnapshotDelta { .. })) => Err(code_invariant_error(
                 "Trying to merge SnapshotDelta with dependent change of wrong type",
             )),
         }
@@ -155,7 +155,7 @@ mod test {
 
     #[test]
     fn test_merge_aggregator_data_into_delta() {
-        let aggregator_change1: AggregatorChange<AggregatorID> = Create(Aggregator(20));
+        let aggregator_change1: AggregatorChange<AggregatorID> = Create(Integer(20));
 
         let aggregator_change2 = Apply(AggregatorDelta {
             delta: DeltaOp::new(SignedU128::Positive(10), 100, DeltaHistory {
@@ -182,7 +182,7 @@ mod test {
         assert_ok!(&result);
         let merged = result.unwrap();
 
-        assert_eq!(merged, Create(Aggregator(30)));
+        assert_eq!(merged, Create(Integer(30)));
         assert_err!(AggregatorChange::merge_two_changes(
             Some(&merged),
             None,
@@ -192,9 +192,9 @@ mod test {
 
     #[test]
     fn test_merge_data_into_data() {
-        let aggregator_change1: AggregatorChange<AggregatorID> = Create(Aggregator(20));
-        let aggregator_change2 = Create(Aggregator(50));
-        let aggregator_change3 = Create(Aggregator(70));
+        let aggregator_change1: AggregatorChange<AggregatorID> = Create(Integer(20));
+        let aggregator_change2 = Create(Integer(50));
+        let aggregator_change3 = Create(Integer(70));
 
         assert_err!(AggregatorChange::merge_two_changes(
             Some(&aggregator_change1),
