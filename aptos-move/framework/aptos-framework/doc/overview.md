@@ -25,6 +25,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::code`](code.md#0x1_code)
 -  [`0x1::coin`](coin.md#0x1_coin)
 -  [`0x1::consensus_config`](consensus_config.md#0x1_consensus_config)
+-  [`0x1::core_resource_group`](core_resource_group.md#0x1_core_resource_group)
 -  [`0x1::create_signer`](create_signer.md#0x1_create_signer)
 -  [`0x1::delegation_pool`](delegation_pool.md#0x1_delegation_pool)
 -  [`0x1::event`](event.md#0x1_event)

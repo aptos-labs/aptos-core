@@ -173,11 +173,10 @@ used for gas fees distribution by Aptos Framework (0x1).
 
 ## Resource `CoinStore`
 
-A holder of a specific coin types and associated event handles.
-These are kept in a single resource to ensure locality of data.
 
 
-<pre><code><b>struct</b> <a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt; <b>has</b> key
+<pre><code>#[resource_group_member(#[group = <a href="core_resource_group.md#0x1_core_resource_group_CoreResourceGroup">0x1::core_resource_group::CoreResourceGroup</a>])]
+<b>struct</b> <a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt; <b>has</b> key
 </code></pre>
 
 
@@ -2263,18 +2262,6 @@ Get address by reflection.
     <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply) && !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">optional_aggregator::is_parallelizable</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_supply))
         && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_supply).integer).<a href="coin.md#0x1_coin_value">value</a> &lt;
         <a href="coin.md#0x1_coin">coin</a>.value;
-}
-</code></pre>
-
-
-
-
-<a name="0x1_coin_AbortsIfNotExistCoinInfo"></a>
-
-
-<pre><code><b>schema</b> <a href="coin.md#0x1_coin_AbortsIfNotExistCoinInfo">AbortsIfNotExistCoinInfo</a>&lt;CoinType&gt; {
-    <b>let</b> addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
 }
 </code></pre>
 

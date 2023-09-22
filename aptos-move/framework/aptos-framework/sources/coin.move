@@ -8,6 +8,7 @@ module aptos_framework::coin {
     use aptos_framework::account;
     use aptos_framework::aggregator_factory;
     use aptos_framework::aggregator::{Self, Aggregator};
+    use aptos_framework::core_resource_group::CoreResourceGroup;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
     use aptos_framework::system_addresses;
@@ -89,6 +90,7 @@ module aptos_framework::coin {
 
     /// A holder of a specific coin types and associated event handles.
     /// These are kept in a single resource to ensure locality of data.
+    #[resource_group_member(group=CoreResourceGroup)]
     struct CoinStore<phantom CoinType> has key {
         coin: Coin<CoinType>,
         frozen: bool,

@@ -110,10 +110,10 @@
 
 ## Resource `Account`
 
-Resource representing an account.
 
 
-<pre><code><b>struct</b> <a href="account.md#0x1_account_Account">Account</a> <b>has</b> store, key
+<pre><code>#[resource_group_member(#[group = <a href="core_resource_group.md#0x1_core_resource_group_CoreResourceGroup">0x1::core_resource_group::CoreResourceGroup</a>])]
+<b>struct</b> <a href="account.md#0x1_account_Account">Account</a> <b>has</b> store, key
 </code></pre>
 
 

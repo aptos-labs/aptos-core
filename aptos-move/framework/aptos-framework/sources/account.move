@@ -6,6 +6,7 @@ module aptos_framework::account {
     use std::signer;
     use std::vector;
     use aptos_framework::chain_id;
+    use aptos_framework::core_resource_group::CoreResourceGroup;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
@@ -24,6 +25,7 @@ module aptos_framework::account {
     friend aptos_framework::transaction_validation;
 
     /// Resource representing an account.
+    #[resource_group_member(group=CoreResourceGroup)]
     struct Account has key, store {
         authentication_key: vector<u8>,
         sequence_number: u64,
