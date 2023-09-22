@@ -83,7 +83,6 @@ impl DKGNode {
 impl TDKGMessage for DKGNode {
     fn verify(&self, dkg_pvss_config: &DKGPvssConfig, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         self.trx.verify(dkg_pvss_config, verifier)?;
-
         Ok(())
     }
 }

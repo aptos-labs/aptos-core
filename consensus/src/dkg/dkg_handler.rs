@@ -42,9 +42,10 @@ pub trait DKGNetworkSender: Send + Sync {
     ) -> anyhow::Result<ConsensusMsg>;
 }
 
+#[derive(Clone)]
 pub struct DKGNetworkHandler {
     author: Author,
-    dkg_rpc_rx: aptos_channel::Receiver<Author, IncomingDKGRequest>,
+    // dkg_rpc_rx: aptos_channel::Receiver<Author, IncomingDKGRequest>,
     node_receiver: DKGNodeHandler,
     agg_node_receiver: DKGAggNodeHandler,
     epoch_state: Arc<EpochState>,
@@ -53,29 +54,37 @@ pub struct DKGNetworkHandler {
 impl DKGNetworkHandler {
     pub fn new(
         author: Author,
-        dkg_rpc_rx: aptos_channel::Receiver<Author, IncomingDKGRequest>,
+        // dkg_rpc_rx: aptos_channel::Receiver<Author, IncomingDKGRequest>,
         epoch_state: Arc<EpochState>,
         dkg_manager: Arc<Mutex<DKGManager>>,
     ) -> Self {
         Self {
             author,
-            dkg_rpc_rx,
+            // dkg_rpc_rx,
             node_receiver: DKGNodeHandler::new(dkg_manager.clone()),
             agg_node_receiver: DKGAggNodeHandler::new(dkg_manager.clone()),
             epoch_state: epoch_state.clone(),
         }
     }
 
-    pub async fn start(mut self) {
+    pub async fn start(self, mut dkg_rpc_rx: aptos_channel::Receiver<Author, IncomingDKGRequest>) {
         info!(
             epoch = self.epoch_state.epoch,
             author = self.author,
             "[DKG] DKGHandler started"
         );
-        while let Some(msg) = self.dkg_rpc_rx.next().await {
-            if let Err(e) = self.process_rpc(msg).await {
-                warn!(error = ?e, "[DKG] error processing rpc");
-            }
+        while let Some(msg) = dkg_rpc_rx.next().await {
+            let sender = msg.sender;
+            // if let Err(e) = self.process_rpc(msg).await {
+            //     warn!(error = ?e, "[DKG] error processing rpc from peer {:?}: {}", sender, e);
+            // }
+            let mut handler = self.clone();
+            
+            tokio::task::spawn(async move {
+                if let Err(e) = handler.process_rpc(msg).await {
+                    warn!(error = ?e, "[DKG] error processing rpc from peer {:?}: {}", sender, e);
+                }
+            });
         }
         info!(
             epoch = self.epoch_state.epoch,
@@ -93,8 +102,7 @@ impl DKGNetworkHandler {
                 self.agg_node_receiver.process(agg_node).map(|r| r.into())
             },
             _ => {
-                error!("[DKG] unknown rpc message {:?}", dkg_message);
-                Err(anyhow::anyhow!("[DKG] unknown rpc message"))
+                Err(anyhow::anyhow!("Unknown rpc message"))
             },
         };
 
@@ -110,10 +118,11 @@ impl DKGNetworkHandler {
         rpc_request
             .response_sender
             .send(response)
-            .map_err(|_| anyhow::anyhow!("[DKG] unable to respond to rpc"))
+            .map_err(|_| anyhow::anyhow!("Unable to respond to rpc"))
     }
 }
 
+#[derive(Clone)]
 pub struct DKGNodeHandler {
     dkg_manager: Arc<Mutex<DKGManager>>,
 }
@@ -142,6 +151,7 @@ impl DKGRpcHandler for DKGNodeHandler {
     }
 }
 
+#[derive(Clone)]
 pub struct DKGAggNodeHandler {
     dkg_manager: Arc<Mutex<DKGManager>>,
 }

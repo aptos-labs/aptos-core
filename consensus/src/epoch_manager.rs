@@ -699,7 +699,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Arc::new(network_sender.clone()),
             ExponentialBackoff::from_millis(5),
             aptos_time_service::TimeService::real(),
-            Duration::from_millis(5000),    // dkg todo: choose a proper timeout
+            Duration::from_millis(1000),    // dkg todo: choose a proper timeout, this includes network latency and verification and aggregation time
         ));
 
         let dkg_manager = Arc::new(Mutex::new(DKGManager::new(
@@ -714,12 +714,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let dkg_handler: DKGNetworkHandler = DKGNetworkHandler::new(
             self.author,
-            dkg_handler_rx,
             Arc::new(epoch_state.clone()),
             dkg_manager.clone(),
         );
         // start the dkg handler
-        tokio::spawn(dkg_handler.start());
+        tokio::spawn(dkg_handler.start(dkg_handler_rx));
 
         self.commit_state_computer.new_epoch(
             epoch_state,

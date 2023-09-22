@@ -7,6 +7,7 @@ use aptos_dkg::pvss::WeightedConfig;
 
 pub const MAX_NUM_SHARES: usize = 1000;
 
+#[derive(Clone)]
 pub struct DKGRounding {
     pub validator_addresses: Vec<Author>,
     pub validator_stakes: Vec<u64>,

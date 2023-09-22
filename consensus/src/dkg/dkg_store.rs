@@ -10,6 +10,7 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 
+#[derive(Clone)]
 pub struct DKGStore {
     author: Author,
     validator_verifier: ValidatorVerifier,
@@ -111,10 +112,10 @@ impl DKGStore {
                     let agg_node = DKGAggNode::new(
                         node.epoch(),
                         self.author,
-                        self.agg_trx.take().unwrap(),
+                        self.agg_trx.clone().unwrap(),
                     );
                     if let Err(e) = agg_node.verify(self.dkg_pvss_config.as_ref().unwrap(), &self.validator_verifier) {
-                        debug!("[DKG] agg trx verify failed: {:?}", e);
+                        unreachable!("[DKG] agg trx verify failed: {:?}", e);
                     }
                     debug!(
                         "[DKG] Node {:?} aggregated transcript is ready for epoch {:?}", self.author,

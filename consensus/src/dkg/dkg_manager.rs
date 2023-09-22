@@ -93,6 +93,7 @@ impl DKGManagerWrapper {
     }
 }
 
+#[derive(Clone)]
 pub struct DKGManager {
     author: Author,
     epoch_state: EpochState,
@@ -127,6 +128,7 @@ impl DKGManager {
         }
     }
 
+    // dkg todo: spawn thread to make this function non-blocking
     pub fn start_dkg(&mut self, dkg_events: Vec<ContractEvent>) {
         self.start_time = Some(self.time_service.get_current_timestamp().as_micros() as u64);
 
