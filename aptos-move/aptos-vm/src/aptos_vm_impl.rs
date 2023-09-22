@@ -637,7 +637,7 @@ impl AptosVMImpl {
     pub(crate) fn extract_module_metadata(
         &self,
         module: &ModuleId,
-    ) -> Option<RuntimeModuleMetadataV1> {
+    ) -> Option<Arc<RuntimeModuleMetadataV1>> {
         if self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
             aptos_framework::get_vm_metadata(&self.move_vm, module)
         } else {

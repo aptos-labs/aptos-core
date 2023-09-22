@@ -175,7 +175,11 @@ impl DagBootstrapper {
         ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
         mut shutdown_rx: oneshot::Receiver<()>,
     ) {
-        let adapter = Arc::new(NotifierAdapter::new(ordered_nodes_tx, self.storage.clone()));
+        let adapter = Arc::new(NotifierAdapter::new(
+            ordered_nodes_tx,
+            self.storage.clone(),
+            self.epoch_state.clone(),
+        ));
 
         let sync_manager = DagStateSynchronizer::new(
             self.epoch_state.clone(),
@@ -245,7 +249,7 @@ pub(super) fn bootstrap_dag_for_test(
     let bootstraper = DagBootstrapper::new(
         self_peer,
         signer.into(),
-        epoch_state,
+        epoch_state.clone(),
         storage.clone(),
         rb_network_sender,
         dag_network_sender,
@@ -255,7 +259,11 @@ pub(super) fn bootstrap_dag_for_test(
     );
 
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
-    let adapter = Arc::new(NotifierAdapter::new(ordered_nodes_tx, storage.clone()));
+    let adapter = Arc::new(NotifierAdapter::new(
+        ordered_nodes_tx,
+        storage.clone(),
+        epoch_state,
+    ));
     let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
 
     let (dag_store, order_rule) =

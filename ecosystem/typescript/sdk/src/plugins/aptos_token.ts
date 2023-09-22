@@ -549,4 +549,31 @@ export class AptosToken {
     );
     return txnHash;
   }
+
+  /**
+   * Burn an object by the object owner
+   * @param owner The object owner account
+   * @param objectId The object address
+   * @optional objectType. The object type, default to "0x1::object::ObjectCore"
+   * @returns The hash of the transaction submitted to the API
+   */
+  async burnObject(
+    owner: AptosAccount,
+    objectId: MaybeHexString,
+    objectType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    const builder = new TransactionBuilderRemoteABI(this.provider, {
+      sender: owner.address(),
+      ...extraArgs,
+    });
+    const rawTxn = await builder.build(
+      "0x1::object::burn",
+      [objectType || "0x1::object::ObjectCore"],
+      [HexString.ensure(objectId).hex()],
+    );
+    const bcsTxn = AptosClient.generateBCSTransaction(owner, rawTxn);
+    const pendingTransaction = await this.provider.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
+  }
 }

@@ -1,4 +1,13 @@
-name: "Faucet Integration Tests"
+# These tests ensure that changes to the faucet itself or its code dependencies don't
+# cause the faucet to stop working with the production (devnet and testnet) networks.
+#
+# For tests that prevent the node from breaking compatibility with the faucet, see
+# faucet-tests-main.
+#
+# These tests use node images built from devnet / testnet so we don't need to use
+# workflow_call to wait for the image build to finish.
+
+name: "Faucet Integration Tests: Prod"
 on:
   pull_request_target:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
@@ -24,6 +33,7 @@ jobs:
           required-permission: write
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
+  # These tests ensure that the faucet works with the nodes running on devnet.
   run-tests-devnet:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]
@@ -43,6 +53,7 @@ jobs:
           NETWORK: devnet
           GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
 
+  # These tests ensure that the faucet works with the nodes running on testnet.
   run-tests-testnet:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]

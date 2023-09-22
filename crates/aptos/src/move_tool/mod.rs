@@ -992,6 +992,9 @@ pub struct DownloadPackage {
     pub(crate) rest_options: RestOptions,
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
+    /// Print metadata of the package
+    #[clap(long)]
+    pub print_metadata: bool,
 }
 
 #[async_trait]
@@ -1015,6 +1018,9 @@ impl CliCommand<&'static str> for DownloadPackage {
                 since it is not safe to depend on such packages."
                     .to_owned(),
             ));
+        }
+        if self.print_metadata {
+            println!("{}", package);
         }
         let package_path = output_dir.join(package.name());
         package

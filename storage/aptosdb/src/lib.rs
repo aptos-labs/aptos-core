@@ -40,7 +40,7 @@ mod aptosdb_test;
 
 #[cfg(feature = "db-debugger")]
 pub mod db_debugger;
-pub mod fast_sync_aptos_db;
+pub mod fast_sync_storage_wrapper;
 
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},

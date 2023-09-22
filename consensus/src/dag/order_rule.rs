@@ -138,7 +138,7 @@ impl OrderRule {
         };
         while let Some(prev_anchor) = dag_reader
             .reachable(
-                &[current_anchor.metadata().clone()],
+                Some(current_anchor.metadata().clone()).iter(),
                 Some(self.lowest_unordered_anchor_round),
                 |node_status| matches!(node_status, NodeStatus::Unordered(_)),
             )

@@ -11,6 +11,7 @@ use super::{
 use crate::{
     dag::{
         dag_fetcher::TFetchRequester,
+        dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
         types::{CertificateAckState, CertifiedNode, Node, NodeCertificate, SignatureBuilder},
     },
@@ -139,14 +140,31 @@ impl DagDriver {
 
     pub async fn enter_new_round(&mut self, new_round: Round, strong_links: Vec<NodeCertificate>) {
         debug!("entering new round {}", new_round);
-        // TODO: support pulling payload
+        let payload_filter = {
+            let dag_reader = self.dag.read();
+            let highest_commit_round = dag_reader.highest_committed_anchor_round();
+            if strong_links.is_empty() {
+                PayloadFilter::Empty
+            } else {
+                PayloadFilter::from(
+                    &dag_reader
+                        .reachable(
+                            strong_links.iter().map(|node| node.metadata()),
+                            Some(highest_commit_round.saturating_sub(DAG_WINDOW as u64)),
+                            |_| true,
+                        )
+                        .map(|node_status| node_status.as_node().payload())
+                        .collect(),
+                )
+            }
+        };
         let payload = match self
             .payload_client
             .pull_payload(
                 Duration::from_secs(1),
                 100,
                 1000,
-                PayloadFilter::Empty,
+                payload_filter,
                 Box::pin(async {}),
                 false,
                 0,

@@ -4,7 +4,7 @@
 use anyhow::{anyhow, Result};
 use aptos_backup_service::start_backup_service;
 use aptos_config::{config::NodeConfig, utils::get_genesis_txn};
-use aptos_db::{fast_sync_aptos_db::FastSyncStorageWrapper, AptosDB};
+use aptos_db::{fast_sync_storage_wrapper::FastSyncStorageWrapper, AptosDB};
 use aptos_executor::db_bootstrapper::maybe_bootstrap;
 use aptos_logger::{debug, info};
 use aptos_storage_interface::{DbReader, DbReaderWriter};
@@ -64,16 +64,18 @@ pub(crate) fn bootstrap_db(
 ) -> Result<(Arc<dyn DbReader>, DbReaderWriter, Option<Runtime>)> {
     use aptos_db::fake_aptosdb::FakeAptosDB;
 
-    let (aptos_db, db_rw, _) = match FastSyncStorageWrapper::initialize_dbs(node_config)? {
-        Either::Left(db) => DbReaderWriter::wrap(FakeAptosDB::new(db)),
-        Either::Right(fast_sync_db_wrapper) => DbReaderWriter::wrap(FakeAptosDB::new(
-            fast_sync_db_wrapper.expect("Fast sync db wrapper should not be None"),
-        )),
-        _ => unreachable!(),
-    };
-
+    let aptos_db = AptosDB::open(
+        &node_config.storage.dir(),
+        false, /* readonly */
+        node_config.storage.storage_pruner_config,
+        node_config.storage.rocksdb_configs,
+        node_config.storage.enable_indexer,
+        node_config.storage.buffered_state_target_items,
+        node_config.storage.max_num_nodes_per_lru_cache_shard,
+    )
+    .map_err(|err| anyhow!("DB failed to open {}", err))?;
+    let (aptos_db, db_rw) = DbReaderWriter::wrap(FakeAptosDB::new(aptos_db));
     maybe_apply_genesis(&db_rw, node_config)?;
-
     Ok((aptos_db, db_rw, None))
 }
 
