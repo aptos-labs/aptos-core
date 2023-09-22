@@ -122,9 +122,7 @@ impl<'env> Abigen<'env> {
     /// Compute the ABIs of all script functions in a module.
     fn compute_abi(&self, module_env: &ModuleEnv<'env>) -> anyhow::Result<Vec<ScriptABI>> {
         // Get all the script functions in this module
-        let script_iter: Vec<_> = if module_env.is_script_module() {
-            module_env.get_functions().collect()
-        } else {
+        let script_iter: Vec<_> = {
             let module = Self::get_compiled_module(module_env)?;
             module_env
                 .get_functions()
@@ -133,7 +131,7 @@ impl<'env> Abigen<'env> {
                     let func_ident = IdentStr::new(&func_name).unwrap();
                     // only pick up script functions that also have a script-callable signature.
                     // and check all arguments have a valid type tag
-                    func.is_entry()
+                    func.is_script_or_entry()
                         && script_signature::verify_module_function_signature_by_name(
                             module,
                             func_ident,
