@@ -183,10 +183,9 @@ pub struct BlockAptosVM();
 
 impl BlockAptosVM {
     fn verify_transactions(transactions: Vec<Transaction>) -> Vec<PreprocessedTransaction> {
-        let len = transactions.len();
         transactions
             .into_par_iter()
-            .with_min_len(len / 64)
+            .with_min_len(25)
             .map(preprocess_transaction::<AptosVM>)
             .collect()
     }
