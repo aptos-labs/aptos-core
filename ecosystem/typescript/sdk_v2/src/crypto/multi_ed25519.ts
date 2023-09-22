@@ -135,6 +135,10 @@ export class MultiEd25519Signature extends Signature {
       );
     }
 
+    if (signatures.length > MultiSignature.MAX_SIGNATURES_SUPPORTED) {
+      throw new Error(`The number of signatures cannot be greater than ${MultiSignature.MAX_SIGNATURES_SUPPORTED}`);
+    }
+
     this.signatures = signatures;
     this.bitmap = bitmap;
   }
