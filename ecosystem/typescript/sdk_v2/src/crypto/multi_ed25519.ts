@@ -18,7 +18,7 @@ export class MultiPublicKey {
   // List of Ed25519 public keys for this MultiEd25519PublicKey
   public readonly publicKeys: PublicKey[];
 
-  // At least "threshold" signatures must be valid for the number of public keys specified
+  // The minimum number of valid signatures required, for the number of public keys specified
   public readonly threshold: number;
 
   /**
@@ -110,6 +110,10 @@ export class MultiSignature {
       throw new Error(`"bitmap" length should be ${MultiSignature.BITMAP_LEN}`);
     }
 
+    if (signatures.length > MultiSignature.MAX_SIGNATURES_SUPPORTED) {
+      throw new Error(`The number of signatures cannot be greater than ${MultiSignature.MAX_SIGNATURES_SUPPORTED}`);
+    }
+
     this.signatures = signatures;
     this.bitmap = bitmap;
   }
@@ -142,7 +146,8 @@ export class MultiSignature {
    *
    * @returns bitmap that is 32bit long
    */
-  static createBitmap(bits: number[]): Uint8Array {
+  static createBitmap(args: { bits: number[] }): Uint8Array {
+    const { bits } = args;
     // Bits are read from left to right. e.g. 0b10000000 represents the first bit is set in one byte.
     // The decimal value of 0b10000000 is 128.
     const firstBitInByte = 128;
@@ -182,12 +187,12 @@ export class MultiSignature {
     const bytes = deserializer.deserializeBytes();
     const bitmap = bytes.subarray(bytes.length - 4);
 
-    const sigs: Signature[] = [];
+    const signatures: Signature[] = [];
 
     for (let i = 0; i < bytes.length - bitmap.length; i += Signature.LENGTH) {
       const begin = i;
-      sigs.push(new Signature({ data: bytes.subarray(begin, begin + Signature.LENGTH) }));
+      signatures.push(new Signature({ data: bytes.subarray(begin, begin + Signature.LENGTH) }));
     }
-    return new MultiSignature({ signatures: sigs, bitmap });
+    return new MultiSignature({ signatures, bitmap });
   }
 }
