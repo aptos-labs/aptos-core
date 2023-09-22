@@ -40,8 +40,7 @@ use std::{
 };
 
 pub struct BlockExecutor<T, E, S, L, X> {
-    // number of active concurrent tasks, corresponding
-    // to the maximum number of rayon
+    // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
     executor_thread_pool: Arc<ThreadPool>,
@@ -165,15 +164,7 @@ where
             }
         }
 
-        if last_input_output
-            .record(idx_to_execute, sync_view.take_reads(), result)
-            .is_err()
-        {
-            // When there is module publishing r/w intersection, can early halt BlockSTM to
-            // fallback to sequential execution.
-            scheduler.halt();
-            return SchedulerTask::NoTask;
-        }
+        last_input_output.record(idx_to_execute, sync_view.take_reads(), result);
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
     }
 
@@ -252,13 +243,13 @@ where
         scheduler: &Scheduler,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        txn_fee_state: &Mutex<(FeeStatement, Vec<FeeStatement>)>,
+        shared_commit_state: &Mutex<(FeeStatement, Vec<FeeStatement>, Option<Error<E::Error>>)>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
-            let mut txn_fee_state = txn_fee_state.lock();
-            let txn_state_pair = txn_fee_state.deref_mut();
-            let (accumulated_fee_statement, txn_fee_statements) =
-                (&mut txn_state_pair.0, &mut txn_state_pair.1);
+            let mut shared_commit_state_guard = shared_commit_state.lock();
+            let shared_commit_state_tuple = shared_commit_state_guard.deref_mut();
+            let (accumulated_fee_statement, txn_fee_statements, maybe_error) =
+                shared_commit_state_tuple;
 
             defer! {
                 scheduler.add_to_commit_queue(txn_idx);
@@ -290,6 +281,16 @@ where
                         last_input_output.update_to_skip_rest(txn_idx);
                     }
                 }
+            }
+
+            if last_input_output.execution_error(txn_idx).is_some() {
+                *maybe_error = last_input_output.execution_error(txn_idx);
+                info!(
+                    "Block execution was aborted due to {:?}",
+                    maybe_error.as_ref().unwrap()
+                );
+                scheduler.halt();
+                break;
             }
 
             // Committed the last transaction, BlockSTM finishes execution.
@@ -341,6 +342,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         base_view: &S,
+        final_results: &Mutex<Vec<E::Output>>,
     ) {
         let delta_keys = last_input_output.delta_keys(txn_idx);
         let _events = last_input_output.events(txn_idx);
@@ -380,7 +382,10 @@ where
             // Must contain committed value as we set the base value above.
             delta_writes.push((k, WriteOp::Modification(serialize(&committed_delta).into())));
         }
+
         last_input_output.record_delta_writes(txn_idx, delta_writes);
+
+        // TODO(zi) Make sure this here is perfectly reentrant, and doesn't introduce regression.
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             let txn_output = last_input_output.txn_output(txn_idx).unwrap();
             let execution_status = txn_output.output_status();
@@ -394,6 +399,14 @@ where
                 },
             }
         }
+
+        let mut final_results = final_results.lock();
+        match last_input_output.take_output(txn_idx) {
+            ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                final_results[txn_idx as usize] = t;
+            },
+            ExecutionStatus::Abort(_) => (),
+        };
     }
 
     fn worker_loop(
@@ -406,7 +419,8 @@ where
         // TODO: should not need to pass base view.
         base_view: &S,
         shared_counter: &AtomicU32,
-        txn_fee_state: &Mutex<(FeeStatement, Vec<FeeStatement>)>,
+        shared_commit_state: &Mutex<(FeeStatement, Vec<FeeStatement>, Option<Error<E::Error>>)>,
+        final_results: &Mutex<Vec<E::Output>>,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -424,14 +438,20 @@ where
                     scheduler,
                     &mut scheduler_task,
                     last_input_output,
-                    txn_fee_state,
+                    shared_commit_state,
                 );
                 scheduler.queueing_commits_mark_done();
             }
 
             {
                 while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
-                    self.commit_epilogue(txn_idx, versioned_cache, last_input_output, base_view);
+                    self.commit_epilogue(
+                        txn_idx,
+                        versioned_cache,
+                        last_input_output,
+                        base_view,
+                        final_results,
+                    );
                 }
             }
 
@@ -476,6 +496,7 @@ where
                             versioned_cache,
                             last_input_output,
                             base_view,
+                            final_results,
                         );
                     }
                     break;
@@ -506,10 +527,19 @@ where
 
         let num_txns = signature_verified_block.len();
 
-        let txn_fee_state = Mutex::new((
+        let shared_commit_state = Mutex::new((
             FeeStatement::zero(),
             Vec::<FeeStatement>::with_capacity(num_txns),
+            None,
         ));
+
+        let final_results = Mutex::new(Vec::with_capacity(num_txns));
+        {
+            // Initialize for [] access, takes less than <1ms for 50k block.
+            final_results
+                .lock()
+                .resize_with(num_txns, E::Output::skip_output);
+        }
 
         let num_txns = num_txns as u32;
 
@@ -528,37 +558,13 @@ where
                         &scheduler,
                         base_view,
                         &shared_counter,
-                        &txn_fee_state,
+                        &shared_commit_state,
+                        &final_results,
                     );
                 });
             }
         });
         drop(timer);
-
-        let num_txns = num_txns as usize;
-        // TODO: for large block sizes and many cores, extract outputs in parallel.
-        let mut final_results = Vec::with_capacity(num_txns);
-
-        let maybe_err = if last_input_output.module_publishing_may_race() {
-            counters::MODULE_PUBLISHING_FALLBACK_COUNT.inc();
-            Some(Error::ModulePathReadWrite)
-        } else {
-            let mut ret = None;
-            for idx in 0..num_txns {
-                match last_input_output.take_output(idx as TxnIndex) {
-                    ExecutionStatus::Success(t) => final_results.push(t),
-                    ExecutionStatus::SkipRest(t) => {
-                        final_results.push(t);
-                        break;
-                    },
-                    ExecutionStatus::Abort(err) => {
-                        ret = Some(err);
-                        break;
-                    },
-                };
-            }
-            ret
-        };
 
         self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
@@ -568,12 +574,10 @@ where
             drop(versioned_cache);
         });
 
-        match maybe_err {
-            Some(err) => Err(err),
-            None => {
-                final_results.resize_with(num_txns, E::Output::skip_output);
-                Ok(final_results)
-            },
+        let maybe_error = &mut shared_commit_state.lock().2;
+        match maybe_error {
+            Some(err) => Err(err.clone()),
+            None => Ok(final_results.into_inner()),
         }
     }
 
@@ -589,9 +593,7 @@ where
         drop(init_timer);
 
         let data_map = UnsyncMap::new();
-
         let mut ret = Vec::with_capacity(num_txns);
-
         let mut accumulated_fee_statement = FeeStatement::zero();
 
         for (idx, txn) in signature_verified_block.iter().enumerate() {

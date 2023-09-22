@@ -333,7 +333,7 @@ impl Scheduler {
     pub fn try_commit(&self) -> Option<TxnIndex> {
         let mut commit_state_mutex = self.commit_state.lock();
         let commit_state = commit_state_mutex.deref_mut();
-        let (commit_idx, commit_wave) = (&mut commit_state.0, &mut commit_state.1);
+        let (commit_idx, commit_wave) = commit_state;
 
         if *commit_idx == self.num_txns {
             return None;

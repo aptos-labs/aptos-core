@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    counters,
     errors::Error,
     task::{ExecutionStatus, Transaction, TransactionOutput},
 };
-use anyhow::anyhow;
 use aptos_mvhashmap::types::{TxnIndex, Version};
 use aptos_types::{
     access_path::AccessPath, executable::ModulePath, fee_statement::FeeStatement,
@@ -184,7 +184,7 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
         txn_idx: TxnIndex,
         input: Vec<ReadDescriptor<K>>,
         output: ExecutionStatus<T, Error<E>>,
-    ) -> anyhow::Result<()> {
+    ) {
         let read_modules: Vec<AccessPath> = input
             .iter()
             .filter_map(|desc| {
@@ -212,22 +212,14 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
             if Self::append_and_check(read_modules, &self.module_reads, &self.module_writes)
                 || Self::append_and_check(written_modules, &self.module_writes, &self.module_reads)
             {
+                counters::MODULE_PUBLISHING_FALLBACK_COUNT.inc();
                 self.module_read_write_intersection
                     .store(true, Ordering::Release);
-                return Err(anyhow!(
-                    "[BlockSTM]: Detect module r/w intersection, will fallback to sequential execution"
-                ));
             }
         }
 
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput::from_output_status(output))));
-
-        Ok(())
-    }
-
-    pub(crate) fn module_publishing_may_race(&self) -> bool {
-        self.module_read_write_intersection.load(Ordering::Acquire)
     }
 
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<Vec<ReadDescriptor<K>>>> {
@@ -257,6 +249,21 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
                 .output_status,
             ExecutionStatus::SkipRest(_) | ExecutionStatus::Abort(_)
         )
+    }
+
+    pub(crate) fn execution_error(&self, txn_idx: TxnIndex) -> Option<Error<E>> {
+        if self.module_read_write_intersection.load(Ordering::Acquire) {
+            return Some(Error::ModulePathReadWrite);
+        }
+
+        if let ExecutionStatus::Abort(err) = &self.outputs[txn_idx as usize]
+            .load_full()
+            .expect("[BlockSTM]: Execution output must be recorded after execution")
+            .output_status
+        {
+            return Some(err.clone());
+        }
+        None
     }
 
     pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
