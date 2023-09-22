@@ -24,7 +24,6 @@ use aptos_storage_interface::{DbReader, Order};
 use aptos_types::{
     account_config::{new_block_event_key, NewBlockEvent},
     aggregate_signature::AggregateSignature,
-    block_info::BlockInfo,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -33,26 +32,29 @@ use async_trait::async_trait;
 use futures_channel::mpsc::UnboundedSender;
 use std::{collections::HashMap, sync::Arc};
 
-#[async_trait]
-pub trait Notifier: Send + Sync {
+pub trait OrderedNotifier: Send + Sync {
     fn send_ordered_nodes(
         &self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
     ) -> anyhow::Result<()>;
+}
 
+#[async_trait]
+pub trait ProofNotifier: Send + Sync {
     async fn send_epoch_change(&self, proof: EpochChangeProof);
 
     async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures);
 }
-pub struct NotifierAdapter {
+
+pub struct OrderedNotifierAdapter {
     executor_channel: UnboundedSender<OrderedBlocks>,
     storage: Arc<dyn DAGStorage>,
-    parent_block_info: Arc<RwLock<BlockInfo>>,
+    parent_block_id: Arc<RwLock<HashValue>>,
     epoch_state: Arc<EpochState>,
 }
 
-impl NotifierAdapter {
+impl OrderedNotifierAdapter {
     pub fn new(
         executor_channel: UnboundedSender<OrderedBlocks>,
         storage: Arc<dyn DAGStorage>,
@@ -64,31 +66,25 @@ impl NotifierAdapter {
 
         // We start from the block that storage's latest ledger info, if storage has end-epoch
         // LedgerInfo, we generate the virtual genesis block
-        let parent_block_info = if ledger_info_from_storage.ledger_info().ends_epoch() {
+        let parent_block_id = if ledger_info_from_storage.ledger_info().ends_epoch() {
             let genesis =
                 Block::make_genesis_block_from_ledger_info(ledger_info_from_storage.ledger_info());
 
-            let ledger_info = ledger_info_from_storage.ledger_info();
-            genesis.gen_block_info(
-                ledger_info.transaction_accumulator_hash(),
-                ledger_info.version(),
-                ledger_info.next_epoch_state().cloned(),
-            )
+            genesis.id()
         } else {
-            ledger_info_from_storage.ledger_info().commit_info().clone()
+            ledger_info_from_storage.ledger_info().commit_info().id()
         };
 
         Self {
             executor_channel,
             storage,
-            parent_block_info: Arc::new(RwLock::new(parent_block_info)),
+            parent_block_id: Arc::new(RwLock::new(parent_block_id)),
             epoch_state,
         }
     }
 }
 
-#[async_trait]
-impl Notifier for NotifierAdapter {
+impl OrderedNotifier for OrderedNotifierAdapter {
     fn send_ordered_nodes(
         &self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
@@ -105,7 +101,7 @@ impl Notifier for NotifierAdapter {
             payload.extend(node.payload().clone());
             node_digests.push(node.digest());
         }
-        let parent_block_info = self.parent_block_info.read().clone();
+        let parent_block_id = *self.parent_block_id.read();
         // construct the bitvec that indicates which nodes present in the previous round in CommitEvent
         let mut parents_bitvec = BitVec::with_num_bits(self.epoch_state.verifier.len() as u16);
         for parent in anchor.parents().iter() {
@@ -119,7 +115,6 @@ impl Notifier for NotifierAdapter {
             }
         }
 
-        // TODO: we may want to split payload into multiple blocks
         let block = ExecutedBlock::new(
             Block::new_for_dag(
                 epoch,
@@ -128,14 +123,15 @@ impl Notifier for NotifierAdapter {
                 payload,
                 author,
                 failed_author,
-                parent_block_info,
+                parent_block_id,
                 parents_bitvec,
-            )?,
+                node_digests,
+            ),
             StateComputeResult::new_dummy(),
         );
         let block_info = block.block_info();
         let storage = self.storage.clone();
-        *self.parent_block_info.write() = block_info.clone();
+        *self.parent_block_id.write() = block.id();
         Ok(self.executor_channel.unbounded_send(OrderedBlocks {
             ordered_blocks: vec![block],
             ordered_proof: LedgerInfoWithSignatures::new(
@@ -143,27 +139,23 @@ impl Notifier for NotifierAdapter {
                 AggregateSignature::empty(),
             ),
             callback: Box::new(
-                move |_committed_blocks: &[Arc<ExecutedBlock>],
+                move |committed_blocks: &[Arc<ExecutedBlock>],
                       _commit_decision: LedgerInfoWithSignatures| {
-                    // TODO: this doesn't really work since not every block will trigger a callback,
-                    // we need to update the buffer manager to invoke all callbacks instead of only last one
-                    if let Err(e) = storage.delete_certified_nodes(node_digests) {
-                        error!(
-                            "Failed to garbage collect committed nodes and anchor: {:?}",
-                            e
-                        );
+                    for executed_block in committed_blocks {
+                        if let Some(node_digests) = executed_block.block().block_data().dag_nodes()
+                        {
+                            if let Err(e) = storage.delete_certified_nodes(node_digests.clone()) {
+                                error!(
+                                    "Failed to garbage collect committed for block {}: {:?}",
+                                    executed_block.block(),
+                                    e
+                                );
+                            }
+                        }
                     }
                 },
             ),
         })?)
-    }
-
-    async fn send_epoch_change(&self, _proof: EpochChangeProof) {
-        todo!()
-    }
-
-    async fn send_commit_proof(&self, _ledger_info: LedgerInfoWithSignatures) {
-        todo!()
     }
 }
 

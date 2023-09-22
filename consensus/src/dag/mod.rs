@@ -19,5 +19,6 @@ mod storage;
 mod tests;
 mod types;
 
+pub use adapter::ProofNotifier;
 pub use dag_network::{RpcHandler, RpcWithFallback, TDAGNetworkSender};
 pub use types::{CertifiedNode, DAGMessage, DAGNetworkMessage, Extensions, Node, NodeId, Vote};

@@ -558,7 +558,7 @@ pretty_assertions = "1.2.1"
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
 project-root = "0.2.2"
-prometheus = { version = "0.13.0", default-features = false }
+prometheus = { version = "0.13.3", default-features = false }
 prometheus-http-query = "0.5.2"
 prometheus-parse = "0.2.4"
 proptest = "1.0.0"
