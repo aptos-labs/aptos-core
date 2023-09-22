@@ -24,6 +24,7 @@ use aptos_event_notifications::{
     DbBackedOnChainConfig, EventSubscriptionService, ReconfigNotificationListener,
 };
 use aptos_logger::prelude::*;
+use aptos_netcore::transport::tcp::TCPBufferCfg;
 use aptos_network::{
     application::storage::PeersAndMetadata,
     connectivity_manager::{builder::ConnectivityManagerBuilder, ConnectivityRequest},
@@ -88,6 +89,7 @@ impl NetworkBuilder {
         network_channel_size: usize,
         max_concurrent_network_reqs: usize,
         inbound_connection_limit: usize,
+        tcp_buffer_cfg: TCPBufferCfg,
     ) -> Self {
         // A network cannot exist without a PeerManager
         // TODO:  construct this in create and pass it to new() as a parameter. The complication is manual construction of NetworkBuilder in various tests.
@@ -104,6 +106,7 @@ impl NetworkBuilder {
             max_message_size,
             enable_proxy_protocol,
             inbound_connection_limit,
+            tcp_buffer_cfg,
         );
 
         NetworkBuilder {
@@ -143,6 +146,7 @@ impl NetworkBuilder {
             NETWORK_CHANNEL_SIZE,
             MAX_CONCURRENT_NETWORK_REQS,
             MAX_INBOUND_CONNECTIONS,
+            TCPBufferCfg::default(),
         );
 
         builder.add_connectivity_manager(
@@ -193,6 +197,12 @@ impl NetworkBuilder {
             config.network_channel_size,
             config.max_concurrent_network_reqs,
             config.max_inbound_connections,
+            TCPBufferCfg::new_configs(
+                config.inbound_rx_buffer_size_bytes,
+                config.inbound_tx_buffer_size_bytes,
+                config.outbound_rx_buffer_size_bytes,
+                config.outbound_tx_buffer_size_bytes,
+            ),
         );
 
         network_builder.add_connection_monitoring(

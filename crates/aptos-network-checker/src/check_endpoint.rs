@@ -12,7 +12,7 @@ use aptos_network::{
     noise::{HandshakeAuthMode, NoiseUpgrader},
     protocols::wire::handshake::v1::ProtocolIdSet,
     transport::{
-        resolve_and_connect, upgrade_outbound, TcpSocket, UpgradeContext,
+        resolve_and_connect, upgrade_outbound, TCPBufferCfg, TcpSocket, UpgradeContext,
         SUPPORTED_MESSAGING_PROTOCOL,
     },
 };
@@ -87,7 +87,7 @@ async fn check_endpoint_with_handshake(
 ) -> Result<String> {
     // Connect to the address, this should handle DNS resolution if necessary.
     let fut_socket = async {
-        resolve_and_connect(address.clone())
+        resolve_and_connect(address.clone(), TCPBufferCfg::new())
             .await
             .map(TcpSocket::new)
     };
@@ -118,7 +118,7 @@ async fn check_endpoint_with_handshake(
 const INVALID_NOISE_HEADER: &[u8; 152] = &[7; 152];
 
 async fn check_endpoint_no_handshake(address: NetworkAddress) -> Result<String> {
-    let mut socket = resolve_and_connect(address.clone())
+    let mut socket = resolve_and_connect(address.clone(), TCPBufferCfg::new())
         .await
         .map(TcpSocket::new)
         .map_err(|error| {
