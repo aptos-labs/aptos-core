@@ -33,11 +33,35 @@ use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
+    cell::UnsafeCell,
     collections::HashMap,
     marker::PhantomData,
+    marker::Sync,
     ops::DerefMut,
     sync::{atomic::AtomicU32, Arc},
 };
+
+struct ExplicitSyncWrapper<T> {
+    value: UnsafeCell<T>,
+}
+
+impl<T> ExplicitSyncWrapper<T> {
+    pub const fn new(value: T) -> Self {
+        Self {
+            value: UnsafeCell::new(value),
+        }
+    }
+
+    pub fn get<'a>(&self) -> &'a mut T {
+        unsafe { &mut *self.value.get() }
+    }
+
+    pub fn into_inner(self) -> T {
+        self.value.into_inner()
+    }
+}
+
+unsafe impl<T> Sync for ExplicitSyncWrapper<T> {}
 
 pub struct BlockExecutor<T, E, S, L, X> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
@@ -342,7 +366,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         base_view: &S,
-        final_results: &Mutex<Vec<E::Output>>,
+        final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) {
         let delta_keys = last_input_output.delta_keys(txn_idx);
         let _events = last_input_output.events(txn_idx);
@@ -400,7 +424,7 @@ where
             }
         }
 
-        let mut final_results = final_results.lock();
+        let mut final_results = final_results.get();
         match last_input_output.take_output(txn_idx) {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                 final_results[txn_idx as usize] = t;
@@ -420,7 +444,7 @@ where
         base_view: &S,
         shared_counter: &AtomicU32,
         shared_commit_state: &Mutex<(FeeStatement, Vec<FeeStatement>, Option<Error<E::Error>>)>,
-        final_results: &Mutex<Vec<E::Output>>,
+        final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -533,11 +557,12 @@ where
             None,
         ));
 
-        let final_results = Mutex::new(Vec::with_capacity(num_txns));
+        let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns));
+        // Initialize for [] access, takes less than <1ms (on Apple M1) for 50k block.
+
         {
-            // Initialize for [] access, takes less than <1ms for 50k block.
             final_results
-                .lock()
+                .get()
                 .resize_with(num_txns, E::Output::skip_output);
         }
 
