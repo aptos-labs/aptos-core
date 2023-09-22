@@ -71,9 +71,6 @@ impl SchemaBatch {
 
     /// Adds an insert/update operation to the batch.
     pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<()> {
-        let _timer = APTOS_SCHEMADB_BATCH_PUT_LATENCY_SECONDS
-            .with_label_values(&["unknown"])
-            .start_timer();
         let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
         let value = <S::Value as ValueCodec<S>>::encode_value(value)?;
         self.rows
@@ -244,20 +241,6 @@ impl DB {
         self.inner.write_opt(db_batch, &default_write_options())?;
 
         // Bump counters only after DB write succeeds.
-        for (cf_name, rows) in rows_locked.iter() {
-            for write_op in rows {
-                match write_op {
-                    WriteOp::Value { key, value } => {
-                        APTOS_SCHEMADB_PUT_BYTES
-                            .with_label_values(&[cf_name])
-                            .observe((key.len() + value.len()) as f64);
-                    },
-                    WriteOp::Deletion { key: _ } => {
-                        APTOS_SCHEMADB_DELETES.with_label_values(&[cf_name]).inc();
-                    },
-                }
-            }
-        }
         APTOS_SCHEMADB_BATCH_COMMIT_BYTES
             .with_label_values(&[&self.name])
             .observe(serialized_size as f64);

@@ -343,7 +343,6 @@ impl Scheduler {
 
     /// Return the next task for the thread.
     pub fn next_task(&self, committing: bool) -> SchedulerTask {
-        let _timer = GET_NEXT_TASK_SECONDS.start_timer();
         loop {
             if self.done() {
                 // No more tasks.

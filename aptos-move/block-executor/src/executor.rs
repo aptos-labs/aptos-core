@@ -338,11 +338,11 @@ where
                 // Either all txn committed, or a committed txn caused an early halt.
                 scheduler.halt();
 
-                counters::update_parallel_block_gas_counters(
-                    accumulated_fee_statement,
-                    (txn_idx + 1) as usize,
-                );
-                counters::update_parallel_txn_gas_counters(txn_fee_statements);
+                // counters::update_parallel_block_gas_counters(
+                //     accumulated_fee_statement,
+                //     (txn_idx + 1) as usize,
+                // );
+                // counters::update_parallel_txn_gas_counters(txn_fee_statements);
 
                 let accumulated_non_storage_gas = accumulated_fee_statement.execution_gas_used()
                     + accumulated_fee_statement.io_gas_used();
