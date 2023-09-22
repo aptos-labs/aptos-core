@@ -112,15 +112,18 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
 struct ChunkExecutorInner<V> {
     db: DbReaderWriter,
     commit_queue: Mutex<ChunkCommitQueue>,
+    proof_fetcher: Arc<AsyncProofFetcher>,
     _phantom: PhantomData<V>,
 }
 
 impl<V: VMExecutor> ChunkExecutorInner<V> {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
         let commit_queue = Mutex::new(ChunkCommitQueue::new_from_db(&db.reader)?);
+        let proof_fetcher = Arc::new(AsyncProofFetcher::new(db.reader.clone()));
         Ok(Self {
             db,
             commit_queue,
+            proof_fetcher,
             _phantom: PhantomData,
         })
     }
@@ -131,7 +134,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                 first_version: latest_view.txn_accumulator().num_leaves(),
             },
             Arc::clone(&self.db.reader),
-            Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
+            self.proof_fetcher.clone(),
         )
     }
 

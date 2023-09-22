@@ -4,7 +4,7 @@
 use crate::{metrics::TIMER, DbReader};
 use anyhow::{anyhow, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_logger::{error, sample, sample::SampleRate};
+use aptos_logger::{error, info, sample, sample::SampleRate};
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -21,36 +21,100 @@ use std::{
     },
     time::Duration,
 };
-
-static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(AptosVM::get_num_proof_reading_threads())
-        .thread_name(|index| format!("proof_reader-{}", index))
-        .build()
-        .unwrap()
-});
+use std::thread::JoinHandle;
 
 struct Proof {
     state_key_hash: HashValue,
     proof: SparseMerkleProofExt,
 }
 
+enum Command {
+    AsyncRead {
+        state_key: StateKey,
+        version: Version,
+        root_hash: Option<HashValue>,
+        value_hash: Option<HashValue>,
+    },
+    Stop,
+}
+
 pub struct AsyncProofFetcher {
     reader: Arc<dyn DbReader>,
-    data_sender: Sender<Proof>,
+    command_sender: Sender<Command>,
     data_receiver: Receiver<Proof>,
     num_proofs_to_read: AtomicUsize,
+    worker_threads: Vec<Option<JoinHandle<()>>>,
 }
 
 impl AsyncProofFetcher {
     pub fn new(reader: Arc<dyn DbReader>) -> Self {
+        let (command_sender, command_receiver) = unbounded();
         let (data_sender, data_receiver) = unbounded();
+        let mut workers = vec![];
+
+        for i in 0..AptosVM::get_num_proof_reading_threads() {
+            let command_receiver = command_receiver.clone();
+            let reader = reader.clone();
+            let data_sender = data_sender.clone();
+            let worker_thread = std::thread::Builder::new()
+                .name(format!("async-proof-fetcher-master-{:?}", i))
+                .spawn(move || Self::proof_read_loop(reader, data_sender, command_receiver))
+                .expect("Creating proof fetcher thread should succeed.");
+            workers.push(Some(worker_thread))
+        }
 
         Self {
             reader,
-            data_sender,
+            command_sender,
             data_receiver,
             num_proofs_to_read: AtomicUsize::new(0),
+            worker_threads: workers,
+        }
+    }
+
+    fn proof_read_loop(
+        reader: Arc<dyn DbReader>,
+        data_sender: Sender<Proof>,
+        command_receiver: Receiver<Command>,
+    ) {
+        // Loop and Receive command from the channel.
+        loop {
+            let command = command_receiver
+                .recv()
+                .expect("Failed to receive command on the channel.");
+            match command {
+                Command::AsyncRead {
+                    state_key,
+                    version,
+                    root_hash,
+                    value_hash,
+                } => {
+                    let proof = reader
+                        .get_state_proof_by_version_ext(&state_key, version)
+                        .expect("Proof reading should succeed.");
+                    if let Some(root_hash) = root_hash {
+                        proof
+                            .verify_by_hash(root_hash, state_key.hash(), value_hash)
+                            .map_err(|err| {
+                                anyhow!(
+                            "Proof is invalid for key {:?} with state root hash {:?}, at version {}: {}.",
+                            state_key,
+                            root_hash,
+                            version,
+                            err
+                        )
+                            })
+                            .expect("Failed to verify proof.");
+                    }
+                    data_sender.send(Proof {
+                        state_key_hash: state_key.hash(),
+                        proof,
+                    }).expect("Failed to send proof, something is wrong in execution.");
+                },
+                Command::Stop => {
+                    break;
+                },
+            }
         }
     }
 
@@ -88,6 +152,7 @@ impl AsyncProofFetcher {
     fn wait(&self) -> HashMap<HashValue, SparseMerkleProofExt> {
         let _timer = TIMER.with_label_values(&["wait_async_proof"]).start_timer();
         // TODO(grao): Find a way to verify the proof.
+        info!("Waiting for proofs to be read.");
         let mut proofs = HashMap::new();
         for _ in 0..self.num_proofs_to_read.load(Ordering::SeqCst) {
             let data = self
@@ -101,6 +166,7 @@ impl AsyncProofFetcher {
             proofs.insert(state_key_hash, proof);
         }
         self.num_proofs_to_read.store(0, Ordering::SeqCst);
+        info!("Proofs reading done for proofs: {}", proofs.len());
         proofs
     }
 
@@ -116,41 +182,20 @@ impl AsyncProofFetcher {
             .with_label_values(&["schedule_async_proof_read"])
             .start_timer();
         self.num_proofs_to_read.fetch_add(1, Ordering::SeqCst);
-        let reader = self.reader.clone();
-        let data_sender = self.data_sender.clone();
-        IO_POOL.spawn(move || {
-            let proof = reader
-                .get_state_proof_by_version_ext(&state_key, version)
-                .expect("Proof reading should succeed.");
-            // NOTE: Drop the reader here to make sure reader has shorter lifetime than the async
-            // proof fetcher.
-            drop(reader);
-            if let Some(root_hash) = root_hash {
-                proof
-                    .verify_by_hash(root_hash, state_key.hash(), value_hash)
-                    .map_err(|err| {
-                        anyhow!(
-                            "Proof is invalid for key {:?} with state root hash {:?}, at version {}: {}.",
-                            state_key,
-                            root_hash,
-                            version,
-                            err
-                        )
-                    })
-                    .expect("Failed to verify proof.");
-            }
-            match data_sender.send(Proof {
-                state_key_hash: state_key.hash(),
-                proof,
-            }) {
-                Ok(_) => {}
-                Err(_) => {
-                    sample!(
-                        SampleRate::Duration(Duration::from_secs(5)),
-                        error!("Failed to send proof, something is wrong in execution.")
-                    );
-                }
-            }
+        self.command_sender
+            .send(Command::AsyncRead{state_key, version, root_hash, value_hash})
+            .expect("Failed to send command on the channel.");
+    }
+}
+
+impl Drop for AsyncProofFetcher {
+    fn drop(&mut self) {
+        self.command_sender.send(Command::Stop).unwrap();
+        self.worker_threads.iter_mut().for_each(|worker| {
+            worker.take()
+                .expect("worker thread should exists")
+                .join()
+                .expect("Worker thread should join peacefully.");
         });
     }
 }

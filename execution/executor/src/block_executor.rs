@@ -161,6 +161,7 @@ struct BlockExecutorInner<V> {
     db: DbReaderWriter,
     block_tree: BlockTree,
     phantom: PhantomData<V>,
+    proof_fetcher: Arc<AsyncProofFetcher>,
 }
 
 impl<V> BlockExecutorInner<V>
@@ -169,10 +170,12 @@ where
 {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
         let block_tree = BlockTree::new(&db.reader)?;
+        let proof_fetcher = Arc::new(AsyncProofFetcher::new(db.reader.clone()));
         Ok(Self {
             db,
             block_tree,
             phantom: PhantomData,
+            proof_fetcher,
         })
     }
 
@@ -235,7 +238,7 @@ where
                         Arc::clone(&self.db.reader),
                         parent_output.next_version(),
                         parent_output.state().current.clone(),
-                        Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
+                        self.proof_fetcher.clone(),
                     )?
                 };
 
