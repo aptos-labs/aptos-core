@@ -186,4 +186,14 @@ module drand::lottery {
 
         (rsrc_acc_signer, rsrc_acc_addr)
     }
+
+    //
+    // Test functions
+    //
+
+    #[test_only]
+    public fun init_module_for_testing(developer: &signer) {
+        account::create_account_for_test(signer::address_of(developer));
+        init_module(developer)
+    }
 }
