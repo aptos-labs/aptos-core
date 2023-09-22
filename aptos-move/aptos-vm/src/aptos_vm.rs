@@ -197,7 +197,7 @@ impl AptosVM {
     /// Sets the # of async proof reading threads.
     pub fn set_num_proof_reading_threads_once(mut num_threads: usize) {
         // TODO(grao): Do more analysis to tune this magic number.
-        num_threads = min(num_threads, 256);
+        num_threads = min(num_threads, 16);
         // Only the first call succeeds, due to OnceCell semantics.
         NUM_PROOF_READING_THREADS.set(num_threads).ok();
     }

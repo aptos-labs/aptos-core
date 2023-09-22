@@ -1071,9 +1071,10 @@ impl AptosDB {
             .with_label_values(&["commit_events"])
             .start_timer();
         let batch = SchemaBatch::new();
+        let len = txns_to_commit.len();
         txns_to_commit
             .par_iter()
-            .with_min_len(128)
+            .with_min_len(len / 64)
             .enumerate()
             .try_for_each(|(i, txn_to_commit)| -> Result<()> {
                 self.event_store.put_events(
