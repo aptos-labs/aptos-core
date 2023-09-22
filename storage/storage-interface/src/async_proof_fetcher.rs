@@ -19,9 +19,9 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
+    thread::JoinHandle,
     time::Duration,
 };
-use std::thread::JoinHandle;
 
 struct Proof {
     state_key_hash: HashValue,
@@ -35,7 +35,6 @@ enum Command {
         root_hash: Option<HashValue>,
         value_hash: Option<HashValue>,
     },
-    Stop,
 }
 
 pub struct AsyncProofFetcher {
@@ -79,9 +78,14 @@ impl AsyncProofFetcher {
     ) {
         // Loop and Receive command from the channel.
         loop {
-            let command = command_receiver
-                .recv()
-                .expect("Failed to receive command on the channel.");
+            let command = command_receiver.recv();
+            if command.is_err() {
+                error!(
+                    "Failed to receive command on the channel, most likely the channel is closed."
+                );
+                break;
+            }
+            let command = command.unwrap();
             match command {
                 Command::AsyncRead {
                     state_key,
@@ -106,14 +110,14 @@ impl AsyncProofFetcher {
                             })
                             .expect("Failed to verify proof.");
                     }
-                    data_sender.send(Proof {
-                        state_key_hash: state_key.hash(),
-                        proof,
-                    }).expect("Failed to send proof, something is wrong in execution.");
+                    data_sender
+                        .send(Proof {
+                            state_key_hash: state_key.hash(),
+                            proof,
+                        })
+                        .expect("Failed to send proof, something is wrong in execution.");
                 },
-                Command::Stop => {
-                    break;
-                },
+                _ => unreachable!(),
             }
         }
     }
@@ -152,7 +156,6 @@ impl AsyncProofFetcher {
     fn wait(&self) -> HashMap<HashValue, SparseMerkleProofExt> {
         let _timer = TIMER.with_label_values(&["wait_async_proof"]).start_timer();
         // TODO(grao): Find a way to verify the proof.
-        info!("Waiting for proofs to be read.");
         let mut proofs = HashMap::new();
         for _ in 0..self.num_proofs_to_read.load(Ordering::SeqCst) {
             let data = self
@@ -166,7 +169,6 @@ impl AsyncProofFetcher {
             proofs.insert(state_key_hash, proof);
         }
         self.num_proofs_to_read.store(0, Ordering::SeqCst);
-        info!("Proofs reading done for proofs: {}", proofs.len());
         proofs
     }
 
@@ -183,20 +185,13 @@ impl AsyncProofFetcher {
             .start_timer();
         self.num_proofs_to_read.fetch_add(1, Ordering::SeqCst);
         self.command_sender
-            .send(Command::AsyncRead{state_key, version, root_hash, value_hash})
+            .send(Command::AsyncRead {
+                state_key,
+                version,
+                root_hash,
+                value_hash,
+            })
             .expect("Failed to send command on the channel.");
-    }
-}
-
-impl Drop for AsyncProofFetcher {
-    fn drop(&mut self) {
-        self.command_sender.send(Command::Stop).unwrap();
-        self.worker_threads.iter_mut().for_each(|worker| {
-            worker.take()
-                .expect("worker thread should exists")
-                .join()
-                .expect("Worker thread should join peacefully.");
-        });
     }
 }
 
