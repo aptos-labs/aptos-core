@@ -424,7 +424,7 @@ where
             }
         }
 
-        let mut final_results = final_results.get();
+        let final_results = final_results.get();
         match last_input_output.take_output(txn_idx) {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                 final_results[txn_idx as usize] = t;
