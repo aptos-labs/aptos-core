@@ -621,7 +621,7 @@ tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tracing = "0.1.34"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 trybuild = "1.0.80"
-tokio = { version = "1.21.0", features = ["full"] }
+tokio = { version = "1.32.0", features = ["full"] }
 tokio-io-timeout = "1.2.0"
 tokio-metrics = "0.1.0"
 tokio-retry = "0.3.0"
