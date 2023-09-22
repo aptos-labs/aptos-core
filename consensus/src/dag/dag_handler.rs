@@ -115,13 +115,18 @@ impl NetworkHandler {
     ) -> anyhow::Result<StateSyncStatus> {
         let dag_message: DAGMessage = rpc_request.req.try_into()?;
 
-        debug!("processing rpc: {:?}", dag_message);
+        debug!("processing rpc: {:?} from {}", dag_message, rpc_request.sender);
 
-        let author = dag_message
-            .author()
-            .map_err(|_| anyhow::anyhow!("unexpected rpc message {:?}", dag_message))?;
-        if author != rpc_request.sender {
-            bail!("message author and network author mismatch");
+        if matches!(
+            dag_message,
+            DAGMessage::NodeMsg(_) | DAGMessage::CertifiedNodeMsg(_)
+        ) {
+            let author = dag_message
+                .author()
+                .map_err(|_| anyhow::anyhow!("unexpected rpc message {:?}", dag_message))?;
+            if author != rpc_request.sender {
+                bail!("message author and network author mismatch");
+            }
         }
 
         let response: anyhow::Result<DAGMessage> = {

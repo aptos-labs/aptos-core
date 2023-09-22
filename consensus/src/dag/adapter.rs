@@ -27,7 +27,7 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures}, block_info::BlockInfo,
 };
 use async_trait::async_trait;
 use futures_channel::mpsc::UnboundedSender;
@@ -166,7 +166,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                     ledger_info_provider
                         .write()
                         .notify_commit_proof(commit_decision);
-                    
+
                     for executed_block in committed_blocks {
                         if let Some(node_digests) = executed_block.block().block_data().dag_nodes()
                         {

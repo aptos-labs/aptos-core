@@ -223,6 +223,9 @@ impl NetworkSender {
         msg: ConsensusMsg,
         timeout_duration: Duration,
     ) -> anyhow::Result<ConsensusMsg> {
+        fail_point!("consensus::send::any", |_| {
+            Err(anyhow::anyhow!("Injected error in send_rpc"))
+        });
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
             .inc();
