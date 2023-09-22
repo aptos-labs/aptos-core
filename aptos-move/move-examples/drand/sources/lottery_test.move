@@ -16,6 +16,10 @@ module drand::lottery_test {
     #[test_only]
     use std::vector;
     #[test_only]
+    use std::string;
+    #[test_only]
+    use std::debug;
+    #[test_only]
     use aptos_std::crypto_algebra::enable_cryptography_algebra_natives;
 
     #[test_only]
@@ -126,5 +130,9 @@ module drand::lottery_test {
         // Send a TXN with `drand_signed_bytes` to close the lottery and determine the winner
         //
         lottery::close_lottery(drand_signed_bytes);
+        let winner_addr = lottery::get_lottery_winner();
+        debug::print(&string::utf8(b"The winner is: "));
+        debug::print(&winner_addr)
+
     }
 }

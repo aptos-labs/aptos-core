@@ -60,6 +60,8 @@ module drand::lottery {
 
         // Signer for the resource accounts storing the coins that can be won
         signer_cap: account::SignerCapability,
+
+        winner: Option<address>,
     }
 
     // Declare the testing module as a friend, so it can call `init_module` below for testing.
@@ -83,12 +85,18 @@ module drand::lottery {
                 tickets: vector::empty<address>(),
                 draw_at: option::none(),
                 signer_cap,
+                winner: option::none(),
             }
         )
     }
 
     public fun get_ticket_price(): u64 { TICKET_PRICE }
     public fun get_minimum_lottery_duration_in_secs(): u64 { MINIMUM_LOTTERY_DURATION_SECS }
+
+    public fun get_lottery_winner(): Option<address> acquires Lottery {
+        let lottery = borrow_global_mut<Lottery>(@drand);
+        lottery.winner
+    }
 
     /// Allows anyone to start & configure the lottery so that drawing happens at time `draw_at` (and thus users
     /// have plenty of time to buy tickets), where `draw_at` is a UNIX timestamp in seconds.
@@ -174,6 +182,7 @@ module drand::lottery {
         // Close the lottery
         option::extract(&mut lottery.draw_at);
         lottery.tickets = vector::empty<address>();
+        lottery.winner = option::some(winner_addr);
     }
 
     //
