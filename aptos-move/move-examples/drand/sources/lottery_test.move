@@ -1,18 +1,30 @@
 module drand::lottery_test {
+    #[test_only]
     use drand::lottery;
+    #[test_only]
     use aptos_framework::timestamp;
+    #[test_only]
     use std::signer;
+    #[test_only]
     use aptos_framework::account;
+    #[test_only]
     use aptos_framework::coin;
+    #[test_only]
     use aptos_framework::aptos_coin::{Self, AptosCoin};
+    #[test_only]
     use std::option;
+    #[test_only]
     use aptos_std::debug;
+    #[test_only]
     use std::string;
+    #[test_only]
     use aptos_framework::coin::MintCapability;
+    #[test_only]
     use std::vector;
     #[test_only]
     use aptos_std::crypto_algebra::enable_cryptography_algebra_natives;
 
+    #[test_only]
     fun give_coins(mint_cap: &MintCapability<AptosCoin>, to: &signer) {
         let to_addr = signer::address_of(to);
         if (!account::exists_at(to_addr)) {
@@ -24,6 +36,7 @@ module drand::lottery_test {
         coin::deposit(to_addr, coins);
     }
 
+    #[test_only]
     #[test(myself = @drand, fx = @aptos_framework, u1 = @0xA001, u2 = @0xA002, u3 = @0xA003, u4 = @0xA004)]
     fun test_lottery(
         myself: signer, fx: signer,

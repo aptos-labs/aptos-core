@@ -66,7 +66,7 @@ module drand::lottery {
     friend drand::lottery_test;
 
     /// Initializes a so-called "resource" account which will maintain the list of lottery tickets bought by users.
-    public(friend) fun init_module(deployer: &signer) {
+    fun init_module(deployer: &signer) {
         // Create the resource account. This will allow this module to later obtain a `signer` for this account and
         // update the list of purchased lottery tickets.
         let (_resource, signer_cap) = account::create_resource_account(deployer, vector::empty());
@@ -129,7 +129,7 @@ module drand::lottery {
     /// Allows anyone to close the lottery (if enough time has elapsed) and to decide the winner, by uploading
     /// the correct _drand-signed bytes_ associated with the committed draw time in `Lottery::draw_at`.
     /// These bytes will then be verified and used to extract randomness.
-    public entry fun close_lottery(drand_signed_bytes: vector<u8>): Option<address> acquires Lottery {
+    public entry fun close_lottery(drand_signed_bytes: vector<u8>) acquires Lottery {
         // Get the Lottery resource
         let lottery = borrow_global_mut<Lottery>(@drand);
 
@@ -142,7 +142,7 @@ module drand::lottery {
             // It's time to draw, but nobody signed up => nobody won.
             // Close the lottery (even if the randomness might be incorrect).
             option::extract(&mut lottery.draw_at);
-            return option::none<address>()
+            return 
         };
 
         // Determine the next drand round after `draw_at`
@@ -174,7 +174,6 @@ module drand::lottery {
         // Close the lottery
         option::extract(&mut lottery.draw_at);
         lottery.tickets = vector::empty<address>();
-        option::some(winner_addr)
     }
 
     //
