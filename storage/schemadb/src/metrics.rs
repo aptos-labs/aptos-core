@@ -114,16 +114,3 @@ pub static APTOS_SCHEMADB_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
     ])
     .unwrap()
 });
-
-pub static APTOS_SCHEMADB_BATCH_PUT_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        // metric name
-        "aptos_schemadb_batch_put_latency_seconds",
-        // metric description
-        "Aptos schemadb schema batch put latency in seconds",
-        // metric labels (dimensions)
-        &["db_name"],
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
-    )
-    .unwrap()
-});
