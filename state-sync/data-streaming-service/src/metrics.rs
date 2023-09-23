@@ -11,6 +11,13 @@ use once_cell::sync::Lazy;
 // Subscription stream termination labels
 pub const MAX_CONSECUTIVE_REQUESTS_LABEL: &str = "max_consecutive_requests";
 
+// Histogram buckets for tracking chunk sizes of data responses
+const DATA_RESPONSE_CHUNK_SIZE_BUCKETS: &[f64] = &[
+    1.0, 2.0, 4.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0, 250.0, 500.0, 750.0, 1000.0, 2500.0, 5000.0,
+    7500.0, 10_000.0, 12_500.0, 15_000.0, 17_500.0, 20_000.0, 25_000.0, 30_000.0, 35_000.0,
+    40_000.0, 45_000.0, 50_000.0, 75_000.0, 100_000.0,
+];
+
 // Latency buckets for network latencies (i.e., the defaults only go up
 // to 10 seconds, but we usually require more).
 const NETWORK_LATENCY_BUCKETS: [f64; 14] = [
@@ -104,6 +111,16 @@ pub static SENT_DATA_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for tracking sent data requests for missing data
+pub static SENT_DATA_REQUESTS_FOR_MISSING_DATA: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_data_streaming_service_sent_data_requests_for_missing_data",
+        "Counters related to sent data requests for missing data",
+        &["request_type"]
+    )
+    .unwrap()
+});
+
 /// Counter for tracking data requests that were retried (including
 /// the new timeouts).
 pub static RETRIED_DATA_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -134,6 +151,16 @@ pub static RECEIVED_DATA_RESPONSE: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for tracking the sizes of received data chunks
+pub static RECEIVED_DATA_RESPONSE_CHUNK_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
+    let histogram_opts = histogram_opts!(
+        "aptos_data_streaming_service_received_data_chunk_sizes",
+        "Counter for tracking sizes of data chunks received by the data stream",
+        DATA_RESPONSE_CHUNK_SIZE_BUCKETS.to_vec()
+    );
+    register_histogram_vec!(histogram_opts, &["request_type", "response_type"]).unwrap()
+});
+
 /// Counter for tracking received data responses
 pub static RECEIVED_RESPONSE_ERROR: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -160,7 +187,7 @@ pub fn increment_counter(counter: &Lazy<IntCounterVec>, label: &str) {
 }
 
 /// Increments the given counter with two label values.
-pub fn increment_counter_multiple(
+pub fn increment_counter_multiple_labels(
     counter: &Lazy<IntCounterVec>,
     first_label: &str,
     second_label: &str,
@@ -168,6 +195,18 @@ pub fn increment_counter_multiple(
     counter
         .with_label_values(&[first_label, second_label])
         .inc();
+}
+
+/// Adds a new observation for the given histogram, labels and value
+pub fn observe_value(
+    histogram: &Lazy<HistogramVec>,
+    first_label: &str,
+    second_label: &str,
+    value: u64,
+) {
+    histogram
+        .with_label_values(&[first_label, second_label])
+        .observe(value as f64);
 }
 
 /// Sets the number of active data streams

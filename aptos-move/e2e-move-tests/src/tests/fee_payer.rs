@@ -224,7 +224,9 @@ fn test_normal_tx_with_signer_with_fee_payer() {
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
+    assert_success!(
+        h.publish_package_cache_building(&acc, &common::test_dir_path("string_args.data/pack"))
+    );
 
     let fun: MemberId = str::parse("0xcafe::test::hi").unwrap();
     let entry = EntryFunction::new(fun.module_id, fun.member_id, vec![], vec![bcs::to_bytes(
@@ -264,7 +266,9 @@ fn test_normal_tx_without_signer_with_fee_payer() {
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
+    assert_success!(
+        h.publish_package_cache_building(&acc, &common::test_dir_path("string_args.data/pack"))
+    );
 
     let fun: MemberId = str::parse("0xcafe::test::nothing").unwrap();
     let entry = EntryFunction::new(fun.module_id, fun.member_id, vec![], vec![]);
@@ -298,7 +302,9 @@ fn test_normal_tx_with_fee_payer_insufficient_funds() {
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
+    assert_success!(
+        h.publish_package_cache_building(&acc, &common::test_dir_path("string_args.data/pack"))
+    );
 
     let fun: MemberId = str::parse("0xcafe::test::nothing").unwrap();
     let entry = EntryFunction::new(fun.module_id, fun.member_id, vec![], vec![]);

@@ -48,26 +48,26 @@ class RunGroupConfig:
 # Local machine numbers will be higher.
 # fmt: off
 TESTS = [
-    RunGroupConfig(expected_tps=20500, key=RunGroupKey("no-op"), included_in=Flow.LAND_BLOCKING),
+    RunGroupConfig(expected_tps=24000, key=RunGroupKey("no-op"), included_in=Flow.LAND_BLOCKING),
     RunGroupConfig(expected_tps=3000, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=Flow.LAND_BLOCKING),
-    RunGroupConfig(expected_tps=14500, key=RunGroupKey("coin-transfer"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=16000, key=RunGroupKey("coin-transfer"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=30300, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=Flow.LAND_BLOCKING),
-    RunGroupConfig(expected_tps=12500, key=RunGroupKey("account-generation"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=14000, key=RunGroupKey("account-generation"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=26500, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=18500, key=RunGroupKey("account-resource32-b"), included_in=Flow.LAND_BLOCKING),
-    RunGroupConfig(expected_tps=3550, key=RunGroupKey("modify-global-resource"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=11500, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.LAND_BLOCKING),
+    RunGroupConfig(expected_tps=20500, key=RunGroupKey("account-resource32-b"), included_in=Flow.LAND_BLOCKING),
+    RunGroupConfig(expected_tps=4200, key=RunGroupKey("modify-global-resource"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.LAND_BLOCKING),
     RunGroupConfig(expected_tps=130, key=RunGroupKey("publish-package"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=2350, key=RunGroupKey(
+    RunGroupConfig(expected_tps=2650, key=RunGroupKey(
         "mix_publish_transfer",
         transaction_type_override="publish-package coin-transfer",
         transaction_weights_override="1 500",
     ), included_in=Flow.LAND_BLOCKING, waived=True),
-    RunGroupConfig(expected_tps=400, key=RunGroupKey("batch100-transfer"), included_in=Flow.LAND_BLOCKING),
+    RunGroupConfig(expected_tps=430, key=RunGroupKey("batch100-transfer"), included_in=Flow.LAND_BLOCKING),
     RunGroupConfig(expected_tps=940, key=RunGroupKey("batch100-transfer", executor_type="native"), included_in=Flow.CONTINUOUS),
 
-    RunGroupConfig(expected_tps=1680, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.LAND_BLOCKING),
-    RunGroupConfig(expected_tps=8200, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.LAND_BLOCKING),
+    RunGroupConfig(expected_tps=1980, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.LAND_BLOCKING),
+    RunGroupConfig(expected_tps=9300, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.LAND_BLOCKING),
     RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=5150, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow.CONTINUOUS),
@@ -80,8 +80,8 @@ TESTS = [
     RunGroupConfig(expected_tps=18000, key=RunGroupKey("no-op2-signers"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=18000, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
    
-    RunGroupConfig(expected_tps=1580, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=5700, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=1820, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=6250, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),

@@ -1150,6 +1150,7 @@ impl CliCommand<()> for RunLocalTestnet {
             let result = aptos_node::setup_test_environment_and_start_node(
                 config_path,
                 self.test_config_override,
+                None,
                 Some(test_dir_copy),
                 false,
                 false,

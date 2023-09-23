@@ -30,7 +30,7 @@ services:
     command: redis-server --replicaof redis 6379
     networks:
       shared:
-        ipv4_address:  172.16.1.22
+        ipv4_address: 172.16.1.22
     restart: unless-stopped
     expose:
       - 6379
@@ -38,10 +38,10 @@ services:
       - redis
 
   indexer-grpc-cache-worker:
-    image: "${INDEXER_GRPC_IMAGE_REPO:-aptoslabs/indexer-grpc}:${IMAGE_TAG:-devnet}"
+    image: "${INDEXER_GRPC_IMAGE_REPO:-aptoslabs/indexer-grpc}:${IMAGE_TAG:-main}"
     networks:
       shared:
-        ipv4_address:  172.16.1.13
+        ipv4_address: 172.16.1.13
     restart: unless-stopped
     volumes:
       - type: volume # XXX: needed now before refactor https://github.com/aptos-labs/aptos-core/pull/8139
@@ -58,10 +58,10 @@ services:
       - redis
 
   indexer-grpc-file-store:
-    image: "${INDEXER_GRPC_IMAGE_REPO:-aptoslabs/indexer-grpc}:${IMAGE_TAG:-devnet}"
+    image: "${INDEXER_GRPC_IMAGE_REPO:-aptoslabs/indexer-grpc}:${IMAGE_TAG:-main}"
     networks:
       shared:
-        ipv4_address:  172.16.1.14
+        ipv4_address: 172.16.1.14
     restart: unless-stopped
     volumes:
       - type: volume
@@ -78,10 +78,10 @@ services:
       - indexer-grpc-cache-worker
 
   indexer-grpc-data-service:
-    image: "${INDEXER_GRPC_IMAGE_REPO:-aptoslabs/indexer-grpc}:${IMAGE_TAG:-devnet}"
+    image: "${INDEXER_GRPC_IMAGE_REPO:-aptoslabs/indexer-grpc}:${IMAGE_TAG:-main}"
     networks:
       shared:
-        ipv4_address:  172.16.1.15
+        ipv4_address: 172.16.1.15
     restart: unless-stopped
     volumes:
       - type: volume # XXX: needed now before refactor https://github.com/aptos-labs/aptos-core/pull/8139

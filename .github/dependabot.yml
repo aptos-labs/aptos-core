@@ -9,3 +9,5 @@ updates:
       - "aptos-labs/prod-eng"
     labels:
       - "CICD:run-e2e-tests"
+      - "dependencies"
+      - "rust"

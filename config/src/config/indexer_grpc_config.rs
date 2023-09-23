@@ -6,33 +6,55 @@ use crate::config::{
 };
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 // Useful indexer defaults
-const DEFAULT_ADDRESS: &str = "0.0.0.0:50051";
-const DEFAULT_OUTPUT_BATCH_SIZE: u16 = 100;
-const DEFAULT_PROCESSOR_BATCH_SIZE: u16 = 1000;
 const DEFAULT_PROCESSOR_TASK_COUNT: u16 = 20;
+const DEFAULT_PROCESSOR_BATCH_SIZE: u16 = 1000;
+const DEFAULT_OUTPUT_BATCH_SIZE: u16 = 100;
+pub const DEFAULT_GRPC_STREAM_PORT: u16 = 50051;
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct IndexerGrpcConfig {
     pub enabled: bool,
 
-    /// The address that the grpc server will listen on
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub address: Option<String>,
+    /// If true, the GRPC stream interface exposed by the data service will be used
+    /// instead of the standard fullnode GRPC stream interface. In other words, with
+    /// this enabled, you can use an indexer fullnode like it is an instance of the
+    /// indexer-grpc data service (aka the Transaction Stream Service API).
+    pub use_data_service_interface: bool,
+
+    /// The address that the grpc server will listen on.
+    pub address: SocketAddr,
 
     /// Number of processor tasks to fan out
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub processor_task_count: Option<u16>,
+    pub processor_task_count: u16,
 
     /// Number of transactions each processor will process
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub processor_batch_size: Option<u16>,
+    pub processor_batch_size: u16,
 
     /// Number of transactions returned in a single stream response
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub output_batch_size: Option<u16>,
+    pub output_batch_size: u16,
+}
+
+// Reminder, #[serde(default)] on IndexerGrpcConfig means that the default values for
+// fields will come from this Default impl, unless the field has a specific
+// #[serde(default)] on it (which none of the above do).
+impl Default for IndexerGrpcConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            use_data_service_interface: false,
+            address: SocketAddr::V4(SocketAddrV4::new(
+                Ipv4Addr::new(0, 0, 0, 0),
+                DEFAULT_GRPC_STREAM_PORT,
+            )),
+            processor_task_count: DEFAULT_PROCESSOR_TASK_COUNT,
+            processor_batch_size: DEFAULT_PROCESSOR_BATCH_SIZE,
+            output_batch_size: DEFAULT_OUTPUT_BATCH_SIZE,
+        }
+    }
 }
 
 impl ConfigSanitizer for IndexerGrpcConfig {
@@ -41,28 +63,18 @@ impl ConfigSanitizer for IndexerGrpcConfig {
         _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {
-        let indexer_grpc_config = &mut node_config.indexer_grpc;
+        let sanitizer_name = Self::get_sanitizer_name();
 
-        // If the indexer is not enabled, we don't need to do anything
-        if !indexer_grpc_config.enabled {
+        if !node_config.indexer_grpc.enabled {
             return Ok(());
         }
 
-        // Set appropriate defaults
-        indexer_grpc_config.address = indexer_grpc_config
-            .address
-            .clone()
-            .or_else(|| Some(DEFAULT_ADDRESS.into()));
-        indexer_grpc_config.processor_task_count = indexer_grpc_config
-            .processor_task_count
-            .or(Some(DEFAULT_PROCESSOR_TASK_COUNT));
-        indexer_grpc_config.processor_batch_size = indexer_grpc_config
-            .processor_batch_size
-            .or(Some(DEFAULT_PROCESSOR_BATCH_SIZE));
-        indexer_grpc_config.output_batch_size = indexer_grpc_config
-            .output_batch_size
-            .or(Some(DEFAULT_OUTPUT_BATCH_SIZE));
-
+        if !node_config.storage.enable_indexer {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "storage.enable_indexer must be true if indexer_grpc.enabled is true".to_string(),
+            ));
+        }
         Ok(())
     }
 }

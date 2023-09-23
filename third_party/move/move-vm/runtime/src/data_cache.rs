@@ -231,7 +231,10 @@ impl<'r> TransactionDataCache<'r> {
         match self.remote.get_module(module_id) {
             Ok(Some(bytes)) => Ok(bytes),
             Ok(None) => Err(PartialVMError::new(StatusCode::LINKER_ERROR)
-                .with_message(format!("Cannot find {:?} in data cache", module_id))
+                .with_message(format!(
+                    "Linker Error: Cannot find {:?} in data cache",
+                    module_id
+                ))
                 .finish(Location::Undefined)),
             Err(err) => {
                 let msg = format!("Unexpected storage error: {:?}", err);
