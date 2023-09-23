@@ -41,7 +41,7 @@ async def rotate_auth_key_ed_25519_payload(
         ),
         originator=from_account.address(),
         current_auth_key=AccountAddress.from_str_relaxed(from_account.auth_key()),
-        new_public_key=to_account.public_key().key.encode(),
+        new_public_key=to_account.public_key(),
     )
 
     serializer = Serializer()
