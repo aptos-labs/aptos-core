@@ -1,11 +1,13 @@
 import asyncio
+from typing import List
 
+import aptos_sdk.asymmetric_crypto as asymmetric_crypto
+import aptos_sdk.ed25519 as ed25519
 from aptos_sdk.account import Account, RotationProofChallenge
 from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.async_client import FaucetClient, RestClient
 from aptos_sdk.authenticator import Authenticator
 from aptos_sdk.bcs import Serializer
-from aptos_sdk.ed25519 import PrivateKey
 from aptos_sdk.transactions import (
     EntryFunction,
     TransactionArgument,
@@ -32,7 +34,7 @@ def format_account_info(account: Account) -> str:
 
 
 async def rotate_auth_key_ed_25519_payload(
-    rest_client: RestClient, from_account: Account, private_key: PrivateKey
+    rest_client: RestClient, from_account: Account, private_key: ed25519.PrivateKey
 ) -> TransactionPayload:
     to_account = Account.load_key(private_key.hex())
     rotation_proof_challenge = RotationProofChallenge(
@@ -48,13 +50,57 @@ async def rotate_auth_key_ed_25519_payload(
     rotation_proof_challenge.serialize(serializer)
     rotation_proof_challenge_bcs = serializer.output()
 
-    proof_signed_by_from = from_account.sign(rotation_proof_challenge_bcs).data()
-    proof_signed_by_to = to_account.sign(rotation_proof_challenge_bcs).data()
+    from_signature = from_account.sign(rotation_proof_challenge_bcs)
+    to_signature = to_account.sign(rotation_proof_challenge_bcs)
 
-    from_scheme = Authenticator.ED25519
-    from_public_key_bytes = from_account.public_key().key.encode()
-    to_scheme = Authenticator.ED25519
-    to_public_key_bytes = to_account.public_key().key.encode()
+    return rotation_payload(
+        from_account.public_key(), to_account.public_key(), from_signature, to_signature
+    )
+
+
+async def rotate_auth_key_multi_ed_25519_payload(
+    rest_client: RestClient,
+    from_account: Account,
+    private_keys: List[ed25519.PrivateKey],
+) -> TransactionPayload:
+    to_accounts = list(
+        map(lambda private_key: Account.load_key(private_key.hex()), private_keys)
+    )
+    public_keys = list(map(lambda account: account.public_key(), to_accounts))
+    public_key = ed25519.MultiPublicKey(public_keys, 1)
+
+    rotation_proof_challenge = RotationProofChallenge(
+        sequence_number=await rest_client.account_sequence_number(
+            from_account.address()
+        ),
+        originator=from_account.address(),
+        current_auth_key=AccountAddress.from_str(from_account.auth_key()),
+        new_public_key=public_key,
+    )
+
+    serializer = Serializer()
+    rotation_proof_challenge.serialize(serializer)
+    rotation_proof_challenge_bcs = serializer.output()
+
+    from_signature = from_account.sign(rotation_proof_challenge_bcs)
+    to_signature = to_accounts[0].sign(rotation_proof_challenge_bcs)
+    multi_to_signature = ed25519.MultiSignature.from_key_map(
+        public_key, [(to_accounts[0].public_key(), to_signature)]
+    )
+
+    return rotation_payload(
+        from_account.public_key(), public_key, from_signature, multi_to_signature
+    )
+
+
+def rotation_payload(
+    from_key: asymmetric_crypto.PublicKey,
+    to_key: asymmetric_crypto.PublicKey,
+    from_signature: asymmetric_crypto.Signature,
+    to_signature: asymmetric_crypto.Signature,
+) -> TransactionPayload:
+    from_scheme = Authenticator.from_key(from_key)
+    to_scheme = Authenticator.from_key(to_key)
 
     entry_function = EntryFunction.natural(
         module="0x1::account",
@@ -62,11 +108,11 @@ async def rotate_auth_key_ed_25519_payload(
         ty_args=[],
         args=[
             TransactionArgument(from_scheme, Serializer.u8),
-            TransactionArgument(from_public_key_bytes, Serializer.to_bytes),
+            TransactionArgument(from_key, Serializer.struct),
             TransactionArgument(to_scheme, Serializer.u8),
-            TransactionArgument(to_public_key_bytes, Serializer.to_bytes),
-            TransactionArgument(proof_signed_by_from, Serializer.to_bytes),
-            TransactionArgument(proof_signed_by_to, Serializer.to_bytes),
+            TransactionArgument(to_key, Serializer.struct),
+            TransactionArgument(from_signature, Serializer.struct),
+            TransactionArgument(to_signature, Serializer.struct),
         ],
     )
 
@@ -82,9 +128,8 @@ async def main():
     alice = Account.generate()
     bob = Account.generate()
 
-    # Fund both accounts
-    await faucet_client.fund_account(alice.address(), 10_000_000)
-    await faucet_client.fund_account(bob.address(), 10_000_000)
+    # Fund Alice's account, since we don't use Bob's
+    await faucet_client.fund_account(alice.address(), 100_000_000)
 
     # Display formatted account info
     print(
@@ -122,12 +167,25 @@ async def main():
     ), "Authentication key doesn't match Bob's"
 
     # Construct a new Account object that reflects alice's original address with the new private key
+    original_alice_key = alice.private_key
     alice = Account(alice.address(), bob.private_key)
 
     # Display formatted account info
     print("Alice".ljust(WIDTH, " ") + format_account_info(alice))
     print("Bob".ljust(WIDTH, " ") + format_account_info(bob))
     print()
+
+    print("\n...rotating...\n")
+    payload = await rotate_auth_key_multi_ed_25519_payload(
+        rest_client, alice, [bob.private_key, original_alice_key]
+    )
+    signed_transaction = await rest_client.create_bcs_signed_transaction(alice, payload)
+    tx_hash = await rest_client.submit_bcs_transaction(signed_transaction)
+    await rest_client.wait_for_transaction(tx_hash)
+
+    alice_new_account_info = await rest_client.account(alice.address())
+    auth_key = alice_new_account_info["authentication_key"]
+    print(f"Rotation to MultiPublicKey complete, new authkey: {auth_key}")
 
     await rest_client.close()
 
