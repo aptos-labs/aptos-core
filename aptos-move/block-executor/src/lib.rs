@@ -33,7 +33,7 @@ describes the updates made by the incarnation as (memory location, value) pairs.
 The write-set of the incarnation is applied to shared memory (the multi-version
 data-structure) at the end of execution. After an incarnation executes it needs
 to pass validation. The validation re-reads the read-set and compares the
-observed versions. Intuitively, a successful validation implies that reads
+observed versions. Intuitively, a successful validation implies that writes
 applied by the incarnation are still up-to-date, while a failed validation implies
 that the incarnation has to be aborted. For instance, if the transaction was
 speculatively executed and read value x=2, but later validation observes x=3,
