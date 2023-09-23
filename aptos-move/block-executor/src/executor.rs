@@ -41,6 +41,10 @@ use std::{
         Arc,
     },
 };
+use std::env::VarError;
+use std::time::Instant;
+use rayon::prelude::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
 
 struct CommitGuard<'a> {
     post_commit_txs: &'a Vec<Sender<u32>>,
@@ -593,28 +597,60 @@ where
 
         let num_txns = num_txns as usize;
         // TODO: for large block sizes and many cores, extract outputs in parallel.
-        let mut final_results = Vec::with_capacity(num_txns);
 
-        let maybe_err = if last_input_output.module_publishing_may_race() {
+        let tt = Instant::now();
+        let (maybe_err, mut final_results) = if last_input_output.module_publishing_may_race() {
             counters::MODULE_PUBLISHING_FALLBACK_COUNT.inc();
-            Some(Error::ModulePathReadWrite)
+            (Some(Error::ModulePathReadWrite), vec![])
         } else {
-            let mut ret = None;
-            for idx in 0..num_txns {
-                match last_input_output.take_output(idx as TxnIndex) {
-                    ExecutionStatus::Success(t) => final_results.push(t),
-                    ExecutionStatus::SkipRest(t) => {
-                        final_results.push(t);
-                        break;
-                    },
-                    ExecutionStatus::Abort(err) => {
-                        ret = Some(err);
-                        break;
-                    },
-                };
+            match std::env::var("PARALLEL_OUTPUT_TAKING") {
+                Ok(v) if v.as_str() == "1" => {
+                    let tmp = self.executor_thread_pool.install(||{
+                        (0..num_txns).into_par_iter().map(|idx|{
+                            match last_input_output.take_output(idx as TxnIndex) {
+                                ExecutionStatus::Success(t) => Ok(t),
+                                ExecutionStatus::SkipRest(t) => Ok(t),
+                                ExecutionStatus::Abort(err) => Err(err),
+                            }
+                        }).collect::<Vec<_>>()
+                    });
+                    let first_err_idx = tmp.iter().position(|item| item.is_err());
+                    match first_err_idx {
+                        None => {
+                            let outputs = tmp.into_iter().map(|item|item.unwrap()).collect::<Vec<_>>();
+                            (None, outputs)
+                        }
+                        Some(idx) => {
+                            let mut items = tmp.into_iter().take(idx + 1).collect::<Vec<_>>();
+                            let err_item = items.pop().unwrap();
+                            let outputs = items.into_iter().map(|item|item.unwrap()).collect::<Vec<_>>();
+                            (Some(err_item.err().unwrap()), outputs)
+                        }
+                    }
+
+                }
+                _ => {
+                    let mut final_results = Vec::with_capacity(num_txns);
+                    let mut ret = None;
+                    for idx in 0..num_txns {
+                        match last_input_output.take_output(idx as TxnIndex) {
+                            ExecutionStatus::Success(t) => final_results.push(t),
+                            ExecutionStatus::SkipRest(t) => {
+                                final_results.push(t);
+                                break;
+                            },
+                            ExecutionStatus::Abort(err) => {
+                                ret = Some(err);
+                                break;
+                            },
+                        };
+                    }
+                    (ret, final_results)
+
+                }
             }
-            ret
         };
+        println!("[TTT] output_taking={:?}", tt.elapsed());
 
         self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
