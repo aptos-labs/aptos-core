@@ -142,6 +142,7 @@ extern crate scopeguard;
 pub mod counters;
 pub mod errors;
 pub mod executor;
+pub mod explicit_sync_wrapper;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
 mod scheduler;

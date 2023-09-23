@@ -9,6 +9,7 @@ use crate::{
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
+    explicit_sync_wrapper::ExplicitSyncWrapper,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
@@ -16,7 +17,6 @@ use crate::{
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
 use aptos_aggregator::delta_change_set::serialize;
-use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
     types::{Incarnation, MVDataError, MVDataOutput, TxnIndex},
@@ -33,35 +33,11 @@ use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
-    cell::UnsafeCell,
     collections::HashMap,
     marker::PhantomData,
     marker::Sync,
-    ops::DerefMut,
     sync::{atomic::AtomicU32, Arc},
 };
-
-struct ExplicitSyncWrapper<T> {
-    value: UnsafeCell<T>,
-}
-
-impl<T> ExplicitSyncWrapper<T> {
-    pub const fn new(value: T) -> Self {
-        Self {
-            value: UnsafeCell::new(value),
-        }
-    }
-
-    pub fn get<'a>(&self) -> &'a mut T {
-        unsafe { &mut *self.value.get() }
-    }
-
-    pub fn into_inner(self) -> T {
-        self.value.into_inner()
-    }
-}
-
-unsafe impl<T> Sync for ExplicitSyncWrapper<T> {}
 
 pub struct BlockExecutor<T, E, S, L, X> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
@@ -267,11 +243,14 @@ where
         scheduler: &Scheduler,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        shared_commit_state: &Mutex<(FeeStatement, Vec<FeeStatement>, Option<Error<E::Error>>)>,
+        shared_commit_state: &ExplicitSyncWrapper<(
+            FeeStatement,
+            Vec<FeeStatement>,
+            Option<Error<E::Error>>,
+        )>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
-            let mut shared_commit_state_guard = shared_commit_state.lock();
-            let shared_commit_state_tuple = shared_commit_state_guard.deref_mut();
+            let shared_commit_state_tuple = shared_commit_state.get_mut();
             let (accumulated_fee_statement, txn_fee_statements, maybe_error) =
                 shared_commit_state_tuple;
 
@@ -424,7 +403,7 @@ where
             }
         }
 
-        let final_results = final_results.get();
+        let final_results = final_results.get_mut();
         match last_input_output.take_output(txn_idx) {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                 final_results[txn_idx as usize] = t;
@@ -443,7 +422,11 @@ where
         // TODO: should not need to pass base view.
         base_view: &S,
         shared_counter: &AtomicU32,
-        shared_commit_state: &Mutex<(FeeStatement, Vec<FeeStatement>, Option<Error<E::Error>>)>,
+        shared_commit_state: &ExplicitSyncWrapper<(
+            FeeStatement,
+            Vec<FeeStatement>,
+            Option<Error<E::Error>>,
+        )>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
@@ -551,18 +534,17 @@ where
 
         let num_txns = signature_verified_block.len();
 
-        let shared_commit_state = Mutex::new((
+        let shared_commit_state = ExplicitSyncWrapper::new((
             FeeStatement::zero(),
             Vec::<FeeStatement>::with_capacity(num_txns),
             None,
         ));
 
         let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns));
-        // Initialize for [] access, takes less than <1ms (on Apple M1) for 50k block.
 
         {
             final_results
-                .get()
+                .get_mut()
                 .resize_with(num_txns, E::Output::skip_output);
         }
 
@@ -599,9 +581,9 @@ where
             drop(versioned_cache);
         });
 
-        let maybe_error = &mut shared_commit_state.lock().2;
-        match maybe_error {
-            Some(err) => Err(err.clone()),
+        let maybe_error = shared_commit_state.into_inner();
+        match maybe_error.2 {
+            Some(err) => Err(err),
             None => Ok(final_results.into_inner()),
         }
     }
