@@ -9,10 +9,7 @@ use aptos_logger::{error, info};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
-        transaction::{
-            authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
-            SignedTransaction,
-        },
+        transaction::{authenticator::AuthenticationKey, SignedTransaction},
         AccountKey, LocalAccount,
     },
 };
@@ -499,8 +496,7 @@ pub fn create_and_fund_account_request(
     pubkey: &Ed25519PublicKey,
     txn_factory: &TransactionFactory,
 ) -> SignedTransaction {
-    let preimage = AuthenticationKeyPreimage::ed25519(pubkey);
-    let auth_key = AuthenticationKey::from_preimage(&preimage);
+    let auth_key = AuthenticationKey::ed25519(pubkey);
     creation_account.sign_with_transaction_builder(txn_factory.payload(
         aptos_stdlib::aptos_account_transfer(auth_key.derived_address(), amount),
     ))
