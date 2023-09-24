@@ -43,7 +43,7 @@ use std::{
 };
 use std::env::VarError;
 use std::time::Instant;
-use rayon::prelude::IntoParallelIterator;
+use rayon::prelude::{IndexedParallelIterator, IntoParallelIterator};
 use rayon::iter::ParallelIterator;
 
 struct CommitGuard<'a> {
@@ -606,7 +606,7 @@ where
             match std::env::var("PARALLEL_OUTPUT_TAKING") {
                 Ok(v) if v.as_str() == "1" => {
                     let tmp = self.executor_thread_pool.install(||{
-                        (0..num_txns).into_par_iter().map(|idx|{
+                        (0..num_txns).into_par_iter().with_min_len(100).map(|idx|{
                             match last_input_output.take_output(idx as TxnIndex) {
                                 ExecutionStatus::Success(t) => Ok(t),
                                 ExecutionStatus::SkipRest(t) => Ok(t),
