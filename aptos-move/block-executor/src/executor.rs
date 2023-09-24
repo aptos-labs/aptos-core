@@ -606,7 +606,7 @@ where
             match std::env::var("PARALLEL_OUTPUT_TAKING") {
                 Ok(v) if v.as_str() == "1" => {
                     let tmp = self.executor_thread_pool.install(||{
-                        (0..num_txns).into_par_iter().with_min_len(100).map(|idx|{
+                        (0..num_txns).into_par_iter().with_min_len((num_txns +  self.concurrency_level - 1) / self.concurrency_level).map(|idx|{
                             match last_input_output.take_output(idx as TxnIndex) {
                                 ExecutionStatus::Success(t) => Ok(t),
                                 ExecutionStatus::SkipRest(t) => Ok(t),
