@@ -12,9 +12,7 @@ use crate::{
 pub use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
 use aptos_global_constants::{GAS_UNIT_PRICE, MAX_GAS_AMOUNT};
-use aptos_types::transaction::{
-    authenticator::AuthenticationKeyPreimage, EntryFunction, ModuleBundle, Script,
-};
+use aptos_types::transaction::{EntryFunction, ModuleBundle, Script};
 
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,
@@ -154,9 +152,8 @@ impl TransactionFactory {
     }
 
     pub fn create_user_account(&self, public_key: &Ed25519PublicKey) -> TransactionBuilder {
-        let preimage = AuthenticationKeyPreimage::ed25519(public_key);
         self.payload(aptos_stdlib::aptos_account_create_account(
-            AuthenticationKey::from_preimage(&preimage).derived_address(),
+            AuthenticationKey::ed25519(public_key).derived_address(),
         ))
     }
 
@@ -165,9 +162,8 @@ impl TransactionFactory {
         public_key: &Ed25519PublicKey,
         amount: u64,
     ) -> TransactionBuilder {
-        let preimage = AuthenticationKeyPreimage::ed25519(public_key);
         self.payload(aptos_stdlib::aptos_account_transfer(
-            AuthenticationKey::from_preimage(&preimage).derived_address(),
+            AuthenticationKey::ed25519(public_key).derived_address(),
             amount,
         ))
     }
