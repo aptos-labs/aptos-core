@@ -17,8 +17,10 @@ use aptos_config::{
 use aptos_infallible::RwLock;
 use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
 use aptos_types::PeerId;
+use arc_swap::ArcSwap;
 use std::{
     collections::{hash_map::Entry, HashMap},
+    ops::Deref,
     sync::Arc,
 };
 
@@ -29,7 +31,7 @@ use std::{
 #[derive(Debug)]
 pub struct PeersAndMetadata {
     peers_and_metadata: HashMap<NetworkId, RwLock<HashMap<PeerId, PeerMetadata>>>,
-    trusted_peers: HashMap<NetworkId, Arc<RwLock<PeerSet>>>,
+    trusted_peers: HashMap<NetworkId, Arc<ArcSwap<PeerSet>>>,
 }
 
 impl PeersAndMetadata {
@@ -46,9 +48,10 @@ impl PeersAndMetadata {
                 .peers_and_metadata
                 .insert(*network_id, RwLock::new(HashMap::new()));
 
-            peers_and_metadata
-                .trusted_peers
-                .insert(*network_id, Arc::new(RwLock::new(PeerSet::new())));
+            peers_and_metadata.trusted_peers.insert(
+                *network_id,
+                Arc::new(ArcSwap::from(Arc::new(PeerSet::new()))),
+            );
         });
 
         Arc::new(peers_and_metadata)
@@ -131,7 +134,10 @@ impl PeersAndMetadata {
     }
 
     /// Returns the trusted peer set for the given network ID
-    pub fn get_trusted_peers(&self, network_id: &NetworkId) -> Result<Arc<RwLock<PeerSet>>, Error> {
+    fn get_trusted_peer_set_for_network(
+        &self,
+        network_id: &NetworkId,
+    ) -> Result<Arc<ArcSwap<PeerSet>>, Error> {
         self.trusted_peers.get(network_id).cloned().ok_or_else(|| {
             Error::UnexpectedError(format!(
                 "No trusted peers were found for the given network id: {:?}",
@@ -159,6 +165,23 @@ impl PeersAndMetadata {
             })
             .or_insert_with(|| PeerMetadata::new(connection_metadata));
 
+        Ok(())
+    }
+
+    /// Returns a clone of the trusted peer set for the given network ID
+    pub fn get_trusted_peers(&self, network_id: &NetworkId) -> Result<PeerSet, Error> {
+        let trusted_peers = self.get_trusted_peer_set_for_network(network_id)?;
+        Ok(trusted_peers.load().clone().deref().clone())
+    }
+
+    /// Updates the trusted peer set for the given network ID
+    pub fn set_trusted_peers(
+        &self,
+        network_id: &NetworkId,
+        trusted_peer_set: PeerSet,
+    ) -> Result<(), Error> {
+        let trusted_peers = self.get_trusted_peer_set_for_network(network_id)?;
+        trusted_peers.store(Arc::new(trusted_peer_set));
         Ok(())
     }
 

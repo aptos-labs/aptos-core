@@ -25,7 +25,7 @@ use aptos_config::{
     config::{Peer, PeerRole},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_types::PeerId;
+use aptos_types::{account_address::AccountAddress, PeerId};
 use futures::channel::oneshot;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -228,7 +228,7 @@ fn test_peers_and_metadata_trusted_peers() {
     // Verify that we get an empty trusted peer set for the validator and VFN network
     for network_id in network_ids {
         let trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
-        assert!(trusted_peers.read().is_empty());
+        assert!(trusted_peers.is_empty());
     }
 
     // Update the trusted peer set for the validator network
@@ -236,47 +236,44 @@ fn test_peers_and_metadata_trusted_peers() {
     let peer_id_2 = PeerId::random();
     let peer_1 = Peer::new(vec![], HashSet::new(), PeerRole::Validator);
     let peer_2 = Peer::new(vec![], HashSet::new(), PeerRole::Unknown);
-    let trusted_peers = peers_and_metadata
-        .get_trusted_peers(&NetworkId::Validator)
-        .unwrap();
-    trusted_peers.write().insert(peer_id_1, peer_1);
-    trusted_peers.write().insert(peer_id_2, peer_2);
+    insert_trusted_peers(&peers_and_metadata, NetworkId::Validator, vec![
+        (peer_id_1, peer_1),
+        (peer_id_2, peer_2),
+    ]);
 
     // Verify the validator network contains the expected trusted peers
     let trusted_peers = peers_and_metadata
         .get_trusted_peers(&NetworkId::Validator)
         .unwrap();
-    assert!(trusted_peers.read().contains_key(&peer_id_1));
-    assert!(trusted_peers.read().contains_key(&peer_id_2));
-    assert!(!trusted_peers.read().contains_key(&PeerId::random()));
+    assert!(trusted_peers.contains_key(&peer_id_1));
+    assert!(trusted_peers.contains_key(&peer_id_2));
+    assert!(!trusted_peers.contains_key(&PeerId::random()));
 
     // Update the trusted peer set for the VFN network
     let peer_id_3 = PeerId::random();
     let peer_3 = Peer::new(vec![], HashSet::new(), PeerRole::ValidatorFullNode);
-    let trusted_peers = peers_and_metadata
-        .get_trusted_peers(&NetworkId::Vfn)
-        .unwrap();
-    trusted_peers.write().insert(peer_id_3, peer_3.clone());
+    insert_trusted_peers(&peers_and_metadata, NetworkId::Vfn, vec![(
+        peer_id_3,
+        peer_3.clone(),
+    )]);
 
     // Verify the VFN network contains the expected trusted peers
     let trusted_peers = peers_and_metadata
         .get_trusted_peers(&NetworkId::Vfn)
         .unwrap();
-    let trusted_peers = trusted_peers.read();
     let vfn_peer = trusted_peers.get(&peer_id_3).unwrap();
     assert_eq!(vfn_peer, &peer_3);
 
     // Clear the validator network trusted peer set
-    let trusted_peers = peers_and_metadata
-        .get_trusted_peers(&NetworkId::Validator)
+    peers_and_metadata
+        .set_trusted_peers(&NetworkId::Validator, HashMap::new())
         .unwrap();
-    trusted_peers.write().clear();
 
     // Verify that we get an empty trusted peer set for the validator network
     let trusted_peers = peers_and_metadata
         .get_trusted_peers(&NetworkId::Validator)
         .unwrap();
-    assert!(trusted_peers.read().is_empty());
+    assert!(trusted_peers.is_empty());
 }
 
 #[test]
@@ -825,6 +822,26 @@ fn disconnect_peer(peers_and_metadata: &Arc<PeersAndMetadata>, peer_network_id: 
 fn connect_peer(peers_and_metadata: &Arc<PeersAndMetadata>, peer_network_id: PeerNetworkId) {
     peers_and_metadata
         .update_connection_state(peer_network_id, ConnectionState::Connected)
+        .unwrap();
+}
+
+/// Inserts the given peers into the trusted peer set for the specified network
+fn insert_trusted_peers(
+    peers_and_metadata: &Arc<PeersAndMetadata>,
+    network_id: NetworkId,
+    peers: Vec<(AccountAddress, Peer)>,
+) {
+    // Get a copy of the trusted peers
+    let mut trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
+
+    // Insert the new peers
+    for (peer_address, peer) in peers {
+        trusted_peers.insert(peer_address, peer);
+    }
+
+    // Update the trusted peers
+    peers_and_metadata
+        .set_trusted_peers(&network_id, trusted_peers)
         .unwrap();
 }
 
