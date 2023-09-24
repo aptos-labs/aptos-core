@@ -123,7 +123,7 @@ impl TransactionAuthenticator {
         }
     }
 
-    /// Create a single-signature Secp256k1 ecdsa authenticator
+    /// Create a single-signature Secp256k1Ecdsa authenticator
     pub fn secp256k1_ecdsa(
         public_key: secp256k1_ecdsa::PublicKey,
         signature: secp256k1_ecdsa::Signature,
@@ -362,7 +362,7 @@ impl fmt::Display for TransactionAuthenticator {
             Self::Secp256k1Ecdsa { .. } => {
                 write!(
                     f,
-                    "TransactionAuthenticator[scheme: Secp256k1, sender: {}]",
+                    "TransactionAuthenticator[scheme: Secp256k1Ecdsa, sender: {}]",
                     self.sender()
                 )
             },
@@ -384,7 +384,6 @@ pub enum Scheme {
     Ed25519 = 0,
     MultiEd25519 = 1,
     Secp256k1Ecdsa = 2,
-    // ... add more schemes here
     /// Scheme identifier used to derive addresses (not the authentication key) of objects and
     /// resources accounts. This application serves to domain separate hashes. Without such
     /// separation, an adversary could create (and get a signer for) a these accounts
@@ -461,7 +460,7 @@ impl AccountAuthenticator {
         }
     }
 
-    /// Create a single-signature ed25519 authenticator
+    /// Create a single-signature secp256k1_ecdsa authenticator
     pub fn secp256k1_ecdsa(
         public_key: secp256k1_ecdsa::PublicKey,
         signature: secp256k1_ecdsa::Signature,
@@ -508,14 +507,9 @@ impl AccountAuthenticator {
         }
     }
 
-    /// Return an authentication key preimage derived from `self`'s public key and scheme id
-    pub fn authentication_key_preimage(&self) -> AuthenticationKeyPreimage {
-        AuthenticationKeyPreimage::new(self.public_key_bytes(), self.scheme())
-    }
-
     /// Return an authentication key derived from `self`'s public key and scheme id
     pub fn authentication_key(&self) -> AuthenticationKey {
-        AuthenticationKey::from_preimage(&self.authentication_key_preimage())
+        AuthenticationKey::from_preimage(self.public_key_bytes(), self.scheme())
     }
 
     /// Return the number of signatures included in this account authenticator.
@@ -562,23 +556,32 @@ impl AuthenticationKey {
     }
 
     /// Create an authentication key from a preimage by taking its sha3 hash
-    pub fn from_preimage(preimage: &AuthenticationKeyPreimage) -> AuthenticationKey {
-        AuthenticationKey::new(*HashValue::sha3_256_of(&preimage.0).as_ref())
+    pub fn from_preimage(mut public_key_bytes: Vec<u8>, scheme: Scheme) -> AuthenticationKey {
+        public_key_bytes.push(scheme as u8);
+        AuthenticationKey::new(*HashValue::sha3_256_of(&public_key_bytes).as_ref())
+    }
+
+    /// Construct a preimage from a transaction-derived AUID as (txn_hash || auid_scheme_id)
+    pub fn auid(txn_hash: Vec<u8>, auid_counter: u64) -> Self {
+        let mut hash_arg = Vec::new();
+        hash_arg.extend(txn_hash);
+        hash_arg.extend(auid_counter.to_le_bytes().to_vec());
+        Self::from_preimage(hash_arg, Scheme::DeriveAuid)
     }
 
     /// Create an authentication key from an Ed25519 public key
     pub fn ed25519(public_key: &Ed25519PublicKey) -> AuthenticationKey {
-        Self::from_preimage(&AuthenticationKeyPreimage::ed25519(public_key))
+        Self::from_preimage(public_key.to_bytes().to_vec(), Scheme::Ed25519)
     }
 
     /// Create an authentication key from a MultiEd25519 public key
     pub fn multi_ed25519(public_key: &MultiEd25519PublicKey) -> Self {
-        Self::from_preimage(&AuthenticationKeyPreimage::multi_ed25519(public_key))
+        Self::from_preimage(public_key.to_bytes(), Scheme::MultiEd25519)
     }
 
-    /// Create an authentication key from a Secp256k1 ecdsa public key
+    /// Create an authentication key from a Secp256k1Ecdsa public key
     pub fn secp256k1_ecdsa(public_key: &secp256k1_ecdsa::PublicKey) -> AuthenticationKey {
-        Self::from_preimage(&AuthenticationKeyPreimage::secp256k1_ecdsa(public_key))
+        Self::from_preimage(public_key.to_bytes().to_vec(), Scheme::Secp256k1Ecdsa)
     }
 
     /// Return an address derived from the last `AccountAddress::LENGTH` bytes of this
@@ -613,46 +616,6 @@ impl AuthenticationKey {
 impl ValidCryptoMaterial for AuthenticationKey {
     fn to_bytes(&self) -> Vec<u8> {
         self.to_vec()
-    }
-}
-
-/// A value that can be hashed to produce an authentication key
-pub struct AuthenticationKeyPreimage(Vec<u8>);
-
-impl AuthenticationKeyPreimage {
-    /// Return bytes for (public_key | scheme_id)
-    fn new(mut public_key_bytes: Vec<u8>, scheme: Scheme) -> Self {
-        public_key_bytes.push(scheme as u8);
-        Self(public_key_bytes)
-    }
-
-    /// Construct a preimage from an Ed25519 public key
-    pub fn ed25519(public_key: &Ed25519PublicKey) -> AuthenticationKeyPreimage {
-        Self::new(public_key.to_bytes().to_vec(), Scheme::Ed25519)
-    }
-
-    /// Construct a preimage from a MultiEd25519 public key
-    pub fn multi_ed25519(public_key: &MultiEd25519PublicKey) -> AuthenticationKeyPreimage {
-        Self::new(public_key.to_bytes(), Scheme::MultiEd25519)
-    }
-
-    /// Construct a preimage from a transaction-derived AUID as (txn_hash || auid_scheme_id)
-    pub fn auid(txn_hash: Vec<u8>, auid_counter: u64) -> AuthenticationKeyPreimage {
-        let mut hash_arg = Vec::new();
-        hash_arg.extend(txn_hash);
-        hash_arg.extend(auid_counter.to_le_bytes().to_vec());
-        hash_arg.push(Scheme::DeriveAuid as u8);
-        Self(hash_arg)
-    }
-
-    /// Construct a preimage from a Secp256k1 ecdsa public key
-    pub fn secp256k1_ecdsa(public_key: &secp256k1_ecdsa::PublicKey) -> AuthenticationKeyPreimage {
-        Self::new(public_key.to_bytes().to_vec(), Scheme::Secp256k1Ecdsa)
-    }
-
-    /// Construct a vector from this authentication key
-    pub fn into_vec(self) -> Vec<u8> {
-        self.0
     }
 }
 
