@@ -24,7 +24,7 @@ impl ServerArgs {
         C: RunnableConfig,
     {
         // Set up the server.
-        setup_logging();
+        setup_logging(None);
         setup_panic_handler();
         let config = load::<GenericConfig<C>>(&self.config_path)?;
         config
@@ -148,20 +148,28 @@ fn handle_panic(panic_info: &PanicInfo<'_>) {
     process::exit(12);
 }
 
-/// Set up logging for the server.
-pub fn setup_logging() {
+/// Set up logging for the server. By default we don't set a writer, in which case it
+/// just logs to stdout. This can be overridden using the `make_writer` parameter.
+/// This can be helpful for custom logging, e.g. logging to different files based on
+/// the origin of the logging.
+pub fn setup_logging(make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write> + Send + Sync>>) {
     let env_filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new("info"))
         .unwrap();
-    tracing_subscriber::fmt()
+
+    let subscriber = tracing_subscriber::fmt()
         .json()
         .with_file(true)
         .with_line_number(true)
         .with_thread_ids(true)
         .with_target(false)
         .with_thread_names(true)
-        .with_env_filter(env_filter)
-        .init();
+        .with_env_filter(env_filter);
+
+    match make_writer {
+        Some(w) => subscriber.with_writer(w).init(),
+        None => subscriber.init(),
+    }
 }
 
 /// Register readiness and liveness probes and set up metrics endpoint.

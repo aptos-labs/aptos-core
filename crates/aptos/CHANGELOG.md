@@ -7,6 +7,10 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 - Added an option `--print-metadata` to the command `aptos move download` to print out the metadata of the package to be downloaded.
   - Example: `aptos move download  --account 0x1 --package AptosFramework --url https://mainnet.aptoslabs.com/v1 --print-metadata`
 
+### Updated
+- The `--with-faucet` flag has been removed from `aptos node run-local-testnet`, we now run a faucet by default. To disable the faucet use the `--no-faucet` flag.
+- When using `aptos node run-local-testnet` we now expose a transaction stream. Learn more about the transaction stream service here: https://aptos.dev/indexer/txn-stream/. Opt out of this with `--no-txn-stream`.
+
 ## [2.1.0] - 2023/08/24
 ### Updated
 - Updated CLI source compilation to use rust toolchain version 1.71.1 (from 1.71.0).
