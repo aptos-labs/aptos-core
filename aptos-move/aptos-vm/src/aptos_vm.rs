@@ -1223,9 +1223,10 @@ impl AptosVM {
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
-        let balance = TransactionMetadata::new(txn).max_gas_amount();
         // TODO: would we end up having a diverging behavior by creating the gas meter at an earlier time?
-        let mut gas_meter = unwrap_or_discard!(self.make_standard_gas_meter(balance, log_context));
+        let mut gas_meter = unwrap_or_discard!(
+            self.make_standard_gas_meter(txn.max_gas_amount().into(), log_context)
+        );
 
         self.execute_user_transaction_impl(resolver, txn, log_context, &mut gas_meter)
     }
@@ -1894,6 +1895,19 @@ impl AptosSimulationVM {
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
+        let mut gas_meter = unwrap_or_discard!(self
+            .0
+            .make_standard_gas_meter(txn.max_gas_amount().into(), log_context));
+        self.simulate_signed_transaction_impl(resolver, txn, log_context, &mut gas_meter)
+    }
+
+    fn simulate_signed_transaction_impl(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        txn: &SignedTransaction,
+        log_context: &AdapterLogSchema,
+        gas_meter: &mut impl AptosGasMeter,
+    ) -> (VMStatus, VMOutput) {
         // simulation transactions should not carry valid signatures, otherwise malicious fullnodes
         // may execute them without user's explicit permission.
         if txn.signature_is_valid() {
@@ -1909,22 +1923,8 @@ impl AptosSimulationVM {
             return discard_error_vm_status(err);
         };
 
-        let gas_params = match self.0 .0.get_gas_parameters(log_context) {
-            Err(err) => return discard_error_vm_status(err),
-            Ok(s) => s,
-        };
-        let storage_gas_params = match self.0 .0.get_storage_gas_parameters(log_context) {
-            Err(err) => return discard_error_vm_status(err),
-            Ok(s) => s,
-        };
-
-        let mut gas_meter =
-            MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
-                self.0 .0.get_gas_feature_version(),
-                gas_params.vm.clone(),
-                storage_gas_params.clone(),
-                txn_data.max_gas_amount(),
-            )));
+        let storage_gas_params =
+            unwrap_or_discard!(self.0 .0.get_storage_gas_parameters(log_context));
 
         let mut new_published_modules_loaded = false;
         let result = match txn.payload() {
@@ -1933,7 +1933,7 @@ impl AptosSimulationVM {
                 self.0.execute_script_or_entry_function(
                     resolver,
                     session,
-                    &mut gas_meter,
+                    gas_meter,
                     &txn_data,
                     payload,
                     log_context,
@@ -1948,7 +1948,7 @@ impl AptosSimulationVM {
                             aptos_try!({
                                 return_on_failure!(self.0.execute_multisig_entry_function(
                                     &mut session,
-                                    &mut gas_meter,
+                                    gas_meter,
                                     multisig.multisig_address,
                                     &entry_function,
                                     &mut new_published_modules_loaded,
@@ -1961,14 +1961,14 @@ impl AptosSimulationVM {
                                     self.0.charge_change_set_and_respawn_session(
                                         session,
                                         resolver,
-                                        &mut gas_meter,
+                                        gas_meter,
                                         &storage_gas_params.change_set_configs,
                                         &txn_data,
                                     )?;
 
                                 self.0.success_transaction_cleanup(
                                     respawned_session,
-                                    &gas_meter,
+                                    gas_meter,
                                     &txn_data,
                                     log_context,
                                     &storage_gas_params.change_set_configs,
@@ -1985,7 +1985,7 @@ impl AptosSimulationVM {
             TransactionPayload::ModuleBundle(m) => self.0.execute_modules(
                 resolver,
                 session,
-                &mut gas_meter,
+                gas_meter,
                 &txn_data,
                 m,
                 log_context,
@@ -2017,7 +2017,7 @@ impl AptosSimulationVM {
                 } else {
                     let (vm_status, output) = self.0.failed_transaction_cleanup_and_keep_vm_status(
                         err,
-                        &gas_meter,
+                        gas_meter,
                         &txn_data,
                         resolver,
                         log_context,

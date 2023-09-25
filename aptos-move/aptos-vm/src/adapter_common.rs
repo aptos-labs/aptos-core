@@ -81,6 +81,6 @@ pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, VMOutput) {
 }
 
 pub(crate) fn discard_error_output(err: StatusCode) -> VMOutput {
-    // Since this transaction will be discarded, no writeset will be included.
+    // Since this transaction will be discarded, no write set will be included.
     VMOutput::empty_with_status(TransactionStatus::Discard(err))
 }
