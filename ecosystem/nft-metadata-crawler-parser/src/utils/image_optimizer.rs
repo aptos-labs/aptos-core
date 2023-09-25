@@ -2,7 +2,13 @@
 
 use crate::{
     get_uri_metadata,
-    utils::constants::{MAX_IMAGE_REQUEST_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
+    utils::{
+        constants::{MAX_IMAGE_REQUEST_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
+        counters::{
+            FAILED_TO_OPTIMIZE_IMAGE_COUNT, OPTIMIZE_IMAGE_INVOCATION_COUNT,
+            SUCCESSFULLY_OPTIMIZED_IMAGE_COUNT,
+        },
+    },
 };
 use anyhow::Context;
 use backoff::{future::retry, ExponentialBackoff};
@@ -13,7 +19,7 @@ use image::{
 };
 use reqwest::Client;
 use std::{io::Cursor, time::Duration};
-use tracing::warn;
+use tracing::{info, warn};
 
 pub struct ImageOptimizer;
 
@@ -25,8 +31,12 @@ impl ImageOptimizer {
         max_file_size_bytes: u32,
         image_quality: u8,
     ) -> anyhow::Result<(Vec<u8>, ImageFormat)> {
+        OPTIMIZE_IMAGE_INVOCATION_COUNT.inc();
         let (_, size) = get_uri_metadata(uri.clone()).await?;
         if size > max_file_size_bytes {
+            FAILED_TO_OPTIMIZE_IMAGE_COUNT
+                .with_label_values(&["Image file too large"])
+                .inc();
             return Err(anyhow::anyhow!(format!(
                 "Image optimizer received file too large: {} bytes, skipping",
                 size
@@ -35,13 +45,15 @@ impl ImageOptimizer {
 
         let op = || {
             async {
+                info!(image_uri = uri, "Sending request for image");
+
                 let client = Client::builder()
                     .timeout(Duration::from_secs(MAX_IMAGE_REQUEST_RETRY_SECONDS))
                     .build()
                     .context("Failed to build reqwest client")?;
 
                 let response = client
-                    .get(&uri)
+                    .get(uri.trim())
                     .send()
                     .await
                     .context("Failed to get image")?;
@@ -76,13 +88,14 @@ impl ImageOptimizer {
         };
 
         match retry(backoff, op).await {
-            Ok(result) => Ok(result),
+            Ok(result) => {
+                SUCCESSFULLY_OPTIMIZED_IMAGE_COUNT.inc();
+                Ok(result)
+            },
             Err(e) => {
-                warn!(
-                    uri = uri,
-                    error = ?e,
-                    "[NFT Metadata Crawler] Exponential backoff timed out, skipping image"
-                );
+                FAILED_TO_OPTIMIZE_IMAGE_COUNT
+                    .with_label_values(&["other"])
+                    .inc();
                 Err(e)
             },
         }

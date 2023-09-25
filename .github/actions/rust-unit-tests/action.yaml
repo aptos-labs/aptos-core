@@ -18,12 +18,12 @@ runs:
 
     # Check the VM features
     - name: Check VM features
-      run: cargo test --locked --features check-vm-features -p aptos-node
+      run: cargo test --profile ci --locked --features check-vm-features -p aptos-node
       shell: bash
 
     # Run the rust doc tests
     - name: Run rust doc tests
-      run: cargo test --locked --doc --workspace --exclude aptos-node-checker
+      run: cargo test --profile ci --locked --doc --workspace --exclude aptos-node-checker
       shell: bash
 
     # Install nextest
@@ -38,7 +38,7 @@ runs:
 
     # Run the rust unit tests
     - name: Run all unit tests
-      run: cargo nextest run --profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast
+      run: cargo nextest run --profile ci --cargo-profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast
       shell: bash
       env:
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres

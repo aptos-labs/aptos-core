@@ -1,59 +1,64 @@
-import { Aptos, AptosConfig } from "../../src";
-import { Network } from "../../src/utils/api-endpoints";
+import { AptosConfig } from "../../src";
+import { AptosSettings } from "../../src/types";
+import { Network, NetworkToFaucetAPI, NetworkToNodeAPI, NetworkToIndexerAPI } from "../../src/utils/api-endpoints";
+import { AptosApiType } from "../../src/utils/const";
 
 describe("aptos config", () => {
-  test("it should set DEVNET network if network is not provided", async () => {
-    const aptos = new Aptos();
-    expect(aptos.config.network).toEqual("devnet");
-    expect(aptos.config.fullnode).toEqual("https://fullnode.devnet.aptoslabs.com/v1");
-    expect(aptos.config.faucet).toEqual("https://faucet.devnet.aptoslabs.com");
-    expect(aptos.config.indexer).toEqual("https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql");
-  });
-
-  test("it should set urls based on the provided network", async () => {
-    const settings: AptosConfig = {
-      network: Network.TESTNET,
-    };
-    const aptos = new Aptos(settings);
-    expect(aptos.config.network).toEqual("testnet");
-    expect(aptos.config.fullnode).toEqual("https://fullnode.testnet.aptoslabs.com/v1");
-    expect(aptos.config.faucet).toEqual("https://faucet.testnet.aptoslabs.com");
-    expect(aptos.config.indexer).toEqual("https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql");
-  });
-
   test("it should set urls based on a local network", async () => {
-    const settings: AptosConfig = {
+    const settings: AptosSettings = {
       network: Network.LOCAL,
     };
-    const aptos = new Aptos(settings);
-    expect(aptos.config.network).toEqual("local");
-    expect(aptos.config.fullnode).toEqual("http://localhost:8080/v1");
-    expect(aptos.config.faucet).toEqual("http://localhost:8081");
-    expect(aptos.config.indexer).toBeUndefined();
+    const aptosConfig = new AptosConfig(settings);
+    expect(aptosConfig.network).toEqual("local");
+    expect(aptosConfig.getRequestUrl(AptosApiType.FULLNODE)).toBe(NetworkToNodeAPI[Network.LOCAL]);
+    expect(aptosConfig.getRequestUrl(AptosApiType.FAUCET)).toBe(NetworkToFaucetAPI[Network.LOCAL]);
+    expect(aptosConfig.getRequestUrl(AptosApiType.INDEXER)).toBeUndefined();
+  });
+
+  test("it should set urls based on a given network", async () => {
+    const settings: AptosSettings = {
+      network: Network.TESTNET,
+    };
+    const aptosConfig = new AptosConfig(settings);
+    expect(aptosConfig.network).toEqual("testnet");
+    expect(aptosConfig.getRequestUrl(AptosApiType.FULLNODE)).toBe(NetworkToNodeAPI[Network.TESTNET]);
+    expect(aptosConfig.getRequestUrl(AptosApiType.FAUCET)).toBe(NetworkToFaucetAPI[Network.TESTNET]);
+    expect(aptosConfig.getRequestUrl(AptosApiType.INDEXER)).toBe(NetworkToIndexerAPI[Network.TESTNET]);
   });
 
   test("it should have undefined urls when network is custom and no urls provided", async () => {
-    const settings: AptosConfig = {
+    const settings: AptosSettings = {
       network: Network.CUSTOM,
     };
-    const aptos = new Aptos(settings);
-    expect(aptos.config.network).toEqual("custom");
-    expect(aptos.config.fullnode).toBeUndefined();
-    expect(aptos.config.faucet).toBeUndefined();
-    expect(aptos.config.indexer).toBeUndefined();
+    const aptosConfig = new AptosConfig(settings);
+    expect(aptosConfig.network).toBe("custom");
+    expect(aptosConfig.fullnode).toBeUndefined();
+    expect(aptosConfig.faucet).toBeUndefined();
+    expect(aptosConfig.indexer).toBeUndefined();
+  });
+
+  test("getRequestUrl should throw when network is custom and no urls provided", async () => {
+    const settings: AptosSettings = {
+      network: Network.CUSTOM,
+    };
+    const aptosConfig = new AptosConfig(settings);
+    expect(aptosConfig.network).toBe("custom");
+    expect(() => aptosConfig.getRequestUrl(AptosApiType.FULLNODE)).toThrow();
+    expect(() => aptosConfig.getRequestUrl(AptosApiType.FAUCET)).toThrow();
+    expect(() => aptosConfig.getRequestUrl(AptosApiType.INDEXER)).toThrow();
   });
 
   test("it should set urls when network is custom and urls provided", async () => {
-    const settings: AptosConfig = {
+    const settings: AptosSettings = {
       network: Network.CUSTOM,
       fullnode: "my-fullnode-url",
       faucet: "my-faucet-url",
       indexer: "my-indexer-url",
     };
-    const aptos = new Aptos(settings);
-    expect(aptos.config.network).toEqual("custom");
-    expect(aptos.config.fullnode).toEqual("my-fullnode-url");
-    expect(aptos.config.faucet).toEqual("my-faucet-url");
-    expect(aptos.config.indexer).toEqual("my-indexer-url");
+    const aptosConfig = new AptosConfig(settings);
+    expect(aptosConfig.network).toBe("custom");
+    expect(aptosConfig.fullnode).toBe("my-fullnode-url");
+    expect(aptosConfig.faucet).toBe("my-faucet-url");
+    expect(aptosConfig.indexer).toBe("my-indexer-url");
   });
 });

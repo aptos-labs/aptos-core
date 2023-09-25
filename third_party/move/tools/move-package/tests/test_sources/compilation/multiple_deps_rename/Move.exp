@@ -21,8 +21,11 @@ CompiledPackageInfo {
         architecture: None,
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: false,
-        bytecode_version: None,
-        known_attributes: {},
-        skip_attribute_checks: false,
+        compiler_config: CompilerConfig {
+            bytecode_version: None,
+            known_attributes: {},
+            skip_attribute_checks: false,
+            compiler_version: None,
+        },
     },
 }

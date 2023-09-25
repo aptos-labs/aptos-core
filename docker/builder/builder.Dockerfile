@@ -15,7 +15,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         libssl-dev \
         libpq-dev \
         binutils \
-        lld
+        lld \
+        libudev-dev
 
 ### Build Rust code ###
 FROM rust-base as builder-base

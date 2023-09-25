@@ -19,10 +19,10 @@ error: expected `()` but found `address`
    │                ^^^^
 
 error: expected `()` but found `integer`
-   ┌─ tests/checking/typing/loop_body_invalid.move:15:24
+   ┌─ tests/checking/typing/loop_body_invalid.move:15:27
    │
 15 │         loop { let x = 0; x }
-   │                        ^
+   │                           ^
 
 error: expected `()` but found `integer`
    ┌─ tests/checking/typing/loop_body_invalid.move:19:26

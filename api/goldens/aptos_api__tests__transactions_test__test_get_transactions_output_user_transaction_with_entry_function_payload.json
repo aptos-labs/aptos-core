@@ -267,6 +267,21 @@
             "struct_name": "0x4170746f73436f696e"
           }
         }
+      },
+      {
+        "guid": {
+          "creation_number": "0",
+          "account_address": "0x0"
+        },
+        "sequence_number": "0",
+        "type": "0x1::transaction_fee::FeeStatement",
+        "data": {
+          "execution_gas_units": "5",
+          "io_gas_units": "2",
+          "storage_fee_octas": "0",
+          "storage_fee_refund_octas": "0",
+          "total_charge_gas_units": "6"
+        }
       }
     ],
     "timestamp": "500000",

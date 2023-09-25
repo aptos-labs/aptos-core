@@ -270,6 +270,14 @@ spec aptos_framework::vesting {
         pragma verify = false;
     }
 
+    spec update_commission_percentage(
+        admin: &signer,
+        contract_address: address,
+        new_commission_percentage: u64,
+    ) {
+        pragma verify = false;
+    }
+
     spec update_voter(
         admin: &signer,
         contract_address: address,

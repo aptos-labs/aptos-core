@@ -59,6 +59,11 @@ impl BootstrappingMode {
             BootstrappingMode::ExecuteOrApplyFromGenesis => "execute_or_apply_from_genesis",
         }
     }
+
+    /// Returns true iff the bootstrapping mode is fast sync
+    pub fn is_fast_sync(&self) -> bool {
+        *self == BootstrappingMode::DownloadLatestStates
+    }
 }
 
 /// The continuous syncing mode determines how the node will stay up-to-date
@@ -199,6 +204,9 @@ impl Default for StorageServiceConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DataStreamingServiceConfig {
+    /// Whether or not to enable data subscription streaming.
+    pub enable_subscription_streaming: bool,
+
     /// The interval (milliseconds) at which to refresh the global data summary.
     pub global_summary_refresh_interval_ms: u64,
 
@@ -221,6 +229,10 @@ pub struct DataStreamingServiceConfig {
     /// memory. Once the number grows beyond this value, garbage collection occurs.
     pub max_notification_id_mappings: u64,
 
+    /// Maxinum number of consecutive subscriptions that can be made before
+    /// the subscription stream is terminated and a new stream must be created.
+    pub max_num_consecutive_subscriptions: u64,
+
     /// The interval (milliseconds) at which to check the progress of each stream.
     pub progress_check_interval_ms: u64,
 }
@@ -228,12 +240,14 @@ pub struct DataStreamingServiceConfig {
 impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
+            enable_subscription_streaming: false,
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,
             max_data_stream_channel_sizes: 300,
             max_request_retry: 5,
             max_notification_id_mappings: 300,
+            max_num_consecutive_subscriptions: 50,
             progress_check_interval_ms: 50,
         }
     }
@@ -252,14 +266,14 @@ pub struct AptosDataClientConfig {
     pub max_num_in_flight_regular_polls: u64,
     /// Maximum number of output reductions before transactions are returned
     pub max_num_output_reductions: u64,
-    /// Maximum version lag we'll tolerate when sending optimistic fetch requests
-    pub max_optimistic_fetch_version_lag: u64,
+    /// Maximum lag (in seconds) we'll tolerate when sending optimistic fetch requests
+    pub max_optimistic_fetch_lag_secs: u64,
     /// Maximum timeout (in ms) when waiting for a response (after exponential increases)
     pub max_response_timeout_ms: u64,
     /// Maximum number of state keys and values per chunk
     pub max_state_chunk_size: u64,
-    /// Maximum version lag we'll tolerate when sending subscription requests
-    pub max_subscription_version_lag: u64,
+    /// Maximum lag (in seconds) we'll tolerate when sending subscription requests
+    pub max_subscription_lag_secs: u64,
     /// Maximum number of transactions per chunk
     pub max_transaction_chunk_size: u64,
     /// Maximum number of transaction outputs per chunk
@@ -268,6 +282,8 @@ pub struct AptosDataClientConfig {
     pub optimistic_fetch_timeout_ms: u64,
     /// First timeout (in ms) when waiting for a response
     pub response_timeout_ms: u64,
+    /// Timeout (in ms) when waiting for a subscription response
+    pub subscription_response_timeout_ms: u64,
     /// Interval (in ms) between data summary poll loop executions
     pub summary_poll_loop_interval_ms: u64,
     /// Whether or not to request compression for incoming data
@@ -277,20 +293,21 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
-            latency_monitor_loop_interval_ms: 50, // 50 milliseconds
+            latency_monitor_loop_interval_ms: 100,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
             max_num_output_reductions: 0,
-            max_optimistic_fetch_version_lag: 50_000, // Assumes 5K TPS for 10 seconds, which should be plenty
-            max_response_timeout_ms: 60_000,          // 60 seconds
+            max_optimistic_fetch_lag_secs: 30, // 30 seconds
+            max_response_timeout_ms: 60_000,   // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_version_lag: 100_000, // Assumes 5K TPS for 20 seconds, which should be plenty
+            max_subscription_lag_secs: 30, // 30 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             optimistic_fetch_timeout_ms: 5000, // 5 seconds
             response_timeout_ms: 10_000,       // 10 seconds
             summary_poll_loop_interval_ms: 200,
+            subscription_response_timeout_ms: 20_000, // 20 seconds (must be longer than a regular timeout because of pre-fetching)
             use_compression: true,
         }
     }
@@ -298,10 +315,35 @@ impl Default for AptosDataClientConfig {
 
 impl ConfigSanitizer for StateSyncConfig {
     fn sanitize(
-        _node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
+        node_type: NodeType,
+        chain_id: ChainId,
+    ) -> Result<(), Error> {
+        // Sanitize the state sync driver config
+        StateSyncDriverConfig::sanitize(node_config, node_type, chain_id)
+    }
+}
+
+impl ConfigSanitizer for StateSyncDriverConfig {
+    fn sanitize(
+        node_config: &NodeConfig,
         _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let state_sync_driver_config = &node_config.state_sync.state_sync_driver;
+
+        // Verify that auto-bootstrapping is not enabled for
+        // nodes that are fast syncing.
+        let fast_sync_enabled = state_sync_driver_config.bootstrapping_mode.is_fast_sync();
+        if state_sync_driver_config.enable_auto_bootstrapping && fast_sync_enabled {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "Auto-bootstrapping should not be enabled for nodes that are fast syncing!"
+                    .to_string(),
+            ));
+        }
+
         Ok(())
     }
 }
@@ -425,10 +467,8 @@ mod tests {
         assert!(modified_config);
 
         // Verify that the bootstrapping mode is now set to fast sync
-        assert_eq!(
-            node_config.state_sync.state_sync_driver.bootstrapping_mode,
-            BootstrappingMode::DownloadLatestStates
-        );
+        let state_sync_driver_config = node_config.state_sync.state_sync_driver;
+        assert!(state_sync_driver_config.bootstrapping_mode.is_fast_sync());
     }
 
     #[test]
@@ -447,10 +487,8 @@ mod tests {
         assert!(modified_config);
 
         // Verify that the bootstrapping mode is now set to fast sync
-        assert_eq!(
-            node_config.state_sync.state_sync_driver.bootstrapping_mode,
-            BootstrappingMode::DownloadLatestStates
-        );
+        let state_sync_driver_config = node_config.state_sync.state_sync_driver;
+        assert!(state_sync_driver_config.bootstrapping_mode.is_fast_sync());
     }
 
     #[test]
@@ -583,6 +621,29 @@ mod tests {
             data_streaming_service_config.max_concurrent_state_requests,
             100
         );
+    }
+
+    #[test]
+    fn test_sanitize_auto_bootstrapping_fast_sync() {
+        // Create a node config with fast sync and
+        // auto bootstrapping enabled.
+        let node_config = NodeConfig {
+            state_sync: StateSyncConfig {
+                state_sync_driver: StateSyncDriverConfig {
+                    bootstrapping_mode: BootstrappingMode::DownloadLatestStates,
+                    enable_auto_bootstrapping: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify that sanitization fails
+        let error =
+            StateSyncConfig::sanitize(&node_config, NodeType::Validator, ChainId::testnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 
     /// Creates and returns a node config with the syncing modes set to execution

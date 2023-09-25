@@ -4,7 +4,7 @@
 
 use crate::components::block_tree::{epoch_genesis_block_id, BlockLookup, BlockTree};
 use aptos_crypto::{hash::PRE_GENESIS_BLOCK_ID, HashValue};
-use aptos_executor_types::ExecutedBlock;
+use aptos_executor_types::{execution_output::ExecutionOutput, LedgerUpdateOutput};
 use aptos_infallible::Mutex;
 use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo};
@@ -13,13 +13,8 @@ use std::sync::Arc;
 impl BlockTree {
     pub fn new_empty() -> Self {
         let block_lookup = Arc::new(BlockLookup::new());
-        let result_view = ExecutedTrees::new_empty();
         let root = block_lookup
-            .fetch_or_add_block(
-                *PRE_GENESIS_BLOCK_ID,
-                ExecutedBlock::new_empty(result_view),
-                None,
-            )
+            .fetch_or_add_block(*PRE_GENESIS_BLOCK_ID, empty_block(), None)
             .unwrap();
 
         Self {
@@ -41,8 +36,13 @@ fn id(index: u64) -> HashValue {
     HashValue::new(buf)
 }
 
-fn empty_block() -> ExecutedBlock {
-    ExecutedBlock::new_empty(ExecutedTrees::new_empty())
+fn empty_block() -> ExecutionOutput {
+    let result_view = ExecutedTrees::new_empty();
+    ExecutionOutput::new_with_ledger_update(
+        result_view.state().clone(),
+        None,
+        LedgerUpdateOutput::new_empty(ExecutedTrees::new_empty().txn_accumulator().clone()),
+    )
 }
 
 fn gen_ledger_info(block_id: HashValue, reconfig: bool) -> LedgerInfo {

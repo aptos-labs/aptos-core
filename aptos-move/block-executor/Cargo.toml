@@ -22,8 +22,10 @@ aptos-mvhashmap = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-logging = { workspace = true }
+aptos-vm-types = { workspace = true }
 arc-swap = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 claims = { workspace = true }
 criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
@@ -36,8 +38,10 @@ parking_lot = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rayon = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
+aptos-aggregator = { workspace = true, features = ["testing"] }
 criterion = { workspace = true }
 itertools = { workspace = true }
 proptest = { workspace = true }

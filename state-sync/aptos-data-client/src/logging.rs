@@ -65,4 +65,5 @@ pub enum LogEvent {
     SendRequest,
     StorageReadFailed,
     UnexpectedError,
+    WaitingForCatchup,
 }

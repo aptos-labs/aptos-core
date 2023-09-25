@@ -43,7 +43,8 @@ impl<'t> ChainInfo<'t> {
             .get_account(self.root_account.address())
             .await?
             .into_inner();
-        *self.root_account.sequence_number_mut() = account.sequence_number;
+        self.root_account
+            .set_sequence_number(account.sequence_number);
         Ok(())
     }
 

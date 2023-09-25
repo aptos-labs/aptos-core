@@ -45,7 +45,9 @@ fn run(
             fun foo<{}>({}) {{ }}
         }}
     "#,
-        TEST_ADDR, ty_params, params
+        TEST_ADDR.to_hex(),
+        ty_params,
+        params
     );
 
     let mut units = compile_units(&code).unwrap();

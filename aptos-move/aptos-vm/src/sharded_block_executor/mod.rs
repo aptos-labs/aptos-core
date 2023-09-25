@@ -18,6 +18,7 @@ use aptos_types::{
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
 
+pub mod aggr_overridden_state_view;
 pub mod coordinator_client;
 mod counters;
 pub mod cross_shard_client;
@@ -26,6 +27,8 @@ pub mod executor_client;
 pub mod global_executor;
 pub mod local_executor_shard;
 pub mod messages;
+pub mod remote_state_value;
+pub mod sharded_aggregator_service;
 pub mod sharded_executor_service;
 #[cfg(test)]
 mod test_utils;

@@ -34,8 +34,7 @@ serde = { version = "1.0.124", features = ["derive"] }
 [dev-dependencies]
 anyhow = "1.0.52"
 datatest-stable = "0.1.1"
-move-prover-test-utils = { path = "../../move-prover/test-utils" }
-move-stdlib = { path = "../../move-stdlib" }
+move-stackless-bytecode-test-utils = { path = "../bytecode-test-utils" }
 
 [[test]]
 name = "testsuite"

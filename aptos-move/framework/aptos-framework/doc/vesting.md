@@ -82,6 +82,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 -  [Function `admin_withdraw`](#0x1_vesting_admin_withdraw)
 -  [Function `update_operator`](#0x1_vesting_update_operator)
 -  [Function `update_operator_with_same_commission`](#0x1_vesting_update_operator_with_same_commission)
+-  [Function `update_commission_percentage`](#0x1_vesting_update_commission_percentage)
 -  [Function `update_voter`](#0x1_vesting_update_voter)
 -  [Function `reset_lockup`](#0x1_vesting_reset_lockup)
 -  [Function `set_beneficiary`](#0x1_vesting_set_beneficiary)
@@ -125,6 +126,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
     -  [Function `admin_withdraw`](#@Specification_1_admin_withdraw)
     -  [Function `update_operator`](#@Specification_1_update_operator)
     -  [Function `update_operator_with_same_commission`](#@Specification_1_update_operator_with_same_commission)
+    -  [Function `update_commission_percentage`](#@Specification_1_update_commission_percentage)
     -  [Function `update_voter`](#@Specification_1_update_voter)
     -  [Function `reset_lockup`](#@Specification_1_reset_lockup)
     -  [Function `set_beneficiary`](#@Specification_1_set_beneficiary)
@@ -2175,6 +2177,41 @@ has already been terminated.
 
 </details>
 
+<a name="0x1_vesting_update_commission_percentage"></a>
+
+## Function `update_commission_percentage`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_update_commission_percentage">update_commission_percentage</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, new_commission_percentage: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_update_commission_percentage">update_commission_percentage</a>(
+    admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    contract_address: <b>address</b>,
+    new_commission_percentage: u64,
+) <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
+    <b>let</b> operator = <a href="vesting.md#0x1_vesting_operator">operator</a>(contract_address);
+    <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
+    <a href="vesting.md#0x1_vesting_verify_admin">verify_admin</a>(admin, vesting_contract);
+    <b>let</b> contract_signer = &<a href="vesting.md#0x1_vesting_get_vesting_account_signer_internal">get_vesting_account_signer_internal</a>(vesting_contract);
+    <a href="staking_contract.md#0x1_staking_contract_update_commision">staking_contract::update_commision</a>(contract_signer, operator, new_commission_percentage);
+    vesting_contract.staking.commission_percentage = new_commission_percentage;
+    // This function does not emit an <a href="event.md#0x1_event">event</a>. Instead, `staking_contract::update_commission_percentage`
+    // <b>emits</b> the <a href="event.md#0x1_event">event</a> for this commission percentage <b>update</b>.
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_vesting_update_voter"></a>
 
 ## Function `update_voter`
@@ -3275,6 +3312,22 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_update_operator_with_same_commission">update_operator_with_same_commission</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, new_operator: <b>address</b>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_update_commission_percentage"></a>
+
+### Function `update_commission_percentage`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_update_commission_percentage">update_commission_percentage</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, new_commission_percentage: u64)
 </code></pre>
 
 

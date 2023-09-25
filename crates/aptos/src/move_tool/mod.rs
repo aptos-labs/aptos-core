@@ -8,7 +8,6 @@ mod manifest;
 pub mod package_hooks;
 mod show;
 pub mod stored_package;
-mod transactional_tests_runner;
 
 use crate::{
     account::derive_resource_account::ResourceAccountSeed,
@@ -41,7 +40,6 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_rest_client::aptos_api_types::{
     EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
 };
-use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     transaction::{TransactionArgument, TransactionPayload},
@@ -56,7 +54,9 @@ use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::env::MOVE_HOME;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
-use move_package::{source_package::layout::SourcePackageLayout, BuildConfig};
+use move_package::{
+    source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig, CompilerVersion,
+};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
 use serde::{Deserialize, Serialize};
@@ -69,7 +69,6 @@ use std::{
 };
 pub use stored_package::*;
 use tokio::task;
-use transactional_tests_runner::TransactionalTestOpts;
 
 /// Tool for Move related operations
 ///
@@ -97,7 +96,6 @@ pub enum MoveTool {
     #[clap(subcommand, hide = true)]
     Show(show::ShowTool),
     Test(TestPackage),
-    TransactionalTest(TransactionalTestOpts),
     VerifyPackage(VerifyPackage),
     View(ViewFunction),
 }
@@ -124,7 +122,6 @@ impl MoveTool {
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
             MoveTool::Show(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
-            MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
             MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
             MoveTool::View(tool) => tool.execute_serialized().await,
         }
@@ -318,6 +315,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
                     self.move_options.skip_fetch_latest_git_deps,
                     self.move_options.named_addresses(),
                     self.move_options.bytecode_version,
+                    self.move_options.compiler_version,
                     self.move_options.skip_attribute_checks,
                 )
         };
@@ -378,6 +376,7 @@ impl CompileScript {
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
+                self.move_options.compiler_version,
                 self.move_options.skip_attribute_checks,
             )
         };
@@ -458,8 +457,11 @@ impl CliCommand<&'static str> for TestPackage {
             test_mode: true,
             install_dir: self.move_options.output_dir.clone(),
             skip_fetch_latest_git_deps: self.move_options.skip_fetch_latest_git_deps,
-            known_attributes: known_attributes.clone(),
-            skip_attribute_checks: self.move_options.skip_attribute_checks,
+            compiler_config: CompilerConfig {
+                known_attributes: known_attributes.clone(),
+                skip_attribute_checks: self.move_options.skip_attribute_checks,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -470,6 +472,7 @@ impl CliCommand<&'static str> for TestPackage {
             self.move_options.named_addresses(),
             None,
             self.move_options.bytecode_version,
+            self.move_options.compiler_version,
             self.move_options.skip_attribute_checks,
             known_attributes.clone(),
         )?;
@@ -524,26 +527,6 @@ impl CliCommand<&'static str> for TestPackage {
             UnitTestResult::Success => Ok("Success"),
             UnitTestResult::Failure => Err(CliError::MoveTestError),
         }
-    }
-}
-
-#[async_trait]
-impl CliCommand<()> for TransactionalTestOpts {
-    fn command_name(&self) -> &'static str {
-        "TransactionalTest"
-    }
-
-    async fn execute(self) -> CliTypedResult<()> {
-        let root_path = self.root_path.display().to_string();
-
-        let requirements = vec![transactional_tests_runner::Requirements::new(
-            run_aptos_test,
-            "tests".to_string(),
-            root_path,
-            self.pattern.clone(),
-        )];
-
-        transactional_tests_runner::runner(&self, &requirements)
     }
 }
 
@@ -626,6 +609,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             docgen_options: Some(docgen_options),
             skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
             bytecode_version: move_options.bytecode_version,
+            compiler_version: move_options.compiler_version,
             skip_attribute_checks: move_options.skip_attribute_checks,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
         };
@@ -693,6 +677,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
+                self.move_options.compiler_version,
                 self.move_options.skip_attribute_checks,
             );
         let package = BuiltPackage::build(package_path, options)
@@ -761,6 +746,7 @@ impl IncludedArtifacts {
         skip_fetch_latest_git_deps: bool,
         named_addresses: BTreeMap<String, AccountAddress>,
         bytecode_version: Option<u32>,
+        compiler_version: Option<CompilerVersion>,
         skip_attribute_checks: bool,
     ) -> BuildOptions {
         use IncludedArtifacts::*;
@@ -775,6 +761,7 @@ impl IncludedArtifacts {
                 named_addresses,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
+                compiler_version,
                 skip_attribute_checks,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
                 ..BuildOptions::default()
@@ -788,6 +775,7 @@ impl IncludedArtifacts {
                 named_addresses,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
+                compiler_version,
                 skip_attribute_checks,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
                 ..BuildOptions::default()
@@ -801,6 +789,7 @@ impl IncludedArtifacts {
                 named_addresses,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
+                compiler_version,
                 skip_attribute_checks,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
                 ..BuildOptions::default()
@@ -944,6 +933,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
             move_options.bytecode_version,
+            move_options.compiler_version,
             move_options.skip_attribute_checks,
         );
         let package = BuiltPackage::build(package_path, options)?;
@@ -1002,6 +992,9 @@ pub struct DownloadPackage {
     pub(crate) rest_options: RestOptions,
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
+    /// Print metadata of the package
+    #[clap(long)]
+    pub print_metadata: bool,
 }
 
 #[async_trait]
@@ -1025,6 +1018,9 @@ impl CliCommand<&'static str> for DownloadPackage {
                 since it is not safe to depend on such packages."
                     .to_owned(),
             ));
+        }
+        if self.print_metadata {
+            println!("{}", package);
         }
         let package_path = output_dir.join(package.name());
         package
@@ -1076,6 +1072,7 @@ impl CliCommand<&'static str> for VerifyPackage {
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
+                self.move_options.compiler_version,
                 self.move_options.skip_attribute_checks,
             )
         };

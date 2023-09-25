@@ -21,7 +21,7 @@ See [Accounts](../concepts/accounts.md) for more information.
 ### Account Address
 
 - An **account address** is the address of an Aptos account.
-- Account address refers to a specific destination on the Aptos network. The address dictates the destination and source of a specific amount of assets exchanged by two parties on the blockchain. 
+- Account address refers to a specific destination on the Aptos network. The address dictates the destination and source of a specific amount of assets exchanged by two parties on the blockchain.
 - An Aptos address is a 64-character hex string, and sometimes it can be shortened by stripping leading 0s and prefixing `0x`. This makes a hex-encoded 32 byte Aptos account address.
 
 See [Accounts](../concepts/accounts.md) for more information.
@@ -49,7 +49,7 @@ See [Accounts](../concepts/accounts.md) for more information.
 
 ### Aptos Name Service (ANS)
 
-- The **Aptos Name Service (ANS)** is a decentralized naming address service for the Aptos blockchain. An Aptos name is a human-readable *.apt* domain name that is used in place of a public key, for example *love.apt*. 
+- The **Aptos Name Service (ANS)** is a decentralized naming address service for the Aptos blockchain. An Aptos name is a human-readable *.apt* domain name that is used in place of a public key, for example *love.apt*.
 - This service also allows users to register subdomain names in addition to the registered domain. Find out more at: [Aptosnames.com](https://www.aptosnames.com/)
 
 ### Aptos-core
@@ -112,7 +112,7 @@ An **Aptos node** is a peer entity of the Aptos network that tracks the state of
 
 ### CLI
 
-- **Command line interface** refers to the Aptos CLI used for developing on the Aptos blockchain, operating nodes, and debugging issues. Find out more at [Use the Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md). 
+- **Command line interface** refers to the Aptos CLI used for developing on the Aptos blockchain, operating nodes, and debugging issues. Find out more at [Use the Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md).
 
 ### Client
 
@@ -193,13 +193,13 @@ then there is a guarantee that T_N will never be included in the blockchain.
 ### Fungible Asset
 
 - A **fungible asset** is an asset, such as a currency, share, in-game resource, etc., that is interchangeable with another identical asset without any loss in its value. For example, APT is a fungible asset because you can exchange one APT for another.
-- Follow the [Digital Asset Standards](../standards/index.md#digital-asset-standards) to create fungible assets on the Aptos blockchain. 
+- Follow the [Asset Standards](../standards/index.md#asset-standards) to create fungible assets on the Aptos blockchain. 
 - Next generation of the Coin standard that addresses shortcomings of `aptos_framework::coin` such as lack of guaranteed enforcement of freeze and burn and advanced functionalities such as programmable transfers, e.g., approve in ERC-20.
 
 ### Fungible Token
 
-- For TokenV1 (aptos_token::token), a **fungible token** is a token that is interchangeable with other identical tokens (i.e., tokens that share the same `TokenId`). This means the tokens have the same `creator address`, `collection name`, `token name`, and `property version`.
-- For TokenV2 (aptos_token_objects::token), a **fungible token** is a fungible asset with metadata object includes a TokenV2 resource.
+- For the legacy Aptos Token Standard (aptos_token::token), a **fungible token** is a token that is interchangeable with other identical tokens (i.e., tokens that share the same `TokenId`). This means the tokens have the same `creator address`, `collection name`, `token name`, and `property version`.
+- For the Aptos Digital Asset Standard (aptos_token_objects::token), a **fungible token** is a fungible asset with metadata object that includes a Digital Asset resource.
 
 ### Fungible Unit
 
@@ -235,7 +235,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ### Indexer
 
-- **[Indexer](../integration/indexing.md)** is the component of Aptos that retrieves, processes, and efficiently stores raw data in the database to provide speedy access to the Aptos blockchain state.
+- **[Indexer](../indexer/indexer-landing.md)** is the component of Aptos that retrieves, processes, and efficiently stores raw data in the database to provide speedy access to the Aptos blockchain state.
 
 ## L
 
@@ -350,7 +350,7 @@ See [Resource accounts](../move/move-on-aptos/resource-accounts.md) for instruct
 
 ### REST Service
 
-- The **REST Service** component is the external interface of a Aptos node. Any incoming client request, such as submitted transactions or queries, must first go through the REST Service. A client needs to go through the REST Service component to access storage or any other component in the system. This filters requests and protects the system.
+- The **REST Service** component is the external interface of an Aptos node. Any incoming client request, such as submitted transactions or queries, must first go through the REST Service. A client needs to go through the REST Service component to access storage or any other component in the system. This filters requests and protects the system.
 - Whenever a client submits a new transaction, the REST Service passes it to [mempool](#mempool).
 
 ### Round
@@ -445,7 +445,7 @@ To see example uses of transaction scripts, follow [Move scripts](../move/move-o
 
 ### Validator Nodes
 
-- **Validator nodes** are a unique class of fullnodes that take part in consensus, specifically a Byzantine Fault Tolerance (BFT) consensus protocol in Aptos. Validators agree upon transactions to be added to the Aptos blockchain as well as the order in which they are added. 
+- **Validator nodes** are a unique class of fullnodes that take part in consensus, specifically a Byzantine Fault Tolerance (BFT) consensus protocol in Aptos. Validators agree upon transactions to be added to the Aptos blockchain as well as the order in which they are added.
 
 ### Version
 

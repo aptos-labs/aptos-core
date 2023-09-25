@@ -38,6 +38,7 @@ pub struct VerifierConfig {
     pub max_per_fun_meter_units: Option<u128>,
     pub max_per_mod_meter_units: Option<u128>,
     pub use_signature_checker_v2: bool,
+    pub sig_checker_v2_fix_script_ty_param_count: bool,
 }
 
 /// Helper for a "canonical" verification of a module.
@@ -150,7 +151,7 @@ pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScrip
         DuplicationChecker::verify_script(script)?;
 
         if config.use_signature_checker_v2 {
-            signature_v2::verify_script(script)?;
+            signature_v2::verify_script(config, script)?;
         } else {
             SignatureChecker::verify_script(script)?;
         }
@@ -208,6 +209,8 @@ impl Default for VerifierConfig {
             max_per_mod_meter_units: None,
 
             use_signature_checker_v2: true,
+
+            sig_checker_v2_fix_script_ty_param_count: true,
         }
     }
 }
@@ -247,6 +250,8 @@ impl VerifierConfig {
             max_per_mod_meter_units: Some(1000 * 8000),
 
             use_signature_checker_v2: true,
+
+            sig_checker_v2_fix_script_ty_param_count: true,
         }
     }
 }

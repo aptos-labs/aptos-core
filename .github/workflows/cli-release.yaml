@@ -25,14 +25,14 @@ jobs:
     name: "Build Ubuntu 20.04 binary"
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Ubuntu"
       - name: Upload Binary
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
+        uses: actions/upload-artifact@v3
         with:
           name: cli-builds
           path: aptos-cli-*.zip
@@ -41,14 +41,14 @@ jobs:
     name: "Build Ubuntu 22.04 binary"
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Ubuntu-22.04"
       - name: Upload Binary
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
+        uses: actions/upload-artifact@v3
         with:
           name: cli-builds
           path: aptos-cli-*.zip
@@ -57,13 +57,13 @@ jobs:
     name: "Build OS X binary"
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "MacOSX"
       - name: Upload Binary
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
+        uses: actions/upload-artifact@v3
         with:
           name: cli-builds
           path: aptos-cli-*.zip
@@ -72,13 +72,13 @@ jobs:
     name: "Build Windows binary"
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - name: Build CLI
         run: scripts\cli\build_cli_release.ps1
       - name: Upload Binary
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
+        uses: actions/upload-artifact@v3
         with:
           name: cli-builds
           path: aptos-cli-*.zip
@@ -97,7 +97,7 @@ jobs:
     if: ${{ inputs.dry_run }} == 'false'
     steps:
       - name: Download prebuilt binaries
-        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # pin@v3
+        uses: actions/download-artifact@v3
         with:
           name: cli-builds
       - name: Create GitHub Release

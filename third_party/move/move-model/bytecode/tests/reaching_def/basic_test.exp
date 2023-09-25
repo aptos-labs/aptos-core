@@ -57,8 +57,8 @@ fun ReachingDefTest::basic($t0|a: u64, $t1|b: u64): u64 {
 
 
 [variant baseline]
-fun ReachingDefTest::create_resource($t0|sender: signer) {
-     var $t1: signer
+fun ReachingDefTest::create_resource($t0|sender: &signer) {
+     var $t1: &signer
      var $t2: u64
      var $t3: bool
      var $t4: ReachingDefTest::R

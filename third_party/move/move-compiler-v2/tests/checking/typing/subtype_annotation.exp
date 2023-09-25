@@ -19,4 +19,6 @@ module 0x8675309::M {
         Tuple(Borrow(Mutable)(0), Borrow(Mutable)(0));
         Tuple()
     }
+    spec fun $t0();
+    spec fun $t1();
 } // end 0x8675309::M

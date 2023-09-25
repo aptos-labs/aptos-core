@@ -6,24 +6,17 @@ error: `M::reduce` is a function and not a macro
 34 │         foreach(&v, |e| sum = sum + reduce!(*e, 0, |t, r| t + r));
    │                                     ^^^^^^
 
-error: no matching declaration of `+`
-   ┌─ tests/checking/typing/lambda.move:67:31
+error: invalid call of `+`: expected `integer` but found `&integer` for argument 2
+   ┌─ tests/checking/typing/lambda.move:67:37
    │
 67 │         foreach(&v, |e| sum = sum + e) // expected to cannot infer type
-   │                               ^^^^^^^
-   │
-   = outruled candidate `+(u8, u8): u8` (expected `u8` but found `&integer` for argument 2)
-   = outruled candidate `+(u16, u16): u16` (expected `u16` but found `&integer` for argument 2)
-   = outruled candidate `+(u32, u32): u32` (expected `u32` but found `&integer` for argument 2)
-   = outruled candidate `+(u64, u64): u64` (expected `u64` but found `&integer` for argument 2)
-   = outruled candidate `+(u128, u128): u128` (expected `u128` but found `&integer` for argument 2)
-   = outruled candidate `+(u256, u256): u256` (expected `u256` but found `&integer` for argument 2)
+   │                                     ^
 
-error: expected `()` but found `u64`
-   ┌─ tests/checking/typing/lambda.move:73:43
+error: expected `()` but found `integer`
+   ┌─ tests/checking/typing/lambda.move:73:44
    │
 73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
-   │                                           ^^
+   │                                            ^
 
 error: expected `(&T, u64)` but found `&T`
    ┌─ tests/checking/typing/lambda.move:40:13
@@ -43,15 +36,8 @@ error: expected `|integer|()` but found `u64`
 61 │         x(1) // expected to be not a function
    │         ^^^^
 
-error: no matching declaration of `+`
-   ┌─ tests/checking/typing/lambda.move:56:17
+error: invalid call of `+`: expected `u64` but found `()` for argument 2
+   ┌─ tests/checking/typing/lambda.move:56:21
    │
 56 │             i = i + action(XVector::borrow(v, i)); // expected to have wrong result type
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   = outruled candidate `+(u8, u8): u8` (expected `u8` but found `u64` for argument 1)
-   = outruled candidate `+(u16, u16): u16` (expected `u16` but found `u64` for argument 1)
-   = outruled candidate `+(u32, u32): u32` (expected `u32` but found `u64` for argument 1)
-   = outruled candidate `+(u64, u64): u64` (expected `u64` but found `()` for argument 2)
-   = outruled candidate `+(u128, u128): u128` (expected `u128` but found `u64` for argument 1)
-   = outruled candidate `+(u256, u256): u256` (expected `u256` but found `u64` for argument 1)
+   │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

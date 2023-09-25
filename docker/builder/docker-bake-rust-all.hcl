@@ -69,7 +69,7 @@ group "forge-images" {
 target "debian-base" {
   dockerfile = "docker/builder/debian-base.Dockerfile"
   contexts = {
-    debian = "docker-image://debian:bullseye@sha256:2c407480ad7c98bdc551dbb38b92acb674dc130c8298f2e0fa2ad34da9078637"
+    debian = "docker-image://debian:bullseye@sha256:eeb0fbb4bbde2b41055caeb458c43f0f4fbe33d01500360e0e6cbd69fb21ea05"
   }
 }
 
@@ -78,7 +78,7 @@ target "builder-base" {
   target     = "builder-base"
   context    = "."
   contexts = {
-    rust = "docker-image://rust:1.71.1-bullseye@sha256:6b5a53fef2818e28548be943a622bfc52d73920fe0f8784f4296227bca30cdf1"
+    rust = "docker-image://rust:1.71.1-bullseye@sha256:79ddef683780336ce47c56c86184cf49e4f36c598d8f0bfe9453f52437b1b9a9"
   }
   args = {
     PROFILE            = "${PROFILE}"

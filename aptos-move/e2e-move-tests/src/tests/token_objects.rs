@@ -48,7 +48,7 @@ fn test_basic_token() {
 
     let result = h.run_entry_function(
         &account,
-        str::parse(&format!("0x{}::hero::mint_hero", addr)).unwrap(),
+        str::parse(&format!("0x{}::hero::mint_hero", addr.to_hex())).unwrap(),
         vec![],
         vec![
             bcs::to_bytes("The best hero ever!").unwrap(),
@@ -99,7 +99,7 @@ fn test_basic_token() {
 
     let result = h.run_entry_function(
         &account,
-        str::parse(&format!("0x{}::hero::set_hero_description", addr)).unwrap(),
+        str::parse(&format!("0x{}::hero::set_hero_description", addr.to_hex())).unwrap(),
         vec![],
         vec![
             bcs::to_bytes("Hero Quest!").unwrap(),

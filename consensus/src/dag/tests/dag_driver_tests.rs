@@ -4,11 +4,14 @@ use crate::{
     dag::{
         anchor_election::RoundRobinAnchorElection,
         dag_driver::{DagDriver, DagDriverError},
-        dag_fetcher::DagFetcher,
+        dag_fetcher::DagFetcherService,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
+        dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
         order_rule::OrderRule,
-        tests::{dag_test::MockStorage, helpers::new_certified_node},
+        tests::{
+            dag_test::MockStorage, helpers::new_certified_node, order_rule_tests::TestNotifier,
+        },
         types::{CertifiedAck, DAGMessage},
         RpcHandler,
     },
@@ -19,10 +22,13 @@ use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfo, validator_verifier::random_validator_verifier,
+    epoch_state::EpochState,
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo},
+    validator_verifier::random_validator_verifier,
 };
 use async_trait::async_trait;
 use claims::{assert_ok, assert_ok_eq};
+use futures_channel::mpsc::unbounded;
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -54,7 +60,7 @@ impl TDAGNetworkSender for MockNetworkSender {
     /// Given a list of potential responders, sending rpc to get response from any of them and could
     /// fallback to more in case of failures.
     async fn send_rpc_with_fallbacks(
-        &self,
+        self: Arc<Self>,
         _responders: Vec<Author>,
         _message: DAGMessage,
         _retry_interval: Duration,
@@ -64,17 +70,23 @@ impl TDAGNetworkSender for MockNetworkSender {
     }
 }
 
-#[test]
-fn test_certified_node_handler() {
+#[tokio::test]
+async fn test_certified_node_handler() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
         verifier: validator_verifier,
     });
-    let storage = Arc::new(MockStorage::new());
-    let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage.clone())));
 
-    let zeroth_round_node = new_certified_node(0, signers[0].author(), vec![]);
+    let mock_ledger_info = LedgerInfo::mock_genesis(None);
+    let mock_ledger_info = generate_ledger_info_with_sig(&signers, mock_ledger_info);
+    let storage = Arc::new(MockStorage::new_with_ledger_info(mock_ledger_info));
+    let dag = Arc::new(RwLock::new(Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        0,
+        DAG_WINDOW,
+    )));
 
     let network_sender = Arc::new(MockNetworkSender {});
     let rb = Arc::new(ReliableBroadcast::new(
@@ -82,19 +94,21 @@ fn test_certified_node_handler() {
         network_sender.clone(),
         ExponentialBackoff::from_millis(10),
         aptos_time_service::TimeService::mock(),
+        Duration::from_millis(500),
     ));
     let time_service = TimeService::mock();
-    let (ordered_nodes_sender, _) = futures_channel::mpsc::unbounded();
     let validators = signers.iter().map(|vs| vs.author()).collect();
+    let (tx, _) = unbounded();
     let order_rule = OrderRule::new(
         epoch_state.clone(),
         LedgerInfo::mock_genesis(None),
         dag.clone(),
         Box::new(RoundRobinAnchorElection::new(validators)),
-        ordered_nodes_sender,
+        Arc::new(TestNotifier { tx }),
+        storage.clone(),
     );
 
-    let (_, fetch_requester, _, _) = DagFetcher::new(
+    let (_, fetch_requester, _, _) = DagFetcherService::new(
         epoch_state.clone(),
         network_sender,
         dag.clone(),
@@ -108,22 +122,22 @@ fn test_certified_node_handler() {
         dag,
         Arc::new(MockPayloadManager::new(None)),
         rb,
-        1,
         time_service,
         storage,
         order_rule,
         fetch_requester,
     );
 
+    let first_round_node = new_certified_node(1, signers[0].author(), vec![]);
     // expect an ack for a valid message
-    assert_ok!(driver.process(zeroth_round_node.clone()));
+    assert_ok!(driver.process(first_round_node.clone()).await);
     // expect an ack if the same message is sent again
-    assert_ok_eq!(driver.process(zeroth_round_node), CertifiedAck::new(1));
+    assert_ok_eq!(driver.process(first_round_node).await, CertifiedAck::new(1));
 
-    let parent_node = new_certified_node(0, signers[1].author(), vec![]);
-    let invalid_node = new_certified_node(1, signers[0].author(), vec![parent_node.certificate()]);
+    let parent_node = new_certified_node(1, signers[1].author(), vec![]);
+    let invalid_node = new_certified_node(2, signers[0].author(), vec![parent_node.certificate()]);
     assert_eq!(
-        driver.process(invalid_node).unwrap_err().to_string(),
+        driver.process(invalid_node).await.unwrap_err().to_string(),
         DagDriverError::MissingParents.to_string()
     );
 }

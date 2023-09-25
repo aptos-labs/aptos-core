@@ -9,7 +9,7 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass
-from typing import Sequence, Union
+from typing import Optional, Sequence, Union
 
 from test_framework.logging import log
 
@@ -19,9 +19,12 @@ class RunResult:
     exit_code: int
     output: bytes
 
+    def output_str(self) -> str:
+        return self.output.decode("utf-8")
+
     def unwrap(self) -> bytes:
         if not self.succeeded():
-            raise Exception(self.output.decode("utf-8"))
+            raise Exception(self.output_str())
         return self.output
 
     def succeeded(self) -> bool:
@@ -29,7 +32,12 @@ class RunResult:
 
 
 class Shell:
-    def run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
+    def run(
+        self,
+        command: Sequence[str],
+        stream_output: bool = False,
+        timeout_secs: Optional[float] = None,
+    ) -> RunResult:
         raise NotImplementedError()
 
     async def gen_run(
@@ -42,56 +50,61 @@ class Shell:
 class LocalShell(Shell):
     logger: logging.Logger = log
 
-    def run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
-        # Write to a temp file, stream to stdout
-        tmpname = tempfile.mkstemp()[1]
-        with open(tmpname, "wb") as writer, open(tmpname, "rb") as reader:
-            self.logger.debug(f"+ {' '.join(command)}")
-            process = subprocess.Popen(command, stdout=writer, stderr=writer)
-            output = b""
-            chunk = reader.read()
-            while (
-                process.poll() is None
-            ):  # continuously poll the process until it finishes, collecting output
-                chunk = reader.read()
-                output += chunk
-                if stream_output:
-                    sys.stdout.write(chunk.decode("utf-8"))
-                time.sleep(0.1)
-            chunk = reader.read()
-            if stream_output:  # stream the rest of the output if there is any
-                sys.stdout.write(chunk.decode("utf-8"))
-            output += chunk
+    def run(
+        self,
+        command: Sequence[str],
+        stream_output: bool = False,
+        timeout_secs: Optional[float] = None,
+    ) -> RunResult:
+        self.logger.debug(f"+ {' '.join(command)}")
+
+        process = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        )
+        if process.stdout is None:
+            raise Exception(f"Could not get stdout for command: {command}")
+
+        output = b""
+        start_time = time.time()
+        for line in iter(process.stdout.readline, b""):
+            if stream_output:
+                sys.stdout.buffer.write(line)
+            output += line
+            if timeout_secs and time.time() - start_time > timeout_secs:
+                process.kill()
+                raise subprocess.TimeoutExpired(" ".join(command), timeout_secs)
+
+        process.communicate()  # ensure process is done
         return RunResult(process.returncode, output)
 
     async def gen_run(
-        self, command: Sequence[str], stream_output: bool = False
+        self,
+        command: Sequence[str],
+        stream_output: bool = False,
+        timeout_secs: Optional[float] = None,
     ) -> RunResult:
-        # Write to a temp file, stream to stdout
-        tmpname = tempfile.mkstemp()[1]
-        with open(tmpname, "wb") as writer, open(tmpname, "rb") as reader:
-            self.logger.debug(f"+ {' '.join(command)}")
-            try:
-                process = await asyncio.create_subprocess_exec(
-                    command[0], *command[1:], stdout=writer, stderr=writer
-                )
-            except Exception as e:
-                raise Exception(f"Failed running {command}") from e
-            output = b""
-            while True:
-                wait_task = asyncio.create_task(process.wait())
-                finished, running = await asyncio.wait({wait_task}, timeout=1)
-                assert bool(finished) ^ bool(
-                    running
-                ), "Cannot have both finished and running"
-                if finished:
-                    break
-                chunk = reader.read()
-                output += chunk
-                if stream_output:
-                    sys.stdout.write(chunk.decode("utf-8"))
-                await asyncio.sleep(1)
-            output += reader.read()
+        self.logger.debug(f"+ {' '.join(command)}")
+
+        process = await asyncio.create_subprocess_exec(
+            *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
+        )
+
+        output = b""
+        while True:
+            if process.stdout is None:
+                break
+            chunk = await asyncio.wait_for(
+                process.stdout.read(4096), timeout=timeout_secs
+            )
+            if not chunk:  # process finished and no more data
+                break
+
+            output += chunk
+            if stream_output:
+                sys.stdout.buffer.write(chunk)
+
+        await asyncio.wait_for(process.wait(), timeout=timeout_secs)
+
         exit_code = process.returncode
         assert exit_code is not None, "Process must have exited"
         return RunResult(exit_code, output)
@@ -145,7 +158,12 @@ class SpyShell(FakeShell):
         """Get the list of commands that are expected to be run"""
         return [fakecommand.command for fakecommand in self.expected_command_list]
 
-    def run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
+    def run(
+        self,
+        command: Sequence[str],
+        stream_output: bool = False,
+        timeout_secs: Optional[float] = None,
+    ) -> RunResult:
         """Mock a command run by adding it to a list of commands and returning the result"""
         rendered_command = " ".join(command)
         default = (
