@@ -27,11 +27,35 @@ block_gens = [
     #         "hotspot": 0.5,
     #     },
     # },
+    # {
+    #     'block_size': 10000,
+    #     'txn_gen': {
+    #         '_type': "p2p_sample",
+    #         'account_pool': 10000,
+    #         "hotspot": 0.5,
+    #     },
+    # },
+    # {
+    #     'block_size': 10000,
+    #     'txn_gen': {
+    #         '_type': "p2p_sample",
+    #         'account_pool': 10000,
+    #         "hotspot": 0.8,
+    #     },
+    # },
+    # {
+    #     'block_size': 10000,
+    #     'txn_gen': {
+    #         '_type': "p2p_sample",
+    #         'account_pool': 10000,
+    #         "hotspot": 0.99,
+    #     },
+    # },
     {
         'block_size': 10000,
         'txn_gen': {
             '_type': "p2p_sample",
-            'account_pool': 10000,
+            'account_pool': 100000,
             "hotspot": 0.5,
         },
     },
@@ -39,30 +63,6 @@ block_gens = [
         'block_size': 10000,
         'txn_gen': {
             '_type': "p2p_sample",
-            'account_pool': 10000,
-            "hotspot": 0.8,
-        },
-    },
-    {
-        'block_size': 10000,
-        'txn_gen': {
-            '_type': "p2p_sample",
-            'account_pool': 10000,
-            "hotspot": 0.99,
-        },
-    },
-    {
-        'block_size': 10000,
-        'txn_gen': {
-            '_type': "p2p_sample",
-            'account_pool': 100000,
-            "hotspot": 0.5,
-        },
-    },
-    {
-        'block_size': 10000,
-        'txn_gen': {
-            '_type': "p2p_sample",
             'account_pool': 100000,
             "hotspot": 0.8,
         },
@@ -75,48 +75,48 @@ block_gens = [
             "hotspot": 0.99,
         },
     },
-    {
-        'block_size': 10000,
-        'txn_gen': {
-            '_type': "p2p_sample",
-            'account_pool': 1000000,
-            "hotspot": 0.5,
-        },
-    },
-    {
-        'block_size': 10000,
-        'txn_gen': {
-            '_type': "p2p_sample",
-            'account_pool': 1000000,
-            "hotspot": 0.8,
-        },
-    },
-    {
-        'block_size': 10000,
-        'txn_gen': {
-            '_type': "p2p_sample",
-            'account_pool': 1000000,
-            "hotspot": 0.99,
-        },
-    },
-    {
-        'block_size': 10000,
-        'txn_gen': {
-            '_type': "connected_groups",
-            'account_pool': 100000,
-            "num_groups": 500,
-            "shuffle": True,
-        },
-    },
-    {
-        'block_size': 10000,
-        'txn_gen': {
-            '_type': "connected_groups",
-            'account_pool': 100000,
-            "num_groups": 1,
-            "shuffle": True,
-        },
-    },
+    # {
+    #     'block_size': 10000,
+    #     'txn_gen': {
+    #         '_type': "p2p_sample",
+    #         'account_pool': 1000000,
+    #         "hotspot": 0.5,
+    #     },
+    # },
+    # {
+    #     'block_size': 10000,
+    #     'txn_gen': {
+    #         '_type': "p2p_sample",
+    #         'account_pool': 1000000,
+    #         "hotspot": 0.8,
+    #     },
+    # },
+    # {
+    #     'block_size': 10000,
+    #     'txn_gen': {
+    #         '_type': "p2p_sample",
+    #         'account_pool': 1000000,
+    #         "hotspot": 0.99,
+    #     },
+    # },
+    # {
+    #     'block_size': 10000,
+    #     'txn_gen': {
+    #         '_type': "connected_groups",
+    #         'account_pool': 100000,
+    #         "num_groups": 500,
+    #         "shuffle": True,
+    #     },
+    # },
+    # {
+    #     'block_size': 10000,
+    #     'txn_gen': {
+    #         '_type': "connected_groups",
+    #         'account_pool': 100000,
+    #         "num_groups": 1,
+    #         "shuffle": True,
+    #     },
+    # },
     # {
     #     'block_size': 10000,
     #     'txn_gen': {
@@ -147,62 +147,62 @@ block_gens = [
 ]
 
 approaches = [
-    {
-        "_type": "unsharded",
-        "concurrency": 60,
-    },
-    {
-        "_type": "unsharded",
-        "concurrency": 56,
-    },
-    {
-        "_type": "unsharded",
-        "concurrency": 52,
-    },
+    # {
+    #     "_type": "unsharded",
+    #     "concurrency": 60,
+    # },
+    # {
+    #     "_type": "unsharded",
+    #     "concurrency": 56,
+    # },
+    # {
+    #     "_type": "unsharded",
+    #     "concurrency": 52,
+    # },
     {
         "_type": "unsharded",
         "concurrency": 48,
     },
-    {
-        "_type": "unsharded",
-        "concurrency": 44,
-    },
-    {
-        "_type": "unsharded",
-        "concurrency": 40,
-    },
-    {
-        "_type": "unsharded",
-        "concurrency": 36,
-    },
-    {
-        "_type": "unsharded",
-        "concurrency": 32,
-    },
-    {
-        "_type": "unsharded",
-        "concurrency": 28,
-    },
-    {
-        "_type": "unsharded",
-        "concurrency": 24,
-    },
-    {
-        "_type": "unsharded",
-        "concurrency": 20,
-    },
-    {
-        "_type": "unsharded",
-        "concurrency": 16,
-    },
-    {
-        "_type": "unsharded",
-        "concurrency": 12,
-    },
-    {
-        "_type": "unsharded",
-        "concurrency": 8,
-    },
+    # {
+    #     "_type": "unsharded",
+    #     "concurrency": 44,
+    # },
+    # {
+    #     "_type": "unsharded",
+    #     "concurrency": 40,
+    # },
+    # {
+    #     "_type": "unsharded",
+    #     "concurrency": 36,
+    # },
+    # {
+    #     "_type": "unsharded",
+    #     "concurrency": 32,
+    # },
+    # {
+    #     "_type": "unsharded",
+    #     "concurrency": 28,
+    # },
+    # {
+    #     "_type": "unsharded",
+    #     "concurrency": 24,
+    # },
+    # {
+    #     "_type": "unsharded",
+    #     "concurrency": 20,
+    # },
+    # {
+    #     "_type": "unsharded",
+    #     "concurrency": 16,
+    # },
+    # {
+    #     "_type": "unsharded",
+    #     "concurrency": 12,
+    # },
+    # {
+    #     "_type": "unsharded",
+    #     "concurrency": 8,
+    # },
     # {
     #     "_type": "sharded_v1",
     #     "xshard_avoid": 0.9,
@@ -235,21 +235,21 @@ approaches = [
     #     "_type": "ptx",
     #     "concurrency": 54,
     # },
-    # {
-    #     "_type": "graph",
-    #     "shards": 2,
-    #     "shard_concurrency": 24,
-    # },
-    # {
-    #     "_type": "graph",
-    #     "shards": 3,
-    #     "shard_concurrency": 16,
-    # },
-    # {
-    #     "_type": "graph",
-    #     "shards": 4,
-    #     "shard_concurrency": 12,
-    # },
+    {
+        "_type": "graph",
+        "shards": 2,
+        "shard_concurrency": 24,
+    },
+    {
+        "_type": "graph",
+        "shards": 3,
+        "shard_concurrency": 16,
+    },
+    {
+        "_type": "graph",
+        "shards": 4,
+        "shard_concurrency": 12,
+    },
     # {
     #     "_type": "graph",
     #     "shards": 6,
