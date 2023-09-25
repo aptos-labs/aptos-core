@@ -150,7 +150,7 @@ module mint_nft::create_nft_with_resource_account {
     public entry fun mint_event_ticket(receiver: &signer) acquires ModuleData {
         let module_data = borrow_global_mut<ModuleData>(@mint_nft);
 
-        // Create a signer of the resource account from the signer capabiity stored in this module.
+        // Create a signer of the resource account from the signer capability stored in this module.
         // Using a resource account and storing its signer capability within the module allows the module to programmatically
         // sign transactions on behalf of the module.
         let resource_signer = account::create_signer_with_capability(&module_data.signer_cap);
