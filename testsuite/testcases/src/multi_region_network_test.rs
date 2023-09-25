@@ -103,7 +103,7 @@ pub struct InterRegionNetEmConfig {
 impl Default for InterRegionNetEmConfig {
     fn default() -> Self {
         Self {
-            delay_jitter_ms: 0,
+            delay_jitter_ms: 20,
             delay_correlation_percentage: 50,
             loss_percentage: 0,
             loss_correlation_percentage: 50,
