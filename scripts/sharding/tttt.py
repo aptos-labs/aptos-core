@@ -235,21 +235,21 @@ approaches = [
     #     "_type": "ptx",
     #     "concurrency": 54,
     # },
+    # {
+    #     "_type": "graph",
+    #     "shards": 2,
+    #     "shard_concurrency": 24,
+    # },
     {
         "_type": "graph",
-        "shards": 2,
-        "shard_concurrency": 24,
+        "shards": 3,
+        "shard_concurrency": 16,
     },
-    # {
-    #     "_type": "graph",
-    #     "shards": 3,
-    #     "shard_concurrency": 16,
-    # },
-    # {
-    #     "_type": "graph",
-    #     "shards": 4,
-    #     "shard_concurrency": 12,
-    # },
+    {
+        "_type": "graph",
+        "shards": 4,
+        "shard_concurrency": 12,
+    },
     # {
     #     "_type": "graph",
     #     "shards": 6,
