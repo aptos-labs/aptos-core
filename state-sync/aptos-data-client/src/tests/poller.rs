@@ -221,39 +221,11 @@ async fn identify_peers_to_poll_latency_weights() {
                 }
             }
 
-            // Build a max-heap of all peers by their polling counts
-            let mut max_heap_poll_counts = BinaryHeap::new();
-            for (peer, poll_count) in peers_and_poll_counts {
-                max_heap_poll_counts.push((poll_count, peer));
-            }
-
-            // Verify the top 10% of polled peers are the lowest latency peers
-            let peers_to_verify = (peer_count / 10) as u64;
-            let mut highest_seen_latency = 0.0;
-            for _ in 0..peers_to_verify {
-                // Get the peer and poll count
-                let (_, peer) = max_heap_poll_counts.pop().unwrap();
-
-                // Get the peer's ping latency
-                let peers_and_metadata = mock_network.get_peers_and_metadata();
-                let peer_metadata = peers_and_metadata.get_metadata_for_peer(peer).unwrap();
-                let peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata();
-                let ping_latency = peer_monitoring_metadata.average_ping_latency_secs.unwrap();
-
-                // Verify that the ping latencies are increasing
-                if ping_latency <= highest_seen_latency {
-                    // The ping latencies did not increase. This should only be
-                    // possible if the latencies are very close (i.e., within 10%).
-                    if (highest_seen_latency - ping_latency) > 0.1 {
-                        panic!(
-                            "The ping latencies are not increasing! Are polls weighted by latency?"
-                        );
-                    }
-                }
-
-                // Update the highest seen latency
-                highest_seen_latency = ping_latency;
-            }
+            // Verify the highest selected peers are the lowest latency peers
+            utils::verify_highest_peer_selection_latencies(
+                &mut mock_network,
+                &mut peers_and_poll_counts,
+            );
         }
     }
 }
@@ -269,8 +241,9 @@ async fn identify_peers_to_poll_missing_latencies() {
         ..Default::default()
     };
 
-    // Create a mock network with a poller
-    let (mut mock_network, _, _, poller) = MockNetwork::new(None, Some(data_client_config), None);
+    // Create a mock network, data client and poller
+    let (mut mock_network, _, client, poller) =
+        MockNetwork::new(None, Some(data_client_config), None);
 
     // Ensure the properties hold for both priority and non-priority peers
     for poll_priority_peers in [true, false] {
@@ -284,17 +257,9 @@ async fn identify_peers_to_poll_missing_latencies() {
         // Set some peers to have missing latencies in the peer metadata
         let num_peers_with_missing_latencies = 10;
         let mut peers_with_missing_latencies = hashset![];
-        let peers_and_metadata = mock_network.get_peers_and_metadata();
         for peer in peers.iter().take(num_peers_with_missing_latencies) {
-            // Create the new peer metadata for the peer (with a missing latency entry)
-            let peer_metadata = peers_and_metadata.get_metadata_for_peer(*peer).unwrap();
-            let mut peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata().clone();
-            peer_monitoring_metadata.average_ping_latency_secs = None;
-
-            // Update the peer monitoring metadata
-            peers_and_metadata
-                .update_peer_monitoring_metadata(*peer, peer_monitoring_metadata)
-                .unwrap();
+            // Remove the latency metadata for the peer
+            utils::remove_latency_metadata(&client, *peer);
 
             // Add the peer to the list of peers with missing latencies
             peers_with_missing_latencies.insert(*peer);
