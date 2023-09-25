@@ -327,7 +327,7 @@ impl<'t> AccountMinter<'t> {
             .load_key("vasp private key", Path::new(&file))
             .unwrap();
         let account_key = AccountKey::from_private_key(mint_key);
-        let address = account_key.authentication_key().derived_address();
+        let address = account_key.authentication_key().account_address();
         let sequence_number = txn_executor
             .query_sequence_number(address)
             .await
@@ -476,7 +476,7 @@ where
     R: ::rand_core::RngCore + ::rand_core::CryptoRng,
 {
     let account_key = AccountKey::generate(rng);
-    let address = account_key.authentication_key().derived_address();
+    let address = account_key.authentication_key().account_address();
     let sequence_number = txn_executor.query_sequence_number(address).await?;
     Ok(LocalAccount::new(address, account_key, sequence_number))
 }
@@ -498,7 +498,7 @@ pub fn create_and_fund_account_request(
 ) -> SignedTransaction {
     let auth_key = AuthenticationKey::ed25519(pubkey);
     creation_account.sign_with_transaction_builder(txn_factory.payload(
-        aptos_stdlib::aptos_account_transfer(auth_key.derived_address(), amount),
+        aptos_stdlib::aptos_account_transfer(auth_key.account_address(), amount),
     ))
 }
 

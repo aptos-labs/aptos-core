@@ -72,7 +72,7 @@ impl FundRequest {
         }
         if let Some(pub_key) = self.pub_key.as_ref() {
             return match Ed25519PublicKey::from_encoded_string(pub_key) {
-                Ok(pub_key) => Some(AuthenticationKey::ed25519(&pub_key).derived_address()),
+                Ok(pub_key) => Some(AuthenticationKey::ed25519(&pub_key).account_address()),
                 Err(_) => None,
             };
         }

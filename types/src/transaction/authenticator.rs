@@ -370,14 +370,6 @@ impl fmt::Display for TransactionAuthenticator {
     }
 }
 
-/// An `AccountAuthenticator` is an an abstraction of a signature scheme. It must know:
-/// (1) How to check its signature against a message and public key
-/// (2) How to convert its public key into an `AuthenticationKeyPreimage` structured as
-/// (public_key | signaure_scheme_id).
-/// Each on-chain `Account` must store an `AuthenticationKey` (computed via a sha3 hash of an
-/// `AuthenticationKeyPreimage`).
-
-// TODO: in the future, can tie these to the AccountAuthenticator enum directly with https://github.com/rust-lang/rust/issues/60553
 #[derive(Debug)]
 #[repr(u8)]
 pub enum Scheme {
@@ -388,6 +380,7 @@ pub enum Scheme {
     /// resources accounts. This application serves to domain separate hashes. Without such
     /// separation, an adversary could create (and get a signer for) a these accounts
     /// when a their address matches matches an existing address of a MultiEd25519 wallet.
+    /// Add new derived schemes below.
     DeriveAuid = 251,
     DeriveObjectAddressFromObject = 252,
     DeriveObjectAddressFromGuid = 253,
@@ -411,6 +404,12 @@ impl fmt::Display for Scheme {
     }
 }
 
+/// An `AccountAuthenticator` is an an abstraction of a signature scheme. It must know:
+/// (1) How to check its signature against a message and public key
+/// (2) How to convert its public key into an `AuthenticationKeyPreimage` structured as
+/// (public_key | signature_scheme_id).
+/// Each on-chain `Account` must store an `AuthenticationKey` (computed via a sha3 hash of `(public
+/// key bytes | scheme as u8)`).
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum AccountAuthenticator {
     /// Ed25519 Single signature
@@ -542,7 +541,7 @@ pub struct AuthenticationKey([u8; AuthenticationKey::LENGTH]);
 
 impl AuthenticationKey {
     /// The number of bytes in an authentication key.
-    pub const LENGTH: usize = 32;
+    pub const LENGTH: usize = AccountAddress::LENGTH;
 
     /// Create an authentication key from `bytes`
     pub const fn new(bytes: [u8; Self::LENGTH]) -> Self {
@@ -584,20 +583,9 @@ impl AuthenticationKey {
         Self::from_preimage(public_key.to_bytes().to_vec(), Scheme::Secp256k1Ecdsa)
     }
 
-    /// Return an address derived from the last `AccountAddress::LENGTH` bytes of this
-    /// authentication key.
-    pub fn derived_address(&self) -> AccountAddress {
-        // keep only last AccountAddress::LENGTH bytes
-        let mut array = [0u8; AccountAddress::LENGTH];
-        array.copy_from_slice(&self.0[AuthenticationKey::LENGTH - AccountAddress::LENGTH..]);
-        AccountAddress::new(array)
-    }
-
-    /// Return the first self::LENGTH - AccountAddress::LENGTH bytes of this authentication key
-    pub fn prefix(&self) -> [u8; AuthenticationKey::LENGTH - AccountAddress::LENGTH] {
-        let mut array = [0u8; AuthenticationKey::LENGTH - AccountAddress::LENGTH];
-        array.copy_from_slice(&self.0[..(AuthenticationKey::LENGTH - AccountAddress::LENGTH)]);
-        array
+    /// Return the authentication key as an account address
+    pub fn account_address(&self) -> AccountAddress {
+        AccountAddress::new(self.0)
     }
 
     /// Construct a vector from this authentication key
