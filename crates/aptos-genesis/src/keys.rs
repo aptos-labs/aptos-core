@@ -41,7 +41,7 @@ pub fn generate_key_objects(
     let validator_network_key = ConfigKey::new(keygen.generate_x25519_private_key()?);
     let full_node_network_key = ConfigKey::new(keygen.generate_x25519_private_key()?);
 
-    let account_address = AuthenticationKey::ed25519(&account_key.public_key()).derived_address();
+    let account_address = AuthenticationKey::ed25519(&account_key.public_key()).account_address();
 
     // Build these for use later as node identity
     let validator_blob = IdentityBlob {

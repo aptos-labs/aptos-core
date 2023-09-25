@@ -82,7 +82,7 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
                     init_validator_account(&mut cli, &mut keygen).await;
 
                 let auth_key = AuthenticationKey::ed25519(&keys.account_private_key.public_key());
-                let validator_account_address = AccountAddress::new(*auth_key.derived_address());
+                let validator_account_address = AccountAddress::new(*auth_key.account_address());
 
                 public_info
                     .mint(validator_account_address, DEFAULT_FUNDED_COINS)

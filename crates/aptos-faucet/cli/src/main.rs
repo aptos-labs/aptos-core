@@ -61,7 +61,7 @@ impl FaucetCliArgs {
         // Build the account that the MintFunder will use.
         let faucet_account = LocalAccount::new(
             self.mint_account_address.unwrap_or_else(|| {
-                AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).derived_address()
+                AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
             }),
             key,
             0,

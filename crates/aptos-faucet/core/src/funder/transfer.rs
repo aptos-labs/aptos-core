@@ -349,7 +349,7 @@ impl FunderTrait for TransferFunder {
 fn account_address_from_private_key(private_key: &Ed25519PrivateKey) -> AccountAddress {
     let public_key = private_key.public_key();
     let auth_key = AuthenticationKey::ed25519(&public_key);
-    AccountAddress::new(*auth_key.derived_address())
+    AccountAddress::new(*auth_key.account_address())
 }
 
 // Use newtypes so we don't accidentally mix these up.
