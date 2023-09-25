@@ -602,7 +602,7 @@ serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev =
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
 serde_yaml = "0.8.24"
 shadow-rs = "0.16.2"
-smallvec = "1.8.0"
+smallvec = "1.11.1"
 static_assertions = "1.1.0"
 stats_alloc = "0.1.8"
 status-line = "0.2.0"

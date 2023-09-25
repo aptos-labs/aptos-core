@@ -21,7 +21,7 @@ move-vm-runtime = { path = "../../../move-vm/runtime", features = ["debugging"] 
 move-vm-test-utils = { path = "../../../move-vm/test-utils" }
 move-vm-types = { path = "../../../move-vm/types" }
 sha3 = "0.9.1"
-smallvec = "1.6.1"
+smallvec = "1.11.1"
 walkdir = "2.3.1"
 
 bcs = { workspace = true }
