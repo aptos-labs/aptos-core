@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    adapter_common::{discard_error_output, discard_error_vm_status, VMAdapter},
+    adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     counters::*,
@@ -104,6 +104,16 @@ pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 static MODULE_BUNDLE_DISALLOWED: AtomicBool = AtomicBool::new(true);
 pub fn allow_module_bundle_for_test() {
     MODULE_BUNDLE_DISALLOWED.store(false, Ordering::Relaxed);
+}
+
+fn discard_error_vm_status(err: VMStatus) -> (VMStatus, VMOutput) {
+    let vm_status = err.clone();
+    (vm_status, discard_error_output(err.status_code()))
+}
+
+fn discard_error_output(err: StatusCode) -> VMOutput {
+    // Since this transaction will be discarded, no write set will be included.
+    VMOutput::empty_with_status(TransactionStatus::Discard(err))
 }
 
 pub struct AptosVM(pub(crate) AptosVMImpl);
@@ -219,6 +229,15 @@ impl AptosVM {
             Some(value) => *value,
             None => false,
         }
+    }
+
+    pub fn should_restart_execution(vm_output: &VMOutput) -> bool {
+        let new_epoch_event_key = new_epoch_event_key();
+        vm_output
+            .change_set()
+            .events()
+            .iter()
+            .any(|event| event.event_key() == Some(&new_epoch_event_key))
     }
 
     pub fn internals(&self) -> AptosVMInternals {
@@ -1772,15 +1791,6 @@ impl VMAdapter for AptosVM {
         }
 
         Ok(())
-    }
-
-    fn should_restart_execution(vm_output: &VMOutput) -> bool {
-        let new_epoch_event_key = aptos_types::on_chain_config::new_epoch_event_key();
-        vm_output
-            .change_set()
-            .events()
-            .iter()
-            .any(|event| event.event_key() == Some(&new_epoch_event_key))
     }
 
     fn execute_single_transaction(
