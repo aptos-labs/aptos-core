@@ -109,7 +109,7 @@ impl ChunkOutput {
                 maybe_block_gas_limit,
             )?;
             let duration = timer.stop_and_record();
-            println!("[TTT] chunk_output__execution_sharded___main={}ms", duration * 1000.0);
+            // println!("[TTTT] block_id={}, chunk_output__execution_sharded___main={}ms", hex::encode(transactions.block_id), (duration * 1000.0) as u64);
             ret
         };
 

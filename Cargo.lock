@@ -1191,6 +1191,7 @@ dependencies = [
  "bcs 0.1.4",
  "dashmap",
  "fail 0.5.0",
+ "hex",
  "itertools",
  "move-core-types",
  "num_cpus",

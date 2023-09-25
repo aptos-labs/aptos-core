@@ -25,22 +25,25 @@ pub struct PartitionerV3B {}
 
 impl aptos_block_partitioner::BlockPartitioner for PartitionerV3B {
     fn partition(&self, block_id: [u8; 32], transactions: Vec<AnalyzedTransaction>, num_shards: usize) -> PartitionedTransactions {
-        for (tid, txn) in transactions.iter().enumerate() {
-            let sender = txn.sender();
-            let seqnum = txn.transaction().try_as_signed_user_txn().map(|t| t.sequence_number());
-            // for loc in txn.write_hints.iter() {
-            //     println!("BEFORE - tid={}, sender={:?}, seq={:?}, write={}", tid, sender, seqnum, loc.state_key().hash());
-            // }
-            // for loc in txn.read_hints.iter() {
-            //     println!("BEFORE - tid={}, sender={:?}, seq={:?}, read={}", tid, sender, seqnum, loc.state_key().hash());
-            // }
-        }
+        // for (tid, txn) in transactions.iter().enumerate() {
+        //     let sender = txn.sender();
+        //     let seqnum = txn.transaction().try_as_signed_user_txn().map(|t| t.sequence_number());
+        //     for loc in txn.write_hints.iter() {
+        //         println!("BEFORE - tid={}, sender={:?}, seq={:?}, write={}", tid, sender, seqnum, loc.state_key().hash());
+        //     }
+        //     for loc in txn.read_hints.iter() {
+        //         println!("BEFORE - tid={}, sender={:?}, seq={:?}, read={}", tid, sender, seqnum, loc.state_key().hash());
+        //     }
+        // }
         let block_size = transactions.len();
-        let min_ordered_transaction_before_execution = min(100, block_size);
+        let min_ordered_transaction_before_execution = std::env::var("V3B__MIN_ORDERED_BEFORE_EXECUTION").ok().map(|v|v.parse::<usize>().unwrap_or(100)).unwrap_or(100);
+        let max_window_size = std::env::var("V3B__MAX_WINDOW_SIZE").ok().map(|v|v.parse::<usize>().unwrap_or(1000)).unwrap_or(1000);
+        println!("V3B configs: max_window_size={}, min_ordered_transaction_before_execution={}", max_window_size, min_ordered_transaction_before_execution);
+
         let block_orderer = BatchedBlockOrdererWithWindow::new(
             SequentialDynamicAriaOrderer::with_window(),
             min_ordered_transaction_before_execution * 5,
-            1000,
+            max_window_size,
         );
         let block_partitioner = OrderedRoundRobinPartitioner::new(
             block_orderer,

@@ -34,9 +34,11 @@ impl BlockPartitioningStage {
             partitioner: if _partitioner_config {
                 match std::env::var("V3B") {
                     Ok(v) if v.as_str() == "1" => {
+                        println!("Using V3b.");
                         Some(Box::new(PartitionerV3B{}))
                     },
                     _ => {
+                        println!("Using V3.");
                         Some(Box::new(PartitionerV3{}))
                     }
                 }

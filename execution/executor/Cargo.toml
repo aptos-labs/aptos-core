@@ -32,6 +32,7 @@ arr_macro = { workspace = true }
 bcs = { workspace = true }
 dashmap = { workspace = true }
 fail = { workspace = true }
+hex = { workspace = true }
 itertools = { workspace = true }
 move-core-types = { workspace = true }
 num_cpus = { workspace = true }
