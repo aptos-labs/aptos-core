@@ -568,7 +568,7 @@ prost-types = "0.12.1"
 quanta = "0.10.1"
 quote = "1.0.18"
 rand = "0.7.3"
-rand_core = "0.5.1"
+rand_core = "0.6.4"
 random_word = "0.3.0"
 rayon = "1.5.2"
 redis = { version = "0.22.3", features = ["tokio-comp", "script", "connection-manager"] }
