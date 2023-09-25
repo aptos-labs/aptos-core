@@ -93,7 +93,7 @@ Module event feature is not supported.
 
 ## Function `emit`
 
-Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s key and counter.
+Emit a module event with payload <code>msg</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: drop, store&gt;(msg: T)
