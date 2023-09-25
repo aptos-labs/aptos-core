@@ -526,5 +526,5 @@ fn open_ledger_transport() -> Result<TransportNativeHID, AptosLedgerError> {
 
 fn account_address_from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
     let auth_key = AuthenticationKey::ed25519(public_key);
-    AccountAddress::new(*auth_key.derived_address())
+    AccountAddress::new(*auth_key.account_address())
 }
