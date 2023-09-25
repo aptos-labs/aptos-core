@@ -6,15 +6,20 @@ use crate::{
     logging::{LogEntry, LogEvent, LogSchema},
 };
 use aptos_config::{
-    config::BaseConfig,
+    config::{AptosDataClientConfig, BaseConfig},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_logger::warn;
+use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::application::storage::PeersAndMetadata;
 use itertools::Itertools;
+use maplit::hashset;
+use ordered_float::OrderedFloat;
 use rand::seq::{IteratorRandom, SliceRandom};
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, sync::Arc, time::Duration};
+
+// Useful constants
+const ERROR_LOG_FREQ_SECS: u64 = 3;
 
 /// Returns true iff the given peer is high-priority.
 ///
@@ -61,6 +66,94 @@ pub fn is_priority_peer(
     false
 }
 
+/// Selects the peer with the lowest latency from the list of specified peers
+pub fn choose_lowest_latency_peer(
+    peers: HashSet<PeerNetworkId>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
+) -> Option<PeerNetworkId> {
+    let mut lowest_latency_peer = None;
+    let mut lowest_latency = f64::MAX;
+    for peer in &peers {
+        if let Some(latency) = get_latency_for_peer(&peers_and_metadata, *peer) {
+            if latency < lowest_latency {
+                lowest_latency_peer = Some(*peer);
+                lowest_latency = latency;
+            }
+        }
+    }
+
+    lowest_latency_peer
+}
+
+/// Selects the specified number of peers from the list of potential
+/// peers. Peer selection is weighted by peer latencies (i.e., the
+/// lower the latency, the higher the probability of selection).
+///
+/// If `ignore_high_latency_peers` is true, the list of potential peers
+/// may be filtered to only include a subset of peers with lower latencies.
+/// This helps to avoid sub-optimal peer selection and bad tail behaviours.
+pub fn choose_peers_by_latency(
+    data_client_config: Arc<AptosDataClientConfig>,
+    num_peers_to_choose: u64,
+    potential_peers: HashSet<PeerNetworkId>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
+    ignore_high_latency_peers: bool,
+) -> HashSet<PeerNetworkId> {
+    // If no peers can be chosen, return an empty set
+    if num_peers_to_choose == 0 || potential_peers.is_empty() {
+        return hashset![];
+    }
+
+    // Gather the latency weights for all potential peers
+    let mut potential_peers_and_latency_weights = vec![];
+    for peer in potential_peers {
+        if let Some(latency) = get_latency_for_peer(&peers_and_metadata, peer) {
+            let latency_weight = 1000.0 / latency; // Invert the latency to get the weight
+            potential_peers_and_latency_weights.push((peer, OrderedFloat(latency_weight)));
+        }
+    }
+
+    // Determine the number of peers to consider. If high latency peers can be
+    // ignored, we only want to consider a subset of peers with the lowest
+    // latencies. However, this can only be done if we have a large total
+    // number of peers, and there are enough potential peers for each request.
+    let mut num_peers_to_consider = potential_peers_and_latency_weights.len() as u64;
+    if ignore_high_latency_peers {
+        let peer_ratio_per_request = num_peers_to_consider / num_peers_to_choose;
+        if num_peers_to_consider >= data_client_config.min_peers_for_latency_filtering
+            && peer_ratio_per_request >= data_client_config.min_peer_ratio_for_latency_filtering
+        {
+            // Consider a subset of peers with the lowest latencies
+            num_peers_to_consider /= data_client_config.latency_filtering_reduction_factor
+        }
+    }
+
+    // Sort the peers by latency weights and take the number of peers to consider
+    potential_peers_and_latency_weights.sort_by_key(|(_, latency_weight)| *latency_weight);
+    let potential_peers_and_latency_weights = potential_peers_and_latency_weights
+        .into_iter()
+        .take(num_peers_to_consider as usize)
+        .map(|(peer, latency_weight)| (peer, latency_weight.into_inner()))
+        .collect::<Vec<_>>();
+
+    // Select the peers by latency weights
+    choose_random_peers_by_weight(num_peers_to_choose, potential_peers_and_latency_weights)
+        .unwrap_or_else(|error| {
+            // Log the error
+            log_warning_with_sample(
+                LogSchema::new(LogEntry::PeerStates)
+                    .event(LogEvent::PeerSelectionError)
+                    .message(&format!(
+                        "Unable to select peer by latencies! Error: {:?}",
+                        error
+                    )),
+            );
+
+            // No peer was selected
+            hashset![]
+        })
+}
+
 /// Selects a single peer randomly from the list of specified peers
 pub fn choose_random_peer(peers: HashSet<PeerNetworkId>) -> Option<PeerNetworkId> {
     peers.into_iter().choose(&mut rand::thread_rng())
@@ -91,6 +184,47 @@ pub fn choose_random_peers_by_weight(
         )
         .map(|peers| peers.into_iter().map(|peer| peer.0).collect())
         .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))
+}
+
+/// Gets the latency for the specified peer from the peer monitoring metadata
+fn get_latency_for_peer(
+    peers_and_metadata: &Arc<PeersAndMetadata>,
+    peer: PeerNetworkId,
+) -> Option<f64> {
+    match peers_and_metadata.get_metadata_for_peer(peer) {
+        Ok(peer_metadata) => {
+            let peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata();
+            if let Some(latency) = peer_monitoring_metadata.average_ping_latency_secs {
+                return Some(latency);
+            } else {
+                log_warning_with_sample(
+                    LogSchema::new(LogEntry::PeerStates)
+                        .event(LogEvent::PeerSelectionError)
+                        .message(&format!("Unable to get latency for peer! Peer: {:?}", peer)),
+                );
+            }
+        },
+        Err(error) => {
+            log_warning_with_sample(
+                LogSchema::new(LogEntry::PeerStates)
+                    .event(LogEvent::PeerSelectionError)
+                    .message(&format!(
+                        "Unable to get peer metadata! Peer: {:?}, Error: {:?}",
+                        peer, error
+                    )),
+            );
+        },
+    }
+
+    None // No latency was found
+}
+
+/// Logs the given schema as a warning with a sampled frequency
+fn log_warning_with_sample(log: LogSchema) {
+    sample!(
+        SampleRate::Duration(Duration::from_secs(ERROR_LOG_FREQ_SECS)),
+        warn!(log);
+    );
 }
 
 #[cfg(test)]

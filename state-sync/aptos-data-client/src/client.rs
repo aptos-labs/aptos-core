@@ -178,6 +178,24 @@ impl AptosDataClient {
         Ok(())
     }
 
+    /// Chooses the peer with the lowest latency from the given set of serviceable peers
+    fn choose_lowest_latency_peer(
+        &self,
+        request: &StorageServiceRequest,
+        serviceable_peers: HashSet<PeerNetworkId>,
+    ) -> Result<PeerNetworkId, Error> {
+        // Choose the peer with the lowest latency
+        if let Some(peer) = utils::choose_lowest_latency_peer(
+            serviceable_peers.clone(),
+            self.get_peers_and_metadata(),
+        ) {
+            return Ok(peer); // Return the peer if we found one
+        }
+
+        // Otherwise, simply select a peer at random
+        self.choose_random_peer(request, serviceable_peers)
+    }
+
     /// Choose a connected peer that can service the given request.
     /// Returns an error if no such peer can be found.
     pub(crate) fn choose_peer_for_request(
@@ -196,14 +214,14 @@ impl AptosDataClient {
 
         // Identify the peer based on the request type
         if request.data_request.is_subscription_request() {
+            // Choose a peer to handle the subscription request
             self.choose_peer_for_subscription_request(request, serviceable_peers)
+        } else if request.data_request.is_optimistic_fetch() {
+            // Choose the peer with the lowest latency for the optimistic fetch
+            self.choose_lowest_latency_peer(request, serviceable_peers)
         } else {
-            utils::choose_random_peer(serviceable_peers).ok_or_else(|| {
-                Error::DataIsUnavailable(format!(
-                    "No peers are advertising that they can serve the data! Request: {:?}",
-                    request
-                ))
-            })
+            // Choose the peer randomly weighted by latency
+            self.choose_random_peer_by_latency(request, serviceable_peers)
         }
     }
 
@@ -258,16 +276,47 @@ impl AptosDataClient {
         }
 
         // Otherwise, we need to choose a new peer and update the subscription state
-        let peer_network_id = utils::choose_random_peer(serviceable_peers).ok_or_else(|| {
-            Error::DataIsUnavailable(format!(
-                "No peers are advertising that they can serve the subscription! Request: {:?}",
-                request
-            ))
-        })?;
+        let peer_network_id = self.choose_lowest_latency_peer(request, serviceable_peers)?;
         let subscription_state = SubscriptionState::new(peer_network_id, request_stream_id);
         *active_subscription_state = Some(subscription_state);
 
         Ok(peer_network_id)
+    }
+
+    /// Chooses a peer at random from the given set of serviceable peers
+    fn choose_random_peer(
+        &self,
+        request: &StorageServiceRequest,
+        serviceable_peers: HashSet<PeerNetworkId>,
+    ) -> Result<PeerNetworkId, Error> {
+        utils::choose_random_peer(serviceable_peers).ok_or_else(|| {
+            Error::DataIsUnavailable(format!(
+                "Unable to select random peer for request: {:?}",
+                request
+            ))
+        })
+    }
+
+    /// Chooses a peer randomly weighted by latency from the given set of serviceable peers
+    fn choose_random_peer_by_latency(
+        &self,
+        request: &StorageServiceRequest,
+        serviceable_peers: HashSet<PeerNetworkId>,
+    ) -> Result<PeerNetworkId, Error> {
+        // Choose a peer weighted by latency
+        let peer_set = utils::choose_peers_by_latency(
+            self.data_client_config.clone(),
+            1,
+            serviceable_peers.clone(),
+            self.get_peers_and_metadata(),
+            true,
+        );
+        if let Some(peer) = peer_set.into_iter().next() {
+            return Ok(peer); // Return the peer if we found one
+        }
+
+        // Otherwise, simply select a peer at random
+        self.choose_random_peer(request, serviceable_peers)
     }
 
     /// Identifies the peers in the given set of prospective peers
