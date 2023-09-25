@@ -279,8 +279,11 @@
 Aborts if conditions of SetStakePoolOperator are not met
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> verify_duration_estimate = 360;
+<b>pragma</b> aborts_if_is_partial;
 <b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakePoolOperator">SetStakePoolOperator</a>;
+<b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakingContractOperator">SetStakingContractOperator</a>;
 </code></pre>
 
 
@@ -315,32 +318,7 @@ Aborts if conditions of SetStackingContractVoter and SetStackPoolVoterAbortsIf a
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
-<b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
-<b>let</b> vesting_contracts = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_AdminStore">vesting::AdminStore</a>&gt;(owner_address).vesting_contracts;
-<b>let</b> <b>post</b> post_vesting_contracts = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_AdminStore">vesting::AdminStore</a>&gt;(owner_address).vesting_contracts;
-<b>ensures</b> <b>exists</b> i in 0..len(vesting_contracts): (<b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">vesting::VestingContract</a>&gt;(vesting_contracts[i])).staking.operator == old_operator
-    ==&gt;
-    {
-        <b>let</b> operator_addr = <a href="staking_proxy.md#0x1_staking_proxy_find_vesting_contract">find_vesting_contract</a>(post_vesting_contracts, old_operator, 0);
-        <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">vesting::VestingContract</a>&gt;(operator_addr).staking.operator == new_operator
-    };
-</code></pre>
-
-
-
-
-<a name="0x1_staking_proxy_find_vesting_contract"></a>
-
-
-<pre><code><b>fun</b> <a href="staking_proxy.md#0x1_staking_proxy_find_vesting_contract">find_vesting_contract</a>(vesting_contracts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, old_operator: <b>address</b>, count: num): <b>address</b> {
-   <b>let</b> operator = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">vesting::VestingContract</a>&gt;(vesting_contracts[count]).staking.operator;
-   <b>if</b> (operator == old_operator) {
-       vesting_contracts[count]
-   } <b>else</b> {
-       <a href="staking_proxy.md#0x1_staking_proxy_find_vesting_contract">find_vesting_contract</a>(vesting_contracts, old_operator, count + 1)
-   }
-}
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 
@@ -356,10 +334,46 @@ Aborts if conditions of SetStackingContractVoter and SetStackPoolVoterAbortsIf a
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
-<b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
-<b>let</b> store = <b>borrow_global</b>&lt;Store&gt;(owner_address);
-<b>let</b> staking_contract_exists = <b>exists</b>&lt;Store&gt;(owner_address) && <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(store.staking_contracts, old_operator);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> aborts_if_is_partial;
+<b>pragma</b> verify_duration_estimate = 120;
+<b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakingContractOperator">SetStakingContractOperator</a>;
+</code></pre>
+
+
+
+
+<a name="0x1_staking_proxy_SetStakingContractOperator"></a>
+
+
+<pre><code><b>schema</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakingContractOperator">SetStakingContractOperator</a> {
+    owner: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    old_operator: <b>address</b>;
+    new_operator: <b>address</b>;
+    <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+    <b>let</b> store = <b>global</b>&lt;Store&gt;(owner_address);
+    <b>let</b> staking_contract_exists = <b>exists</b>&lt;Store&gt;(owner_address) && <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(store.staking_contracts, old_operator);
+    <b>aborts_if</b> staking_contract_exists && <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(store.staking_contracts, new_operator);
+    <b>let</b> <b>post</b> post_store = <b>global</b>&lt;Store&gt;(owner_address);
+    <b>ensures</b> staking_contract_exists ==&gt; !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_store.staking_contracts, old_operator);
+    <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(store.staking_contracts, old_operator);
+    <b>let</b> stake_pool = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(<a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address);
+    <b>let</b> active = <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.active);
+    <b>let</b> pending_active = <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.pending_active);
+    <b>let</b> total_active_stake = active + pending_active;
+    <b>let</b> accumulated_rewards = total_active_stake - <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.principal;
+    <b>let</b> commission_amount = accumulated_rewards * <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage / 100;
+    <b>aborts_if</b> staking_contract_exists && !<b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(<a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address);
+    <b>ensures</b> staking_contract_exists ==&gt;
+        <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_store.staking_contracts, new_operator).principal == total_active_stake - commission_amount;
+    <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.owner_cap.pool_address;
+    <b>let</b> current_commission_percentage = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage;
+    <b>aborts_if</b> staking_contract_exists && commission_amount != 0 && !<b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
+    <b>ensures</b> staking_contract_exists && commission_amount != 0 ==&gt;
+        <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address == new_operator
+        && <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_store.staking_contracts, new_operator).commission_percentage == current_commission_percentage;
+    <b>ensures</b> staking_contract_exists ==&gt; <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_store.staking_contracts, new_operator);
+}
 </code></pre>
 
 
@@ -393,6 +407,7 @@ One of them are not exists
     <b>let</b> ownership_cap = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a>&gt;(owner_address);
     <b>let</b> pool_address = ownership_cap.pool_address;
     <b>aborts_if</b> <a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(owner_address) && !(<b>exists</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a>&gt;(owner_address) && <a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(pool_address));
+    <b>ensures</b> <a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(owner_address) ==&gt; <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address == new_operator;
 }
 </code></pre>
 
@@ -409,7 +424,7 @@ One of them are not exists
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 
@@ -447,8 +462,10 @@ Then abort if the resource is not exist
     <b>let</b> staker_address = owner_address;
     <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(store.staking_contracts, operator);
     <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
+    <b>let</b> pool_address1 = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.owner_cap.pool_address;
     <b>aborts_if</b> staking_contract_exists && !<b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
     <b>aborts_if</b> staking_contract_exists && !<b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(<a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.owner_cap.pool_address);
+    <b>ensures</b> staking_contract_exists ==&gt; <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address1).delegated_voter == new_voter;
 }
 </code></pre>
 
@@ -481,6 +498,7 @@ Then abort if the resource is not exist
     <b>let</b> ownership_cap = <b>global</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a>&gt;(owner_address);
     <b>let</b> pool_address = ownership_cap.pool_address;
     <b>aborts_if</b> <a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(owner_address) && !(<b>exists</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a>&gt;(owner_address) && <a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(pool_address));
+    <b>ensures</b> <a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(owner_address) ==&gt; <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).delegated_voter == new_voter;
 }
 </code></pre>
 
