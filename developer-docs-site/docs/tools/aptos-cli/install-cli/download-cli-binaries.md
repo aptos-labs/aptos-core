@@ -45,13 +45,13 @@ dyld[81095]: Library not loaded: /usr/local/opt/openssl@3/lib/libssl.3.dylib
 [1]    81095 abort      aptos
 ```
 
-Install `openssl3` with the following command:
-1. Download latest version from https://www.openssl.org/source/
-2. Unzip the downloaded file
-3. `cd` into the unzipped folder e.g. `cd openssl-3.1.2`
-4. Run `./config --prefix /usr/local darwin64-x86_64-cc` configure openssl3
-5. Run `make` to build openssl3
-6. Run `sudo make install` to install openssl3. Notice that `sudo` is required to install openssl3 to `/usr/local` folder.
+Take the following steps to install `openssl3`:
+1. Download the latest version from [OpenSSL](https://www.openssl.org/source).
+2. Unzip the downloaded file.
+3. `cd` into the unzipped folder, for example: `cd openssl-3.1.2`
+4. Run `./config --prefix /usr/local darwin64-x86_64-cc` to configure openssl3.
+5. Run `make` to build openssl3.
+6. Run `sudo make install` to install openssl3. Notice that `sudo` is required to install openssl3 to the `/usr/local` folder.
 7. Run `openssl version` to verify the installation. You should see something similar to the following output:
 ```
 OpenSSL 3.1.2 1 Aug 2023
