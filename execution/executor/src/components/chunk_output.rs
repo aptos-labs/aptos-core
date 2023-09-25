@@ -102,12 +102,15 @@ impl ChunkOutput {
     ) -> Result<Self> {
         let state_view_arc = Arc::new(state_view);
         let transaction_outputs = {
-            let _timer = SHARDING_V3_SPAN_SECONDS.with_label_values(&["chunk_output__execution_sharded___main"]).start_timer();
-            Self::execute_block_sharded::<V>(
+            let timer = SHARDING_V3_SPAN_SECONDS.with_label_values(&["chunk_output__execution_sharded___main"]).start_timer();
+            let ret = Self::execute_block_sharded::<V>(
                 transactions.clone(),
                 state_view_arc.clone(),
                 maybe_block_gas_limit,
-            )?
+            )?;
+            let duration = timer.stop_and_record();
+            println!("[TTT] chunk_output__execution_sharded___main={}ms", duration * 1000.0);
+            ret
         };
 
         // TODO(skedia) add logic to emit counters per shard instead of doing it globally.
