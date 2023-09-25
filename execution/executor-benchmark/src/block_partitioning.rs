@@ -13,6 +13,7 @@ use std::time::Instant;
 use aptos_crypto::hash::CryptoHash;
 use aptos_streaming_partitioner::{PartitionerV3, SerializationIdx, StreamingTransactionPartitioner, transaction_graph_partitioner};
 use aptos_streaming_partitioner::transaction_graph_partitioner::TransactionGraphPartitioner;
+use aptos_transaction_orderer::PartitionerV3B;
 use aptos_types::batched_stream::BatchedStream;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use aptos_transaction_orderer::transaction_compressor::CompressedPTransaction;
@@ -22,7 +23,7 @@ use move_core_types::account_address::AccountAddress;
 pub(crate) struct BlockPartitioningStage {
     num_executor_shards: usize,
     num_blocks_processed: usize,
-    partitioner: Option<PartitionerV3>,
+    partitioner: Option<Box<dyn BlockPartitioner>>,
 }
 
 impl BlockPartitioningStage {
@@ -30,7 +31,18 @@ impl BlockPartitioningStage {
         Self {
             num_executor_shards: num_shards,
             num_blocks_processed: 0,
-            partitioner: if _partitioner_config { Some(PartitionerV3{}) } else { None },
+            partitioner: if _partitioner_config {
+                match std::env::var("V3B") {
+                    Ok(v) if v.as_str() == "1" => {
+                        Some(Box::new(PartitionerV3B{}))
+                    },
+                    _ => {
+                        Some(Box::new(PartitionerV3{}))
+                    }
+                }
+            } else {
+                None
+            },
         }
     }
 

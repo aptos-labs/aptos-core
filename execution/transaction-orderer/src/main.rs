@@ -71,7 +71,7 @@ fn main() {
     );
 
     let now = Instant::now();
-    let transactions = compress_transactions(transactions);
+    let (transactions, compressor) = compress_transactions(transactions);
     println!("Mapping time: {:?}", now.elapsed());
 
     for _ in 0..args.num_blocks {
