@@ -133,7 +133,7 @@ We are aware of the confusion this might create, and plan to present these as se
 
 If a transaction deletes state items, a refund is issued to the transaction payer for the released storage slots. Currently a full refund for the fee charged for the slot is issued, not including any fee charged for the execess bytes beyond a configurable quota (for e.g. 1KB). There's no refund for storage fee charged for event emittions.
 
-Note that the amount of refund is in APT value, and is not converted to gas units or reflected as part of the total `gas_used`. The amount is separately represented in the `storage_fee_refund_octas` field of the [`FeeStatement`](#the-fee-statement). As a result, the net effect of a transaction to the transaction payer's APT balance is `gas_used * gas_unit_price - storage_refund` -- a charge off the account balance if this number is positive or a deposit if it's negative. 
+The amount of refund is in APT value, and is not converted to gas units or reflected as part of the total `gas_used`. The amount is separately represented in the `storage_fee_refund_octas` field of the [`FeeStatement`](#the-fee-statement). As a result, a transactions net effect of to the transaction payer's APT balance is `gas_used * gas_unit_price - storage_refund` -- a charge off the account balance if this number is positive or a deposit if it's negative. 
 
 
 ## Examples
