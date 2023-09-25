@@ -69,7 +69,7 @@ impl LoggerConfig {
 
 impl ConfigSanitizer for LoggerConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {
@@ -188,7 +188,7 @@ mod tests {
     #[test]
     fn test_sanitize_missing_feature() {
         // Create a logger config with the tokio console port set
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             logger: LoggerConfig {
                 tokio_console_port: Some(100),
                 ..Default::default()
@@ -197,9 +197,8 @@ mod tests {
         };
 
         // Verify that the config fails sanitization (the tokio-console feature is missing!)
-        let error =
-            LoggerConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::testnet())
-                .unwrap_err();
+        let error = LoggerConfig::sanitize(&node_config, NodeType::Validator, ChainId::testnet())
+            .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 }

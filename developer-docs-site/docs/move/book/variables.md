@@ -714,25 +714,33 @@ before it is assigned a value.
 As mentioned above, the Move compiler will infer a `copy` or `move` if one is not indicated. The
 algorithm for doing so is quite simple:
 
-- Any scalar value with the `copy` [ability](./abilities.md) is given a `copy`.
+- Any value with the `copy` [ability](./abilities.md) is given a `copy`.
 - Any reference (both mutable `&mut` and immutable `&`) is given a `copy`.
   - Except under special circumstances where it is made a `move` for predictable borrow checker
     errors.
 - Any other value is given a `move`.
-  - This means that even though other values might be have the `copy` [ability](./abilities.md), it
-    must be done _explicitly_ by the programmer.
-  - This is to prevent accidental copies of large data structures.
+- If the compiler can prove that the source value with copy ability is not used after the 
+  assignment, then a move may be used instead of a copy for performance, but this will be invisible
+  to the programmer (except in possible decreased time or gas cost).
 
 For example:
 
 ```move
+struct Foo {
+    f: u64
+}
+
+struct Coin has copy {
+    value: u64
+}
+
 let s = b"hello";
 let foo = Foo { f: 0 };
 let coin = Coin { value: 0 };
 
-let s2 = s; // move
+let s2 = s; // copy
 let foo2 = foo; // move
-let coin2 = coin; // move
+let coin2 = coin; // copy
 
 let x = 0;
 let b = false;

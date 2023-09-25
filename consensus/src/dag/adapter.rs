@@ -32,26 +32,29 @@ use async_trait::async_trait;
 use futures_channel::mpsc::UnboundedSender;
 use std::{collections::HashMap, sync::Arc};
 
-#[async_trait]
-pub trait Notifier: Send + Sync {
+pub trait OrderedNotifier: Send + Sync {
     fn send_ordered_nodes(
         &self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
     ) -> anyhow::Result<()>;
+}
 
+#[async_trait]
+pub trait ProofNotifier: Send + Sync {
     async fn send_epoch_change(&self, proof: EpochChangeProof);
 
     async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures);
 }
-pub struct NotifierAdapter {
+
+pub struct OrderedNotifierAdapter {
     executor_channel: UnboundedSender<OrderedBlocks>,
     storage: Arc<dyn DAGStorage>,
     parent_block_id: Arc<RwLock<HashValue>>,
     epoch_state: Arc<EpochState>,
 }
 
-impl NotifierAdapter {
+impl OrderedNotifierAdapter {
     pub fn new(
         executor_channel: UnboundedSender<OrderedBlocks>,
         storage: Arc<dyn DAGStorage>,
@@ -81,8 +84,7 @@ impl NotifierAdapter {
     }
 }
 
-#[async_trait]
-impl Notifier for NotifierAdapter {
+impl OrderedNotifier for OrderedNotifierAdapter {
     fn send_ordered_nodes(
         &self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
@@ -154,14 +156,6 @@ impl Notifier for NotifierAdapter {
                 },
             ),
         })?)
-    }
-
-    async fn send_epoch_change(&self, _proof: EpochChangeProof) {
-        todo!()
-    }
-
-    async fn send_commit_proof(&self, _ledger_info: LedgerInfoWithSignatures) {
-        todo!()
     }
 }
 
