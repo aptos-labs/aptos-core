@@ -5,9 +5,9 @@
  * general namespace and without having a dependency cycle error.
  */
 
-import { AptosConfig } from "../api";
+import { AptosConfig } from "../api/aptos_config";
 import { get, post } from "../client";
-import { Block, LedgerInfo, LedgerVersion, MoveValue, TableItemRequest, ViewRequest } from "../types";
+import { Block, GraphqlQuery, LedgerInfo, LedgerVersion, MoveValue, TableItemRequest, ViewRequest } from "../types";
 import { AptosApiType } from "../utils/const";
 
 export async function getLedgerInfo(args: { aptosConfig: AptosConfig }): Promise<LedgerInfo> {
@@ -84,6 +84,22 @@ export async function view(args: {
     originMethod: "view",
     params: { ledger_version: options?.ledgerVersion },
     overrides: { ...aptosConfig.clientConfig },
+  });
+  return data;
+}
+
+export async function queryIndexer<T>(args: {
+  aptosConfig: AptosConfig;
+  query: GraphqlQuery;
+  originMethod?: string;
+}): Promise<T> {
+  const { aptosConfig, query, originMethod } = args;
+  const { data } = await post<GraphqlQuery, T>({
+    url: aptosConfig.getRequestUrl(AptosApiType.INDEXER),
+    body: query,
+    originMethod: originMethod ?? "queryIndexer",
+    overrides: { WITH_CREDENTIALS: false, ...aptosConfig.clientConfig },
+    isIndexer: true,
   });
   return data;
 }

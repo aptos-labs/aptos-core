@@ -54,25 +54,32 @@ async function request<Req, Res>(
  * @returns the response or AptosApiError
  */
 export async function aptosRequest<Req, Res>(options: AptosRequest): Promise<AptosResponse<Req, Res>> {
-  const { url, endpoint, method, body, contentType, params, overrides } = options;
+  const { url, endpoint, method, body, contentType, params, overrides, isIndexer } = options;
   const fullEndpoint = `${url}/${endpoint ?? ""}`;
   const response = await request<Req, Res>(fullEndpoint, method, body, contentType, params, overrides);
 
   const result: AptosResponse<Req, Res> = {
     status: response.status,
     statusText: response.statusText!,
-    // to support both indexer/graphql and fullnode responses
-    // response.data.data format from indexer/graphql response, response.data format from fullnode response
-    data: response.data.data ?? response.data,
+    data: response.data,
     headers: response.headers,
     config: response.config,
     url: fullEndpoint,
   };
 
+  // to support both fullnode and indexer responses,
+  // check if it is an indexer query, and adjust response.data
+  if (isIndexer) {
+    // errors from indexer
+    if ((result.data as any).errors) {
+      throw new AptosApiError(options, result, response.data.errors[0].message ?? "Generic Error");
+    }
+    result.data = (result.data as any).data as Res;
+  }
+
   if (result.status >= 200 && result.status < 300) {
     return result;
   }
-
   const errorMessage = errors[result.status];
   throw new AptosApiError(options, result, errorMessage ?? "Generic Error");
 }

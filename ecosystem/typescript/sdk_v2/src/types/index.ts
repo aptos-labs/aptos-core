@@ -1,5 +1,7 @@
 import { Network } from "../utils/api-endpoints";
 
+export * from "./indexer";
+
 /**
  * Hex data as input to a function
  */
@@ -44,11 +46,6 @@ export interface PaginationArgs {
   limit?: number;
 }
 
-export interface IndexerPaginationArgs {
-  offset?: AnyNumber;
-  limit?: number;
-}
-
 /**
  * QUERY TYPES
  */
@@ -88,6 +85,7 @@ export type AptosRequest = {
   params?: Record<string, string | AnyNumber | boolean | undefined>;
   originMethod?: string;
   overrides?: ClientConfig;
+  isIndexer?: boolean;
 };
 
 /**
@@ -133,98 +131,6 @@ export type MoveModuleBytecode = {
   bytecode: string;
   abi?: MoveModule;
 };
-
-export type GetAccountTokensCountQueryResponse = {
-  __typename?: "query_root";
-  current_token_ownerships_v2_aggregate: {
-    __typename?: "current_token_ownerships_v2_aggregate";
-    aggregate?: { __typename?: "current_token_ownerships_v2_aggregate_fields"; count: number } | null;
-  };
-};
-
-export type GetAccountTokensCountQueryResult = number | undefined;
-
-export type GetOwnedTokensQueryResponse = {
-  __typename?: "query_root";
-  current_token_ownerships_v2: Array<{
-    __typename?: "current_token_ownerships_v2";
-    token_standard: string;
-    token_properties_mutated_v1?: any | null;
-    token_data_id: string;
-    table_type_v1?: string | null;
-    storage_id: string;
-    property_version_v1: any;
-    owner_address: string;
-    last_transaction_version: any;
-    last_transaction_timestamp: any;
-    is_soulbound_v2?: boolean | null;
-    is_fungible_v2?: boolean | null;
-    amount: any;
-    current_token_data?: {
-      __typename?: "current_token_datas_v2";
-      collection_id: string;
-      description: string;
-      is_fungible_v2?: boolean | null;
-      largest_property_version_v1?: any | null;
-      last_transaction_timestamp: any;
-      last_transaction_version: any;
-      maximum?: any | null;
-      supply: any;
-      token_data_id: string;
-      token_name: string;
-      token_properties: any;
-      token_standard: string;
-      token_uri: string;
-      current_collection?: {
-        __typename?: "current_collections_v2";
-        collection_id: string;
-        collection_name: string;
-        creator_address: string;
-        current_supply: any;
-        description: string;
-        last_transaction_timestamp: any;
-        last_transaction_version: any;
-        max_supply?: any | null;
-        mutable_description?: boolean | null;
-        mutable_uri?: boolean | null;
-        table_handle_v1?: string | null;
-        token_standard: string;
-        total_minted_v2?: any | null;
-        uri: string;
-      } | null;
-    } | null;
-  }>;
-};
-
-/**
- * Holds a generic type that being passed by each function and holds an
- * array of properties we can sort the query by
- */
-export type IndexerSortBy<T> = IndexerSortingOptions<T>;
-export type InputMaybe<T> = T | null;
-export type IndexerSortingOptions<T> = {
-  [K in keyof T]?: T[K] extends InputMaybe<infer U> ? IndexerSortingOptions<U> | U | OrderBy : T[K] | OrderBy;
-};
-
-export enum OrderBy {
-  /** in ascending order, nulls last */
-  Asc = "asc",
-  /** in ascending order, nulls first */
-  AscNullsFirst = "asc_nulls_first",
-  /** in ascending order, nulls last */
-  AscNullsLast = "asc_nulls_last",
-  /** in descending order, nulls first */
-  Desc = "desc",
-  /** in descending order, nulls first */
-  DescNullsFirst = "desc_nulls_first",
-  /** in descending order, nulls last */
-  DescNullsLast = "desc_nulls_last",
-}
-
-/**
- * Refers to the token standard we want to query for
- */
-export type TokenStandard = "v1" | "v2";
 
 /**
  * TRANSACTION TYPES
@@ -845,7 +751,7 @@ export type Block = {
   transactions?: Array<TransactionResponse>;
 };
 
-/////// REQUEST TYPES ///////
+// REQUEST TYPES
 
 /**
  * View request for the Move view function API
