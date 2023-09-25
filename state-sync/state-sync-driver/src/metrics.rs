@@ -143,12 +143,19 @@ pub static STORAGE_SYNCHRONIZER_GAUGES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+// Latency buckets for storage synchronizer operations
+const STORAGE_SYNCHRONIZER_LATENCY_BUCKETS_SECS: &[f64] = &[
+    0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 40.0,
+    60.0, 120.0, 180.0, 240.0, 300.0,
+];
+
 /// Counter for tracking storage synchronizer latencies
 pub static STORAGE_SYNCHRONIZER_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_state_sync_storage_synchronizer_latencies",
         "Counters related to the storage synchronizer latencies",
-        &["label"]
+        &["label"],
+        STORAGE_SYNCHRONIZER_LATENCY_BUCKETS_SECS.to_vec()
     )
     .unwrap()
 });

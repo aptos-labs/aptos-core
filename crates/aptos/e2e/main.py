@@ -30,7 +30,8 @@ import shutil
 import sys
 
 from cases.account import (
-    test_account_create,
+    test_account_create_and_transfer,
+    test_account_list,
     test_account_fund_with_faucet,
     test_account_lookup_address,
     test_account_resource_account,
@@ -138,7 +139,8 @@ def run_tests(run_helper):
 
     # Run account tests.
     test_account_fund_with_faucet(run_helper)
-    test_account_create(run_helper)
+    test_account_create_and_transfer(run_helper)
+    test_account_list(run_helper)
     test_account_lookup_address(run_helper)
     test_account_resource_account(run_helper)
 

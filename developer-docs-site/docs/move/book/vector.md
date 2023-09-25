@@ -158,21 +158,11 @@ fun destroy_droppable_vector<T: drop>(vec: vector<T>) {
 ```
 
 Similarly, vectors cannot be copied unless the element type has `copy`. In other words, a
-`vector<T>` has `copy` if and only if `T` has `copy`. However, even copyable vectors are never
-implicitly copied:
-
-```move
-let x = vector::singleton<u64>(10);
-let y = copy x; // compiler error without the copy!
-```
-
-Copies of large vectors can be expensive, so the compiler requires explicit `copy`'s to make it
-easier to see where they are happening.
+`vector<T>` has `copy` if and only if `T` has `copy`.
 
 For more details see the sections on [type abilities](./abilities.md) and [generics](./generics.md).
 
 ## Ownership
 
 As mentioned [above](#destroying-and-copying-vectors), `vector` values can be copied only if the
-elements can be copied. In that case, the copy must be explicit via a
-[`copy`](./variables.md#move-and-copy) or a [dereference `*`](./references.md#reading-and-writing-through-references).
+elements can be copied.

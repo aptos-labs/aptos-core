@@ -142,6 +142,7 @@ pub struct DagStateSyncComputer {
 }
 
 impl DagStateSyncComputer {
+    #[allow(dead_code)]
     pub fn new(
         state_computer_for_sync: Arc<dyn StateComputer>,
         reset_event_channel_tx: UnboundedSender<ResetRequest>,
