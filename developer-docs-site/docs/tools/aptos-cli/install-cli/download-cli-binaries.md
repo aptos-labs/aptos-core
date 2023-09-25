@@ -37,7 +37,7 @@ These instructions have been tested on macOS Monterey (12.6)
 1. Add `~/bin` to your path in your `.bashrc` or `.zshrc` file for future use.
 1. Run `aptos help` to see the list of commands and verify that the CLI is working.
 
-Note: If you encounter an error message like the following. You will need to manually install `openssl3`.
+Note: You will need to manually install `openssl3` if you encounter an error message like the following:
 ```
 dyld[81095]: Library not loaded: /usr/local/opt/openssl@3/lib/libssl.3.dylib
   Referenced from: <56FDDCBF-43F4-381E-9ECA-ACEBC556EAB7> /Users/jinhou/.local/bin/aptos
