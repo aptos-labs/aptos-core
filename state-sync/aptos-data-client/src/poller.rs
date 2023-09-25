@@ -11,6 +11,7 @@ use crate::{
     metrics,
     metrics::{set_gauge, start_request_timer, DataType, PRIORITIZED_PEER, REGULAR_PEER},
     utils,
+    utils::choose_peers_by_latency,
 };
 use aptos_config::{
     config::{AptosDataClientConfig, AptosDataPollerConfig},
@@ -32,7 +33,6 @@ use std::{cmp, collections::HashSet, sync::Arc, time::Duration};
 use tokio::{runtime::Handle, task::JoinHandle};
 
 // Useful constants
-const ERROR_LOG_FREQ_SECS: u64 = 3;
 const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 10;
 const GLOBAL_DATA_METRIC_FREQ_SECS: u64 = 1;
 const IN_FLIGHT_METRICS_SAMPLE_FREQ: u64 = 5;
@@ -187,9 +187,11 @@ impl DataSummaryPoller {
 
                 // Select the latency weighted peers
                 let peers_to_poll_by_latency = choose_peers_by_latency(
+                    self.data_client_config.clone(),
                     num_peers_to_poll_by_latency,
                     potential_peers,
                     self.peers_and_metadata.clone(),
+                    false,
                 );
 
                 // Return all peers to poll
@@ -383,70 +385,6 @@ pub(crate) fn calculate_num_peers_to_poll(
 
     // Bound the number of peers to poll by the given maximum
     cmp::min(num_peers_to_poll, max_num_peers_to_poll)
-}
-
-/// Selects the specified number of peers from the list of potential
-/// peers. Peer selection is weighted by peer latencies (i.e., the
-/// lower the latency, the higher the probability of selection).
-pub(crate) fn choose_peers_by_latency(
-    num_peers_to_choose: u64,
-    potential_peers: HashSet<PeerNetworkId>,
-    peers_and_metadata: Arc<PeersAndMetadata>,
-) -> HashSet<PeerNetworkId> {
-    // Calculate the latency weights for the peers
-    let mut peer_and_latency_weights = vec![];
-    for peer in potential_peers {
-        match peers_and_metadata.get_metadata_for_peer(peer) {
-            Ok(peer_metadata) => {
-                let peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata();
-                if let Some(latency) = peer_monitoring_metadata.average_ping_latency_secs {
-                    let latency_weight = 1.0 / latency; // Invert the latency to get the weight
-                    peer_and_latency_weights.push((peer, latency_weight));
-                } else {
-                    log_warning_with_sample(
-                        LogSchema::new(LogEntry::DataSummaryPoller)
-                            .event(LogEvent::PeerSelectionError)
-                            .message(&format!("Unable to get latency for peer! Peer: {:?}", peer)),
-                    );
-                }
-            },
-            Err(error) => {
-                log_warning_with_sample(
-                    LogSchema::new(LogEntry::DataSummaryPoller)
-                        .event(LogEvent::PeerSelectionError)
-                        .message(&format!(
-                            "Unable to get peer metadata! Peer: {:?}, Error: {:?}",
-                            peer, error
-                        )),
-                );
-            },
-        }
-    }
-
-    // Select the peer by latencies
-    utils::choose_random_peers_by_weight(num_peers_to_choose, peer_and_latency_weights)
-        .unwrap_or_else(|error| {
-            // Log the error
-            log_warning_with_sample(
-                LogSchema::new(LogEntry::DataSummaryPoller)
-                    .event(LogEvent::PeerSelectionError)
-                    .message(&format!(
-                        "Unable to select peer by latencies! Error: {:?}",
-                        error
-                    )),
-            );
-
-            // No peer was selected
-            hashset![]
-        })
-}
-
-/// Logs the given schema as a warning with a sampled frequency
-fn log_warning_with_sample(log: LogSchema) {
-    sample!(
-        SampleRate::Duration(Duration::from_secs(ERROR_LOG_FREQ_SECS)),
-        warn!(log);
-    );
 }
 
 /// Spawns a dedicated poller for the given peer.
