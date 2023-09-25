@@ -22,17 +22,20 @@ use crate::{
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{Peer, PeerRole},
+    config::{Peer, PeerRole, PeerSet},
     network_id::{NetworkId, PeerNetworkId},
 };
+use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
 use aptos_types::{account_address::AccountAddress, PeerId};
 use futures::channel::oneshot;
 use futures_util::StreamExt;
+use maplit::hashmap;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
+    ops::Deref,
     sync::Arc,
     time::Duration,
 };
@@ -274,6 +277,154 @@ fn test_peers_and_metadata_trusted_peers() {
         .get_trusted_peers(&NetworkId::Validator)
         .unwrap();
     assert!(trusted_peers.is_empty());
+}
+
+#[test]
+fn test_peers_and_metadata_caching() {
+    // Create the peers and metadata container
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn];
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+    // Verify the states of the internal maps
+    verify_internal_map_states(
+        &network_ids,
+        peers_and_metadata.clone(),
+        HashMap::new(),
+        PeerSet::new(),
+        HashMap::new(),
+    );
+
+    // Create two peers and initialize the connection metadata
+    let (peer_network_id_1, connection_1) = create_peer_and_connection(
+        NetworkId::Vfn,
+        vec![ProtocolId::MempoolDirectSend, ProtocolId::StorageServiceRpc],
+        peers_and_metadata.clone(),
+    );
+    let (peer_network_id_2, connection_2) = create_peer_and_connection(
+        NetworkId::Validator,
+        vec![ProtocolId::MempoolDirectSend, ProtocolId::ConsensusRpcBcs],
+        peers_and_metadata.clone(),
+    );
+
+    // Verify the states of the VFN maps
+    let mut peer_metadata_1 = PeerMetadata::new(connection_1.clone());
+    let expected_peers_and_metadata = hashmap! {
+        peer_network_id_1.peer_id() => peer_metadata_1.clone()
+    };
+    verify_internal_map_states(
+        &[NetworkId::Vfn],
+        peers_and_metadata.clone(),
+        expected_peers_and_metadata.clone(),
+        PeerSet::new(),
+        expected_peers_and_metadata,
+    );
+
+    // Verify the states of the validator maps
+    let peer_metadata_2 = PeerMetadata::new(connection_2.clone());
+    let expected_peers_and_metadata = hashmap! {
+        peer_network_id_2.peer_id() => peer_metadata_2.clone()
+    };
+    verify_internal_map_states(
+        &[NetworkId::Validator],
+        peers_and_metadata.clone(),
+        expected_peers_and_metadata.clone(),
+        PeerSet::new(),
+        expected_peers_and_metadata,
+    );
+
+    // Mark peer 1 as disconnected
+    mark_peer_disconnecting(&peers_and_metadata, peer_network_id_1);
+
+    // Verify the states of the VFN maps
+    peer_metadata_1.connection_state = ConnectionState::Disconnecting;
+    let expected_peers_and_metadata = hashmap! {
+        peer_network_id_1.peer_id() => peer_metadata_1.clone()
+    };
+    verify_internal_map_states(
+        &[NetworkId::Vfn],
+        peers_and_metadata.clone(),
+        expected_peers_and_metadata.clone(),
+        PeerSet::new(),
+        expected_peers_and_metadata.clone(),
+    );
+
+    // Verify the states of the validator maps
+    let expected_peers_and_metadata = hashmap! {
+        peer_network_id_2.peer_id() => peer_metadata_2.clone()
+    };
+    verify_internal_map_states(
+        &[NetworkId::Validator],
+        peers_and_metadata.clone(),
+        expected_peers_and_metadata.clone(),
+        PeerSet::new(),
+        expected_peers_and_metadata.clone(),
+    );
+
+    // Remove peer 2
+    remove_peer_metadata(
+        &peers_and_metadata,
+        peer_network_id_2,
+        connection_2.connection_id.get_inner(),
+    )
+    .unwrap();
+
+    // Verify the states of the VFN maps
+    let expected_peers_and_metadata = hashmap! {
+        peer_network_id_1.peer_id() => peer_metadata_1.clone()
+    };
+    verify_internal_map_states(
+        &[NetworkId::Vfn],
+        peers_and_metadata.clone(),
+        expected_peers_and_metadata.clone(),
+        PeerSet::new(),
+        expected_peers_and_metadata.clone(),
+    );
+
+    // Verify the states of the validator maps
+    verify_internal_map_states(
+        &[NetworkId::Validator],
+        peers_and_metadata.clone(),
+        HashMap::new(),
+        PeerSet::new(),
+        HashMap::new(),
+    );
+
+    // Update the peer metadata for peer 1
+    let peer_monitoring_metadata =
+        PeerMonitoringMetadata::new(Some(1010101.0), None, None, Some("Internal string".into()));
+    peers_and_metadata
+        .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata.clone())
+        .unwrap();
+
+    // Verify the states of the VFN maps
+    peer_metadata_1.peer_monitoring_metadata = peer_monitoring_metadata;
+    let expected_peers_and_metadata = hashmap! {
+        peer_network_id_1.peer_id() => peer_metadata_1.clone()
+    };
+    verify_internal_map_states(
+        &[NetworkId::Vfn],
+        peers_and_metadata.clone(),
+        expected_peers_and_metadata.clone(),
+        PeerSet::new(),
+        expected_peers_and_metadata,
+    );
+
+    // Reconnect peer 2
+    peers_and_metadata
+        .insert_connection_metadata(peer_network_id_2, connection_2.clone())
+        .unwrap();
+
+    // Verify the states of the validator maps
+    let expected_peers_and_metadata = hashmap! {
+        peer_network_id_2.peer_id() => peer_metadata_2.clone()
+    };
+    verify_internal_map_states(
+        &[NetworkId::Validator],
+        peers_and_metadata.clone(),
+        expected_peers_and_metadata.clone(),
+        PeerSet::new(),
+        expected_peers_and_metadata.clone(),
+    );
 }
 
 #[test]
@@ -873,6 +1024,41 @@ fn update_connection_metadata(
     peers_and_metadata
         .insert_connection_metadata(peer_network_id_3, connection_3)
         .unwrap();
+}
+
+/// Verifies the internal states of the peers and metadata container
+/// using the given expected values.
+fn verify_internal_map_states(
+    network_ids: &[NetworkId],
+    peers_and_metadata: Arc<PeersAndMetadata>,
+    expected_peers_and_metadata: HashMap<PeerId, PeerMetadata>,
+    expected_trusted_peers: PeerSet,
+    expected_cached_peers_and_metadata: HashMap<PeerId, PeerMetadata>,
+) {
+    // Get the internal maps
+    let (peers_and_metadata, trusted_peers, cached_peers_and_metadata) =
+        peers_and_metadata.get_all_internal_maps();
+
+    // Verify the states of the internal maps
+    for network_id in network_ids {
+        // Verify the peers and metadata
+        assert_eq!(
+            peers_and_metadata.get(network_id).unwrap(),
+            &expected_peers_and_metadata
+        );
+
+        // Verify the trusted peers
+        let trusted_peers_for_network = trusted_peers.get(network_id).unwrap();
+        let trusted_peers = trusted_peers_for_network.load().clone().deref().clone();
+        assert_eq!(trusted_peers, expected_trusted_peers.clone());
+
+        // Verify the cached peers and metadata
+        let cached_peers_and_metadata = cached_peers_and_metadata.load().clone().deref().clone();
+        assert_eq!(
+            cached_peers_and_metadata.get(network_id).unwrap(),
+            &expected_cached_peers_and_metadata,
+        );
+    }
 }
 
 /// Waits for a network event on the expected channels and
