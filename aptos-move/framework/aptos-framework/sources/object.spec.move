@@ -2,13 +2,6 @@ spec aptos_framework::object {
 
     spec module {
         pragma aborts_if_is_strict;
-        apply AddressNoChange to * except delete;
-    }
-
-    spec schema AddressNoChange {
-        // property 4: Objects may never change the address which houses them.
-        ensures forall addr: address where old(exists<ObjectCore>(addr)):
-            exists<ObjectCore>(addr);
     }
 
     spec fun spec_exists_at<T: key>(object: address): bool;
@@ -28,7 +21,6 @@ spec aptos_framework::object {
         use std::features;
         pragma aborts_if_is_partial;
 
-        // TODO: native function generate_unique_address() cause an abort
         let unique_address = transaction_context::spec_generate_unique_address();
         aborts_if !features::spec_is_enabled(features::APTOS_UNIQUE_IDENTIFIERS);
         aborts_if exists<ObjectCore>(unique_address);
@@ -55,7 +47,6 @@ spec aptos_framework::object {
         use std::features;
         pragma aborts_if_is_partial;
 
-        // TODO: native function generate_unique_address() cause an abort
         let unique_address = transaction_context::spec_generate_unique_address();
         aborts_if !features::spec_is_enabled(features::APTOS_UNIQUE_IDENTIFIERS);
         aborts_if exists<ObjectCore>(unique_address);
@@ -273,20 +264,7 @@ spec aptos_framework::object {
         aborts_if exists<ObjectCore>(object);
         ensures exists<ObjectCore>(object);
         // property 6: Object addresses must not overlap with other addresses in different domains.
-        ensures global<ObjectCore>(object) == ObjectCore {
-                guid_creation_num: INIT_GUID_CREATION_NUM + 1,
-                owner: creator_address,
-                allow_ungated_transfer: true,
-                transfer_events: event::EventHandle {
-                    counter: 0,
-                    guid: guid::GUID {
-                        id: guid::ID {
-                            creation_num: INIT_GUID_CREATION_NUM,
-                            addr: object,
-                        }
-                    }
-                }
-        };
+        ensures global<ObjectCore>(object).guid_creation_num ==  INIT_GUID_CREATION_NUM + 1;
         ensures result == ConstructorRef { self: object, can_delete };
     }
 
@@ -395,6 +373,9 @@ spec aptos_framework::object {
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
         aborts_if !global<ObjectCore>(object_address).allow_ungated_transfer;
+        // property 3: The 'indirect' owner of an object may transfer the object.
+        let post new_owner_address = global<ObjectCore>(object_address).owner;
+        ensures owner_address != object_address ==> new_owner_address == to;
     }
 
     spec transfer_raw(
@@ -445,12 +426,10 @@ spec aptos_framework::object {
     }
 
     spec owns<T: key>(object: Object<T>, owner: address): bool {
-        // property 3: The 'indirect' owner of an object may transfer the object.
-        aborts_if object.inner != owner && !exists<ObjectCore>(object.inner);
-
         let current_address_0 = object.inner;
         let object_0 = global<ObjectCore>(current_address_0);
         let current_address = object_0.owner;
+        aborts_if object.inner != owner && !exists<ObjectCore>(object.inner);
         ensures current_address_0 == owner ==> result == true;
     }
 

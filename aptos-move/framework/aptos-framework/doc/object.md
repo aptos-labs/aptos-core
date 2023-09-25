@@ -1920,19 +1920,6 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>pragma</b> aborts_if_is_strict;
-<b>apply</b> <a href="object.md#0x1_object_AddressNoChange">AddressNoChange</a> <b>to</b> * <b>except</b> delete;
-</code></pre>
-
-
-
-
-<a name="0x1_object_AddressNoChange"></a>
-
-
-<pre><code><b>schema</b> <a href="object.md#0x1_object_AddressNoChange">AddressNoChange</a> {
-    <b>ensures</b> <b>forall</b> addr: <b>address</b> <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(addr)):
-        <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(addr);
-}
 </code></pre>
 
 
@@ -2361,20 +2348,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 <pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
 <b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
-<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
-        owner: creator_address,
-        allow_ungated_transfer: <b>true</b>,
-        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
-            counter: 0,
-            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
-                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
-                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
-                    addr: <a href="object.md#0x1_object">object</a>,
-                }
-            }
-        }
-};
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>).guid_creation_num ==  <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1;
 <b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: <a href="object.md#0x1_object">object</a>, can_delete };
 </code></pre>
 
@@ -2611,6 +2585,8 @@ Return true if the provided address has indirect or direct ownership of the prov
 <b>let</b> object_address = <a href="object.md#0x1_object">object</a>.inner;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address);
 <b>aborts_if</b> !<b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address).allow_ungated_transfer;
+<b>let</b> <b>post</b> new_owner_address = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address).owner;
+<b>ensures</b> owner_address != object_address ==&gt; new_owner_address == <b>to</b>;
 </code></pre>
 
 
@@ -2734,10 +2710,10 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
-<pre><code><b>aborts_if</b> <a href="object.md#0x1_object">object</a>.inner != owner && !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
-<b>let</b> current_address_0 = <a href="object.md#0x1_object">object</a>.inner;
+<pre><code><b>let</b> current_address_0 = <a href="object.md#0x1_object">object</a>.inner;
 <b>let</b> object_0 = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address_0);
 <b>let</b> current_address = object_0.owner;
+<b>aborts_if</b> <a href="object.md#0x1_object">object</a>.inner != owner && !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
 <b>ensures</b> current_address_0 == owner ==&gt; result == <b>true</b>;
 </code></pre>
 

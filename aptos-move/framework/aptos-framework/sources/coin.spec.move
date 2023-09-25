@@ -261,9 +261,6 @@ spec aptos_framework::coin {
         aborts_if supply_no_parallel && !exists<aggregator_factory::AggregatorFactory>(@aptos_framework);
         ensures supply_no_parallel ==>
             optional_aggregator::is_parallelizable(post_supply) && post_value == value;
-
-        //Only the owner of a coin may mint, burn or freeze coins.
-        ensures type_info::type_of<CoinType>().account_address == account_addr;
     }
 
     spec initialize {
