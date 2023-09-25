@@ -243,6 +243,7 @@ impl DB {
 
         self.inner.write_opt(db_batch, &default_write_options())?;
 
+        /*
         // Bump counters only after DB write succeeds.
         for (cf_name, rows) in rows_locked.iter() {
             for write_op in rows {
@@ -261,6 +262,7 @@ impl DB {
         APTOS_SCHEMADB_BATCH_COMMIT_BYTES
             .with_label_values(&[&self.name])
             .observe(serialized_size as f64);
+        */
 
         Ok(())
     }
