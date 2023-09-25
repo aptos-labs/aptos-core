@@ -1506,6 +1506,36 @@ impl AptosVM {
             .collect::<Vec<_>>())
     }
 
+    fn validate_signature_checked_transaction(
+        &self,
+        session: &mut SessionExt,
+        resolver: &impl AptosMoveResolver,
+        transaction: &SignatureCheckedTransaction,
+        allow_too_new: bool,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        self.check_transaction_format(transaction)?;
+
+        let txn_data = TransactionMetadata::new(transaction);
+        let prologue_status = self.run_prologue_with_payload(
+            session,
+            resolver,
+            transaction.payload(),
+            &txn_data,
+            log_context,
+            false,
+        );
+
+        match prologue_status {
+            Err(err)
+                if !allow_too_new || err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW =>
+            {
+                Err(err)
+            },
+            _ => Ok(()),
+        }
+    }
+
     fn run_prologue_with_payload(
         &self,
         session: &mut SessionExt,
@@ -1729,24 +1759,6 @@ impl VMAdapter for AptosVM {
         }
 
         Ok(())
-    }
-
-    fn run_prologue(
-        &self,
-        session: &mut SessionExt,
-        resolver: &impl AptosMoveResolver,
-        transaction: &SignedTransaction,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(), VMStatus> {
-        let txn_data = TransactionMetadata::new(transaction);
-        self.run_prologue_with_payload(
-            session,
-            resolver,
-            transaction.payload(),
-            &txn_data,
-            log_context,
-            false,
-        )
     }
 
     fn should_restart_execution(vm_output: &VMOutput) -> bool {
