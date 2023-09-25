@@ -10,8 +10,12 @@ use aptos_config::config::NodeConfig;
 use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
 use aptos_protos::{
-    indexer::v1::raw_data_server::RawDataServer,
+    indexer::v1::{
+        raw_data_server::RawDataServer, FILE_DESCRIPTOR_SET as INDEXER_V1_FILE_DESCRIPTOR_SET,
+    },
     internal::fullnode::v1::fullnode_data_server::FullnodeDataServer,
+    transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
+    util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
 use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
@@ -58,9 +62,25 @@ pub fn bootstrap(
             service_context: service_context.clone(),
         };
         let localnet_data_server = LocalnetDataService { service_context };
-        let mut tonic_server = Server::builder()
+
+        let reflection_service = tonic_reflection::server::Builder::configure()
+            // Note: It is critical that the file descriptor set is registered for every
+            // file that the top level API proto depends on recursively. If you don't,
+            // compilation will still succeed but reflection will fail at runtime.
+            //
+            // TODO: Add a test for this / something in build.rs, this is a big footgun.
+            .register_encoded_file_descriptor_set(INDEXER_V1_FILE_DESCRIPTOR_SET)
+            .register_encoded_file_descriptor_set(TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET)
+            .register_encoded_file_descriptor_set(UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET)
+            .build()
+            .expect("Failed to build reflection service");
+
+        let reflection_service_clone = reflection_service.clone();
+
+        let tonic_server = Server::builder()
             .http2_keepalive_interval(Some(std::time::Duration::from_secs(60)))
-            .http2_keepalive_timeout(Some(std::time::Duration::from_secs(5)));
+            .http2_keepalive_timeout(Some(std::time::Duration::from_secs(5)))
+            .add_service(reflection_service_clone);
 
         let router = match use_data_service_interface {
             false => tonic_server.add_service(FullnodeDataServer::new(server)),

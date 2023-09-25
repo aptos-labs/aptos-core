@@ -15,7 +15,7 @@ You can run a local testnet from the aptos CLI, that will match the version it w
 run a faucet side by side with the local single node testnet.
 
 ```bash
-$ aptos node run-local-testnet --with-faucet
+$ aptos node run-local-testnet
 Completed generating configuration:
         Log file: "/Users/greg/.aptos/testnet/validator.log"
         Test dir: "/Users/greg/.aptos/testnet"
@@ -32,7 +32,7 @@ This will have consistent state if the node is shutdown, it will start with the 
 If you want to restart the chain from genesis, you can add the `--force-restart` flag.
 
 ```bash
-$ aptos node run-local-testnet --with-faucet --force-restart
+$ aptos node run-local-testnet --force-restart
 Are you sure you want to delete the existing chain? [yes/no] >
 yes
 Completed generating configuration:
