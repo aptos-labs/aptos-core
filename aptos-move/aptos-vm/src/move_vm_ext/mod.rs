@@ -7,9 +7,10 @@ mod resolver;
 mod respawned_session;
 mod session;
 mod vm;
+pub(crate) mod write_op_converter;
 
 pub use crate::move_vm_ext::{
-    resolver::{AptosMoveResolver, MoveResolverExt, StateValueMetadataResolver},
+    resolver::{AptosMoveResolver, AsExecutorView},
     respawned_session::RespawnedSession,
     session::{SessionExt, SessionId},
     vm::{get_max_binary_format_version, verifier_config, MoveVmExt},

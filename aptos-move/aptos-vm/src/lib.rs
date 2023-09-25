@@ -114,6 +114,7 @@ mod errors;
 pub mod move_vm_ext;
 pub mod natives;
 pub mod sharded_block_executor;
+pub mod storage_adapter;
 pub mod system_module_names;
 pub mod testing;
 pub mod transaction_metadata;

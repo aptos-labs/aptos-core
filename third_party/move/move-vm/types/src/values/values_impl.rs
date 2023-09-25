@@ -1466,7 +1466,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Addition overflow".to_string())
+        })
     }
 
     pub fn sub_checked(self, other: Self) -> PartialVMResult<Self> {
@@ -1483,7 +1486,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Subtraction overflow".to_string())
+        })
     }
 
     pub fn mul_checked(self, other: Self) -> PartialVMResult<Self> {
@@ -1500,7 +1506,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Multiplication overflow".to_string())
+        })
     }
 
     pub fn div_checked(self, other: Self) -> PartialVMResult<Self> {
@@ -1517,7 +1526,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Division by zero".to_string())
+        })
     }
 
     pub fn rem_checked(self, other: Self) -> PartialVMResult<Self> {
@@ -1534,7 +1546,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Integer remainder by zero".to_string())
+        })
     }
 
     pub fn bit_or(self, other: Self) -> PartialVMResult<Self> {
@@ -1589,37 +1604,16 @@ impl IntegerValue {
         use IntegerValue::*;
 
         Ok(match self {
-            U8(x) => {
-                if n_bits >= 8 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U8(x << n_bits)
-            },
-            U16(x) => {
-                if n_bits >= 16 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U16(x << n_bits)
-            },
-            U32(x) => {
-                if n_bits >= 32 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U32(x << n_bits)
-            },
-            U64(x) => {
-                if n_bits >= 64 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U64(x << n_bits)
-            },
-            U128(x) => {
-                if n_bits >= 128 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U128(x << n_bits)
-            },
+            U8(x) if n_bits < 8 => IntegerValue::U8(x << n_bits),
+            U16(x) if n_bits < 16 => IntegerValue::U16(x << n_bits),
+            U32(x) if n_bits < 32 => IntegerValue::U32(x << n_bits),
+            U64(x) if n_bits < 64 => IntegerValue::U64(x << n_bits),
+            U128(x) if n_bits < 128 => IntegerValue::U128(x << n_bits),
             U256(x) => IntegerValue::U256(x << n_bits),
+            _ => {
+                return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                    .with_message("Shift Left overflow".to_string()));
+            },
         })
     }
 
@@ -1627,37 +1621,16 @@ impl IntegerValue {
         use IntegerValue::*;
 
         Ok(match self {
-            U8(x) => {
-                if n_bits >= 8 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U8(x >> n_bits)
-            },
-            U16(x) => {
-                if n_bits >= 16 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U16(x >> n_bits)
-            },
-            U32(x) => {
-                if n_bits >= 32 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U32(x >> n_bits)
-            },
-            U64(x) => {
-                if n_bits >= 64 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U64(x >> n_bits)
-            },
-            U128(x) => {
-                if n_bits >= 128 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U128(x >> n_bits)
-            },
+            U8(x) if n_bits < 8 => IntegerValue::U8(x >> n_bits),
+            U16(x) if n_bits < 16 => IntegerValue::U16(x >> n_bits),
+            U32(x) if n_bits < 32 => IntegerValue::U32(x >> n_bits),
+            U64(x) if n_bits < 64 => IntegerValue::U64(x >> n_bits),
+            U128(x) if n_bits < 128 => IntegerValue::U128(x >> n_bits),
             U256(x) => IntegerValue::U256(x >> n_bits),
+            _ => {
+                return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                    .with_message("Shift Right overflow".to_string()));
+            },
         })
     }
 

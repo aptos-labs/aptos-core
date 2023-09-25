@@ -166,14 +166,14 @@ pub fn run_benchmark<V>(
             db.clone(),
             // Initialization pipeline is temporary, so needs to be fully committed.
             // No discards/aborts allowed during initialization, even if they are allowed later.
-            PipelineConfig::default(),
+            &PipelineConfig::default(),
         )
     });
 
     let version = db.reader.get_latest_version().unwrap();
 
     let (pipeline, block_sender) =
-        Pipeline::new(executor, version, pipeline_config, Some(num_blocks));
+        Pipeline::new(executor, version, &pipeline_config, Some(num_blocks));
 
     let mut num_accounts_to_load = num_main_signer_accounts;
     if let Some(mix) = &transaction_mix {
@@ -345,7 +345,7 @@ fn init_workload<V>(
     mut main_signer_accounts: Vec<LocalAccount>,
     burner_accounts: Vec<LocalAccount>,
     db: DbReaderWriter,
-    pipeline_config: PipelineConfig,
+    pipeline_config: &PipelineConfig,
 ) -> Box<dyn TransactionGeneratorCreator>
 where
     V: TransactionBlockExecutor + 'static,
@@ -451,7 +451,7 @@ fn add_accounts_impl<V>(
     let (pipeline, block_sender) = Pipeline::new(
         executor,
         start_version,
-        pipeline_config,
+        &pipeline_config,
         Some(1 + num_new_accounts / block_size * 101 / 100),
     );
 

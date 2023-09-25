@@ -12,7 +12,6 @@ use aptos_language_e2e_tests::{
 };
 use aptos_types::{
     block_executor::partitioner::PartitionedTransactions,
-    state_store::state_key::StateKeyInner,
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput},
 };
 use move_core_types::account_address::AccountAddress;
@@ -77,27 +76,13 @@ pub fn compare_txn_outputs(
             unsharded_txn_output[i].gas_used(),
             sharded_txn_output[i].gas_used()
         );
-        //assert_eq!(unsharded_txn_output[i].write_set(), sharded_txn_output[i].write_set());
+        assert_eq!(
+            unsharded_txn_output[i].write_set(),
+            sharded_txn_output[i].write_set()
+        );
         assert_eq!(
             unsharded_txn_output[i].events(),
             sharded_txn_output[i].events()
-        );
-        // Global supply tracking for coin is not supported in sharded execution yet, so we filter
-        // out the table item from the write set, which has the global supply. This is a hack until
-        // we support global supply tracking in sharded execution.
-        let unsharded_write_set_without_table_item = unsharded_txn_output[i]
-            .write_set()
-            .into_iter()
-            .filter(|(k, _)| matches!(k.inner(), &StateKeyInner::AccessPath(_)))
-            .collect::<Vec<_>>();
-        let sharded_write_set_without_table_item = sharded_txn_output[i]
-            .write_set()
-            .into_iter()
-            .filter(|(k, _)| matches!(k.inner(), &StateKeyInner::AccessPath(_)))
-            .collect::<Vec<_>>();
-        assert_eq!(
-            unsharded_write_set_without_table_item,
-            sharded_write_set_without_table_item
         );
     }
 }
@@ -117,17 +102,18 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),
-            partitioned_txns,
+            partitioned_txns.clone(),
             2,
             None,
         )
         .unwrap();
-    let unsharded_txn_output = AptosVM::execute_block(
-        transactions.into_iter().map(|t| t.into_txn()).collect(),
-        executor.data_store(),
-        None,
-    )
-    .unwrap();
+
+    let ordered_txns: Vec<Transaction> = PartitionedTransactions::flatten(partitioned_txns)
+        .into_iter()
+        .map(|t| t.into_txn())
+        .collect();
+    let unsharded_txn_output =
+        AptosVM::execute_block(ordered_txns, executor.data_store(), None).unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
 }
 
@@ -187,7 +173,7 @@ pub fn sharded_block_executor_with_random_transfers<E: ExecutorClient<FakeDataSt
     let mut rng = OsRng;
     let max_accounts = 200;
     let max_txns = 1000;
-    let num_accounts = rng.gen_range(1, max_accounts);
+    let num_accounts = rng.gen_range(2, max_accounts);
     let mut accounts = Vec::new();
     let mut executor = FakeExecutor::from_head_genesis();
 

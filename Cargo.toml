@@ -21,7 +21,6 @@ members = [
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
     "aptos-move/aptos-transaction-benchmarks",
-    "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
     "aptos-move/aptos-vm-benchmarks",
@@ -74,6 +73,7 @@ members = [
     "crates/aptos-openapi",
     "crates/aptos-profiler",
     "crates/aptos-proptest-helpers",
+    "crates/aptos-protos",
     "crates/aptos-push-metrics",
     "crates/aptos-rate-limiter",
     "crates/aptos-rest-client",
@@ -122,6 +122,7 @@ members = [
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
     "mempool",
+    "network/benchmark",
     "network/builder",
     "network/discovery",
     "network/framework",
@@ -135,12 +136,12 @@ members = [
     "secure/storage",
     "secure/storage/vault",
     "state-sync/aptos-data-client",
+    "state-sync/data-streaming-service",
     "state-sync/inter-component/consensus-notifications",
     "state-sync/inter-component/event-notifications",
     "state-sync/inter-component/mempool-notifications",
     "state-sync/inter-component/storage-service-notifications",
-    "state-sync/state-sync-v2/data-streaming-service",
-    "state-sync/state-sync-v2/state-sync-driver",
+    "state-sync/state-sync-driver",
     "state-sync/storage-service/client",
     "state-sync/storage-service/server",
     "state-sync/storage-service/types",
@@ -229,8 +230,6 @@ members = [
     "vm-validator",
 ]
 
-exclude = ["crates/aptos-protos"]
-
 # NOTE: default-members is the complete list of binaries that form the "production Aptos codebase". These members should
 # never include crates that require fuzzing features or test features. These are the crates we want built with no extra
 # test-only code included.
@@ -289,7 +288,7 @@ aptos-crash-handler = { path = "crates/crash-handler" }
 aptos-crypto = { path = "crates/aptos-crypto" }
 aptos-crypto-derive = { path = "crates/aptos-crypto-derive" }
 aptos-data-client = { path = "state-sync/aptos-data-client" }
-aptos-data-streaming-service = { path = "state-sync/state-sync-v2/data-streaming-service" }
+aptos-data-streaming-service = { path = "state-sync/data-streaming-service" }
 aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
 aptos-db-tool = { path = "storage/db-tool" }
@@ -351,6 +350,7 @@ aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
 aptos-network = { path = "network/framework" }
+aptos-network-benchmark = { path = "network/benchmark" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
@@ -388,7 +388,7 @@ aptos-secure-net = { path = "secure/net" }
 aptos-secure-storage = { path = "secure/storage" }
 aptos-short-hex-str = { path = "crates/short-hex-str" }
 aptos-speculative-state-helper = { path = "crates/aptos-speculative-state-helper" }
-aptos-state-sync-driver = { path = "state-sync/state-sync-v2/state-sync-driver" }
+aptos-state-sync-driver = { path = "state-sync/state-sync-driver" }
 aptos-state-view = { path = "storage/state-view" }
 aptos-storage-interface = { path = "storage/storage-interface" }
 aptos-storage-service-client = { path = "state-sync/storage-service/client" }
@@ -404,7 +404,6 @@ aptos-time-service = { path = "crates/aptos-time-service", features = [
 ] }
 aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
-aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
 aptos-utils = { path = "aptos-utils" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
@@ -433,6 +432,7 @@ ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
 assert_approx_eq = "1.1.0"
 assert_unordered = "0.3.5"
+async-channel = "1.7.1"
 async-stream = "0.3"
 async-trait = "0.1.53"
 axum = "0.5.16"
@@ -448,14 +448,14 @@ blake2-rfc = "0.2.18"
 blst = "0.3.7"
 bulletproofs = { version = "4.0.0" }
 byteorder = "1.4.3"
-bytes = "1.1.0"
+bytes = { version = "1.4.0", features = ["serde"] }
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
 cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 claims = "0.7"
 clap = { version = "4.3.9", features = ["derive", "unstable-styles"] }
-clap_complete = "4.3.1"
-cloud-storage = { version = "0.11.1", features = ["global-client"] }
+clap_complete = "4.4.1"
+cloud-storage = { version = "0.11.1", features = ["global-client", "rustls-tls"], default-features = false }
 codespan-reporting = "0.11.1"
 console-subscriber = "0.1.8"
 const_format = "0.2.26"
@@ -500,7 +500,7 @@ gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
 git2 = "0.16.1"
 glob = "0.3.0"
-goldenfile = "1.1.0"
+goldenfile = "1.5.2"
 google-cloud-pubsub = "0.18.0"
 google-cloud-storage = "0.13.0"
 handlebars = "4.2.2"
@@ -518,10 +518,11 @@ indoc = "1.0.6"
 inferno = "0.11.14"
 ipnet = "2.5.0"
 itertools = "0.10.3"
-jemallocator = { version = "0.3.2", features = [
+jemallocator = { version = "0.5.0", features = [
     "profiling",
     "unprefixed_malloc_on_supported_platforms",
 ] }
+jemalloc-sys = "0.5.4"
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 libc = "0.2.147"
@@ -546,22 +547,24 @@ ouroboros = "0.15.6"
 owo-colors = "3.5.0"
 parking_lot = "0.12.0"
 paste = "1.0.7"
+pbjson = "0.5.1"
 percent-encoding = "2.1.0"
 pin-project = "1.0.10"
 poem = { version = "=1.3.55", features = ["anyhow", "rustls"] }
 poem-openapi = { version = "=2.0.11", features = ["swagger-ui", "url"] }
 poem-openapi-derive = "=2.0.11"
+pprof = { version = "0.11", features = ["flamegraph"] }
 pretty_assertions = "1.2.1"
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
 project-root = "0.2.2"
-prometheus = { version = "0.13.0", default-features = false }
+prometheus = { version = "0.13.3", default-features = false }
 prometheus-http-query = "0.5.2"
 prometheus-parse = "0.2.4"
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
-prost = "0.11.3"
-prost-types = "0.11.3"
+prost = "0.12.1"
+prost-types = "0.12.1"
 quanta = "0.10.1"
 quote = "1.0.18"
 rand = "0.7.3"
@@ -609,6 +612,7 @@ syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = "0.28.4"
 tempfile = "3.3.0"
 termcolor = "1.1.2"
+test-case = "3.1.0"
 textwrap = "0.15.0"
 thiserror = "1.0.37"
 time = { version = "0.3.24", features = ["serde"] }
@@ -625,14 +629,14 @@ tokio-stream = "0.1.8"
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.7.4"
-tonic = { version = "0.8.3", features = [
+tonic = { version = "0.10.0", features = [
     "tls-roots",
     "transport",
     "prost",
     "gzip",
     "codegen",
 ] }
-tonic-reflection = "0.6.0"
+tonic-reflection = "0.10.0"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",

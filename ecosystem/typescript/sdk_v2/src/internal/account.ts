@@ -6,7 +6,7 @@ import {
   MoveResource,
   MoveResourceType,
   PaginationArgs,
-  Transaction,
+  TransactionResponse,
   HexInput,
 } from "../types";
 import { get } from "../client";
@@ -77,9 +77,9 @@ export async function getTransactions(args: {
   aptosConfig: AptosConfig;
   accountAddress: HexInput;
   options?: PaginationArgs;
-}): Promise<Transaction[]> {
+}): Promise<TransactionResponse[]> {
   const { aptosConfig, accountAddress, options } = args;
-  const data = await paginateWithCursor<{}, Transaction[]>({
+  const data = await paginateWithCursor<{}, TransactionResponse[]>({
     url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
     endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/transactions`,
     originMethod: "getTransactions",

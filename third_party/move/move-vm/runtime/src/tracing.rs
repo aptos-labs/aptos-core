@@ -18,14 +18,15 @@ use ::{
         env,
         fs::{File, OpenOptions},
         io::Write,
-        process,
         sync::Mutex,
-        thread,
     },
 };
 
 #[cfg(any(debug_assertions, feature = "debugging"))]
 const MOVE_VM_TRACING_ENV_VAR_NAME: &str = "MOVE_VM_TRACE";
+
+#[cfg(any(debug_assertions, feature = "debugging"))]
+const MOVE_VM_TRACING_FLUSH_ENV_VAR_NAME: &str = "MOVE_VM_TRACE_FLUSH";
 
 #[cfg(any(debug_assertions, feature = "debugging"))]
 const MOVE_VM_STEPPING_ENV_VAR_NAME: &str = "MOVE_VM_STEP";
@@ -36,23 +37,30 @@ static FILE_PATH: Lazy<String> = Lazy::new(|| {
 });
 
 #[cfg(any(debug_assertions, feature = "debugging"))]
-static TRACING_ENABLED: Lazy<bool> = Lazy::new(|| env::var(MOVE_VM_TRACING_ENV_VAR_NAME).is_ok());
+pub static TRACING_ENABLED: Lazy<bool> =
+    Lazy::new(|| env::var(MOVE_VM_TRACING_ENV_VAR_NAME).is_ok());
 
 #[cfg(any(debug_assertions, feature = "debugging"))]
 static DEBUGGING_ENABLED: Lazy<bool> =
     Lazy::new(|| env::var(MOVE_VM_STEPPING_ENV_VAR_NAME).is_ok());
 
 #[cfg(any(debug_assertions, feature = "debugging"))]
-static LOGGING_FILE: Lazy<Mutex<File>> = Lazy::new(|| {
-    Mutex::new(
-        OpenOptions::new()
-            .write(true)
-            .create(true)
-            .append(true)
-            .open(&*FILE_PATH)
-            .unwrap(),
-    )
+pub static LOGGING_FILE_WRITER: Lazy<Mutex<std::io::BufWriter<File>>> = Lazy::new(|| {
+    let file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(true)
+        .open(&*FILE_PATH)
+        .unwrap();
+    Mutex::new(std::io::BufWriter::with_capacity(
+        4096 * 1024, /* 4096KB */
+        file,
+    ))
 });
+
+#[cfg(any(debug_assertions, feature = "debugging"))]
+pub static SINGLE_STEP_FLUSHING: Lazy<bool> =
+    Lazy::new(|| env::var(MOVE_VM_TRACING_FLUSH_ENV_VAR_NAME).is_ok());
 
 #[cfg(any(debug_assertions, feature = "debugging"))]
 static DEBUG_CONTEXT: Lazy<Mutex<DebugContext>> = Lazy::new(|| Mutex::new(DebugContext::new()));
@@ -68,17 +76,13 @@ pub(crate) fn trace(
     interp: &Interpreter,
 ) {
     if *TRACING_ENABLED {
-        let f = &mut *LOGGING_FILE.lock().unwrap();
-        writeln!(
-            f,
-            "{}-{:?},{},{},{:?}",
-            process::id(),
-            thread::current().id(),
-            function_desc.pretty_string(),
-            pc,
-            instr,
-        )
-        .unwrap();
+        let buf_writer = &mut *LOGGING_FILE_WRITER.lock().unwrap();
+        buf_writer
+            .write_fmt(format_args!("{},{}\n", function_desc.pretty_string(), pc,))
+            .unwrap();
+        if *SINGLE_STEP_FLUSHING {
+            buf_writer.flush().unwrap();
+        }
     }
     if *DEBUGGING_ENABLED {
         DEBUG_CONTEXT

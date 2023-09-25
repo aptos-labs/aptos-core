@@ -34,11 +34,11 @@ macro_rules! as_bytes {
 }
 
 pub(crate) fn mock_create(k: impl ToString, v: u128) -> (StateKey, WriteOp) {
-    (as_state_key!(k), WriteOp::Creation(as_bytes!(v)))
+    (as_state_key!(k), WriteOp::Creation(as_bytes!(v).into()))
 }
 
 pub(crate) fn mock_modify(k: impl ToString, v: u128) -> (StateKey, WriteOp) {
-    (as_state_key!(k), WriteOp::Modification(as_bytes!(v)))
+    (as_state_key!(k), WriteOp::Modification(as_bytes!(v).into()))
 }
 
 pub(crate) fn mock_delete(k: impl ToString) -> (StateKey, WriteOp) {

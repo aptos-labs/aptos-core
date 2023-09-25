@@ -8,6 +8,7 @@ use crate::{
     *,
 };
 use anyhow::{bail, format_err, Error, Result};
+use aptos_config::config::{NodeConfig, OverrideNodeConfig};
 use aptos_framework::ReleaseBundle;
 use clap::{Parser, ValueEnum};
 use rand::{rngs::OsRng, Rng, SeedableRng};
@@ -116,6 +117,8 @@ pub enum InitialVersion {
 
 pub type NodeConfigFn = Arc<dyn Fn(&mut serde_yaml::Value) + Send + Sync>;
 pub type GenesisConfigFn = Arc<dyn Fn(&mut serde_yaml::Value) + Send + Sync>;
+/// override_config, base_config (see OverrideNodeConfig)
+pub type OverrideNodeConfigFn = Arc<dyn Fn(&mut NodeConfig, &mut NodeConfig) + Send + Sync>;
 
 pub struct ForgeConfig {
     aptos_tests: Vec<Box<dyn AptosTest>>,
@@ -137,8 +140,13 @@ pub struct ForgeConfig {
     /// Optional genesis helm values init function
     genesis_helm_config_fn: Option<GenesisConfigFn>,
 
-    /// Optional node helm values init function
-    node_helm_config_fn: Option<NodeConfigFn>,
+    /// Optional validator node config override function
+    validator_override_node_config_fn: Option<OverrideNodeConfigFn>,
+
+    /// Optional fullnode node config override function
+    fullnode_override_node_config_fn: Option<OverrideNodeConfigFn>,
+
+    multi_region_config: bool,
 
     /// Transaction workload to run on the swarm
     emit_job_request: EmitJobRequest,
@@ -200,9 +208,63 @@ impl ForgeConfig {
         self
     }
 
-    pub fn with_node_helm_config_fn(mut self, node_helm_config_fn: NodeConfigFn) -> Self {
-        self.node_helm_config_fn = Some(node_helm_config_fn);
+    pub fn with_validator_override_node_config_fn(mut self, f: OverrideNodeConfigFn) -> Self {
+        self.validator_override_node_config_fn = Some(f);
         self
+    }
+
+    pub fn with_fullnode_override_node_config_fn(mut self, f: OverrideNodeConfigFn) -> Self {
+        self.fullnode_override_node_config_fn = Some(f);
+        self
+    }
+
+    pub fn with_multi_region_config(mut self) -> Self {
+        self.multi_region_config = true;
+        self
+    }
+
+    fn override_node_config_from_fn(config_fn: OverrideNodeConfigFn) -> OverrideNodeConfig {
+        let mut override_config = NodeConfig::default();
+        let mut base_config = NodeConfig::default();
+        config_fn(&mut override_config, &mut base_config);
+        OverrideNodeConfig::new(override_config, base_config)
+    }
+
+    pub fn build_node_helm_config_fn(&self) -> Option<NodeConfigFn> {
+        let validator_override_node_config = self
+            .validator_override_node_config_fn
+            .clone()
+            .map(|config_fn| Self::override_node_config_from_fn(config_fn));
+        let fullnode_override_node_config = self
+            .fullnode_override_node_config_fn
+            .clone()
+            .map(|config_fn| Self::override_node_config_from_fn(config_fn));
+        let multi_region_config = self.multi_region_config;
+        let existing_db_tag = self.existing_db_tag.clone();
+
+        Some(Arc::new(move |helm_values: &mut serde_yaml::Value| {
+            if let Some(override_config) = &validator_override_node_config {
+                helm_values["validator"]["config"] = override_config.get_yaml().unwrap();
+            }
+            if let Some(override_config) = &fullnode_override_node_config {
+                helm_values["validator"]["config"] = override_config.get_yaml().unwrap();
+            }
+            if multi_region_config {
+                helm_values["multicluster"]["enabled"] = true.into();
+                // Create headless services for validators and fullnodes.
+                // Note: chaos-mesh will not work with clusterIP services.
+                helm_values["service"]["validator"]["internal"]["type"] = "ClusterIP".into();
+                helm_values["service"]["validator"]["internal"]["headless"] = true.into();
+                helm_values["service"]["fullnode"]["internal"]["type"] = "ClusterIP".into();
+                helm_values["service"]["fullnode"]["internal"]["headless"] = true.into();
+            }
+            if let Some(existing_db_tag) = &existing_db_tag {
+                helm_values["validator"]["storage"]["labels"]["tag"] =
+                    existing_db_tag.clone().into();
+                helm_values["fullnode"]["storage"]["labels"]["tag"] =
+                    existing_db_tag.clone().into();
+            }
+        }))
     }
 
     pub fn with_initial_version(mut self, initial_version: InitialVersion) -> Self {
@@ -353,7 +415,9 @@ impl Default for ForgeConfig {
             initial_version: InitialVersion::Oldest,
             genesis_config: None,
             genesis_helm_config_fn: None,
-            node_helm_config_fn: None,
+            validator_override_node_config_fn: None,
+            fullnode_override_node_config_fn: None,
+            multi_region_config: false,
             emit_job_request: EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
                 mempool_backlog: 40000,
             }),
@@ -441,7 +505,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 self.tests.genesis_config.as_ref(),
                 self.global_duration + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
                 self.tests.genesis_helm_config_fn.clone(),
-                self.tests.node_helm_config_fn.clone(),
+                self.tests.build_node_helm_config_fn(),
                 self.tests.existing_db_tag.clone(),
             ))?;
 

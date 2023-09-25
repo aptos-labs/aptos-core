@@ -248,6 +248,7 @@ codes!(
         Recursion: { msg: "recursion during function inlining not allowed", severity: BlockingError },
         AfterExpansion: {  msg: "Inlined code invalid in this context", severity: BlockingError },
         Unsupported: { msg: "feature not supported in inlined functions", severity: BlockingError },
+        UnexpectedLambda: { msg: "lambda parameter only permitted as parameter to inlined function", severity: BlockingError },
     ],
 );
 

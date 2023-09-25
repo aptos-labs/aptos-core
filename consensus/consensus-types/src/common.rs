@@ -4,7 +4,7 @@
 
 use crate::proof_of_store::{BatchInfo, ProofOfStore};
 use aptos_crypto::HashValue;
-use aptos_executor_types::Error;
+use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_types::{
     account_address::AccountAddress, transaction::SignedTransaction,
@@ -63,7 +63,7 @@ pub enum DataStatus {
     Requested(
         Vec<(
             HashValue,
-            oneshot::Receiver<Result<Vec<SignedTransaction>, Error>>,
+            oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
         )>,
     ),
 }

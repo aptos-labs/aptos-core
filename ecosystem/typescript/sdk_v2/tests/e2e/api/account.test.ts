@@ -10,7 +10,7 @@ describe("account api", () => {
       const aptos = new Aptos(config);
       expect(
         async () =>
-          await aptos.account.getInfo({
+          await aptos.getAccountInfo({
             accountAddress: "ca843279e3427144cead5e4d5999a3d0ca843279e3427144cead5e4d5999a3d0",
           }),
       ).rejects.toThrow();
@@ -19,7 +19,7 @@ describe("account api", () => {
     test("it throws when invalid account address", () => {
       const config = new AptosConfig({ network: Network.LOCAL });
       const aptos = new Aptos(config);
-      expect(async () => await aptos.account.getInfo({ accountAddress: "0x123" })).rejects.toThrow();
+      expect(async () => await aptos.getAccountInfo({ accountAddress: "0x123" })).rejects.toThrow();
     });
   });
 
@@ -27,7 +27,7 @@ describe("account api", () => {
     test("it fetches account data", async () => {
       const config = new AptosConfig({ network: Network.LOCAL });
       const aptos = new Aptos(config);
-      const data = await aptos.account.getInfo({
+      const data = await aptos.getAccountInfo({
         accountAddress: "0x1",
       });
       expect(data).toHaveProperty("sequence_number");
@@ -39,7 +39,7 @@ describe("account api", () => {
     test("it fetches account modules", async () => {
       const config = new AptosConfig({ network: Network.LOCAL });
       const aptos = new Aptos(config);
-      const data = await aptos.account.getModules({
+      const data = await aptos.getAccountModules({
         accountAddress: "0x1",
       });
       expect(data.length).toBeGreaterThan(0);
@@ -48,7 +48,7 @@ describe("account api", () => {
     test("it fetches account module", async () => {
       const config = new AptosConfig({ network: Network.LOCAL });
       const aptos = new Aptos(config);
-      const data = await aptos.account.getModule({
+      const data = await aptos.getAccountModule({
         accountAddress: "0x1",
         moduleName: "coin",
       });
@@ -58,7 +58,7 @@ describe("account api", () => {
     test("it fetches account resources", async () => {
       const config = new AptosConfig({ network: Network.LOCAL });
       const aptos = new Aptos(config);
-      const data = await aptos.account.getResources({
+      const data = await aptos.getAccountResources({
         accountAddress: "0x1",
       });
       expect(data.length).toBeGreaterThan(0);
@@ -67,7 +67,7 @@ describe("account api", () => {
     test("it fetches account resource", async () => {
       const config = new AptosConfig({ network: Network.LOCAL });
       const aptos = new Aptos(config);
-      const data = await aptos.account.getResource({
+      const data = await aptos.getAccountResource({
         accountAddress: "0x1",
         resourceType: "0x1::account::Account",
       });
@@ -79,7 +79,7 @@ describe("account api", () => {
     test("it fetches account data", async () => {
       const config = new AptosConfig({ network: Network.LOCAL });
       const aptos = new Aptos(config);
-      const data = await aptos.account.getInfo({
+      const data = await aptos.getAccountInfo({
         accountAddress: new Uint8Array([
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
         ]),
@@ -93,7 +93,7 @@ describe("account api", () => {
     test("it fetches account modules", async () => {
       const config = new AptosConfig({ network: Network.LOCAL });
       const aptos = new Aptos(config);
-      const data = await aptos.account.getModules({
+      const data = await aptos.getAccountModules({
         accountAddress: new Uint8Array([
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
         ]),
@@ -104,7 +104,7 @@ describe("account api", () => {
     test("it fetches account module", async () => {
       const config = new AptosConfig({ network: Network.LOCAL });
       const aptos = new Aptos(config);
-      const data = await aptos.account.getModule({
+      const data = await aptos.getAccountModule({
         accountAddress: new Uint8Array([
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
         ]),
@@ -116,7 +116,7 @@ describe("account api", () => {
     test("it fetches account resources", async () => {
       const config = new AptosConfig({ network: Network.LOCAL });
       const aptos = new Aptos(config);
-      const data = await aptos.account.getResources({
+      const data = await aptos.getAccountResources({
         accountAddress: new Uint8Array([
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
         ]),
@@ -127,7 +127,7 @@ describe("account api", () => {
     test("it fetches account resource", async () => {
       const config = new AptosConfig({ network: Network.LOCAL });
       const aptos = new Aptos(config);
-      const data = await aptos.account.getResource({
+      const data = await aptos.getAccountResource({
         accountAddress: "0x1",
         resourceType: "0x1::account::Account",
       });

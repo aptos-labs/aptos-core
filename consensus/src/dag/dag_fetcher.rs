@@ -273,7 +273,7 @@ impl TDagFetcher for DagFetcher {
                     }
                 }
 
-                if dag.read().all_exists(remote_request.targets().iter()) {
+                if dag.read().all_exists(remote_request.targets()) {
                     return Ok(());
                 }
             }
@@ -303,11 +303,12 @@ impl FetchRequestHandler {
     }
 }
 
+#[async_trait]
 impl RpcHandler for FetchRequestHandler {
     type Request = RemoteFetchRequest;
     type Response = FetchResponse;
 
-    fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response> {
+    async fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response> {
         let dag_reader = self.dag.read();
 
         // `Certified Node`: In the good case, there should exist at least one honest validator that
@@ -316,7 +317,7 @@ impl RpcHandler for FetchRequestHandler {
         // `Node`: In the good case, the sender of the Node should have the parents in its local DAG
         // to satisfy this request.
         ensure!(
-            dag_reader.all_exists(message.targets().iter()),
+            dag_reader.all_exists(message.targets()),
             FetchRequestHandleError::TargetsMissing
         );
 

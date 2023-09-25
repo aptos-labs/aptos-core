@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::check_change_set::CheckChangeSet;
-use aptos_aggregator::delta_change_set::{serialize, DeltaOp};
-use aptos_state_view::StateView;
+use aptos_aggregator::{
+    delta_change_set::{serialize, DeltaOp},
+    resolver::{AggregatorReadMode, AggregatorResolver},
+};
 use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::{StateKey, StateKeyInner},
@@ -153,14 +155,14 @@ impl VMChangeSet {
     }
 
     pub fn write_set_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
-        self.resource_write_set
+        self.resource_write_set()
             .iter()
-            .chain(self.module_write_set.iter())
-            .chain(self.aggregator_write_set.iter())
+            .chain(self.module_write_set().iter())
+            .chain(self.aggregator_v1_write_set().iter())
     }
 
     pub fn num_write_ops(&self) -> usize {
-        self.resource_write_set.len()
+        self.resource_write_set().len()
             + self.module_write_set().len()
             + self.aggregator_v1_write_set().len()
     }
@@ -203,7 +205,10 @@ impl VMChangeSet {
 
     /// Materializes this change set: all deltas are converted into writes and
     /// are combined with existing aggregator writes.
-    pub fn try_materialize(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
+    pub fn try_materialize(
+        self,
+        resolver: &impl AggregatorResolver,
+    ) -> anyhow::Result<Self, VMStatus> {
         let Self {
             resource_write_set,
             module_write_set,
@@ -214,7 +219,10 @@ impl VMChangeSet {
 
         let into_write =
             |(state_key, delta): (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
-                let write = delta.try_into_write_op(state_view, &state_key)?;
+                // Materialization is needed when committing a transaction, so
+                // we need precise mode to compute the true value of an
+                // aggregator.
+                let write = resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta, AggregatorReadMode::Precise)?;
                 Ok((state_key, write))
             };
 
@@ -243,8 +251,8 @@ impl VMChangeSet {
         use WriteOp::*;
 
         // First, squash deltas.
-        for (key, additional_delta_op) in additional_aggregator_delta_set {
-            if let Some(write_op) = aggregator_write_set.get_mut(&key) {
+        for (state_key, additional_delta_op) in additional_aggregator_delta_set {
+            if let Some(write_op) = aggregator_write_set.get_mut(&state_key) {
                 // In this case, delta follows a write op.
                 match write_op {
                     Creation(data)
@@ -259,7 +267,7 @@ impl VMChangeSet {
                         let value = additional_delta_op
                             .apply_to(base)
                             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-                        *data = serialize(&value);
+                        *data = serialize(&value).into();
                     },
                     Deletion | DeletionWithMetadata { .. } => {
                         // This case (applying a delta to deleted item) should
@@ -274,7 +282,7 @@ impl VMChangeSet {
             } else {
                 // Otherwise, this is a either a new delta or an additional delta
                 // for the same state key.
-                match aggregator_delta_set.entry(key) {
+                match aggregator_delta_set.entry(state_key) {
                     Occupied(entry) => {
                         // In this case, we need to merge the new incoming delta
                         // to the existing delta, ensuring the strict ordering.
@@ -293,8 +301,8 @@ impl VMChangeSet {
         }
 
         // Next, squash write ops.
-        for (key, additional_write_op) in additional_aggregator_write_set {
-            match aggregator_write_set.entry(key) {
+        for (state_key, additional_write_op) in additional_aggregator_write_set {
+            match aggregator_write_set.entry(state_key) {
                 Occupied(mut entry) => {
                     squash_writes_pair!(entry, additional_write_op);
                 },
@@ -364,5 +372,11 @@ impl VMChangeSet {
         self.events.extend(additional_events);
 
         checker.check_change_set(self)
+    }
+
+    pub fn has_creation(&self) -> bool {
+        use WriteOp::*;
+        self.write_set_iter()
+            .any(|(_key, op)| matches!(op, Creation(..) | CreationWithMetadata { .. }))
     }
 }

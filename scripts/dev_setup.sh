@@ -863,7 +863,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "false" ]] && \
    INSTALL_BUILD_TOOLS="true"
 fi
 
-if [ ! -f rust-toolchain ]; then
+if [ ! -f rust-toolchain.toml ]; then
 	echo "Unknown location. Please run this from the aptos-core repository. Abort."
 	exit 1
 fi
@@ -947,7 +947,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_lld
 
   install_rustup "$BATCH_MODE"
-  install_toolchain "$(cat ./rust-toolchain)"
+  install_toolchain "$(grep channel ./rust-toolchain.toml | grep -o '"[^"]\+"' | sed 's/"//g')" # TODO: Fix me. This feels hacky.
   install_rustup_components_and_nightly
 
   install_cargo_sort

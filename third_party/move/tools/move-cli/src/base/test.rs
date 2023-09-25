@@ -18,6 +18,7 @@ use move_package::{
     BuildConfig, CompilerConfig,
 };
 use move_unit_test::UnitTestingConfig;
+use move_vm_runtime::tracing::{LOGGING_FILE_WRITER, TRACING_ENABLED};
 use move_vm_test_utils::gas_schedule::CostTable;
 // if unix
 #[cfg(target_family = "unix")]
@@ -268,6 +269,10 @@ pub fn run_move_unit_tests<W: Write + Send>(
 
     // Compute the coverage map. This will be used by other commands after this.
     if compute_coverage && !no_tests {
+        if *TRACING_ENABLED {
+            let buf_writer = &mut *LOGGING_FILE_WRITER.lock().unwrap();
+            buf_writer.flush().unwrap();
+        }
         let coverage_map = CoverageMap::from_trace_file(trace_path);
         output_map_to_file(coverage_map_path, &coverage_map).unwrap();
     }

@@ -16,6 +16,7 @@ use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
 use aptos_types::{
     aggregate_signature::{AggregateSignature, PartialSignatures},
     epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -398,6 +399,14 @@ impl CertifiedNode {
     pub fn certificate(&self) -> NodeCertificate {
         NodeCertificate::new(self.node.metadata.clone(), self.signatures.clone())
     }
+
+    pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(self.digest() == self.calculate_digest(), "invalid digest");
+
+        verifier
+            .verify_multi_signatures(self.metadata(), self.certificate().signatures())
+            .map_err(|e| anyhow::anyhow!("unable to verify: {}", e))
+    }
 }
 
 impl Deref for CertifiedNode {
@@ -408,13 +417,44 @@ impl Deref for CertifiedNode {
     }
 }
 
-impl TDAGMessage for CertifiedNode {
-    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        ensure!(self.digest() == self.calculate_digest(), "invalid digest");
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct CertifiedNodeMessage {
+    inner: CertifiedNode,
+    ledger_info: LedgerInfoWithSignatures,
+}
 
-        verifier
-            .verify_multi_signatures(self.metadata(), self.certificate().signatures())
-            .map_err(|e| anyhow::anyhow!("unable to verify: {}", e))
+impl CertifiedNodeMessage {
+    pub fn new(node: CertifiedNode, ledger_info: LedgerInfoWithSignatures) -> Self {
+        Self {
+            inner: node,
+            ledger_info,
+        }
+    }
+
+    pub fn certified_node(self) -> CertifiedNode {
+        self.inner
+    }
+
+    pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
+        &self.ledger_info
+    }
+}
+
+impl Deref for CertifiedNodeMessage {
+    type Target = CertifiedNode;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl TDAGMessage for CertifiedNodeMessage {
+    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.inner.verify(verifier)?;
+
+        self.ledger_info
+            .verify_signatures(verifier)
+            .map_err(|e| anyhow::anyhow!("unable to verify ledger info: {}", e))
     }
 }
 
@@ -505,7 +545,7 @@ impl CertifiedAck {
 impl BroadcastStatus<DAGMessage> for CertificateAckState {
     type Ack = CertifiedAck;
     type Aggregated = ();
-    type Message = CertifiedNode;
+    type Message = CertifiedNodeMessage;
 
     fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
         self.received.insert(peer);
@@ -528,10 +568,10 @@ pub struct RemoteFetchRequest {
 }
 
 impl RemoteFetchRequest {
-    pub fn new(epoch: u64, parents: Vec<NodeMetadata>, exists_bitmask: DagSnapshotBitmask) -> Self {
+    pub fn new(epoch: u64, targets: Vec<NodeMetadata>, exists_bitmask: DagSnapshotBitmask) -> Self {
         Self {
             epoch,
-            targets: parents,
+            targets,
             exists_bitmask,
         }
     }
@@ -540,8 +580,8 @@ impl RemoteFetchRequest {
         self.epoch
     }
 
-    pub fn targets(&self) -> &[NodeMetadata] {
-        &self.targets
+    pub fn targets(&self) -> impl Iterator<Item = &NodeMetadata> + Clone {
+        self.targets.iter()
     }
 
     pub fn exists_bitmask(&self) -> &DagSnapshotBitmask {
@@ -619,7 +659,7 @@ impl core::fmt::Debug for DAGNetworkMessage {
 pub enum DAGMessage {
     NodeMsg(Node),
     VoteMsg(Vote),
-    CertifiedNodeMsg(CertifiedNode),
+    CertifiedNodeMsg(CertifiedNodeMessage),
     CertifiedAckMsg(CertifiedAck),
     FetchRequest(RemoteFetchRequest),
     FetchResponse(FetchResponse),

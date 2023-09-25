@@ -36,6 +36,6 @@ macro_rules! define_schema {
 }
 
 pub use block::BLOCK_CF_NAME;
-pub use dag::{CERTIFIED_NODE_CF_NAME, DAG_VOTE_CF_NAME, NODE_CF_NAME, ORDERED_ANCHOR_ID_CF_NAME};
+pub use dag::{CERTIFIED_NODE_CF_NAME, DAG_VOTE_CF_NAME, NODE_CF_NAME};
 pub use quorum_certificate::QC_CF_NAME;
 pub use single_entry::SINGLE_ENTRY_CF_NAME;

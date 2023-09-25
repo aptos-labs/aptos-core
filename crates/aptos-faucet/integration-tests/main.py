@@ -20,10 +20,11 @@ Redis instance is alive.
 import argparse
 import logging
 import os
+import platform
 import shutil
 import sys
 
-from common import Network
+from common import VALID_NETWORK_OPTIONS, Network, network_from_str
 from local_testnet import run_node, stop_node, wait_for_startup
 from prechecks import check_redis_is_running
 from tests import run_faucet_integration_tests
@@ -59,9 +60,18 @@ def parse_args():
     parser.add_argument(
         "--base-network",
         required=True,
-        type=Network,
-        choices=list(Network),
-        help="What branch the Aptos CLI used for the local testnet should be built from",
+        choices=VALID_NETWORK_OPTIONS,
+        help=(
+            "What branch the Aptos CLI used for the local testnet should be built "
+            'from. If "custom", --tag must be set.'
+        ),
+    )
+    parser.add_argument(
+        "--tag",
+        help=(
+            'If --base-network is set to "custom", this must be set to the image tag'
+            "to use. Otherwise this has no effect."
+        ),
     )
     parser.add_argument(
         "--base-startup-timeout",
@@ -87,13 +97,24 @@ def main():
     else:
         logging.getLogger().setLevel(logging.INFO)
 
+    if platform.system() == "Darwin" and platform.processor().startswith("arm"):
+        if not os.environ.get("DOCKER_DEFAULT_PLATFORM"):
+            os.environ["DOCKER_DEFAULT_PLATFORM"] = "linux/amd64"
+            LOG.info(
+                "Detected ARM Mac and DOCKER_DEFAULT_PLATFORM was not set, setting it "
+                "to linux/amd64"
+            )
+
+    # Build the Network.
+    network = network_from_str(args.base_network, args.tag)
+
     # Verify that a local Redis instance is running. This is just a basic check that
     # something is listening at the expected port.
     check_redis_is_running()
 
     # Run a node and wait for it to start up.
     container_name = run_node(
-        args.base_network, args.image_repo_with_project, args.external_test_dir
+        network, args.image_repo_with_project, args.external_test_dir
     )
     wait_for_startup(container_name, args.base_startup_timeout)
 

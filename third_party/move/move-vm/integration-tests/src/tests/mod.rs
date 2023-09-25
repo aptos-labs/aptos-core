@@ -12,6 +12,7 @@ mod invariant_violation_tests;
 mod leak_tests;
 mod loader_tests;
 mod mutated_accounts_tests;
+mod native_tests;
 mod nested_loop_tests;
 mod regression_tests;
 mod return_value_tests;
