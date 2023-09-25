@@ -153,7 +153,7 @@ impl TransactionFactory {
 
     pub fn create_user_account(&self, public_key: &Ed25519PublicKey) -> TransactionBuilder {
         self.payload(aptos_stdlib::aptos_account_create_account(
-            AuthenticationKey::ed25519(public_key).derived_address(),
+            AuthenticationKey::ed25519(public_key).account_address(),
         ))
     }
 
@@ -163,7 +163,7 @@ impl TransactionFactory {
         amount: u64,
     ) -> TransactionBuilder {
         self.payload(aptos_stdlib::aptos_account_transfer(
-            AuthenticationKey::ed25519(public_key).derived_address(),
+            AuthenticationKey::ed25519(public_key).account_address(),
             amount,
         ))
     }
