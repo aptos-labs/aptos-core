@@ -1089,16 +1089,16 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
     ) -> (VMStatus, VMOutput) {
         // Revalidate the transaction.
-        let mut session = self.0.new_session(resolver, SessionId::prologue(txn));
-        if let Err(err) = self.validate_signature_checked_transaction(
+        let txn_data = TransactionMetadata::new(txn);
+        let mut session = self.new_session(resolver, SessionId::prologue_meta(&txn_data));
+        unwrap_or_discard!(self.validate_signed_transaction(
             &mut session,
             resolver,
             txn,
-            false,
+            &txn_data,
             log_context,
-        ) {
-            return discard_error_vm_status(err);
-        };
+            false,
+        ));
 
         if self.0.get_gas_feature_version() >= 1 {
             // Create a new session so that the data cache is flushed.
@@ -1109,7 +1109,7 @@ impl AptosVM {
             // By releasing resource group cache, we start with a fresh slate for resource group
             // cost accounting.
             resolver.release_resource_group_cache();
-            session = self.0.new_session(resolver, SessionId::txn(txn));
+            session = self.new_session(resolver, SessionId::txn_meta(&txn_data));
         }
 
         if let aptos_types::transaction::authenticator::TransactionAuthenticator::FeePayer {
@@ -1134,7 +1134,6 @@ impl AptosVM {
         }
 
         let storage_gas_params = unwrap_or_discard!(self.0.get_storage_gas_parameters(log_context));
-        let txn_data = TransactionMetadata::new(txn);
 
         // We keep track of whether any newly published modules are loaded into the Vm's loader
         // cache as part of executing transactions. This would allow us to decide whether the cache
@@ -1183,37 +1182,58 @@ impl AptosVM {
             .expect("Balance should always be less than or equal to max gas amount set");
         TXN_GAS_USAGE.observe(u64::from(gas_usage) as f64);
 
-        match result {
-            Ok(output) => output,
-            Err(err) => {
-                // Invalidate the loader cache in case there was a new module loaded from a module
-                // publish request that failed.
-                // This ensures the loader cache is flushed later to align storage with the cache.
-                // None of the modules in the bundle will be committed to storage,
-                // but some of them may have ended up in the cache.
-                if new_published_modules_loaded {
-                    self.0.mark_loader_cache_as_invalid();
-                };
+        result.unwrap_or_else(|err| {
+            self.on_execution_failure(
+                err,
+                resolver,
+                &txn_data,
+                log_context,
+                gas_meter,
+                storage_gas_params,
+                new_published_modules_loaded,
+            )
+        })
+    }
 
-                let txn_status = TransactionStatus::from_vm_status(
-                    err.clone(),
-                    self.0
-                        .get_features()
-                        .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
-                );
-                if txn_status.is_discarded() {
-                    discard_error_vm_status(err)
-                } else {
-                    self.failed_transaction_cleanup_and_keep_vm_status(
-                        err,
-                        gas_meter,
-                        &txn_data,
-                        resolver,
-                        log_context,
-                        &storage_gas_params.change_set_configs,
-                    )
-                }
-            },
+    // Called by `execute_user_transaction_impl` and `simulate_signed_transaction_impl`
+    // when the execution fails, in order to discard the transaction, or clean up
+    // the failed state.
+    fn on_execution_failure(
+        &self,
+        err: VMStatus,
+        resolver: &impl AptosMoveResolver,
+        txn_data: &TransactionMetadata,
+        log_context: &AdapterLogSchema,
+        gas_meter: &mut impl AptosGasMeter,
+        storage_gas_params: &StorageGasParameters,
+        new_published_modules_loaded: bool,
+    ) -> (VMStatus, VMOutput) {
+        // Invalidate the loader cache in case there was a new module loaded from a module
+        // publish request that failed.
+        // This ensures the loader cache is flushed later to align storage with the cache.
+        // None of the modules in the bundle will be committed to storage,
+        // but some of them may have ended up in the cache.
+        if new_published_modules_loaded {
+            self.0.mark_loader_cache_as_invalid();
+        };
+
+        let txn_status = TransactionStatus::from_vm_status(
+            err.clone(),
+            self.0
+                .get_features()
+                .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
+        );
+        if txn_status.is_discarded() {
+            discard_error_vm_status(err)
+        } else {
+            self.failed_transaction_cleanup_and_keep_vm_status(
+                err,
+                gas_meter,
+                txn_data,
+                resolver,
+                log_context,
+                &storage_gas_params.change_set_configs,
+            )
         }
     }
 
@@ -1506,34 +1526,24 @@ impl AptosVM {
             .collect::<Vec<_>>())
     }
 
-    fn validate_signature_checked_transaction(
+    fn validate_signed_transaction(
         &self,
         session: &mut SessionExt,
         resolver: &impl AptosMoveResolver,
-        transaction: &SignatureCheckedTransaction,
-        allow_too_new: bool,
+        transaction: &SignedTransaction,
+        txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
+        is_simulation: bool,
     ) -> Result<(), VMStatus> {
         self.check_transaction_format(transaction)?;
-
-        let txn_data = TransactionMetadata::new(transaction);
-        let prologue_status = self.run_prologue_with_payload(
+        self.run_prologue_with_payload(
             session,
             resolver,
             transaction.payload(),
-            &txn_data,
+            txn_data,
             log_context,
-            false,
-        );
-
-        match prologue_status {
-            Err(err)
-                if !allow_too_new || err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW =>
-            {
-                Err(err)
-            },
-            _ => Ok(()),
-        }
+            is_simulation,
+        )
     }
 
     fn run_prologue_with_payload(
@@ -1696,24 +1706,27 @@ impl VMValidator for AptosVM {
         };
 
         let resolver = self.as_move_resolver(&state_view);
-        let mut session = self.0.new_session(&resolver, SessionId::prologue(&txn));
-        let validation_result = self.validate_signature_checked_transaction(
+        let txn_data = TransactionMetadata::new(&txn);
+        let mut session = self.new_session(&resolver, SessionId::prologue_meta(&txn_data));
+        let validation_result = self.validate_signed_transaction(
             &mut session,
             &resolver,
             &txn,
-            true,
+            &txn_data,
             &log_context,
+            false,
         );
 
         // Increment the counter for transactions verified.
         let (counter_label, result) = match validation_result {
-            Ok(_) => (
-                "success",
-                VMValidatorResult::new(None, txn.gas_unit_price()),
-            ),
-            Err(err) => (
+            // For validation, having too new sequence numbers is ok.
+            Err(err) if err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => (
                 "failure",
                 VMValidatorResult::new(Some(err.status_code()), 0),
+            ),
+            _ => (
+                "success",
+                VMValidatorResult::new(None, txn.gas_unit_price()),
             ),
         };
 
@@ -1882,25 +1895,6 @@ impl VMAdapter for AptosVM {
 }
 
 impl AptosSimulationVM {
-    fn validate_simulated_transaction(
-        &self,
-        session: &mut SessionExt,
-        resolver: &impl AptosMoveResolver,
-        transaction: &SignedTransaction,
-        txn_data: &TransactionMetadata,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(), VMStatus> {
-        self.0.check_transaction_format(transaction)?;
-        self.0.run_prologue_with_payload(
-            session,
-            resolver,
-            transaction.payload(),
-            txn_data,
-            log_context,
-            true,
-        )
-    }
-
     fn simulate_signed_transaction(
         &self,
         resolver: &impl AptosMoveResolver,
@@ -1910,6 +1904,13 @@ impl AptosSimulationVM {
         let mut gas_meter = unwrap_or_discard!(self
             .0
             .make_standard_gas_meter(txn.max_gas_amount().into(), log_context));
+
+        // Simulation transactions should not carry valid signatures, otherwise
+        // malicious full nodes may execute them without user's explicit permission.
+        if txn.signature_is_valid() {
+            return discard_error_vm_status(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
+        }
+
         self.simulate_signed_transaction_impl(resolver, txn, log_context, &mut gas_meter)
     }
 
@@ -1920,20 +1921,17 @@ impl AptosSimulationVM {
         log_context: &AdapterLogSchema,
         gas_meter: &mut impl AptosGasMeter,
     ) -> (VMStatus, VMOutput) {
-        // simulation transactions should not carry valid signatures, otherwise malicious fullnodes
-        // may execute them without user's explicit permission.
-        if txn.signature_is_valid() {
-            return discard_error_vm_status(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
-        }
-
         // Revalidate the transaction.
         let txn_data = TransactionMetadata::new(txn);
         let mut session = self.0.new_session(resolver, SessionId::txn_meta(&txn_data));
-        if let Err(err) =
-            self.validate_simulated_transaction(&mut session, resolver, txn, &txn_data, log_context)
-        {
-            return discard_error_vm_status(err);
-        };
+        unwrap_or_discard!(self.0.validate_signed_transaction(
+            &mut session,
+            resolver,
+            txn,
+            &txn_data,
+            log_context,
+            true,
+        ));
 
         let storage_gas_params =
             unwrap_or_discard!(self.0 .0.get_storage_gas_parameters(log_context));
@@ -2006,38 +2004,16 @@ impl AptosSimulationVM {
             ),
         };
 
-        match result {
-            Ok(output) => output,
-            Err(err) => {
-                // Invalidate the loader cache in case there was a new module loaded from a module
-                // publish request that failed.
-                // This ensures the loader cache is flushed later to align storage with the cache.
-                // None of the modules in the bundle will be committed to storage,
-                // but some of them may have ended up in the cache.
-                if new_published_modules_loaded {
-                    self.0 .0.mark_loader_cache_as_invalid();
-                };
-                let txn_status = TransactionStatus::from_vm_status(
-                    err.clone(),
-                    self.0
-                         .0
-                        .get_features()
-                        .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
-                );
-                if txn_status.is_discarded() {
-                    discard_error_vm_status(err)
-                } else {
-                    let (vm_status, output) = self.0.failed_transaction_cleanup_and_keep_vm_status(
-                        err,
-                        gas_meter,
-                        &txn_data,
-                        resolver,
-                        log_context,
-                        &storage_gas_params.change_set_configs,
-                    );
-                    (vm_status, output)
-                }
-            },
-        }
+        result.unwrap_or_else(|err| {
+            self.0.on_execution_failure(
+                err,
+                resolver,
+                &txn_data,
+                log_context,
+                gas_meter,
+                storage_gas_params,
+                new_published_modules_loaded,
+            )
+        })
     }
 }
