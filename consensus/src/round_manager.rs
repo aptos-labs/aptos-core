@@ -30,6 +30,7 @@ use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
+    delayed_qc_msg::DelayedQcMsg,
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
@@ -145,6 +146,7 @@ pub enum VerifiedEvent {
     // network messages
     ProposalMsg(Box<ProposalMsg>),
     VerifiedProposalMsg(Box<Block>),
+    VerifiedDelayedQcMsg(Box<DelayedQcMsg>),
     VoteMsg(Box<VoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
@@ -433,6 +435,27 @@ impl RoundManager {
         }
 
         self.process_verified_proposal(proposal).await
+    }
+
+    pub async fn process_delayed_qc_msg(&mut self, msg: DelayedQcMsg) -> anyhow::Result<()> {
+        if msg.vote.vote_data().proposed().round() != self.round_state.current_round() {
+            bail!(
+                "Discarding stale delayed QC for round {}, current round {}",
+                msg.vote.vote_data().proposed().round(),
+                self.round_state.current_round()
+            );
+        }
+        let vote = msg.vote().clone();
+        let vote_reception_result = self
+            .round_state
+            .process_delayed_qc_msg(&self.epoch_state.verifier, msg)
+            .await;
+        info!(
+            "Received delayed QC message and vote reception result is {:?}",
+            vote_reception_result
+        );
+        self.process_vote_reception_result(&vote, vote_reception_result)
+            .await
     }
 
     /// Sync to the sync info sending from peer if it has newer certificates.
@@ -848,11 +871,20 @@ impl RoundManager {
         {
             return Ok(());
         }
-        // Add the vote and check whether it completes a new QC or a TC
-        match self
+        let vote_reception_result = self
             .round_state
-            .insert_vote(vote, &self.epoch_state.verifier)
-        {
+            .insert_vote(vote, &self.epoch_state.verifier);
+        self.process_vote_reception_result(vote, vote_reception_result)
+            .await
+    }
+
+    async fn process_vote_reception_result(
+        &mut self,
+        vote: &Vote,
+        result: VoteReceptionResult,
+    ) -> anyhow::Result<()> {
+        let round = vote.vote_data().proposed().round();
+        match result {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
                 if !vote.is_timeout() {
                     observe_block(
@@ -869,6 +901,7 @@ impl RoundManager {
                 self.process_local_timeout(round).await
             },
             VoteReceptionResult::VoteAdded(_)
+            | VoteReceptionResult::VoteAddedQCDelayed(_)
             | VoteReceptionResult::EchoTimeout(_)
             | VoteReceptionResult::DuplicateVote => Ok(()),
             e => Err(anyhow::anyhow!("{:?}", e)),
@@ -1004,6 +1037,12 @@ impl RoundManager {
                     let result = match event {
                         VerifiedEvent::VoteMsg(vote_msg) => {
                             monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
+                        }
+                        VerifiedEvent::VerifiedDelayedQcMsg(msg) => {
+                            monitor!(
+                                "process_delayed_qc",
+                                self.process_delayed_qc_msg(*msg).await
+                            )
                         }
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
                             monitor!(
