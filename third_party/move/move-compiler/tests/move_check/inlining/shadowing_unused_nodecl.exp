@@ -1,0 +1,6 @@
+warning[W09003]: unused assignment
+  ┌─ tests/move_check/inlining/shadowing_unused_nodecl.move:6:42
+  │
+6 │     public inline fun quux(f:|u64, u64|, z: u64) {
+  │                                          ^ Unused assignment or binding for local 'z'. Consider removing, replacing with '_', or prefixing with '_' (e.g., '_z')
+
