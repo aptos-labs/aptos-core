@@ -17,15 +17,15 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
 #[derive(Debug)]
-pub enum ExecutionStatus<T, E> {
+pub enum ExecutionStatus<O, E> {
     /// Transaction was executed successfully.
-    Success(T),
+    Success(O),
     /// Transaction hit a none recoverable error during execution, halt the execution and propagate
     /// the error back to the caller.
     Abort(E),
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
-    SkipRest(T),
+    SkipRest(O),
 }
 
 /// Trait that defines a transaction type that can be executed by the block executor. A transaction
