@@ -234,11 +234,14 @@ dependencies = [
  "aptos-genesis",
  "aptos-github-client",
  "aptos-global-constants",
+ "aptos-indexer-grpc-server-framework",
+ "aptos-indexer-grpc-utils",
  "aptos-keygen",
  "aptos-ledger",
  "aptos-logger",
  "aptos-network-checker",
  "aptos-node",
+ "aptos-protos",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-storage-interface",
@@ -254,6 +257,7 @@ dependencies = [
  "clap 4.3.21",
  "clap_complete",
  "codespan-reporting",
+ "dashmap",
  "dirs",
  "futures",
  "hex",
@@ -273,6 +277,7 @@ dependencies = [
  "move-unit-test",
  "move-vm-runtime",
  "once_cell",
+ "poem",
  "rand 0.7.3",
  "regex",
  "reqwest",
@@ -286,6 +291,8 @@ dependencies = [
  "thiserror",
  "tokio",
  "toml 0.7.4",
+ "tonic 0.10.0",
+ "tracing-subscriber",
  "walkdir",
 ]
 
@@ -2006,6 +2013,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic 0.10.0",
+ "tonic-reflection",
 ]
 
 [[package]]
@@ -3841,6 +3849,7 @@ dependencies = [
  "ouroboros 0.15.6",
  "proptest",
  "rand 0.7.3",
+ "rand_core 0.5.1",
  "rayon",
  "serde",
  "serde_json",
@@ -4390,7 +4399,7 @@ checksum = "a564d521dd56509c4c47480d00b80ee55f7e385ae48db5744c67ad50c92d2ebf"
 dependencies = [
  "proc-macro2 1.0.64",
  "quote 1.0.29",
- "syn 2.0.25",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -4679,7 +4688,7 @@ dependencies = [
  "regex",
  "rustc-hash",
  "shlex",
- "syn 2.0.25",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -5187,7 +5196,7 @@ dependencies = [
  "heck 0.4.0",
  "proc-macro2 1.0.64",
  "quote 1.0.29",
- "syn 2.0.25",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -5939,7 +5948,7 @@ checksum = "53e0efad4403bfc52dc201159c4b842a246a14b98c64b55dfd0f2d89729dfeb8"
 dependencies = [
  "proc-macro2 1.0.64",
  "quote 1.0.29",
- "syn 2.0.25",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -5990,7 +5999,7 @@ dependencies = [
  "diesel_table_macro_syntax",
  "proc-macro2 1.0.64",
  "quote 1.0.29",
- "syn 2.0.25",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -6010,7 +6019,7 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc5557efc453706fed5e4fa85006fe9817c224c3f480a34c7e5959fd700921c5"
 dependencies = [
- "syn 2.0.25",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -6353,7 +6362,7 @@ dependencies = [
  "impl-codec 0.6.0",
  "impl-rlp",
  "impl-serde",
- "scale-info 1.0.0",
+ "scale-info 2.9.0",
  "tiny-keccak",
 ]
 
@@ -6422,7 +6431,7 @@ dependencies = [
  "impl-rlp",
  "impl-serde",
  "primitive-types 0.11.1",
- "scale-info 1.0.0",
+ "scale-info 2.9.0",
  "uint",
 ]
 
@@ -9001,6 +9010,7 @@ dependencies = [
  "move-borrow-graph",
  "move-core-types",
  "petgraph 0.5.1",
+ "serde",
  "typed-arena",
 ]
 
@@ -9804,6 +9814,7 @@ dependencies = [
  "once_cell",
  "parking_lot 0.11.2",
  "proptest",
+ "serde",
  "sha3 0.9.1",
  "tracing",
 ]
@@ -11051,7 +11062,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b69d39aab54d069e7f2fe8cb970493e7834601ca2d8c65fd7bbd183578080d1"
 dependencies = [
  "proc-macro2 1.0.64",
- "syn 2.0.25",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -11078,7 +11089,7 @@ dependencies = [
  "impl-codec 0.6.0",
  "impl-rlp",
  "impl-serde",
- "scale-info 1.0.0",
+ "scale-info 2.9.0",
  "uint",
 ]
 
@@ -11281,7 +11292,7 @@ dependencies = [
  "itertools",
  "proc-macro2 1.0.64",
  "quote 1.0.29",
- "syn 2.0.25",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -13057,9 +13068,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.25"
+version = "2.0.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15e3fc8c0c74267e2df136e5e5fb656a464158aa57624053375eb9c8c6e25ae2"
+checksum = "239814284fd6f1a4ffe4ca893952cdd93c224b6a1571c9a9eadd670295c0c9e2"
 dependencies = [
  "proc-macro2 1.0.64",
  "quote 1.0.29",
@@ -13298,7 +13309,7 @@ checksum = "7d7b1fadccbbc7e19ea64708629f9d8dccd007c260d66485f20a6d41bc1cf4b3"
 dependencies = [
  "proc-macro2 1.0.64",
  "quote 1.0.29",
- "syn 2.0.25",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -13463,7 +13474,7 @@ checksum = "630bdcf245f78637c13ec01ffae6187cca34625e8c63150d424b59e55af2675e"
 dependencies = [
  "proc-macro2 1.0.64",
  "quote 1.0.29",
- "syn 2.0.25",
+ "syn 2.0.32",
 ]
 
 [[package]]

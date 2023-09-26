@@ -1,10 +1,13 @@
 import { Account } from "./account";
 import { AptosConfig } from "./aptos_config";
+import { General } from "./general";
 
 export class Aptos {
   readonly config: AptosConfig;
 
   readonly account: Account;
+
+  readonly general: General;
 
   /**
    * This class is the main entry point into Aptos's
@@ -26,10 +29,12 @@ export class Aptos {
   constructor(settings?: AptosConfig) {
     this.config = new AptosConfig(settings);
     this.account = new Account(this.config);
+    this.general = new General(this.config);
   }
 }
 
 export interface Aptos extends Account {}
+export interface Aptos extends General {}
 
 /**
 In TypeScript, we can’t inherit or extend from more than one class,
@@ -53,3 +58,4 @@ function applyMixin(targetClass: any, baseClass: any, baseClassProp: string) {
 }
 
 applyMixin(Aptos, Account, "account");
+applyMixin(Aptos, General, "general");

@@ -111,6 +111,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         ChainId::test().id(),
         Features::default(),
         TimedFeatures::enable_all(),
+        &data_cache,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -219,6 +220,7 @@ pub fn encode_genesis_change_set(
         ChainId::test().id(),
         Features::default(),
         TimedFeatures::enable_all(),
+        &data_cache,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -904,6 +906,7 @@ pub fn test_genesis_module_publishing() {
         ChainId::test().id(),
         Features::default(),
         TimedFeatures::enable_all(),
+        &data_cache,
     )
     .unwrap();
     let id1 = HashValue::zero();

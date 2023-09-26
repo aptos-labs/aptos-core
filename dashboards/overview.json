@@ -3005,7 +3005,16 @@
           },
           "unit": "s"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": { "mode": "exclude", "names": ["p50"], "prefix": "All except:", "readOnly": true }
+            },
+            "properties": [{ "id": "custom.hideFrom", "value": { "legend": false, "tooltip": false, "viz": true } }]
+          }
+        ]
       },
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 88 },
       "id": 32,
@@ -3167,7 +3176,7 @@
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Block execution time",
+      "title": "Per block execution time",
       "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
@@ -3786,13 +3795,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "iops"
         },
         "overrides": []
@@ -3846,13 +3849,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "Bps"
         },
         "overrides": []
@@ -3906,13 +3903,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "percentunit"
         },
         "overrides": []
@@ -3996,7 +3987,7 @@
       "type": "barchart"
     }
   ],
-  "refresh": "10s",
+  "refresh": "1m",
   "schemaVersion": 38,
   "tags": ["aptos-core"],
   "templating": {
@@ -4159,6 +4150,6 @@
   "timezone": "",
   "title": "overview",
   "uid": "overview",
-  "version": 29,
+  "version": 30,
   "weekStart": ""
 }
