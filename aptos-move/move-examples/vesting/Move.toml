@@ -1,0 +1,10 @@
+[package]
+name = "vesting"
+version = "1.0.0"
+authors = []
+
+[addresses]
+vesting = "_"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
