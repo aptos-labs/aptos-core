@@ -234,11 +234,14 @@ dependencies = [
  "aptos-genesis",
  "aptos-github-client",
  "aptos-global-constants",
+ "aptos-indexer-grpc-server-framework",
+ "aptos-indexer-grpc-utils",
  "aptos-keygen",
  "aptos-ledger",
  "aptos-logger",
  "aptos-network-checker",
  "aptos-node",
+ "aptos-protos",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-storage-interface",
@@ -254,6 +257,7 @@ dependencies = [
  "clap 4.3.21",
  "clap_complete",
  "codespan-reporting",
+ "dashmap",
  "dirs",
  "futures",
  "hex",
@@ -273,6 +277,7 @@ dependencies = [
  "move-unit-test",
  "move-vm-runtime",
  "once_cell",
+ "poem",
  "rand 0.7.3",
  "regex",
  "reqwest",
@@ -286,6 +291,8 @@ dependencies = [
  "thiserror",
  "tokio",
  "toml 0.7.4",
+ "tonic 0.10.0",
+ "tracing-subscriber",
  "walkdir",
 ]
 
@@ -2006,6 +2013,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic 0.10.0",
+ "tonic-reflection",
 ]
 
 [[package]]

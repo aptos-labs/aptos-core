@@ -12,7 +12,7 @@ To see it working:
 
 ```shell
 # Start a node with an account
-aptos node run-local-testnet --with-faucet &
+aptos node run-local-testnet &
 aptos account create --account default --use-faucet 
 # Compile and publish pack2
 cd pack2

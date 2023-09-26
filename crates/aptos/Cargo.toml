@@ -30,11 +30,14 @@ aptos-gas-schedule = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-github-client = { workspace = true }
 aptos-global-constants = { workspace = true }
+aptos-indexer-grpc-server-framework = { workspace = true }
+aptos-indexer-grpc-utils = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-ledger = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-network-checker = { workspace = true }
 aptos-node = { workspace = true }
+aptos-protos = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
@@ -50,6 +53,7 @@ chrono = { workspace = true }
 clap = { workspace = true, features = ["env", "unstable-styles"] }
 clap_complete = { workspace = true }
 codespan-reporting = { workspace = true }
+dashmap = { workspace = true }
 dirs = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
@@ -68,6 +72,7 @@ move-symbol-pool = { workspace = true }
 move-unit-test = { workspace = true, features = [ "debugging" ] }
 move-vm-runtime = { workspace = true, features = [ "testing" ] }
 once_cell = { workspace = true }
+poem = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
@@ -80,6 +85,8 @@ termcolor = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
+tonic = { workspace = true }
+tracing-subscriber = { workspace = true }
 walkdir = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
