@@ -2462,6 +2462,7 @@ dependencies = [
  "claims",
  "crossbeam",
  "dashmap",
+ "move-core-types",
  "proptest",
  "proptest-derive",
  "rayon",
@@ -3493,6 +3494,7 @@ dependencies = [
  "aptos-native-interface",
  "aptos-types",
  "better_any",
+ "bytes",
  "move-binary-format",
  "move-core-types",
  "move-table-extension",
@@ -9739,6 +9741,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "better_any",
+ "bytes",
  "clap 4.3.21",
  "codespan-reporting",
  "colored",
