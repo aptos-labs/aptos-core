@@ -339,6 +339,8 @@ accessors
 accountHasList
 acount
 addr
+ae
+af
 ait
 allowfullscreen
 allowlist
@@ -351,6 +353,7 @@ aptoslabs
 arity
 arweave
 asia
+async
 atomicity
 auth
 authenticator
@@ -399,6 +402,7 @@ dapp
 dapp's
 dapps
 data's
+dbab
 de
 deallocate
 debuggability
@@ -433,6 +437,7 @@ enums
 extensibility
 failover
 faq
+fdaefc
 fetchList
 filesystem
 findable
@@ -446,6 +451,7 @@ fungibility
 gcloud
 gcp
 gcs
+getAccountResource
 getAddressByName
 getPrimaryNameByAddress
 groth
@@ -505,6 +511,7 @@ mempool
 mempools
 merkle
 mintAptosName
+moduleAddress
 monorepo
 multinode
 multisig
@@ -598,6 +605,7 @@ subtyping
 superset
 svg
 synchronizer
+TodoListResource
 terraform
 testnet
 th
@@ -649,6 +657,7 @@ waypoint
 webapp
 whitepaper
 withdrawable
+xcbddf
 xFD
 xlarge
 yaml
