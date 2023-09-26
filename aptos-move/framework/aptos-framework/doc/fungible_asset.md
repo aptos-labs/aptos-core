@@ -610,7 +610,7 @@ The fungible asset's supply has exceeded maximum.
 
 <a name="0x1_fungible_asset_EMINT_REF_AND_STORE_MISMATCH"></a>
 
-The mint ref and the store do not match.
+The mint ref and the the store do not match.
 
 
 <pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EMINT_REF_AND_STORE_MISMATCH">EMINT_REF_AND_STORE_MISMATCH</a>: u64 = 7;
